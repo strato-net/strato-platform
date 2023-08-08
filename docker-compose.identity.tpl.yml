@@ -14,8 +14,6 @@ services:
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - OAUTH_MASTER_CLIENT_ID=${OAUTH_MASTER_CLIENT_ID}
-    - OAUTH_MASTER_CLIENT_SECRET=${OAUTH_MASTER_CLIENT_SECRET}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - VAULT_URL=${VAULT_URL}
@@ -23,7 +21,8 @@ services:
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped
     volumes: 
-      - ./identity-provider-certs:/identity-provider/certs:ro
+      - ./identity-provider/certs:/identity-provider/certs:ro
+      - ./identity-provider/idconf.yaml:/identity-provider/idconf.yaml:ro
     logging:
       driver: "json-file"
       options:
