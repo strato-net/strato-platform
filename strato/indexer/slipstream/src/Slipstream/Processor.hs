@@ -139,7 +139,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
-  , assetInsert     :: Maybe ProcessedContract
+  , abstractInsert     :: Maybe (ProcessedContract, [T.Text])
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -346,7 +346,7 @@ processTheMessages env conn g messages = do
                     mapNames = map fst listOfMappingsWithRecords
                     parents' = c ^. parents
                     parentContracts = getContractsForParents parents' (cc^.contracts)
-                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
+                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType) parentContracts
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
@@ -365,9 +365,8 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
 
-                when (length parentAbstractContracts >= 1) $ do
-                  outputData conn $ insertContractInAssetTableQuery g nameParts 
-
+                (\parent -> outputData conn $ insertContractInAbstractTableQuery g nameParts parent) parentAbstractContracts
+  
                 return deferredForeignKeys
 
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
@@ -405,14 +404,15 @@ processTheMessages env conn g messages = do
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
-          mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          assets <- getAssetTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          mapNames <- getM
+          appingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          if (AssetTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)) `elem` assets
-            then  pure . Right $ BatchedInserts indexContract (Just indexContract) hs pMappings
+          if (AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)) `elem` abstracts
+            then  pure . Right $ BatchedInserts indexContract (Just (indexContract, abstracts)) hs pMappings
           else
             pure . Right $ BatchedInserts indexContract Nothing hs pMappings
 
@@ -429,7 +429,7 @@ processTheMessages env conn g messages = do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
     unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
-    unless (null ins) $ outputData conn . insertAssetTable $ map assetInsert ins
+    unless (null ins) $ outputData conn . insertAbstractTable $ map abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
@@ -452,3 +452,12 @@ generateAssetTable :: (MonadLogger m, HasSQL m) =>
 generateAssetTable conn g = do
   outputData conn $ createAssetTable g
 
+generateSaleTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateSaleTable conn g = do
+  outputData conn $ createSaleTable g
+
+generateUserTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateUserTable conn g = do
+  outputData conn $ createUserTable g
