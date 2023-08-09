@@ -73,7 +73,6 @@ contract ProductManager is InventoryStatus, RestStatus {
         Product_3 product = Product_3(_productAddress);
         return product.update(_description, _imageKey, _isActive, _scheme);
     }
-
     function deleteProduct(address _productAddress) returns (uint256, string) {
         Product_3 product = Product_3(_productAddress);
         return product.deleteProduct();

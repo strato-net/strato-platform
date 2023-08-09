@@ -9,7 +9,7 @@ contract Item_3 is ItemStatus {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
-
+                                                        
     address public productId;
     address public inventoryId;
     string public batchSerializationNumber;
