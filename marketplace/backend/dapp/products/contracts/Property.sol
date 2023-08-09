@@ -1,5 +1,5 @@
 /// @title A representation of Property assets
-contract Property_0_2 {
+contract Property_0_3 {
     address public produdctId;
     int public listPrice;
     string public unparsedAddress;

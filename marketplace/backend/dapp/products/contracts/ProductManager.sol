@@ -283,7 +283,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         bool _sprinklerSystem,
         bool _waterFront
     ) returns (uint256, address) {
-        Property_0_2 property = new Property_0_2(
+        Property_0_3 property = new Property_0_3(
             _produdctId,
             _listPrice,
             _unparsedAddress,

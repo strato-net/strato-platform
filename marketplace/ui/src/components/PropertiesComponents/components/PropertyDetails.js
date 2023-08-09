@@ -15,7 +15,7 @@ function PropertyDetails() {
   const [propertyDetail, setPropertyDetail] = useState({})
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const dispatch = usePropertiesDispatch()
-  const { isPropertyDetailsLoading, message, success } = usePropertiesState()
+  const { property, isPropertyDetailsLoading, message, success } = usePropertiesState()
   let { id } = useParams();
 
   useEffect(() => {
@@ -66,25 +66,25 @@ function PropertyDetails() {
     bathroomsTotalInteger
   } = propertyDetail
 
-  const property = {
-    fields: "Property detail"
-  }
+  // const property = {
+  //   fields: "Property detail"
+  // }
 
   const tabs = [
     {
       key: "Overview",
       label: `Overview`,
-      children: <OverviewTab property={property.fields} />,
+      children: <OverviewTab property={property?.fields} />,
     },
     {
       key: "Features",
       label: `Features`,
-      children: <FeaturesTab property={property.fields} />,
+      children: <FeaturesTab property={property?.fields} />,
     },
     {
       key: "Price",
       label: `Price and Tax History`,
-      children: <PriceHistoryTab property={property.fields} />,
+      children: <PriceHistoryTab property={property?.fields} />,
     },
     {
       key: "Reviews",
