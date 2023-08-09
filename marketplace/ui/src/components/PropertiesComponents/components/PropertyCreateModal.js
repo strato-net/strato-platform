@@ -12,8 +12,6 @@ import {
   Typography,
   Checkbox,
   Collapse,
-  Row,
-  Col
 } from "antd";
 import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
 import {
@@ -25,7 +23,8 @@ import {
   flooringData,
   appliancesData,
   interiorFeaturesData,
-  exteriorFeaturesData
+  exteriorFeaturesData,
+  PropertyCheckBox
 } from "../helpers/constants";
 import { getStringDate } from "../helpers/utils";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
@@ -65,12 +64,9 @@ function PropertyCreateModal({
     parking: [],
     interior: [],
     exterior: [],
+    numberOfUnitsTotal: 1
   });
-  const [homeType, setHomeType] = useState("");
-  const [bedrooms, setBedrooms] = useState("");
-  const [bathrooms, setBathrooms] = useState("");
-  const [squareFeet, setSquareFeet] = useState("");
-  const [lotSize, setLotSize] = useState("");
+  const [selectedOptions, setSelectedOptions] = useState(PropertyCheckBox)
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
@@ -85,13 +81,14 @@ function PropertyCreateModal({
     unitNumber,
     postalCity,
     stateOrProvince,
-    postalcode,
+    postalCode,
 
     propertyType,
     bedroomsTotal,
     bathroomsTotalInteger,
     livingArea,
     lotSizeArea,
+    numberOfUnitsTotal,
 
     appliances,
     cooling,
@@ -115,7 +112,7 @@ function PropertyCreateModal({
     !unitNumber ||
     !postalCity ||
     !stateOrProvince ||
-    !postalcode;
+    !postalCode;
 
   const isDisabledFactsView =
     !propertyType ||
@@ -136,11 +133,11 @@ function PropertyCreateModal({
   );
 
   const handleModalToggle = () => {
-    if (isDisabledCreateView) {
-    } else {
-      setModalView(!modalView);
+    // if (isDisabledCreateView) {
+    // } else {
+    setModalView(!modalView);
 
-    }
+    // }
   };
 
   const showConfirmationModal = () => {
@@ -173,98 +170,99 @@ function PropertyCreateModal({
       description: description,
       propertyType: propertyType,
       listPrice: listPrice,
-      // unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
-      streetName: streetName,
       streetNumber: streetNumber,
+      streetName: streetName,
       unitNumber: unitNumber,
       postalCity: postalCity,
       stateOrProvince: stateOrProvince,
-      postalcode: postalcode,
+      postalCode: postalCode,
       bathroomsTotalInteger: bathroomsTotalInteger,
       bedroomsTotal: bedroomsTotal,
       lotSizeArea: lotSizeArea,
-      livingAreaUnits: 'sqft',
+      lotSizeUnits: lotSizeUnits,
       livingArea: livingArea,
-      lotSizeUnits: 'sqft',
-      numberOfUnitsTotal: 3,
+      livingAreaUnits: livingAreaUnits,
+      latitude: "",
+      longitude: "",
+      numberOfUnitsTotal: numberOfUnitsTotal,
 
       // Appliances
-      dishwasher: appliances.includes("dishwasher"),
-      dryer: appliances.includes("dryer"),
-      freezer: appliances.includes("freezer"),
-      garbageDisposal: appliances.includes("garbageDisposal"),
-      microwave: appliances.includes("microwave"),
-      ovenOrRange: appliances.includes("ovenOrRange"),
-      refrigerator: appliances.includes("refrigerator"),
-      washer: appliances.includes("washer"),
-      waterHeater: appliances.includes("waterHeater"),
+      dishwasher: false,
+      dryer: false,
+      freezer: false,
+      garbageDisposal: false,
+      microwave: false,
+      ovenOrRange: false,
+      refrigerator: false,
+      washer: false,
+      waterHeater: false,
 
       // Cooling
-      centralAir: cooling.includes("centralAir"),
-      evaporative: cooling.includes("evaporative"),
-      geoThermal: cooling.includes("geoThermal"),
-      refrigeration: cooling.includes("refrigeration"),
-      solar: cooling.includes("solar"),
-      wallUnit: cooling.includes("wallUnit"),
+      centralAir: false,
+      evaporative: false,
+      geoThermal: false,
+      refrigeration: false,
+      solar: false,
+      wallUnit: false,
 
       // Heating
-      baseboard: heating.includes("baseboard"),
-      forceAir: heating.includes("forceAir"),
-      geoThermalHeat: heating.includes("geoThermalHeat"),
-      heatPump: heating.includes("heatPump"),
-      hotWater: heating.includes("hotWater"),
-      radiant: heating.includes("radiant"),
-      solarHeat: heating.includes("solarHeat"),
-      steam: heating.includes("steam"),
+      baseboard: false,
+      forceAir: false,
+      geoThermalHeat: false,
+      heatPump: false,
+      hotWater: false,
+      radiant: false,
+      solarHeat: false,
+      steam: false,
 
       // Flooring
-      carpet: flooring.includes("carpet"),
-      concrete: flooring.includes("concrete"),
-      hardwood: flooring.includes("hardwood"),
-      laminate: flooring.includes("laminate"),
-      linoleumVinyl: flooring.includes("linoleumVinyl"),
-      slate: flooring.includes("slate"),
-      softwood: flooring.includes("softwood"),
-      tile: flooring.includes("tile"),
+      carpet: false,
+      concrete: false,
+      hardwood: false,
+      laminate: false,
+      linoleumVinyl: false,
+      slate: false,
+      softwood: false,
+      tile: false,
 
       // Parking
-      carport: parking.includes("carport"),
-      garage: parking.includes("garage"),
-      offStreet: parking.includes("offStreet"),
-      onStreet: parking.includes("onStreet"),
+      carport: false,
+      garage: false,
+      offStreet: false,
+      onStreet: false,
 
       // Interior Features
-      attic: interior.includes("attic"),
-      cableReady: interior.includes("cableReady"),
-      ceilingFan: interior.includes("ceilingFan"),
-      doublePaneWindows: interior.includes("doublePaneWindows"),
-      elevator: interior.includes("elevator"),
-      fireplace: interior.includes("fireplace"),
-      flooring: interior.includes("flooring"),
-      furnished: interior.includes("furnished"),
-      jettedTub: interior.includes("jettedTub"),
-      securitySystem: interior.includes("securitySystem"),
-      vaultedCeiling: interior.includes("vaultedCeiling"),
-      skylight: interior.includes("skylight"),
-      wetBar: interior.includes("wetBar"),
+      attic: false,
+      cableReady: false,
+      ceilingFan: false,
+      doublePaneWindows: false,
+      elevator: false,
+      fireplace: false,
+      flooring: false,
+      furnished: false,
+      jettedTub: false,
+      securitySystem: false,
+      vaultedCeiling: false,
+      skylight: false,
+      wetBar: false,
 
       // Exterior Features
-      barbecueArea: exterior.includes("barbecueArea"),
-      deck: exterior.includes("deck"),
-      dock: exterior.includes("dock"),
-      fence: exterior.includes("fence"),
-      garden: exterior.includes("garden"),
-      hotTubOrSpa: exterior.includes("hotTubOrSpa"),
-      lawn: exterior.includes("lawn"),
-      patio: exterior.includes("patio"),
-      pond: exterior.includes("pond"),
-      pool: exterior.includes("pool"),
-      porch: exterior.includes("porch"),
-      rvParking: exterior.includes("rvParking"),
-      sauna: exterior.includes("sauna"),
-      sprinklerSystem: exterior.includes("sprinklerSystem"),
-      waterFront: exterior.includes("waterFront"),
-    };
+      barbecueArea: false,
+      deck: false,
+      dock: false,
+      fence: false,
+      garden: false,
+      hotTubOrSpa: false,
+      lawn: false,
+      patio: false,
+      pond: false,
+      pool: false,
+      porch: false,
+      rvParking: false,
+      sauna: false,
+      sprinklerSystem: false,
+      waterFront: false,
+    }
 
     let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
@@ -351,6 +349,16 @@ function PropertyCreateModal({
     }
   };
 
+  const collapseData = [
+    { header: "Appliances", options: appliancesData, defaultValue: appliances, keyName: "appliances" },
+    { header: "Cooling", options: coolingData, defaultValue: cooling, keyName: "cooling" },
+    { header: "Heating", options: heatingData, defaultValue: heating, keyName: "heating" },
+    { header: "Flooring", options: flooringData, defaultValue: flooring, keyName: "flooring" },
+    { header: "Parking", options: parkingFeaturesData, defaultValue: parking, keyName: "parking" },
+    { header: "Interior Features", options: interiorFeaturesData, defaultValue: interior, keyName: "interior" },
+    { header: "Exterior Features", options: exteriorFeaturesData, defaultValue: exterior, keyName: "exterior" },
+  ]
+
   return (
     <>
       {contextHolder}
@@ -415,6 +423,30 @@ function PropertyCreateModal({
               />
             </Form.Item>
             <Form.Item
+              label="Total Units"
+              name="totalUnits"
+              rules={[
+                { required: true, message: "Please enter total units." },
+              ]}
+            >
+              <InputNumber
+                style={{ width: 150 }}
+                label="Total Units"
+                id="numberOfUnitsTotal"
+                type="Number"
+                placeholder="Total Units"
+                controls={false}
+                defaultValue={numberOfUnitsTotal}
+                value={numberOfUnitsTotal}
+                onChange={(value) => {
+                  handleChange("numberOfUnitsTotal", value);
+                }}
+                onWheel={(e) => {
+                  e.target.blur();
+                }}
+              />
+            </Form.Item>
+            <Form.Item
               label="Asking Price"
               name="listPrice"
               rules={[
@@ -468,6 +500,7 @@ function PropertyCreateModal({
                 style={{ width: 150 }}
                 label="Street Number"
                 id="streetnumber"
+                type="Number"
                 placeholder="Street Number"
                 controls={false}
                 defaultValue={streetNumber}
@@ -554,10 +587,10 @@ function PropertyCreateModal({
                 min={0}
                 max={99999}
                 controls={false}
-                defaultValue={postalcode}
-                value={postalcode}
+                defaultValue={postalCode}
+                value={postalCode}
                 onChange={(value) => {
-                  handleChange("postalcode", value);
+                  handleChange("postalCode", value);
                 }}
                 onWheel={(e) => {
                   e.target.blur();
@@ -720,93 +753,19 @@ function PropertyCreateModal({
                 expandIconPosition={"end"}
                 defaultActiveKey={[]}
               >
-                <Panel style={{ fontWeight: 700 }} header="Appliances" key="1">
-                  <Row>
-                    <Col>
-                      <Checkbox.Group
-                        style={{ display: "block", lineHeight: "30px" }}
-                        options={appliancesData}
-                        value={appliances}
-                        defaultValue={appliances}
-                        onChange={(value) => {
-                          handleChange("appliances", value);
-                        }}
-                      />
-                    </Col>
-                  </Row>
-                </Panel>
-
-                <Panel style={{ fontWeight: 700 }} header="Cooling" key="2">
-                  <Checkbox.Group
-                    style={{ display: "block", lineHeight: "30px" }}
-                    options={coolingData}
-                    value={cooling}
-                    defaultValue={cooling}
-                    onChange={(value) => {
-                      handleChange("cooling", value);
-                    }}
-                  />
-                </Panel>
-
-                <Panel style={{ fontWeight: 700 }} header="Heating" key="3">
-                  <Checkbox.Group
-                    style={{ display: "block", lineHeight: "30px" }}
-                    options={heatingData}
-                    value={heating}
-                    defaultValue={heating}
-                    onChange={(value) => {
-                      handleChange("heating", value);
-                    }}
-                  />
-                </Panel>
-
-                <Panel style={{ fontWeight: 700 }} header="Flooring" key="4">
-                  <Checkbox.Group
-                    style={{ display: "block", lineHeight: "30px" }}
-                    options={flooringData}
-                    value={flooring}
-                    defaultValue={flooring}
-                    onChange={(value) => {
-                      handleChange("flooring", value);
-                    }}
-                  />
-                </Panel>
-
-                <Panel style={{ fontWeight: 700 }} header="Parking" key="5">
-                  <Checkbox.Group
-                    style={{ display: "block", lineHeight: "30px" }}
-                    options={parkingFeaturesData}
-                    value={parking}
-                    defaultValue={parking}
-                    onChange={(value) => {
-                      handleChange("parking", value);
-                    }}
-                  />
-                </Panel>
-
-                <Panel style={{ fontWeight: 700 }} header="Interior Features" key="6">
-                  <Checkbox.Group
-                    style={{ display: "block", lineHeight: "30px" }}
-                    options={interiorFeaturesData}
-                    value={interior}
-                    defaultValue={interior}
-                    onChange={(value) => {
-                      handleChange("interior", value);
-                    }}
-                  />
-                </Panel>
-
-                <Panel style={{ fontWeight: 700 }} header="Exterior Features" key="7">
-                  <Checkbox.Group
-                    style={{ display: "block", lineHeight: "30px" }}
-                    options={exteriorFeaturesData}
-                    value={exterior}
-                    defaultValue={exterior}
-                    onChange={(value) => {
-                      handleChange("exterior", value);
-                    }}
-                  />
-                </Panel>
+                {collapseData.map((item, index) => {
+                  return <Panel style={{ fontWeight: 700 }} header={item.header} key={index}>
+                    <Checkbox.Group
+                      style={{ display: "block", lineHeight: "30px" }}
+                      options={item.options}
+                      value={item.defaultValue}
+                      defaultValue={item.defaultValue}
+                      onChange={(value, e) => {
+                        handleChange(item.keyName, value);
+                      }}
+                    />
+                  </Panel>
+                })}
               </Collapse>
             </Form>
           </div>
