@@ -24,6 +24,7 @@ describe('Membership', function() {
     let globalAdmin;
     let contract;
     let newOptions;
+    let orgAdmin
 
     const factoryArgs = () => ({ ...(factory.getMembershipArgs(util.uid()))});
 
@@ -47,8 +48,11 @@ describe('Membership', function() {
     
         let adminUserName = process.env.GLOBAL_ADMIN_NAME
         let adminUserPassword = process.env.GLOBAL_ADMIN_PASSWORD
+        let orgAdminName = process.env.TRADINGENTITY_NAME
+        let orgAdminPassword = process.env.TRADINGENTITY_PASSWORD
     
         let adminUserToken
+        let orgAdminToken
         try {
           adminUserToken = await oauthHelper.getUserToken(adminUserName, adminUserPassword)
         } catch(e) {
@@ -66,7 +70,26 @@ describe('Membership', function() {
           RestStatus.OK,
           adminResponse.message
         )
+
+        try {
+            orgAdminToken = await oauthHelper.getUserToken(orgAdminName, orgAdminPassword)
+          } catch(e) {
+            console.error("ERROR: Unable to fetch the user token, check your username and password in your .env", e)
+            throw e
+          }
+          let orgAdminCredentials = { token: orgAdminToken }
+          console.log("getting admin user's address:", orgAdminName)
+          const orgAdminResponse = await oauthHelper.getStratoUserFromToken(orgAdminCredentials.token)
+          console.log("orgAdminResponse", orgAdminResponse)
+      
+      
+          assert.strictEqual(
+            orgAdminResponse.status,
+            RestStatus.OK,
+            orgAdminResponse.message
+          )
         globalAdmin = {...adminResponse.user, ...adminCredentials}
+        orgAdmin = {...orgAdminResponse.user, ...orgAdminCredentials}
 
         const cert = await certificateJs.getCertificateMe(globalAdmin)
         const userOrganization = cert.organization;
@@ -92,42 +115,39 @@ describe('Membership', function() {
             { ...args, owner: globalAdmin.address, constructor: '' });
     });
 
-    // it('Create and transfer ownership of a Membership', async () => {
-    //     // Create our Membership
-    //     const args = factoryArgs(globalAdmin);
-    //     const membership = await membershipChainJs.createMembership(globalAdmin, args, options);
-  
-    //     // Check if Membership was created
-    //     const membershipData = await membership.get();
-    //     assert.deepInclude(R.map(v => '' + v, membershipData), R.map(v => '' + v, args));
-  
-    //     // Create App Permission Manager
-    //     const appPermissionManagerContract = await appPermissionManagerJs.uploadContract(globalAdmin, {
-    //         admin: globalAdmin.address,
-    //         master: globalAdmin.address,
-    //     }, options);
-      
-    //     // assign role
-    //     await appPermissionManagerContract.grantGlobalAdminRole({ user: globalAdmin });
-
-    //     let addrToBeTransferedTo = 0x0 // TODO FILL THIS IN
-
-
-    //     const membershipResponse = await membership.transferOwnership(addrToBeTransferedTo);
-    //     assert.equal(membershipResponse, RestStatus.OK)
-    // });
 
     it('Update a Membership', async () => {
         // Create our Membership
-        const args = await contract.getState();
+        const args = factoryArgs(globalAdmin)
+        const membership = await membershipJs.uploadContract(globalAdmin, args, options)
+        const response = await membership.getState();
           
-        console.log("args", args)
+        console.log("args", response)
         const args2 = factoryArgs(globalAdmin);
         const update = await contract.update(args2)
         assert.equal(update[0], RestStatus.OK)
-        assert.notStrictEqual(args.additionalInfo, args2.additionalInfo)
-        assert.notStrictEqual(args.createdDate, args2.createdDate)
-        assert.notStrictEqual(args.timePeriodInMonths, args2.timePeriodInMonths)
+        assert.notStrictEqual(response.additionalInfo, args2.additionalInfo)
+        assert.notStrictEqual(response.createdDate, args2.createdDate)
+        assert.notStrictEqual(response.timePeriodInMonths, args2.timePeriodInMonths)
 
     });
+
+    
+    it('Create and transfer ownership of a Membership', async () => {
+        // Create our Membership
+        const args = factoryArgs(globalAdmin);
+        contract = await membershipJs.uploadContract(globalAdmin, args, options);
+  
+        // // Check if Membership was created
+        // const membershipData = await contract.getState();
+        // assert.deepInclude(R.map(v => '' + v, membershipData), R.map(v => '' + v, args));
+  
+
+
+
+        const membershipResponse = await contract.transferOwnership(orgAdmin.address);
+        assert.equal(membershipResponse, RestStatus.OK)
+    });
+
+
 });

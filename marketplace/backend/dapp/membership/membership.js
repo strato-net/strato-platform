@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgsLike, setSearchQueryOptionsPrime } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
 
@@ -34,8 +34,9 @@ async function uploadContract(user, _constructorArgs, options) {
         ...options,
         history: contractName
       }
-
+    console.log("are we here", user, "args", contractArgs, "options", copyOfOptions)
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
+    console.log("lets see")
     contract.src = 'removed';
 
     return bind(user, contract, copyOfOptions);
@@ -117,19 +118,6 @@ function bind(user, _contract, options) {
     contract.getState = async () => getState(user, contract, options);
     contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
     contract.update = async (args) => update(user, contract, args, options);
-    contract.addOrg = async  (orgName) => addOrg(user, contract, options, orgName);
-    contract.addOrgUnit = async  (orgName, orgUnit) => addOrgUnit(user, contract, options, orgName, orgUnit);
-    contract.addMember = async  (orgName, orgUnit, commonName) => addMember(user, contract, options, orgName, orgUnit, commonName);
-    contract.removeOrg = async  (orgName) => removeOrg(user, contract, options, orgName);
-    contract.removeOrgUnit = async  (orgName, orgUnit) => removeOrgUnit(user, contract, options, orgName, orgUnit);
-    contract.removeMember = async (orgName, orgUnit, commonName) => removeMember(user, contract, options, orgName, orgUnit, commonName);
-    contract.addOrgs = async (orgNames) => addOrgs(user, contract, options, orgNames);
-    contract.addOrgUnits = async (orgNames, orgUnits) => addOrgUnits(user, contract, options, orgNames, orgUnits);
-    contract.addMembers = async (orgNames, orgUnits, commonNames) => addMembers(user, contract, options, orgNames, orgUnits, commonNames);
-    contract.removeOrgs = async (orgNames) => removeOrgs(user, contract, options, orgNames);
-    contract.removeOrgUnits = async (orgNames, orgUnits) => removeOrgUnits(user, contract, options, orgNames, orgUnits);
-    contract.removeMembers = async (orgNames, orgUnits, commonNames) => removeMembers(user, contract, options, orgNames, orgUnits, commonNames);
-    contract.getMembers = async () => getMembers(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
 
@@ -183,31 +171,9 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const memberships = await searchAllWithQueryArgsLike(contractName, args, options, admin)
+    const memberships = await searchAllWithQueryArgs(contractName, args, options, admin)
 
-    const queryArgs = setSearchQueryOptionsPrime(
-        {
-          ...args,
-          limit: undefined,
-          offset: 0
-        }
-    )
-
-    const totalResult = await searchAll(
-        contractName,
-        {
-          ...queryArgs,
-          sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
-          queryOptions: {
-            ...queryArgs.queryOptions,
-            select: 'count'
-          },
-        },
-        options,
-        admin,
-      )
-
-    return { memberships: memberships.map((membership) => marshalOut(membership)), total: totalResult[0].count}
+    return { memberships: memberships.map((membership) => marshalOut(membership))}
 }
 
 /**
@@ -285,174 +251,6 @@ async function transferOwnership(user, contract, options, newOwner) {
     }
   
     return transferStatus
-}
-
-/**
- * Add a new organization to a membership contract/chain.
- * @param {string} orgName The new organization to add
- */
- async function addOrg(user, contract, options, orgName) {
-    const callArgs = {
-        contract,
-        method: 'addOrg',
-        args: util.usc({ orgName }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Add a new organization unit to a membership contract/chain.
- * @param {string} orgName The organization the unit to add belongs to
- * @param {string} orgUnit The new organization unit to add
- */
- async function addOrgUnit(user, contract, options, orgName, orgUnit) {
-    const callArgs = {
-        contract,
-        method: 'addOrgUnit',
-        args: util.usc({ orgName, orgUnit }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Add a new member to a membership contract/chain.
- * @param {string} orgName The organization the member to add belongs to
- * @param {string} orgUnit The organization unit the member to add belongs to
- * @param {string} commonName The common name of the member to add
- */
-async function addMember(user, contract, options, orgName, orgUnit, commonName) {
-    const callArgs = {
-        contract,
-        method: 'addMember',
-        args: util.usc({ orgName, orgUnit, commonName }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Remove an existing organization from a membership contract/chain.
- * @param {string} orgName The organization to remove
- */
- async function removeOrg(user, contract, options, orgName) {
-    const callArgs = {
-        contract,
-        method: 'removeOrg',
-        args: util.usc({ orgName }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Remove an existing organization unit from a membership contract/chain.
- * @param {string} orgName The organization the unit to remove belongs to
- * @param {string} orgUnit The organization unit to remove
- */
- async function removeOrgUnit(user, contract, options, orgName, orgUnit) {
-    const callArgs = {
-        contract,
-        method: 'removeOrgUnit',
-        args: util.usc({ orgName, orgUnit }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Remove an existing member from a membership contract/chain.
- * @param {string} orgName The organization the member to remove belongs to
- * @param {string} orgUnit The organization unit the member to remove belongs to
- * @param {string} commonName The common name of the member to remove
- */
- async function removeMember(user, contract, options, orgName, orgUnit, commonName) {
-    const callArgs = {
-        contract,
-        method: 'removeMember',
-        args: util.usc({ orgName, orgUnit, commonName }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Add multiple new organizations to a membership contract/chain.
- * @param {string} orgNames An array of new organizations to add
- */
- async function addOrgs(user, contract, options, orgNames) {
-    const callArgs = {
-        contract,
-        method: 'addOrgs',
-        args: util.usc({ orgNames }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Add multiple new organization units to a membership contract/chain.
- * @param {string} orgNames An array of organizations the units to add belongs to
- * @param {string} orgUnits An array of new organization units to add 
- */
- async function addOrgUnits(user, contract, options, orgNames, orgUnits) {
-    const callArgs = {
-        contract,
-        method: 'addOrgUnits',
-        args: util.usc({ orgNames, orgUnits }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Add multiple new members to a membership contract/chain.
- * @param {string} orgNames An array of organizations the units to add belongs to
- * @param {string} orgUnits An array of organization units the members to add belongs to
- * @param {string} commonNames An array of the common names of the members to add
- */
- async function addMembers(user, contract, options, orgNames, orgUnits, commonNames) {
-    const callArgs = {
-        contract,
-        method: 'addMembers',
-        args: util.usc({ orgNames, orgUnits, commonNames }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Remove multiple existing organizations from a membership contract/chain.
- * @param {string[]} orgNames An array of organizations to remove
- */
- async function removeOrgs(user, contract, options, orgNames) {
-    const callArgs = {
-        contract,
-        method: 'removeOrgs',
-        args: util.usc({ orgNames }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Remove multiple existing organization units from a membership contract/chain.
- * @param {string[]} orgNames An array of organizations the units to remove belongs to
- * @param {string[]} orgUnits An array of organization units to remove
- */
- async function removeOrgUnits(user, contract, options, orgNames, orgUnits) {
-    const callArgs = {
-        contract,
-        method: 'removeOrgUnits',
-        args: util.usc({ orgNames, orgUnits }),
-    };
-    return rest.call(user, callArgs, options);
-}
-
-/**
- * Remove multiple existing members from a membership contract/chain.
- * @param {string[]} orgNames An array of organizations the units to remove belongs to
- * @param {string[]} orgUnits An array of organization units the members to remove belongs to
- * @param {string[]} commonNames An array of the common names of the members to remove
- */
- async function removeMembers(user, contract, options, orgNames, orgUnits, commonNames) {
-    const callArgs = {
-        contract,
-        method: 'removeMembers',
-        args: util.usc({ orgNames, orgUnits, commonNames }),
-    };
-    return rest.call(user, callArgs, options);
 }
 
 export default {

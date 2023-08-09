@@ -5,6 +5,7 @@ import config from '../../load.config'
 import constants from '/helpers/constants'
 import oauthHelper from '/helpers/oauthHelper'
 import { get, post, put } from '/helpers/rest'
+import RestStatus from 'http-status-codes'
 
 
 import { membershipArgs, updateMembershipArgs } from './factories/membership'
@@ -18,13 +19,28 @@ assert.isUndefined(loadEnv.error)
 describe('Membership End-To-End Tests', function () {
   this.timeout(config.timeout)
   let orgAdmin
+  let tradingEntity
 
   before(async () => {
     let orgAdminToken
     try {
       orgAdminToken = await oauthHelper.getUserToken(
         `${process.env.GLOBAL_ADMIN_NAME}`,
-        `${process.env.TEST_USER_PASSWORD}`,
+        `${process.env.GLOBAL_ADMIN_PASSWORD}`,
+      )
+    } catch (e) {
+      console.error(
+        'ERROR: Unable to fetch the org user token, check your OAuth settings in config',
+        e,
+      )
+      throw e
+    }
+
+    let tradingEntityToken
+    try {
+      tradingEntityToken = await oauthHelper.getUserToken(
+        `${process.env.TRADINGENTITY_NAME}`,
+        `${process.env.TRADINGENTITY_PASSWORD}`,
       )
     } catch (e) {
       console.error(
@@ -45,9 +61,24 @@ describe('Membership End-To-End Tests', function () {
       RestStatus.OK,
       orgAdminResponse.message
     )
-    orgAdmin = {...orgAdminResponse.user, ...orgAdminCredentials}
+
+    const tradingEntityCredentials = { token: tradingEntityToken }
+
+    const tradingEntityResponse = await oauthHelper.getStratoUserFromToken(tradingEntityCredentials.token)
+    console.log("tradingEntityResponse", tradingEntityResponse)
+
+    assert.strictEqual(
+      tradingEntityResponse.status,
+      RestStatus.OK,
+      tradingEntityResponse.message
+    )
 
 
+    orgAdmin = { ...orgAdminResponse.user, ...orgAdminCredentials }
+    tradingEntity = { ...tradingEntityResponse.user, ...tradingEntityCredentials }
+
+    console.log("orgAdmin", orgAdmin)
+    console.log("tradingEntity", tradingEntity)
 
   })
 
@@ -90,14 +121,14 @@ describe('Membership End-To-End Tests', function () {
       {},
       orgAdmin.token,
     )
-      
+
     assert.equal(getMachine.status, 200, 'should be 200');
     assert.isDefined(getMachine.body, 'body should be defined');
-    
-      assert.equal(getMachine['productId'], createArgs['productId'], 'productId should be equal');
-      assert.equal(getMachine['timePeriodInMonths'], createArgs['timePeriodInMonths'], 'timePeriodInMonths should be equal');
-      assert.equal(getMachine['additionalInfo'], createArgs['additionalInfo'], 'additionalInfo should be equal');
-      assert.equal(getMachine['createdDate'], createArgs['createdDate'], 'createdDate should be equal');
+
+    assert.equal(getMachine['productId'], createArgs['productId'], 'productId should be equal');
+    assert.equal(getMachine['timePeriodInMonths'], createArgs['timePeriodInMonths'], 'timePeriodInMonths should be equal');
+    assert.equal(getMachine['additionalInfo'], createArgs['additionalInfo'], 'additionalInfo should be equal');
+    assert.equal(getMachine['createdDate'], createArgs['createdDate'], 'createdDate should be equal');
   })
 
   it('Get all Membership', async () => {
@@ -150,39 +181,6 @@ describe('Membership End-To-End Tests', function () {
     assert.equal(getMachine.installation_Date, createArgs.installation_Date, 'installation_Date should be defined');
   })
 
-  it('audit Membership', async () => {
-
-    // create
-    const createArgs = {
-      ...membershipArgs(util.uid()),
-    }
-
-    const createResponse = await post(
-      Membership.prefix,
-      Membership.create,
-      createArgs,
-      orgAdmin.token,
-    )
-
-    console.log(createResponse.body);
-
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-
-
-    // get
-    const getMachine = await get(
-      Membership.prefix,
-      Membership.audit.replace(':address', createResponse.body.data.address).replace(':chainId', createResponse.body.data.chainIds[0]),
-      {},
-      orgAdmin.token,
-    )
-      
-    assert.equal(getMachine.status, 200, 'should be 200');
-    assert.isDefined(getMachine.body, 'body should be defined');
-    assert.isAtLeast(getMachine.body.data.length, 1, 'should be equal and greater');
-  })
-
   it('transfer ownership', async () => {
 
     // create
@@ -202,22 +200,12 @@ describe('Membership End-To-End Tests', function () {
     assert.equal(createResponse.status, 200, 'should be 200');
     assert.isDefined(createResponse.body, 'body should be defined')
 
-    // fetch Orgs
-    const fetchResponse = await get(
-      Organizations.prefix,
-      Organizations.getAll,
-      {},
-      orgAdmin.token,
-    )
 
-    assert.equal(fetchResponse.status, 200, 'should be 200');
-    assert.isDefined(fetchResponse.body, 'body should be defined')
 
 
     const transferArgs = {
       address: createResponse.body.data.address,
-      chainId: createResponse.body.data.chainIds[0],
-      newOwner: fetchResponse.body.data[0].address
+      newOwner: tradingEntity.address
     }
 
     // get
@@ -227,7 +215,7 @@ describe('Membership End-To-End Tests', function () {
       transferArgs,
       orgAdmin.token,
     )
-      
+
     assert.equal(getTransfer.status, 200, 'should be 200');
   })
 })

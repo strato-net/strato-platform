@@ -7,7 +7,7 @@ export const membershipArgs = (uid) => {
         additionalInfo: `additionalInfo_${uid}`,
         createdDate: uid,
     },
-    isPublic: false
+    isPublic: true
   }
 
   return args

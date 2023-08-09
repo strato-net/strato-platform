@@ -112,7 +112,6 @@ class MembershipController {
   static validateUpdateMembershipArgs(args) {
     const updateMembershipSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       updates: Joi.object({
         productId: Joi.string(),
         timePeriodInMonths: Joi.number(),
@@ -133,7 +132,6 @@ class MembershipController {
   static validateTransferOwnershipArgs(args) {
     const transferOwnershipMembershipSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       newOwner: Joi.string().required(),
     })
 
