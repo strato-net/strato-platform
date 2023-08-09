@@ -7,7 +7,6 @@ import "/dapp/dapp/contracts/Dapp.sol";
 contract Membership {
 
     address public owner;
-    string public appChainId;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
@@ -28,15 +27,13 @@ contract Membership {
 
 
     constructor(
-        string _appChainId,
             address _productId
         ,   int _timePeriodInMonths
         ,   string _additionalInfo
         ,   uint _createdDate
     ) public {
         owner = msg.sender;
-        appChainId = _appChainId;
-
+        
         productId = _productId;
         timePeriodInMonths = _timePeriodInMonths;
         additionalInfo = _additionalInfo;

@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 
 
 const contractName = 'Membership';
-const contractFilename = `${util.cwd}/dapp/assets/Membership/contracts/Membership.sol`;
+const contractFilename = `${util.cwd}/dapp/membership/contracts/Membership.sol`;
 
 /** 
  * Upload a new Membership 
