@@ -137,7 +137,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     _item.productId(),
                     _item.inventoryId(),
                     _item.batchSerializationNumber(),
-                    _item.quantity(),
+                    oldInventory.availableQuantity(),
                     _item.status(),
                     block.timestamp
                 );
@@ -151,6 +151,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 itemProductIdMapping[itemContractAddress] = _item.productId();
                 itemInventoryIdMapping[itemContractAddress] = _item
                     .inventoryId();
+
+                _item.updateQuantity(_newQuantity);
 
                 _item.transferOwnership(
                     _newOwner,

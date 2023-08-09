@@ -72,6 +72,10 @@ contract Item_3 is ItemStatus {
         return RestStatus.OK;
     }
 
+    function updateQuantity(int _newQuantity) {
+        quantity = _newQuantity;
+    }
+
     // Get the userOrganization
     function getUserOrganization(address caller) public returns (string) {
         mapping(string => string) ownerCert = getUserCert(caller);
