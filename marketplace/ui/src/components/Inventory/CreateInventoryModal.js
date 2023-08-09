@@ -27,6 +27,8 @@ import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { usePapaParse } from "react-papaparse";
 import { INVENTORY_STATUS, MAX_RAW_MATERIAL } from "../../helpers/constants";
+import TagManager from "react-gtm-module";
+
 
 const { Option } = Select;
 
@@ -116,6 +118,11 @@ const CreateInventoryModal = ({
       serialNumber: values.serialNumber.serialNumArr,
     };
 
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'create_inventory',
+      },
+    });
     let isDone = await actions.createInventory(dispatch, body);
 
     if (isDone) {
