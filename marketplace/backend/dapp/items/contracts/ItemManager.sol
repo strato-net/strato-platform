@@ -114,9 +114,6 @@ contract ItemManager is ItemStatus, InventoryStatus {
         }
 
         Inventory oldInventory = Inventory(item.inventoryId());
-        if (oldInventory.availableQuantity() < _newQuantity) {
-            return (address(0), address(0));
-        }
 
         (uint status, address inventory) = product.addInventory(
             _newQuantity,
