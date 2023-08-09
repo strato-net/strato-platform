@@ -186,82 +186,7 @@ function PropertyCreateModal({
       longitude: "",
       numberOfUnitsTotal: numberOfUnitsTotal,
 
-      // Appliances
-      dishwasher: false,
-      dryer: false,
-      freezer: false,
-      garbageDisposal: false,
-      microwave: false,
-      ovenOrRange: false,
-      refrigerator: false,
-      washer: false,
-      waterHeater: false,
-
-      // Cooling
-      centralAir: false,
-      evaporative: false,
-      geoThermal: false,
-      refrigeration: false,
-      solar: false,
-      wallUnit: false,
-
-      // Heating
-      baseboard: false,
-      forceAir: false,
-      geoThermalHeat: false,
-      heatPump: false,
-      hotWater: false,
-      radiant: false,
-      solarHeat: false,
-      steam: false,
-
-      // Flooring
-      carpet: false,
-      concrete: false,
-      hardwood: false,
-      laminate: false,
-      linoleumVinyl: false,
-      slate: false,
-      softwood: false,
-      tile: false,
-
-      // Parking
-      carport: false,
-      garage: false,
-      offStreet: false,
-      onStreet: false,
-
-      // Interior Features
-      attic: false,
-      cableReady: false,
-      ceilingFan: false,
-      doublePaneWindows: false,
-      elevator: false,
-      fireplace: false,
-      flooring: false,
-      furnished: false,
-      jettedTub: false,
-      securitySystem: false,
-      vaultedCeiling: false,
-      skylight: false,
-      wetBar: false,
-
-      // Exterior Features
-      barbecueArea: false,
-      deck: false,
-      dock: false,
-      fence: false,
-      garden: false,
-      hotTubOrSpa: false,
-      lawn: false,
-      patio: false,
-      pond: false,
-      pool: false,
-      porch: false,
-      rvParking: false,
-      sauna: false,
-      sprinklerSystem: false,
-      waterFront: false,
+      ...selectedOptions
     }
 
     let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
@@ -349,6 +274,12 @@ function PropertyCreateModal({
     }
   };
 
+  const handleCheckbox = (value, check) => {
+    let data = { ...selectedOptions }
+    data[value] = check
+    setSelectedOptions(data)
+  }
+
   const collapseData = [
     { header: "Appliances", options: appliancesData, defaultValue: appliances, keyName: "appliances" },
     { header: "Cooling", options: coolingData, defaultValue: cooling, keyName: "cooling" },
@@ -362,6 +293,7 @@ function PropertyCreateModal({
   return (
     <>
       {contextHolder}
+      {message && openToast("bottom")}
       <Modal
         {...layout}
         open={isCreateModalOpen}
@@ -369,7 +301,7 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        okButtonProps={{ disabled: primaryAction.disabled }}
+        // okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);
@@ -754,15 +686,18 @@ function PropertyCreateModal({
               >
                 {collapseData.map((item, index) => {
                   return <Panel style={{ fontWeight: 700 }} header={item.header} key={index}>
-                    <Checkbox.Group
-                      style={{ display: "block", lineHeight: "30px" }}
-                      options={item.options}
-                      value={item.defaultValue}
-                      defaultValue={item.defaultValue}
-                      onChange={(value, e) => {
-                        handleChange(item.keyName, value);
-                      }}
-                    />
+                    {item.options.map((opt) => {
+                      return (
+                        <Checkbox
+                          name={opt.label}
+                          onChange={(e) => {
+                            handleCheckbox(opt.value, e.target.checked)
+                          }}
+                        >
+                          {opt.label}
+                        </Checkbox>
+                      )
+                    })}
                   </Panel>
                 })}
               </Collapse>

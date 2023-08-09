@@ -94,6 +94,7 @@ function PropertyDetails() {
   return (
     <>
       {contextHolder}
+      {message && openToast("bottom")}
       <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
         <Typography.Title level={4} style={{ padding: "0px 16px" }}>
         </Typography.Title>
