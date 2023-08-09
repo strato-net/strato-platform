@@ -8,22 +8,18 @@ import ReviewTab from "./ListingTabs/ReviewTab";
 import { useParams } from 'react-router-dom';
 import { actions } from '../../../contexts/propertyContext/actions';
 import { usePropertiesDispatch, usePropertiesState } from '../../../contexts/propertyContext';
-import { sampleProperties } from '../helpers/sampleProperties';
 import UploadPhotosModal from '../../Product/UploadPhotosModal';
 
 function PropertyDetails() {
-  const [propertyDetail, setPropertyDetail] = useState({})
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const dispatch = usePropertiesDispatch()
-  const { property, isPropertyDetailsLoading, message, success } = usePropertiesState()
+  const { property, propertyDetails, isPropertyDetailsLoading, message, success } = usePropertiesState()
   let { id } = useParams();
 
   useEffect(() => {
-    // actions.fetchPropertyDetails(dispatch, id)
-    const propertyData = sampleProperties?.filter((item) => item?.id === id);
-    setPropertyDetail(propertyData[0])
+    actions.fetchPropertyDetails(dispatch, id)
   }, [])
-  const { Text, Title, Paragraph } = Typography
+  const { Text, Title } = Typography
 
   const [api, contextHolder] = notification.useNotification();
 
@@ -31,14 +27,14 @@ function PropertyDetails() {
 
     if (success) {
       api.success({
-        message: "message-success",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 1,
       });
     } else {
       api.error({
-        message: "message-failed",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 2,
@@ -46,8 +42,8 @@ function PropertyDetails() {
     }
   };
 
-  // Dummy data for Collage & Carousel
-  const { images,
+  const {
+    images,
     reviews,
     postalCity,
     postalCode,
@@ -63,8 +59,10 @@ function PropertyDetails() {
     propertyType,
     unitNumber,
     bedroomsTotal,
-    bathroomsTotalInteger
-  } = propertyDetail
+    bathroomsTotalInteger,
+    standardStatus,
+    numberOfUnitsTotal
+  } = propertyDetails || {};
 
   // const property = {
   //   fields: "Property detail"
@@ -89,7 +87,7 @@ function PropertyDetails() {
     {
       key: "Reviews",
       label: `Reviews`,
-      children: <ReviewTab reviews={reviews} />,
+      // children: <ReviewTab reviews={reviews} />,
     },
   ];
 
@@ -145,73 +143,89 @@ function PropertyDetails() {
                     </Text>
                   </Row>
                   <Row>
-                    <span style={{ width: '10px', height: "10px", borderRadius: "50%", backgroundColor: "green", margin: '5px' }}></span>
-                    <Text strong>Active</Text>
+                    {standardStatus === "Active" ? <span style={{ width: '10px', height: "10px", borderRadius: "50%", backgroundColor: "green", margin: '5px' }}></span> : ""}
+                    <Text strong>{standardStatus}</Text>
                   </Row>
-                  <Row style={{ marginTop: "15px" }}>
-                    <Col>
-                      <Paragraph>
-                        <b>
-                          Property Type:{" "}
-                        </b>
-                      </Paragraph>
-                      <Paragraph>
-                        <b>
-                          Lot Size:{" "}
-                        </b>
-                      </Paragraph>
-                      <Paragraph>
-                        <b>
-                          Appliances:{" "}
-                        </b>
-                      </Paragraph>
-                      <Paragraph>
-                        <b>
-                          Cooling:{" "}
-                        </b>
-                      </Paragraph>
-                      <Paragraph>
-                        <b>
-                          Heating:{" "}
-                        </b>
-                      </Paragraph>
-                      <Paragraph>
-                        <b>
-                          Number of Units:{" "}
-                        </b>
-                      </Paragraph>
-                    </Col>
-                    <Col offset={1}>
-                      <Paragraph>
-                        {propertyType}
-                      </Paragraph>
-                      <Paragraph>
-                        {lotSizeArea} {lotSizeUnits}
-                      </Paragraph>
-                      <Paragraph>
-                        Refrigerator, Stove, Water heater
-                      </Paragraph>
-                      <Paragraph>
-                        Window Unit
-                      </Paragraph>
-                      <Paragraph>
-                        Wall Heaters
-                      </Paragraph>
-                      <Paragraph>
-                        {unitNumber}
-                      </Paragraph>
+                  <Row style={{ marginTop: "15px" }} >
+                    <Col style={{ lineHeight: "30px" }}>
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>Property Type</Text>
+                        </Col>
+                        <Col span={16}>{propertyType}</Col>
+                      </Row>
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>Lot Size</Text>
+                        </Col>
+                        <Col span={16}>{lotSizeArea} {lotSizeUnits}</Col>
+                      </Row>
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>appliances</Text>
+                        </Col>
+                        <Col span={16}>Refrigerator, Stove, Water heater</Col>
+                      </Row>
+
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>Cooling</Text>
+                        </Col>
+                        <Col span={16}>Window Unit</Col>
+                      </Row>
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>Heating</Text>
+                        </Col>
+                        <Col span={16}>Wall heaters</Col>
+                      </Row>
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>Number of Units</Text>
+                        </Col>
+                        <Col span={16}>
+                          {numberOfUnitsTotal}
+                        </Col>
+                      </Row>
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>Utilites</Text>
+                        </Col>
+                        <Col span={16}>Water, Sewer, Garbage, gas</Col>
+                      </Row>
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>parking</Text>
+                        </Col>
+                        <Col span={16}>On-street</Col>
+                      </Row>
+
+                      <Row>
+                        <Col span={8}>
+                          <Text strong>Lisitng Provider</Text>
+                        </Col>
+                        <Col span={16}>Tiffany Rider: 503-380-4875, MLS#23640335
+                          Premiere Property Group, LLC</Col>
+                      </Row>
                     </Col>
                   </Row>
                 </Col>
               </Row>
-              <Button type='primary' style={{ marginLeft: "50px" }}>Submit  Inquiry</Button>
+              <Button type='primary' style={{ marginLeft: "50px", marginTop: "30px" }}>Submit  Inquiry</Button>
             </Col>
           </Row>
           <Row >
             <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
               <Tabs defaultActiveKey="Overview" items={tabs} />
             </Col>
-            <Col sm={24} lg={10} style={{ marginTop: "20px" }}>
+            <Col sm={24} lg={10} style={{ marginTop: "50px" }}>
               <div style={{ width: '300px', height: "200px", background: 'grey', margin: 'auto', textAlign: "center" }}>
                 MAP
               </div>

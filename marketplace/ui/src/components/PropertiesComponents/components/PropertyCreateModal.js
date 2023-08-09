@@ -369,8 +369,7 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        // uncomment later******
-        // okButtonProps={{ disabled: primaryAction.disabled }}
+        okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);

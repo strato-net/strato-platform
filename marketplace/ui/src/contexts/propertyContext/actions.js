@@ -149,23 +149,23 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchProductSuccessful,
+          type: actionDescriptors.fetchPropertiesSuccessful,
           payload: body.data,
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
-          type: actionDescriptors.fetchProductFailed,
+          type: actionDescriptors.fetchPropertiesFailed,
           error: "Error while fetching property list",
         });
       }
       dispatch({
-        type: actionDescriptors.fetchProductFailed,
+        type: actionDescriptors.fetchPropertiesFailed,
         error: body.error,
       });
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchProductFailed,
+        type: actionDescriptors.fetchPropertiesFailed,
         error: "Error while fetching property list",
       });
     }

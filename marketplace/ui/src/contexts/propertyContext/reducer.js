@@ -56,7 +56,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchPropertyDetailsSuccessful:
       return {
         ...state,
-        isPropertyDetailsLoading: true,
+        isPropertyDetailsLoading: false,
         propertyDetails: action.payload
       };
     case actionDescriptors.fetchPropertyDetailsFailed:

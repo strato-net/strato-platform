@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Space, Spin, Pagination, notification, Button } from 'antd'
+import { Row, Col, Typography, Space, Spin, Pagination, notification, Button, Modal } from 'antd'
 import PropertyCard from './PropertyCard'
-import { sampleProperties } from '../helpers/sampleProperties'
 import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
@@ -17,25 +16,33 @@ function PropertyListings() {
 
   useEffect(() => {
     // TODO: will be used when API is ready
-    // actions.fetchProperties(dispatch, limit, currentPage)
-  }, [])
+    actions.fetchProperties(dispatch, limit, currentPage)
+  }, [currentPage])
 
   const dispatch = usePropertiesDispatch()
-  const { properties, isPropertiesLoading, message, success } = usePropertiesState();
+  const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
+
+  useEffect(() => {
+    if (isCreatePropertySubmitting) {
+      toggleCreateModal(false)
+      toggleCreateConfirmModal(false)
+    }
+    //  openToast("bottom")
+  }, [isCreatePropertySubmitting])
 
   const openToast = (placement) => {
 
     if (success) {
       api.success({
-        message: "message-success",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 1,
       });
     } else {
       api.error({
-        message: "message-failed",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 2,
@@ -57,57 +64,66 @@ function PropertyListings() {
   }
 
   return (
+
     <>
-      {contextHolder}
-      <Row justify="center">
-        <Col span={22}>
-          <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
-            <Typography.Title level={4} style={{ padding: "0px 16px" }}>
-              Recommended Properties
-            </Typography.Title>
-            <Col style={{ display: "flex", justifyContent: "space-between" }}>
-              <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
-              <Button style={{ backgroundColor: '#FD3200', color: '#FFFFFF' }}
-                onClick={() => {
-                  toggleCreateModal(true)
-                }}
-              >List Property</Button>
+      {isCreatePropertySubmitting
+        ? <div className="h-96 flex justify-center items-center">
+          <Spin spinning={isCreatePropertySubmitting} size="large" />
+        </div>
+        :
+        <>
+          {contextHolder}
+          <Row justify="center">
+            <Col span={22}>
+              <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
+                <Typography.Title level={4} style={{ padding: "0px 16px" }}>
+                  Recommended Properties
+                </Typography.Title>
+                <Col style={{ display: "flex", justifyContent: "space-between" }}>
+                  <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
+                  <Button style={{ backgroundColor: '#FD3200', color: '#FFFFFF' }}
+                    onClick={() => {
+                      toggleCreateModal(true)
+                    }}
+                  >List Property</Button>
+                </Col>
+              </Row>
+              {isPropertiesLoading
+                ? <div className="h-96 flex justify-center items-center">
+                  <Spin spinning={isPropertiesLoading} size="large" />
+                </div>
+                :
+                <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
+                  {properties &&
+                    properties.map((property, index) => {
+                      const { listPrice, address } = property
+                      return listPrice && (
+                        <Col key={index} style={{ padding: '10px' }}>
+                          <Link to={`/properties/${address}`}>
+                            <PropertyCard property={property} />
+                          </Link>
+                        </Col>
+                      )
+                    })}
+                </Row>
+              }
+              <Pagination style={{ width: '500px', margin: 'auto', marginTop: "200px" }}
+                onChange={(e) => { handlePageChange(e) }} showSizeChanger={false}
+                current={currentPage}
+                defaultCurrent={1} total={500}
+              />
             </Col>
           </Row>
-          {isPropertiesLoading
-            ? <div className="h-96 flex justify-center items-center">
-              <Spin spinning={isPropertiesLoading} size="large" />
-            </div>
-            :
-            <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
-              {sampleProperties &&
-                sampleProperties.map((property, index) => {
-                  const { listPrice, id } = property
-                  return listPrice && (
-                    <Col key={index} style={{ padding: '10px' }}>
-                      <Link to={`/properties/${id}`}>
-                        <PropertyCard property={property} />
-                      </Link>
-                    </Col>
-                  )
-                })}
-            </Row>
-          }
-          <Pagination style={{ width: '500px', margin: 'auto', marginTop: "200px" }}
-            onChange={(e) => { handlePageChange(e) }} showSizeChanger={false}
-            current={currentPage}
-            defaultCurrent={1} total={500}
+          <PropertyCreateModal
+            isCreateModalOpen={isCreateModalOpen}
+            toggleCreateModal={toggleCreateModal}
+            modalView={modalView}
+            setModalView={setModalView}
+            isCreateConfirmModalOpen={isCreateConfirmModalOpen}
+            toggleCreateConfirmModal={toggleCreateConfirmModal}
           />
-        </Col>
-      </Row>
-      <PropertyCreateModal
-        isCreateModalOpen={isCreateModalOpen}
-        toggleCreateModal={toggleCreateModal}
-        modalView={modalView}
-        setModalView={setModalView}
-        isCreateConfirmModalOpen={isCreateConfirmModalOpen}
-        toggleCreateConfirmModal={toggleCreateConfirmModal}
-      />
+        </>
+      }
     </>
   );
 }

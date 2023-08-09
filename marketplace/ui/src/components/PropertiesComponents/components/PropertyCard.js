@@ -2,7 +2,17 @@ import React from "react";
 import { Card, Carousel } from "antd";
 
 function PropertyCard(props) {
-  const { property } = props;
+  const { property,
+    property: {
+      images,
+      postalCity,
+      stateOrProvince,
+      postalCode,
+      bedroomsTotal,
+      bathroomsTotalInteger,
+      lotSizeArea,
+      listPrice }
+  } = props;
   const { Meta } = Card;
 
   return (
@@ -11,7 +21,7 @@ function PropertyCard(props) {
       style={{ width: 300, margin: 10 }}
       cover={
         <Carousel>
-          {property?.images.map((img, key) => (
+          {images?.map((img, key) => (
             <div key={key}>
               <img
                 style={{ width: "100%", height: 200 }}
@@ -24,11 +34,11 @@ function PropertyCard(props) {
       }
     >
       <Meta
-        title={`${property?.postalCity}, ${property?.stateOrProvince} ${property?.postalCode}`}
-        description={`${property?.bedroomsTotal} br | 
-        ${property?.bathroomsTotalInteger} ba | 
-        ${property?.lotSizeArea} sqft | 
-        $${property.listPrice?.toLocaleString()}`}
+        title={`${postalCity}, ${stateOrProvince} ${postalCode}`}
+        description={`${bedroomsTotal} br | 
+        ${bathroomsTotalInteger} ba | 
+        ${lotSizeArea} sqft | 
+        $${listPrice?.toLocaleString()}`}
       />
     </Card>
   );
