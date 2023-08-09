@@ -94,41 +94,4 @@ contract MembershipService {
 
       return RestStatus.OK;
     }
-
-    // Transfer the ownership of a MembershipService
-    function transferOwnership(address _addr) public returns (uint256) {
-      // caller must be current owner to transfer ownership
-      if (tx.origin != owner) {
-        return RestStatus.FORBIDDEN;
-      }
-
-      // fetch new owner cert details (org and unit)
-      mapping(string => string) newOwnerCert = getUserCert(_addr);
-      string newOwnerOrganization = newOwnerCert["organization"];
-      string newOwnerOrganizationalUnit = newOwnerCert["organizationalUnit"];
-      string newOwnerCommonName = newOwnerCert["commonName"];
-
-      // add new owner org (and maybe unit)
-      if (newOwnerOrganization == "") 
-        return RestStatus.NOT_FOUND;
-      else if (newOwnerOrganizationalUnit == "")
-        addOrg(newOwnerOrganization);
-      else
-        addOrgUnit(newOwnerOrganization, newOwnerOrganizationalUnit);
-
-      // remove old owner org (and maybe unit)
-      if (ownerOrganizationalUnit == "")
-        removeOrg(ownerOrganization);
-      else
-        removeOrgUnit(ownerOrganization, ownerOrganizationalUnit);
-
-      // set newOwner as asset owner
-      owner = _addr;
-      ownerOrganization = newOwnerOrganization;
-      ownerOrganizationalUnit = newOwnerOrganizationalUnit;
-      ownerCommonName = newOwnerCommonName;
-
-      return RestStatus.OK;
-
-    } 
 }

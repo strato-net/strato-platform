@@ -5,7 +5,7 @@ import config from '../../load.config'
 import constants from '/helpers/constants'
 import oauthHelper from '/helpers/oauthHelper'
 import { get, post, put } from '/helpers/rest'
-
+import RestStatus from 'http-status-codes'
 
 import { membershipServiceArgs, updateMembershipServiceArgs } from './factories/membershipService'
 import { MembershipService, Organizations } from '../../api/v1/endpoints'
@@ -24,7 +24,7 @@ describe('MembershipService End-To-End Tests', function () {
     try {
       orgAdminToken = await oauthHelper.getUserToken(
         `${process.env.GLOBAL_ADMIN_NAME}`,
-        `${process.env.TEST_USER_PASSWORD}`,
+        `${process.env.GLOBAL_ADMIN_PASSWORD}`,
       )
     } catch (e) {
       console.error(
@@ -151,86 +151,5 @@ describe('MembershipService End-To-End Tests', function () {
     assert.equal(getMachine.purpose, createArgs.purpose, 'purpose should be defined');
     assert.equal(getMachine.model, createArgs.model, 'model should be defined');
     assert.equal(getMachine.installation_Date, createArgs.installation_Date, 'installation_Date should be defined');
-  })
-
-  it('audit MembershipService', async () => {
-
-    // create
-    const createArgs = {
-      ...membershipServiceArgs(util.uid()),
-    }
-
-    const createResponse = await post(
-      MembershipService.prefix,
-      MembershipService.create,
-      createArgs,
-      orgAdmin.token,
-    )
-
-    console.log(createResponse.body);
-
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-
-
-    // get
-    const getMachine = await get(
-      MembershipService.prefix,
-      MembershipService.audit.replace(':address', createResponse.body.data.address).replace(':chainId', createResponse.body.data.chainIds[0]),
-      {},
-      orgAdmin.token,
-    )
-      
-    assert.equal(getMachine.status, 200, 'should be 200');
-    assert.isDefined(getMachine.body, 'body should be defined');
-    assert.isAtLeast(getMachine.body.data.length, 1, 'should be equal and greater');
-  })
-
-  it('transfer ownership', async () => {
-
-    // create
-    const createArgs = {
-      ...membershipServiceArgs(util.uid()),
-    }
-
-    const createResponse = await post(
-      MembershipService.prefix,
-      MembershipService.create,
-      createArgs,
-      orgAdmin.token,
-    )
-
-    console.log(createResponse.body);
-
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-
-    // fetch Orgs
-    const fetchResponse = await get(
-      Organizations.prefix,
-      Organizations.getAll,
-      {},
-      orgAdmin.token,
-    )
-
-    assert.equal(fetchResponse.status, 200, 'should be 200');
-    assert.isDefined(fetchResponse.body, 'body should be defined')
-
-
-    const transferArgs = {
-      address: createResponse.body.data.address,
-      chainId: createResponse.body.data.chainIds[0],
-      newOwner: fetchResponse.body.data[0].address
-    }
-
-    // get
-    const getTransfer = await post(
-      MembershipService.prefix,
-      MembershipService.transferOwnership,
-      transferArgs,
-      orgAdmin.token,
-    )
-      
-    assert.equal(getTransfer.status, 200, 'should be 200');
   })
 })

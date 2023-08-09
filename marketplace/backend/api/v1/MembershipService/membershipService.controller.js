@@ -115,7 +115,6 @@ class MembershipServiceController {
   static validateUpdateMembershipServiceArgs(args) {
     const updateMembershipServiceSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       updates: Joi.object({
         membershipId: Joi.string(),
         serviceId: Joi.string(),

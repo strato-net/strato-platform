@@ -3,16 +3,11 @@ import { rest, util, assert } from '/blockapps-rest-plus';
 import config from '/load.config';
 import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
-import constants from '/helpers/constants';
 
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import membershipServiceJs from '../membershipService';
-import membershipServiceChainJs from '../membershipServiceChain';
 import factory from './membershipService.factory.js';
-import user from '/dapp/users/user.js';
-import { args } from 'commander';
 
 const options = { config };
 
@@ -28,9 +23,7 @@ describe('MembershipService', function() {
     let globalAdmin;
     let contract;
 
-    const member = () => `${util.uid() + 1}`.padStart(40, '0'); // Generate address
-    const enode = () => 'enode://' + `${util.uid() + 1}`.padStart(130, '0') + '@1.2.3.4:30303';
-    const factoryArgs = (user) => ({ ...(factory.getMembershipServiceArgs(util.uid())), assetOwner: user.address});
+    const factoryArgs = () => ({ ...(factory.getMembershipServiceArgs(util.uid()))});
 
     before(async () => {
         assert.isDefined(
@@ -87,59 +80,6 @@ describe('MembershipService', function() {
             { ...args, owner: globalAdmin.address, constructor: '' });
     });
 
-    it('addMember - 200', async () => {
-        const res = await contract.addMember(member(), enode());
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('removeMember - 200', async () => {
-        const res = await contract.removeMember(member());
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('addMembers - 200', async () => {
-        const res = await contract.addMembers([member(), member(), member()], [enode(), enode(), enode()]);
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('removeMembers - 200', async () => {
-        const res = await contract.removeMembers([member(), member(), member()]);
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('createMembershipService (Private chain)', async () => {
-        const args = factoryArgs(globalAdmin);
-        const membershipService = await membershipServiceChainJs.createMembershipService(globalAdmin, args, options);
-        const membershipServiceData = await membershipService.get();
-        // Sorting is needed in order to allow for chainIds to be in any order
-        // Convert all fields into a string to allow for equality checking
-        assert.deepInclude(
-            // Convert the MembershipService data into strings as the args are in strings
-            R.map(v => '' + v, membershipServiceData),
-            R.map(v => '' + v, args));
-    });
-
-    it('createMembershipService (Private chain, multiple)', async () => {
-        const args1 = factoryArgs(globalAdmin);
-        const args2 = factoryArgs(globalAdmin);
-        const args3 = factoryArgs(globalAdmin);
-        const args4 = factoryArgs(globalAdmin);
-        const membershipService1 = await membershipServiceChainJs.createMembershipService(globalAdmin, args1, options);
-        const membershipService2 = await membershipServiceChainJs.createMembershipService(globalAdmin, args2, options);
-        const membershipService3 = await membershipServiceChainJs.createMembershipService(globalAdmin, args3, options);
-        const membershipService4 = await membershipServiceChainJs.createMembershipService(globalAdmin, args4, options);
-        const membershipServiceData1 = await membershipService1.get();
-        const membershipServiceData2 = await membershipService2.get();
-        const membershipServiceData3 = await membershipService3.get();
-        const membershipServiceData4 = await membershipService4.get();
-        // Our logic shouldn't mix up membershipServices
-        assert.deepInclude(R.map(v => '' + v, membershipServiceData1), R.map(v => '' + v, args1));
-        assert.deepInclude(R.map(v => '' + v, membershipServiceData2), R.map(v => '' + v, args2));
-        assert.deepInclude(R.map(v => '' + v, membershipServiceData3), R.map(v => '' + v, args3));
-        assert.deepInclude(R.map(v => '' + v, membershipServiceData4), R.map(v => '' + v, args4));    
-    });
-
-    // it('Create an organization manager', async () => {
     //     // Create App Permission Manager
     //     const appPermissionManagerContract = await appPermissionManagerJs.uploadContract(globalAdmin, {
     //         admin: globalAdmin.address,
@@ -160,40 +100,35 @@ describe('MembershipService', function() {
     //     assert.equal(permissionManager, appPermissionManagerContract.address, 'permissionManager');
     // });
 
-    it('Create and transfer ownership of a MembershipService', async () => {
-        // Create our MembershipService
-        const args = factoryArgs(globalAdmin);
-        const membershipService = await membershipServiceChainJs.createMembershipService(globalAdmin, args, options);
+    // it('Create and transfer ownership of a MembershipService', async () => {
+    //     // Create our MembershipService
+    //     const args = factoryArgs(globalAdmin);
+    //     const membershipService = await membershipServiceChainJs.createMembershipService(globalAdmin, args, options);
   
-        // Check if MembershipService was created
-        const membershipServiceData = await membershipService.get();
-        assert.deepInclude(R.map(v => '' + v, membershipServiceData), R.map(v => '' + v, args));
+    //     // Check if MembershipService was created
+    //     const membershipServiceData = await membershipService.get();
+    //     assert.deepInclude(R.map(v => '' + v, membershipServiceData), R.map(v => '' + v, args));
   
-        // Create App Permission Manager
-        const appPermissionManagerContract = await appPermissionManagerJs.uploadContract(globalAdmin, {
-            admin: globalAdmin.address,
-            master: globalAdmin.address,
-        }, options);
+    //     // Create App Permission Manager
+    //     const appPermissionManagerContract = await appPermissionManagerJs.uploadContract(globalAdmin, {
+    //         admin: globalAdmin.address,
+    //         master: globalAdmin.address,
+    //     }, options);
       
-        // assign role
-        await appPermissionManagerContract.grantGlobalAdminRole({ user: globalAdmin });
+    //     // assign role
+    //     await appPermissionManagerContract.grantGlobalAdminRole({ user: globalAdmin });
 
-        let addrToBeTransferedTo = 0x0 // TODO FILL THIS IN
+    //     let addrToBeTransferedTo = 0x0 // TODO FILL THIS IN
 
 
-        const membershipServiceResponse = await membershipService.transferOwnership(addrToBeTransferedTo);
-        assert.equal(membershipServiceResponse, RestStatus.OK)
-    });
+    //     const membershipServiceResponse = await membershipService.transferOwnership(addrToBeTransferedTo);
+    //     assert.equal(membershipServiceResponse, RestStatus.OK)
+    // });
 
     it('Create and update a MembershipService', async () => {
         // Create our MembershipService
         const args = factoryArgs(globalAdmin);
-        const membershipService = await membershipServiceChainJs.createMembershipService(globalAdmin, args, options);
-  
-        // Check if MembershipService was created
-        const membershipServiceData = await membershipService.get();
-        assert.deepInclude(R.map(v => '' + v, membershipServiceData), R.map(v => '' + v, args));
-        
+        const membershipService = await membershipServiceJs.uploadContract(globalAdmin, args, options);
         
         const args2 = factoryArgs(globalAdmin);
         const update = await membershipService.update(args2)

@@ -1339,19 +1339,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   //-----------------------------Membership Service starts here -------------------------------
 
   contract.createMembershipService = async function (args, options = defaultOptions) {
-    const { membershipServiceArgs, isPublic } = args;
     const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
-    if (isPublic) {
-      return membershipServiceJs.uploadContract(rawAdmin, { 
-        appChainId: contract.chainId,
-        ...membershipServiceArgs,
-      }, createOptions);
-    } else {
-      return membershipServiceChainJs.createMembershipService(rawAdmin, { 
-        appChainId: contract.chainId,
-        ...membershipServiceArgs,
-      }, createOptions);
-    }
+      return membershipServiceJs.uploadContract(rawAdmin, args, createOptions);
   }
 
   contract.getMembershipService = async function (args, options = optionsNoChainIds) {
@@ -1361,7 +1350,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   contract.getMembershipServices = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = {...options, org: managers.cirrusOrg, app: contractName}
     return membershipServiceJs.getAll(rawAdmin, { 
-      appChainId: contract.chainId,
       ...args
     }, getOptions)
   }

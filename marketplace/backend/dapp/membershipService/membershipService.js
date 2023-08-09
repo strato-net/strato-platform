@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgsLike, setSearchQueryOptionsPrime } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
 
@@ -120,19 +120,6 @@ function bind(user, _contract, options) {
     contract.getState = async () => getState(user, contract, options);
     contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
     contract.update = async (args) => update(user, contract, args, options);
-    contract.addOrg = async  (orgName) => addOrg(user, contract, options, orgName);
-    contract.addOrgUnit = async  (orgName, orgUnit) => addOrgUnit(user, contract, options, orgName, orgUnit);
-    contract.addMember = async  (orgName, orgUnit, commonName) => addMember(user, contract, options, orgName, orgUnit, commonName);
-    contract.removeOrg = async  (orgName) => removeOrg(user, contract, options, orgName);
-    contract.removeOrgUnit = async  (orgName, orgUnit) => removeOrgUnit(user, contract, options, orgName, orgUnit);
-    contract.removeMember = async (orgName, orgUnit, commonName) => removeMember(user, contract, options, orgName, orgUnit, commonName);
-    contract.addOrgs = async (orgNames) => addOrgs(user, contract, options, orgNames);
-    contract.addOrgUnits = async (orgNames, orgUnits) => addOrgUnits(user, contract, options, orgNames, orgUnits);
-    contract.addMembers = async (orgNames, orgUnits, commonNames) => addMembers(user, contract, options, orgNames, orgUnits, commonNames);
-    contract.removeOrgs = async (orgNames) => removeOrgs(user, contract, options, orgNames);
-    contract.removeOrgUnits = async (orgNames, orgUnits) => removeOrgUnits(user, contract, options, orgNames, orgUnits);
-    contract.removeMembers = async (orgNames, orgUnits, commonNames) => removeMembers(user, contract, options, orgNames, orgUnits, commonNames);
-    contract.getMembers = async () => getMembers(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
 
@@ -186,31 +173,9 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const membershipServices = await searchAllWithQueryArgsLike(contractName, args, options, admin)
+    const membershipServices = await searchAllWithQueryArgs(contractName, args, options, admin)
 
-    const queryArgs = setSearchQueryOptionsPrime(
-        {
-          ...args,
-          limit: undefined,
-          offset: 0
-        }
-    )
-
-    const totalResult = await searchAll(
-        contractName,
-        {
-          ...queryArgs,
-          sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
-          queryOptions: {
-            ...queryArgs.queryOptions,
-            select: 'count'
-          },
-        },
-        options,
-        admin,
-      )
-
-    return { membershipServices: membershipServices.map((membershipService) => marshalOut(membershipService)), total: totalResult[0].count}
+    return { membershipServices: membershipServices.map((membershipService) => marshalOut(membershipService))}
 }
 
 /**
