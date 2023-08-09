@@ -80,6 +80,7 @@ expressionCrawler = \case
   HexaLiteral{} -> ["HexaLiteral"]
   NumberLiteral{} -> ["NumberLiteral"]
   StringLiteral{} -> ["StringLiteral"]
+  AccountLiteral{} -> ["AccountLiteral"]
   TupleExpression _ subexprs -> "TupleExpression" : do
     expr <- catMaybes subexprs
     expressionCrawler expr

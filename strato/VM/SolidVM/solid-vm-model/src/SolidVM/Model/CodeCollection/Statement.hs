@@ -28,7 +28,7 @@ module SolidVM.Model.CodeCollection.Statement
   , numLitGen
   ) where
 
-import Blockchain.Model.Strato.Account
+import Blockchain.Strato.Model.Account
 import Data.Aeson
 import Data.Source
 --import Data.Swagger
