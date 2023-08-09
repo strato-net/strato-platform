@@ -124,21 +124,17 @@ const styles = StyleSheet.create({
 const InvoiceComponent = ({ invoice }) => {
   const [subtotal, setSubtotal] = useState(0);
   const [totalTax, settotalTax] = useState(0);
-  const [totalShipping, settotalShipping] = useState(0);
 
 
   useEffect(() => {
    
     let tax = 0;
-    let shipping = 0;
     invoice.orderLines.forEach(item => {
       tax += item.tax;
-      shipping += item.shippingCharges;
     });
    
     settotalTax(tax);
-    settotalShipping(shipping);
-    setSubtotal(invoice.orderTotal-tax-shipping);
+    setSubtotal(invoice.orderTotal-tax);
   }, [invoice])
 
 
@@ -224,8 +220,6 @@ const InvoiceComponent = ({ invoice }) => {
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>{item.quantity}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${item.shippingCharges}</Text>
-              {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${item.tax}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${item.amount}</Text>
@@ -250,10 +244,6 @@ const InvoiceComponent = ({ invoice }) => {
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Tax</Text>
               <Text style={styles.bottomLabel}>${totalTax}</Text>
-            </View>
-            <View style={styles.textSection}>
-              <Text style={styles.bottomLabel}>Shipping</Text>
-              <Text style={styles.bottomLabel}>${totalShipping}</Text>
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Total</Text>

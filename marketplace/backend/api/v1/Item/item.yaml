@@ -129,7 +129,7 @@ definitions:
             type: string
           inventoryId:
             type: string
-          creditBatchSerialization:
+          batchSerializationNumber:
             type: string
           quantity:
             type: number
@@ -151,7 +151,7 @@ definitions:
             type: string
           inventoryId:
             type: string
-          creditBatchSerialization:
+          batchSerializationNumber:
             type: string
           quantity:
             type: number

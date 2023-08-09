@@ -5,24 +5,25 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Product assets
 contract Product_3 is InventoryStatus {
-  
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
-                                                                 
-    string public name;                                             
-    string public description;                                                   
-    string public imageKey;                                         
-    bool public isActive;                                           
-    string public category;                                         
-    uint public createdDate;                                        
+
+    string public name;
+    string public description;
+    uint public uniqueProductCode;
+    string public imageKey;
+    bool public isActive;
+    string public category;
+    uint public createdDate;
     bool public isDeleted;
     bool public isInventoryAvailable;
 
     constructor(
         string _name,
         string _description,
+        uint _uniqueProductCode,
         string _imageKey,
         bool _isActive,
         string _category,
@@ -33,6 +34,7 @@ contract Product_3 is InventoryStatus {
 
         name = _name;
         description = _description;
+        uniqueProductCode = _uniqueProductCode;
         imageKey = _imageKey;
         isActive = _isActive;
         category = _category;
@@ -142,10 +144,6 @@ contract Product_3 is InventoryStatus {
         address _inventory,
         int _quantity
     ) public returns (uint256) {
-        // if(ownerOrganization != getUserOrganization(tx.origin)){
-        //   return RestStatus.FORBIDDEN;
-        // }
-
         Inventory inventory = Inventory(_inventory);
         inventory.updateQuantity(_quantity);
         return (RestStatus.OK);

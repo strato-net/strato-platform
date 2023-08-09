@@ -12,7 +12,7 @@ contract Item_3 is ItemStatus {
                                                         
     address public productId;
     address public inventoryId;
-    string public creditBatchSerialization;
+    string public batchSerializationNumber;
     int public quantity;
     ItemStatus public status;
     uint public createdDate;
@@ -36,7 +36,7 @@ contract Item_3 is ItemStatus {
     constructor(
         address _productId,
         address _inventoryId,
-        string _creditBatchSerialization,
+        string _batchSerializationNumber,
         int _quantity,
         ItemStatus _status,
         uint _createdDate
@@ -45,7 +45,7 @@ contract Item_3 is ItemStatus {
 
         productId = _productId;
         inventoryId = _inventoryId;
-        creditBatchSerialization = _creditBatchSerialization;
+        batchSerializationNumber = _batchSerializationNumber;
         quantity = _quantity;
         status = _status;
         createdDate = _createdDate;
@@ -54,22 +54,10 @@ contract Item_3 is ItemStatus {
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
-
-        // if (_rawMaterialSerialNumber.length > 0) {
-        //     addRawMaterials(
-        //         _uniqueProductCode,
-        //         _rawMaterialProductName,
-        //         _rawMaterialSerialNumber,
-        //         _rawMaterialProductId
-        //     );
-        // }
     }
 
-    function update(
-        ItemStatus _status,
-        uint _scheme
-    ) returns (uint) {
-        if(ownerOrganization != getUserOrganization(tx.origin)){
+    function update(ItemStatus _status, uint _scheme) returns (uint) {
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
 
@@ -86,9 +74,9 @@ contract Item_3 is ItemStatus {
 
     // Get the userOrganization
     function getUserOrganization(address caller) public returns (string) {
-      mapping(string => string) ownerCert = getUserCert(caller);
-      string userOrganization = ownerCert["organization"];
-      return userOrganization;
+        mapping(string => string) ownerCert = getUserCert(caller);
+        string userOrganization = ownerCert["organization"];
+        return userOrganization;
     }
 
     function generateOwnershipHistory(
@@ -97,7 +85,7 @@ contract Item_3 is ItemStatus {
         uint _ownershipStartDate,
         address _itemAddress
     ) returns (uint) {
-        if(ownerOrganization != getUserOrganization(tx.origin)){
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
         emit OwnershipUpdate(
@@ -150,42 +138,6 @@ contract Item_3 is ItemStatus {
         inventoryId = _inventoryId;
         return RestStatus.OK;
     }
-
-    // Add the raw material for the item
-    // function addRawMaterial(
-    //     uint _uniqueProductCode,
-    //     string _rawMaterialProductName,
-    //     string _rawMaterialSerialNumber,
-    //     string _rawMaterialProductId
-    // ) public returns (uint256) {
-    //     RawMaterial_3 rawMaterial = new RawMaterial_3(
-    //         serialNumber,
-    //         _rawMaterialSerialNumber,
-    //         _rawMaterialProductName,
-    //         _uniqueProductCode,
-    //         _rawMaterialProductId,
-    //         createdDate
-    //     );
-    //     return RestStatus.OK;
-    // }
-
-    // Add the raw materials for the item
-    // function addRawMaterials(
-    //     uint _uniqueProductCode,
-    //     string[] _rawMaterialProductName,
-    //     string[] _rawMaterialSerialNumber,
-    //     string[] _rawMaterialProductId
-    // ) public returns (uint256) {
-    //     for (uint256 i = 0; i < _rawMaterialProductName.length; i++) {
-    //         addRawMaterial(
-    //             _uniqueProductCode,
-    //             _rawMaterialProductName[i],
-    //             _rawMaterialSerialNumber[i],
-    //             _rawMaterialProductId[i]
-    //         );
-    //     }
-    //     return RestStatus.OK;
-    // }
 
     // ------------------- ASSET SHARD MEMBERSHIP FUNCTIONS ---------------
 

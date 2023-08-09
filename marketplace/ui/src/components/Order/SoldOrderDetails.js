@@ -42,7 +42,6 @@ const SoldOrderDetails = ({ user, users }) => {
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [paid, setPaid] = useState(false);
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false)
-  const [comment, setcomment] = useState("");
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
   const [isUploadSerialNumberModalOpen, setisUploadSerialNumberModalOpen] =
@@ -73,7 +72,6 @@ const SoldOrderDetails = ({ user, users }) => {
     message,
     issellerDetailsUpdating,
     success,
-    isCreateOrderLineItem,
   } = useOrderState();
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
@@ -83,14 +81,13 @@ const SoldOrderDetails = ({ user, users }) => {
   useEffect(() => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.status)));
-      setcomment(orderDetails.sellerComments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
       if (orderDetails.fullfilmentDate === 0 || orderDetails.fullfilmentDate === null || orderDetails.fullfilmentDate === undefined) {
         setSelectedDate(null);
       } else {
         setSelectedDate(dayjs.unix(orderDetails.fullfilmentDate));
       }
-     
+
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
         items.push({
@@ -101,7 +98,6 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod.productName,
           unitPrice: prod.pricePerUnit,
           quantity: prod.quantity,
-          shippingCharges: prod.shippingCharges,
           amount: prod.amount,
           serialNumber: prod,
           tax: prod.tax,
@@ -192,24 +188,6 @@ const SoldOrderDetails = ({ user, users }) => {
     setSelectedDate(date);
   };
 
-// This is checking if we need to upload serial numbers. 
-// Used to disable the sae button if the serial numbers aren't uploaded.
-  const allSerialNumbersUploaded = () => {
-    let serialsUploaded = true;
-    if (orderDetails === null) {
-      return serialsUploaded;
-    }
-    for (const orderLine of orderDetails.orderLines) {
-      if (orderLine.containsSerialNumber === true) {
-        if (orderLine.isSerialUploaded === false) {
-          serialsUploaded = false;
-        }
-      }
-    }
-    return serialsUploaded;
-  };
-
-
   const handleUpdateComment = async () => {
 
     let body = {};
@@ -219,19 +197,19 @@ const SoldOrderDetails = ({ user, users }) => {
 
       // Here we are skipping the createOrderLineItem if the serial number is already uploaded. 
       // If the serial number is uploaded an orderLineItem is already created.
-      if (details.orderLines[i].containsSerialNumber === true) {
-        continue;
-      } else {
-        body = {
-          orderId: details.orderId,
-          orderAddress: details.address,
-          orderLineId: details.orderLines[i].address,
-          serialNumber: [],
-          quantity: details.orderLines[i].quantity,
-        };
+      // if (details.orderLines[i].containsSerialNumber === true) {
+      //   continue;
+      // } else {
+      //   body = {
+      //     orderId: details.orderId,
+      //     orderAddress: details.address,
+      //     orderLineId: details.orderLines[i].address,
+      //     serialNumber: [],
+      //     quantity: details.orderLines[i].quantity,
+      //   };
 
-        promises.push(actions.createOrderLineItem(dispatch, body));
-      }
+      //   promises.push(actions.createOrderLineItem(dispatch, body));
+      // }
     }
     if (promises.length > 0) {
       await Promise.all(promises);
@@ -242,7 +220,6 @@ const SoldOrderDetails = ({ user, users }) => {
         address: Id,
 
         updates: {
-          sellerComments: comment,
           status: parseInt(getStatusByValue(status)),
 
         },
@@ -250,9 +227,8 @@ const SoldOrderDetails = ({ user, users }) => {
     } else {
       body = {
         address: Id,
-      
+
         updates: {
-          sellerComments: comment,
           status: 3,
           fullfilmentDate: dayjs(selectedDate).unix(),
         },
@@ -269,29 +245,24 @@ const SoldOrderDetails = ({ user, users }) => {
     handleCancel();
     let body = {};
     if (selectedStatus === getStatus(4)) {
-      if (comment === "") {
-        openToast("bottom", true, "Comment is mandatory to cancel order");
-        return;
-      }
       body = {
         address: Id,
-      
+
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
-          sellerComments: comment,
           // fullfilmentDate: dayjs(selectedDate).unix(),
         },
       };
     } else {
       body = {
         address: Id,
-        
+
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
         },
       };
     }
-   
+
     const isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(selectedStatus);
@@ -331,63 +302,61 @@ const SoldOrderDetails = ({ user, users }) => {
       key: "productName",
       render: (text) => <p className="text-primary text-[17px]">{decodeURIComponent(text)}</p>,
     },
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      // width: "192px",
-      
-      // This is checking the serial number. If a serial number was uploaded at inventory creation we need to provide one here
-      // If the serial number is necessary provide the upload button / view button
-      // If it is not necessary provide N/A. 
+    // {
+    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+    //   dataIndex: "serialNumber",
+    //   key: "serialNumber",
+    //   align: "center",
+    //   // width: "192px",
 
-      render: (text) => {
-        if (text.containsSerialNumber === true) {
-          if (text.isSerialUploaded === true) {
-            return (
-              <div className="flex items-center justify-center">
-                <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
-                <p
-                  onClick={() => {
-                    navigate(
-                      `${routes.SoldOrderItemDetail.url.replace(":id", text.address)}`,
-                      { state: { orderId: orderDetails.orderId, address: Id } }
-                    );
-                  }}
-                  className="hover:text-primaryHover cursor-pointer"
-                >
-                  View
-                </p>
-              </div>
-            );
-          } else {
-            return (
-              <Button
-                id="upload-button"
-                className="text-primary text-[17px]"
-                type="link"
-                disabled={orderDetails.status === 4}
-                onClick={() => {
-                  setselectedProd(text);
-                  setisUploadSerialNumberModalOpen(true);
-                }}
-              >
-                Upload
-              </Button>
-            );
-          }
-        } else {
-          return (
-            <div className="flex items-center justify-center">
-              <p className="text-primary text-[17px]">N/A</p>
-            </div>
-          )
-        }
-      }
+    //   // This is checking the serial number. If a serial number was uploaded at inventory creation we need to provide one here
+    //   // If the serial number is necessary provide the upload button / view button
+    //   // If it is not necessary provide N/A. 
 
-
-    },
+    //   render: (text) => {
+    //     if (text.containsSerialNumber === true) {
+    //       if (text.isSerialUploaded === true) {
+    //         return (
+    //           <div className="flex items-center justify-center">
+    //             <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
+    //             <p
+    //               onClick={() => {
+    //                 navigate(
+    //                   `${routes.SoldOrderItemDetail.url.replace(":id", text.address)}`,
+    //                   { state: { orderId: orderDetails.orderId, address: Id } }
+    //                 );
+    //               }}
+    //               className="hover:text-primaryHover cursor-pointer"
+    //             >
+    //               View
+    //             </p>
+    //           </div>
+    //         );
+    //       } else {
+    //         return (
+    //           <Button
+    //             id="upload-button"
+    //             className="text-primary text-[17px]"
+    //             type="link"
+    //             disabled={orderDetails.status === 4}
+    //             onClick={() => {
+    //               setselectedProd(text);
+    //               setisUploadSerialNumberModalOpen(true);
+    //             }}
+    //           >
+    //             Upload
+    //           </Button>
+    //         );
+    //       }
+    //     } else {
+    //       return (
+    //         <div className="flex items-center justify-center">
+    //           <p className="text-primary text-[17px]">N/A</p>
+    //         </div>
+    //       )
+    //     }
+    //   }
+    // },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
       dataIndex: "unitPrice",
@@ -399,15 +368,6 @@ const SoldOrderDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
       dataIndex: "quantity",
       key: "quantity",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      key: "shippingCharges",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
@@ -494,7 +454,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 id="save-button"
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false}
+                disabled={status === getStatus(3)}
                 onClick={handleUpdateComment}
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
               >
@@ -613,25 +573,6 @@ const SoldOrderDetails = ({ user, users }) => {
               </div>
             </Row>
 
-            <Row className="flex-nowrap items-center justify-between mb-6">
-              <div className="w-full">
-                <Text className="block text-primaryC text-[13px] mb-2">
-                  COMMENTS
-                </Text>
-                <TextArea
-                  rows={2}
-                  placeholder="Enter Comments"
-                  value={decodeURIComponent(comment)}
-                  disabled={
-                    orderDetails.status === 3 || orderDetails.status === 4
-                  }
-                  onChange={(event) => {
-                    setcomment(encodeURIComponent(event.target.value));
-                  }}
-                />
-              </div>
-            </Row>
-
             <DataTableComponent
               columns={column}
               data={data}
@@ -650,7 +591,7 @@ const SoldOrderDetails = ({ user, users }) => {
           orderAddress={details.address}
           dispatch={dispatch}
           actions={actions}
-          isLoading={isCreateOrderLineItem}
+          isLoading={false}
           Id={Id}
         />
       )}

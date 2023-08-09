@@ -57,7 +57,7 @@ const CreateInventoryModal = ({
     quantity: null,
     pricePerUnit: "",
     vintage: 0,
-    creditBatchSerialization: "Test123",
+    batchSerializationNumber: " ",
     status: true,
   };
 
@@ -96,7 +96,7 @@ const CreateInventoryModal = ({
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-      creditBatchSerialization: "Test123",
+      batchSerializationNumber: " ",
     };
 
     let isDone = await actions.createInventory(dispatch, body);

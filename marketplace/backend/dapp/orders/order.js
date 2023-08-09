@@ -68,8 +68,6 @@ function marshalIn(_args) {
     orderShippingCharges: 0,
     status: 1,
     amountPaid: 0,
-    buyerComments: "",
-    sellerComments: "",
     createdDate: 0,
     paymentSessionId: "",
     shippingAddress: 0
@@ -86,7 +84,6 @@ function marshalInUpdateSeller(_args){
   const defaultArgs = {
     status:1,
     fullfilmentDate:0,
-    sellerComments:''
   }
   const args = {
     ...defaultArgs,
@@ -262,8 +259,6 @@ async function updateBuyerDetails(admin, contract, _args, baseOptions) {
     switch (key) {
       case "status":
         return agg | (base << 0);
-      case "buyerComments":
-        return agg | (base << 1);
       default:
         return agg;
     }
@@ -307,8 +302,6 @@ async function updateSellerDetails(admin, contract, _args, baseOptions) {
         return agg | (base << 0);
       case "fullfilmentDate":
         return agg | (base << 1);
-      case "sellerComments":
-        return agg | (base << 2);
       default:
         return agg;
     }

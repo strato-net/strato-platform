@@ -29,7 +29,6 @@ import RestStatus from "http-status-codes";
 
 
 const BoughtOrderDetails = ({ user, users }) => {
-  const [comment, setcomment] = useState("");
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
@@ -127,7 +126,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   useEffect(() => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.status)));
-      setcomment(orderDetails.buyerComments);
      
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
@@ -139,7 +137,6 @@ const BoughtOrderDetails = ({ user, users }) => {
           productName: prod.productName,
           unitPrice: prod.pricePerUnit,
           quantity: prod.quantity,
-          shippingCharges: prod.shippingCharges,
           amount: prod.amount,
           serialNumber: prod,
           tax: prod.tax,
@@ -253,15 +250,6 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      key: "shippingCharges",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
       title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
       dataIndex: "tax",
       key: "tax",
@@ -281,7 +269,6 @@ const BoughtOrderDetails = ({ user, users }) => {
     const body = {
       address: Id,
       updates: {
-        buyerComments: encodeURIComponent(comment),
         status: 4,
       },
     };
@@ -357,25 +344,11 @@ const BoughtOrderDetails = ({ user, users }) => {
             </Row>
 
             <Row className="flex-nowrap items-center justify-between mb-6">
-              <div className="w-full">
-                <Text className="block text-primaryC text-[13px] mb-2">
-                  COMMENTS
-                </Text>
-                <TextArea
-                  rows={2}
-                  placeholder="Enter Comments"
-                  value={decodeURIComponent(comment)}
-                  disabled={status !== getStatus(1)}
-                  onChange={(event) => {
-                    setcomment(event.target.value);
-                  }}
-                />
-              </div>
               <Button
                 id="cancel-order-button"
                 type="primary"
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
-                disabled={status !== getStatus(1) || comment === "" || details.paymentSessionId !== ""}
+                disabled={status !== getStatus(1) || details.paymentSessionId !== ""}
                 onClick={handleCancelOrder}
               >
                 Cancel Order

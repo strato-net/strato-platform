@@ -404,7 +404,6 @@ describe('OrderLineItem End-To-End Tests', function () {
       address:orderAddress,
       updates:{
         status:3,
-        sellerComments:"dfjlksdjf",
         fullfilmentDate:0
       }
     }

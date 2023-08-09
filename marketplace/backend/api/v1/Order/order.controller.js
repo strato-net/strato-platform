@@ -215,7 +215,6 @@ class OrderController {
       address: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().required(),
-        buyerComments: Joi.string().required(),
       }),
     });
 
@@ -233,7 +232,6 @@ class OrderController {
       address: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().required(),
-        sellerComments: Joi.string().allow(''),
         fullfilmentDate: Joi.number()
       }),
     });

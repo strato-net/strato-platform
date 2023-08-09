@@ -8,10 +8,12 @@ contract ProductManager is InventoryStatus, RestStatus {
     // constructor() public {}
     mapping(address => mapping(string => bool))
         private uniqueSerialNumberByProductAddress;
+    mapping(string => mapping(uint => address)) orgToUPCToProduct;
 
     function addProduct(
         string _name,
         string _description,
+        uint _uniqueProductCode,
         string _imageKey,
         bool _isActive,
         string _category,
@@ -20,6 +22,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         Product_3 product = new Product_3(
             _name,
             _description,
+            _uniqueProductCode,
             _imageKey,
             _isActive,
             _category,
@@ -28,8 +31,36 @@ contract ProductManager is InventoryStatus, RestStatus {
         );
 
         string _organization = getOrganization(tx.origin);
+        orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
 
         return (RestStatus.OK, address(product));
+    }
+
+    function addProductForBuyer(
+        string _name,
+        string _description,
+        uint _uniqueProductCode,
+        string _imageKey,
+        bool _isActive,
+        string _category,
+        uint _createdDate,
+        address _newOwner
+    ) returns (address) {
+        Product_3 product = new Product_3(
+            _name,
+            _description,
+            _uniqueProductCode,
+            _imageKey,
+            _isActive,
+            _category,
+            _createdDate,
+            _newOwner
+        );
+
+        string _organization = getOrganization(_newOwner);
+        orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
+
+        return (address(product));
     }
 
     function updateProduct(
@@ -40,15 +71,8 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint _scheme
     ) returns (uint256) {
         Product_3 product = Product_3(_productAddress);
-        return
-            product.update(
-                _description,
-                _imageKey,
-                _isActive,
-                _scheme
-            );
+        return product.update(_description, _imageKey, _isActive, _scheme);
     }
-
     function deleteProduct(address _productAddress) returns (uint256, string) {
         Product_3 product = Product_3(_productAddress);
         return product.deleteProduct();
@@ -156,4 +180,17 @@ contract ProductManager is InventoryStatus, RestStatus {
         return ownerOrganization;
     }
 
+    function checkForProduct(
+        uint _uniqueProductCode,
+        address _owner
+    ) public returns (address) {
+        string _organization = getOrganization(_owner);
+
+        if (
+            orgToUPCToProduct[_organization][_uniqueProductCode] != address(0)
+        ) {
+            return orgToUPCToProduct[_organization][_uniqueProductCode];
+        }
+        return address(0);
+    }
 }

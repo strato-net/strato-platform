@@ -59,7 +59,7 @@ function marshalIn(_args) {
         status: 1,
         createdDate: 0,
         uniqueProductCode: '',
-        creditBatchSerialization: '',
+        batchSerializationNumber: '',
         quantity: 0
     };
 
@@ -142,11 +142,11 @@ async function addItem(admin, contract, _args, baseOptions) {
         history: [contractName],
     }
 
-    const [restStatus, itemAddress, repeatedSerialNumbers] = await rest.call(admin, callArgs, options)
+    const [restStatus, itemAddress] = await rest.call(admin, callArgs, options)
 
     if (parseInt(restStatus, 10) !== RestStatus.OK) throw new rest.RestError(restStatus, 0, { callArgs })
 
-    return [restStatus, itemAddress, repeatedSerialNumbers];
+    return [restStatus, itemAddress];
 }
 
 // * Transfer the ownership of the items

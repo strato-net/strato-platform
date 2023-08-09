@@ -7,20 +7,12 @@ const factory = {
         const args = {
             productId: constants.zeroAddress,
             inventoryId: constants.zeroAddress,
+            batchSerializationNumber: "Test123",
             quantity: uid,
             pricePerUnit: uid,
             tax: uid,
-            shippingCharges: uid,
             createdDate: new Date().getTime(),
             orderAddress:constants.zeroAddress
-        };
-        return args;
-    },
-    getOrderLineItemsArgs(uid) {
-        const args = {
-            orderLineId: constants.zeroAddress,
-            items: Array(4).fill(`${constants.zeroAddress}`),
-            createdDate: new Date().getTime(),
         };
         return args;
     },

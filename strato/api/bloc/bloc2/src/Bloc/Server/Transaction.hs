@@ -14,6 +14,7 @@
 
 module Bloc.Server.Transaction (
   postBlocTransaction,
+  postBlocTransactionExternal,
   postBlocTransactionRaw,
   postBlocTransactionBody,
   postBlocTransactionUnsigned,
@@ -505,6 +506,21 @@ postBlocTransaction :: ( MonadLogger m
                     -> PostBlocTransactionRequest
                     -> m [BlocChainOrTransactionResult]
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
+
+postBlocTransactionExternal :: ( MonadLogger m
+                              , A.Selectable Account Contract m
+                              , A.Selectable Account AddressState m
+                              , (Keccak256 `A.Selectable` SourceMap) m
+                              , HasBlocEnv m
+                              , HasVault m
+                              , HasSQL m
+                              )
+                            => Maybe Text
+                            -> Maybe ChainId
+                            -> Bool
+                            -> PostBlocTransactionRequest
+                            -> m [BlocChainOrTransactionResult]
+postBlocTransactionExternal bearerToken = postBlocTransaction' (Don't CacheNonce) (Text.replace "Bearer " "" <$> bearerToken)
 
 
 postBlocTransaction' :: ( MonadLogger m

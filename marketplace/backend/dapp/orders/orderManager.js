@@ -12,7 +12,6 @@ import dayjs from "dayjs";
 import productJs from "./order";
 import orderJs from 'dapp/orders/order';
 import orderLineJs from 'dapp/orders/orderLine';
-import orderLineItemJs from 'dapp/orders/orderLineItem';
 
 const contractName = "OrderManager";
 const contractFilename = `${util.cwd}/dapp/products/contracts/OrderManager.sol`;
@@ -70,7 +69,6 @@ function marshalInUpdateSeller(_args){
   const defaultArgs = {
     status:1,
     fullfilmentDate:0,
-    sellerComments:''
   }
   const args = {
     ...defaultArgs,
@@ -128,12 +126,6 @@ function bind(user, _contract, options) {
     orderLineJs.get(user, args, options);
   contract.getOrderLines = async (args,options=defaultOptions) =>
     orderLineJs.getAll(user, args, options);
-  contract.addOrderLineItems = async (args) =>
-    addOrderLineItems(user, contract, args, options);
-  contract.getOrderLineItem = async (args,options=defaultOptions) =>
-    orderLineItemJs.get(user, args, options);
-  contract.getOrderLineItems = async (args,options=defaultOptions) =>
-    orderLineItemJs.getAll(user, args, options);
   return contract;
 }
 
@@ -177,8 +169,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
     switch (key) {
       case "status":
         return agg | (base << 0);
-      case "buyerComments":
-        return agg | (base << 1);
       default:
         return agg;
     }
@@ -219,7 +209,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
  */
  async function updateSellerDetails(admin, contract, _args, baseOptions) {
   const args = marshalInUpdateSeller(_args);
-  // console.log("===========================================",_args);
 
   const scheme = Object.keys(_args).reduce((agg, key) => {
     const base = 1;
@@ -228,8 +217,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
         return agg | (base << 0);
       case "fullfilmentDate":
         return agg | (base << 1);
-      case "sellerComments":
-        return agg | (base << 2);
       default:
         return agg;
     }
@@ -288,34 +275,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
     throw new rest.RestError(restStatus, 0, { callArgs });
 
   return [restStatus, orderLineAddress];
-}
-
-/**
- * Add the oderLineItems for a order
- */
- async function addOrderLineItems(admin, contract, _args, baseOptions) {
-  const callArgs = {
-    contract,
-    method: "addOrderLineItems",
-    args: util.usc({
-      ..._args,
-    }),
-  };
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-
-  const [restStatus, orderLineItemAddress] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, orderLineItemAddress];
 }
 
 /**
