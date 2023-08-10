@@ -127,6 +127,8 @@ instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceM
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (IdentityM m) where
   select p = lift . select p
 
+instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (CirrusM m) where
+  select p = lift . select p
 
 instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
   select p = lift . select p
@@ -148,12 +150,15 @@ instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
       (toMaybe 0 $ addressStateRefChainId r)
 
 instance MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
-  select _ = Account.getCommonNameForAccount
+  select _ = Account.getX509CertForAccount
 
 instance Selectable Address Certificate m => Selectable Address Certificate (VaultM m) where
   select p = lift . select p
 
 instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT BlocEnv m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (IdentityM m) where
   select p = lift . select p
 
 instance Selectable Address Certificate m => Selectable Address Certificate (SQLM m) where
@@ -252,8 +257,8 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         Left e -> throwE $ apiErrorToServantErr e
     runM f =
       runLoggingT .
-        runCirrusM .
         runSQLM .
+        runCirrusM .
         flip runReaderT blocEnv .
         runVaultM ("http://localhost:8013/strato/v2.3" ) . 
         runIdentitytM getIdServerUrl $ f

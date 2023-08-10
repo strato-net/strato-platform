@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 
 module Bloc.Server.Transaction (
   postBlocTransaction,
@@ -514,6 +515,7 @@ postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 postBlocTransactionExternal :: ( MonadLogger m
                               , A.Selectable Account Contract m
                               , A.Selectable Account AddressState m
+                              , A.Selectable Address Certificate m
                               , (Keccak256 `A.Selectable` SourceMap) m
                               , HasBlocEnv m
                               , HasVault m

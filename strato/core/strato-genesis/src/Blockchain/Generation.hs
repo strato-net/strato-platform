@@ -853,7 +853,14 @@ contract UserRegistry {
         require((msg.sender == owner), "You don't have permission to use this function!");
 
         User targetUser = User(_userContractAddress);
-        targetUser.addCertificate(_certificateAddress);
+        targetUser.addCertificate(_userContractAddress, _certificateAddress);
+    }
+
+    function toggleUserActiveStatus(address _userContractAddress) public {
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        User targetUser = User(_userContractAddress);
+        targetUser.toggleUserActiveStatus();
     }
 }
 
@@ -862,6 +869,7 @@ contract User {
 
     mapping(address => address) userCertificates;     // Data structure subject to change
     string public commonName;
+    bool isActive;
 
     constructor() {
         owner = msg.sender;
@@ -872,8 +880,8 @@ contract User {
         require((msg.sender == owner), "You don't have permission to use this function!");
 
         commonName = _commonName;
-        userAddress = _userAddress;
         userCertificates[_userAddress] = _certificateAddress;
+        isActive = true;
     }
 
     function addCertificate(address _userAddress, address _certificateAddress) public {
@@ -883,14 +891,20 @@ contract User {
         userCertificates[_userAddress] = _certificateAddress;
     }
 
+    function toggleUserActiveStatus() public {
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        isActive = !isActive;
+    }
+
     // Checks if the caller is indeed the user the wallet belongs to.
     function authenticate() public returns (bool) {
-        return userCertificates[msg.sender] != 0
+        return userCertificates[msg.sender] != address(0);
     }
 
     function callContract(address contractToCall, string f, variadic args) public returns (variadic) {
         // Only the user that this contract is associated with, can use this function.
-        require((authenticate()), "You don't have permission to use this function!");
+        require((authenticate() && isActive), "You don't have permission to use this function!");
 
         variadic result = contractToCall.call(f, args);
         return result;
@@ -919,7 +933,7 @@ insertUserRegistryContract gi =
             (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
                 (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
-                (BC.pack $ ".userCertificates<" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
+                (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
             ]
 
         -- testAcct = SolidVMContractWithStorage 0x5516eb4e821a23b38f6a2be92ae7a0086ecaac9d 123
