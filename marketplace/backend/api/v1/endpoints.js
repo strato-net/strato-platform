@@ -103,7 +103,7 @@ export const Service = {
   get: '/:serviceName',
   getAll: '/',
   create: '/',
-  update: '/:serviceName',
+  update: '/update',
 }
 
 export const Event = {

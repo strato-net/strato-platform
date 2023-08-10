@@ -87,18 +87,20 @@ describe('Service', function() {
             { ...args, owner: globalAdmin.address, constructor: '' });
     });
 
-    // it('Create and update a Service', async () => {
-    //     // Create our Service
-    //     const args = factoryArgs(globalAdmin);
-    //     const service = await serviceChainJs.createService(globalAdmin, args, options);
-  
-    //     // Check if Service was created
-    //     const serviceData = await service.get();
-    //     assert.deepInclude(R.map(v => '' + v, serviceData), R.map(v => '' + v, args));
+    it('Create and update a Service', async () => {
+        // Create our Service
+        const args = factoryArgs(globalAdmin)
+        const service = await serviceJs.uploadContract(globalAdmin, args, options);
+        const state = await service.getState();
         
-        
-    //     const args2 = factoryArgs(globalAdmin);
-    //     const update = await service.update(args2)
-    //     assert.equal(update[0], RestStatus.OK)
-    // });
+        console.log("args", state)
+        const args2 = factoryArgs(globalAdmin);
+        const update = await contract.update(args2)
+        console.log("update", update)
+        assert.equal(update[0], RestStatus.OK)
+        assert.notStrictEqual(state.name, args2.name)
+        assert.notStrictEqual(state.description, args2.description)
+        assert.notStrictEqual(state.price, args2.price)
+        assert.notStrictEqual(state.createdDate, args2.createdDate) // How can we really check the created date?
+    });
 });

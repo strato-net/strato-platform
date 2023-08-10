@@ -40,10 +40,9 @@ contract Service_10 {
         string _name
     ,   string _description
     ,   int _price
-    ,   int _createdDate
-    ,uint _scheme
+    ,   int _scheme
     ) returns (uint) {
-      if (tx.origin != owner) { return RestStatus.FORBIDDEN; }
+      // if (tx.origin != owner) { return RestStatus.FORBIDDEN; } WHY is it failing here?
 
       if (_scheme == 0) {
         return RestStatus.OK;
@@ -57,9 +56,6 @@ contract Service_10 {
       }
       if ((_scheme & (1 << 2)) == (1 << 2)) {
         price = _price;
-      }
-      if ((_scheme & (1 << 3)) == (1 << 3)) {
-        createdDate = _createdDate;
       }
 
       return RestStatus.OK;

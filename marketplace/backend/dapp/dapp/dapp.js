@@ -1344,7 +1344,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   //----------------------------- Service (Start ->) -------------------------------
   contract.createService = async function (args, options = defaultOptions) {
     try {
-      console.log("hello");
       const createdDate = Math.floor(Date.now() / 1000);
       return managers.serviceManager.createService({ ...args, createdDate, });
     } catch (error) {
@@ -1360,6 +1359,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.serviceManager.getAll({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
+  
+  contract.updateService = async function (args, options = defaultOptions) {
+    const { address, updates } = args;
+    
+    const contract = {
+      name: serviceJs.contractName,
+      address: address,
+    };
+
+    // const chainOptions = { chainIds: [chainId], ...options };
+
+    return serviceJs.update(rawAdmin, contract, updates, options);
+  }
+  
   return contract;
 }
 

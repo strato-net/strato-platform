@@ -121,7 +121,6 @@ class ServiceController {
   static validateUpdateServiceArgs(args) {
     const updateServiceSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       updates: Joi.object({
         name: Joi.string(),
         description: Joi.string(),
