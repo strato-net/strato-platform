@@ -248,3 +248,10 @@ getCodeFromPostgres cHash =
         E.from $ \(codeRef) -> do
         E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)
         return codeRef
+
+getCommonNameForAccount :: HasCirrus m => Address -> m (Maybe Certificate)
+getCommonNameForAccount addr = do
+  fmap (listToMaybe . map E.entityVal) . cirrusQuery . E.select $
+    E.from $ \(certificate) -> do
+      E.where_ (certificate E.^. CertificateUserAddress E.==. E.val addr)
+      return $ certificate

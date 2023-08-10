@@ -52,6 +52,7 @@ import           Bloc.Server.Utils          (toMaybe)
 import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Data.AddressStateDB
@@ -99,6 +100,9 @@ instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
+instance Selectable Account Contract m => Selectable Account Contract (CirrusM m) where
+  select p = lift . select p
+
 instance Selectable Account Contract m => Selectable Account Contract (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -129,6 +133,21 @@ instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
       (addressStateRefContractRoot r)
       codePtr
       (toMaybe 0 $ addressStateRefChainId r)
+
+instance MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
+  select _ = Account.getCommonNameForAccount
+
+instance Selectable Address Certificate m => Selectable Address Certificate (VaultM m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT BlocEnv m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (SQLM m) where
+  select p = lift . select p
+
+instance Selectable Account AddressState m => Selectable Account AddressState (CirrusM m) where
+  select p = lift . select p
 
 instance Selectable Account AddressState m => Selectable Account AddressState (VaultM m) where
   select p = lift . select p
@@ -194,6 +213,7 @@ fullServer :: ( MonadLogger m
               , HasVault m
               , Selectable Account Contract m
               , Selectable Account AddressState m
+              , Selectable Address Certificate m
               , Selectable Keccak256 SourceMap m
               )
            => ServerT FullAPI m
@@ -212,6 +232,7 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         Left e -> throwE $ apiErrorToServantErr e
     runM f =
       runLoggingT .
+        runCirrusM .
         runSQLM .
         flip runReaderT blocEnv .
         runVaultM "http://localhost:8013/strato/v2.3" $ f

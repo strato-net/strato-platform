@@ -43,6 +43,7 @@ import           Data.Int                          (Int32)
 import           Data.List                         (partition, sortOn)
 import qualified Data.Vector                       as V
 
+-- import qualified Data.Map                          as M
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
@@ -122,6 +123,7 @@ mergeTxParams inner outer = inner <|> outer
 txWorker :: ( MonadLogger m
             , A.Selectable Account Contract m
             , A.Selectable Account AddressState m
+            , A.Selectable Address Certificate m
             , (Keccak256 `A.Selectable` SourceMap) m
             , HasBlocEnv m
             , HasVault m
@@ -470,6 +472,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
 postBlocTransactionParallel :: ( MonadLogger m
                                , A.Selectable Account Contract m
                                , A.Selectable Account AddressState m
+                               , A.Selectable Address Certificate m
                                , (Keccak256 `A.Selectable` SourceMap) m
                                , HasBlocEnv m
                                , HasVault m
@@ -494,6 +497,7 @@ postBlocTransactionParallel jwtToken b resolve queue c =
 postBlocTransaction :: ( MonadLogger m
                        , A.Selectable Account Contract m
                        , A.Selectable Account AddressState m
+                       , A.Selectable Address Certificate m
                        , (Keccak256 `A.Selectable` SourceMap) m
                        , HasBlocEnv m
                        , HasVault m
@@ -510,6 +514,7 @@ postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 postBlocTransaction' :: ( MonadLogger m
                         , A.Selectable Account Contract m
                         , A.Selectable Account AddressState m
+                        , A.Selectable Address Certificate m
                         , (Keccak256 `A.Selectable` SourceMap) m
                         , HasBlocEnv m
                         , HasVault m
@@ -527,10 +532,17 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
   case mJwtToken of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
     Just jwtToken -> do
-      addr' <- case mAddr of
+      addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwtToken) Nothing
-        Just addr'' -> return addr''
-      let addr = deriveAddressWithSalt Nothing (show addr') Nothing "OrderedVals []"
+        Just addr' -> return addr'
+      -- let err = CouldNotFind $ Text.concat
+      --           [ "postBlocTransaction': Couldn't find common name for user address "
+      --           , Text.pack $ formatAddressWithoutColor addr
+      --           ]
+      -- userCert <- maybe (throwIO err) pure =<<
+      --   A.select (A.Proxy @Certificate) addr
+      -- let userContractAddr = deriveAddressWithSalt Nothing (certificateCommonName userCert) Nothing "OrderedVals []"
+      -- $logInfoS "DEBUG" $ Text.pack $ show userContractAddr
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0
@@ -623,6 +635,16 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
+            -- let bfp = FunctionParameters
+            --             addr
+            --             userContractAddr
+            --             "callContract"
+            --             (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p)] ++ (M.toList $ functionpayloadArgs p))
+            --             (functionpayloadValue p)
+            --             (mergeTxParams (functionpayloadTxParams p) txParams)
+            --             (functionpayloadMetadata p)
+            --             (functionpayloadChainid p <|> chainId)
+            --             resolve
             fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp jwtToken
           xs -> do
             p <- mapM fromFunction xs
@@ -632,6 +654,20 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                                 MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
+            -- let bflp = FunctionListParameters
+            --             addr
+            --             (map (\(FunctionPayload a m r v x c md) ->
+            --                     MethodCall 
+            --                       userContractAddr 
+            --                       "callContract"  
+            --                       (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m)] ++ (M.toList r))
+            --                       (fromMaybe (Strung 0) v) 
+            --                       (mergeTxParams x txParams) 
+            --                       c 
+            --                       md
+            --                   ) p)
+            --             chainId
+            --             resolve
             fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp jwtToken
         GENESIS -> case txs of
           [] -> return []
