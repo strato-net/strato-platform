@@ -22,8 +22,11 @@ so that they could be properly moved to their respective version's subsection.
 - `/transaction/unsigned` endpoint for generating raw transaction inputs
 - Bi-directional sync functionality
 - Mappings in SolidVM receive their own table in Cirrus
+- UserRegistry and User Contract on the genesis block
+- Connection to Cirrus Certificate table added in the API
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
+- POST `/transaction` calls redirected to the corresponding User contract
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
 ### Removed
