@@ -12,6 +12,8 @@ import {
   Typography,
   Checkbox,
   Collapse,
+  Col,
+  Row,
 } from "antd";
 import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
 import {
@@ -81,7 +83,7 @@ function PropertyCreateModal({
     unitNumber,
     postalCity,
     stateOrProvince,
-    postalCode,
+    postalcode,
 
     propertyType,
     bedroomsTotal,
@@ -112,7 +114,7 @@ function PropertyCreateModal({
     !unitNumber ||
     !postalCity ||
     !stateOrProvince ||
-    !postalCode;
+    !postalcode;
 
   const isDisabledFactsView =
     !propertyType ||
@@ -175,7 +177,7 @@ function PropertyCreateModal({
       unitNumber: unitNumber,
       postalCity: postalCity,
       stateOrProvince: stateOrProvince,
-      postalCode: postalCode,
+      postalcode: postalcode,
       bathroomsTotalInteger: bathroomsTotalInteger,
       bedroomsTotal: bedroomsTotal,
       lotSizeArea: lotSizeArea,
@@ -259,14 +261,14 @@ function PropertyCreateModal({
 
     if (success) {
       api.success({
-        message: "message-success",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 1,
       });
     } else {
       api.error({
-        message: "message-failed",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 2,
@@ -307,11 +309,11 @@ function PropertyCreateModal({
           setModalView(true);
         }}
         // confirmLoading={primaryAction.loading}
-        width={850}
+        width={672}
       >
         <Divider />
         {modalView ? (
-          <Form labelCol={{ span: 8 }} labelAlign="left">
+          <Form name="basic" layout="vertical">
             <Form.Item
               label="Listing Title"
               name="title"
@@ -353,55 +355,64 @@ function PropertyCreateModal({
                 }}
               />
             </Form.Item>
-            <Form.Item
-              label="Total Units"
-              name="totalUnits"
-              rules={[
-                { required: true, message: "Please enter total units." },
-              ]}
-            >
-              <InputNumber
-                style={{ width: 150 }}
-                label="Total Units"
-                id="numberOfUnitsTotal"
-                type="Number"
-                placeholder="Total Units"
-                controls={false}
-                defaultValue={numberOfUnitsTotal}
-                value={numberOfUnitsTotal}
-                onChange={(value) => {
-                  handleChange("numberOfUnitsTotal", value);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Asking Price"
-              name="listPrice"
-              rules={[
-                { required: true, message: "Please enter asking price." },
-              ]}
-            >
-              <InputNumber
-                precision={0}
-                label="Asking Price"
-                type="Number"
-                min={0}
-                placeholder="Asking Price"
-                controls={false}
-                addonBefore="$"
-                defaultValue={listPrice}
-                value={listPrice}
-                onChange={(e) => {
-                  handleChange("listPrice", e);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
+
+            <Row>
+              <Col span={11}>
+                <Form.Item
+                  label="Total Units"
+                  name="totalUnits"
+                  rules={[
+                    { required: true, message: "Please enter total units." },
+                  ]}
+                >
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    label="Total Units"
+                    id="numberOfUnitsTotal"
+                    type="Number"
+                    placeholder="Total Units"
+                    controls={false}
+                    defaultValue={numberOfUnitsTotal}
+                    value={numberOfUnitsTotal}
+                    onChange={(value) => {
+                      handleChange("numberOfUnitsTotal", value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12} offset={1}>
+                <Form.Item
+                  label="Asking Price"
+                  name="listPrice"
+                  rules={[
+                    { required: true, message: "Please enter asking price." },
+                  ]}
+                >
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    precision={0}
+                    label="Asking Price"
+                    type="Number"
+                    min={0}
+                    placeholder="Asking Price"
+                    controls={false}
+                    addonBefore="$"
+                    defaultValue={listPrice}
+                    value={listPrice}
+                    onChange={(e) => {
+                      handleChange("listPrice", e);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item
               label="Street Name"
               name="streetName"
@@ -420,71 +431,60 @@ function PropertyCreateModal({
                 }}
               />
             </Form.Item>
-            <Form.Item
-              label="Street Number"
-              name="streetNumber"
-              rules={[
-                { required: true, message: "Please enter street number." },
-              ]}
-            >
-              <InputNumber
-                style={{ width: 150 }}
-                label="Street Number"
-                id="streetnumber"
-                type="Number"
-                placeholder="Street Number"
-                controls={false}
-                defaultValue={streetNumber}
-                value={streetNumber}
-                onChange={(value) => {
-                  handleChange("streetNumber", value);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="House Number"
-              name="houseNumber"
-              rules={[
-                { required: true, message: "Please enter house number." },
-              ]}
-            >
-              <Input
-                style={{ width: 150 }}
-                label="House Number"
-                id="housenumber"
-                placeholder="House Number"
-                controls={false}
-                defaultValue={unitNumber}
-                value={unitNumber}
-                onChange={(e) => {
-                  handleChange("unitNumber", e.target.value);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="City"
-              name="city"
-              rules={[
-                { required: true, message: "Please enter a city." },
-              ]}
-            >
-              <Input
-                label="City"
-                id="city"
-                placeholder="City"
-                defaultValue={postalCity}
-                value={postalCity}
-                onChange={(e) => {
-                  handleChange("postalCity", e.target.value);
-                }}
-              />
-            </Form.Item>
+            <Row>
+              <Col span={11}>
+                <Form.Item
+                  label="Street Number"
+                  name="streetNumber"
+                  rules={[
+                    { required: true, message: "Please enter street number." },
+                  ]}
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    label="Street Number"
+                    id="streetnumber"
+                    type="Number"
+                    placeholder="Street Number"
+                    controls={false}
+                    defaultValue={streetNumber}
+                    value={streetNumber}
+                    onChange={(value) => {
+                      handleChange("streetNumber", value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12} offset={1}>
+                <Form.Item
+                  label="House Number"
+                  name="houseNumber"
+                  rules={[
+                    { required: true, message: "Please enter house number." },
+                  ]}
+                >
+                  <Input
+                    style={{ width: "100%" }}
+                    label="House Number"
+                    id="housenumber"
+                    placeholder="House Number"
+                    controls={false}
+                    defaultValue={unitNumber}
+                    value={unitNumber}
+                    onChange={(e) => {
+                      handleChange("unitNumber", e.target.value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item
               label="State"
               name="state"
@@ -504,30 +504,54 @@ function PropertyCreateModal({
                 showSearch
               />
             </Form.Item>
-            <Form.Item
-              label="Zip Code"
-              name="postalCode"
-              rules={[{ required: true, message: "Please enter a zip code." }]}
-            >
-              <InputNumber
-                precision={0}
-                style={{ width: 150 }}
-                label="Zip Code"
-                type="Number"
-                placeholder="ZipCode"
-                min={0}
-                max={99999}
-                controls={false}
-                defaultValue={postalCode}
-                value={postalCode}
-                onChange={(value) => {
-                  handleChange("postalCode", value);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
+            <Row>
+              <Col span={11}>
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[
+                    { required: true, message: "Please enter a city." },
+                  ]}
+                >
+                  <Input
+                    label="City"
+                    id="city"
+                    placeholder="City"
+                    defaultValue={postalCity}
+                    value={postalCity}
+                    onChange={(e) => {
+                      handleChange("postalCity", e.target.value);
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12} offset={1}>
+                <Form.Item
+                  label="Zip Code"
+                  name="postalcode"
+                  rules={[{ required: true, message: "Please enter a zip code." }]}
+                >
+                  <InputNumber
+                    precision={0}
+                    style={{ width: "100%" }}
+                    label="Zip Code"
+                    type="Number"
+                    placeholder="ZipCode"
+                    min={0}
+                    max={99999}
+                    controls={false}
+                    defaultValue={postalcode}
+                    value={postalcode}
+                    onChange={(value) => {
+                      handleChange("postalcode", value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
             <Form.Item label="Upload Image" name="image">
               <div className="w-48 h-36 p-4 border-secondryD border rounded flex flex-col justify-around">
@@ -570,7 +594,7 @@ function PropertyCreateModal({
           </Form>
         ) : (
           <div>
-            <Form labelCol={{ span: 8 }} labelAlign="left">
+            <Form name="basic" layout="vertical">
               <Form.Item
                 label="Home Type"
                 name="homeType"
@@ -588,101 +612,117 @@ function PropertyCreateModal({
                   showSearch
                 />
               </Form.Item>
-              <Form.Item
-                label="Bedrooms"
-                name="bedrooms"
-                rules={[
-                  { required: true, message: "Please enter number of bedrooms." },
-                ]}
-              >
-                <InputNumber
-                  style={{ width: 150 }}
-                  precision={0}
-                  label="bedrooms"
-                  placeholder="Bedrooms"
-                  type="Number"
-                  controls={false}
-                  min={0}
-                  value={bedroomsTotal}
-                  defaultValue={bedroomsTotal}
-                  onChange={(value) => { handleChange("bedroomsTotal", value) }}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Bathrooms"
-                name="bathrooms"
-                rules={[
-                  { required: true, message: "Please enter number of bathrooms" },
-                ]}
-              >
-                <InputNumber
-                  style={{ width: 150 }}
-                  precision={0}
-                  label="bathrooms"
-                  placeholder="Bathrooms"
-                  type="Number"
-                  controls={false}
-                  min={0}
-                  defaultValue={bathroomsTotalInteger}
-                  value={bathroomsTotalInteger}
-                  onChange={(value) => { handleChange("bathroomsTotalInteger", value) }}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Living Area"
-                name="livingArea"
-                rules={[
-                  { required: true, message: "Please enter square feet" },
-                ]}
-              >
-                <InputNumber
-                  precision={0}
-                  label="Living Area"
-                  placeholder="Living Area"
-                  type="Number"
-                  controls={false}
-                  addonAfter={LivingAreaUnitElement}
-                  min={0}
-                  defaultValue={livingArea}
-                  value={livingArea}
-                  onChange={(value) => { handleChange("livingArea", value) }}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Lot Size Area"
-                name="lotSize"
-                rules={[
-                  { required: true, message: "Please enter an asking price." },
-                ]}
-              >
-                <InputNumber
-                  precision={0}
-                  label="lotSize"
-                  placeholder="Lot Size Area"
-                  type="Number"
-                  controls={false}
-                  addonAfter={LotSizeAreaUnitElement}
-                  min={0}
-                  defaultValue={lotSizeArea}
-                  value={lotSizeArea}
-                  onChange={(value) => { handleChange("lotSizeArea", value) }}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
+              <Row>
+                <Col span={11}>
+                  <Form.Item
+                    label="Bedrooms"
+                    name="bedrooms"
+                    rules={[
+                      { required: true, message: "Please enter number of bedrooms." },
+                    ]}
+                  >
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      precision={0}
+                      label="bedrooms"
+                      placeholder="Bedrooms"
+                      type="Number"
+                      controls={false}
+                      min={0}
+                      value={bedroomsTotal}
+                      defaultValue={bedroomsTotal}
+                      onChange={(value) => { handleChange("bedroomsTotal", value) }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12} offset={1}>
+                  <Form.Item
+                    label="Bathrooms"
+                    name="bathrooms"
+                    rules={[
+                      { required: true, message: "Please enter number of bathrooms" },
+                    ]}
+                  >
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      precision={0}
+                      label="bathrooms"
+                      placeholder="Bathrooms"
+                      type="Number"
+                      controls={false}
+                      min={0}
+                      defaultValue={bathroomsTotalInteger}
+                      value={bathroomsTotalInteger}
+                      onChange={(value) => { handleChange("bathroomsTotalInteger", value) }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row>
+                <Col span={11}>
+                  <Form.Item
+                    label="Living Area"
+                    name="livingArea"
+                    rules={[
+                      { required: true, message: "Please enter square feet" },
+                    ]}
+                  >
+                    <InputNumber
+                      precision={0}
+                      label="Living Area"
+                      placeholder="Living Area"
+                      type="Number"
+                      controls={false}
+                      addonAfter={LivingAreaUnitElement}
+                      min={0}
+                      defaultValue={livingArea}
+                      value={livingArea}
+                      onChange={(value) => { handleChange("livingArea", value) }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12} offset={1}>
+                  <Form.Item
+                    label="Lot Size Area"
+                    name="lotSize"
+                    rules={[
+                      { required: true, message: "Please enter an asking price." },
+                    ]}
+                  >
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      precision={0}
+                      label="lotSize"
+                      placeholder="Lot Size Area"
+                      type="Number"
+                      controls={false}
+                      addonAfter={LotSizeAreaUnitElement}
+                      min={0}
+                      defaultValue={lotSizeArea}
+                      value={lotSizeArea}
+                      onChange={(value) => { handleChange("lotSizeArea", value) }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+
               <Collapse
                 expandIconPosition={"end"}
                 defaultActiveKey={[]}
+                style={{margin:"10px 0px"}}
               >
                 {collapseData.map((item, index) => {
                   return <Panel style={{ fontWeight: 700 }} header={item.header} key={index}>
