@@ -63,13 +63,52 @@ function PropertyListings() {
     // actions.fetchProperties(dispatch, limit,1,options)
   }
 
+  const propertyList = () => {
+    return (
+      <>
+        <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
+          {properties &&
+            properties?.map((property, index) => {
+              const { listPrice, address } = property
+              return listPrice && (
+                <Col key={index} style={{ padding: '10px' }}>
+                  <Link to={`/properties/${address}`}>
+                    <PropertyCard property={property} />
+                  </Link>
+                </Col>
+              )
+            })}
+        </Row>
+        <Pagination style={{ width: '500px', margin: 'auto' }}
+          onChange={(e) => { handlePageChange(e) }} showSizeChanger={false}
+          current={currentPage}
+          defaultCurrent={1} total={500}
+        />
+      </>
+    )
+  }
+
+  const loader = (isActive) => {
+    return (
+      <div className="h-96 flex justify-center items-center">
+        <Spin spinning={isActive} size="large" />
+      </div>
+    )
+  }
+
+  const dataNotFound = () => {
+    return (
+      <div className="h-96 flex justify-center items-center" id="product-list">
+        No property available
+      </div>
+    )
+  }
+
   return (
 
     <>
       {isCreatePropertySubmitting
-        ? <div className="h-96 flex justify-center items-center">
-          <Spin spinning={isCreatePropertySubmitting} size="large" />
-        </div>
+        ? loader(isCreatePropertySubmitting)
         :
         <>
           {contextHolder}
@@ -81,37 +120,17 @@ function PropertyListings() {
                 </Typography.Title>
                 <Col style={{ display: "flex", justifyContent: "space-between" }}>
                   <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
-                  <Button style={{ backgroundColor: '#FD3200', color: '#FFFFFF' }}
+                  <Button type="primary"
                     onClick={() => {
                       toggleCreateModal(true)
                     }}
                   >List Property</Button>
                 </Col>
               </Row>
-              {isPropertiesLoading
-                ? <div className="h-96 flex justify-center items-center">
-                  <Spin spinning={isPropertiesLoading} size="large" />
-                </div>
-                :
-                <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
-                  {properties &&
-                    properties.map((property, index) => {
-                      const { listPrice, address } = property
-                      return listPrice && (
-                        <Col key={index} style={{ padding: '10px' }}>
-                          <Link to={`/properties/${address}`}>
-                            <PropertyCard property={property} />
-                          </Link>
-                        </Col>
-                      )
-                    })}
-                </Row>
-              }
-              <Pagination style={{ width: '500px', margin: 'auto', marginTop: "200px" }}
-                onChange={(e) => { handlePageChange(e) }} showSizeChanger={false}
-                current={currentPage}
-                defaultCurrent={1} total={500}
-              />
+              {isPropertiesLoading && loader(isPropertiesLoading)}
+              {!isPropertiesLoading && properties.length > 0 && propertyList()}
+              {!isPropertiesLoading && !properties.length && dataNotFound()}
+
             </Col>
           </Row>
           <PropertyCreateModal
