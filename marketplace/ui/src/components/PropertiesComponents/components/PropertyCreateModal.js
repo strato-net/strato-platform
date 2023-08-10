@@ -76,7 +76,7 @@ function PropertyCreateModal({
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [fileList, setFileList] = useState([]);
-
+  let CategoriesData = categoriesObj
   const {
     title,
     description,
@@ -277,50 +277,23 @@ function PropertyCreateModal({
     setSelectedOptions(data);
   };
 
-  const collapseData = [
-    {
-      header: "Appliances",
-      options: appliances,
-      // defaultValue: appliances,
-      keyName: "appliances",
-    },
-    {
-      header: "Cooling",
-      options: cooling,
-      // defaultValue: cooling,
-      keyName: "cooling",
-    },
-    {
-      header: "Heating",
-      options: heating,
-      // defaultValue: heating,
-      keyName: "heating",
-    },
-    {
-      header: "Flooring",
-      options: flooring,
-      // defaultValue: flooring,
-      keyName: "flooring",
-    },
-    {
-      header: "Parking",
-      options: parking_features,
-      // defaultValue: parking,
-      keyName: "parking",
-    },
-    {
-      header: "Interior Features",
-      options: interior_features,
-      // defaultValue: interior,
-      keyName: "interior",
-    },
-    {
-      header: "Exterior Features",
-      options: exterior_features,
-      // defaultValue: exterior,
-      keyName: "exterior",
-    },
-  ];
+  function convertCategories(CategoriesData) {
+    const convertedData = [];
+    for (const category in categoriesObj) {
+      if (categoriesObj.hasOwnProperty(category)) {
+        convertedData.push({
+          header: category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' '),
+          options: categoriesObj[category],
+          keyName: category,
+        });
+      }
+    }
+
+    return convertedData;
+  }
+
+  const collapseData = convertCategories();
+
 
   return (
     <>
@@ -333,7 +306,7 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        // okButtonProps={{ disabled: primaryAction.disabled }}
+        okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);
@@ -597,7 +570,7 @@ function PropertyCreateModal({
                   onChange={(e) => {
                     setSelectedImage(URL.createObjectURL(e.file.originFileObj));
                   }}
-                  customRequest={() => {}}
+                  customRequest={() => { }}
                   style={{ display: "none" }}
                   accept="image/png, image/jpeg"
                   maxCount={1}
