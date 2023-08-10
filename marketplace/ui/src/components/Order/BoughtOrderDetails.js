@@ -26,7 +26,7 @@ import { US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
-
+import TagManager from "react-gtm-module";
 
 const BoughtOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -349,7 +349,14 @@ const BoughtOrderDetails = ({ user, users }) => {
                 type="primary"
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
                 disabled={status !== getStatus(1) || details.paymentSessionId !== ""}
-                onClick={handleCancelOrder}
+                onClick={() => {
+                  handleCancelOrder()
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: 'orderDetails_bought_cancel_click',
+                    },
+                  });
+                }}
               >
                 Cancel Order
               </Button>

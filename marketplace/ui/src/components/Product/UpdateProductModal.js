@@ -6,6 +6,9 @@ import { PictureOutlined } from "@ant-design/icons";
 import getSchema from "./ProductSchema";
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import { UNIT_OF_MEASUREMENTS, unitOfMeasures } from "../../helpers/constants";
+import TagManager from "react-gtm-module";
+
 
 const { Option } = Select;
 
@@ -101,6 +104,12 @@ const UpdateProductModal = ({
           },
         }
       }
+
+      TagManager.dataLayer({
+        dataLayer: {
+          event: 'update_product',
+        },
+      });
       let isDone = await actions.updateProduct(dispatch, body);
 
       if (isDone) {

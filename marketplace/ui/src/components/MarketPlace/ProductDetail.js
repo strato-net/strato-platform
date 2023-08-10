@@ -46,6 +46,7 @@ import NestedComponent from "./NestedComponent";
 import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -563,6 +564,14 @@ const ProductDetails = ({ user, users }) => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
                       } else {
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'add_to_cart_from_product_details',
+                            product_name: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          },
+                        });
                         addItemToCart();
                       }
                     }}
@@ -574,6 +583,14 @@ const ProductDetails = ({ user, users }) => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
                       } else {
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'add_to_cart_from_product_details',
+                            product_name: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          },
+                        });
                         addItemToCart();
                       }
                     }}
@@ -589,6 +606,14 @@ const ProductDetails = ({ user, users }) => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
                       } else {
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'buy_now_from_product_details',
+                            product_name: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          },
+                        });
                         addItemToCart();
                         navigate("/checkout");
                       }
@@ -604,13 +629,22 @@ const ProductDetails = ({ user, users }) => {
                   <Button
                     type="primary"
                     className="w-40 h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
-                    href={`mailto:sales@blockapps.net`}>
+                    href={`mailto:sales@blockapps.net`}
+                    onClick={() => {
+                      TagManager.dataLayer({
+                        dataLayer: {
+                          event: 'contact_sales_from_product_details',
+                          product_name: details.name,
+                          category: details.category,
+                          productId: details.productId
+                        },
+                      });
+                    }}>
                     Contact to Buy
                   </Button>
                 </div>
               }
             </div>
-
             <div className="w-1/2 ml-8  mb-6" id="details">
               <Row className="items-center">
                 <Text className="font-semibold text-xl text-primaryB">

@@ -35,6 +35,8 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
+import TagManager from "react-gtm-module";
+
 
 const { TextArea } = Input;
 
@@ -231,6 +233,11 @@ const ConfirmOrder = () => {
       ...billingAddr
     };
 
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'add_shipping_address',
+      },
+    });
     let res = await actions.addShippingAddress(marketplaceDispatch, body);
     if (res != null) {
       await actions.fetchUserAddresses(marketplaceDispatch);
@@ -322,6 +329,11 @@ const ConfirmOrder = () => {
       shippingAddress: userAddresses[selectedAddress].address,
     };
 
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'pay_later_button',
+      },
+    });
     let isDone = await orderActions.createOrder(orderDispatch, body);
     if (isDone) {
       let updatedCart = [];
@@ -349,6 +361,11 @@ const ConfirmOrder = () => {
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
     };
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'pay_now_button',
+      },
+    });
     let data = await orderActions.createPayment(orderDispatch, body);
    
     if (data != null && data.url !== undefined) {

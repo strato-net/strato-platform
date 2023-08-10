@@ -14,6 +14,8 @@ import {
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useProductState } from "../../contexts/product";
 import { INVENTORY_STATUS } from "../../helpers/constants";
+import TagManager from "react-gtm-module";
+
 
 const { Option } = Select;
 
@@ -96,8 +98,11 @@ const UpdateInventoryModal = ({
       },
     };
 
-
-
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'update_inventory',
+      },
+    });
     let isDone = await actions.updateInventory(dispatch, body);
 
     if (isDone) {

@@ -24,6 +24,8 @@ import { CHARGES } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
+import TagManager from "react-gtm-module";
+
 const { Title, Text } = Typography;
 
 const Checkout = ({ user }) => {
@@ -298,6 +300,13 @@ const Checkout = ({ user }) => {
             let items = [...cartList];
             items.splice(
               items.findIndex(function (i) {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'delete_item_from_cart',
+                    product_name: i.product.name,
+                    category: i.product.category
+                  },
+                });
                 return i.product.address === text;
               }),
               1

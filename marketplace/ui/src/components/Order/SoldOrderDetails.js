@@ -31,6 +31,7 @@ import { US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
+import TagManager from "react-gtm-module";
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -455,7 +456,14 @@ const SoldOrderDetails = ({ user, users }) => {
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
                 disabled={status === getStatus(3)}
-                onClick={handleUpdateComment}
+                onClick={() => {
+                  handleUpdateComment()
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: 'orderDetails_sold_save_click',
+                    },
+                  });
+                }}
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
               >
                 Save

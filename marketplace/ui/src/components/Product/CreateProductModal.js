@@ -7,6 +7,9 @@ import getSchema from "./ProductSchema";
 
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import { unitOfMeasures } from "../../helpers/constants";
+import TagManager from "react-gtm-module";
+
 
 const { Option } = Select;
 
@@ -61,6 +64,11 @@ const CreateProductModal = ({
         },
       };
 
+      TagManager.dataLayer({
+        dataLayer: {
+          event: 'create_product',
+        },
+      });
       let isDone = await actions.createProduct(dispatch, body);
 
       if (isDone) {
