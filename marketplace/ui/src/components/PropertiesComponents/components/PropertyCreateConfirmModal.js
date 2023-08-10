@@ -1,13 +1,13 @@
 import React from 'react'
 import { Modal, Divider, Typography } from 'antd'
 
-function PropertyCreateConfirmModal({isCreateConfirmModalOpen, toggleCreateConfirmModal, handleSubmitCreateProperty}) {
+function PropertyCreateConfirmModal({isCreateConfirmModalOpen, toggleCreateConfirmModal, handleSubmitCreateProperty, isCreatePropertySubmitting}) {
 
   const primaryAction = {
     content: "Create a Property Listing - Confirmation",
     disabled: false,
     onAction: handleSubmitCreateProperty,
-    // loading: isCreateSubmitting
+    loading: isCreatePropertySubmitting
   };
 
   return (
@@ -20,7 +20,7 @@ function PropertyCreateConfirmModal({isCreateConfirmModalOpen, toggleCreateConfi
         okText={"Submit"}
         okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => toggleCreateConfirmModal(!isCreateConfirmModalOpen)}
-        // confirmLoading={primaryAction.loading}
+        confirmLoading={primaryAction.loading}
         width={400}
       >
         <Divider />

@@ -17,6 +17,7 @@
     "test:eventType": "yarn mocha-babel dapp/eventType/test -b",
     "test:event": "yarn mocha-babel dapp/assets/Event/test -b",
     "test:payment": "yarn mocha-babel dapp/payments/test -b",
+    "test:property": "yarn mocha-babel dapp/property/test -b",
     "test:rawMaterial": "yarn mocha-babel dapp/items/rawMaterials/test -b",
     "test:api:category": "yarn mocha-babel test/v1/category.test.js -b",
     "test:api:subCategory": "yarn mocha-babel test/v1/subCategory.test.js -b",
@@ -31,6 +32,7 @@
     "test:api:event": "yarn mocha-babel test/v1/event.test.js -b",
     "test:api:image": "yarn mocha-babel test/v1/image.test.js -b",
     "test:api:marketplace": "yarn mocha-babel test/v1/marketplace.test.js -b",
+    "test:api:property": "yarn mocha-babel test/v1/property.test.js -b",
     "test:api": "yarn mocha-babel test/v1/ -b",
     "addToDapp": "babel-node membership-utility/addToDapp.js",
     "clean": "rm -f ${CONFIG_DIR_PATH:-config}/*.deploy.yaml ${CONFIG_DIR_PATH:-config}/testdeploy.*"

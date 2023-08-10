@@ -54,11 +54,12 @@ class PropertiesController {
 
   static async create(req, res, next) {
     try {
-      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalCode } } = req
+      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalcode } } = req
+
 
       const propertyArgs = {
         ...body,
-        unparsedAddress: `${streetNumber} ${streetName} ${unitNumber}, ${postalCity}, ${stateOrProvince} ${postalCode}`,
+        unparsedAddress: `${streetNumber} ${streetName} ${unitNumber}, ${postalCity}, ${stateOrProvince} ${postalcode}`,
         standardStatus: "Active",
         //use google maps api to get lat and long, then convert to string
         latitude: "",
@@ -77,9 +78,9 @@ class PropertiesController {
           status: 1,
           serialNumber: [],
         }
-        console.log(inventoryBody)
         const inventoryResult = await dapp.createInventory(inventoryBody)
         if (inventoryResult) {
+          console.log('propertyResult', propertyResult)
           rest.response.status200(res, propertyResult)
         }
       }

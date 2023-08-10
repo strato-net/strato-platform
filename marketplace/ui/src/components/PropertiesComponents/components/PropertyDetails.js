@@ -119,7 +119,7 @@ function PropertyDetails() {
     {
       key: "Overview",
       label: `Overview`,
-      children: <OverviewTab property={property?.fields} />,
+      children: <OverviewTab description={description} />,
     },
     {
       key: "Features",
@@ -158,7 +158,7 @@ function PropertyDetails() {
   };
 
   const formattedResults = getFormattedResults(getSelectedCategories());
-
+  console.log(propertyDetails)
   return (
     <>
       {contextHolder}
@@ -178,6 +178,7 @@ function PropertyDetails() {
             onClick={() => {
               setUploadPhotosModal(true);
             }}
+            disabled
           >
             Upload Images
           </Button>
@@ -198,7 +199,7 @@ function PropertyDetails() {
                 <Col sm={24} md={20}>
                   <Space direction="horizontal">
                     <Title style={{ margin: "0px 10px 0px 0px" }} level={4}>
-                      $ {listPrice}
+                      $ {listPrice?.toLocaleString()}
                     </Title>
                     <Text>{bedroomsTotal} Bed</Text>
                     <Text>{bathroomsTotalInteger} Bath</Text>
@@ -282,6 +283,7 @@ function PropertyDetails() {
               <Button
                 type="primary"
                 style={{ marginLeft: "50px", marginTop: "30px" }}
+                disabled
               >
                 Submit Inquiry
               </Button>

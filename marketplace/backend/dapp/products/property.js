@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Property_0_3';
+const contractName = 'Property_0_4';
 const contractFilename = `${util.cwd}/dapp/products/contracts/Property.sol`;
 /** 
  * Upload a new Product 
@@ -51,7 +51,7 @@ async function uploadContract(user, _constructorArgs, options) {
  */
 function marshalIn(_args) {
     const defaultArgs = {
-        produdctId: '',
+        productId: '',
         propertType: '',
         listPrice: 0,
         unparsedAddress: '',
@@ -240,7 +240,7 @@ function bindAddress(user, address, options) {
 async function get(user, args, options) {
     const { uniqueProductID, address, ...restArgs } = args;
     let product;
-
+    console.log('productJS',uniqueProductID, address)
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
         product = await searchOne(contractName, searchArgs, options, user);

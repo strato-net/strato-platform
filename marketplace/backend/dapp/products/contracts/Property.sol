@@ -1,6 +1,6 @@
 /// @title A representation of Property assets
-contract Property_0_3 {
-    address public produdctId;
+contract Property_0_4 {
+    address public productId;
     int public listPrice;
     string public unparsedAddress;
     int public streetNumber;
@@ -98,7 +98,7 @@ contract Property_0_3 {
     bool public waterFront;
 
     constructor(
-        address _produdctId,
+        address _productId,
         int _listPrice,
         string _unparsedAddress,
         int _streetNumber,
@@ -188,7 +188,7 @@ contract Property_0_3 {
         bool _sprinklerSystem,
         bool _waterFront
     ) public {
-        produdctId = _produdctId;
+        productId = _productId;
         listPrice = _listPrice;
         unparsedAddress = _unparsedAddress;
         streetNumber = _streetNumber;
