@@ -74,8 +74,6 @@ function PropertyDetails() {
     postalCity,
     postalcode,
     stateOrProvince,
-    appliances,
-    cooling,
     description,
     lotSizeArea,
     lotSizeUnits,
@@ -163,7 +161,6 @@ function PropertyDetails() {
 
   return (
     <>
-      {/* {getSelectedCategories()} */}
       {contextHolder}
       {message && openToast("bottom")}
       <Row

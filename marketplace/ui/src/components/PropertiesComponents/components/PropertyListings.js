@@ -15,7 +15,6 @@ function PropertyListings() {
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
 
   useEffect(() => {
-    // TODO: will be used when API is ready
     actions.fetchProperties(dispatch, limit, currentPage)
   }, [currentPage])
 
@@ -28,7 +27,6 @@ function PropertyListings() {
       toggleCreateModal(false)
       toggleCreateConfirmModal(false)
     }
-    //  openToast("bottom")
   }, [isCreatePropertySubmitting])
 
   const openToast = (placement) => {
@@ -109,8 +107,7 @@ function PropertyListings() {
     <>
       {isCreatePropertySubmitting
         ? loader(isCreatePropertySubmitting)
-        :
-        <>
+        : <>
           {contextHolder}
           <Row justify="center">
             <Col span={22}>

@@ -26,7 +26,6 @@ import {
   homeTypeData,
   PropertyCheckBox,
 } from "../helpers/constants";
-import { getStringDate } from "../helpers/utils";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
 import {
@@ -52,15 +51,7 @@ function PropertyCreateModal({
   isCreateConfirmModalOpen,
   toggleCreateConfirmModal,
 }) {
-  const {
-    appliances,
-    cooling,
-    heating,
-    flooring,
-    parking_features,
-    exterior_features,
-    interior_features
-  } = categoriesObj;
+
   const dispatch = usePropertiesDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { message, success } = usePropertiesState();
@@ -130,11 +121,7 @@ function PropertyCreateModal({
   );
 
   const handleModalToggle = () => {
-    // if (isDisabledCreateView) {
-    // } else {
     setModalView(!modalView);
-
-    // }
   };
 
   const showConfirmationModal = () => {
@@ -226,13 +213,6 @@ function PropertyCreateModal({
   const handleFileChange = ({ fileList: newFileList }) =>
     setFileList(newFileList);
 
-  const uploadButton = (
-    <div>
-      <PlusOutlined />
-      <div style={{ marginTop: 8 }}>Upload</div>
-    </div>
-  );
-
   const primaryAction = {
     content: modalView ? (
       "Create a Property Listing"
@@ -277,7 +257,7 @@ function PropertyCreateModal({
     setSelectedOptions(data);
   };
 
-  function convertCategories(CategoriesData) {
+  function convertCategories() {
     const convertedData = [];
     for (const category in categoriesObj) {
       if (categoriesObj.hasOwnProperty(category)) {
