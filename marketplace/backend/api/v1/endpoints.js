@@ -100,7 +100,7 @@ export const EventType = {
 
 export const Service = {
   prefix: '/service',
-  get: '/:serviceName',
+  get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',

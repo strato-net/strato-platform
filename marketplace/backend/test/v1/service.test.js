@@ -12,6 +12,8 @@ import { Service } from '../../api/v1/endpoints'
 
 const options = { config }
 
+let test = undefined
+
 const loadEnv = dotenv.config()
 assert.isUndefined(loadEnv.error)
 
@@ -63,12 +65,28 @@ describe('Service End-To-End Tests', function () {
       createArgs,
       orgAdmin.token,
     )
-    console.log("createResponse: ", createResponse)
+    console.log("createResponse: ", createResponse.body.data)
+    test = createResponse.body.data[1]
     assert.equal(createResponse.status, 200, 'should be 200');
     assert.isDefined(createResponse.body, 'body should be defined')
   })
+  
+  it('Get a Service', async () => {
+    
+    const getService = await get(
+      Service.prefix,
+      Service.get.replace(':address', test),
+      {},
+      orgAdmin.token,
+    )
+    
+    assert.equal(getService.status, 200, 'should be 200');
+    assert.isDefined(getService.body, 'body should be defined');
+    console.log(" a getService: ", getService.body.data)
+  })
 
   it('Get all Services', async () => {
+    
     // get Services
     const getServices = await get(
       Service.prefix,
@@ -76,7 +94,7 @@ describe('Service End-To-End Tests', function () {
       {},
       orgAdmin.token,
     )
-    console.log("getServices: ", getServices)
+    console.log("getServices: ", getServices.body.data)
     assert.equal(getServices.status, 200, 'should be 200');
     assert.isDefined(getServices.body, 'body should be defined');
     assert.isDefined(getServices.body.data, 'body should be defined');
@@ -98,6 +116,17 @@ describe('Service End-To-End Tests', function () {
     
     assert.equal(createResponse.status, 200, 'should be 200');
     assert.isDefined(createResponse.body, 'body should be defined')
+    
+    const getService0 = await get(
+      Service.prefix,
+      Service.get.replace(':address', createResponse.body.data[1]),
+      {},
+      orgAdmin.token,
+    )
+    
+    assert.equal(getService0.status, 200, 'should be 200');
+    assert.isDefined(getService0.body, 'body should be defined');
+    console.log("getService0: ", getService0.body.data)
 
     const updateArgs = {
       ...updateServiceArgs(createResponse.body.data[1], util.uid()),
@@ -112,11 +141,21 @@ describe('Service End-To-End Tests', function () {
     )
     assert.equal(getMachine.status, 200, 'should be 200');
     assert.isDefined(getMachine.body, 'body should be defined');
-    assert.isDefined(getMachine.body.data, 'body should be defined');
-    console.log("getMachine: ", getMachine.name)
-    assert.notStrictEqual(getMachine.body.data.name, createArgs.name)
-    assert.notStrictEqual(getMachine.body.data.description, createArgs.description)
-    assert.notStrictEqual(getMachine.body.data.price, createArgs.price)
-    assert.equal(getMachine.body.data.createdDate, createArgs.createdDate);
+    
+    const getService = await get(
+      Service.prefix,
+      Service.get.replace(':address', createResponse.body.data[1]),
+      {},
+      orgAdmin.token,
+    )
+    
+    assert.equal(getService.status, 200, 'should be 200');
+    assert.isDefined(getService.body, 'body should be defined');
+    console.log("getService: ", getService.body.data)
+    
+    assert.notStrictEqual(getService.body.data.name, getService0.body.data.name)
+    assert.notStrictEqual(getService.body.data.description, getService0.body.data.description)
+    assert.notStrictEqual(getService.body.data.price, getService0.body.data.price)
+    assert.equal(getService.body.data.createdDate, getService0.body.data.createdDate);
   })
 })

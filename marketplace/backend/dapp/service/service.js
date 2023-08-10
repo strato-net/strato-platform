@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgsLike, setSearchQueryOptionsPrime } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
 
 
@@ -183,31 +183,8 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const services = await searchAllWithQueryArgsLike(contractName, args, options, admin)
-
-    const queryArgs = setSearchQueryOptionsPrime(
-        {
-          ...args,
-          limit: undefined,
-          offset: 0
-        }
-    )
-
-    const totalResult = await searchAll(
-        contractName,
-        {
-          ...queryArgs,
-          sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
-          queryOptions: {
-            ...queryArgs.queryOptions,
-            select: 'count'
-          },
-        },
-        options,
-        admin,
-      )
-
-    return { services: services.map((service) => marshalOut(service)), total: totalResult[0].count}
+  const services = await searchAllWithQueryArgs(contractName, args, options, admin)
+  return services.map((service) => marshalOut(service))
 }
 
 /**
@@ -234,8 +211,6 @@ async function update(admin, contract, _args, baseOptions) {
           return agg | (base << 1)
         case 'price':
           return agg | (base << 2)
-        case 'createdDate':
-          return agg | (base << 3)
         default:
           return agg
       }

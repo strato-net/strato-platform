@@ -104,26 +104,11 @@ function bindAddress(user, address, options) {
 }
 
 async function get(admin, args, options) {
-  const { uniqueserviceId, address, ...restArgs } = args
-  let service
-
-  if (address) {
-    const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address })
-    service = await searchOne(serviceJS.contractName, searchArgs, options, admin)
-  }
-  else {
-    const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueserviceId', value: uniqueserviceId })
-    service = await searchOne(serviceJS.contractName, searchArgs, options, admin)
-  }
-  if (!service) {
-    return undefined
-  }
-  return serviceJS.marshalOut(service)
+  return serviceJS.get(admin, args, options);
 }
 
-async function getAll(admin, args = {}, options) {
-  const services = await searchAllWithQueryArgs(serviceJS.contractName, args, options, admin)
-  return services.map((service) => serviceJS.marshalOut(service))
+async function getAll(admin, args, options) {
+  return serviceJS.getAll(admin, args, options);
 }
 
 async function createService(admin, contract, _args, baseOptions) {

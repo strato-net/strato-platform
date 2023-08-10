@@ -10,16 +10,14 @@ class ServiceController {
   static async get(req, res, next) {
     try {
       const { dapp, params } = req
-      const { address, chainId } = params 
+      const { address } = params 
      
       let args
       let chainOptions = options
       
       if (address) {
         args = { address }
-        if (chainId) {
-          chainOptions = { ...options, chainIds: [chainId] }
-        }
+        chainOptions = { ...options }
       }
 
       const result = await dapp.getService(args, chainOptions)
@@ -106,7 +104,6 @@ class ServiceController {
       name: Joi.string().required(),
       description: Joi.string().required(),
       price: Joi.number().required(),
-      createdDate: Joi.number().required(),
     });
 
     const validation = createServiceSchema.validate(args);

@@ -23,14 +23,14 @@ contract Service_10 {
         ,   int _price
         ,   int _createdDate
     ) public {
-        owner = msg.sender;
+        owner = tx.origin;
 
         name = _name;
         description = _description;
         price = _price;
         createdDate = _createdDate;
 
-        mapping(string => string) ownerCert = getUserCert(msg.sender);
+        mapping(string => string) ownerCert = getUserCert(tx.origin);
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
@@ -42,7 +42,9 @@ contract Service_10 {
     ,   int _price
     ,   int _scheme
     ) returns (uint) {
-      // if (tx.origin != owner) { return RestStatus.FORBIDDEN; } WHY is it failing here?
+      if(ownerOrganization != getUserOrganization(tx.origin)){
+        return RestStatus.FORBIDDEN;
+      }
 
       if (_scheme == 0) {
         return RestStatus.OK;
@@ -59,5 +61,12 @@ contract Service_10 {
       }
 
       return RestStatus.OK;
+    }
+    
+    // Get the userOrganization
+    function getUserOrganization(address caller) public returns (string) {
+      mapping(string => string) ownerCert = getUserCert(caller);
+      string userOrganization = ownerCert["organization"];
+      return userOrganization;
     }
 }

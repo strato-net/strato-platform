@@ -1354,10 +1354,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while createService");
     }
   };
+  
+  contract.getService = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return managers.serviceManager.get({ ...args, ownerOrganization: userOrganization }, getOptions);
+  };
 
   contract.getServices = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.serviceManager.getAll({ ...args, ownerOrganization: userOrganization }, getOptions);
+    return managers.serviceManager.getAll({ ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
   
   contract.updateService = async function (args, options = defaultOptions) {
