@@ -303,7 +303,7 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        // okButtonProps={{ disabled: primaryAction.disabled }}
+        okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);
@@ -722,7 +722,7 @@ function PropertyCreateModal({
               <Collapse
                 expandIconPosition={"end"}
                 defaultActiveKey={[]}
-                style={{margin:"10px 0px"}}
+                style={{ margin: "10px 0px" }}
               >
                 {collapseData.map((item, index) => {
                   return <Panel style={{ fontWeight: 700 }} header={item.header} key={index}>

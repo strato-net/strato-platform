@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Spin, Typography, Tabs, Col, Row, notification, Button } from "antd";
+import { Spin, Typography, Tabs, Col, Row, notification, Button, Space } from "antd";
 import ImageCollage from '../../Carousel/ImageCollage';
 import OverviewTab from "./ListingTabs/OverviewTab";
 import FeaturesTab from "./ListingTabs/FeaturesTab";
@@ -9,6 +9,7 @@ import { useParams } from 'react-router-dom';
 import { actions } from '../../../contexts/propertyContext/actions';
 import { usePropertiesDispatch, usePropertiesState } from '../../../contexts/propertyContext';
 import UploadPhotosModal from '../../Product/UploadPhotosModal';
+import { appliancesData, coolingData, exteriorFeaturesData, flooringData, heatingData, interiorFeaturesData, parkingFeaturesData } from '../helpers/constants';
 
 function PropertyDetails() {
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
@@ -46,7 +47,7 @@ function PropertyDetails() {
     images,
     reviews,
     postalCity,
-    postalCode,
+    postalcode,
     stateOrProvince,
     appliances,
     cooling,
@@ -64,9 +65,53 @@ function PropertyDetails() {
     numberOfUnitsTotal
   } = propertyDetails || {};
 
-  // const property = {
-  //   fields: "Property detail"
-  // }
+  let appliance = []
+  let coolings = []
+  let heating = []
+  let flooring = []
+  let utilities = []
+  let parking = []
+
+  const seperateKeys = () => {
+    let featureData = {}
+
+    featureData["applianceArray"] = appliancesData.map(item => item.value)
+    featureData["coolingArray"] = coolingData.map(item => item.value)
+    featureData["heatingArray"] = heatingData.map(item => item.value)
+    featureData["flooringArray"] = flooringData.map(item => item.value)
+    featureData["parkingArray"] = parkingFeaturesData.map(item => item.value)
+    featureData["interiorArray"] = interiorFeaturesData.map(item => item.value)
+    featureData["exteriorArray"] = exteriorFeaturesData.map(item => item.value)
+
+    for (let key in propertyDetails) {
+      if (typeof propertyDetails[key] === 'boolean' && propertyDetails[key]) {
+        switch (true) {
+          case featureData["applianceArray"].includes(key):
+            appliance.push(appliancesData[featureData["applianceArray"].indexOf(key)].label);
+            break;
+          case featureData["coolingArray"].includes(key):
+            coolings.push(coolingData[featureData["coolingArray"].indexOf(key)].label);
+            break;
+          case featureData["heatingArray"].includes(key):
+            heating.push(heatingData[featureData["heatingArray"].indexOf(key)].label);
+            break;
+          case featureData["flooringArray"].includes(key):
+            flooring.push(flooringData[featureData["flooringArray"].indexOf(key)].label);
+            break;
+          case featureData["parkingArray"].includes(key):
+            parking.push(parkingFeaturesData[featureData["parkingArray"].indexOf(key)].label);
+            break;
+          case featureData["interiorArray"].includes(key):
+            parking.push(interiorFeaturesData[featureData["interiorArray"].indexOf(key)].label);
+            break;
+          case featureData["exteriorArray"].includes(key):
+            parking.push(exteriorFeaturesData[featureData["exteriorArray"].indexOf(key)].label);
+            break;
+        }
+      }
+    }
+
+  }
 
   const tabs = [
     {
@@ -93,6 +138,7 @@ function PropertyDetails() {
 
   return (
     <>
+      {seperateKeys()}
       {contextHolder}
       {message && openToast("bottom")}
       <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
@@ -121,30 +167,31 @@ function PropertyDetails() {
                 <Col
                   sm={24} md={20}
                 >
-                  <Row align="top"  >
-                    <Col span={8}>
-                      <Title
-                        style={{ marginTop: 0, marginRight: 10 }}
-                        level={4}
-                      >
-                        $ {listPrice}
-                      </Title>
-                    </Col>
-                    <Col span={12} style={{ display: "flex", justifyContent: "space-around" }}>
-                      <Text>{bedroomsTotal} Bed</Text>
-                      <Text>{bathroomsTotalInteger} Bath</Text>
-                      <Text>{livingArea} {livingAreaUnits}</Text>
-                    </Col>
-                    <Col span={4}></Col>
-                  </Row>
+
+                  <Space direction="horizontal">
+                    <Title
+                      style={{ margin: "0px 10px 0px 0px" }}
+                      level={4}
+                    >
+                      $ {listPrice}
+                    </Title>
+                    <Text>{bedroomsTotal} Bed</Text>
+                    <Text>{bathroomsTotalInteger} Bath</Text>
+                    <Text>{livingArea} {livingAreaUnits}</Text>
+                  </Space>
+
                   <Row>
-                    <Text style={{ marginTop: 2 }} level={4}>
-                      {postalCity}, {stateOrProvince}{" "}
-                      {postalCode}
+                    <Text style={{ margin: "5px 0px 0px 10px" }} level={4}>
+                      {postalCity}, {stateOrProvince},
+                      {postalcode}
                     </Text>
                   </Row>
                   <Row>
-                    {standardStatus === "Active" ? <span style={{ width: '10px', height: "10px", borderRadius: "50%", backgroundColor: "green", margin: '5px' }}></span> : ""}
+                    <span style={{
+                      width: '10px', height: "10px", borderRadius: "50%",
+                      backgroundColor: `${standardStatus === "Active" ? "green" : "red"}`, margin: '5px'
+                    }}>
+                    </span>
                     <Text strong>{standardStatus}</Text>
                   </Row>
                   <Row style={{ marginTop: "15px" }} >
@@ -167,22 +214,21 @@ function PropertyDetails() {
                         <Col span={8}>
                           <Text strong>appliances</Text>
                         </Col>
-                        <Col span={16}>Refrigerator, Stove, Water heater</Col>
+                        <Col span={16}>{appliance.join(', ')}</Col>
                       </Row>
-
 
                       <Row>
                         <Col span={8}>
                           <Text strong>Cooling</Text>
                         </Col>
-                        <Col span={16}>Window Unit</Col>
+                        <Col span={16}>{coolings.join(', ')}</Col>
                       </Row>
 
                       <Row>
                         <Col span={8}>
                           <Text strong>Heating</Text>
                         </Col>
-                        <Col span={16}>Wall heaters</Col>
+                        <Col span={16}>{heating.join(', ')}</Col>
                       </Row>
 
                       <Row>
@@ -205,7 +251,7 @@ function PropertyDetails() {
                         <Col span={8}>
                           <Text strong>parking</Text>
                         </Col>
-                        <Col span={16}>On-street</Col>
+                        <Col span={16}>{parking.join(', ')}</Col>
                       </Row>
 
                       <Row>
