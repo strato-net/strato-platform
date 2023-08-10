@@ -17,7 +17,7 @@ contract OrderManager is RestStatus, OrderStatus {
         string _paymentSessionId,
         address _shippingAddress
     ) public returns (uint256, address) {
-        Order order = new Order(
+        Order_2 order = new Order_2(
             _orderId,
             _buyerOrganization,
             _sellerOrganization,
@@ -38,7 +38,7 @@ contract OrderManager is RestStatus, OrderStatus {
         OrderStatus _status,
         uint _scheme
     ) public returns (uint, string, string) {
-        Order order = Order(_orderAddress);
+        Order_2 order = Order_2(_orderAddress);
         return order.updateBuyerDetails(_status, _scheme);
     }
 
@@ -48,7 +48,7 @@ contract OrderManager is RestStatus, OrderStatus {
         uint _fullfilmentDate,
         uint _scheme
     ) public returns (uint, string, string) {
-        Order order = Order(_orderAddress);
+        Order_2 order = Order_2(_orderAddress);
         return
             order.updateSellerDetails(
                 _status,
@@ -63,7 +63,7 @@ contract OrderManager is RestStatus, OrderStatus {
         address[] _orderLines,
         bool _isBuyer
     ) public returns (uint, string, string) {
-        Order order = Order(_orderAddress);
+        Order_2 order = Order_2(_orderAddress);
         return
             order.getInventoriesAndAvailableQuantity(
                 _status,
@@ -82,7 +82,7 @@ contract OrderManager is RestStatus, OrderStatus {
         uint _tax,
         uint _createdDate
     ) public returns (uint256, address) {
-        Order order = Order(_orderAddress);
+        Order_2 order = Order_2(_orderAddress);
         return
             order.addOrderLine(
                 _orderAddress,

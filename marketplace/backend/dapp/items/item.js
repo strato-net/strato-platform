@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 
-const contractName = 'Item_3';
+const contractName = 'Item_4';
 const contractFilename = `${util.cwd}/dapp/items/contracts/Item.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 

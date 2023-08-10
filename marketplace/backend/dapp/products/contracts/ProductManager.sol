@@ -19,7 +19,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         string _category,
         uint _createdDate
     ) returns (uint256, address) {
-        Product_3 product = new Product_3(
+        Product_4 product = new Product_4(
             _name,
             _description,
             _uniqueProductCode,
@@ -46,7 +46,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint _createdDate,
         address _newOwner
     ) returns (address) {
-        Product_3 product = new Product_3(
+        Product_4 product = new Product_4(
             _name,
             _description,
             _uniqueProductCode,
@@ -70,11 +70,11 @@ contract ProductManager is InventoryStatus, RestStatus {
         bool _isActive,
         uint _scheme
     ) returns (uint256) {
-        Product_3 product = Product_3(_productAddress);
+        Product_4 product = Product_4(_productAddress);
         return product.update(_description, _imageKey, _isActive, _scheme);
     }
     function deleteProduct(address _productAddress) returns (uint256, string) {
-        Product_3 product = Product_3(_productAddress);
+        Product_4 product = Product_4(_productAddress);
         return product.deleteProduct();
     }
 
@@ -88,7 +88,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         string[] _serialNumbers
     ) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
-            Product_3 product = Product_3(_productAddress);
+            Product_4 product = Product_4(_productAddress);
             return
                 product.addInventory(
                     _quantity,
@@ -115,7 +115,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                 ] = true;
             }
 
-            Product_3 product = Product_3(_productAddress);
+            Product_4 product = Product_4(_productAddress);
             return
                 product.addInventory(
                     _quantity,
@@ -135,7 +135,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         InventoryStatus _status,
         uint _scheme
     ) returns (uint256) {
-        Product_3 product = Product_3(_productAddress);
+        Product_4 product = Product_4(_productAddress);
         return
             product.updateInventory(
                 _inventory,
@@ -151,7 +151,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         bool _isReduce
     ) returns (uint256) {
         for (uint i = 0; i < _inventories.length; i++) {
-            Inventory inventory = Inventory(_inventories[i]);
+            Inventory_2 inventory = Inventory_2(_inventories[i]);
 
             if (_isReduce) {
                 if (_quantities[i] > inventory.availableQuantity()) {

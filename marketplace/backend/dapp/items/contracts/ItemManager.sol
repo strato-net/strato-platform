@@ -20,7 +20,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     ) public returns (uint, string) {
         string itemAddresses = "";
 
-        Item_3 itemAddr = new Item_3(
+        Item_4 itemAddr = new Item_4(
             _productId,
             _inventoryId,
             _batchSerializationNumber,
@@ -49,7 +49,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         uint _scheme
     ) public returns (uint) {
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
-            Item_3 item = Item_3(_itemsAddress[i]);
+            Item_4 item = Item_4(_itemsAddress[i]);
             item.update(_status, _scheme);
         }
         return (RestStatus.OK);
@@ -87,11 +87,11 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _newOwner,
         int _newQuantity
     ) public returns (address, address) {
-        Item_3 item = Item_3(_itemAddress[0]);
-        Product_3 product;
-        Inventory inventory;
+        Item_4 item = Item_4(_itemAddress[0]);
+        Product_4 product;
+        Inventory_2 inventory;
 
-        Product_3 oldProduct = Product_3(item.productId());
+        Product_4 oldProduct = Product_4(item.productId());
         address productAddress = _productManager.checkForProduct(
             oldProduct.uniqueProductCode(),
             _newOwner
@@ -108,12 +108,12 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             );
-            product = Product_3(addr);
+            product = Product_4(addr);
         } else {
-            product = Product_3(productAddress);
+            product = Product_4(productAddress);
         }
 
-        Inventory oldInventory = Inventory(item.inventoryId());
+        Inventory_2 oldInventory = Inventory_2(item.inventoryId());
 
         (uint status, address inventory) = product.addInventory(
             _newQuantity,
@@ -125,7 +125,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         );
 
         for (uint i = 0; i < _itemAddress.length; i++) {
-            Item_3 _item = Item_3(_itemAddress[i]);
+            Item_4 _item = Item_4(_itemAddress[i]);
             if (oldInventory.availableQuantity() == _newQuantity) {
                 _item.transferOwnership(
                     _newOwner,
@@ -133,7 +133,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     address(inventory)
                 );
             } else {
-                Item_3 itemAddr = new Item_3(
+                Item_4 itemAddr = new Item_4(
                     _item.productId(),
                     _item.inventoryId(),
                     _item.batchSerializationNumber(),

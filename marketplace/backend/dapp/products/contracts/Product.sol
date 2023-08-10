@@ -4,7 +4,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Product assets
-contract Product_3 is InventoryStatus {
+contract Product_4 is InventoryStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -111,7 +111,7 @@ contract Product_3 is InventoryStatus {
         if (!isInventoryAvailable) {
             isInventoryAvailable = true;
         }
-        Inventory inventory = new Inventory(
+        Inventory_2 inventory = new Inventory_2(
             category,
             _quantity,
             _pricePerUnit,
@@ -134,7 +134,7 @@ contract Product_3 is InventoryStatus {
             return RestStatus.FORBIDDEN;
         }
 
-        Inventory inventory = Inventory(_inventory);
+        Inventory_2 inventory = Inventory_2(_inventory);
         inventory.update(_pricePerUnit, _status, _scheme);
         return (RestStatus.OK);
     }
@@ -144,7 +144,7 @@ contract Product_3 is InventoryStatus {
         address _inventory,
         int _quantity
     ) public returns (uint256) {
-        Inventory inventory = Inventory(_inventory);
+        Inventory_2 inventory = Inventory_2(_inventory);
         inventory.updateQuantity(_quantity);
         return (RestStatus.OK);
     }

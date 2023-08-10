@@ -5,7 +5,7 @@ import "./OrderStatus.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
 
 /// @title A representation of Order assets
-contract Order is OrderStatus {
+contract Order_2 is OrderStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -113,7 +113,7 @@ contract Order is OrderStatus {
         // check for open status to closed status
         if (_status == OrderStatus.CLOSED) {
             for (uint i = 0; i < orderLines.length; i++) {
-                OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
+                OrderLine_3 orderLine = OrderLine_3(orderLines[i]);
             }
             fullfilmentDate = _fullfilmentDate;
             return
@@ -157,7 +157,7 @@ contract Order is OrderStatus {
             return (RestStatus.FORBIDDEN, address(0));
         }
 
-        OrderLine_2 orderLine = new OrderLine_2(
+        OrderLine_3 orderLine = new OrderLine_3(
             _orderAddress,
             _productId,
             _inventoryId,
@@ -198,8 +198,8 @@ contract Order is OrderStatus {
         string inventories = "";
         string orderLineQuantities = "";
         for (uint i = 0; i < orderLines.length; i++) {
-            OrderLine_2 orderLine = OrderLine_2(address(orderLines[i]));
-            Inventory inventory = Inventory(address(orderLine.inventoryId()));
+            OrderLine_3 orderLine = OrderLine_3(address(orderLines[i]));
+            Inventory_2 inventory = Inventory_2(address(orderLine.inventoryId()));
             inventories += string(address(orderLine.inventoryId())) + ",";
             orderLineQuantities += string(orderLine.quantity()) + ",";
         }

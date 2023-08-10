@@ -6,7 +6,7 @@ import "/dapp/items/contracts/Item.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets
-contract OrderLine_2 is ItemStatus, OrderStatus {
+contract OrderLine_3 is ItemStatus, OrderStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;

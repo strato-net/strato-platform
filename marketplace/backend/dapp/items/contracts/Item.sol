@@ -4,7 +4,7 @@ import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 
 /// @title A representation of Item assets
-contract Item_3 is ItemStatus {
+contract Item_4 is ItemStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
