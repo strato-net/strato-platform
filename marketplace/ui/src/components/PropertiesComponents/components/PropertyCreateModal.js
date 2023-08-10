@@ -8,15 +8,33 @@ import {
   Upload,
   Button,
   Select,
-  notification
+  notification,
+  Typography,
+  Checkbox,
+  Collapse,
+  Col,
+  Row,
 } from "antd";
-import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
-import { StateData, HomeTypeData } from "../helpers/constants";
-import { getStringDate } from "../helpers/utils";
+import {
+  PlusOutlined,
+  ArrowLeftOutlined,
+  PictureOutlined,
+} from "@ant-design/icons";
+import {
+  categoriesObj,
+  stateData,
+  homeTypeData,
+  PropertyCheckBox,
+} from "../helpers/constants";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
-import { usePropertiesDispatch, usePropertiesState } from "../../../contexts/propertyContext";
-
+import {
+  usePropertiesDispatch,
+  usePropertiesState,
+} from "../../../contexts/propertyContext";
+const { Panel } = Collapse;
+const { Text } = Typography;
+const { Option } = Select;
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -33,54 +51,77 @@ function PropertyCreateModal({
   isCreateConfirmModalOpen,
   toggleCreateConfirmModal,
 }) {
+
   const dispatch = usePropertiesDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { message, success } = usePropertiesState()
+  const { message, success } = usePropertiesState();
 
   const [selectedImage, setSelectedImage] = useState(null);
-  const [propertyData, setPropertyData] = useState({});
-  const [homeType, setHomeType] = useState("");
-  const [bedrooms, setBedrooms] = useState("");
-  const [bathrooms, setBathrooms] = useState("");
-  const [squareFeet, setSquareFeet] = useState("");
-  const [lotSize, setLotSize] = useState("");
+  const [propertyData, setPropertyData] = useState({
+    lotSizeUnits: "sqft",
+    livingAreaUnits: "sqft",
+    numberOfUnitsTotal: 1,
+  });
+  const [selectedOptions, setSelectedOptions] = useState(PropertyCheckBox);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [fileList, setFileList] = useState([]);
-
+  let CategoriesData = categoriesObj
   const {
-    name,
+    title,
     description,
-    lotNumber,
-    addressLine1,
-    addressLine2,
-    city,
-    state,
-    zipCode,
-    askingPrice,
+    listPrice,
+    streetName,
+    streetNumber,
+    unitNumber,
+    postalCity,
+    stateOrProvince,
+    postalcode,
+
+    propertyType,
+    bedroomsTotal,
+    bathroomsTotalInteger,
+    livingArea,
+    lotSizeArea,
+    numberOfUnitsTotal,
+
+
+    lotSizeUnits,
+    livingAreaUnits,
   } = propertyData;
 
   const isDisabledCreateView =
-    !name ||
+    !title ||
     !description ||
-    !lotNumber ||
-    !addressLine1 ||
-    !addressLine2 ||
-    !city ||
-    !state ||
-    !zipCode ||
-    !askingPrice;
+    !listPrice ||
+    !streetName ||
+    !streetNumber ||
+    !unitNumber ||
+    !postalCity ||
+    !stateOrProvince ||
+    !postalcode;
 
   const isDisabledFactsView =
-    !homeType ||
-    !bedrooms ||
-    !bathrooms ||
-    !squareFeet ||
-    !lotSize;
+    !propertyType ||
+    !bedroomsTotal ||
+    !bathroomsTotalInteger ||
+    !livingArea ||
+    !lotSizeArea;
+
+  const LivingAreaUnitElement = (
+    <Select defaultValue={livingAreaUnits}>
+      <Option value={livingAreaUnits}>{livingAreaUnits}</Option>
+    </Select>
+  );
+  const LotSizeAreaUnitElement = (
+    <Select defaultValue={lotSizeUnits}>
+      <Option value={lotSizeUnits}>{livingAreaUnits}</Option>
+    </Select>
+  );
 
   const handleModalToggle = () => {
-      setModalView(!modalView);
+    setModalView(!modalView);
   };
 
   const showConfirmationModal = () => {
@@ -94,7 +135,7 @@ function PropertyCreateModal({
   };
 
   function beforeUpload(file) {
-    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
+    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
       openToast("bottom", "Image must be of jpeg or png format");
     }
@@ -107,104 +148,30 @@ function PropertyCreateModal({
 
   //creates the listing for property
   const handleSubmitCreateProperty = async () => {
-
     const body = {
-      title: 'body.title',
-      description: 'body.description',
-      propertyType: 'body.propertyType',
-      listPrice: 100000,
-      unparsedAddress: '${body.streetNumber} ${body.streetName} ${body.unitNumber}, ${body.postalCity}, ${body.stateOrProvince} ${body.postalCode}',
-      streetNumber: 8,
-      streetName: 'body.streetName',
-      unitNumber: 'body.unitNumber',
-      postalCity: 'state.postalCity',
-      stateOrProvince: 'body.stateOrProvince',
-      postalcode: 12345,
-      bathroomsTotalInteger: 5,
-      bedroomsTotal: 7,
-      lotSizeArea: 1000,
-      lotSizeUnits: 'sqft',
-      livingArea: 100,
-      livingAreaUnits: 'sqft', 
-      numberOfUnitsTotal: 3,
+      title: title,
+      description: description,
+      propertyType: propertyType,
+      listPrice: listPrice,
+      streetNumber: streetNumber,
+      streetName: streetName,
+      unitNumber: unitNumber,
+      postalCity: postalCity,
+      stateOrProvince: stateOrProvince,
+      postalcode: postalcode,
+      bathroomsTotalInteger: bathroomsTotalInteger,
+      bedroomsTotal: bedroomsTotal,
+      lotSizeArea: lotSizeArea,
+      lotSizeUnits: lotSizeUnits,
+      livingArea: livingArea,
+      livingAreaUnits: livingAreaUnits,
+      latitude: "",
+      longitude: "",
+      numberOfUnitsTotal: numberOfUnitsTotal,
 
-      // Appliances
-      dishwasher: true,
-      dryer: true,
-      freezer: true,
-      garbageDisposal: true,
-      microwave: true,
-      ovenOrRange: true,
-      refrigerator: true,
-      washer: true,
-      waterHeater: true,
-
-      // Cooling
-      centralAir: true,
-      evaporative: true,
-      geoThermal: true,
-      refrigeration: true,
-      solar: true,
-      wallUnit: true,
-
-      // Heating
-      baseboard: true,
-      forceAir: true,
-      geoThermalHeat: true,
-      heatPump: true,
-      hotWater: true,
-      radiant: true,
-      solarHeat: true,
-      steam: true,
-
-      // Flooring
-      carpet: true,
-      concrete: true,
-      hardwood: true,
-      laminate: true,
-      linoleumVinyl: true,
-      slate: true,
-      softwood: true,
-      tile: true,
-
-      // Parking
-      carport: true,
-      garage: true,
-      offStreet: true,
-      onStreet: true,
-
-      // Interior Features
-      attic: true,
-      cableReady: true,
-      ceilingFan: true,
-      doublePaneWindows: true,
-      elevator: true,
-      fireplace: true,
-      flooring: true,
-      furnished: true,
-      jettedTub: true,
-      securitySystem: true,
-      vaultedCeiling: true,
-      skylight: true,
-      wetBar: true,
-
-      // Exterior Features
-      barbecueArea: true,
-      deck: true,
-      dock: true,
-      fence: true,
-      garden: true,
-      hotTubOrSpa: true,
-      lawn: true,
-      patio: true,
-      pond: true,
-      pool: true,
-      porch: true,
-      rvParking: true,
-      sauna: true,
-      sprinklerSystem: true,
-      waterFront: true,
+      ...selectedOptions,
     };
+
     let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
     // if (isDone) {
@@ -246,17 +213,17 @@ function PropertyCreateModal({
   const handleFileChange = ({ fileList: newFileList }) =>
     setFileList(newFileList);
 
-  const uploadButton = (
-    <div>
-      <PlusOutlined />
-      <div style={{ marginTop: 8 }}>Upload</div>
-    </div>
-  );
-
   const primaryAction = {
-    content: modalView
-      ? "Create a Property Listing"
-      : "Property Listing - House Facts",
+    content: modalView ? (
+      "Create a Property Listing"
+    ) : (
+      <>
+        <Button type="link" onClick={handleModalToggle}>
+          <ArrowLeftOutlined />
+        </Button>
+        <Text>Property Listing - House Facts</Text>
+      </>
+    ),
     disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
     onConfirm: showConfirmationModal,
@@ -267,17 +234,16 @@ function PropertyCreateModal({
   };
 
   const openToast = (placement) => {
-
     if (success) {
       api.success({
-        message: "message-success",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 1,
       });
     } else {
       api.error({
-        message: "message-failed",
+        message: message,
         onClose: actions.resetMessage(dispatch),
         placement,
         key: 2,
@@ -285,9 +251,34 @@ function PropertyCreateModal({
     }
   };
 
+  const handleCheckbox = (value, check) => {
+    let data = { ...selectedOptions };
+    data[value] = check;
+    setSelectedOptions(data);
+  };
+
+  function convertCategories() {
+    const convertedData = [];
+    for (const category in categoriesObj) {
+      if (categoriesObj.hasOwnProperty(category)) {
+        convertedData.push({
+          header: category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' '),
+          options: categoriesObj[category],
+          keyName: category,
+        });
+      }
+    }
+
+    return convertedData;
+  }
+
+  const collapseData = convertCategories();
+
+
   return (
     <>
       {contextHolder}
+      {message && openToast("bottom")}
       <Modal
         {...layout}
         open={isCreateModalOpen}
@@ -295,34 +286,33 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        // uncomment later******
-        // okButtonProps={{ disabled: primaryAction.disabled }}
+        okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);
         }}
         // confirmLoading={primaryAction.loading}
-        width={850}
+        width={672}
       >
         <Divider />
         {modalView ? (
-          <Form labelCol={{ span: 8 }} labelAlign="left">
+          <Form name="basic" layout="vertical">
             <Form.Item
               label="Listing Title"
-              name="name"
+              name="title"
               rules={[
-                { required: true, message: "Please input project name." },
+                { required: true, message: "Please enter project title." },
               ]}
             >
               <Input
-                label="name"
-                defaultValue={propertyData?.name}
-                value={propertyData?.name}
+                label="title"
+                defaultValue={title}
+                value={title}
                 maxLength={100}
                 placeholder="Listing Title"
                 showCount
                 onChange={(e) => {
-                  handleChange("name", e.target.value);
+                  handleChange("title", e.target.value);
                 }}
               />
             </Form.Item>
@@ -332,14 +322,14 @@ function PropertyCreateModal({
               rules={[
                 {
                   required: true,
-                  message: "Please input project description.",
+                  message: "Please enter project description.",
                 },
               ]}
             >
               <Input.TextArea
                 label="Project Description"
-                defaultValue={propertyData?.projectDescription}
-                value={propertyData?.projectDescription}
+                defaultValue={description}
+                value={description}
                 maxLength={500}
                 showCount
                 placeholder="Project Description"
@@ -348,153 +338,199 @@ function PropertyCreateModal({
                 }}
               />
             </Form.Item>
+
+            <Row>
+              <Col span={11}>
+                <Form.Item
+                  label="Total Units"
+                  name="totalUnits"
+                  rules={[
+                    { required: true, message: "Please enter total units." },
+                  ]}
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    label="Total Units"
+                    id="numberOfUnitsTotal"
+                    type="Number"
+                    placeholder="Total Units"
+                    controls={false}
+                    defaultValue={numberOfUnitsTotal}
+                    value={numberOfUnitsTotal}
+                    onChange={(value) => {
+                      handleChange("numberOfUnitsTotal", value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12} offset={1}>
+                <Form.Item
+                  label="Asking Price"
+                  name="listPrice"
+                  rules={[
+                    { required: true, message: "Please enter asking price." },
+                  ]}
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    precision={0}
+                    label="Asking Price"
+                    type="Number"
+                    min={0}
+                    placeholder="Asking Price"
+                    controls={false}
+                    addonBefore="$"
+                    defaultValue={listPrice}
+                    value={listPrice}
+                    onChange={(e) => {
+                      handleChange("listPrice", e);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item
-              label="Asking Price"
-              name="askingPrice"
-              rules={[
-                { required: true, message: "Please input an asking price." },
-              ]}
-            >
-              <InputNumber
-                precision={0}
-                label="Asking Price"
-                type="Number"
-                min={0}
-                placeholder="Asking Price"
-                controls={false}
-                addonBefore="$"
-                defaultValue={propertyData?.askingPrice}
-                value={propertyData?.askingPrice}
-                onChange={(e) => {
-                  handleChange("askingPrice", e);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Lot Number"
-              name="lotNumber"
-              rules={[
-                { required: true, message: "Please input an asking price." },
-              ]}
-            >
-              <InputNumber
-                style={{ width: 150 }}
-                precision={0}
-                label="Lot Number"
-                type="Number"
-                min={0}
-                placeholder="Lot Number"
-                controls={false}
-                defaultValue={propertyData?.lotNumber}
-                value={propertyData?.lotNumber}
-                onChange={(e) => {
-                  handleChange("lotNumber", e);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Address Line 1"
-              name="addressLine1"
-              rules={[
-                { required: true, message: "Please input an asking price." },
-              ]}
-            >
-              <Input
-                label="Address Line 1"
-                id="addressLine1"
-                placeholder="Address Line 1"
-                defaultValue={propertyData?.addressLine1}
-                value={propertyData?.addressLine1}
-                onChange={(e) => {
-                  handleChange("addressLine1", e.target.value);
-                }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="Address Line 2"
-              name="addressLine2"
-              rules={[
-                { required: true, message: "Please input an asking price." },
-              ]}
+              label="Street Name"
+              name="streetName"
+              rules={[{ required: true, message: "Please enter street name." }]}
             >
               <Input
-                label="Address Line 2"
-                id="addressLine2"
-                placeholder="Address Line 2"
-                defaultValue={propertyData?.addressLine2}
-                value={propertyData?.addressLine2}
+                label="Street Name"
+                id="streetname"
+                placeholder="Street Name"
+                defaultValue={streetName}
+                value={streetName}
                 onChange={(e) => {
-                  handleChange("addressLine2", e.target.value);
+                  handleChange("streetName", e.target.value);
                 }}
               />
             </Form.Item>
-            <Form.Item
-              label="City"
-              name="city"
-              rules={[
-                { required: true, message: "Please input an asking price." },
-              ]}
-            >
-              <Input
-                label="City"
-                id="city"
-                placeholder="City"
-                defaultValue={propertyData?.city}
-                value={propertyData?.city}
-                onChange={(e) => {
-                  handleChange("city", e.target.value);
-                }}
-              />
-            </Form.Item>
+            <Row>
+              <Col span={11}>
+                <Form.Item
+                  label="Street Number"
+                  name="streetNumber"
+                  rules={[
+                    { required: true, message: "Please enter street number." },
+                  ]}
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    label="Street Number"
+                    id="streetnumber"
+                    type="Number"
+                    placeholder="Street Number"
+                    controls={false}
+                    defaultValue={streetNumber}
+                    value={streetNumber}
+                    onChange={(value) => {
+                      handleChange("streetNumber", value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12} offset={1}>
+                <Form.Item
+                  label="House Number"
+                  name="houseNumber"
+                  rules={[
+                    { required: true, message: "Please enter house number." },
+                  ]}
+                >
+                  <Input
+                    style={{ width: "100%" }}
+                    label="House Number"
+                    id="housenumber"
+                    placeholder="House Number"
+                    controls={false}
+                    defaultValue={unitNumber}
+                    value={unitNumber}
+                    onChange={(e) => {
+                      handleChange("unitNumber", e.target.value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item
               label="State"
               name="state"
-              rules={[
-                { required: true, message: "Please input an asking price." },
-              ]}
+              rules={[{ required: true, message: "Please select state" }]}
             >
               <Select
                 label="State"
-                defaultValue={propertyData?.state}
-                value={propertyData?.state}
+                defaultValue={stateOrProvince}
+                value={stateOrProvince}
                 placeholder="Select State"
                 onSelect={(e) => {
-                  handleChange("state", e);
+                  handleChange("stateOrProvince", e);
                 }}
-                options={StateData}
+                options={stateData}
                 showSearch
               />
             </Form.Item>
-            <Form.Item
-              label="Zip Code"
-              name="zipCode"
-              rules={[{ required: true, message: "Please input a zip code." }]}
-            >
-              <InputNumber
-                precision={0}
-                style={{ width: 150 }}
-                label="Zip Code"
-                type="Number"
-                placeholder="ZipCode"
-                min={0}
-                max={99999}
-                controls={false}
-                defaultValue={propertyData?.zipCode}
-                value={propertyData?.zipCode}
-                onChange={(value) => {
-                  handleChange("zipCode", value);
-                }}
-                onWheel={(e) => {
-                  e.target.blur();
-                }}
-              />
-            </Form.Item>
+            <Row>
+              <Col span={11}>
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[{ required: true, message: "Please enter a city." }]}
+                >
+                  <Input
+                    label="City"
+                    id="city"
+                    placeholder="City"
+                    defaultValue={postalCity}
+                    value={postalCity}
+                    onChange={(e) => {
+                      handleChange("postalCity", e.target.value);
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12} offset={1}>
+                <Form.Item
+                  label="Zip Code"
+                  name="postalcode"
+                  rules={[
+                    { required: true, message: "Please enter a zip code." },
+                  ]}
+                >
+                  <InputNumber
+                    precision={0}
+                    style={{ width: "100%" }}
+                    label="Zip Code"
+                    type="Number"
+                    placeholder="ZipCode"
+                    min={0}
+                    max={99999}
+                    controls={false}
+                    defaultValue={postalcode}
+                    value={postalcode}
+                    onChange={(value) => {
+                      handleChange("postalcode", value);
+                    }}
+                    onWheel={(e) => {
+                      e.target.blur();
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
             <Form.Item label="Upload Image" name="image">
               <div className="w-48 h-36 p-4 border-secondryD border rounded flex flex-col justify-around">
@@ -537,141 +573,177 @@ function PropertyCreateModal({
           </Form>
         ) : (
           <div>
-            <Button type="link" onClick={handleModalToggle}>
-              <ArrowLeftOutlined />
-            </Button>
-            <Form labelCol={{ span: 8 }} labelAlign="left">
+            <Form name="basic" layout="vertical">
               <Form.Item
                 label="Home Type"
                 name="homeType"
                 rules={[
-                  { required: true, message: "Please input an asking price." },
+                  { required: true, message: "Please Select Home Type." },
                 ]}
               >
                 <Select
                   label="homeType"
-                  defaultValue={homeType}
-                  onSelect={(e) => setHomeType(e)}
-                  options={HomeTypeData}
+                  placeholder="Property Type"
+                  defaultValue={propertyType}
+                  value={propertyType}
+                  onSelect={(value) => {
+                    handleChange("propertyType", value);
+                  }}
+                  options={homeTypeData}
                   showSearch
                 />
               </Form.Item>
-              <Form.Item
-                label="Bedrooms"
-                name="bedrooms"
-                rules={[
-                  { required: true, message: "Please input an asking price." },
-                ]}
+              <Row>
+                <Col span={11}>
+                  <Form.Item
+                    label="Bedrooms"
+                    name="bedrooms"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Please enter number of bedrooms.",
+                      },
+                    ]}
+                  >
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      precision={0}
+                      label="bedrooms"
+                      placeholder="Bedrooms"
+                      type="Number"
+                      controls={false}
+                      min={0}
+                      value={bedroomsTotal}
+                      defaultValue={bedroomsTotal}
+                      onChange={(value) => {
+                        handleChange("bedroomsTotal", value);
+                      }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12} offset={1}>
+                  <Form.Item
+                    label="Bathrooms"
+                    name="bathrooms"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Please enter number of bathrooms",
+                      },
+                    ]}
+                  >
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      precision={0}
+                      label="bathrooms"
+                      placeholder="Bathrooms"
+                      type="Number"
+                      controls={false}
+                      min={0}
+                      defaultValue={bathroomsTotalInteger}
+                      value={bathroomsTotalInteger}
+                      onChange={(value) => {
+                        handleChange("bathroomsTotalInteger", value);
+                      }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row>
+                <Col span={11}>
+                  <Form.Item
+                    label="Living Area"
+                    name="livingArea"
+                    rules={[
+                      { required: true, message: "Please enter square feet" },
+                    ]}
+                  >
+                    <InputNumber
+                      precision={0}
+                      label="Living Area"
+                      placeholder="Living Area"
+                      type="Number"
+                      controls={false}
+                      addonAfter={LivingAreaUnitElement}
+                      min={0}
+                      defaultValue={livingArea}
+                      value={livingArea}
+                      onChange={(value) => {
+                        handleChange("livingArea", value);
+                      }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12} offset={1}>
+                  <Form.Item
+                    label="Lot Size Area"
+                    name="lotSize"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Please enter an asking price.",
+                      },
+                    ]}
+                  >
+                    <InputNumber
+                      style={{ width: "100%" }}
+                      precision={0}
+                      label="lotSize"
+                      placeholder="Lot Size Area"
+                      type="Number"
+                      controls={false}
+                      addonAfter={LotSizeAreaUnitElement}
+                      min={0}
+                      defaultValue={lotSizeArea}
+                      value={lotSizeArea}
+                      onChange={(value) => {
+                        handleChange("lotSizeArea", value);
+                      }}
+                      onWheel={(e) => {
+                        e.target.blur();
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Collapse
+                expandIconPosition={"end"}
+                defaultActiveKey={[]}
+                style={{ margin: "10px 0px" }}
               >
-                <InputNumber
-                  precision={0}
-                  label="bedrooms"
-                  type="Number"
-                  controls={false}
-                  min={0}
-                  value={bedrooms}
-                  defaultValue={bedrooms}
-                  onChange={(e) => setBedrooms(e)}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Bathrooms"
-                name="bathrooms"
-                rules={[
-                  { required: true, message: "Please input an asking price." },
-                ]}
-              >
-                <InputNumber
-                  precision={0}
-                  label="bathrooms"
-                  type="Number"
-                  controls={false}
-                  min={0}
-                  defaultValue={bathrooms}
-                  onChange={(e) => setBathrooms(e)}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Square Ft"
-                name="squareFeet"
-                rules={[
-                  { required: true, message: "Please input an asking price." },
-                ]}
-              >
-                <InputNumber
-                  precision={0}
-                  label="squareFeet"
-                  type="Number"
-                  controls={false}
-                  min={0}
-                  defaultValue={squareFeet}
-                  onChange={(e) => setSquareFeet(e)}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Lot Size"
-                name="lotSize"
-                rules={[
-                  { required: true, message: "Please input an asking price." },
-                ]}
-              >
-                <InputNumber
-                  precision={0}
-                  label="lotSize"
-                  type="Number"
-                  controls={false}
-                  min={0}
-                  defaultValue={lotSize}
-                  onChange={(e) => setLotSize(e)}
-                  onWheel={(e) => {
-                    e.target.blur();
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                label="Appliances"
-                name="appliances"
-                rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
-              <Form.Item
-                label="Flooring"
-                name="flooring"
-                rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
-              <Form.Item
-                label="Cooling"
-                name="cooling"
-                rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
-              <Form.Item
-                label="Heating"
-                name="heating"
-                rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
-              <Form.Item
-                label="Parking"
-                name="parking"
-                rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
-              <Form.Item
-                label="Interior Features"
-                name="interiorFeatures"
-                rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
-              <Form.Item
-                label="Exterior Features"
-                name="exteriorFeatures"
-                rules={[{ message: "Please input an asking price." }]}
-              ></Form.Item>
+                {collapseData.map((item, index) => {
+                  return (
+                    <Panel
+                      style={{ fontWeight: 700 }}
+                      header={item.header}
+                      key={index}
+                    >
+                      {item.options.map((opt) => {
+                        return (
+                          <Checkbox
+                            name={opt.label}
+                            onChange={(e) => {
+                              handleCheckbox(opt.value, e.target.checked);
+                            }}
+                          >
+                            {opt.label}
+                          </Checkbox>
+                        );
+                      })}
+                    </Panel>
+                  );
+                })}
+              </Collapse>
             </Form>
           </div>
         )}

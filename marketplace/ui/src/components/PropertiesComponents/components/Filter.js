@@ -12,7 +12,7 @@ import {
   Space,
   Button,
 } from "antd";
-import { FilterFilled, CloseOutlined } from "@ant-design/icons";
+import { FilterFilled, ClearOutlined } from "@ant-design/icons";
 import filterData from "../helpers/filterOptions.json";
 
 const { Panel } = Collapse;
@@ -72,19 +72,17 @@ const Filter = (props) => {
         size={"default"}
         onClose={closeDrawer}
         open={isDrawerOpen}
-      >
-        <Row style={{ marginBottom: "20px" }}>
-          <Col offset={2} span={10}>
-            <Button onClick={handleClear} icon={<CloseOutlined />}>
-              Clear Filter
+        extra={
+          <Space>
+            <Button onClick={handleClear} icon={<ClearOutlined />}>
+              Clear
             </Button>
-          </Col>
-          <Col offset={2} span={10}>
             <Button onClick={applyFilter} type="primary">
-              Apply Filter{" "}
+              Apply
             </Button>
-          </Col>
-        </Row>
+          </Space>
+        }
+      >
         <Typography.Title level={5}>Sort By</Typography.Title>
         <Select
           value={filterOption?.sortBy}
@@ -101,7 +99,7 @@ const Filter = (props) => {
         </Typography.Title>
         <Collapse
           expandIconPosition={"end"}
-          defaultActiveKey={["1", "2", "3", "4", "5"]}
+          defaultActiveKey={["1", "2"]}
         >
           <Panel style={{ fontWeight: 700 }} header="Price Range" key="1">
             <Typography.Title
