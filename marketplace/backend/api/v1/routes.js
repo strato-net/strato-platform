@@ -11,6 +11,7 @@ import item from './Item'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
 import eventType from './EventType'
+import service from './Service'
 import event from './Event'
 import authentication from './authentication'
 import users from './users'
@@ -30,6 +31,7 @@ import {
   Order,
   OrderLineItem,
   EventType,
+  Service,
   Event,
   Image,
   Marketplace,
@@ -50,6 +52,7 @@ router.use(Item.prefix, item)
 router.use(Order.prefix, order)
 router.use(OrderLineItem.prefix, orderLineItem)
 router.use(EventType.prefix, eventType)
+router.use(Service.prefix, service)
 router.use(Event.prefix, event)
 router.use(Image.prefix, image)
 router.use(Marketplace.prefix, marketplace)

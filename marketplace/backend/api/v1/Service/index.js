@@ -27,25 +27,11 @@ router.post(
   ServiceController.create
 );
 
-router.post(
-  Service.transferOwnership,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ServiceController.transferOwnership
-)
-
 router.put(
   Service.update,
   authHandler.authorizeRequest(),
   loadDapp,
   ServiceController.update
-)
-
-router.get(
-  Service.audit,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ServiceController.audit
 )
 
 export default router;

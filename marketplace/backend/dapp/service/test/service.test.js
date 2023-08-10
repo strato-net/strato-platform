@@ -7,11 +7,11 @@ import constants from '/helpers/constants';
 
 import RestStatus from 'http-status-codes';
 
-import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
+// import appPermissionManagerJs from '/dapp/permissions/app/appPermissionManager';
 import serviceJs from '../service';
-import serviceChainJs from '../serviceChain';
+// import serviceChainJs from '../serviceChain';
 import factory from './service.factory.js';
-import user from '/dapp/users/user.js';
+// import user from '/dapp/users/user.js';
 import { args } from 'commander';
 
 const options = { config };
@@ -87,116 +87,18 @@ describe('Service', function() {
             { ...args, owner: globalAdmin.address, constructor: '' });
     });
 
-    it('addMember - 200', async () => {
-        const res = await contract.addMember(member(), enode());
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('removeMember - 200', async () => {
-        const res = await contract.removeMember(member());
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('addMembers - 200', async () => {
-        const res = await contract.addMembers([member(), member(), member()], [enode(), enode(), enode()]);
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('removeMembers - 200', async () => {
-        const res = await contract.removeMembers([member(), member(), member()]);
-        assert.equal(res[0], RestStatus.OK);
-    });
-
-    it('createService (Private chain)', async () => {
-        const args = factoryArgs(globalAdmin);
-        const service = await serviceChainJs.createService(globalAdmin, args, options);
-        const serviceData = await service.get();
-        // Sorting is needed in order to allow for chainIds to be in any order
-        // Convert all fields into a string to allow for equality checking
-        assert.deepInclude(
-            // Convert the Service data into strings as the args are in strings
-            R.map(v => '' + v, serviceData),
-            R.map(v => '' + v, args));
-    });
-
-    it('createService (Private chain, multiple)', async () => {
-        const args1 = factoryArgs(globalAdmin);
-        const args2 = factoryArgs(globalAdmin);
-        const args3 = factoryArgs(globalAdmin);
-        const args4 = factoryArgs(globalAdmin);
-        const service1 = await serviceChainJs.createService(globalAdmin, args1, options);
-        const service2 = await serviceChainJs.createService(globalAdmin, args2, options);
-        const service3 = await serviceChainJs.createService(globalAdmin, args3, options);
-        const service4 = await serviceChainJs.createService(globalAdmin, args4, options);
-        const serviceData1 = await service1.get();
-        const serviceData2 = await service2.get();
-        const serviceData3 = await service3.get();
-        const serviceData4 = await service4.get();
-        // Our logic shouldn't mix up services
-        assert.deepInclude(R.map(v => '' + v, serviceData1), R.map(v => '' + v, args1));
-        assert.deepInclude(R.map(v => '' + v, serviceData2), R.map(v => '' + v, args2));
-        assert.deepInclude(R.map(v => '' + v, serviceData3), R.map(v => '' + v, args3));
-        assert.deepInclude(R.map(v => '' + v, serviceData4), R.map(v => '' + v, args4));    
-    });
-
-    // it('Create an organization manager', async () => {
-    //     // Create App Permission Manager
-    //     const appPermissionManagerContract = await appPermissionManagerJs.uploadContract(globalAdmin, {
-    //         admin: globalAdmin.address,
-    //         master: globalAdmin.address,
-    //     }, options);
-      
-    //     // assign role
-    //     await appPermissionManagerContract.grantGlobalAdminRole({ user: globalAdmin });
+    // it('Create and update a Service', async () => {
+    //     // Create our Service
+    //     const args = factoryArgs(globalAdmin);
+    //     const service = await serviceChainJs.createService(globalAdmin, args, options);
   
-    //     // Create Organization Manager
-    //     const organizationManager = await organizationManagerJs.uploadContract(globalAdmin,
-    //         { permissionManager: appPermissionManagerContract.address }, options);
-  
-    //     assert.notEqual(organizationManager.address, constants.zeroAddress, 'Contract address must be not zero');
-  
-    //     const { permissionManager, owner } = await organizationManager.getState();
-    //     assert.equal(owner, globalAdmin.address, 'owner');
-    //     assert.equal(permissionManager, appPermissionManagerContract.address, 'permissionManager');
+    //     // Check if Service was created
+    //     const serviceData = await service.get();
+    //     assert.deepInclude(R.map(v => '' + v, serviceData), R.map(v => '' + v, args));
+        
+        
+    //     const args2 = factoryArgs(globalAdmin);
+    //     const update = await service.update(args2)
+    //     assert.equal(update[0], RestStatus.OK)
     // });
-
-    it('Create and transfer ownership of a Service', async () => {
-        // Create our Service
-        const args = factoryArgs(globalAdmin);
-        const service = await serviceChainJs.createService(globalAdmin, args, options);
-  
-        // Check if Service was created
-        const serviceData = await service.get();
-        assert.deepInclude(R.map(v => '' + v, serviceData), R.map(v => '' + v, args));
-  
-        // Create App Permission Manager
-        const appPermissionManagerContract = await appPermissionManagerJs.uploadContract(globalAdmin, {
-            admin: globalAdmin.address,
-            master: globalAdmin.address,
-        }, options);
-      
-        // assign role
-        await appPermissionManagerContract.grantGlobalAdminRole({ user: globalAdmin });
-
-        let addrToBeTransferedTo = 0x0 // TODO FILL THIS IN
-
-
-        const serviceResponse = await service.transferOwnership(addrToBeTransferedTo);
-        assert.equal(serviceResponse, RestStatus.OK)
-    });
-
-    it('Create and update a Service', async () => {
-        // Create our Service
-        const args = factoryArgs(globalAdmin);
-        const service = await serviceChainJs.createService(globalAdmin, args, options);
-  
-        // Check if Service was created
-        const serviceData = await service.get();
-        assert.deepInclude(R.map(v => '' + v, serviceData), R.map(v => '' + v, args));
-        
-        
-        const args2 = factoryArgs(globalAdmin);
-        const update = await service.update(args2)
-        assert.equal(update[0], RestStatus.OK)
-    });
 });

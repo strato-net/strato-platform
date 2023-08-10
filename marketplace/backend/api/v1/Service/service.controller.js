@@ -103,13 +103,10 @@ class ServiceController {
   
   static validateCreateServiceArgs(args) {
     const createServiceSchema = Joi.object({
-      serviceArgs: Joi.object({
-        name: Joi.string().required(),
-        description: Joi.string().required(),
-        price: Joi.number().required(),
-        createdDate: Joi.number().required(),
-      }),
-      isPublic: Joi.boolean().required(),
+      name: Joi.string().required(),
+      description: Joi.string().required(),
+      price: Joi.number().required(),
+      createdDate: Joi.number().required(),
     });
 
     const validation = createServiceSchema.validate(args);

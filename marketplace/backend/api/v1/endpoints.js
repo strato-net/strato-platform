@@ -98,6 +98,14 @@ export const EventType = {
   create: '/'
 }
 
+export const Service = {
+  prefix: '/service',
+  get: '/:serviceName',
+  getAll: '/',
+  create: '/',
+  update: '/:serviceName',
+}
+
 export const Event = {
   prefix: '/event',
   getInventoryEventTypes: '/:inventoryId',

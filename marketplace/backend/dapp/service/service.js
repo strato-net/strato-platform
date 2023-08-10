@@ -5,8 +5,8 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgsLike
 import dayjs from 'dayjs';
 
 
-const contractName = 'Service';
-const contractFilename = `${util.cwd}/dapp/assets/Service/contracts/Service.sol`;
+const contractName = 'Service_10';
+const contractFilename = `${util.cwd}/dapp/service/contracts/Service.sol`;
 
 /** 
  * Upload a new Service 
@@ -269,7 +269,6 @@ export default {
     bindAddress,
     get,
     getAll,
-    transferOwnership,
     update,
     marshalIn,
     marshalOut,

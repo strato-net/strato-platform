@@ -4,7 +4,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of Service assets
-contract Service {
+contract Service_10 {
 
     address public owner;
     string public ownerOrganization;
