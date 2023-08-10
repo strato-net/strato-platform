@@ -46,6 +46,7 @@ library:
     - generic-arbitrary
     - generic-deriving
     - hashable
+    - hflags
     - http-api-data
     - integer-gmp
     - labeled-error

@@ -25,9 +25,9 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Maybe                      (listToMaybe, maybeToList)
+import           Data.Maybe                      (listToMaybe, maybeToList, isJust)
 import           Data.Source.Map
-import           Data.Swagger                    hiding (delete)
+import           Data.Swagger                    hiding (delete, Http)
 import           HFlags
 import           Network.HTTP.Types.Status
 import           Network.Wai
@@ -36,6 +36,7 @@ import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.Prometheus
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
+import           Servant.Client.Core             hiding (requestMethod)
 import           Servant.Multipart
 import           Servant.Swagger
 import           Servant.Swagger.UI
@@ -61,11 +62,13 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 
 import           Control.Monad.Composable.SQL
+import           Control.Monad.Composable.Identity
 import           Control.Monad.Composable.Vault  hiding (httpManager)
 
 import           SolidVM.Model.CodeCollection.Contract
 
 import           Text.Tools
+import           Text.Regex
 
 import qualified Handlers.AccountInfo            as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
@@ -74,6 +77,7 @@ import qualified Handlers.Block                  as Block
 import qualified Handlers.Chain                  as Chain
 import qualified Handlers.Coinbase               as Coinbase
 import qualified Handlers.Faucet                 as Faucet
+import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Log                    as Log
 import qualified Handlers.Metadata               as Metadata
 import qualified Handlers.Peers                  as Peers
@@ -86,6 +90,7 @@ import qualified Handlers.TxLast                 as TxLast
 import qualified Handlers.UUID                   as UUID
 import qualified Handlers.Version                as Version
 import           Options
+import           Blockchain.Strato.Model.Options()
 import           SQLM
 import           UnliftIO                        hiding (Handler)
 
@@ -109,11 +114,19 @@ instance Selectable Account Contract m => Selectable Account Contract (ReaderT B
 instance Selectable Account Contract m => Selectable Account Contract (VaultM m) where
   select p = lift . select p
 
+instance Selectable Account Contract m => Selectable Account Contract (IdentityM m) where
+  select p = lift . select p
+
+
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
   select p = lift . select p
+
+instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (IdentityM m) where
+  select p = lift . select p
+
 
 instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
   select p = lift . select p
@@ -152,6 +165,9 @@ instance Selectable Account AddressState m => Selectable Account AddressState (C
 instance Selectable Account AddressState m => Selectable Account AddressState (VaultM m) where
   select p = lift . select p
 
+instance Selectable Account AddressState m => Selectable Account AddressState (IdentityM m) where
+  select p = lift . select p
+
 instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -166,6 +182,7 @@ type CoreAPI =
     :<|> Chain.API
     :<|> Coinbase.API
     :<|> Faucet.API
+    :<|> Identity.API
     :<|> Log.API
     :<|> Metadata.API
     :<|> Peers.API
@@ -182,7 +199,8 @@ type CoreAPI =
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
 coreServer :: ( MonadLogger m
-              , HasSQL m
+               , HasSQL m
+              , Accessible IdentityData m
               , Accessible VaultData m
               , Selectable Keccak256 SourceMap m
               )
@@ -195,6 +213,7 @@ coreServer = Account.server
   :<|> Chain.server
   :<|> Coinbase.server
   :<|> Faucet.server
+  :<|> Identity.server
   :<|> Log.server
   :<|> Metadata.server
   :<|> Peers.server
@@ -210,6 +229,7 @@ coreServer = Account.server
 fullServer :: ( MonadLogger m
               , HasSQL m
               , HasBlocEnv m
+              , HasIdentity m
               , HasVault m
               , Selectable Account Contract m
               , Selectable Account AddressState m
@@ -235,7 +255,8 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         runCirrusM .
         runSQLM .
         flip runReaderT blocEnv .
-        runVaultM "http://localhost:8013/strato/v2.3" $ f
+        runVaultM ("http://localhost:8013/strato/v2.3" ) . 
+        runIdentitytM getIdServerUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -243,6 +264,15 @@ fullAPI = Proxy
 main :: IO ()
 main = do
   _ <- $initHFlags "Core API"
+
+  -- check if id server connection is valid; only run if using https (unless using localhost)
+  identityUrl <- parseBaseUrl getIdServerUrl
+  let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+  let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
+  if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
+    then 
+      error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdServerUrl
+    else putStrLn "Identity server url is valid to connect to"
 
   let theDoc = toSwagger (Proxy :: Proxy FullAPI)
                & info.title .~ "Strato API"
@@ -285,8 +315,6 @@ app blocEnv theDoc =
   $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
   $ hoistCoreServer blocEnv :<|> swaggerSchemaUIServer theDoc
 
-
-
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =
   baseApp req $ \response -> do
@@ -310,3 +338,5 @@ instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a)
 instance ToSchema Value where
   declareNamedSchema _ = return $
     NamedSchema (Just "JSON Value") mempty
+
+-----------
