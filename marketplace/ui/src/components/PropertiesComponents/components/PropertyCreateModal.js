@@ -15,23 +15,24 @@ import {
   Col,
   Row,
 } from "antd";
-import { PlusOutlined, ArrowLeftOutlined, PictureOutlined } from "@ant-design/icons";
 import {
-  StateData,
-  HomeTypeData,
-  parkingFeaturesData,
-  heatingData,
-  coolingData,
-  flooringData,
-  appliancesData,
-  interiorFeaturesData,
-  exteriorFeaturesData,
-  PropertyCheckBox
+  PlusOutlined,
+  ArrowLeftOutlined,
+  PictureOutlined,
+} from "@ant-design/icons";
+import {
+  categoriesObj,
+  stateData,
+  homeTypeData,
+  PropertyCheckBox,
 } from "../helpers/constants";
 import { getStringDate } from "../helpers/utils";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
-import { usePropertiesDispatch, usePropertiesState } from "../../../contexts/propertyContext";
+import {
+  usePropertiesDispatch,
+  usePropertiesState,
+} from "../../../contexts/propertyContext";
 const { Panel } = Collapse;
 const { Text } = Typography;
 const { Option } = Select;
@@ -51,24 +52,26 @@ function PropertyCreateModal({
   isCreateConfirmModalOpen,
   toggleCreateConfirmModal,
 }) {
+  const {
+    appliances,
+    cooling,
+    heating,
+    flooring,
+    parking_features,
+    exterior_features,
+    interior_features
+  } = categoriesObj;
   const dispatch = usePropertiesDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { message, success } = usePropertiesState()
+  const { message, success } = usePropertiesState();
 
   const [selectedImage, setSelectedImage] = useState(null);
   const [propertyData, setPropertyData] = useState({
     lotSizeUnits: "sqft",
     livingAreaUnits: "sqft",
-    appliances: [],
-    cooling: [],
-    heating: [],
-    flooring: [],
-    parking: [],
-    interior: [],
-    exterior: [],
-    numberOfUnitsTotal: 1
+    numberOfUnitsTotal: 1,
   });
-  const [selectedOptions, setSelectedOptions] = useState(PropertyCheckBox)
+  const [selectedOptions, setSelectedOptions] = useState(PropertyCheckBox);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
@@ -92,17 +95,9 @@ function PropertyCreateModal({
     lotSizeArea,
     numberOfUnitsTotal,
 
-    appliances,
-    cooling,
-    heating,
-    flooring,
-    parking,
-    interior,
-    exterior,
 
     lotSizeUnits,
     livingAreaUnits,
-
   } = propertyData;
 
   const isDisabledCreateView =
@@ -153,7 +148,7 @@ function PropertyCreateModal({
   };
 
   function beforeUpload(file) {
-    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
+    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
       openToast("bottom", "Image must be of jpeg or png format");
     }
@@ -166,7 +161,6 @@ function PropertyCreateModal({
 
   //creates the listing for property
   const handleSubmitCreateProperty = async () => {
-
     const body = {
       title: title,
       description: description,
@@ -188,8 +182,8 @@ function PropertyCreateModal({
       longitude: "",
       numberOfUnitsTotal: numberOfUnitsTotal,
 
-      ...selectedOptions
-    }
+      ...selectedOptions,
+    };
 
     let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
 
@@ -240,14 +234,16 @@ function PropertyCreateModal({
   );
 
   const primaryAction = {
-    content: modalView
-      ? "Create a Property Listing"
-      : <>
+    content: modalView ? (
+      "Create a Property Listing"
+    ) : (
+      <>
         <Button type="link" onClick={handleModalToggle}>
           <ArrowLeftOutlined />
         </Button>
         <Text>Property Listing - House Facts</Text>
-      </>,
+      </>
+    ),
     disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
     onConfirm: showConfirmationModal,
@@ -258,7 +254,6 @@ function PropertyCreateModal({
   };
 
   const openToast = (placement) => {
-
     if (success) {
       api.success({
         message: message,
@@ -277,20 +272,55 @@ function PropertyCreateModal({
   };
 
   const handleCheckbox = (value, check) => {
-    let data = { ...selectedOptions }
-    data[value] = check
-    setSelectedOptions(data)
-  }
+    let data = { ...selectedOptions };
+    data[value] = check;
+    setSelectedOptions(data);
+  };
 
   const collapseData = [
-    { header: "Appliances", options: appliancesData, defaultValue: appliances, keyName: "appliances" },
-    { header: "Cooling", options: coolingData, defaultValue: cooling, keyName: "cooling" },
-    { header: "Heating", options: heatingData, defaultValue: heating, keyName: "heating" },
-    { header: "Flooring", options: flooringData, defaultValue: flooring, keyName: "flooring" },
-    { header: "Parking", options: parkingFeaturesData, defaultValue: parking, keyName: "parking" },
-    { header: "Interior Features", options: interiorFeaturesData, defaultValue: interior, keyName: "interior" },
-    { header: "Exterior Features", options: exteriorFeaturesData, defaultValue: exterior, keyName: "exterior" },
-  ]
+    {
+      header: "Appliances",
+      options: appliances,
+      // defaultValue: appliances,
+      keyName: "appliances",
+    },
+    {
+      header: "Cooling",
+      options: cooling,
+      // defaultValue: cooling,
+      keyName: "cooling",
+    },
+    {
+      header: "Heating",
+      options: heating,
+      // defaultValue: heating,
+      keyName: "heating",
+    },
+    {
+      header: "Flooring",
+      options: flooring,
+      // defaultValue: flooring,
+      keyName: "flooring",
+    },
+    {
+      header: "Parking",
+      options: parking_features,
+      // defaultValue: parking,
+      keyName: "parking",
+    },
+    {
+      header: "Interior Features",
+      options: interior_features,
+      // defaultValue: interior,
+      keyName: "interior",
+    },
+    {
+      header: "Exterior Features",
+      options: exterior_features,
+      // defaultValue: exterior,
+      keyName: "exterior",
+    },
+  ];
 
   return (
     <>
@@ -303,7 +333,7 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        okButtonProps={{ disabled: primaryAction.disabled }}
+        // okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);
@@ -366,7 +396,7 @@ function PropertyCreateModal({
                   ]}
                 >
                   <InputNumber
-                    style={{ width: '100%' }}
+                    style={{ width: "100%" }}
                     label="Total Units"
                     id="numberOfUnitsTotal"
                     type="Number"
@@ -392,7 +422,7 @@ function PropertyCreateModal({
                   ]}
                 >
                   <InputNumber
-                    style={{ width: '100%' }}
+                    style={{ width: "100%" }}
                     precision={0}
                     label="Asking Price"
                     type="Number"
@@ -416,9 +446,7 @@ function PropertyCreateModal({
             <Form.Item
               label="Street Name"
               name="streetName"
-              rules={[
-                { required: true, message: "Please enter street name." },
-              ]}
+              rules={[{ required: true, message: "Please enter street name." }]}
             >
               <Input
                 label="Street Name"
@@ -488,9 +516,7 @@ function PropertyCreateModal({
             <Form.Item
               label="State"
               name="state"
-              rules={[
-                { required: true, message: "Please select state" },
-              ]}
+              rules={[{ required: true, message: "Please select state" }]}
             >
               <Select
                 label="State"
@@ -500,7 +526,7 @@ function PropertyCreateModal({
                 onSelect={(e) => {
                   handleChange("stateOrProvince", e);
                 }}
-                options={StateData}
+                options={stateData}
                 showSearch
               />
             </Form.Item>
@@ -509,9 +535,7 @@ function PropertyCreateModal({
                 <Form.Item
                   label="City"
                   name="city"
-                  rules={[
-                    { required: true, message: "Please enter a city." },
-                  ]}
+                  rules={[{ required: true, message: "Please enter a city." }]}
                 >
                   <Input
                     label="City"
@@ -529,7 +553,9 @@ function PropertyCreateModal({
                 <Form.Item
                   label="Zip Code"
                   name="postalcode"
-                  rules={[{ required: true, message: "Please enter a zip code." }]}
+                  rules={[
+                    { required: true, message: "Please enter a zip code." },
+                  ]}
                 >
                   <InputNumber
                     precision={0}
@@ -571,7 +597,7 @@ function PropertyCreateModal({
                   onChange={(e) => {
                     setSelectedImage(URL.createObjectURL(e.file.originFileObj));
                   }}
-                  customRequest={() => { }}
+                  customRequest={() => {}}
                   style={{ display: "none" }}
                   accept="image/png, image/jpeg"
                   maxCount={1}
@@ -607,8 +633,10 @@ function PropertyCreateModal({
                   placeholder="Property Type"
                   defaultValue={propertyType}
                   value={propertyType}
-                  onSelect={(value) => { handleChange("propertyType", value) }}
-                  options={HomeTypeData}
+                  onSelect={(value) => {
+                    handleChange("propertyType", value);
+                  }}
+                  options={homeTypeData}
                   showSearch
                 />
               </Form.Item>
@@ -618,7 +646,10 @@ function PropertyCreateModal({
                     label="Bedrooms"
                     name="bedrooms"
                     rules={[
-                      { required: true, message: "Please enter number of bedrooms." },
+                      {
+                        required: true,
+                        message: "Please enter number of bedrooms.",
+                      },
                     ]}
                   >
                     <InputNumber
@@ -631,7 +662,9 @@ function PropertyCreateModal({
                       min={0}
                       value={bedroomsTotal}
                       defaultValue={bedroomsTotal}
-                      onChange={(value) => { handleChange("bedroomsTotal", value) }}
+                      onChange={(value) => {
+                        handleChange("bedroomsTotal", value);
+                      }}
                       onWheel={(e) => {
                         e.target.blur();
                       }}
@@ -643,7 +676,10 @@ function PropertyCreateModal({
                     label="Bathrooms"
                     name="bathrooms"
                     rules={[
-                      { required: true, message: "Please enter number of bathrooms" },
+                      {
+                        required: true,
+                        message: "Please enter number of bathrooms",
+                      },
                     ]}
                   >
                     <InputNumber
@@ -656,7 +692,9 @@ function PropertyCreateModal({
                       min={0}
                       defaultValue={bathroomsTotalInteger}
                       value={bathroomsTotalInteger}
-                      onChange={(value) => { handleChange("bathroomsTotalInteger", value) }}
+                      onChange={(value) => {
+                        handleChange("bathroomsTotalInteger", value);
+                      }}
                       onWheel={(e) => {
                         e.target.blur();
                       }}
@@ -683,7 +721,9 @@ function PropertyCreateModal({
                       min={0}
                       defaultValue={livingArea}
                       value={livingArea}
-                      onChange={(value) => { handleChange("livingArea", value) }}
+                      onChange={(value) => {
+                        handleChange("livingArea", value);
+                      }}
                       onWheel={(e) => {
                         e.target.blur();
                       }}
@@ -695,7 +735,10 @@ function PropertyCreateModal({
                     label="Lot Size Area"
                     name="lotSize"
                     rules={[
-                      { required: true, message: "Please enter an asking price." },
+                      {
+                        required: true,
+                        message: "Please enter an asking price.",
+                      },
                     ]}
                   >
                     <InputNumber
@@ -709,7 +752,9 @@ function PropertyCreateModal({
                       min={0}
                       defaultValue={lotSizeArea}
                       value={lotSizeArea}
-                      onChange={(value) => { handleChange("lotSizeArea", value) }}
+                      onChange={(value) => {
+                        handleChange("lotSizeArea", value);
+                      }}
                       onWheel={(e) => {
                         e.target.blur();
                       }}
@@ -718,27 +763,32 @@ function PropertyCreateModal({
                 </Col>
               </Row>
 
-
               <Collapse
                 expandIconPosition={"end"}
                 defaultActiveKey={[]}
                 style={{ margin: "10px 0px" }}
               >
                 {collapseData.map((item, index) => {
-                  return <Panel style={{ fontWeight: 700 }} header={item.header} key={index}>
-                    {item.options.map((opt) => {
-                      return (
-                        <Checkbox
-                          name={opt.label}
-                          onChange={(e) => {
-                            handleCheckbox(opt.value, e.target.checked)
-                          }}
-                        >
-                          {opt.label}
-                        </Checkbox>
-                      )
-                    })}
-                  </Panel>
+                  return (
+                    <Panel
+                      style={{ fontWeight: 700 }}
+                      header={item.header}
+                      key={index}
+                    >
+                      {item.options.map((opt) => {
+                        return (
+                          <Checkbox
+                            name={opt.label}
+                            onChange={(e) => {
+                              handleCheckbox(opt.value, e.target.checked);
+                            }}
+                          >
+                            {opt.label}
+                          </Checkbox>
+                        );
+                      })}
+                    </Panel>
+                  );
                 })}
               </Collapse>
             </Form>
