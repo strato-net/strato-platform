@@ -136,11 +136,13 @@ function PropertyDetails() {
     const formattedResults = {};
 
     for (const category in selectedCategories) {
-      const formattedCategory =
-        category.charAt(0).toUpperCase() + category.slice(1);
-      const valuesArray = selectedCategories[category].map((value) =>
-        value
-      );
+      const formattedCategory = category
+        .replace(/_/g, " ")
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+
+      const valuesArray = selectedCategories[category].map((value) => value);
       const formattedValues = valuesArray.join(", ");
 
       formattedResults[formattedCategory] = formattedValues;
