@@ -193,7 +193,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     }
 
     function addProperty(
-        address _produdctId,
+        address _productId,
         int _listPrice,
         string _unparsedAddress,
         int _streetNumber,
@@ -283,8 +283,8 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         bool _sprinklerSystem,
         bool _waterFront
     ) returns (uint256, address) {
-        Property_0_3 property = new Property_0_3(
-            _produdctId,
+        Property_0_4 property = new Property_0_4(
+            _productId,
             _listPrice,
             _unparsedAddress,
             _streetNumber,

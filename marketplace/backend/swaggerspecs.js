@@ -32,6 +32,7 @@ const options = {
     './api/v1/Category/category.yaml',
     './api/v1/SubCategory/subCategory.yaml',
     './api/v1/Product/product.yaml',
+    './api/v1/Product/properties.yaml',
     './api/v1/Inventory/inventory.yaml',
     './api/v1/Item/item.yaml',
     './api/v1/Order/order.yaml',

@@ -1,0 +1,313 @@
+paths:
+  /properties/:
+    get:
+      security:              
+        - bearerAuth: []                    
+      tags:               
+        - Properties        
+      summary: Retrieve properties
+      produces:
+      - application/json
+      responses:         
+        200:
+          description: Array of properties
+    post:  
+      security:              
+        - bearerAuth: []                  
+      tags:               
+        - Properties        
+      summary: Create a property
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to create properties
+        required: true
+        content:
+          'application/json': 
+            schema:       
+              $ref: '#/definitions/createProperty' 
+      responses:         
+        200:
+          description: Object of create property
+  /product/{address}/{chainId}:
+    get:                 
+      security:              
+        - bearerAuth: []   
+      tags:               
+        - Properties      
+      summary: Retrieve a property
+      produces:
+      - application/json
+      parameters:         
+      - in: path          
+        name: address     
+        description: address to retrieve the property
+        required: true
+      - in: path          
+        name: chainId     
+        description: chainId corresponding to the address
+        required: true
+        schema:       
+          $ref: '#/definitions/fetchProperty' 
+      responses:         
+        200:
+          description: Retrieve a property
+  /product/update:
+    put:    
+      security:              
+        - bearerAuth: []                
+      tags:               
+        - Product        
+      summary: Update a property
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to update a property
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/updateProperty' 
+      responses:         
+        200:
+          description: Retrieve a updated property
+  /product/transferOwnership:
+    post:              
+      security:              
+        - bearerAuth: []      
+      tags:               
+        - Properties        
+      summary: Transfer ownership
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to transfer ownership
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/transferOwnership' 
+      responses:         
+        200:
+          description: indicates success of transfer ownership
+definitions:        
+  fetchProperty:
+    address:
+      type: string
+    chainId:
+      type: string
+  createProduct:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          manufacturer:
+            type: string
+          unitOfMeasurement:
+            type: string
+          uniqueProductCode:
+            type: string
+          leastSellableUnit:
+            type: number
+          imageUrl:
+            type: string
+          fileHash:
+            type: string
+          isActive:
+            type: boolean
+          category:
+            type: string
+          subCategory:
+            type: string
+          createdAt:
+            type: string
+  updateProduct:
+    type: object
+    properties:
+      address:
+        type: string
+      chainId:
+        type: string
+      updates:
+        type: object
+        properties:
+          title:
+            type: string
+          description: 
+            type: string
+          propertyType: 
+            type: string
+          listPrice: 
+            type: number
+          unparsedAddress: 
+            type: string
+        streetNumber: 
+            type: number
+        streetName: 
+            type: string
+        unitNumber:
+            type: string
+        postalCity: 
+            type: string
+        stateOrProvince:
+            type: string
+        postalcode: 
+            type: number
+        bathroomsTotalInteger: 
+            type: number
+        bedroomsTotal: 
+            type: number
+        standardStatus: 
+        lotSizeArea: 
+            type: number
+        lotSizeUnits: 
+        livingArea: 
+            type: number
+        livingAreaUnits: 
+            type: string
+        latitude:
+            type: string
+        longitude:
+            type: string
+        numberOfUnitsTotal: 
+            type: number
+        dishwasher:
+            type: boolean
+        dryer:
+            type: boolean
+        freezer:
+            type: boolean
+        garbageDisposal:
+            type: boolean
+        microwave:
+            type: boolean
+        ovenOrRange:
+            type: boolean
+        refrigerator:
+            type: boolean
+        washer:
+            type: boolean
+        waterHeater:
+            type: boolean
+        centralAir:
+            type: boolean
+        evaporative:
+            type: boolean
+        geoThermal:
+            type: boolean
+        refrigeration:
+            type: boolean
+        solar:
+            type: boolean
+        wallUnit:
+            type: boolean
+        baseboard:
+            type: boolean
+        forceAir:
+            type: boolean
+        geoThermalHeat:
+            type: boolean
+        heatPump:
+            type: boolean
+        hotWater:
+            type: boolean
+        radiant:
+            type: boolean
+        solarHeat:
+            type: boolean
+        steam:
+            type: boolean
+        carpet:
+            type: boolean
+        concrete:
+            type: boolean
+        hardwood:
+            type: boolean
+        laminate:
+            type: boolean
+        linoleumVinyl:
+            type: boolean
+        slate:
+            type: boolean
+        softwood:
+            type: boolean
+        tile:
+            type: boolean
+        carport:
+            type: boolean
+        garage:
+            type: boolean
+        offStreet:
+            type: boolean
+        onStreet:
+            type: boolean
+        attic:
+            type: boolean
+        cableReady:
+            type: boolean
+        ceilingFan:
+            type: boolean
+        doublePaneWindows:
+            type: boolean
+        elevator:
+            type: boolean
+        fireplace:
+            type: boolean
+        flooring:
+            type: boolean
+        furnished:
+            type: boolean
+        jettedTub:
+            type: boolean
+        securitySystem:
+            type: boolean
+        vaultedCeiling:
+            type: boolean
+        skylight:
+            type: boolean
+        wetBar:
+            type: boolean
+        barbecueArea:
+            type: boolean
+        deck:
+            type: boolean
+        dock:
+            type: boolean
+        fence:
+            type: boolean
+        garden:
+            type: boolean
+        hotTubOrSpa:
+            type: boolean
+        lawn:
+            type: boolean
+        patio:
+            type: boolean
+        pond:
+            type: boolean
+        pool:
+            type: boolean
+        porch:
+            type: boolean
+        rvParking:
+            type: boolean
+        sauna:
+            type: boolean
+        sprinklerSystem:
+            type: boolean
+        waterFront:
+            type: boolean
+  transferOwnership:
+    type: object
+    properties:
+      address:
+        type: string
+      chainId:
+        type: string
+      newOwner:
+        type: string

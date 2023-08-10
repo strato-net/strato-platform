@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Modal,
   Form,
@@ -52,9 +53,11 @@ function PropertyCreateModal({
   toggleCreateConfirmModal,
 }) {
 
+  const navigate = useNavigate();
+
   const dispatch = usePropertiesDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { message, success } = usePropertiesState();
+  const { message, success, isCreatePropertySubmitting } = usePropertiesState();
 
   const [selectedImage, setSelectedImage] = useState(null);
   const [propertyData, setPropertyData] = useState({
@@ -165,16 +168,16 @@ function PropertyCreateModal({
       lotSizeUnits: lotSizeUnits,
       livingArea: livingArea,
       livingAreaUnits: livingAreaUnits,
-      latitude: "",
-      longitude: "",
       numberOfUnitsTotal: numberOfUnitsTotal,
 
       ...selectedOptions,
     };
 
-    let [isDone, projectAddress] = await actions.createProperty(dispatch, body);
+    let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
 
-    // if (isDone) {
+    if (productContractAddress) {
+      setTimeout(() => navigate(`/properties/${propertyContractAddress}`), 5000)
+    }
 
     //   if (projectImages) {
     //     const formData = new FormData()
@@ -186,15 +189,6 @@ function PropertyCreateModal({
     //     await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
     //   }
     //   Modal.destroyAll();
-
-    //   setTimeout(() => navigate(`/projects/${projectAddress}`), 2000)
-
-    //   // setTimeout(() => navigate(`/projects`),2000)
-
-    //   actions.mintProjectCredits(dispatch, { projectAddress: projectAddress })
-
-    //   // await actions.fetchProject(dispatch, 10, 0, debouncedSearchTerm);
-    // }
   };
 
   const handleCancel = () => setPreviewOpen(false);
@@ -227,6 +221,7 @@ function PropertyCreateModal({
     disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
     onConfirm: showConfirmationModal,
+    loading: isCreatePropertySubmitting
   };
   const layout = {
     labelCol: { span: 8 },
@@ -291,7 +286,7 @@ function PropertyCreateModal({
           toggleCreateModal(false);
           setModalView(true);
         }}
-        // confirmLoading={primaryAction.loading}
+        confirmLoading={primaryAction.loading}
         width={672}
       >
         <Divider />
@@ -532,7 +527,7 @@ function PropertyCreateModal({
               </Col>
             </Row>
 
-            <Form.Item label="Upload Image" name="image">
+            {/* <Form.Item label="Upload Image" name="image">
               <div className="w-48 h-36 p-4 border-secondryD border rounded flex flex-col justify-around">
                 {selectedImage ? (
                   <div className="h-20">
@@ -569,7 +564,7 @@ function PropertyCreateModal({
                   use jpg, png format of size less than 1mb
                 </p>
               </div>
-            </Form.Item>
+            </Form.Item> */}
           </Form>
         ) : (
           <div>
@@ -752,6 +747,7 @@ function PropertyCreateModal({
         isCreateConfirmModalOpen={isCreateConfirmModalOpen}
         toggleCreateConfirmModal={toggleCreateConfirmModal}
         handleSubmitCreateProperty={handleSubmitCreateProperty}
+        isCreatePropertySubmitting={isCreatePropertySubmitting}
       />
     </>
   );

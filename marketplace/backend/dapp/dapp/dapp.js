@@ -603,12 +603,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* PROPERTIES DAPP */
   contract.getProperty = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    console.log('getOptions', getOptions)
     //Get the property contract
     const property = await managers.productManager.getProperty({ ...args }, getOptions);
     //Get the product contract
+    console.log('dapp.getProperty - property', property)
+    console.log('dapp.getProperty - productId', property.productId)
     const productData = await managers.productManager.getProduct({ 
       address: property.productId,
+      uniqueProductID: property.productId,
       ownerOrganization: userOrganization }, getOptions);
+      console.log('dapp.getProperty - productData', productData)
     const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
     return propertyData
   };
@@ -621,6 +626,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     for (const property of allPropertiesData) {
       const productData = await managers.productManager.getProduct({ 
         ...args,
+        address: property.productId,
         uniqueProductID: property.productId,
         ownerOrganization: userOrganization }, getOptions);
       propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
@@ -650,7 +656,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //create the property contract that matches product id with the property id
     if (productContract[0] == 200) {
       const propertyArgs = {
-        produdctId: productContract[1],
+        productId: productContract[1],
         listPrice: args.listPrice,
         unparsedAddress: args.unparsedAddress,
         streetNumber: args.streetNumber,
