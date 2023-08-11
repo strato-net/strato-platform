@@ -20,18 +20,20 @@ import           Control.Monad.IO.Class
 import           Network.HTTP.Client
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header           (hContentType, hAuthorization)
+import           Servant.Client                      (BaseUrl, parseBaseUrl)
 
 
 data RealmMinInfo = -- minimum info user must provide to support realm
     RealmMinInfo {
-        discoveryUrl :: String, 
+        discoveryUrl :: String,
         clientId     :: String,
-        clientSecret :: String
+        clientSecret :: String,
+        nodeUrl      :: Maybe String
     } deriving (Show, Generic, FromJSON, ToJSON)
 
-data OAuthEndpoints = 
+data OAuthEndpoints =
     OAuthEndpoints {
-        issuer :: String, 
+        issuer :: String,
         token_endpoint :: String
     } deriving (Show, Generic, ToJSON, FromJSON)
 
@@ -39,37 +41,42 @@ data RealmDetails =
     RealmDetails {
         realmEndpoints    :: OAuthEndpoints,
         realmClientId     :: String,
-        realmClientSecret :: String
+        realmClientSecret :: String,
+        associatedNodeUrl :: BaseUrl
     } deriving (Show)
 
 type RealmData = Map String RealmDetails -- realm name -> realm data
 
 getRealmData :: MonadIO m => [RealmMinInfo] -> m RealmData
-getRealmData realmInfos = fromList <$> sequence (parseRealmMinInfo <$> realmInfos)
-    where 
+getRealmData realmInfos = fromList <$> mapM parseRealmMinInfo realmInfos
+    where
         parseRealmMinInfo :: MonadIO m => RealmMinInfo -> m (String, RealmDetails)
-        parseRealmMinInfo realmInfo = do 
+        parseRealmMinInfo realmInfo = do
             endpoints <- getEndpointsFromDiscovery $ discoveryUrl realmInfo
-            let realmName = extractRealmName $ issuer endpoints 
+            let realmName = extractRealmName $ issuer endpoints
+            nurl <- liftIO $ parseBaseUrl $ case nodeUrl realmInfo of
+                    Just url -> url
+                    Nothing -> "https://node2." <> realmName <> ".blockapps.net" -- if no url provided, assume network follows this pattern
             return (realmName, RealmDetails {
                 realmEndpoints = endpoints,
                 realmClientId = clientId realmInfo,
-                realmClientSecret = clientSecret realmInfo
+                realmClientSecret = clientSecret realmInfo,
+                associatedNodeUrl = nurl
             })
 
 getEndpointsFromDiscovery :: MonadIO m => String -> m OAuthEndpoints
-getEndpointsFromDiscovery url = do 
+getEndpointsFromDiscovery url = do
     discoveryRequest <- liftIO $ parseRequest url
     manager <- liftIO $ newManager tlsManagerSettings
     response <- liftIO $ httpLbs discoveryRequest manager
     either error return (eitherDecode $ responseBody response)
 
-extractRealmName :: String -> String 
+extractRealmName :: String -> String
 extractRealmName idProv = last $ splitOn "/" (if "/" `isSuffixOf` idProv then init idProv else idProv)
 
 
 
-newtype AccessToken = AccessToken {access_token :: Text} 
+newtype AccessToken = AccessToken {access_token :: Text}
     deriving (Show, Generic, ToJSON, FromJSON)
 
 getAccessToken :: MonadIO m => String -> String -> String -> m (Maybe AccessToken)
@@ -85,7 +92,7 @@ getAccessToken id' sec tokenEndpoint = do
 
 
 
-data OAuthUser = 
+data OAuthUser =
     OAuthUser {
         id          :: Text,
         firstName   :: Text,
@@ -93,7 +100,7 @@ data OAuthUser =
         attributes  :: Maybe OAuthUserAttributes
     } deriving (Show, Generic, FromJSON, ToJSON)
 
-newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [Text]} 
+newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [Text]}
     deriving (Show, Generic, FromJSON, ToJSON)
 
 getUserByUUID :: ( MonadIO m

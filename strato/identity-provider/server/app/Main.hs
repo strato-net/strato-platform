@@ -49,6 +49,5 @@ main = do
     
     putStrLn "Initializing identity server..."
     let p = flags_port 
-        n = flags_nodeUrl
         vp = flags_vaultProxyUrl
-    run p $ identityProviderApp n vp iss crt privk realmData
+    run p $ identityProviderApp vp iss crt privk realmData

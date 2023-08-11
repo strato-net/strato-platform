@@ -33,7 +33,6 @@ import           Network.HTTP.Types.Status
 
 import           Data.Aeson
 import qualified Data.ByteString.Lazy                    as BL
-import           Data.List                               (isSuffixOf)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import           Data.Text.Encoding                      (encodeUtf8, decodeUtf8)
@@ -68,8 +67,8 @@ getAccessTokenForRealm realm = do
     case M.lookup realm rd of 
         Nothing -> do 
             $logErrorS "getAccessTokenForRealm" $ "Recieved PUT /identity request from a realm we don't support: " <> T.pack realm
-            return Nothing
-        Just (RealmDetails endpoints cid csec) -> getAccessToken cid csec (token_endpoint endpoints)
+            throwIO $ IdentityError "Identity server does not support this realm"
+        Just (RealmDetails endpoints cid csec _) -> getAccessToken cid csec (token_endpoint endpoints)
 
 oAuthUserToSubject :: OAuthUser -> PublicKey -> Subject
 oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
@@ -90,7 +89,6 @@ data IdentityServerData = IdentityServerData
     { issuer             :: Issuer          -- issuer of signing cert
     , issuerCert         :: X509Certificate -- the signing cert
     , issuerPrivKey      :: PrivateKey      -- the signing private key
-    , blocAPIUrl         :: BaseUrl -- strato node where will register cert
     , realmNameToDetails :: RealmData
 }
 instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
@@ -99,8 +97,6 @@ instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) wh
     access _ = asks issuerCert
 instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
     access _ = asks issuerPrivKey
-instance Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where
-    access _ = asks blocAPIUrl
 instance Monad m => Accessible RealmData (ReaderT IdentityServerData m) where
     access _ = asks realmNameToDetails
 instance Monad m => Accessible VaultData (VaultM m) where
@@ -118,7 +114,6 @@ putIdentity :: ( MonadIO m
                , Accessible Issuer m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
-               , Accessible BaseUrl m
                , Accessible RealmData m
                ) => T.Text -> T.Text -> T.Text -> m Address
 putIdentity accessToken uuid idProv = do
@@ -127,7 +122,7 @@ putIdentity accessToken uuid idProv = do
     let realm = extractRealmName $ T.unpack idProv
     getVaultKey accessToken >>= \case
         Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
-            hasCert <- certInCirrus accessToken a
+            hasCert <- certInCirrus accessToken realm a
             unless hasCert $ createAndRegisterCert uuid realm k
             return a
         Nothing -> do -- no vault key, so make key and register cert
@@ -147,14 +142,13 @@ putIdentityExternal ::  ( MonadIO m
                         , Accessible Issuer m
                         , Accessible X509Certificate m
                         , Accessible PrivateKey m
-                        , Accessible BaseUrl m
                         , Accessible RealmData m
                         ) => T.Text -> m Address
 putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" ""
 
 
 blocEndpoint :: String
-blocEndpoint = "bloc/v2.2"
+blocEndpoint = "/bloc/v2.2"
 
 data CertificateInCirrus = CertificateInCirrus{
     -- commonName :: Text,
@@ -164,24 +158,31 @@ data CertificateInCirrus = CertificateInCirrus{
 instance FromJSON CertificateInCirrus
 instance ToJSON CertificateInCirrus
 
-certInCirrus :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => T.Text -> Address -> m Bool
-certInCirrus token a = do
-    url <- access (Proxy @BaseUrl)
-    let cirrusUrl = "cirrus/search/Certificate?userAddress=eq." <> show a
-        url' = T.unpack $ T.replace (T.pack blocEndpoint) (T.pack cirrusUrl) (T.pack $ showBaseUrl url)
-    mgr <- liftIO $ case baseUrlScheme url of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings
-    templateRequest <- liftIO $ parseRequest url'
-    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
-        request = templateRequest{requestHeaders = rHead}
-    response <- liftIO $ httpLbs request mgr
-    let mCerts:: Maybe [CertificateInCirrus] = decode $ responseBody response
-    case mCerts of
-        Just certs -> do
-            $logInfoS "certInCirrus" $ T.pack $ "Cirrus response was: " <> show certs
-            return . not $ null certs -- maybe can also check if cert is valid and matches user attributes
-        Nothing -> error "Unexpected response from cirrus query. This should never happen"
+certInCirrus :: (MonadIO m, MonadLogger m, Accessible RealmData m) => T.Text -> String -> Address -> m Bool
+certInCirrus token realm a = do
+    rd <- access (Proxy @RealmData)
+    case M.lookup realm rd of
+        Nothing -> do 
+            $logErrorS "certInCirrus" "Trying to find a cert on a network whose realm we don't support (How?? We should never reach this error)"
+            throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown sooner"
+        Just (RealmDetails _ _ _ nurl) -> do 
+            let cirrusEndpoint = "/cirrus/search/Certificate?userAddress=eq." <> show a
+                url = showBaseUrl nurl{baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
+            mgr <- liftIO $ case baseUrlScheme nurl of
+                Http -> newManager defaultManagerSettings
+                Https -> newManager tlsManagerSettings
+            templateRequest <- liftIO $ parseRequest url
+            let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
+                request = templateRequest{requestHeaders = rHead}
+            response <- liftIO $ httpLbs request mgr
+            let mCerts:: Maybe [CertificateInCirrus] = decode $ responseBody response
+            case mCerts of
+                Just certs -> do
+                    $logInfoS "certInCirrus" $ T.pack $ "Checked for user's cert in Cirrus; response was: " <> show certs
+                    return . not $ null certs -- maybe can also check if cert is valid and matches user attributes
+                Nothing -> do 
+                    $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
+                    throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
 
 createAndRegisterCert :: ( MonadIO m
                          , MonadLogger m
@@ -189,7 +190,6 @@ createAndRegisterCert :: ( MonadIO m
                          , Accessible X509Certificate m
                          , Accessible PrivateKey m
                          , Accessible RealmData m
-                         , Accessible BaseUrl m
                          ) => T.Text -> String -> PublicKey -> m ()
 createAndRegisterCert uuid realm k = do
     getAccessTokenForRealm "master" >>= \case
@@ -209,7 +209,7 @@ createAndRegisterCert uuid realm k = do
                                 Nothing -> do
                                     $logErrorS "createAndRegisterCert" "uh oh! We couldn't an access token for our realm"
                                     throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
-                                Just realmToken -> registerCert newCert realmToken
+                                Just realmToken -> registerCert newCert realmToken realm
                         Nothing -> do
                             $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
                             throwIO $ IdentityError "Unable to sign new cert for user"
@@ -226,26 +226,35 @@ createNewCert user k = do
     let signWIssuerPrivKey bs = return $ signMsg iK bs
     makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
 
-registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> AccessToken -> m ()
-registerCert cert token = do
-    url <- access (Proxy @BaseUrl)
-    mgr <- liftIO $ case baseUrlScheme url of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings
-    let clientEnv = mkClientEnv mgr url
-        txPayload = BlocFunction FunctionPayload{
-            functionpayloadContractAddress = 0x509,
-            functionpayloadMethod = "registerCertificate",
-            functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
-            functionpayloadValue = Nothing,
-            functionpayloadTxParams = Nothing,
-            functionpayloadChainid = Nothing,
-            functionpayloadMetadata = Nothing
-        }
-        txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-    eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing True txRequest) clientEnv
-    $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse
-    --TODO: how to tell if cert successfully added to blockchain?
+registerCert :: (MonadIO m, MonadLogger m, Accessible RealmData m) 
+             => X509Certificate 
+             -> AccessToken 
+             -> String
+             -> m ()
+registerCert cert token realm = do
+    rd <- access (Proxy @RealmData)
+    case M.lookup realm rd of 
+        Nothing -> do
+            $logErrorS "registerCert" "Trying to register cert for realm we don't support. Error should have been thrown MUCH sooner"
+            throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown MUCH sooner"
+        Just (RealmDetails _ _ _ nurl) -> do
+            mgr <- liftIO $ case baseUrlScheme nurl of
+                Http -> newManager defaultManagerSettings
+                Https -> newManager tlsManagerSettings
+            let clientEnv = mkClientEnv mgr nurl{baseUrlPath = baseUrlPath nurl <> blocEndpoint}
+                txPayload = BlocFunction FunctionPayload{
+                    functionpayloadContractAddress = 0x509,
+                    functionpayloadMethod = "registerCertificate",
+                    functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
+                    functionpayloadValue = Nothing,
+                    functionpayloadTxParams = Nothing,
+                    functionpayloadChainid = Nothing,
+                    functionpayloadMetadata = Nothing
+                }
+                txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
+            eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing True txRequest) clientEnv
+            $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse
+            --TODO: how to tell if cert successfully added to blockchain?
 
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do
@@ -279,19 +288,17 @@ server :: ( MonadIO m
           , Accessible Issuer m
           , Accessible X509Certificate m
           , Accessible PrivateKey m
-          , Accessible BaseUrl m
           , Accessible RealmData m
           ) => ServerT IDAPI.IdentityProviderAPI m
 server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
 
 hoistCoreServer :: String 
-                -> String 
                 -> Issuer 
                 -> X509Certificate 
                 -> PrivateKey
                 -> RealmData
                 -> Server IDAPI.IdentityProviderAPI
-hoistCoreServer nodeurl vaulturl iss cert privk rd = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
+hoistCoreServer vaulturl iss cert privk rd = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     convertErrors r x = Handler $ do
       eRes <- liftIO . try $ r x
@@ -299,31 +306,24 @@ hoistCoreServer nodeurl vaulturl iss cert privk rd = hoistServer (Proxy :: Proxy
         Right a -> return a
         Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk rd x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd x
     reThrowError :: IdentityError -> ServerError
     reThrowError
       = \case
           IdentityError err -> err400{errBody = BL.fromStrict $ encodeUtf8 err}
 
-runIdentityM :: MonadIO m
-             => String
-             -> Issuer
+runIdentityM :: Issuer
              -> X509Certificate
              -> PrivateKey
              -> RealmData
              -> ReaderT IdentityServerData m a -> m a
-runIdentityM nodeurl iss cert privk rd x = do
-    url <- liftIO $ parseBaseUrl nodeurl
-    let path' = baseUrlPath url
-    let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> blocEndpoint -- surely there is a better way to do this?
-    runReaderT x $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi} rd
+runIdentityM iss cert privk rd x = runReaderT x $ IdentityServerData iss cert privk rd
 
 
 identityProviderApp :: String
-                    -> String
                     -> Issuer
                     -> X509Certificate
                     -> PrivateKey
                     -> RealmData
                     -> Application
-identityProviderApp nurl vurl iss cert pk rd = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer nurl vurl iss cert pk rd
+identityProviderApp vurl iss cert pk rd = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd
