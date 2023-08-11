@@ -105,9 +105,7 @@ describe('Membership', function() {
     it('Create Membership - 201', async () => {
         // Create Membership via upload
         const args = factoryArgs(globalAdmin)
-        console.log("args", args)
         contract = await membershipJs.uploadContract(globalAdmin, args, options);
-        console.log("contract upload", contract)
         const state = await contract.getState();
 
         assert.notStrictEqual(
@@ -120,15 +118,17 @@ describe('Membership', function() {
         // Create our Membership
         const args = factoryArgs(globalAdmin)
         const membership = await membershipJs.uploadContract(globalAdmin, args, options)
-        const response = await membership.getState();
-          
-        console.log("args", response)
+
+        assert.isDefined(membership.address, "Membership was not created")
+        
         const args2 = factoryArgs(globalAdmin);
-        const update = await contract.update(args2)
+        const update = await membership.update(args2)
+        const response = await membership.getState();
+
         assert.equal(update[0], RestStatus.OK)
-        assert.notStrictEqual(response.additionalInfo, args2.additionalInfo)
-        assert.notStrictEqual(response.createdDate, args2.createdDate)
-        assert.notStrictEqual(response.timePeriodInMonths, args2.timePeriodInMonths)
+        assert.equal(response.additionalInfo, args2.additionalInfo)
+        assert.equal(response.createdDate, args2.createdDate)
+        assert.equal(response.timePeriodInMonths, args2.timePeriodInMonths)
 
     });
 

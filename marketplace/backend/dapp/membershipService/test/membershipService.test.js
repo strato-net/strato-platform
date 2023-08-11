@@ -132,6 +132,15 @@ describe('MembershipService', function() {
         
         const args2 = factoryArgs(globalAdmin);
         const update = await membershipService.update(args2)
+        const state = await membershipService.getState();
+
         assert.equal(update[0], RestStatus.OK)
+        assert.equal(state.membershipId, args2.membershipId)
+        assert.equal(state.serviceId, args2.serviceId)
+        assert.equal(state.membershipPrice, args2.membershipPrice)
+        assert.equal(state.discountPrice, args2.discountPrice)
+        assert.equal(state.maxQuantity, args2.maxQuantity)
+        assert.equal(state.createdDate, args2.createdDate)
+        assert.equal(state.isActive, args2.isActive)
     });
 });

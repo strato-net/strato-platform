@@ -138,23 +138,29 @@ describe('MembershipService End-To-End Tests', function () {
     }
 
     // get
-    const getMembershipServiceResponse = await put(
+    const updateMembershipService = await put(
       MembershipService.prefix,
       MembershipService.update,
       updateArgs,
       orgAdmin.token,
     )
 
-    const membershipService = getMembershipServiceResponse.body.data
+    const getMembershipServiceResponse = await get(
+      MembershipService.prefix,
+      MembershipService.get.replace(':address', createResponse.body.data.address),
+      {},
+      orgAdmin.token,
+    )
 
-    assert.equal(getMembershipServiceResponse.status, 200, 'should be 200');
-    assert.isDefined(getMembershipServiceResponse.body, 'body should be defined');
-    assert.equal(membershipService['membershipId'], updateArgs['membershipId'], 'membershipId should be equal');
-    assert.equal(membershipService['serviceId'], updateArgs['serviceId'], 'serviceId should be equal');
-    assert.equal(membershipService['membershipPrice'], updateArgs['membershipPrice'], 'membershipPrice should be equal');
-    assert.equal(membershipService['discountPrice'], updateArgs['discountPrice'], 'discountPrice should be equal');
-    assert.equal(membershipService['maxQuantity'], updateArgs['maxQuantity'], 'maxQuantity should be equal');
-    assert.equal(membershipService['createdDate'], updateArgs['createdDate'], 'createdDate should be equal');
-    assert.equal(membershipService['isActive'], updateArgs['isActive'], 'isActive should be equal');
+
+    assert.equal(updateMembershipService.status, 200, 'should be 200');
+    assert.isDefined(updateMembershipService.body, 'body should be defined');
+    assert.equal(getMembershipServiceResponse.body.data['membershipId'], updateArgs.updates['membershipId'], 'membershipId should be equal');
+    assert.equal(getMembershipServiceResponse.body.data['serviceId'], updateArgs.updates['serviceId'], 'serviceId should be equal');
+    assert.equal(getMembershipServiceResponse.body.data['membershipPrice'], updateArgs.updates['membershipPrice'], 'membershipPrice should be equal');
+    assert.equal(getMembershipServiceResponse.body.data['discountPrice'], updateArgs.updates['discountPrice'], 'discountPrice should be equal');
+    assert.equal(getMembershipServiceResponse.body.data['maxQuantity'], updateArgs.updates['maxQuantity'], 'maxQuantity should be equal');
+    assert.equal(getMembershipServiceResponse.body.data['createdDate'], updateArgs.updates['createdDate'], 'createdDate should be equal');
+    assert.equal(getMembershipServiceResponse.body.data['isActive'], updateArgs.updates['isActive'], 'isActive should be equal');
   })
 })
