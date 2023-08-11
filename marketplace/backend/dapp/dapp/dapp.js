@@ -1298,6 +1298,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   }
 
   contract.getMembership = async function (args, options = optionsNoChainIds) {
+    // May need to insert contractName in options when this goes throught the product manager
+    // This param was hard coded for the get and getAll functions for Membership and MembershipService below
     return membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
   }
 
