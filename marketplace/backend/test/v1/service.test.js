@@ -65,7 +65,7 @@ describe('Service End-To-End Tests', function () {
       createArgs,
       orgAdmin.token,
     )
-    console.log("createResponse: ", createResponse.body.data)
+    
     test = createResponse.body.data[1]
     assert.equal(createResponse.status, 200, 'should be 200');
     assert.isDefined(createResponse.body, 'body should be defined')
@@ -82,7 +82,6 @@ describe('Service End-To-End Tests', function () {
     
     assert.equal(getService.status, 200, 'should be 200');
     assert.isDefined(getService.body, 'body should be defined');
-    console.log(" a getService: ", getService.body.data)
   })
 
   it('Get all Services', async () => {
@@ -94,7 +93,7 @@ describe('Service End-To-End Tests', function () {
       {},
       orgAdmin.token,
     )
-    console.log("getServices: ", getServices.body.data)
+    
     assert.equal(getServices.status, 200, 'should be 200');
     assert.isDefined(getServices.body, 'body should be defined');
     assert.isDefined(getServices.body.data, 'body should be defined');
@@ -133,14 +132,15 @@ describe('Service End-To-End Tests', function () {
     }
 
     // get
-    const getMachine = await put(
+    const updateService = await put(
       Service.prefix,
       Service.update,
       updateArgs,
       orgAdmin.token,
     )
-    assert.equal(getMachine.status, 200, 'should be 200');
-    assert.isDefined(getMachine.body, 'body should be defined');
+    assert.equal(updateService.status, 200, 'should be 200');
+    assert.isDefined(updateService.body, 'body should be defined');
+    console.log("updateService: ", updateService.body.data)
     
     const getService = await get(
       Service.prefix,
@@ -153,9 +153,13 @@ describe('Service End-To-End Tests', function () {
     assert.isDefined(getService.body, 'body should be defined');
     console.log("getService: ", getService.body.data)
     
+    assert.equal(getService.body.data.name, updateArgs.updates.name);
+    assert.equal(getService.body.data.description, updateArgs.updates.description)
+    assert.equal(getService.body.data.price, updateArgs.updates.price)
     assert.notStrictEqual(getService.body.data.name, getService0.body.data.name)
     assert.notStrictEqual(getService.body.data.description, getService0.body.data.description)
     assert.notStrictEqual(getService.body.data.price, getService0.body.data.price)
     assert.equal(getService.body.data.createdDate, getService0.body.data.createdDate);
+    assert.equal(getService.body.data.owner, getService0.body.data.owner);
   })
 })
