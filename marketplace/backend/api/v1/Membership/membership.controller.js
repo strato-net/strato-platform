@@ -91,13 +91,10 @@ class MembershipController {
   
   static validateCreateMembershipArgs(args) {
     const createMembershipSchema = Joi.object({
-      membershipArgs: Joi.object({
         productId: Joi.string().required(),
         timePeriodInMonths: Joi.number().required(),
         additionalInfo: Joi.string().required(),
         createdDate: Joi.number().required(),
-      }),
-      isPublic: Joi.boolean().required(),
     });
 
     const validation = createMembershipSchema.validate(args);

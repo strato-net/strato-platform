@@ -34,9 +34,8 @@ async function uploadContract(user, _constructorArgs, options) {
         ...options,
         history: contractName
       }
-    console.log("are we here", user, "args", contractArgs, "options", copyOfOptions)
+
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
-    console.log("lets see")
     contract.src = 'removed';
 
     return bind(user, contract, copyOfOptions);

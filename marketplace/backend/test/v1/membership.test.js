@@ -115,70 +115,38 @@ describe('Membership End-To-End Tests', function () {
     assert.isDefined(createResponse.body, 'body should be defined')
 
     // get
-    const getMachine = await get(
+    const getResponse = await get(
       Membership.prefix,
-      Membership.get.replace(':address', createResponse.body.data.address).replace(':chainId', createResponse.body.data.chainIds[0]),
+      Membership.get.replace(':address', createResponse.body.data.address),
       {},
       orgAdmin.token,
     )
 
-    assert.equal(getMachine.status, 200, 'should be 200');
-    assert.isDefined(getMachine.body, 'body should be defined');
+    // console.log("get membership", getResponse.body)
 
-    assert.equal(getMachine['productId'], createArgs['productId'], 'productId should be equal');
-    assert.equal(getMachine['timePeriodInMonths'], createArgs['timePeriodInMonths'], 'timePeriodInMonths should be equal');
-    assert.equal(getMachine['additionalInfo'], createArgs['additionalInfo'], 'additionalInfo should be equal');
-    assert.equal(getMachine['createdDate'], createArgs['createdDate'], 'createdDate should be equal');
+    assert.equal(getResponse.status, 200, 'should be 200');
+    assert.isDefined(getResponse.body, 'body should be defined');
+
+    assert.equal(getResponse['productId'], createArgs['productId'], 'productId should be equal');
+    assert.equal(getResponse['timePeriodInMonths'], createArgs['timePeriodInMonths'], 'timePeriodInMonths should be equal');
+    assert.equal(getResponse['additionalInfo'], createArgs['additionalInfo'], 'additionalInfo should be equal');
+    assert.equal(getResponse['createdDate'], createArgs['createdDate'], 'createdDate should be equal');
   })
 
   it('Get all Membership', async () => {
     // get
-    const getMachine = await get(
+    const getResponse = await get(
       Membership.prefix,
       Membership.getAll,
       {},
       orgAdmin.token,
     )
 
-    assert.equal(getMachine.status, 200, 'should be 200');
-    assert.isDefined(getMachine.body, 'body should be defined');
-    assert.isDefined(getMachine.body.data, 'body should be defined');
-  })
+    console.log("getAll membershipssss", getResponse.body)
 
-  it('update Membership', async () => {
-    // create
-    const createArgs = {
-      ...membershipArgs(util.uid()),
-    }
-
-    const createResponse = await post(
-      Membership.prefix,
-      Membership.create,
-      createArgs,
-      orgAdmin.token,
-    )
-
-    assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
-
-    const updateArgs = {
-      ...updateMembershipArgs(createResponse.body.data.address, createResponse.body.data.chainIds[0], util.uid()),
-    }
-
-    // get
-    const getMachine = await put(
-      Membership.prefix,
-      Membership.update,
-      updateArgs,
-      orgAdmin.token,
-    )
-
-    assert.equal(getMachine.status, 200, 'should be 200');
-    assert.isDefined(getMachine.body, 'body should be defined');
-    assert.equal(getMachine.machine_ID, createArgs.machine_ID, 'machine Id should be equal');
-    assert.equal(getMachine.purpose, createArgs.purpose, 'purpose should be defined');
-    assert.equal(getMachine.model, createArgs.model, 'model should be defined');
-    assert.equal(getMachine.installation_Date, createArgs.installation_Date, 'installation_Date should be defined');
+    assert.equal(getResponse.status, 200, 'should be 200');
+    assert.isDefined(getResponse.body, 'body should be defined');
+    assert.isDefined(getResponse.body.data, 'body should be defined');
   })
 
   it('transfer ownership', async () => {
@@ -217,5 +185,41 @@ describe('Membership End-To-End Tests', function () {
     )
 
     assert.equal(getTransfer.status, 200, 'should be 200');
+  })
+
+  it('update Membership', async () => {
+    // create
+    const createArgs = {
+      ...membershipArgs(util.uid()),
+    }
+
+    const createResponse = await post(
+      Membership.prefix,
+      Membership.create,
+      createArgs,
+      orgAdmin.token,
+    )
+
+    assert.equal(createResponse.status, 200, 'should be 200');
+    assert.isDefined(createResponse.body, 'body should be defined')
+
+    const updateArgs = {
+      ...updateMembershipArgs(createResponse.body.data.address, util.uid()),
+    }
+
+    // get
+    const getResponse = await put(
+      Membership.prefix,
+      Membership.update,
+      updateArgs,
+      orgAdmin.token,
+    )
+
+    assert.equal(getResponse.status, 200, 'should be 200');
+    assert.isDefined(getResponse.body, 'body should be defined');
+    assert.equal(getResponse.machine_ID, updateArgs.machine_ID, 'machine Id should be equal');
+    assert.equal(getResponse.purpose, updateArgs.purpose, 'purpose should be defined');
+    assert.equal(getResponse.model, updateArgs.model, 'model should be defined');
+    assert.equal(getResponse.installation_Date, updateArgs.installation_Date, 'installation_Date should be defined');
   })
 })

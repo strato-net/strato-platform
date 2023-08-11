@@ -91,7 +91,6 @@ class MembershipServiceController {
   
   static validateCreateMembershipServiceArgs(args) {
     const createMembershipServiceSchema = Joi.object({
-      membershipServiceArgs: Joi.object({
         membershipId: Joi.string().required(),
         serviceId: Joi.string().required(),
         membershipPrice: Joi.number().required(),
@@ -99,9 +98,7 @@ class MembershipServiceController {
         maxQuantity: Joi.number().required(),
         createdDate: Joi.number().required(),
         isActive: Joi.boolean().required(),
-      }),
-      isPublic: Joi.boolean().required(),
-    });
+      })
 
     const validation = createMembershipServiceSchema.validate(args);
 
@@ -138,7 +135,6 @@ class MembershipServiceController {
   static validateTransferOwnershipArgs(args) {
     const transferOwnershipMembershipServiceSchema = Joi.object({
       address: Joi.string().required(),
-      chainId: Joi.string().required(),
       newOwner: Joi.string().required(),
     })
 

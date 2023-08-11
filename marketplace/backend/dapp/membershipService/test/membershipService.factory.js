@@ -3,9 +3,8 @@ const factory = {
     /** Sample arguments for creating a MembershipService contract. Use util.uid() to generate a uid. */
     getMembershipServiceArgs(uid) {
         const args = {
-            appChainId: `${uid}`,
-            membershipId: `${uid + 2}`.padStart(40, '0'),  // chainID
-            serviceId: `${uid + 2}`.padStart(40, '0'),  // chainID
+            membershipId: `${uid + 2}`.padStart(40, '0'), 
+            serviceId: `${uid + 2}`.padStart(40, '0'), 
             membershipPrice: uid,
             discountPrice: uid,
             maxQuantity: uid,

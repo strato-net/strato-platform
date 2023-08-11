@@ -133,20 +133,18 @@ export const PaymentService = {
 
 export const Membership = {
   prefix: '/membership',
-  get: '/:address/:chainId/',
+  get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
-  audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
 }
 export const MembershipService = {
   prefix: '/membershipService',
-  get: '/:address/:chainId/',
+  get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
-  audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
 }
 

@@ -1298,13 +1298,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   }
 
   contract.getMembership = async function (args, options = optionsNoChainIds) {
-    return membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: contractName})
+    return membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
   }
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = {...options, org: managers.cirrusOrg, app: contractName}
+    const getOptions = {...options, org: managers.cirrusOrg, app: ""}
     return membershipJs.getAll(rawAdmin, { 
-      appChainId: contract.chainId,
       ...args
     }, getOptions)
   }
@@ -1344,11 +1343,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   }
 
   contract.getMembershipService = async function (args, options = optionsNoChainIds) {
-    return membershipServiceJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: contractName})
+    return membershipServiceJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
   }
 
   contract.getMembershipServices = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = {...options, org: managers.cirrusOrg, app: contractName}
+    const getOptions = {...options, org: managers.cirrusOrg, app: ""}
     return membershipServiceJs.getAll(rawAdmin, { 
       ...args
     }, getOptions)
