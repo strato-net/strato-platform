@@ -9,8 +9,6 @@ import PropertyCreateModal from './PropertyCreateModal'
 import { propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
-const LIMIT_PER_PAGE = 10;
-
 function PropertyListings() {
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(LIMIT_PER_PAGE)
