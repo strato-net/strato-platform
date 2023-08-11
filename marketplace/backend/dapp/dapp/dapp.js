@@ -628,9 +628,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     for (const property of allPropertiesData) {
       const productData = await managers.productManager.getProduct({ 
         ...args,
+        offset: 0,
         address: property.productId,
         uniqueProductID: property.productId,
-        ownerOrganization: userOrganization }, getOptions);
+        ownerOrganization: userOrganization }, 
+        getOptions
+      );
       propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
     }
     return propertiesWProducts
