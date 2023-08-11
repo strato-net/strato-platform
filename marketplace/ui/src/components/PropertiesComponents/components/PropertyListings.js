@@ -1,26 +1,29 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Space, Spin, Pagination, notification, Button, Modal } from 'antd'
+import { Row, Col, Typography, Spin, Pagination, notification, Button } from 'antd'
 import PropertyCard from './PropertyCard'
 import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
 
+const LIMIT_PER_PAGE = 5;
+
 function PropertyListings() {
-  const [currentPage, setCurrentPage] = useState(0)
-  const [limit, setLimit] = useState(12)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [limit] = useState(LIMIT_PER_PAGE)
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
-
-  useEffect(() => {
-    actions.fetchProperties(dispatch, limit, currentPage)
-  }, [currentPage])
+  const totalValue = useRef(0);
 
   const dispatch = usePropertiesDispatch()
   const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
+
+  useEffect(() => {
+    actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
+  }, [dispatch, currentPage, limit])
 
   useEffect(() => {
     if (isCreatePropertySubmitting) {
@@ -48,10 +51,6 @@ function PropertyListings() {
     }
   };
 
-  const handlePageChange = (e) => {
-    setCurrentPage(e)
-  }
-
   const applyFilter = (options) => {
     // actions.fetchProperties(dispatch, limit,currentPage,options)
   }
@@ -62,6 +61,7 @@ function PropertyListings() {
   }
 
   const propertyList = () => {
+    totalValue.current = properties.length === 5 ? (currentPage * 5) + 1 : currentPage * 5
     return (
       <>
         <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
@@ -77,11 +77,20 @@ function PropertyListings() {
               )
             })}
         </Row>
-        <Pagination style={{ width: '500px', margin: 'auto' }}
-          onChange={(e) => { handlePageChange(e) }} showSizeChanger={false}
-          current={currentPage}
-          defaultCurrent={1} total={500}
-        />
+        <Row>
+          <Col span={10}></Col>
+          <Col span={4}>
+            <Pagination
+              // style={{ width: '500px', margin: 'auto' }}
+              onChange={(pageNumber) => setCurrentPage(pageNumber)}
+              current={currentPage}
+              defaultCurrent={1}
+              defaultPageSize={LIMIT_PER_PAGE}
+              total={totalValue.current}
+            />
+          </Col>
+          <Col span={10}></Col>
+        </Row>
       </>
     )
   }
@@ -103,7 +112,6 @@ function PropertyListings() {
   }
 
   return (
-
     <>
       {isCreatePropertySubmitting
         ? loader(isCreatePropertySubmitting)
@@ -127,7 +135,6 @@ function PropertyListings() {
               {isPropertiesLoading && loader(isPropertiesLoading)}
               {!isPropertiesLoading && properties.length > 0 && propertyList()}
               {!isPropertiesLoading && !properties.length && dataNotFound()}
-
             </Col>
           </Row>
           <PropertyCreateModal
