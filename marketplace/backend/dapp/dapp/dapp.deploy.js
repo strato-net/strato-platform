@@ -7,6 +7,8 @@ import RestStatus from "http-status-codes"
 import dotenv from 'dotenv'
 
 import dappJs from "./dapp"
+import ServiceSeederJs from "/seeder-utility/serviceSeeder";
+import ServiceJson from "/seeder-utility/service.json";
 import { ROLE } from "/helpers/constants";
 const options = { config, logger: console }
 const loadEnv = dotenv.config()
@@ -88,6 +90,13 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     const deployment = dapp.deploy(deployArgs)
     assert.isDefined(deployment)
     assert.equal(deployment.dapp.contract.address, dapp.address)
+  })
+  
+  it('Should populate services', async () => {
+    let _dapp = await dappJs.uploadDappContract(adminUser, options)
+    const result = await ServiceSeederJs.createServices(_dapp)
+    assert(Array.isArray(result), 'result should be an array')
+    assert.equal(result.length, ServiceJson.services.length)
   })
 
 
