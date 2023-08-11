@@ -7,7 +7,7 @@ import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
 
-const LIMIT_PER_PAGE = 5;
+const LIMIT_PER_PAGE = 10;
 
 function PropertyListings() {
   const [currentPage, setCurrentPage] = useState(1)
@@ -62,7 +62,6 @@ function PropertyListings() {
   }
 
   const propertyList = () => {
-    totalValue.current = properties.length === 5 ? (currentPage * 5) + 1 : currentPage * 5
     return (
       <>
         <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
@@ -77,19 +76,6 @@ function PropertyListings() {
                 </Col>
               )
             })}
-        </Row>
-        <Row>
-          <Col span={10}></Col>
-          <Col span={4}>
-            <Pagination
-              onChange={(pageNumber) => setCurrentPage(pageNumber)}
-              current={currentPage}
-              defaultCurrent={1}
-              defaultPageSize={LIMIT_PER_PAGE}
-              total={totalValue.current}
-            />
-          </Col>
-          <Col span={10}></Col>
         </Row>
       </>
     )
@@ -111,6 +97,11 @@ function PropertyListings() {
     )
   }
 
+  totalValue.current = properties.length === 0
+    ? currentPage * LIMIT_PER_PAGE
+    : (properties.length === LIMIT_PER_PAGE
+      ? (currentPage * LIMIT_PER_PAGE) + 1
+      : currentPage * LIMIT_PER_PAGE)
   return (
     <>
       {message && openToast("bottom")}
@@ -133,7 +124,20 @@ function PropertyListings() {
           {isPropertiesLoading && loader(isPropertiesLoading)}
           {!isPropertiesLoading && properties.length > 0 && propertyList()}
           {!isPropertiesLoading && !properties.length && dataNotFound()}
-
+          {!isPropertiesLoading &&
+            <Row>
+              <Col span={10}></Col>
+              <Col span={4}>
+                <Pagination
+                  onChange={(pageNumber) => setCurrentPage(pageNumber)}
+                  current={currentPage}
+                  defaultCurrent={1}
+                  defaultPageSize={LIMIT_PER_PAGE}
+                  total={totalValue.current}
+                />
+              </Col>
+              <Col span={10}></Col>
+            </Row>}
         </Col>
       </Row>
       <PropertyCreateModal

@@ -214,8 +214,7 @@ function PropertyCreateModal({
     ),
     disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
-    onConfirm: showConfirmationModal,
-    loading: isCreatePropertySubmitting
+    onConfirm: showConfirmationModal
   };
   const layout = {
     labelCol: { span: 8 },
