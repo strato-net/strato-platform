@@ -22,7 +22,8 @@ import {
   categoriesObj,
   stateData,
   homeTypeData,
-  PropertyCheckBox,
+  propertyCheckBox,
+  propertyConstants,
 } from "../helpers/constants";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
@@ -30,6 +31,7 @@ import {
   usePropertiesDispatch,
   usePropertiesState,
 } from "../../../contexts/propertyContext";
+const { LIMIT_PER_PAGE } = propertyConstants;
 const { Panel } = Collapse;
 const { Text } = Typography;
 const { Option } = Select;
@@ -58,7 +60,7 @@ function PropertyCreateModal({
     livingAreaUnits: "sqft",
     numberOfUnitsTotal: 1,
   });
-  const [selectedOptions, setSelectedOptions] = useState(PropertyCheckBox);
+  const [selectedOptions, setSelectedOptions] = useState(propertyCheckBox);
 
   //TODO:- Can uncomment when use image upload ***
   // const [selectedImage, setSelectedImage] = useState(null);
@@ -171,6 +173,12 @@ function PropertyCreateModal({
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
     let response = await actions.createProperty(dispatch, body);
+    if(response){
+      toggleCreateModal(false)
+      toggleCreateConfirmModal(false)
+      setModalView(!modalView);
+      actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+    }
 
     //TODO:- Can uncomment when use image upload ***
     //   if (projectImages) {

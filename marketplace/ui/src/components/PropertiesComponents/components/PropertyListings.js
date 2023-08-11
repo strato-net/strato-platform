@@ -6,6 +6,8 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
+import { propertyConstants } from '../helpers/constants'
+const { LIMIT_PER_PAGE } = propertyConstants;
 
 const LIMIT_PER_PAGE = 10;
 
@@ -24,14 +26,6 @@ function PropertyListings() {
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
 
-  useEffect(() => {
-    if (success) {
-      toggleCreateModal(false)
-      toggleCreateConfirmModal(false)
-      setCurrentPage(1)
-      setModalView(!modalView)
-    }
-  }, [isCreatePropertySubmitting])
 
   const openToast = (placement) => {
 
