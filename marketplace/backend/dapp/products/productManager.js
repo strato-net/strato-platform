@@ -123,6 +123,8 @@ function bind(user, _contract, options) {
     getProperties(user, args, _options);
   contract.createProperty = async (args) =>
     createProperty(user, contract, args, options);
+  contract.updateProperty = async (args) =>
+    updateProperty(user, contract, args, options);
   return contract;
 }
 
@@ -434,6 +436,210 @@ async function createProperty(admin, contract, _args, baseOptions) {
   return [restStatus, propertyAddress];
 }
 
+async function updateProperty(admin, contract, _args, baseOptions) {
+  _args = { propertyAddress: _args.propertyAddress, ..._args.updates }; //need to update
+
+  const scheme = Object.keys(_args).reduce((agg, key) => {
+    const base = 1;
+    switch (key) {
+      case "listPrice":
+        return agg | (base << 0);
+      case "streetNumber":
+        return agg | (base << 1);
+      case "streetName":
+        return agg | (base << 2);
+      case "unitNumber":
+        return agg | (base << 3);
+      case "postalCity":
+        return agg | (base << 4);
+      case "stateOrProvince":
+        return agg | (base << 5);
+      case "postalcode":
+        return agg | (base << 6);
+      case "bathroomsTotalInteger":
+        return agg | (base << 7);
+      case "bedroomsTotal":
+        return agg | (base << 8);
+      case "standardStatus":
+        return agg | (base << 9);
+      case "lotSizeArea":
+        return agg | (base << 10);
+      case "lotSizeUnits":
+        return agg | (base << 11);
+      case "livingArea":
+        return agg | (base << 12);
+      case "livingAreaUnits":
+        return agg | (base << 13);
+      case "latitude":
+        return agg | (base << 14);
+      case "longitude":
+        return agg | (base << 15);
+      case "numberOfUnitsTotal":
+        return agg | (base << 16);
+      // Appliances
+      case "dishwasher":
+        return agg | (base << 17);
+      case "dryer":
+        return agg | (base << 18);
+      case "freezer":
+        return agg | (base << 19);
+      case "garbageDisposal":
+        return agg | (base << 20);
+      case "microwave":
+        return agg | (base << 21);
+      case "ovenOrRange":
+        return agg | (base << 22);
+      case "refrigerator":
+        return agg | (base << 23);
+      case "washer":
+        return agg | (base << 24);
+      case "waterHeater":
+        return agg | (base << 25);
+      // Cooling
+      case "centralAir":
+        return agg | (base << 26);
+      case "evaporative":
+        return agg | (base << 27);
+      case "geoThermal":
+        return agg | (base << 28);
+      case "refrigeration":
+        return agg | (base << 29);
+      case "solar":
+        return agg | (base << 30);
+      case "wallUnit":
+        return agg | (base << 31);
+      // Heating
+      case "baseboard":
+        return agg | (base << 32);
+      case "forceAir":
+        return agg | (base << 33);
+      case "geoThermalHeat":
+        return agg | (base << 34);
+      case "heatPump":
+        return agg | (base << 35);
+      case "hotWater":
+        return agg | (base << 36);
+      case "radiant":
+        return agg | (base << 37);
+      case "solarHeat":
+        return agg | (base << 38);
+      case "steam":
+        return agg | (base << 39);
+      // Flooring
+      case "carpet":
+        return agg | (base << 40);
+      case "concrete":
+        return agg | (base << 41);
+      case "hardwood":
+        return agg | (base << 42);
+      case "laminate":
+        return agg | (base << 43);
+      case "linoleumVinyl":
+        return agg | (base << 44);
+      case "slate":
+        return agg | (base << 45);
+      case "softwood":
+        return agg | (base << 46);
+      case "tile":
+        return agg | (base << 47);
+      // Parking
+      case "carport":
+        return agg | (base << 48);
+      case "garage":
+        return agg | (base << 49);
+      case "offStreet":
+        return agg | (base << 50);
+      case "onStreet":
+        return agg | (base << 51);
+      // Interior Features
+      case "attic":
+        return agg | (base << 52);
+      case "cableReady":
+        return agg | (base << 53);
+      case "ceilingFan":
+        return agg | (base << 54);
+      case "doublePaneWindows":
+        return agg | (base << 55);
+      case "elevator":
+        return agg | (base << 56);
+      case "fireplace":
+        return agg | (base << 57);
+      case "flooring":
+        return agg | (base << 58);
+      case "furnished":
+        return agg | (base << 59);
+      case "jettedTub":
+        return agg | (base << 60);
+      case "securitySystem":
+        return agg | (base << 61);
+      case "vaultedCeiling":
+        return agg | (base << 62);
+      case "skylight":
+        return agg | (base << 63);
+      case "wetBar":
+        return agg | (base << 64);
+      // Exterior Features
+      case "barbecueArea":
+        return agg | (base << 65);
+      case "deck":
+        return agg | (base << 66);
+      case "dock":
+        return agg | (base << 67);
+      case "fence":
+        return agg | (base << 68);
+      case "garden":
+        return agg | (base << 69);
+      case "hotTubOrSpa":
+        return agg | (base << 70);
+      case "lawn":
+        return agg | (base << 71);
+      case "patio":
+        return agg | (base << 72);
+      case "pond":
+        return agg | (base << 73);
+      case "pool":
+        return agg | (base << 74);
+      case "porch":
+        return agg | (base << 75);
+      case "rvParking":
+        return agg | (base << 76);
+      case "sauna":
+        return agg | (base << 77);
+      case "sprinklerSystem":
+        return agg | (base << 78);
+      case "waterFront":
+        return agg | (base << 79);
+      default:
+        return agg;
+    }
+  }, 0);
+
+  const callArgs = {
+    contract,
+    method: "updateProperty",
+    args: util.usc({
+      scheme,
+      ..._args,
+    }),
+  };
+
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus];
+}
+
 export default {
   bindAddress,
   uploadContract,
@@ -449,4 +655,5 @@ export default {
   getProperty,
   getProperties,
   createProperty,
+  updateProperty,
 };

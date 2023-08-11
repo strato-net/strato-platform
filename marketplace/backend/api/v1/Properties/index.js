@@ -27,4 +27,11 @@ router.post(
   PropertiesController.create
 );
 
+router.put(
+  Properties.update,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.update
+)
+
 export default router;

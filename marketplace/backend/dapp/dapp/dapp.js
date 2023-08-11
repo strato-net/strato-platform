@@ -762,6 +762,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   }
 
+  contract.updateProperty = async function (args, options = defaultOptions) {
+    return managers.productManager.updateProperty(args);
+  };
+
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
