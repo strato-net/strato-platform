@@ -103,5 +103,9 @@ describe('Service', function() {
         assert.equal(response.name, args2.name)
         assert.equal(response.price, args2.price)
         assert.equal(response.description, args2.description)
+        assert.notStrictEqual(response.name, args.name)
+        assert.notStrictEqual(response.price, args.price)
+        assert.notStrictEqual(response.description, args.description)
+        assert.equal(response.createdDate, args.createdDate)
     });
 });
