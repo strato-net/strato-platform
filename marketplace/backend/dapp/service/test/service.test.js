@@ -87,23 +87,21 @@ describe('Service', function() {
             { ...args, owner: globalAdmin.address, constructor: '' });
     });
 
-    // it('Create and update a Service', async () => {
-    //     // Create our Service
-    //     const args = factoryArgs(globalAdmin)
-    //     const service = await serviceJs.uploadContract(globalAdmin, args, options);
-    //     console.log("service", service)
-    //     const get = await service.get();
-    //     console.log("get", get)
-    //     const state = await service.getState();
+    it('Update a Service', async () => {
+        // Create our Membership
+        const args = factoryArgs(globalAdmin)
+        const service = await serviceJs.uploadContract(globalAdmin, args, options)
+
+        assert.isDefined(service.address, "Service was not created")
         
-    //     console.log("args", state)
-    //     const args2 = factoryArgs(globalAdmin);
-    //     const update = await service.update(args2)
-    //     console.log("update", state.name, " --- ", args2)
-    //     assert.equal(update[0], RestStatus.OK)
-    //     assert.notStrictEqual(state.name, args2.name)
-    //     assert.notStrictEqual(state.description, args2.description)
-    //     assert.notStrictEqual(state.price, args2.price)
-    //     assert.notStrictEqual(state.createdDate, args2.createdDate) // How can we really check the created date?
-    // });
+        const args2 = factoryArgs(globalAdmin);
+        const update = await service.update(args2)
+        const response = await service.getState();
+        
+        assert.equal(update[0], RestStatus.OK)
+        assert.equal(response.owner, args2.assetOwner)
+        assert.equal(response.name, args2.name)
+        assert.equal(response.price, args2.price)
+        assert.equal(response.description, args2.description)
+    });
 });

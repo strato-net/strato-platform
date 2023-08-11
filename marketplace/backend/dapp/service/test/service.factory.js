@@ -6,7 +6,6 @@ const factory = {
             name: `name_${uid}`,
             description: `description_${uid}`,
             price: uid,
-            createdDate: uid,
         };
         return args;
     },
