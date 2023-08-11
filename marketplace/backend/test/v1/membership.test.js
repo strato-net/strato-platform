@@ -65,7 +65,6 @@ describe('Membership End-To-End Tests', function () {
     const tradingEntityCredentials = { token: tradingEntityToken }
 
     const tradingEntityResponse = await oauthHelper.getStratoUserFromToken(tradingEntityCredentials.token)
-    console.log("tradingEntityResponse", tradingEntityResponse)
 
     assert.strictEqual(
       tradingEntityResponse.status,
@@ -122,15 +121,13 @@ describe('Membership End-To-End Tests', function () {
       orgAdmin.token,
     )
 
-    // console.log("get membership", getResponse.body)
-
     assert.equal(getResponse.status, 200, 'should be 200');
     assert.isDefined(getResponse.body, 'body should be defined');
 
-    assert.equal(getResponse['productId'], createArgs['productId'], 'productId should be equal');
-    assert.equal(getResponse['timePeriodInMonths'], createArgs['timePeriodInMonths'], 'timePeriodInMonths should be equal');
-    assert.equal(getResponse['additionalInfo'], createArgs['additionalInfo'], 'additionalInfo should be equal');
-    assert.equal(getResponse['createdDate'], createArgs['createdDate'], 'createdDate should be equal');
+    assert.equal(getResponse.body.data['productId'], createArgs['productId'], 'productId should be equal');
+    assert.equal(getResponse.body.data['timePeriodInMonths'], createArgs['timePeriodInMonths'], 'timePeriodInMonths should be equal');
+    assert.equal(getResponse.body.data['additionalInfo'], createArgs['additionalInfo'], 'additionalInfo should be equal');
+    assert.equal(getResponse.body.data['createdDate'], createArgs['createdDate'], 'createdDate should be equal');
   })
 
   it('Get all Membership', async () => {
@@ -141,8 +138,6 @@ describe('Membership End-To-End Tests', function () {
       {},
       orgAdmin.token,
     )
-
-    console.log("getAll membershipssss", getResponse.body)
 
     assert.equal(getResponse.status, 200, 'should be 200');
     assert.isDefined(getResponse.body, 'body should be defined');
@@ -177,14 +172,22 @@ describe('Membership End-To-End Tests', function () {
     }
 
     // get
-    const getTransfer = await post(
+    const transferMembership = await post(
       Membership.prefix,
       Membership.transferOwnership,
       transferArgs,
       orgAdmin.token,
     )
 
-    assert.equal(getTransfer.status, 200, 'should be 200');
+    const getResponse = await get(
+      Membership.prefix,
+      Membership.get.replace(':address', createResponse.body.data.address),
+      {},
+      orgAdmin.token,
+    )
+
+    assert.equal(transferMembership.status, 200, 'should be 200');
+    assert.equal(getResponse.body.data.owner, tradingEntity.address, 'should be equal');
   })
 
   it('update Membership', async () => {
@@ -207,19 +210,25 @@ describe('Membership End-To-End Tests', function () {
       ...updateMembershipArgs(createResponse.body.data.address, util.uid()),
     }
 
-    // get
-    const getResponse = await put(
+    const updateMembership = await put(
       Membership.prefix,
       Membership.update,
       updateArgs,
       orgAdmin.token,
     )
 
-    assert.equal(getResponse.status, 200, 'should be 200');
-    assert.isDefined(getResponse.body, 'body should be defined');
-    assert.equal(getResponse.machine_ID, updateArgs.machine_ID, 'machine Id should be equal');
-    assert.equal(getResponse.purpose, updateArgs.purpose, 'purpose should be defined');
-    assert.equal(getResponse.model, updateArgs.model, 'model should be defined');
-    assert.equal(getResponse.installation_Date, updateArgs.installation_Date, 'installation_Date should be defined');
+    const getMembership = await get(
+      Membership.prefix,
+      Membership.get.replace(':address', createResponse.body.data.address),
+      {},
+      orgAdmin.token,
+    )
+
+    assert.equal(updateMembership.status, 200, 'should be 200');
+    assert.isDefined(updateMembership.body, 'body should be defined');
+    assert.equal(getMembership.body.data.machine_ID, updateArgs.machine_ID, 'machine Id should be equal');
+    assert.equal(getMembership.body.data.purpose, updateArgs.purpose, 'purpose should be defined');
+    assert.equal(getMembership.body.data.model, updateArgs.model, 'model should be defined');
+    assert.equal(getMembership.body.data.installation_Date, updateArgs.installation_Date, 'installation_Date should be defined');
   })
 })
