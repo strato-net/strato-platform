@@ -22,6 +22,8 @@ import userAddressJs from "/dapp/addresses/userAddress.js";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
+import membershipJs from "../membership/membership";
+import membershipServiceJs from "../membershipService/membershipService";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -30,6 +32,8 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
   serviceJs.contractName,
   serviceManagerJS.contractName,
+  membershipJs.contractName,
+  membershipServiceJs.contractName,
 ];
 
 const contractName = "Dapp";
@@ -1292,6 +1296,98 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
 
   //-----------------------------Order ends here -------------------------------
+  //-----------------------------Membership starts here -------------------------------
+  contract.createMembership = async function (args, options = defaultOptions) {
+    const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
+    return membershipJs.uploadContract(rawAdmin, args, createOptions)
+  }
+
+  contract.getMembership = async function (args, options = optionsNoChainIds) {
+    // May need to insert contractName in options when this goes throught the product manager
+    // This param was hard coded for the get and getAll functions for Membership and MembershipService below
+    return membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+  }
+
+  contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = {...options, org: managers.cirrusOrg, app: ""}
+    return membershipJs.getAll(rawAdmin, { 
+      ...args
+    }, getOptions)
+  }
+
+  contract.transferOwnershipMembership = async function (args, options = defaultOptions) {
+    const { address, chainId, newOwner } = args
+
+    const contract = {
+      name: membershipJs.contractName,
+      address: address,
+    }
+
+    const chainOptions = { chainIds: [chainId], ...options }
+
+    return membershipJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner)
+  }
+
+  contract.updateMembership = async function (args, options = defaultOptions) {
+    const { address, chainId, updates } = args;
+
+    const contract = {
+      name: membershipJs.contractName,
+      address: address,
+    };
+
+    const chainOptions = { chainIds: [chainId], ...options };
+
+    return membershipJs.update(rawAdmin, contract, updates, chainOptions);
+  }
+
+  //-----------------------------Membership ends here -------------------------------
+  //-----------------------------Membership Service starts here -------------------------------
+
+  contract.createMembershipService = async function (args, options = defaultOptions) {
+    const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
+      return membershipServiceJs.uploadContract(rawAdmin, args, createOptions);
+  }
+
+  contract.getMembershipService = async function (args, options = optionsNoChainIds) {
+    return membershipServiceJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+  }
+
+  contract.getMembershipServices = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = {...options, org: managers.cirrusOrg, app: ""}
+    return membershipServiceJs.getAll(rawAdmin, { 
+      ...args
+    }, getOptions)
+  }
+
+  contract.transferOwnershipMembershipService = async function (args, options = defaultOptions) {
+    const { address, chainId, newOwner } = args
+
+    const contract = {
+      name: membershipServiceJs.contractName,
+      address: address,
+    }
+
+    const chainOptions = { chainIds: [chainId], ...options }
+
+    return membershipServiceJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner)
+  }
+
+  contract.updateMembershipService = async function (args, options = defaultOptions) {
+    const { address, chainId, updates } = args;
+
+    const contract = {
+      name: membershipServiceJs.contractName,
+      address: address,
+    };
+
+    const chainOptions = { chainIds: [chainId], ...options };
+
+    return membershipServiceJs.update(rawAdmin, contract, updates, chainOptions);
+  }
+
+  //-----------------------------Membership Service ends here -------------------------------
+
   contract.createEventType = async function (args, options = defaultOptions) {
     try {
 

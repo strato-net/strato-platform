@@ -1,0 +1,173 @@
+paths:
+  /membershipService/:
+    get:
+      security:              
+        - bearerAuth: []                    
+      tags:               
+        - MembershipService        
+      summary: Retrieve membershipService
+      produces:
+      - application/json
+      responses:         
+        200:
+          description: Array of membershipServices
+    post:  
+      security:              
+        - bearerAuth: []                  
+      tags:               
+        - MembershipService        
+      summary: Create a membershipService
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to create membershipService
+        required: true
+        content:
+          'application/json': 
+            schema:       
+              $ref: '#/definitions/createMembershipService' 
+      responses:         
+        200:
+          description: Object of create membershipService
+  /membershipService/{address}/{chainId}:
+    get:                 
+      security:              
+        - bearerAuth: []   
+      tags:               
+        - MembershipService        
+      summary: Retrieve a membershipService
+      produces:
+      - application/json
+      parameters:         
+      - in: path          
+        name: address     
+        description: address to retrieve the membershipService
+        required: true
+      - in: path          
+        name: chainId     
+        description: chainId corresponding to the address
+        required: true
+        schema:       
+          $ref: '#/definitions/fetchMembershipService' 
+      responses:         
+        200:
+          description: Retrieve a membershipService
+  /membershipService/update:
+    put:    
+      security:              
+        - bearerAuth: []                
+      tags:               
+        - MembershipService        
+      summary: Update a membershipService
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to update a membershipService
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/updateMembershipService' 
+      responses:         
+        200:
+          description: Retrieve a updated membershipService
+  /membershipService/{address}/{chainId}/audit:
+    get:     
+      security:              
+        - bearerAuth: []               
+      tags:               
+        - MembershipService        
+      summary: Audit membershipService
+      produces:
+      - application/json
+      parameters:         
+      - in: path          
+        name: address     
+        description: address to retrieve the membershipService
+        required: true
+      - in: path          
+        name: chainId     
+        description: chainId corresponding to the address
+        required: true
+        schema:       
+          $ref: '#/definitions/auditMembershipService' 
+      responses:         
+        200:
+          description: List of audit
+  /membershipService/transferOwnership:
+    post:              
+      security:              
+        - bearerAuth: []      
+      tags:               
+        - MembershipService        
+      summary: Transfer ownership
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to transfer ownership
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/transferOwnership' 
+      responses:         
+        200:
+          description: indicates success of transfer ownership
+definitions:        
+  fetchMembershipService:
+    address:
+      type: string
+    chainId:
+      type: string
+  createMembershipService:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          membershipPrice:
+            type: number
+          discountPrice:
+            type: number
+          maxQuantity:
+            type: number
+          createdDate:
+            type: number
+          isActive:
+            type: boolean
+      isPublic:
+        type: boolean
+  updateMembershipService:
+    type: object
+    properties:
+      address:
+        type: string
+      chainId:
+        type: string
+      updates:
+        type: object
+        properties:
+          membershipPrice:
+            type: number
+          discountPrice:
+            type: number
+          maxQuantity:
+            type: number
+          createdDate:
+            type: number
+          isActive:
+            type: boolean
+  auditMembershipService:
+    address:
+      type: string
+    chainId:
+      type: string
+  transferOwnership:
+    type: object
+    properties:
+      address:
+        type: string
+      chainId:
+        type: string
+      newOwner:
+        type: string
