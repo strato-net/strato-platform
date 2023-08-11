@@ -1,109 +1,54 @@
 {
   "services": [
     {
-      "name": "Male Haircut",
-      "description": "Enjoy a relaxing shampoo and haircut with one of our talented barbers.",
-      "price": 1999
+      "name": "Botox",
+      "description": "Botox, (17/unit) of 50 units",
+      "price": 850
     },
     {
-      "name": "Female Haircut",
-      "description": "Enjoy a relaxing shampoo and haircut with one of our talented barbers or stylists that are specialized in female aesthetics.",
-      "price": 3999
+      "name": "Daxxify",
+      "description": "Daxxify, (26/unit) of 50 units",
+      "price": 1300
     },
     {
-      "name": "Beard Trim",
-      "description": "Treat yourself to a precision beard trim and grooming session with our skilled barbers.",
-      "price": 1499
+      "name": "Skincare Products",
+      "description": "Skincare Products",
+      "price": 442
     },
     {
-      "name": "Shave",
-      "description": "Experience the ultimate classic shave with hot towels, shaving cream, and a close razor shave.",
-      "price": 2499
+      "name": "Anti-Aging HydraFacials",
+      "description": "Anti-Aging HydraFacials",
+      "price": 250
     },
     {
-      "name": "Hair Color",
-      "description": "Transform your look with a professional hair coloring session by our experienced stylists.",
-      "price": 4999
+      "name": "Photofacial/IPL (Face)",
+      "description": "Photofacial/IPL (Face)",
+      "price": 350
     },
     {
-      "name": "Blowout Styling",
-      "description": "Get ready for a special event with a blowout styling that adds volume and elegance to your hair.",
-      "price": 2999
+      "name": "Morpheus8 (Face)",
+      "description": "Morpheus8 (Face)",
+      "price": 1200
     },
     {
-      "name": "Updo",
-      "description": "Elevate your appearance for formal occasions with an expertly crafted updo hairstyle.",
-      "price": 5499
+      "name": "PRP",
+      "description": "PRP",
+      "price": 330
     },
     {
-      "name": "Hair Extensions",
-      "description": "Achieve the hair length and volume you desire with high-quality hair extensions and expert installation.",
-      "price": 8999
+      "name": "EvolveX Transform",
+      "description": "EvolveX Transform (1 area)",
+      "price": 650
     },
     {
-      "name": "Deep Conditioning",
-      "description": "Revitalize your hair with a nourishing deep conditioning treatment that restores moisture and shine.",
-      "price": 1999
+      "name": "Evoke (Face Tightening)",
+      "description": "Evoke (Face Tightening) included",
+      "price": 792
     },
     {
-      "name": "Braiding",
-      "description": "Explore a variety of intricate braiding styles that showcase your personality and creativity.",
-      "price": 3499
-    },
-    {
-      "name": "Perm",
-      "description": "Get beautifully curled hair that lasts with a professional perm treatment tailored to your preferences.",
-      "price": 5999
-    },
-    {
-      "name": "Waxing",
-      "description": "Achieve smooth skin with professional waxing services for various body areas.",
-      "price": 2299
-    },
-    {
-      "name": "Facial",
-      "description": "Indulge in a rejuvenating facial treatment that revitalizes and nourishes your skin.",
-      "price": 4499
-    },
-    {
-      "name": "Manicure",
-      "description": "Give your hands the attention they deserve with a pampering manicure session.",
-      "price": 2999
-    },
-    {
-      "name": "Pedicure",
-      "description": "Treat your feet to a relaxing pedicure that leaves them soft, smooth, and well-groomed.",
-      "price": 3499
-    },
-    {
-      "name": "Massage",
-      "description": "Relax your body and mind with a therapeutic massage session by our experienced masseurs.",
-      "price": 6999
-    },
-    {
-      "name": "Aromatherapy",
-      "description": "Enhance your relaxation experience with aromatherapy, featuring soothing scents and essential oils.",
-      "price": 999
-    },
-    {
-      "name": "Hot Stone Massage",
-      "description": "Experience the calming effects of hot stone therapy combined with a therapeutic massage.",
-      "price": 7999
-    },
-    {
-      "name": "Mud Wrap",
-      "description": "Indulge in a luxurious mud wrap treatment that detoxifies and hydrates your skin.",
-      "price": 5999
-    },
-    {
-      "name": "Body Scrub",
-      "description": "Rejuvenate your skin with a invigorating body scrub that removes dead skin cells and promotes circulation.",
-      "price": 3999
-    },
-    {
-      "name": "Sauna Session",
-      "description": "Relax and unwind in our state-of-the-art sauna for a soothing and rejuvenating experience.",
-      "price": 1999
+      "name": "GLAM facial",
+      "description": "Complimentary GLAM facial",
+      "price": 750
     }
   ]
 }
