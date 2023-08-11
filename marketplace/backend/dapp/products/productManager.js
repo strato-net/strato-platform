@@ -652,8 +652,6 @@ export default {
   createInventory,
   updateInventory,
   updateInventoriesQuantities,
-  getProperty,
-  getProperties,
   createProperty,
   updateProperty,
 };

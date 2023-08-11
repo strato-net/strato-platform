@@ -20,6 +20,7 @@ import userAddressJs from "/dapp/addresses/userAddress.js";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
+import productDocumentManagerJs from '/dapp/productDocument/productDocumentManager';
 
 const allAssetNames = [
   orderJs.contractName,
@@ -117,10 +118,11 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
+  const productDocumentManager = await productDocumentManagerJs.bindAddress(admin, state.productDocumentManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager, productDocumentManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -600,7 +602,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
 
-  /* PROPERTIES DAPP */
+  /* ----------------------------------PROPERTIES DAPP---------------------------------- */
   contract.getProperty = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     console.log('getOptions', getOptions)
@@ -767,6 +769,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
+
+  /* ------------------------------PRODUCTDOCUMENT MANAGER---------------------------- */
+
+  // Create productDocuments
+
+  // Get productDocuments by the productId/productAddress - Can be images or pdfs
+
+  // Delete productDocuments by the productId/productAddress
+
+  /* ----------------------------PRODUCTDOCUMENT MANAGER ENDS-------------------------- */
+
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
