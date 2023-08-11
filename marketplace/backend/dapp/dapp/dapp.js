@@ -658,7 +658,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const propertyArgs = {
         productId: productContract[1],
         listPrice: args.listPrice,
-        unparsedAddress: args.unparsedAddress,
         streetNumber: args.streetNumber,
         streetName: args.streetName,
         unitNumber: args.unitNumber,

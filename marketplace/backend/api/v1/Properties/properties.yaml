@@ -144,8 +144,6 @@ definitions:
             type: string
           listPrice: 
             type: number
-          unparsedAddress: 
-            type: string
         streetNumber: 
             type: number
         streetName: 

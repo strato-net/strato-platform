@@ -4,7 +4,6 @@ export const productArgs = (uid) => {
       productId: `${uid + 2}`.padStart(40, '0'),
       propertyType: `propertyType_${uid}`,
       listPrice: 1000000,
-      unparsedAddress: `unparsedAddress_${uid}`,
       streetNumber: 54,
       streetName: `streetName_${uid}`,
       unitNumber: `unitNumber_${uid}`,

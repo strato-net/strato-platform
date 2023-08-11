@@ -195,7 +195,6 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     function addProperty(
         address _productId,
         int _listPrice,
-        string _unparsedAddress,
         int _streetNumber,
         string _streetName,
         string _unitNumber,
@@ -286,7 +285,6 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         Property_0_4 property = new Property_0_4(
             _productId,
             _listPrice,
-            _unparsedAddress,
             _streetNumber,
             _streetName,
             _unitNumber,
@@ -375,5 +373,24 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
             _waterFront
         );
         return (RestStatus.OK, address(property));
+    }
+
+    function updateProperty(
+        address _productAddress,
+        string _description,
+        string _imageKey,
+        bool _isActive,
+        string _userUniqueProductCode,
+        uint _scheme
+    ) returns (uint256) {
+        Property_0_4 property = Property_0_4(_productAddress);
+        return
+            property.update(
+                _description,
+                _imageKey,
+                _isActive,
+                _userUniqueProductCode,
+                _scheme
+            );
     }
 }

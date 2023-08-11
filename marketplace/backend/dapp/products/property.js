@@ -54,7 +54,6 @@ function marshalIn(_args) {
         productId: '',
         propertType: '',
         listPrice: 0,
-        unparsedAddress: '',
         streetNumber: 0,
         streetName: '',
         unitNumber: '',
