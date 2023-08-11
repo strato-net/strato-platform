@@ -13,6 +13,8 @@ import orderLineJs from "/dapp/orders/orderLine";
 
 import eventTypeJs from "/dapp/eventType/eventType";
 import eventTypeManagerJs from "/dapp/eventType/eventTypeManager";
+import serviceJs from "dapp/service/service";
+import serviceManagerJS from "/dapp/service/serviceManager";
 import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
@@ -28,6 +30,8 @@ const allAssetNames = [
   // orderLineItemJs.contractName,
   eventTypeJs.contractName,
   eventTypeManagerJs.contractName,
+  serviceJs.contractName,
+  serviceManagerJS.contractName,
   membershipJs.contractName,
   membershipServiceJs.contractName,
 ];
@@ -119,12 +123,13 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
+  const serviceManager = await serviceManagerJS.bindAddress(admin, state.serviceManager, options)
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
@@ -1431,7 +1436,44 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return eventJs.getHistory(rawAdmin, chainId, address, auditOptions);
   };
+  
+  //----------------------------- Service (Start ->) -------------------------------
+  contract.createService = async function (args, options = defaultOptions) {
+    try {
+      const createdDate = Math.floor(Date.now() / 1000);
+      return managers.serviceManager.createService({ ...args, createdDate, });
+    } catch (error) {
+      console.log("error: ", error);
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while createService");
+    }
+  };
+  
+  contract.getService = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return managers.serviceManager.get({ ...args, ownerOrganization: userOrganization }, getOptions);
+  };
 
+  contract.getServices = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return managers.serviceManager.getAll({ ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+  };
+  
+  contract.updateService = async function (args, options = defaultOptions) {
+    const { address, updates } = args;
+    
+    const contract = {
+      name: serviceJs.contractName,
+      address: address,
+    };
+
+    // const chainOptions = { chainIds: [chainId], ...options };
+
+    return serviceJs.update(rawAdmin, contract, updates, options);
+  }
+  
   return contract;
 }
 
