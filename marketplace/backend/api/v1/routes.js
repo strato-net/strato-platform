@@ -18,6 +18,8 @@ import image from './Image'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
+import membership from "./Membership"
+import membershipService from "./MembershipService"
 
 import {
   Authentication,
@@ -35,6 +37,8 @@ import {
   Marketplace,
   OrderLine,
   PaymentService,
+  Membership,
+  MembershipService
 } from './endpoints'
 
 
@@ -55,6 +59,8 @@ router.use(Image.prefix, image)
 router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
 router.use(PaymentService.prefix, paymentService)
+router.use(Membership.prefix, membership)
+router.use(MembershipService.prefix, membershipService)
 
 
 router.get(`/health`, (req, res) => {

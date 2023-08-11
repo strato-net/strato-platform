@@ -18,6 +18,8 @@
     "test:event": "yarn mocha-babel dapp/assets/Event/test -b",
     "test:payment": "yarn mocha-babel dapp/payments/test -b",
     "test:rawMaterial": "yarn mocha-babel dapp/items/rawMaterials/test -b",
+    "test:membership": "yarn mocha-babel dapp/membership/test -b",
+    "test:membershipService": "yarn mocha-babel dapp/membershipService/test -b",
     "test:api:category": "yarn mocha-babel test/v1/category.test.js -b",
     "test:api:subCategory": "yarn mocha-babel test/v1/subCategory.test.js -b",
     "test:api:product": "yarn mocha-babel test/v1/product.test.js -b",
@@ -31,6 +33,8 @@
     "test:api:event": "yarn mocha-babel test/v1/event.test.js -b",
     "test:api:image": "yarn mocha-babel test/v1/image.test.js -b",
     "test:api:marketplace": "yarn mocha-babel test/v1/marketplace.test.js -b",
+    "test:api:membership": "yarn mocha-babel test/v1/membership.test.js -b",
+    "test:api:membershipService": "yarn mocha-babel test/v1/membershipService.test.js -b",
     "test:api": "yarn mocha-babel test/v1/ -b",
     "addToDapp": "babel-node membership-utility/addToDapp.js",
     "clean": "rm -f ${CONFIG_DIR_PATH:-config}/*.deploy.yaml ${CONFIG_DIR_PATH:-config}/testdeploy.*"

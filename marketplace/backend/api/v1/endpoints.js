@@ -131,4 +131,22 @@ export const PaymentService = {
   stripeWebhookConnect: '/stripe/webhook/connect',
 }
 
+export const Membership = {
+  prefix: '/membership',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  update: '/update',
+  transferOwnership: '/transferOwnership',
+}
+export const MembershipService = {
+  prefix: '/membershipService',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  update: '/update',
+  transferOwnership: '/transferOwnership',
+}
+
+
 
