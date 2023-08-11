@@ -172,7 +172,7 @@ describe('Membership End-To-End Tests', function () {
     }
 
     // get
-    const transfterMembership = await post(
+    const transferMembership = await post(
       Membership.prefix,
       Membership.transferOwnership,
       transferArgs,
@@ -186,7 +186,7 @@ describe('Membership End-To-End Tests', function () {
       orgAdmin.token,
     )
 
-    assert.equal(transfterMembership.status, 200, 'should be 200');
+    assert.equal(transferMembership.status, 200, 'should be 200');
     assert.equal(getResponse.body.data.owner, tradingEntity.address, 'should be equal');
   })
 
