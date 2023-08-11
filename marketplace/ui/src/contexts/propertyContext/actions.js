@@ -57,6 +57,7 @@ const actions = {
         dispatch({
           type: actionDescriptors.createPropertySuccessful,
           payload: body.data,
+          success: true
         });
         actions.setMessage(dispatch, "Property listing created successfully", true);
         return true;

@@ -6,8 +6,8 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-
-const LIMIT_PER_PAGE = 5;
+import { propertyConstants } from '../helpers/constants'
+const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
   const [currentPage, setCurrentPage] = useState(1)
@@ -18,19 +18,12 @@ function PropertyListings() {
   const totalValue = useRef(0);
 
   const dispatch = usePropertiesDispatch()
-  const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success } = usePropertiesState();
+  const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success, error } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
-
   useEffect(() => {
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
 
-  useEffect(() => {
-    if (isCreatePropertySubmitting) {
-      toggleCreateModal(false)
-      toggleCreateConfirmModal(false)
-    }
-  }, [isCreatePropertySubmitting])
 
   const openToast = (placement) => {
 
@@ -61,7 +54,6 @@ function PropertyListings() {
   }
 
   const propertyList = () => {
-    totalValue.current = properties.length === 5 ? (currentPage * 5) + 1 : currentPage * 5
     return (
       <>
         <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}>
@@ -76,20 +68,6 @@ function PropertyListings() {
                 </Col>
               )
             })}
-        </Row>
-        <Row>
-          <Col span={10}></Col>
-          <Col span={4}>
-            <Pagination
-              // style={{ width: '500px', margin: 'auto' }}
-              onChange={(pageNumber) => setCurrentPage(pageNumber)}
-              current={currentPage}
-              defaultCurrent={1}
-              defaultPageSize={LIMIT_PER_PAGE}
-              total={totalValue.current}
-            />
-          </Col>
-          <Col span={10}></Col>
         </Row>
       </>
     )
@@ -111,42 +89,57 @@ function PropertyListings() {
     )
   }
 
+  totalValue.current = properties.length === 0
+    ? currentPage * LIMIT_PER_PAGE
+    : (properties.length === LIMIT_PER_PAGE
+      ? (currentPage * LIMIT_PER_PAGE) + 1
+      : currentPage * LIMIT_PER_PAGE)
   return (
     <>
-      {isCreatePropertySubmitting
-        ? loader(isCreatePropertySubmitting)
-        : <>
-          {contextHolder}
-          <Row justify="center">
-            <Col span={22}>
-              <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
-                <Typography.Title level={4} style={{ padding: "0px 16px" }}>
-                  Recommended Properties
-                </Typography.Title>
-                <Col style={{ display: "flex", justifyContent: "space-between" }}>
-                  <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
-                  <Button type="primary"
-                    onClick={() => {
-                      toggleCreateModal(true)
-                    }}
-                  >List Property</Button>
-                </Col>
-              </Row>
-              {isPropertiesLoading && loader(isPropertiesLoading)}
-              {!isPropertiesLoading && properties.length > 0 && propertyList()}
-              {!isPropertiesLoading && !properties.length && dataNotFound()}
+      {message && openToast("bottom")}
+      {contextHolder}
+      <Row justify="center">
+        <Col span={22}>
+          <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
+            <Typography.Title level={4} style={{ padding: "0px 16px" }}>
+              Recommended Properties
+            </Typography.Title>
+            <Col style={{ display: "flex", justifyContent: "space-between" }}>
+              <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
+              <Button type="primary"
+                onClick={() => {
+                  toggleCreateModal(true)
+                }}
+              >List Property</Button>
             </Col>
           </Row>
-          <PropertyCreateModal
-            isCreateModalOpen={isCreateModalOpen}
-            toggleCreateModal={toggleCreateModal}
-            modalView={modalView}
-            setModalView={setModalView}
-            isCreateConfirmModalOpen={isCreateConfirmModalOpen}
-            toggleCreateConfirmModal={toggleCreateConfirmModal}
-          />
-        </>
-      }
+          {isPropertiesLoading && loader(isPropertiesLoading)}
+          {!isPropertiesLoading && properties.length > 0 && propertyList()}
+          {!isPropertiesLoading && !properties.length && dataNotFound()}
+          {!isPropertiesLoading &&
+            <Row>
+              <Col span={10}></Col>
+              <Col span={4}>
+                <Pagination
+                  onChange={(pageNumber) => setCurrentPage(pageNumber)}
+                  current={currentPage}
+                  defaultCurrent={1}
+                  defaultPageSize={LIMIT_PER_PAGE}
+                  total={totalValue.current}
+                />
+              </Col>
+              <Col span={10}></Col>
+            </Row>}
+        </Col>
+      </Row>
+      <PropertyCreateModal
+        isCreateModalOpen={isCreateModalOpen}
+        toggleCreateModal={toggleCreateModal}
+        modalView={modalView}
+        setModalView={setModalView}
+        isCreateConfirmModalOpen={isCreateConfirmModalOpen}
+        toggleCreateConfirmModal={toggleCreateConfirmModal}
+      />
     </>
   );
 }

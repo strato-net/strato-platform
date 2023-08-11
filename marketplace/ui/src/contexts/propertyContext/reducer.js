@@ -46,7 +46,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isPropertiesLoading: false,
-        properties: action.error
+        message: action.error
       };
     case actionDescriptors.fetchPropertyDetails:
       return {

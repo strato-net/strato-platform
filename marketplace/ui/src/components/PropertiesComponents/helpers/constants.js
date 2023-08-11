@@ -148,7 +148,7 @@ export const stateData = [
   { value: "WY", label: "WY" },
 ];
 
-export const PropertyCheckBox = {
+export const propertyCheckBox = {
   dishwasher: false,
   dryer: false,
   freezer: false,
@@ -219,3 +219,8 @@ export const PropertyCheckBox = {
   sprinklerSystem: false,
   waterFront: false,
 };
+
+export const propertyConstants = {
+  LIMIT_PER_PAGE:10,
+  MAX_PRICE_VALUE:200000
+}
