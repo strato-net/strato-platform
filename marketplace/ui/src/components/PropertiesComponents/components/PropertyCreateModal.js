@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Modal,
   Form,
@@ -17,9 +16,7 @@ import {
   Row,
 } from "antd";
 import {
-  PlusOutlined,
   ArrowLeftOutlined,
-  PictureOutlined,
 } from "@ant-design/icons";
 import {
   categoriesObj,
@@ -53,24 +50,23 @@ function PropertyCreateModal({
   toggleCreateConfirmModal,
 }) {
 
-  const navigate = useNavigate();
-
   const dispatch = usePropertiesDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { message, success, isCreatePropertySubmitting } = usePropertiesState();
-
-  const [selectedImage, setSelectedImage] = useState(null);
   const [propertyData, setPropertyData] = useState({
     lotSizeUnits: "sqft",
     livingAreaUnits: "sqft",
     numberOfUnitsTotal: 1,
   });
   const [selectedOptions, setSelectedOptions] = useState(PropertyCheckBox);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewImage, setPreviewImage] = useState("");
-  const [previewTitle, setPreviewTitle] = useState("");
-  const [fileList, setFileList] = useState([]);
-  let CategoriesData = categoriesObj
+
+  //TODO:- Can uncomment when use image upload ***
+  // const [selectedImage, setSelectedImage] = useState(null);
+  // const [previewOpen, setPreviewOpen] = useState(false);
+  // const [previewImage, setPreviewImage] = useState("");
+  // const [previewTitle, setPreviewTitle] = useState("");
+  // const [fileList, setFileList] = useState([]);
+
   const {
     title,
     description,
@@ -88,7 +84,6 @@ function PropertyCreateModal({
     livingArea,
     lotSizeArea,
     numberOfUnitsTotal,
-
 
     lotSizeUnits,
     livingAreaUnits,
@@ -151,34 +146,33 @@ function PropertyCreateModal({
 
   //creates the listing for property
   const handleSubmitCreateProperty = async () => {
+
     const body = {
-      title: title,
-      description: description,
-      propertyType: propertyType,
-      listPrice: listPrice,
-      streetNumber: streetNumber,
-      streetName: streetName,
-      unitNumber: unitNumber,
-      postalCity: postalCity,
-      stateOrProvince: stateOrProvince,
-      postalcode: postalcode,
-      bathroomsTotalInteger: bathroomsTotalInteger,
-      bedroomsTotal: bedroomsTotal,
-      lotSizeArea: lotSizeArea,
-      lotSizeUnits: lotSizeUnits,
-      livingArea: livingArea,
-      livingAreaUnits: livingAreaUnits,
-      numberOfUnitsTotal: numberOfUnitsTotal,
+      title,
+      description,
+      propertyType,
+      listPrice,
+      streetNumber,
+      streetName,
+      unitNumber,
+      postalCity,
+      stateOrProvince,
+      postalcode,
+      bathroomsTotalInteger,
+      bedroomsTotal,
+      lotSizeArea,
+      lotSizeUnits,
+      livingArea,
+      livingAreaUnits,
+      numberOfUnitsTotal,
 
       ...selectedOptions,
     };
 
-    let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
+    // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
+    let response = await actions.createProperty(dispatch, body);
 
-    if (productContractAddress) {
-      setTimeout(() => navigate(`/properties/${propertyContractAddress}`), 5000)
-    }
-
+    //TODO:- Can uncomment when use image upload ***
     //   if (projectImages) {
     //     const formData = new FormData()
     //     formData.append('projectAddress', projectAddress)
@@ -191,21 +185,21 @@ function PropertyCreateModal({
     //   Modal.destroyAll();
   };
 
-  const handleCancel = () => setPreviewOpen(false);
-
-  const handlePreview = async (file) => {
-    if (!file.url && !file.preview) {
-      file.preview = await getBase64(file.originFileObj);
-    }
-    setPreviewImage(file.url || file.preview);
-    setPreviewOpen(true);
-    setPreviewTitle(
-      file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
-    );
-  };
-
-  const handleFileChange = ({ fileList: newFileList }) =>
-    setFileList(newFileList);
+  //TODO:- Can uncomment when use image upload ***
+  // const handleCancel = () => setPreviewOpen(false);
+  // const handlePreview = async (file) => {
+  //   if (!file.url && !file.preview) {
+  //     file.preview = await getBase64(file.originFileObj);
+  //   }
+  //   setPreviewImage(file.url || file.preview);
+  //   setPreviewOpen(true);
+  //   setPreviewTitle(
+  //     file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
+  //   );
+  // };
+  // const handleFileChange = ({ fileList: newFileList }) => {
+  //   setFileList(newFileList);
+  // }
 
   const primaryAction = {
     content: modalView ? (
@@ -268,7 +262,6 @@ function PropertyCreateModal({
   }
 
   const collapseData = convertCategories();
-
 
   return (
     <>

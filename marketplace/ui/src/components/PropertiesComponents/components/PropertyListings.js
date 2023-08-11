@@ -18,17 +18,18 @@ function PropertyListings() {
   const totalValue = useRef(0);
 
   const dispatch = usePropertiesDispatch()
-  const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success } = usePropertiesState();
+  const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success, error } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
-
   useEffect(() => {
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
 
   useEffect(() => {
-    if (isCreatePropertySubmitting) {
+    if (success) {
       toggleCreateModal(false)
       toggleCreateConfirmModal(false)
+      setCurrentPage(1)
+      setModalView(!modalView)
     }
   }, [isCreatePropertySubmitting])
 
@@ -81,7 +82,6 @@ function PropertyListings() {
           <Col span={10}></Col>
           <Col span={4}>
             <Pagination
-              // style={{ width: '500px', margin: 'auto' }}
               onChange={(pageNumber) => setCurrentPage(pageNumber)}
               current={currentPage}
               defaultCurrent={1}
@@ -113,40 +113,37 @@ function PropertyListings() {
 
   return (
     <>
-      {isCreatePropertySubmitting
-        ? loader(isCreatePropertySubmitting)
-        : <>
-          {contextHolder}
-          <Row justify="center">
-            <Col span={22}>
-              <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
-                <Typography.Title level={4} style={{ padding: "0px 16px" }}>
-                  Recommended Properties
-                </Typography.Title>
-                <Col style={{ display: "flex", justifyContent: "space-between" }}>
-                  <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
-                  <Button type="primary"
-                    onClick={() => {
-                      toggleCreateModal(true)
-                    }}
-                  >List Property</Button>
-                </Col>
-              </Row>
-              {isPropertiesLoading && loader(isPropertiesLoading)}
-              {!isPropertiesLoading && properties.length > 0 && propertyList()}
-              {!isPropertiesLoading && !properties.length && dataNotFound()}
+      {message && openToast("bottom")}
+      {contextHolder}
+      <Row justify="center">
+        <Col span={22}>
+          <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
+            <Typography.Title level={4} style={{ padding: "0px 16px" }}>
+              Recommended Properties
+            </Typography.Title>
+            <Col style={{ display: "flex", justifyContent: "space-between" }}>
+              <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
+              <Button type="primary"
+                onClick={() => {
+                  toggleCreateModal(true)
+                }}
+              >List Property</Button>
             </Col>
           </Row>
-          <PropertyCreateModal
-            isCreateModalOpen={isCreateModalOpen}
-            toggleCreateModal={toggleCreateModal}
-            modalView={modalView}
-            setModalView={setModalView}
-            isCreateConfirmModalOpen={isCreateConfirmModalOpen}
-            toggleCreateConfirmModal={toggleCreateConfirmModal}
-          />
-        </>
-      }
+          {isPropertiesLoading && loader(isPropertiesLoading)}
+          {!isPropertiesLoading && properties.length > 0 && propertyList()}
+          {!isPropertiesLoading && !properties.length && dataNotFound()}
+
+        </Col>
+      </Row>
+      <PropertyCreateModal
+        isCreateModalOpen={isCreateModalOpen}
+        toggleCreateModal={toggleCreateModal}
+        modalView={modalView}
+        setModalView={setModalView}
+        isCreateConfirmModalOpen={isCreateConfirmModalOpen}
+        toggleCreateConfirmModal={toggleCreateConfirmModal}
+      />
     </>
   );
 }
