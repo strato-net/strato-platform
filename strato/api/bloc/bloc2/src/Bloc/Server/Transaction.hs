@@ -84,6 +84,7 @@ import           BlockApps.Solidity.XabiContract
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AlternateTransaction
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json             hiding (Contract)
 import           Blockchain.Data.TXOrigin

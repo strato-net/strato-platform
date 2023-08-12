@@ -256,7 +256,7 @@ deriveAddressWithSalt sender salt src args = do
       theHash = SHA.hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
                                                    , rlpEncode theAddress
                                                    , rlpEncode salt
-                                                   , rlpEncode $ maybe ("\ETB\238\&5\SOP\228\213\200\NUL\186\246`\226\236\189F\ETX\238\151\154\166\SOH\255\186\172<\154\174=g%\DC3" :: BC.ByteString) (SHA.keccak256ToByteString . SHA.hash) src 
+                                                   , rlpEncode $ maybe ("=!\228\177\181\t\192#\204\246\166\DC3;\170]1\DEL)\DC2dw\203\182&\162\146\196rU\202\253\162" :: BC.ByteString) (SHA.keccak256ToByteString . SHA.hash) src 
                                                    , rlpEncode args
                                                    ]
   -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)

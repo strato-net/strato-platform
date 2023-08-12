@@ -230,23 +230,3 @@ ChainMetadataRef
     value String
     deriving Eq Generic Show
 
-Certificate
-    address Address
-    chainId Word256 Maybe
-    blockHash Keccak256
-    blockTimestamp UTCTime
-    blockNumber Integer sqltype=numeric(1000,0)
-    transactionHash Keccak256
-    transactionSender Address
-    certificateString String
-    commonName String
-    country String
-    group String
-    isValid Bool
-    organization String
-    organizationalUnit String
-    owner Address
-    parent Address
-    publicKey String
-    userAddress Address
-    deriving Eq Generic Show

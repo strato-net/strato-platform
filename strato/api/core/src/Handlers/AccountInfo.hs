@@ -28,7 +28,7 @@ import           Servant
 import           Servant.Client
 --import           Servant.Swagger.Tags
 
-
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB

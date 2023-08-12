@@ -59,6 +59,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.Json
 
 import           Control.Monad.Composable.SQL

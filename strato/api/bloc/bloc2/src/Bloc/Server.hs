@@ -32,7 +32,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.DataDefs
+import           Blockchain.Data.CirrusDefs
 
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Vault
