@@ -32,6 +32,7 @@ const contractName = "Dapp";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
+let   userCert = null;
 
 // interface Member {
 //   access?:boolean,
@@ -138,10 +139,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       userCertificate = await certificateJs.getCertificateMe(rawAdmin);
       console.log('user content from second attempt', userCertificate)
     }
-    contract.userOrganization = userCertificate.organization
-    userOrganization = userCertificate.organization
-
-    console.log('dapp - userCertificate.organization', userCertificate.organization)
+    //We are not guaranteed the user will have a certificate
+    //99% chance they do, but if this this their first login
+    //the node might not have a certificate in time
+    if (!(userCertificate === null || userCertificate === undefined)) {
+      contract.userOrganization = userCertificate.organization
+      userOrganization = userCertificate.organization
+      userCert    = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
+      console.log('dapp - userCertificate.organization', userCertificate.organization)
+    }
   }
   
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
@@ -215,7 +221,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   contract.getCertificate = async function (args) {
     return certificateJs.getCertificate(admin, args);
   };
-  contract.getCertificateMe = async function () {
+  contract.getCertificateMe = (!(userCert === null || userCert === undefined)) ? userCert : async function () {
     return certificateJs.getCertificateMe(admin);
   };
   contract.getCertificates = async function (args) {
