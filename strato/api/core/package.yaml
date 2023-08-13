@@ -12,7 +12,6 @@ library:
   dependencies:
   - aeson
   - aeson-casing
-  - async
   - base64-bytestring
   - binary
   - blockapps-data
