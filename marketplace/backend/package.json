@@ -19,6 +19,7 @@
     "test:payment": "yarn mocha-babel dapp/payments/test -b",
     "test:rawMaterial": "yarn mocha-babel dapp/items/rawMaterials/test -b",
     "test:service": "yarn mocha-babel dapp/service/test -b",
+    "test:productFile": "yarn mocha-babel dapp/productFile/test -b",
     "test:membership": "yarn mocha-babel dapp/membership/test -b",
     "test:membershipService": "yarn mocha-babel dapp/membershipService/test -b",
     "test:api:category": "yarn mocha-babel test/v1/category.test.js -b",
