@@ -2,6 +2,8 @@ import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
 import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
+import { pollingHelper } from "/helpers/utils";
+
 import StripeService from "/payment-service/stripe.service";
 import dayjs from 'dayjs';
 import RestStatus from 'http-status-codes';
@@ -130,15 +132,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   let userOrganization
   
   if (!serviceUser) {
-    let userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-    console.log('dapp - userCertificate', userCertificate)
-    if (userCertificate === null || userCertificate === undefined) { 
-      // delay for 6 seconds and check again if cert got created successfully
-      console.log('user not found in first attempt, this may be a brand new registration, recheck in 3 secs')
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-      console.log('user content from second attempt', userCertificate)
-    }
+    
+    let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
+    // let userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+    // console.log('dapp - userCertificate', userCertificate)
+    // if (userCertificate === null || userCertificate === undefined) { 
+    //   // delay for 6 seconds and check again if cert got created successfully
+    //   console.log('user not found in first attempt, this may be a brand new registration, recheck in 3 secs')
+    //   await new Promise(resolve => setTimeout(resolve, 3000));
+    //   userCertificate = await certificateJs.getCertificateMe(rawAdmin);
+    //   console.log('user content from second attempt', userCertificate)
+    // }
+
+
     //We are not guaranteed the user will have a certificate
     //99% chance they do, but if this this their first login
     //the node might not have a certificate in time
