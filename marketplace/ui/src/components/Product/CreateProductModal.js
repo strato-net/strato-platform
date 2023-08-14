@@ -1,8 +1,26 @@
 import React, { useState } from "react";
 import { useFormik, getIn } from "formik";
-import { Form, Modal, Input, Select, Radio, Button, Upload, Spin, notification } from "antd";
+import {
+  Form,
+  Modal,
+  Input,
+  InputNumber,
+  Select,
+  DatePicker,
+  Button,
+  Upload,
+  message,
+  Spin,
+  notification,
+  Typography,
+} from "antd";
 import TextArea from "antd/es/input/TextArea";
-import { PictureOutlined } from "@ant-design/icons";
+import {
+  PictureOutlined,
+  PlusOutlined,
+  InboxOutlined,
+  MinusOutlined,
+} from "@ant-design/icons";
 import getSchema from "./ProductSchema";
 
 //sub-categories
@@ -11,6 +29,7 @@ import { useProductDispatch, useProductState } from "../../contexts/product";
 import { unitOfMeasures } from "../../helpers/constants";
 
 const { Option } = Select;
+const { Dragger } = Upload;
 
 const CreateProductModal = ({
   open,
@@ -21,8 +40,13 @@ const CreateProductModal = ({
   debouncedSearchTerm,
 }) => {
   const schema = getSchema();
-  const [selectedImage, setSelectedImage] = useState(null);
+  // const [selectedImage, setSelectedImage] = useState(null);
   const dispatch = useProductDispatch();
+  const [previewImage, setPreviewImage] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [imageList, setImageList] = useState([]);
+  const [serviceRows, setServiceRows] = useState(0);
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
     useProductState();
@@ -58,6 +82,77 @@ const CreateProductModal = ({
     enableReinitialize: true,
   });
 
+  const getBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+
+  const handlePreview = async (file) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj);
+    }
+    setPreviewImage(file.url || file.preview);
+    setPreviewOpen(true);
+    setPreviewTitle(
+      file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
+    );
+  };
+
+  const handleImageChange = ({ fileList }) => {
+    setImageList(fileList);
+    formik.setFieldValue("image", fileList);
+  };
+
+  const uploadButton = (
+    <div>
+      <PlusOutlined />
+      <div
+        style={{
+          marginTop: 8,
+        }}
+      >
+        Upload
+      </div>
+    </div>
+  );
+
+  const addServiceRow = () => {
+    setServiceRows(serviceRows + 1);
+  };
+
+  const removeServiceRow = () => {
+    if (serviceRows > 0) {
+      setServiceRows(serviceRows - 1);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setPreviewOpen(false);
+  };
+
+  const props = {
+    name: "file",
+    multiple: true,
+    action: "https://www.mocky.io/v2/5cc8019d300000980a055e76",
+    onChange(info) {
+      const { status } = info.file;
+      if (status !== "uploading") {
+        console.log(info.file, info.fileList);
+      }
+      if (status === "done") {
+        message.success(`${info.file.name} file uploaded successfully.`);
+      } else if (status === "error") {
+        message.error(`${info.file.name} file upload failed.`);
+      }
+    },
+    onDrop(e) {
+      console.log("Dropped files", e.dataTransfer.files);
+    },
+  };
+
   const handleCreateFormSubmit = async (values) => {
     const formData = new FormData();
     formData.append("fileUpload", formik.values.image);
@@ -75,7 +170,7 @@ const CreateProductModal = ({
           isActive: values.active,
           category: values.category.name,
           subCategory: values.subCategory.name,
-          userUniqueProductCode:values.userUniqueProductCode,
+          userUniqueProductCode: values.userUniqueProductCode,
         },
       };
 
@@ -97,13 +192,13 @@ const CreateProductModal = ({
   };
 
   function beforeUpload(file) {
-    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
+    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
-      openToast("bottom","Image must be of jpeg or png format");
+      openToast("bottom", "Image must be of jpeg or png format");
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
-      openToast("bottom","Cannot upload an image of size more than 1mb");
+      openToast("bottom", "Cannot upload an image of size more than 1mb");
     }
     return isJpgOrPng && isLt1M;
   }
@@ -124,7 +219,7 @@ const CreateProductModal = ({
       open={open}
       centered
       onCancel={closeModal}
-      width={885}
+      width={1000}
       footer={[
         <div className="flex justify-center">
           <Button
@@ -145,12 +240,310 @@ const CreateProductModal = ({
         id="modal-title"
         className="text-center font-semibold text-lg text-primaryB"
       >
-        Add Product
+        Create Membership
       </h1>
       <hr className="text-secondryD mt-3" />
       <Form layout="vertical" className="mt-5">
+        {/* Inside the form I will have 4 sections to fill out titled Membership, Pricing, Services, and Documents. Each section will have different form items.
+          Membership Form.Items: Membership Name, Category(dropdown), location, start date, end date, company Name, website, contact email, photos (multiple photo upload), and description
+          Pricing Form.Items: price, quantity
+          Services Form.Items: service name, description, number of uses, non member price, member price, (add service button)
+          Documents Form.Items: upload document, list of uploaded documents.
+        */}
+        <div className="flex flex-col mb-7">
+          <Typography.Title level={5}>Membership</Typography.Title>
+          <div className="grid grid-cols-5 mb-6">
+            <Form.Item label="Membership Name" name="name">
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                placeholder="Membership Name"
+                onChange={formik.handleChange}
+                value={formik.values.name}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="Category" name="category" className="w-10/12">
+              <Select
+                id="category"
+                name="category"
+                placeholder="Select Category"
+                onChange={(value) => {
+                  formik.setFieldValue("category", value);
+                }}
+                value={formik.values.category}
+              >
+                {categorys.map((category) => (
+                  <Select.Option key={category.id} value={category.id}>
+                    {category.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item label="Location" name="location">
+              <Input
+                id="location"
+                name="location"
+                type="text"
+                placeholder="Location"
+                onChange={formik.handleChange}
+                value={formik.values.location}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="Start Date" name="startDate">
+              <DatePicker
+                id="startDate"
+                name="startDate"
+                placeholder="Start Date"
+                onChange={(value) => {
+                  formik.setFieldValue("startDate", value);
+                }}
+                value={formik.values.startDate}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="End Date" name="endDate">
+              <DatePicker
+                id="endDate"
+                name="endDate"
+                placeholder="End Date"
+                onChange={(value) => {
+                  formik.setFieldValue("endDate", value);
+                }}
+                value={formik.values.endDate}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="Company Name" name="companyName">
+              <Input
+                id="companyName"
+                name="companyName"
+                type="text"
+                placeholder="Company Name"
+                onChange={formik.handleChange}
+                value={formik.values.companyName}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="Website" name="website">
+              <Input
+                id="website"
+                name="website"
+                type="text"
+                placeholder="Website"
+                onChange={formik.handleChange}
+                value={formik.values.website}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="Contact Email" name="contactEmail">
+              <Input
+                id="contactEmail"
+                name="contactEmail"
+                type="text"
+                placeholder="Contact Email"
+                onChange={formik.handleChange}
+                value={formik.values.contactEmail}
+                className="w-10/12"
+              />
+            </Form.Item>
+          </div>
+          <Form.Item label="Photos" name="photos">
+            <div className="flex flex-row flex-nowrap">
+              <Upload
+                id="photos"
+                name="photos"
+                onChange={handleImageChange}
+                fileList={imageList}
+                listType="picture-card"
+                customRequest={() => {}}
+                style={{ display: "none" }}
+                accept="image/*"
+                beforeUpload={beforeUpload}
+                onPreview={handlePreview}
+                maxCount={10}
+              >
+                {imageList.length >= 10 ? null : uploadButton}
+              </Upload>
+              <Modal
+                open={previewOpen}
+                title={previewTitle}
+                footer={null}
+                onCancel={handleCancelPreview}
+              >
+                <img
+                  alt="example"
+                  style={{
+                    width: "100%",
+                  }}
+                  src={previewImage}
+                />
+              </Modal>
+            </div>
+          </Form.Item>
+          <Form.Item label="Description" name="description">
+            <Input.TextArea
+              id="description"
+              name="description"
+              type="text"
+              placeholder="Description"
+              onChange={formik.handleChange}
+              value={formik.values.description}
+              className=""
+            />
+          </Form.Item>
+        </div>
+        <div className="flex flex-col mb-7">
+          <Typography.Title level={5}>Pricing</Typography.Title>
+          <div className="grid grid-cols-5">
+            <Form.Item label="Price" name="price">
+              <InputNumber
+                id="price"
+                name="price"
+                type="number"
+                min={1}
+                addonBefore="$"
+                value={formik.values.price}
+                onChange={(value) => {
+                  formik.setFieldValue("price", value);
+                }}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="Quantity" name="quantity">
+              <InputNumber
+                id="quantity"
+                name="quantity"
+                type="number"
+                min={1}
+                value={formik.values.quantity}
+                onChange={(value) => {
+                  formik.setFieldValue("quantity", value);
+                }}
+                className="w-10/12"
+              />
+            </Form.Item>
+          </div>
+        </div>
+        <div className="flex flex-col mb-7">
+          <Typography.Title level={5}>Services</Typography.Title>
+          <Button
+            className="w-80"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              addServiceRow();
+            }}
+          >
+            Add Service
+          </Button>
+
+          {Array.from({ length: serviceRows }).map((_, index) => (
+            <div className="grid grid-cols-5" key={index}>
+              <Form.Item label="Service Name" name={`serviceName${index}`}>
+                <Input
+                  id={`serviceName${index}`}
+                  name={`serviceName${index}`}
+                  type="text"
+                  placeholder="Service Name"
+                  onChange={formik.handleChange}
+                  value={formik.values[`serviceName${index}`]}
+                  className="w-10/12"
+                />
+              </Form.Item>
+              <Form.Item
+                label="Service Description"
+                name={`serviceDescription${index}`}
+              >
+                <Input.TextArea
+                  id={`serviceDescription${index}`}
+                  name={`serviceDescription${index}`}
+                  type="text"
+                  placeholder="Service Description"
+                  onChange={formik.handleChange}
+                  value={formik.values[`serviceDescription${index}`]}
+                  className="w-10/12"
+                />
+              </Form.Item>
+              <Form.Item label="Number of Uses" name={`numberOfUses${index}`}>
+                <InputNumber
+                  id={`numberOfUses${index}`}
+                  name={`numberOfUses${index}`}
+                  type="number"
+                  min={1}
+                  value={formik.values[`numberOfUses${index}`]}
+                  onChange={(value) => {
+                    formik.setFieldValue(`numberOfUses${index}`, value);
+                  }}
+                  className="w-10/12"
+                />
+              </Form.Item>
+              <Form.Item
+                label="Non-Member Price"
+                name={`nonMemberPrice${index}`}
+              >
+                <InputNumber
+                  id={`nonMemberPrice${index}`}
+                  name={`nonMemberPrice${index}`}
+                  type="number"
+                  min={1}
+                  addonBefore="$"
+                  value={formik.values[`nonMemberPrice${index}`]}
+                  onChange={(value) => {
+                    formik.setFieldValue(`nonMemberPrice${index}`, value);
+                  }}
+                  className="w-10/12"
+                />
+              </Form.Item>
+              <Form.Item label="Member Price" name={`memberPrice${index}`}>
+                <InputNumber
+                  id={`memberPrice${index}`}
+                  name={`memberPrice${index}`}
+                  type="number"
+                  min={1}
+                  addonBefore="$"
+                  value={formik.values[`memberPrice${index}`]}
+                  onChange={(value) => {
+                    formik.setFieldValue(`memberPrice${index}`, value);
+                  }}
+                  className="w-10/12"
+                />
+              </Form.Item>
+              <Button
+                className="w-10/12 self-center"
+                type="primary"
+                icon={<MinusOutlined />}
+                onClick={() => {
+                  removeServiceRow();
+                }}
+              >
+              </Button>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1">
+          <Typography.Title level={5}>Documents</Typography.Title>
+          <Form.Item label="Documents" name="documents" className="w-10/12">
+            <div className="flex flex-row flex-nowrap">
+              <Dragger {...props}>
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">
+                  Click or drag file to this area to upload
+                </p>
+                <p className="ant-upload-hint">
+                  Support for a single or bulk upload.
+                </p>
+              </Dragger>
+            </div>
+          </Form.Item>
+        </div>
+      </Form>
+      {/* <Form layout="vertical" className="mt-5">
         <div className="flex w-full">
-          <div className="w-1/4">
             <Form.Item label="Upload Image" name="image">
               <div className="w-48 h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
                 {selectedImage ? (
@@ -195,7 +588,6 @@ const CreateProductModal = ({
                 </span>
               )}
             </Form.Item>
-          </div>
           <div className="w-3/4 mb-3">
             <div className="flex justify-between ">
               <Form.Item label="Name" name="name" className="w-72">
@@ -394,7 +786,7 @@ const CreateProductModal = ({
            
           </div>
         </div>
-      </Form>
+      </Form> */}
     </Modal>
   );
 };
