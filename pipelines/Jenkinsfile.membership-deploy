@@ -124,7 +124,7 @@ pipeline {
 
             sh 'chmod +x run.sh'
 
-            sh './run.sh'
+            sh 'sudo ./run.sh'
       
             sh 'sudo docker ps'
 
