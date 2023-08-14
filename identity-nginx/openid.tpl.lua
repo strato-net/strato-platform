@@ -19,7 +19,7 @@ local openidc = require("resty.openidc")
 local cjson_s = require("cjson.safe")
 local unb64 = ngx.decode_base64
 
-local config = require("conf-loader")
+local config = require("cfg-loader")
 assert(type(config) == "table", "Config should be in the expected format.")
 
 local function get_bearer_access_token_from_header(header)
