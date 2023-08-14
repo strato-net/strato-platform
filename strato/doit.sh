@@ -31,9 +31,7 @@ echo 'Postgres is available'
 # Check if this container was initialized before
 if [ ! -f _container_initialized ]; then
   # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
-  echo '_container_initialized file not found'
   if [ ! -f /volume_data/_volume_initialized ]; then
-    echo '/volume_data/_volume_initialized file not found'
     # drop slipstream db if already exists
     PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
     # Create the database for slipstream
@@ -43,7 +41,6 @@ if [ ! -f _container_initialized ]; then
     date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
   fi
   # Create logs directory
-  echo 'creating /logs directory'
   mkdir /logs
   # Create the '_container_initialized' sentinel file
   date '+%Y-%m-%d %H:%M:%S' > _container_initialized

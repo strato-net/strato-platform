@@ -21,7 +21,6 @@ Replace below place holders with valid values:
 * *REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY*
 * *REPLACE_WITH_STRIPE_PUBLISHABLE_KEY*
 * *REPLACE_WITH_STRIPE_SECRET_KEY*
-* *REPLACE_WITH_VERSION*
 
 # Create genesis block
 kubectl create configmap genesis-block --from-file=genesis-block.json -n strato-platform
