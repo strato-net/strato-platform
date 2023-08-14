@@ -95,8 +95,8 @@ pipeline {
         steps {
           dir("strato-getting-started") {
             // Copy .pem and .key for SSL
-            sh 'cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/'
-            sh 'cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
+            sh 'sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/'
+            sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
             withCredentials([
               usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
               usernamePassword(credentialsId: 'marketplace-testnet2-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID'),
