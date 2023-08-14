@@ -90,7 +90,6 @@ const Filter = (props) => {
           onChange={(value) => {
             handleChange("sortBy", value);
           }}
-          defaultValue={"Select"}
           options={sortBy}
         />
 
@@ -205,7 +204,6 @@ const Filter = (props) => {
               onChange={(value) => {
                 handleChange("stateValue", value);
               }}
-              defaultValue={"Select"}
               options={states}
             />
           </Panel>
@@ -335,7 +333,7 @@ const Filter = (props) => {
               onChange={(value) => {
                 handleChange("parkingType", value);
               }}
-              defaultValue={"Select"}
+              placeholder="Select"
               options={parkingType}
             />
 
@@ -352,7 +350,6 @@ const Filter = (props) => {
               onChange={(value) => {
                 handleChange("propertyType", value);
               }}
-              defaultValue={"Select"}
               options={propertyTypes}
             />
           </Panel>
