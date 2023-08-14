@@ -6,24 +6,10 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-import { propertyConstants } from '../helpers/constants'
+import { filterSchema, propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
-  const MAX_PRICE_VALUE = 2000000;
-  const filterSchema = {
-    sortBy: "",
-    minPriceValue: 0,
-    maxPriceValue: MAX_PRICE_VALUE,
-    zipcodeValue: 0,
-    stateValue: "",
-    minBedrooms: 0,
-    minBathrooms: 0,
-    amenities: [],
-    minSqFt: 0,
-    parkingType: "",
-    propertyType: "",
-  };
 
   const [filterOption, setFilterOption] = useState(filterSchema);
   const [selectedFilter, setSelectedFilter] = useState([])
