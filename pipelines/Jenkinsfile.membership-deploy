@@ -125,7 +125,7 @@ pipeline {
 
             sh './run.sh'
       
-            sh 'docker ps'
+            sh 'sudo docker ps'
 
             // Few quick tests
             sh '''#!/bin/bash -le
