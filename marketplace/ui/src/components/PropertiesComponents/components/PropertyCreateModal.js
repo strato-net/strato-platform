@@ -35,6 +35,7 @@ const { LIMIT_PER_PAGE } = propertyConstants;
 const { Panel } = Collapse;
 const { Text } = Typography;
 const { Option } = Select;
+
 const getBase64 = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -301,7 +302,6 @@ function PropertyCreateModal({
             >
               <Input
                 label="title"
-                defaultValue={title}
                 value={title}
                 maxLength={100}
                 placeholder="Listing Title"
@@ -323,7 +323,6 @@ function PropertyCreateModal({
             >
               <Input.TextArea
                 label="Project Description"
-                defaultValue={description}
                 value={description}
                 maxLength={500}
                 showCount
@@ -350,7 +349,6 @@ function PropertyCreateModal({
                     type="Number"
                     placeholder="Total Units"
                     controls={false}
-                    defaultValue={numberOfUnitsTotal}
                     value={numberOfUnitsTotal}
                     onChange={(value) => {
                       handleChange("numberOfUnitsTotal", value);
@@ -378,7 +376,6 @@ function PropertyCreateModal({
                     placeholder="Asking Price"
                     controls={false}
                     addonBefore="$"
-                    defaultValue={listPrice}
                     value={listPrice}
                     onChange={(e) => {
                       handleChange("listPrice", e);
@@ -400,7 +397,6 @@ function PropertyCreateModal({
                 label="Street Name"
                 id="streetname"
                 placeholder="Street Name"
-                defaultValue={streetName}
                 value={streetName}
                 onChange={(e) => {
                   handleChange("streetName", e.target.value);
@@ -423,7 +419,6 @@ function PropertyCreateModal({
                     type="Number"
                     placeholder="Street Number"
                     controls={false}
-                    defaultValue={streetNumber}
                     value={streetNumber}
                     onChange={(value) => {
                       handleChange("streetNumber", value);
@@ -448,7 +443,6 @@ function PropertyCreateModal({
                     id="housenumber"
                     placeholder="House Number"
                     controls={false}
-                    defaultValue={unitNumber}
                     value={unitNumber}
                     onChange={(e) => {
                       handleChange("unitNumber", e.target.value);
@@ -468,7 +462,6 @@ function PropertyCreateModal({
             >
               <Select
                 label="State"
-                defaultValue={stateOrProvince}
                 value={stateOrProvince}
                 placeholder="Select State"
                 onSelect={(e) => {
@@ -489,7 +482,6 @@ function PropertyCreateModal({
                     label="City"
                     id="city"
                     placeholder="City"
-                    defaultValue={postalCity}
                     value={postalCity}
                     onChange={(e) => {
                       handleChange("postalCity", e.target.value);
@@ -514,7 +506,6 @@ function PropertyCreateModal({
                     min={0}
                     max={99999}
                     controls={false}
-                    defaultValue={postalcode}
                     value={postalcode}
                     onChange={(value) => {
                       handleChange("postalcode", value);
@@ -579,7 +570,6 @@ function PropertyCreateModal({
                 <Select
                   label="homeType"
                   placeholder="Property Type"
-                  defaultValue={propertyType}
                   value={propertyType}
                   onSelect={(value) => {
                     handleChange("propertyType", value);
@@ -609,7 +599,6 @@ function PropertyCreateModal({
                       controls={false}
                       min={0}
                       value={bedroomsTotal}
-                      defaultValue={bedroomsTotal}
                       onChange={(value) => {
                         handleChange("bedroomsTotal", value);
                       }}
@@ -638,7 +627,6 @@ function PropertyCreateModal({
                       type="Number"
                       controls={false}
                       min={0}
-                      defaultValue={bathroomsTotalInteger}
                       value={bathroomsTotalInteger}
                       onChange={(value) => {
                         handleChange("bathroomsTotalInteger", value);
@@ -667,7 +655,6 @@ function PropertyCreateModal({
                       controls={false}
                       addonAfter={LivingAreaUnitElement}
                       min={0}
-                      defaultValue={livingArea}
                       value={livingArea}
                       onChange={(value) => {
                         handleChange("livingArea", value);
@@ -698,7 +685,6 @@ function PropertyCreateModal({
                       controls={false}
                       addonAfter={LotSizeAreaUnitElement}
                       min={0}
-                      defaultValue={lotSizeArea}
                       value={lotSizeArea}
                       onChange={(value) => {
                         handleChange("lotSizeArea", value);
