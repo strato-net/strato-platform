@@ -55,6 +55,25 @@ contract ItemManager is ItemStatus, InventoryStatus {
         return (RestStatus.OK);
     }
 
+    function retireItem(
+        address _itemAddress,
+        string _retiredBy,
+        string _retiredOnBehalfOf,
+        int _quantity,
+        string _purpose,
+        uint _retirementDate
+    ) returns (uint256, address) {
+        Item_4 item = Item_4(_itemAddress);
+        return
+        item.retireItem(
+            _retiredBy,
+            _retiredOnBehalfOf,
+            _quantity,
+            _purpose,
+            _retirementDate
+        );
+    }
+
     function transferOwnership(
         address[] _itemsAddress,
         address _newOwner,
