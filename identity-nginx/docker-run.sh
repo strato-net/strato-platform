@@ -14,7 +14,6 @@ IDENTITY_PORT_VAULT_PROXY=${IDENTITY_PORT_VAULT_PROXY:-8013}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
-  python3 createRealmConfig.py #TODO: error handling?
 
   ########
   ### Generate nginx.conf from template according to configuration provided
