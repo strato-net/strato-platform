@@ -10,6 +10,24 @@ import { propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
+  const MAX_PRICE_VALUE = 2000000;
+  const filterSchema = {
+    sortBy: "",
+    minPriceValue: 0,
+    maxPriceValue: MAX_PRICE_VALUE,
+    zipcodeValue: 0,
+    stateValue: "",
+    minBedrooms: 0,
+    minBathrooms: 0,
+    amenities: [],
+    minSqFt: 0,
+    parkingType: "",
+    propertyType: "",
+  };
+
+  const [filterOption, setFilterOption] = useState(filterSchema);
+  const [selectedFilter, setSelectedFilter] = useState([])
+  const [appliedFilter, setAppliedFilter] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(LIMIT_PER_PAGE)
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
@@ -44,13 +62,32 @@ function PropertyListings() {
     }
   };
 
-  const applyFilter = (options) => {
+  const applyFilter = () => {
     // actions.fetchProperties(dispatch, limit,currentPage,options)
+    let data = [...selectedFilter];
+    setAppliedFilter(data)
   }
 
   const clearFilter = () => {
     setCurrentPage(1)
     // actions.fetchProperties(dispatch, limit,1,options)
+  }
+
+  const handleTagClose = (name) => {
+    let data = [...appliedFilter];
+    const check = data.map((item, index) => {
+      let data = { ...filterOption }
+      data[name] = filterSchema[name];
+      setFilterOption(data);
+
+      if (item.name === name) {
+        return { name: name, value: (filterSchema[name] === 0 ? "" : filterSchema[name]) }
+      } else {
+        return item;
+      }
+    })
+    setAppliedFilter(check);
+    setSelectedFilter(check);
   }
 
   const propertyList = () => {
@@ -89,6 +126,18 @@ function PropertyListings() {
     )
   }
 
+  const handleChange = (key, value) => {
+    let filter = { ...filterOption };
+    filter[key] = value;
+    setFilterOption(filter);
+
+    const convertedData = Object.keys(filter).map((key) => ({
+      name: key,
+      value: filter[key] || ""
+    }));
+    setSelectedFilter(convertedData)
+  }
+
   totalValue.current = properties.length === 0
     ? currentPage * LIMIT_PER_PAGE
     : (properties.length === LIMIT_PER_PAGE
@@ -105,7 +154,8 @@ function PropertyListings() {
               Recommended Properties
             </Typography.Title>
             <Col style={{ display: "flex", justifyContent: "space-between" }}>
-              <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
+              <Filter applyFilter={applyFilter} clearFilter={clearFilter}
+                handleChange={handleChange} filterOption={filterOption} />
               <Button type="primary"
                 onClick={() => {
                   toggleCreateModal(true)
@@ -113,6 +163,16 @@ function PropertyListings() {
               >List Property</Button>
             </Col>
           </Row>
+
+          {appliedFilter.map((item, index) => {
+            const { name, value } = item;
+            return (value && <Tag style={{ margin: "5px" }} key={index}
+              closable onClose={() => { handleTagClose(name) }}
+            >
+              {name}: {name === "amenities" ? value.join(", ") : value}
+            </Tag>)
+          })}
+
           {isPropertiesLoading && loader(isPropertiesLoading)}
           {!isPropertiesLoading && properties.length > 0 && propertyList()}
           {!isPropertiesLoading && !properties.length && dataNotFound()}

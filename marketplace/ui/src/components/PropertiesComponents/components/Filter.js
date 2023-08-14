@@ -19,31 +19,14 @@ const { Panel } = Collapse;
 
 const Filter = (props) => {
 
-  const MAX_PRICE_VALUE = 2000000;
-  const filterSchema = {
-    sortBy: "Select",
-    minPriceValue: 0,
-    maxPriceValue: MAX_PRICE_VALUE,
-    zipcodeValue: 0,
-    stateValue: "Select",
-    minBedrooms: 0,
-    minBathrooms: 0,
-    amenities: [],
-    minSqFt: 0,
-    parkingType: "Select",
-    propertyType: "Select",
-  };
-
-  const [filterOption, setFilterOption] = useState(filterSchema);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const { filterOption } = props;
 
   const { sortBy, states, amenities, parkingType, propertyTypes } = filterData;
   const { maxPriceValue, zipcodeValue, minPriceValue, stateValue, minBedrooms, minBathrooms, minSqFt, } = filterOption;
 
   const handleChange = (key, value) => {
-    let filter = { ...filterOption };
-    filter[key] = value;
-    setFilterOption(filter);
+    props.handleChange(key, value)
   };
 
   const openDrawer = () => {
@@ -55,14 +38,14 @@ const Filter = (props) => {
   };
 
   const handleClear = () => {
-    setDrawerOpen(false);
-    setFilterOption(filterSchema);
+    // setDrawerOpen(false);
+    // setFilterOption(filterSchema);
     props.clearFilter()
   };
 
   const applyFilter = () => {
     setDrawerOpen(false);
-    props.applyFilter(filterOption)
+    props.applyFilter()
   };
 
   return (
@@ -333,7 +316,6 @@ const Filter = (props) => {
               onChange={(value) => {
                 handleChange("parkingType", value);
               }}
-              placeholder="Select"
               options={parkingType}
             />
 
