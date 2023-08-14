@@ -20,6 +20,8 @@ type PutIdentity = "identity"
                 :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" T.Text -- pass along for vault calls
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
                 :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" T.Text
+                :> Header' '[Optional] "X-USER-NAME" T.Text 
+                :> Header' '[Optional] "X-USER-COMPANY" T.Text 
                 :> Put '[JSON] Address --should return user address
 
 type PutIdentityExternal = "identity" -- only to be used for external api client bindings

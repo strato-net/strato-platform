@@ -114,9 +114,14 @@ putIdentity :: ( MonadIO m
                , Accessible Issuer m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
-               , Accessible RealmData m
-               ) => T.Text -> T.Text -> T.Text -> m Address
-putIdentity accessToken uuid idProv = do
+               , Accessible RealmData m ) 
+               => T.Text 
+               -> T.Text 
+               -> T.Text 
+               -> Maybe T.Text
+               -> Maybe T.Text
+               -> m Address
+putIdentity accessToken uuid idProv _ _ = do
     $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity"
     -- check if a user exists in vault
     let realm = extractRealmName $ T.unpack idProv
@@ -144,7 +149,7 @@ putIdentityExternal ::  ( MonadIO m
                         , Accessible PrivateKey m
                         , Accessible RealmData m
                         ) => T.Text -> m Address
-putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" ""
+putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" "" Nothing Nothing
 
 
 blocEndpoint :: String
