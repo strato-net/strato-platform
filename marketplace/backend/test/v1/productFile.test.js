@@ -68,11 +68,11 @@ describe('ProductFile End-To-End Tests', function () {
       createArgs,
       orgAdmin.token,
     )
-    
+
     assert.equal(createResponse.status, 200, 'should be 200');
-    assert.isDefined(createResponse.body, 'body should be defined')
+    assert.isDefined(createResponse.body, 'body should be defined');
     assert.isDefined(createResponse.body.data, 'body.data should be defined');
-    test = createResponse.body.data[1];
+    test = createResponse.body.data.address;
   })
 
   it('Get a ProductFile', async () => {
@@ -129,7 +129,7 @@ describe('ProductFile End-To-End Tests', function () {
     
     const getProductFile0 = await get(
       ProductFile.prefix,
-      ProductFile.get.replace(':address', createResponse.body.data[1]),
+      ProductFile.get.replace(':address', createResponse.body.data.address),
       {},
       orgAdmin.token,
     )
@@ -139,7 +139,7 @@ describe('ProductFile End-To-End Tests', function () {
     console.log("getProductFile0: ", getProductFile0.body.data)
 
     const updateArgs = {
-      ...updateProductFileArgs(createResponse.body.data[1], util.uid()),
+      ...updateProductFileArgs(createResponse.body.data.address, util.uid()),
     }
 
     // get
@@ -155,7 +155,7 @@ describe('ProductFile End-To-End Tests', function () {
     
     const getProductFile = await get(
       ProductFile.prefix,
-      ProductFile.get.replace(':address', createResponse.body.data[1]),
+      ProductFile.get.replace(':address', createResponse.body.data.address),
       {},
       orgAdmin.token,
     )
