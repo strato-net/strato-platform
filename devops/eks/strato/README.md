@@ -10,6 +10,9 @@ This template uses AWS EBS volumes for container volumes. For AWS EFS volumes se
 # Delete Existing Resources (Deployement, EFS Storage Class, Persistent Volume Claims and Persistent Volumes)
 kubectl delete -f strato-platform-manifest.yaml
 
+# Make a copy of the template
+cp strato-platform-manifest.tpl.yaml strato-platform-manifest.yaml
+
 # Download the strato-platform-manifest.yaml file from jenkins build artifact in your local.
 Replace below place holders with valid values:
 * *REPLACE_WITH_OAUTH_CLIENT_ID*
@@ -18,14 +21,10 @@ Replace below place holders with valid values:
 * *REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY*
 * *REPLACE_WITH_STRIPE_PUBLISHABLE_KEY*
 * *REPLACE_WITH_STRIPE_SECRET_KEY*
+* *REPLACE_WITH_VERSION*
+
+# Create genesis block
+kubectl create configmap genesis-block --from-file=genesis-block.json -n strato-platform
 
 # Execute the manifest file
 kubectl apply -f strato-platform-manifest.yaml
-
-# Known Issues
-* We are using old strato api by setting USE_OLD_STRATO_API as true. New strato api is using [hardcoded](https://github.com/blockapps/strato-platform/blob/develop/strato/api/strato-api/app/StratoAPIInit.hs#L26) postgres service. [STRATO-2805](https://blockapps.atlassian.net/browse/STRATO-2805) has been created for the fix.
-* Vault-wrapper password needs to be set within strato container
-Jump onto the starto container:
-`kubectl exec -it <pod_name> -c strato -- bash`
-Setting the password:
-`curl -s -H "Content-Type: application/json" -d @- localhost:8000/strato/v2.3/password <<< \"hello\"`
