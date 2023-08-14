@@ -103,12 +103,12 @@ pipeline {
             ]) {
               writeFile file: "run.sh", text: """#!/bin/bash
                 sudo \\
-                  NODE_HOST=membership.mercata-testnet2.blockapps.net \\
-                  HTTPS_PORT='443' \\
-                  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration \\
-                  OAUTH_CLIENT_ID=mercata-testnet2-membership \\
-                  OAUTH_CLIENT_SECRET=89070133-62f6-4a06-a1ca-41b0594bb0a7 \\
-                  VAULT_URL=https://vault.blockapps.net:8093 \\
+                  NODE_HOST="membership.mercata-testnet2.blockapps.net" \\
+                  HTTPS_PORT="443" \\
+                  OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration" \\
+                  OAUTH_CLIENT_ID="mercata-testnet2-membership" \\
+                  OAUTH_CLIENT_SECRET="89070133-62f6-4a06-a1ca-41b0594bb0a7" \\
+                  VAULT_URL="https://vault.blockapps.net:8093" \\
                   certInfo='{"orgName":"BlockApps","orgUnit":"Mercata","commonName":"MembershipNode","access":true}' \\
                   EXT_STORAGE_S3_ACCESS_KEY_ID='${AWS_IAM_USER_KEY_ID}' \\
                   EXT_STORAGE_S3_SECRET_ACCESS_KEY='${AWS_IAM_USER_ACCESS_KEY}' \\
@@ -116,7 +116,7 @@ pipeline {
                   STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
                   STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
                   MP_DAPP_ADDRESS='c93f9a422a4508a6501a63537291128122f7bcf2' \\
-                  CLIENT_URL=https://membership.mercata-testnet2.blockapps.net \\
+                  CLIENT_URL="https://membership.mercata-testnet2.blockapps.net" \\
                   ./strato --single
               """
             }
