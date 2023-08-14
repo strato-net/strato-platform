@@ -17,10 +17,7 @@ function PropertyListings() {
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(LIMIT_PER_PAGE)
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
-  const [modalView, setModalView] = useState(true);
-  const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
   const totalValue = useRef(0);
-
   const dispatch = usePropertiesDispatch()
   const { properties, isPropertiesLoading, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
@@ -185,10 +182,6 @@ function PropertyListings() {
       <PropertyCreateModal
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
-        modalView={modalView}
-        setModalView={setModalView}
-        isCreateConfirmModalOpen={isCreateConfirmModalOpen}
-        toggleCreateConfirmModal={toggleCreateConfirmModal}
       />
     </>
   );
