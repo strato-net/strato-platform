@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Spin, Pagination, notification, Button } from 'antd'
+import { Row, Col, Typography, Spin, Pagination, notification, Button, Tag } from 'antd'
 import PropertyCard from './PropertyCard'
 import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
@@ -18,7 +18,7 @@ function PropertyListings() {
   const totalValue = useRef(0);
 
   const dispatch = usePropertiesDispatch()
-  const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success, error } = usePropertiesState();
+  const { properties, isPropertiesLoading, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
   useEffect(() => {
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))

@@ -173,7 +173,7 @@ function PropertyCreateModal({
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
     let response = await actions.createProperty(dispatch, body);
-    if(response){
+    if (response) {
       toggleCreateModal(false)
       toggleCreateConfirmModal(false)
       setModalView(!modalView);

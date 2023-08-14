@@ -162,7 +162,7 @@ const actions = {
       }
       dispatch({
         type: actionDescriptors.fetchPropertiesFailed,
-        error: body.error,
+        error: "Error while fetching property list",
       });
     } catch (err) {
       dispatch({
