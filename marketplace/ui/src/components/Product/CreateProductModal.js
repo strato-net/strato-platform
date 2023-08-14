@@ -441,7 +441,7 @@ const CreateProductModal = ({
           </Button>
 
           {Array.from({ length: serviceRows }).map((_, index) => (
-            <div className="grid grid-cols-5" key={index}>
+            <div className="grid grid-cols-6 mt-3" key={index}>
               <Form.Item label="Service Name" name={`serviceName${index}`}>
                 <Input
                   id={`serviceName${index}`}
@@ -456,15 +456,17 @@ const CreateProductModal = ({
               <Form.Item
                 label="Service Description"
                 name={`serviceDescription${index}`}
+                className="col-span-2"
               >
                 <Input.TextArea
                   id={`serviceDescription${index}`}
                   name={`serviceDescription${index}`}
                   type="text"
+                  rows={4}
                   placeholder="Service Description"
                   onChange={formik.handleChange}
                   value={formik.values[`serviceDescription${index}`]}
-                  className="w-10/12"
+                  className="w-11/12"
                 />
               </Form.Item>
               <Form.Item label="Number of Uses" name={`numberOfUses${index}`}>
