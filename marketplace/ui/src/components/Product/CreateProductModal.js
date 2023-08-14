@@ -244,12 +244,6 @@ const CreateProductModal = ({
       </h1>
       <hr className="text-secondryD mt-3" />
       <Form layout="vertical" className="mt-5">
-        {/* Inside the form I will have 4 sections to fill out titled Membership, Pricing, Services, and Documents. Each section will have different form items.
-          Membership Form.Items: Membership Name, Category(dropdown), location, start date, end date, company Name, website, contact email, photos (multiple photo upload), and description
-          Pricing Form.Items: price, quantity
-          Services Form.Items: service name, description, number of uses, non member price, member price, (add service button)
-          Documents Form.Items: upload document, list of uploaded documents.
-        */}
         <div className="flex flex-col mb-7">
           <Typography.Title level={5}>Membership</Typography.Title>
           <div className="grid grid-cols-5 mb-6">
@@ -292,38 +286,16 @@ const CreateProductModal = ({
                 className="w-10/12"
               />
             </Form.Item>
-            <Form.Item label="Start Date" name="startDate">
-              <DatePicker
-                id="startDate"
-                name="startDate"
-                placeholder="Start Date"
+            <Form.Item label="Duration (Months)" name="duration">
+              <InputNumber
+                id="duration"
+                name="duration"
+                type="number"
+                min={1}
+                value={formik.values.duration}
                 onChange={(value) => {
-                  formik.setFieldValue("startDate", value);
+                  formik.setFieldValue("duration", value);
                 }}
-                value={formik.values.startDate}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="End Date" name="endDate">
-              <DatePicker
-                id="endDate"
-                name="endDate"
-                placeholder="End Date"
-                onChange={(value) => {
-                  formik.setFieldValue("endDate", value);
-                }}
-                value={formik.values.endDate}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="Company Name" name="companyName">
-              <Input
-                id="companyName"
-                name="companyName"
-                type="text"
-                placeholder="Company Name"
-                onChange={formik.handleChange}
-                value={formik.values.companyName}
                 className="w-10/12"
               />
             </Form.Item>
@@ -398,7 +370,7 @@ const CreateProductModal = ({
         <div className="flex flex-col mb-7">
           <Typography.Title level={5}>Pricing</Typography.Title>
           <div className="grid grid-cols-5">
-            <Form.Item label="Price" name="price">
+            <Form.Item label="Yearly Price" name="price">
               <InputNumber
                 id="price"
                 name="price"
@@ -408,6 +380,20 @@ const CreateProductModal = ({
                 value={formik.values.price}
                 onChange={(value) => {
                   formik.setFieldValue("price", value);
+                }}
+                className="w-10/12"
+              />
+            </Form.Item>
+            <Form.Item label="Monthly Price" name="monthlyPrice">
+              <InputNumber
+                id="monthlyPrice"
+                name="monthlyPrice"
+                type="number"
+                min={1}
+                addonBefore="$"
+                value={formik.values.monthlyPrice}
+                onChange={(value) => {
+                  formik.setFieldValue("monthlyPrice", value);
                 }}
                 className="w-10/12"
               />
@@ -453,22 +439,6 @@ const CreateProductModal = ({
                   className="w-10/12"
                 />
               </Form.Item>
-              <Form.Item
-                label="Service Description"
-                name={`serviceDescription${index}`}
-                className="col-span-2"
-              >
-                <Input.TextArea
-                  id={`serviceDescription${index}`}
-                  name={`serviceDescription${index}`}
-                  type="text"
-                  rows={4}
-                  placeholder="Service Description"
-                  onChange={formik.handleChange}
-                  value={formik.values[`serviceDescription${index}`]}
-                  className="w-11/12"
-                />
-              </Form.Item>
               <Form.Item label="Number of Uses" name={`numberOfUses${index}`}>
                 <InputNumber
                   id={`numberOfUses${index}`}
@@ -478,23 +448,6 @@ const CreateProductModal = ({
                   value={formik.values[`numberOfUses${index}`]}
                   onChange={(value) => {
                     formik.setFieldValue(`numberOfUses${index}`, value);
-                  }}
-                  className="w-10/12"
-                />
-              </Form.Item>
-              <Form.Item
-                label="Non-Member Price"
-                name={`nonMemberPrice${index}`}
-              >
-                <InputNumber
-                  id={`nonMemberPrice${index}`}
-                  name={`nonMemberPrice${index}`}
-                  type="number"
-                  min={1}
-                  addonBefore="$"
-                  value={formik.values[`nonMemberPrice${index}`]}
-                  onChange={(value) => {
-                    formik.setFieldValue(`nonMemberPrice${index}`, value);
                   }}
                   className="w-10/12"
                 />
@@ -514,7 +467,7 @@ const CreateProductModal = ({
                 />
               </Form.Item>
               <Button
-                className="w-10/12 self-center"
+                className="w-10/12 self-end"
                 type="primary"
                 icon={<MinusOutlined />}
                 onClick={() => {
@@ -544,251 +497,6 @@ const CreateProductModal = ({
           </Form.Item>
         </div>
       </Form>
-      {/* <Form layout="vertical" className="mt-5">
-        <div className="flex w-full">
-            <Form.Item label="Upload Image" name="image">
-              <div className="w-48 h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
-                {selectedImage ? (
-                  <div className="h-20">
-                    <img
-                      alt="Product"
-                      src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                    <br />
-                  </div>
-                ) : (
-                  <PictureOutlined className="text-7xl text-primary opacity-10" />
-                )}
-                <Upload
-                  onChange={(e) => {
-                    setSelectedImage(URL.createObjectURL(e.file.originFileObj));
-                    formik.setFieldValue("image", e.file.originFileObj);
-                  }}
-                  customRequest={() => { }}
-                  style={{ display: "none" }}
-                  accept="image/png, image/jpeg"
-                  maxCount={1}
-                  showUploadList={false}
-                  beforeUpload={beforeUpload}
-                >
-                  <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                    Browse
-                  </div>
-                </Upload>
-              </div>
-
-              <div className="flex items-start">
-                <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                <p className="mt-1 text-xs italic ml-1 mr-4">
-                  use jpg, png format of size less than 1mb
-                </p>
-              </div>
-              {formik.touched.image && formik.errors.image && (
-                <span className="text-error text-xs">
-                  {formik.errors.image}
-                </span>
-              )}
-            </Form.Item>
-          <div className="w-3/4 mb-3">
-            <div className="flex justify-between ">
-              <Form.Item label="Name" name="name" className="w-72">
-                <Input
-                  label="name"
-                  name="name"
-                  placeholder="Enter Name"
-                  value={formik.values.name}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.name && formik.errors.name && (
-                  <span className="text-error text-xs">
-                    {formik.errors.name}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Category" className="w-72">
-                <Select
-                  id="category"
-                  placeholder="Select Category"
-                  showSearch
-                  allowClear
-                  name="category.name"
-                  value={formik.values.category.name}
-                  onChange={(value) => {
-                    formik.setFieldValue("category.name", value);
-                    formik.setFieldValue("subCategory.name", null);
-                  }}
-                >
-                  {categorys.map((e, index) => (
-                    <Option value={e.name} key={index}>
-                      {e.name}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "category.name") &&
-                  getIn(formik.errors, "category.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "category.name")}
-                    </span>
-                  )}
-              </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4">
-              <Form.Item
-                label="Sub Category"
-                name="subCategory"
-                className="w-72"
-              >
-                <Select
-                  id="subCategory"
-                  showSearch
-                  placeholder="Select Sub Category"
-                  allowClear
-                  name="subCategory.name"
-                  value={formik.values.subCategory.name}
-                  onChange={(value) => {
-                    formik.setFieldValue("subCategory.name", value);
-                  }}
-                >
-                  {categorys.map((category) =>
-                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {e.name}
-                      </Option>
-                    )) : null
-                  )}
-                </Select>
-                {getIn(formik.touched, "subCategory.name") &&
-                  getIn(formik.errors, "subCategory.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "subCategory.name")}
-                    </span>
-                  )}
-              </Form.Item>
-              <Form.Item
-                label="Manufacturer"
-                name="manufacturer"
-                className="w-72"
-              >
-                <Input
-                  label="manufacturer"
-                  placeholder="Enter Manufacturer"
-                  name="manufacturer"
-                  value={formik.values.manufacturer}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.manufacturer && formik.errors.manufacturer && (
-                  <span className="text-error text-xs">
-                    {formik.errors.manufacturer}
-                  </span>
-                )}
-              </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4 ">
-              <Form.Item
-                label="Unit of Measurement "
-                name="unitofmeasurement "
-                className="w-72"
-              >
-                <Select
-                  id="unitofmeasurement"
-                  placeholder="Select Unit of Measurement "
-                  allowClear
-                  name="unitofmeasurement.name"
-                  value={formik.values.unitofmeasurement.name}
-                  onChange={(value) => {
-                    let selectedUOM = unitOfMeasures.find(u => u.value === value);
-                    formik.setFieldValue("unitofmeasurement.name", selectedUOM.name);
-                    formik.setFieldValue("unitofmeasurement.value", value);
-                  }}
-                >
-                  {unitOfMeasures.map((e, index) => (
-                    <Option value={e.value} key={index}>
-                      {e.name}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "unitofmeasurement.name") &&
-                  getIn(formik.errors, "unitofmeasurement.name") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "unitofmeasurement.name")}
-                    </span>
-                  )}
-              </Form.Item>
-              <Form.Item
-                label="Least Sellable Unit"
-                name="leastSellableUnit"
-                className="w-72"
-              >
-                <Input
-                  label="leastSellableUnit"
-                  name="leastSellableUnit"
-                  value={formik.values.leastSellableUnit}
-                  onChange={formik.handleChange}
-                  placeholder="Enter Least Sellable Unit"
-                />
-                {formik.touched.leastSellableUnit &&
-                  formik.errors.leastSellableUnit && (
-                    <span className="text-error text-xs">
-                      {formik.errors.leastSellableUnit}
-                    </span>
-                  )}
-              </Form.Item>
-            </div>
-            <Form.Item label="Description" name="description" className="mt-4">
-              <TextArea
-                label="description"
-                placeholder="Enter Description"
-                name="description"
-                value={formik.values.description}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.description && formik.errors.description && (
-                <span className="text-error text-xs">
-                  {formik.errors.description}
-                </span>
-              )}
-            </Form.Item>
-            <div className="flex justify-between mt-4 items-center">
-            <Form.Item label="Active" name="active">
-              <Radio.Group
-                value={formik.values.active}
-                onChange={formik.handleChange}
-                name="active"
-              >
-                <Radio value={true}>Yes</Radio>
-                <Radio value={false}>No</Radio>
-              </Radio.Group>
-
-              {formik.touched.active && formik.errors.active && (
-                <span className="text-error text-xs">
-                  {formik.errors.active}
-                </span>
-              )}
-            </Form.Item>
-              <Form.Item
-                label="Unique Product Code"
-                name="userUniqueProductCode"
-                className="w-72"
-              >
-                <Input
-                  label="userUniqueProductCode"
-                  placeholder="Enter Unique Product Code"
-                  name="userUniqueProductCode"
-                  value={formik.values.userUniqueProductCode}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.userUniqueProductCode && formik.errors.userUniqueProductCode && (
-                  <span className="text-error text-xs">
-                    {formik.errors.userUniqueProductCode}
-                  </span>
-                )}
-              </Form.Item>
-            </div>
-           
-          </div>
-        </div>
-      </Form> */}
     </Modal>
   );
 };
