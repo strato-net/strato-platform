@@ -7,6 +7,7 @@ import "/dapp/eventType/contracts/EventType.sol";
 import "/dapp/eventType/contracts/EventTypeManager.sol";
 import "/dapp/service/contracts/Service.sol";
 import "/dapp/service/contracts/ServiceManager.sol";
+import "/dapp/productFile/contracts/ProductFileManager.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
 import "/dapp/orders/contracts/OrderLineItem.sol";
 import "/dapp/items/contracts/Event.sol";
@@ -36,6 +37,7 @@ contract Dapp {
     ProductManager public productManager;
     EventTypeManager_10 eventTypeManager;
     ServiceManager_10 serviceManager;
+    ProductFileManager productFileManager;
     PaymentManager paymentManager;
     OrderManager orderManager;
     
@@ -57,6 +59,7 @@ contract Dapp {
         productManager = new ProductManager();
         eventTypeManager = new EventTypeManager_10();
         serviceManager = new ServiceManager_10();
+        productFileManager = new ProductFileManager();
         paymentManager = new PaymentManager();
     }
 

@@ -15,6 +15,8 @@ import eventTypeJs from "/dapp/eventType/eventType";
 import eventTypeManagerJs from "/dapp/eventType/eventTypeManager";
 import serviceJs from "dapp/service/service";
 import serviceManagerJS from "/dapp/service/serviceManager";
+import productFileJs from "/dapp/productFile/productFile";
+import productFileManagerJs from "/dapp/productFile/productFileManager";
 import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
@@ -32,6 +34,8 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
   serviceJs.contractName,
   serviceManagerJS.contractName,
+  productFileJs.contractName,
+  productFileManagerJs.contractName,
   membershipJs.contractName,
   membershipServiceJs.contractName,
 ];
@@ -124,12 +128,13 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const serviceManager = await serviceManagerJS.bindAddress(admin, state.serviceManager, options)
+  const productFileManager = await productFileManagerJs.bindAddress(admin, state.productFileManager, options)
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, serviceManager, productFileManager, itemManager, paymentManager, orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
@@ -1443,7 +1448,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       const createdDate = Math.floor(Date.now() / 1000);
       return managers.serviceManager.createService({ ...args, createdDate, });
     } catch (error) {
-      console.log("error: ", error);
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
@@ -1472,6 +1476,42 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     // const chainOptions = { chainIds: [chainId], ...options };
 
     return serviceJs.update(rawAdmin, contract, updates, options);
+  }
+  
+  //----------------------------- ProductFile (Start ->) -------------------------------
+  contract.createProductFile = async function (args, options = defaultOptions) {
+    try {
+      const createdDate = Math.floor(Date.now() / 1000);
+      return managers.productFileManager.createProductFile({ ...args, createdDate, });
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while createProductFile");
+    }
+  };
+  
+  contract.getProductFile = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return managers.productFileManager.get({ ...args, ownerOrganization: userOrganization }, getOptions);
+  };
+
+  contract.getProductFiles = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return managers.productFileManager.getAll({ ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+  };
+  
+  contract.updateProductFile = async function (args, options = defaultOptions) {
+    const { address, updates } = args;
+    
+    const contract = {
+      name: productFileJs.contractName,
+      address: address,
+    };
+
+    // const chainOptions = { chainIds: [chainId], ...options };
+
+    return productFileJs.update(rawAdmin, contract, updates, options);
   }
   
   return contract;

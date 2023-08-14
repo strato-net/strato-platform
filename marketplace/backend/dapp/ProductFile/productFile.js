@@ -11,7 +11,7 @@ import {
 import dayjs from "dayjs";
 
 const contractName = "ProductFile";
-const contractFilename = `${util.cwd}/dapp/ProductFile/contracts/ProductFile.sol`;
+const contractFilename = `${util.cwd}/dapp/productFile/contracts/ProductFile.sol`;
 
 /**
  * Upload a new ProductFile
