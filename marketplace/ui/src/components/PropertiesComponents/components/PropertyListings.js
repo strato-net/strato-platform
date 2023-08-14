@@ -51,7 +51,10 @@ function PropertyListings() {
   const applyFilter = () => {
     // actions.fetchProperties(dispatch, limit,currentPage,options)
     let data = [...selectedFilter];
-    setAppliedFilter(data)
+    let filteredData = data.map((item, index) => {
+      return { name: item.name, value: (item.value === ("select" || item.value.length === 0) ? "" : item.value) }
+    })
+    setAppliedFilter(filteredData)
   }
 
   const clearFilter = () => {
@@ -152,6 +155,7 @@ function PropertyListings() {
 
           {appliedFilter.map((item, index) => {
             const { name, value } = item;
+            if (name === "amenities" && value.length === 0) return false;
             return (value && <Tag style={{ margin: "5px" }} key={index}
               closable onClose={() => { handleTagClose(name) }}
             >

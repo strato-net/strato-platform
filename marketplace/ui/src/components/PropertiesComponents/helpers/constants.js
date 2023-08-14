@@ -221,20 +221,20 @@ export const propertyCheckBox = {
 };
 
 export const propertyConstants = {
-  LIMIT_PER_PAGE:10,
-  MAX_PRICE_VALUE:200000
+  LIMIT_PER_PAGE: 10,
+  MAX_PRICE_VALUE: 200000
 }
 
 export const filterSchema = {
-  sortBy: "",
+  sortBy: "select",
   minPriceValue: 0,
   maxPriceValue: propertyConstants.MAX_PRICE_VALUE,
   zipcodeValue: 0,
-  stateValue: "",
+  stateValue: "select",
   minBedrooms: 0,
   minBathrooms: 0,
   amenities: [],
   minSqFt: 0,
-  parkingType: "",
-  propertyType: "",
+  parkingType: "select",
+  propertyType: "select",
 };
