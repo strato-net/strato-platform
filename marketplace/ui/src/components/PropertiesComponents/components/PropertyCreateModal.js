@@ -11,7 +11,14 @@ import {
   Collapse,
   Col,
   Row,
+  Button,
+  Typography,
 } from "antd";
+
+import {
+  ArrowLeftOutlined,
+} from "@ant-design/icons";
+
 import {
   categoriesObj,
   stateData,
@@ -28,6 +35,7 @@ import {
 const { LIMIT_PER_PAGE } = propertyConstants;
 const { Panel } = Collapse;
 const { Option } = Select;
+const { Text } = Typography;
 
 // const getBase64 = (file) =>
 //   new Promise((resolve, reject) => {
@@ -205,8 +213,15 @@ function PropertyCreateModal({
   // }
 
   const primaryAction = {
-    content: (
+    content: modalView ? (
       "Create a Property Listing"
+    ) : (
+      <>
+        <Button type="link" onClick={handleModalToggle}>
+          <ArrowLeftOutlined />
+        </Button>
+        <Text>Property Listing - House Facts</Text>
+      </>
     ),
     disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
@@ -704,9 +719,9 @@ function PropertyCreateModal({
         destroyOnClose={true}
         open={isCreateModalOpen}
         title={primaryAction.content}
-        onOk={primaryAction.onConfirm}
+        onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
-        okText={"Next"}
+        okText={modalView ? "Continue" : "Next"}
         okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
