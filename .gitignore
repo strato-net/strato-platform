@@ -15,8 +15,7 @@ docker-compose.identity.push.yml
 docker-compose.identity.push.ecr.yml
 docker-compose.identity.yml
 docker-compose.identity.ecr.yml
-eks-deployment.yaml
-eks-strato-deployment.yaml
+strato-platform-manifest.yaml
 eks-vault-deployment.yaml
 eks-identity-deployment.yaml
 stack.yaml.lock
