@@ -138,7 +138,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     //We are not guaranteed the user will have a certificate
     //99% chance they do, but if this this their first login
     //the node might not have a certificate in time
-    if (!(userCertificate === null || userCertificate === undefined)) {
+    if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
       userCert    = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
