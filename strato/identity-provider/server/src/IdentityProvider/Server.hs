@@ -34,6 +34,7 @@ import           Network.HTTP.Types.Status
 import           Data.Aeson
 import qualified Data.ByteString.Lazy                    as BL
 import qualified Data.Map as M
+import           Data.Text                               (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding                      (encodeUtf8, decodeUtf8)
 import           GHC.Generics
@@ -55,7 +56,7 @@ import           Control.Monad.Trans.Except
 import           BlockApps.Logging
 
 data IdentityError
-  = IdentityError T.Text
+  = IdentityError Text
   deriving (Show, Exception)
 
 getAccessTokenForRealm :: ( MonadIO m
@@ -70,21 +71,68 @@ getAccessTokenForRealm realm = do
             throwIO $ IdentityError "Identity server does not support this realm"
         Just (RealmDetails endpoints cid csec _) -> getAccessToken cid csec (token_endpoint endpoints)
 
-oAuthUserToSubject :: OAuthUser -> PublicKey -> Subject
-oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
-    let firstN = T.unpack firstN'
-        lastN = T.unpack lastN'
-    in Subject {
-    subCommonName =  firstN <> " " <> lastN,
-    subOrg = case attr of
-        Just (OAuthUserAttributes (Just (org:_))) | not (T.null org) -> T.unpack org
-        _ -> head firstN : lastN ++ T.unpack (T.take 8 id')
-    ,
-    subUnit = Nothing,
-    subCountry = Nothing,
-    subPub = pk
-}
+-- oAuthUserToSubject :: OAuthUser -> PublicKey -> Subject
+-- oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
+--     let firstN = T.unpack firstN'
+--         lastN = T.unpack lastN'
+--     in Subject {
+--     subCommonName =  firstN <> " " <> lastN,
+--     subOrg = case attr of
+--         Just (OAuthUserAttributes (Just (org:_))) | not (T.null org) -> T.unpack org
+--         _ -> head firstN : lastN ++ T.unpack (T.take 8 id')
+--     ,
+--     subUnit = Nothing,
+--     subCountry = Nothing,
+--     subPub = pk
+-- }
 
+getDefaultEmptyOrg :: String -> String -> String
+getDefaultEmptyOrg name uuid = case words name of 
+    firstN : lastN : _ -> head firstN : lastN ++ take 8 uuid
+    firstN : _ -> head firstN: take 8 uuid 
+    _ -> error "name param is empty"
+
+getSubject :: ( MonadIO m
+              , MonadLogger m ) 
+               => Text 
+               -> Maybe Text 
+               -> Text 
+               -> String
+               -> PublicKey
+               -> m Subject
+getSubject name mCo uuid _ pk
+    | not $ T.null name = do
+        let name' = T.unpack name
+        return Subject {
+            subCommonName = name',
+            subOrg = case mCo of 
+                Just co | not $ T.null co -> T.unpack co
+                _ -> getDefaultEmptyOrg (T.unpack name) (T.unpack uuid),
+            subUnit = Nothing,
+            subCountry = Nothing,
+            subPub = pk
+        }
+    | otherwise = do
+        $logErrorS "getSubject" "Improper query params! Param 'name' is not defined or is empty. Cannot create a cert with so little info"
+        throwIO $ IdentityError "Param 'name' cannot be empty"
+        -- NOTE TO FUTURE DEVELOPERS: This commented-out code block is from a previous flow where we would call 
+        -- the GET /users endpoint on keycloak to get the user's information. We are trying to be less keycloak
+        -- dependent, so this flow is not being used, but I'll just leave it in here just in case we ever need it
+
+
+        -- getAccessTokenForRealm "master" >>= \case 
+        --     Nothing -> do 
+        --         $logErrorS "createAndRegisterCert" "uh oh! We couldn't get an access token for the master realm"
+        --         throwIO $ IdentityError "Something is wrong with the provided access credentials for the master realm. Have a network administrator look into this."
+        --     Just masterToken -> do 
+        --         getUserByUUID masterToken (T.unpack uuid) realm >>= \case
+        --             Left err -> do
+        --                 $logErrorS "createAndRegisterCert" $ "Error occurred while querying OAuth server for information on user with uuid " <> uuid <> ": " <> T.pack err
+        --                 throwIO $ IdentityError "Could not retrieve user's information from OAuth server"
+        --             Right user -> do
+        --                 $logInfoS "createAndRegisterCert" $ "The user's info from the OAuth server is " <> T.pack (show user)
+        --                 return $ oAuthUserToSubject user pk
+ 
 data IdentityServerData = IdentityServerData
     { issuer             :: Issuer          -- issuer of signing cert
     , issuerCert         :: X509Certificate -- the signing cert
@@ -115,25 +163,30 @@ putIdentity :: ( MonadIO m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
                , Accessible RealmData m ) 
-               => T.Text 
-               -> T.Text 
-               -> T.Text 
-               -> Maybe T.Text
-               -> Maybe T.Text
+               => Text 
+               -> Text 
+               -> Text 
+               -> Maybe Text
+               -> Maybe Text
                -> m Address
-putIdentity accessToken uuid idProv _ _ = do
-    $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity"
-    -- check if a user exists in vault
-    let realm = extractRealmName $ T.unpack idProv
-    getVaultKey accessToken >>= \case
-        Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
-            hasCert <- certInCirrus accessToken realm a
-            unless hasCert $ createAndRegisterCert uuid realm k
-            return a
-        Nothing -> do -- no vault key, so make key and register cert
-            AddressAndKey a k <- postVaultKey accessToken
-            createAndRegisterCert uuid realm k
-            return a
+putIdentity accessToken uuid idProv mName mCo = do
+    $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> T.pack (show mName) <> " and company " <> T.pack (show mCo)
+    case mName of
+        Nothing -> do
+            $logErrorS "putIdentity" "No name was provided or deduced from JWT. Cannot operate with such little info"
+            throwIO $ IdentityError "Name param was not provided and could not be deduced"
+        Just name -> do
+            -- check if a user exists in vault
+            let realm = extractRealmName $ T.unpack idProv
+            getVaultKey accessToken >>= \case
+                Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
+                    hasCert <- certInCirrus accessToken realm a (T.unpack name)
+                    unless hasCert $ createAndRegisterCert name mCo uuid realm k
+                    return a
+                Nothing -> do -- no vault key, so make key and register cert
+                    AddressAndKey a k <- postVaultKey accessToken
+                    createAndRegisterCert name mCo uuid realm k
+                    return a
 
 -- This is just a dummy function
 -- This never gets called on the sevrvant backend
@@ -148,7 +201,7 @@ putIdentityExternal ::  ( MonadIO m
                         , Accessible X509Certificate m
                         , Accessible PrivateKey m
                         , Accessible RealmData m
-                        ) => T.Text -> m Address
+                        ) => Text -> m Address
 putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" "" Nothing Nothing
 
 
@@ -163,15 +216,15 @@ data CertificateInCirrus = CertificateInCirrus{
 instance FromJSON CertificateInCirrus
 instance ToJSON CertificateInCirrus
 
-certInCirrus :: (MonadIO m, MonadLogger m, Accessible RealmData m) => T.Text -> String -> Address -> m Bool
-certInCirrus token realm a = do
+certInCirrus :: (MonadIO m, MonadLogger m, Accessible RealmData m) => Text -> String -> Address -> String -> m Bool
+certInCirrus token realm a commonName = do
     rd <- access (Proxy @RealmData)
     case M.lookup realm rd of
         Nothing -> do 
             $logErrorS "certInCirrus" "Trying to find a cert on a network whose realm we don't support (How?? We should never reach this error)"
             throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown sooner"
         Just (RealmDetails _ _ _ nurl) -> do 
-            let cirrusEndpoint = "/cirrus/search/Certificate?userAddress=eq." <> show a
+            let cirrusEndpoint = "/cirrus/search/Certificate?or=(userAddress.eq." <> show a <> ",commonName.eq." <> commonName <> ")"
                 url = showBaseUrl nurl{baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
             mgr <- liftIO $ case baseUrlScheme nurl of
                 Http -> newManager defaultManagerSettings
@@ -194,42 +247,37 @@ createAndRegisterCert :: ( MonadIO m
                          , Accessible Issuer m
                          , Accessible X509Certificate m
                          , Accessible PrivateKey m
-                         , Accessible RealmData m
-                         ) => T.Text -> String -> PublicKey -> m ()
-createAndRegisterCert uuid realm k = do
-    getAccessTokenForRealm "master" >>= \case
+                         , Accessible RealmData m ) 
+                         => Text 
+                         -> Maybe Text 
+                         -> Text
+                         -> String 
+                         -> PublicKey 
+                         -> m ()
+createAndRegisterCert name mCo uuid realm k = do
+    sub <- getSubject name mCo uuid realm k
+    createNewCert sub >>= \case
+        Just newCert -> do
+            getAccessTokenForRealm realm >>= \case
+                Nothing -> do
+                    $logErrorS "createAndRegisterCert" "uh oh! We couldn't an access token for our realm"
+                    throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
+                Just realmToken -> registerCert newCert realmToken realm
         Nothing -> do
-            $logErrorS "createAndRegisterCert" "uh oh! We couldn't get an access token for the master realm"
-            throwIO $ IdentityError "Something is wrong with the provided access credentials for the master realm. Have a network administrator look into this."
-        Just masterToken -> do
-            getUserByUUID masterToken (T.unpack uuid) realm >>= \case
-                Left err -> do
-                    $logErrorS "createAndRegisterCert" $ "Error occurred while querying OAuth server for information on user with uuid " <> uuid <> ": " <> T.pack err
-                    throwIO $ IdentityError "Could not retrieve user's information from OAuth server"
-                Right user -> do
-                    $logInfoS "createAndRegisterCert" $ "The user's info from the OAuth server is " <> T.pack (show user)
-                    createNewCert user k >>= \case
-                        Just newCert -> do
-                            getAccessTokenForRealm realm >>= \case
-                                Nothing -> do
-                                    $logErrorS "createAndRegisterCert" "uh oh! We couldn't an access token for our realm"
-                                    throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
-                                Just realmToken -> registerCert newCert realmToken realm
-                        Nothing -> do
-                            $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
-                            throwIO $ IdentityError "Unable to sign new cert for user"
+            $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
+            throwIO $ IdentityError "Unable to sign new cert for user"
 
 createNewCert :: ( MonadIO m
                  , Accessible Issuer m
                  , Accessible X509Certificate m
                  , Accessible PrivateKey m
-                 ) => OAuthUser -> PublicKey -> m (Maybe X509Certificate)
-createNewCert user k = do
+                 ) => Subject -> m (Maybe X509Certificate)
+createNewCert sub = do
     i <- access (Proxy @Issuer)
     c <- access (Proxy @X509Certificate)
     iK <- access (Proxy @PrivateKey)
     let signWIssuerPrivKey bs = return $ signMsg iK bs
-    makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
+    makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i sub
 
 registerCert :: (MonadIO m, MonadLogger m, Accessible RealmData m) 
              => X509Certificate 
@@ -261,7 +309,7 @@ registerCert cert token realm = do
             $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse
             --TODO: how to tell if cert successfully added to blockchain?
 
-getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
+getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do
     VaultData url mgr <- access Proxy
     eAddressNKey <- liftIO $ runClientM (getKey (Just accessToken) Nothing) (mkClientEnv mgr url)
@@ -275,7 +323,7 @@ getVaultKey accessToken = do
             $logInfoS "getVaultKey" $ T.pack $ "Vault error when trying to get user's key: " <> show err
             throwIO $ IdentityError $ T.pack $ "Vault error when trying to get user's key: " <> show err
 
-postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m AddressAndKey
+postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m AddressAndKey
 postVaultKey accessToken = do
     VaultData url mgr <- access Proxy
     eAddressNKey <- liftIO $ runClientM (postKey (Just accessToken)) (mkClientEnv mgr url)

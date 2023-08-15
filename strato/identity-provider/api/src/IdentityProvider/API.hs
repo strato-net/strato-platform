@@ -10,22 +10,22 @@ module IdentityProvider.API (
     PutIdentityExternal
     ) where
 
-import qualified  Data.Text as T
+import            Data.Text (Text)
 import            Servant.API
 import            Blockchain.Strato.Model.Address
 
 type GetPingIdentity = "ping" :> Get '[JSON] Int
 
 type PutIdentity = "identity" 
-                :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" T.Text -- pass along for vault calls
-                :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" T.Text -- need for keycloak query
-                :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" T.Text
-                :> Header' '[Optional] "X-USER-NAME" T.Text 
-                :> Header' '[Optional] "X-USER-COMPANY" T.Text 
+                :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text -- pass along for vault calls
+                :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text -- need for keycloak query
+                :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
+                :> QueryParam "name" Text 
+                :> QueryParam "company" Text 
                 :> Put '[JSON] Address --should return user address
 
 type PutIdentityExternal = "identity" -- only to be used for external api client bindings
-                :> Header' '[Required, Strict]  "Authorization" T.Text
+                :> Header' '[Required, Strict]  "Authorization" Text
                 :> Put '[JSON] Address 
 
 

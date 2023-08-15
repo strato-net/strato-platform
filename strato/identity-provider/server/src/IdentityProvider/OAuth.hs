@@ -12,7 +12,6 @@ import           Data.List                           (isSuffixOf)
 import           Data.List.Split                     (splitOn)
 import           Data.Map                            (Map, fromList)
 import           Data.Text                           (Text)
-import           Data.Text.Encoding                  (encodeUtf8)
 import           GHC.Generics
 
 import           Control.Monad.IO.Class
@@ -92,24 +91,24 @@ getAccessToken id' sec tokenEndpoint = do
 
 
 
-data OAuthUser =
-    OAuthUser {
-        id          :: Text,
-        firstName   :: Text,
-        lastName    :: Text,
-        attributes  :: Maybe OAuthUserAttributes
-    } deriving (Show, Generic, FromJSON, ToJSON)
+-- data OAuthUser =
+--     OAuthUser {
+--         id          :: Text,
+--         firstName   ::  Text, --maybe
+--         lastName    ::  Text, --maybe
+--         attributes  :: Maybe OAuthUserAttributes
+--     } deriving (Show, Generic, FromJSON, ToJSON)
 
-newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [Text]}
-    deriving (Show, Generic, FromJSON, ToJSON)
+-- newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [Text]}
+--     deriving (Show, Generic, FromJSON, ToJSON)
 
-getUserByUUID :: ( MonadIO m
-                 ) => AccessToken -> String -> String -> m (Either String OAuthUser)
-getUserByUUID token uuid realm = do
-    manager <- liftIO $ newManager tlsManagerSettings
-    let url = "https://keycloak.blockapps.net/auth/admin/realms/" <> realm <> "/users/" <> uuid
-    templateRequest <- liftIO $ parseRequest url
-    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> access_token token)]
-        request = templateRequest{requestHeaders=rHead}
-    response <- liftIO $ httpLbs request manager
-    return $ eitherDecode $ responseBody response
+-- getUserByUUID :: ( MonadIO m
+--                  ) => AccessToken -> String -> String -> m (Either String OAuthUser)
+-- getUserByUUID token uuid realm = do
+--     manager <- liftIO $ newManager tlsManagerSettings
+--     let url = "https://keycloak.blockapps.net/auth/admin/realms/" <> realm <> "/users/" <> uuid
+--     templateRequest <- liftIO $ parseRequest url
+--     let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> access_token token)]
+--         request = templateRequest{requestHeaders=rHead}
+--     response <- liftIO $ httpLbs request manager
+--     return $ eitherDecode $ responseBody response

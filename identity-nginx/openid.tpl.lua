@@ -94,8 +94,6 @@ local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_
 local id_provider = ''
 local unique_name = ''
 local user_access_token = ''
-local user_name = ''
-local user_company = ''
 local verify_res = ''
 local verify_err = ''
 
@@ -139,12 +137,8 @@ if ngx.req.get_headers()["Authorization"] then
     unique_name = verify_res['sub']
   end
 
-  if verify_res['name'] ~= nil then
-    user_name = verify_res['name']
-  end
-
-  if verify_res['company'] ~= nil then
-    user_company = verify_res['company']
+  if verify_res['name'] ~= nil and verify_res['company'] ~= nil then
+    ngx.req.set_uri_args({name=verify_res['name'], company=verify_res['company']})
   end
 
 else
@@ -165,12 +159,5 @@ if unique_name ~= '' then
   ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 end
 
-if user_name ~= '' then
-  ngx.req.set_header("X-USER-NAME", user_name)
-end
-
-if user_company ~= '' then
-  ngx.req.set_header("X-USER-COMPANY", user_company)
-end
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")

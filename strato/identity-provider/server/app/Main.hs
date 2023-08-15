@@ -14,7 +14,7 @@ import           Data.Yaml
 
 import           Network.Wai.Handler.Warp (run)
 import           IdentityProvider.Server
-import           IdentityProvider.OAuth   hiding (id)
+import           IdentityProvider.OAuth
 
 import           HFlags
 import           Options
