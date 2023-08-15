@@ -51,17 +51,15 @@ async function uploadContract(user, _constructorArgs, options) {
  */
 function marshalIn(_args) {
     const defaultArgs = {
-        name: '',
-        description: '',
-        manufacturer: '',
-        unitOfMeasurement: '',
-        uniqueProductCode: '',
-        leastSellableUnit: 0,
-        imageKey: '',
-        isActive: false,
-        category: '',
-        subCategory: '',
-        createdDate: 0
+        productId: '',
+        fileKey: '',
+        fileHash: '',
+        fileName: '',
+        fileLocation: '',
+        uploadDate: 0,
+        documentType: '',
+        uploadedByUser: '',
+        delDate: 0,
     };
 
     const args = {

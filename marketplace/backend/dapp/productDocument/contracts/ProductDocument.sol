@@ -1,64 +1,47 @@
- 
+import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
 /// @title A representation of Product assets
 contract ProductDocument {
-
-    address public owner;
-    string public ownerOrganization;
-    string public ownerOrganizationalUnit;
-    string public ownerCommonName;
-
-    string public name;
-    string public description;
-    string public manufacturer;
-    UnitOfMeasurement public unitOfMeasurement;
-    string public userUniqueProductCode;
-    uint public uniqueProductCode;
-    int public leastSellableUnit;
-    string public imageKey;
-    bool public isActive;
-    string public category;
-    string public subCategory;
-    uint public createdDate;
-    bool public isDeleted; 
-    bool public isInventoryAvailable;  
+    address public productId;
+    string public fileKey;
+    string public fileHash;
+    string public fileName;
+    string public fileLocation;
+    int public uploadDate;
+    string public documentType;
+    string public uploadedByUser;
+    uint public delDate;
+    string public events;
 
 
     constructor(
-            string _name
-        ,   string _description
-        ,   string _manufacturer
-        ,   UnitOfMeasurement _unitOfMeasurement
-        ,   string _userUniqueProductCode
-        ,   uint _uniqueProductCode
-        ,   int _leastSellableUnit
-        ,   string _imageKey
-        ,   bool _isActive
-        ,   string _category
-        ,   string _subCategory
-        ,   uint _createdDate
-        ,   address _owner
+        address _productId,
+        string _fileKey,
+        string _fileHash,
+        string _fileName,
+        string _fileLocation,
+        int _uploadDate,
+        string _documentType,
+        string _uploadedByUser,
+        int _delDate
+
     ) public {
-        owner = _owner;
+        productId = _productId;
+        fileKey = _fileKey;
+        fileHash = _fileHash;
+        fileName = _fileName;
+        fileLocation = _fileLocation;
+        uploadDate = _uploadDate;
+        documentType = _documentType;
+        uploadedByUser = _uploadedByUser;
+        delDate = _delDate;
+    }
 
-        name = _name;
-        description = _description;
-        manufacturer = _manufacturer;
-        unitOfMeasurement = _unitOfMeasurement;
-        userUniqueProductCode = _userUniqueProductCode;
-        uniqueProductCode = _uniqueProductCode;
-        leastSellableUnit = _leastSellableUnit;
-        imageKey = _imageKey;
-        isActive = _isActive;
-        category = _category;
-        subCategory = _subCategory;
-        createdDate = _createdDate;
-        isDeleted = false;
-        isInventoryAvailable = false;
+        // Delete the product document
+    function deleteProductDocument() public returns(uint256, string){
 
-        mapping(string => string) ownerCert = getUserCert(owner);
-        ownerOrganization = ownerCert["organization"];
-        ownerOrganizationalUnit = ownerCert["organizationalUnit"];
-        ownerCommonName = ownerCert["commonName"];
+        delDate = block.timestamp;
+        return (RestStatus.OK, "ProductDocunent is deleted successfully.");
+      }
     }
 }

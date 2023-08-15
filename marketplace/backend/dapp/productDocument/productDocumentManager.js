@@ -94,11 +94,11 @@ function bind(user, _contract, options) {
     ...options,
   };
   contract.getState = async () => getState(user, contract, options);
-  contract.getProduct = async (args, _options = defaultOptions) =>
+  contract.getProducDocument = async (args, _options = defaultOptions) =>
     getProduct(user, args, _options);
-  contract.createProduct = async (args) =>
+  contract.createProductDocument = async (args) =>
     createProduct(user, contract, args, options);
-  contract.deleteProduct = async (args) =>
+  contract.deleteProductDocument = async (args) =>
     deleteProduct(user, contract, args, options);
   return contract;
 }
@@ -107,14 +107,14 @@ function bind(user, _contract, options) {
  * get the productDocuments
  */
 async function getProduct(user, args, options) {
-  return productJs.get(user, args, options);
+  return productDocumentJs.get(user, args, options);
 }
 
 // * Add the productDocuments
-async function createProduct(admin, contract, _args, baseOptions) {
+async function createProductDocument(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
-    method: "addProduct",
+    method: "createProductDocument",
     args: util.usc({
       ..._args,
     }),
@@ -139,10 +139,10 @@ async function createProduct(admin, contract, _args, baseOptions) {
 /**
  * Delete productDocuments
  */
-async function deleteProduct(admin, contract, _args, baseOptions) {
+async function deleteProductDocument(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
-    method: "deleteProduct",
+    method: "deleteProductDocument",
     args: util.usc({
       ..._args,
     }),
@@ -176,6 +176,6 @@ export default {
   contractName,
   contractFilename,
   marshalOut,
-  createProduct,
-  deleteProduct,
+  createProductDocument,
+  deleteProductDocument,
 };

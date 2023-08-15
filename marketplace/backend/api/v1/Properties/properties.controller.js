@@ -2,7 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3, deleteFileFromS3 } from '../../../helpers/s3'
+import { uploadFileToS3, getFileStreamFromS3, getSignedUrlFromS3, deleteFileFromS3 } from "../../../helpers/s3";
 import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
@@ -54,8 +54,7 @@ class PropertiesController {
 
   static async create(req, res, next) {
     try {
-      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalcode } } = req
-
+      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalcode }, file, files } = req
 
       const propertyArgs = {
         ...body,
@@ -65,10 +64,35 @@ class PropertiesController {
         longitude: "",
       }
 
+      console.log('propertyArgs', propertyArgs)
+
       PropertiesController.validateCreatePropertyArgs(propertyArgs)
 
       const propertyResult = await dapp.createProperty(propertyArgs)
       if (propertyResult) {
+
+  /* -------upload the documents and images if necessary-------- */
+        if (file || files) {
+          files.forEach(async (file) => {
+
+          
+            const productDocumentArgs = {
+              productId: propertyResult.productContractAddress,
+              fileKey: "",
+              fileHash: "",
+              fileName: "",
+              fileLocation: "",
+              documentType: "",
+              uploadedByUser: "",
+              delDate: 0,
+            }
+
+            PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
+
+            await dapp.createProductDocument(productDocumentArgs)
+          })
+        }
+
         const inventoryBody = {
           productAddress: propertyResult.productContractAddress,
           quantity: 1,
@@ -98,9 +122,23 @@ class PropertiesController {
 
 
       // Need to update the product contract if the update is regarding the title, subcategory, or description
-      
+
 
       const result = await dapp.updateProperty(body, options)
+
+      rest.response.status200(res, result)
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async deleteProductDocument(req, res, next) {
+    try {
+      const { dapp, params } = req
+      const { address } = params
+      // Change this to the product address, right now it is the property address
+      const result = await dapp.deleteProductDocument({ address }, options)
 
       rest.response.status200(res, result)
       return next()
@@ -223,7 +261,7 @@ class PropertiesController {
 
   static validateUpdatePropertyArgs(args) {
     const updatePropertySchema = Joi.object({
-      propertyAddress: Joi.string().required()
+      propertyAddress: Joi.string().required(),
       updates: Joi.object({
         listPrice: Joi.number().required(),
         streetNumber: Joi.number().required(),
@@ -242,7 +280,7 @@ class PropertiesController {
         latitude: Joi.string().allow("").required(),
         longitude: Joi.string().allow("").required(),
         numberOfUnitsTotal: Joi.number().required(),
-  
+
         // Appliances
         dishwasher: Joi.boolean().required(),
         dryer: Joi.boolean().required(),
@@ -253,7 +291,7 @@ class PropertiesController {
         refrigerator: Joi.boolean().required(),
         washer: Joi.boolean().required(),
         waterHeater: Joi.boolean().required(),
-  
+
         // Cooling
         centralAir: Joi.boolean().required(),
         evaporative: Joi.boolean().required(),
@@ -261,7 +299,7 @@ class PropertiesController {
         refrigeration: Joi.boolean().required(),
         solar: Joi.boolean().required(),
         wallUnit: Joi.boolean().required(),
-  
+
         // Heating
         baseboard: Joi.boolean().required(),
         forceAir: Joi.boolean().required(),
@@ -271,7 +309,7 @@ class PropertiesController {
         radiant: Joi.boolean().required(),
         solarHeat: Joi.boolean().required(),
         steam: Joi.boolean().required(),
-  
+
         // Flooring
         carpet: Joi.boolean().required(),
         concrete: Joi.boolean().required(),
@@ -281,13 +319,13 @@ class PropertiesController {
         slate: Joi.boolean().required(),
         softwood: Joi.boolean().required(),
         tile: Joi.boolean().required(),
-  
+
         // Parking
         carport: Joi.boolean().required(),
         garage: Joi.boolean().required(),
         offStreet: Joi.boolean().required(),
         onStreet: Joi.boolean().required(),
-  
+
         // Interior Features
         attic: Joi.boolean().required(),
         cableReady: Joi.boolean().required(),
@@ -302,7 +340,7 @@ class PropertiesController {
         vaultedCeiling: Joi.boolean().required(),
         skylight: Joi.boolean().required(),
         wetBar: Joi.boolean().required(),
-  
+
         // Exterior Features
         barbecueArea: Joi.boolean().required(),
         deck: Joi.boolean().required(),
@@ -330,6 +368,30 @@ class PropertiesController {
       })
     }
   }
+
+  static validateCreateProductDocumentArgs(args) {
+    const createProductDocumentSchema = Joi.object({
+      productDocumentArgs: Joi.object({
+        productId: Joi.string().required(),
+        fileKey: Joi.string().required(),
+        fileHash: Joi.string().required(),
+        fileName: Joi.string().required(),
+        fileLocation: Joi.string().required(),
+        documentType: Joi.string().required(),
+        uploadedByUser: Joi.string().required(),
+        delDate: Joi.number().required(),
+      })
+    });
+
+    const validation = createProductDocumentSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create ProductDocument Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
 
 }
 

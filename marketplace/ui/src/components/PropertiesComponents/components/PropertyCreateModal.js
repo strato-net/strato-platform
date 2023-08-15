@@ -17,6 +17,7 @@ import {
 } from "antd";
 import {
   ArrowLeftOutlined,
+  PlusOutlined
 } from "@ant-design/icons";
 import {
   categoriesObj,
@@ -63,12 +64,11 @@ function PropertyCreateModal({
   const [selectedOptions, setSelectedOptions] = useState(propertyCheckBox);
 
   //TODO:- Can uncomment when use image upload ***
-  // const [selectedImage, setSelectedImage] = useState(null);
-  // const [previewOpen, setPreviewOpen] = useState(false);
-  // const [previewImage, setPreviewImage] = useState("");
-  // const [previewTitle, setPreviewTitle] = useState("");
-  // const [fileList, setFileList] = useState([]);
-
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [fileList, setFileList] = useState([]);
   const {
     title,
     description,
@@ -171,43 +171,41 @@ function PropertyCreateModal({
       ...selectedOptions,
     };
 
-    // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
-    let response = await actions.createProperty(dispatch, body);
-    if(response){
-      toggleCreateModal(false)
-      toggleCreateConfirmModal(false)
-      setModalView(!modalView);
-      actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+    const formData = new FormData()
+    for (const [key, value] of Object.entries(body)) {
+      formData.append(key, value)
     }
+    fileList.forEach((file) => {
+      formData.append(`upload_${file.name}`, file.originFileObj);
+    });
 
-    //TODO:- Can uncomment when use image upload ***
-    //   if (projectImages) {
-    //     const formData = new FormData()
-    //     formData.append('projectAddress', projectAddress)
-    //     formData.append('section', uploadSections.IMAGES)
-    //     projectImages.forEach((file) => {
-    //       formData.append('projectImageFiles', file.originFileObj);
-    //     });
-    //     await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
-    //   }
+
+    let response = await actions.createProperty(dispatch, formData);
+    // if (response) {
+    //   toggleCreateModal(false)
+    //   toggleCreateConfirmModal(false)
+    //   setModalView(!modalView);
+    //   actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+    // }
     //   Modal.destroyAll();
   };
 
   //TODO:- Can uncomment when use image upload ***
-  // const handleCancel = () => setPreviewOpen(false);
-  // const handlePreview = async (file) => {
-  //   if (!file.url && !file.preview) {
-  //     file.preview = await getBase64(file.originFileObj);
-  //   }
-  //   setPreviewImage(file.url || file.preview);
-  //   setPreviewOpen(true);
-  //   setPreviewTitle(
-  //     file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
-  //   );
-  // };
-  // const handleFileChange = ({ fileList: newFileList }) => {
-  //   setFileList(newFileList);
-  // }
+  const handleCancelImgPreview = () => setPreviewOpen(false);
+  const handlePreview = async (file) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj);
+    }
+    setPreviewImage(file.url || file.preview);
+    setPreviewOpen(true);
+    setPreviewTitle(
+      file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
+    );
+  };
+  const handleFileChange = ({ fileList: newFileList }) => {
+    setFileList(newFileList);
+    console.log("fileList", fileList)
+  }
 
   const primaryAction = {
     content: modalView ? (
@@ -527,44 +525,38 @@ function PropertyCreateModal({
               </Col>
             </Row>
 
-            {/* <Form.Item label="Upload Image" name="image">
-              <div className="w-48 h-36 p-4 border-secondryD border rounded flex flex-col justify-around">
-                {selectedImage ? (
-                  <div className="h-20">
-                    <img
-                      alt="Product"
-                      src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                    <br />
+            <Form.Item label="Upload Image" name="image">
+              <Upload
+                // action="https://www.mocky.io/v2/5cc8019d300000980a055e76"
+                listType="picture-card"
+                fileList={fileList}
+                onPreview={handlePreview}
+                onChange={handleFileChange}
+                accept="image/png, image/gif, image/jpeg"
+              >
+                {fileList.length >= 8 ? null :
+                  <div>
+                    <PlusOutlined />
+                    <div
+                      style={{
+                        marginTop: 8,
+                      }}
+                    >
+                      Upload
+                    </div>
                   </div>
-                ) : (
-                  <PictureOutlined className="text-7xl text-primary opacity-10" />
-                )}
-                <Upload
-                  onChange={(e) => {
-                    setSelectedImage(URL.createObjectURL(e.file.originFileObj));
+                }
+              </Upload>
+              <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancelImgPreview}>
+                <img
+                  alt="example"
+                  style={{
+                    width: '100%',
                   }}
-                  customRequest={() => { }}
-                  style={{ display: "none" }}
-                  accept="image/png, image/jpeg"
-                  maxCount={1}
-                  showUploadList={false}
-                  beforeUpload={beforeUpload}
-                >
-                  <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                    Browse
-                  </div>
-                </Upload>
-              </div>
-
-              <div className="flex items-start">
-                <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                <p className="mt-1 text-xs italic ml-1 mr-4">
-                  use jpg, png format of size less than 1mb
-                </p>
-              </div>
-            </Form.Item> */}
+                  src={previewImage}
+                />
+              </Modal>
+            </Form.Item>
           </Form>
         ) : (
           <div>

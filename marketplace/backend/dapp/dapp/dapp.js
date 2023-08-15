@@ -776,10 +776,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------------PRODUCTDOCUMENT MANAGER---------------------------- */
 
   // Create productDocuments
+  contract.createProductDocument = async function (args, options = defaultOptions) {
+    const uploadDate = Math.floor(Date.now() / 1000);
+    return managers.productDocumentManager.createProductDocument({ ...args, uploadDate: uploadDate });
+  }
 
   // Get productDocuments by the productId/productAddress - Can be images or pdfs
 
   // Delete productDocuments by the productId/productAddress
+  contract.deleteProductDocument = async function (args, options = defaultOptions) {
+    return managers.productDocumentManager.deleteProductDocument(args);
+  };
 
   /* ----------------------------PRODUCTDOCUMENT MANAGER ENDS-------------------------- */
 
