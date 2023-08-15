@@ -9,7 +9,7 @@ contract ProductDocument {
     string public fileLocation;
     int public uploadDate;
     string public documentType;
-    string public uploadedByUser;
+    address public uploadedByUser;
     uint public delDate;
     string public events;
 
@@ -22,7 +22,6 @@ contract ProductDocument {
         string _fileLocation,
         int _uploadDate,
         string _documentType,
-        string _uploadedByUser,
         int _delDate
 
     ) public {
@@ -33,8 +32,8 @@ contract ProductDocument {
         fileLocation = _fileLocation;
         uploadDate = _uploadDate;
         documentType = _documentType;
-        uploadedByUser = _uploadedByUser;
-        delDate = _delDate;
+        uploadedByUser = tx.origin;
+        delDate = 0;
     }
 
         // Delete the product document

@@ -605,18 +605,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ----------------------------------PROPERTIES DAPP---------------------------------- */
   contract.getProperty = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    console.log('getOptions', getOptions)
     //Get the property contract
     const property = await managers.productManager.getProperty({ ...args }, getOptions);
     //Get the product contract
-    console.log('dapp.getProperty - property', property)
-    console.log('dapp.getProperty - productId', property.productId)
-    const productData = await managers.productManager.getProduct({ 
+    const productData = await managers.productManager.getProduct({
       address: property.productId,
       uniqueProductID: property.productId,
-      ownerOrganization: userOrganization }, getOptions);
-      console.log('dapp.getProperty - productData', productData)
-    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
+      ownerOrganization: userOrganization
+    }, getOptions);
+    const propertyImages = await managers.productDocumentManager.getProductDocuments({ ...args, productId: property.productId }, getOptions);
+    const propertyData = {
+      ...property,
+      title: productData.name,
+      description: productData.description,
+      propertyType: productData.subCategory,
+      images: propertyImages
+    }
     return propertyData
   };
 
@@ -626,15 +630,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const propertiesWProducts = []
 
     for (const property of allPropertiesData) {
-      const productData = await managers.productManager.getProduct({ 
+      const productData = await managers.productManager.getProduct({
         ...args,
         offset: 0,
         address: property.productId,
         uniqueProductID: property.productId,
-        ownerOrganization: userOrganization }, 
+        ownerOrganization: userOrganization
+      },
         getOptions
       );
-      propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
+      //get document data
+      const propertyImages = await managers.productDocumentManager.getProductDocuments({ ...args, productId: property.productId }, getOptions);
+
+      propertiesWProducts.push({
+        ...property,
+        title: productData.name,
+        description: productData.description,
+        propertyType: productData.subCategory,
+        images: propertyImages
+      })
     }
     return propertiesWProducts
   };
@@ -780,8 +794,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const uploadDate = Math.floor(Date.now() / 1000);
     return managers.productDocumentManager.createProductDocument({ ...args, uploadDate: uploadDate });
   }
-
-  // Get productDocuments by the productId/productAddress - Can be images or pdfs
 
   // Delete productDocuments by the productId/productAddress
   contract.deleteProductDocument = async function (args, options = defaultOptions) {
