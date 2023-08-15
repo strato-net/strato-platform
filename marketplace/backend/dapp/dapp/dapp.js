@@ -1307,7 +1307,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   contract.getMembership = async function (args, options = optionsNoChainIds) {
     // May need to insert contractName in options when this goes throught the product manager
     // This param was hard coded for the get and getAll functions for Membership and MembershipService below
-    return membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+    
+    // Get all membershipServices
+    const membershipServicesAll = await membershipServiceJs.getAll(rawAdmin, { }, {...options, org: managers.cirrusOrg, app: ""})
+    
+    // Get all services
+    const servicesAll = await managers.serviceManager.getAll({ownerOrganization: userOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
+
+    // Get The membership
+    const membership = await membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+    
+    // Map membershipServices so that the membershipServices array only contains the address of the membership in its membershipId field
+    const membershipServices = membershipServicesAll.membershipServices.map((membershipService) => membershipService.membershipId === membership.productId ? membershipService : null).filter(Boolean);
+
+    // Map ServicesAll so that the services array only contains services that are in the membershipServices array
+    const services = servicesAll.map((service) => membershipServices.find((membershipService) => membershipService.serviceId === service.address) ? service : null).filter(Boolean);
+    console.log({membership, membershipServices, services});
+    return {membership, membershipServices, services}
   }
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
@@ -1357,9 +1373,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   contract.getMembershipServices = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = {...options, org: managers.cirrusOrg, app: ""}
-    return membershipServiceJs.getAll(rawAdmin, { 
+    const out = await membershipServiceJs.getAll(rawAdmin, { 
       ...args
     }, getOptions)
+    console.log("getMembershipServices getOptions: ", getOptions)
+    console.log("getMembershipServices: ", out)
+    return out
   }
 
   contract.transferOwnershipMembershipService = async function (args, options = defaultOptions) {
