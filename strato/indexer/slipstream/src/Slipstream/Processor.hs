@@ -350,6 +350,11 @@ processTheMessages env conn g messages = do
                     parentContracts = getContractsForParents parents' (cc^.contracts)
                     parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType) parentContracts
                     parentAbstractContractsName = map (labelToText ._contractName) parentAbstractContracts
+                
+                $logInfoS "DAVIDprocessTheMessages/parents'" $ T.pack $ show parents'
+                $logInfoS "DAVIDprocessTheMessages/parentContracts" $ T.pack $ show parentContracts
+                $logInfoS "DAVIDprocessTheMessages/parentAbstractContracts" $ T.pack $ show parentAbstractContracts
+                $logInfoS "DAVIDprocessTheMessages/parentAbstractContractsName" $ T.pack $ show parentAbstractContractsName
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
@@ -368,8 +373,9 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
 
-                forM_ parentAbstractContractsName $ \parent -> do 
-                  outputData conn $ insertContractInAbstractTableQuery g nameParts parent --Tables are created
+                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTable g c nameParts (head parentAbstractContractsName)
+
+                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ insertContractInAbstractTableQuery g nameParts (head parentAbstractContractsName) --Tables are created
 
                 -- map (\parent -> outputData conn $ insertContractInAbstractTableQuery g nameParts parent) parentAbstractContractsName
   
