@@ -1539,11 +1539,9 @@ async function listExtStorage(user, args, options:Options) {
 //   NEW!
 // =====================================================================
 
-async function uploadFileToS3(fileKey, fileBuffer, s3Options) {
+async function uploadFileToS3(data) {
   const uploadResult = await api.uploadFileToS3(
-    fileKey,
-    fileBuffer,
-    s3Options
+    data
   );
   return uploadResult;
 }

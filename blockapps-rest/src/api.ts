@@ -38,7 +38,8 @@ const {
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 import aws = require("aws-sdk");
-
+import { error } from "console";
+const axios = require('axios'); // Import Axios (Node.js environment)
 
 
 
@@ -518,23 +519,23 @@ async function debugPostFuzz(user:OAuthUser, args, options:Options) {
   return postRaw(url, endpoint, args, setAuthHeaders(user, options));
 }
 
-async function uploadFileToS3(fileKey, fileBuffer, s3Options) {
-  const s3 = new aws.S3(s3Options)
-  return new Promise((resolve, reject) => {
-    s3.upload(
-      {
-        Bucket: s3Options.bucket.Bucket,
-        Key: fileKey,
-        Body: fileBuffer,
-      },
-      (err, data) => {
-        if (err) {
-          return reject(err)
-        }
-        return resolve(data)
-      },
-    )
+async function uploadFileToS3( data) {
+
+  const endpoint = 'https://multinode203.ci.blockapps.net/api/v1/image'; // Replace with your specific endpoint URL
+
+  return axios.post(endpoint, data.file, {
+    headers: {
+      'Authorization': `Bearer ${data.accessToken.token}`
+    }
   })
+  .then(response => {
+    console.log('POST request successful:', response.data);
+    return response.data;
+  })
+  .catch(error => {
+    console.error('Error making POST request:', error);
+    return error;
+  });
 }
 
 async function getSignedUrlFromS3 (fileKey, s3Options) {
