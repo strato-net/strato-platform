@@ -21,6 +21,8 @@ module Slipstream.Processor
   ( processTheMessages
   , parseActions
   , generateAssetTable
+  , generateSaleTable
+  , generateUserTable
   ) where
 
 import Prelude hiding (lookup)
@@ -139,7 +141,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
-  , abstractInsert     :: Maybe (ProcessedContract, [T.Text])
+  , abstractInsert     :: Maybe (ProcessedContract, T.Text)
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -347,6 +349,7 @@ processTheMessages env conn g messages = do
                     parents' = c ^. parents
                     parentContracts = getContractsForParents parents' (cc^.contracts)
                     parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType) parentContracts
+                    parentAbstractContractsName = map (labelToText ._contractName) parentAbstractContracts
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
@@ -365,7 +368,10 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
 
-                (\parent -> outputData conn $ insertContractInAbstractTableQuery g nameParts parent) parentAbstractContracts
+                forM_ parentAbstractContractsName $ \parent -> do 
+                  outputData conn $ insertContractInAbstractTableQuery g nameParts parent --Tables are created
+
+                -- map (\parent -> outputData conn $ insertContractInAbstractTableQuery g nameParts parent) parentAbstractContractsName
   
                 return deferredForeignKeys
 
@@ -404,17 +410,17 @@ processTheMessages env conn g messages = do
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
-          mapNames <- getM
-          appingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          if (AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)) `elem` abstracts
-            then  pure . Right $ BatchedInserts indexContract (Just (indexContract, abstracts)) hs pMappings
+          if null abstracts
+            then pure . Right $ BatchedInserts indexContract Nothing hs pMappings
           else
-            pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+            pure . Right $ BatchedInserts indexContract (Just (indexContract, head abstracts)) hs pMappings
+            
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 

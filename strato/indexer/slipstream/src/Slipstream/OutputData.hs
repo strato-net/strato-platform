@@ -49,7 +49,7 @@ import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
-import           Data.Text                       (Text, append)
+import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 -- import qualified Data.Text.Encoding as TE
 import           Data.Time
@@ -408,9 +408,9 @@ createAbstractTable globalsIORef contract (o, a, n) ab = do
   let tableName = abstractTableRowName o a n ab
   tableExists <- isTableCreated globalsIORef tableName
   when (not tableExists) $ do
-    yield $ createAbstractTableQuery contract (o,a,n,ab)
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
         finalList = list ++ ["data"]
+    yield $ createAbstractTableQuery contract (o,a,n,ab)
     setTableCreated globalsIORef tableName finalList
 
 createAssetTable :: OutputM m
@@ -873,14 +873,20 @@ insertContractInAbstractTableQuery globalsIORef (o,a,n) ab = do
 insertAbstractTableQuery :: [(E.ProcessedContract, T.Text)] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs = concat $
-  let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab) -> (c, Map.mapMaybe valueToSQLTextFilterContract $ contractData)) <$> cs
-   in flip map (map snd $ partitionWith (length . snd) cs') $ \case
+  let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), ab)) <$> cs
+   in flip map (map snd $ partitionWith (length . snd . fst) cs') $ \case
         [] -> []
-        contracts@((x,ab):_) ->
+        contracts@(((x, _), ab):_) ->
           let contractTableName = indexTableName
                   (E.organization x)
                   (E.application x)
-                  (E.contractName x)                
+                  (E.contractName x)   
+              abTableName = abstractTableRowName
+                  (E.organization x)
+                  (E.application x)
+                  (E.contractName x)
+                  (ab)
+              abTableName' = tableNameToDoubleQuoteText abTableName             
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractTableColumns
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
@@ -892,12 +898,12 @@ insertAbstractTableQuery cs = concat $
                          , tshow . E.transactionSender
                          ]
 
-              vals = flip map contracts $ \(row, rowList) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (contractTableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper rowList]
+              vals = flip map contracts $ \((row, rowList),_) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper rowList]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
-                , tableNameToDoubleQuoteText abstractTableNameInsert
+                , abTableName'
                 , " "
                 , keySt
                 , "\n  VALUES "
