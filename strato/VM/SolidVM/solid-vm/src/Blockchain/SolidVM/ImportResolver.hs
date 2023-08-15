@@ -12,9 +12,18 @@
 module Blockchain.SolidVM.ImportResolver
   ( FileUnitF(..)
   , FileUnitMapF
+  , UnresolvedFileUnitsF(..)
+  , ufuImports
+  , ufuPragmas
+  , ufuUnits
+  , emptyUnresolvedFileUnits
+  , mergeUnresolvedFileUnitsIgnoreDuplicates
+  , mergeUnresolvedFileUnits
   , FileUnitsF(..)
   , fuPragmas
   , fuUnits
+  , emptyFileUnits
+  , mergeFileUnits
   , resolveImports
   ) where
 
@@ -32,9 +41,7 @@ import           Data.Text                            (Text)
 import qualified Data.Text                            as T
 
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.ChainInfo
 import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 
 import           SolidVM.Model.CodeCollection
@@ -60,31 +67,69 @@ data UnresolvedFileUnitsF a = UFU
   }
 makeLenses ''UnresolvedFileUnitsF
 
+emptyUnresolvedFileUnits :: UnresolvedFileUnitsF a
+emptyUnresolvedFileUnits = UFU [] M.empty M.empty
+
+instance Default (UnresolvedFileUnitsF a) where
+  def = emptyUnresolvedFileUnits
+
+mergeUnresolvedFileUnitsIgnoreDuplicates :: UnresolvedFileUnitsF a -> UnresolvedFileUnitsF a -> UnresolvedFileUnitsF a
+mergeUnresolvedFileUnitsIgnoreDuplicates (UFU i p u) (UFU j q v) = UFU (i <> j) (p <> q) (u <> v)
+
+mergeUnresolvedFileUnits :: Show a => UnresolvedFileUnitsF a -> UnresolvedFileUnitsF a -> Either Text (UnresolvedFileUnitsF a)
+mergeUnresolvedFileUnits (UFU i p u) (UFU j q v) =
+  let n = M.intersection u v
+   in if null n
+        then Right $ UFU (i <> j) (p <> q) (u <> v)
+        else Left . T.pack $ "Duplicate values: " ++ show n
+
+instance Semigroup (UnresolvedFileUnitsF a) where
+  (<>) = mergeUnresolvedFileUnitsIgnoreDuplicates
+
+instance Monoid (UnresolvedFileUnitsF a) where
+  mempty = def
+  mappend = (<>)
+
 data FileUnitsF a = FileUnits
   { _fuPragmas :: Map String String
   , _fuUnits   :: Map (Maybe Text) (FileUnitMapF a)
   }
 makeLenses ''FileUnitsF
 
+emptyFileUnits :: FileUnitsF a
+emptyFileUnits = FileUnits M.empty M.empty
+
+instance Default (FileUnitsF a) where
+  def = emptyFileUnits
+
+mergeFileUnits :: FileUnitsF a -> FileUnitsF a -> FileUnitsF a
+mergeFileUnits (FileUnits p u) (FileUnits q v) = FileUnits (p <> q) (u <> v)
+
+instance Semigroup (FileUnitsF a) where
+  (<>) = mergeFileUnits
+
+instance Monoid (FileUnitsF a) where
+  mempty = def
+  mappend = (<>)
+
 type ImportMapF a = Map Text (Either (UnresolvedFileUnitsF a) (FileUnitsF a))
 
-resolveImports :: ( (Account `A.Alters` AddressState) m
-                  , A.Selectable Word256 ParentChainIds m
+resolveImports :: ( A.Selectable Account AddressState m
                   , Show a
                   , Ord a
                   , Default a
                   )
                => (Keccak256 -> m (CodeCollectionF a))
                -> Map Text (UnresolvedFileUnitsF a)
-               -> m (Either Text (Map Text (FileUnitsF a)))
-resolveImports getCCFromHash m = runExceptT $ do
+               -> ExceptT Text m (CodeCollectionF a)
+resolveImports getCCFromHash m = do
   m' <- fmap snd . foldrM (resolveFile getCCFromHash) (S.empty, Left <$> m) . map lit $ M.keys m
-  flip M.traverseWithKey m' $ \k v -> case v of
+  m'' <- flip M.traverseWithKey m' $ \k v -> case v of
     Left _ -> throwE $ "Failed to resolve imports for file: " <> k
     Right r -> pure r
+  pure . foldMap fileUnitsToCodeCollection $ M.elems m''
 
-resolveFile :: ( (Account `A.Alters` AddressState) m
-               , A.Selectable Word256 ParentChainIds m
+resolveFile :: ( A.Selectable Account AddressState m
                , Show a
                , Ord a
                , Default a
@@ -99,9 +144,9 @@ resolveFile getCCFromHash expr (seen, resolved) = if tShowExpr expr `S.member` s
       if namedAcct ^. namedAccountChainId == MainChain || namedAcct ^. namedAccountChainId == UnspecifiedChain
         then do
           let acct = namedAccountToAccount Nothing namedAcct
-          lift (A.lookup (A.Proxy @AddressState) acct) >>= \case
+          lift (A.select (A.Proxy @AddressState) acct) >>= \case
             Nothing -> pure (seen, resolved)
-            Just AddressState{..} -> lift (resolveCodePtr Nothing addressStateCodeHash) >>= \case
+            Just AddressState{..} -> lift (runMainChainT $ resolveCodePtr Nothing addressStateCodeHash) >>= \case
               Just (SolidVMCode _ ch) -> do
                 rfu <- lift $ codeCollectionToFileUnits <$> getCCFromHash ch
                 pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
@@ -130,8 +175,17 @@ codeCollectionToFileUnits CodeCollection{..} =
            <> (FUError    <$> _flErrors)
    in FileUnits (M.fromList _pragmas) $ M.singleton Nothing units
 
-doResolve :: ( (Account `A.Alters` AddressState) m
-             , A.Selectable Word256 ParentChainIds m
+fileUnitsToCodeCollection :: FileUnitsF a -> CodeCollectionF a
+fileUnitsToCodeCollection (FileUnits ps us) =
+  foldr addUnit (def & pragmas .~ M.toList ps) . concat $ M.toList <$> M.elems us
+  where addUnit (n, (FUContract c)) = contracts . at n ?~ c 
+        addUnit (n, (FUConstant c)) = flConstants . at n ?~ c
+        addUnit (n, (FUStruct s))   = flStructs . at n ?~ s
+        addUnit (n, (FUEnum e))     = flEnums . at n ?~ e
+        addUnit (n, (FUFunction f)) = flFuncs . at n ?~ f
+        addUnit (n, (FUError e))    = flErrors . at n ?~ e
+
+doResolve :: ( A.Selectable Account AddressState m
              , Show a
              , Ord a
              , Default a

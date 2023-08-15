@@ -1,11 +1,19 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module OptimizerSpec where
 
 import           Control.Lens
-import qualified Data.Map as M
+import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
+import qualified Data.Map.Strict as M
 import           Data.Maybe            (catMaybes) 
 import qualified Data.Text as T
 import           Data.Source.Annotation
@@ -16,6 +24,9 @@ import           Text.RawString.QQ
 
 import           BlockApps.Logging
 
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.CodeDB
 import           Blockchain.DB.SolidStorageDB
 import           Blockchain.SolidVM.Exception
 import           Blockchain.SolidVM.CodeCollectionDB
@@ -35,10 +46,17 @@ import           SolidVMSpec
 --Helper Functions
 --------------------
 
-runOptimizer :: String -> CodeCollection
-runOptimizer c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
-            Left _ -> internalError "Compilation Error" ()
-            Right cc -> cc
+instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (MainChainT (MemAddressStateDB m)) where 
+  lookup p   = lift . lift . A.lookup p
+  insert p k = lift . lift . A.insert p k
+  delete p   = lift . lift . A.delete p
+
+runOptimizer :: String -> IO CodeCollection
+runOptimizer c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ do
+  eCC <- compileSourceWithAnnotations True (M.fromList [("",T.pack c)])
+  case eCC of
+    Left _ -> internalError "Compilation Error" ()
+    Right cc -> pure cc
 
 runTestOptimizer :: CodeCollection -> IO ()
 runTestOptimizer f = case f of
@@ -160,21 +178,23 @@ prop_example = monadicIO $ do
 ---------------------
 spec :: Spec
 spec = describe "Optimizer tests" $ do
-    it "can replace binary expression with number literal for state variables" $
-        let anns = (runOptimizer [r|
+    it "can replace binary expression with number literal for state variables" $ do
+        anns <- liftIO (runOptimizer [r|
             contract A {
                 int b = 2 + 2 + 2;
-            }|])  in case (varDeclHelper'' $ varDeclHelper' anns) of
+            }|])
+        (case (varDeclHelper'' $ varDeclHelper' anns) of
                 [(NumberLiteral _ 6 _) ] -> True
-                _ -> False
-    it "Variable  wrap --- then takes the wrap and turns it to." $
-        let anns = runOptimizer [r|
+                _ -> False) `shouldBe` True
+    it "Variable  wrap --- then takes the wrap and turns it to." $ do
+        anns <- liftIO $ runOptimizer [r|
             type Mytype is int;
             contract A {
                 Mytype a = Mytype.wrap(2);
-            }|]  in case (varDeclHelper'' $ varDeclHelper' anns) of
+            }|]
+        (case (varDeclHelper'' $ varDeclHelper' anns) of
                 [NumberLiteral _ 2 _] -> True
-                _ -> False
+                _ -> False) `shouldBe` True
 
     -- Temporarly removed untill further tests/research is done on optimizing variables by name
     -- it "Unwrap Variable by name of Variable " $
@@ -186,17 +206,16 @@ spec = describe "Optimizer tests" $ do
     --         }|]  in case varDeclHelper'' $ varDeclHelper' anns of
     --             [NumberLiteral _ 2 _, (NumberLiteral _ 2 _) ] -> True
     --             _ -> False
-    it "can turn func arguements and values to user defined" $
-        let anns = runOptimizer [r|
+    it "can turn func arguements and values to user defined" $ do
+        anns <- liftIO $ runOptimizer [r|
             type Mytype is int;
             contract A {
                 Mytype a = Mytype.wrap(2);
                 function f(Mytype y) returns (Mytype) { return (y);}
-            }|] in case
-             concat $ (_funcArgs <$> getFuncByName"f" anns) ++ (_funcArgs <$> getFuncByName"f" anns)
-             of
+            }|]
+        (case concat $ (_funcArgs <$> getFuncByName"f" anns) ++ (_funcArgs <$> getFuncByName"f" anns) of
                 [(Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) ), (Just _, (IndexedType  0  ( SVMType.Int (Just True)  Nothing) ) )] -> True
-                _ -> False
+                _ -> False) `shouldBe` True
     it "Should be the same after one optimization as two optimizes" $ --Cannot optimize an already optimized CodeCollection
             quickCheck propIdempotence
     it "Should have evaluated expressions between optimized and non-optimized CodeCollections equal" $

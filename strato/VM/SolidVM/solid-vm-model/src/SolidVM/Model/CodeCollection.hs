@@ -10,6 +10,7 @@
 module SolidVM.Model.CodeCollection (
   CodeCollectionF(..),
   CodeCollection,
+  emptyCodeCollection,
   flFuncs,
   contracts,
   getParents,
@@ -34,6 +35,7 @@ module SolidVM.Model.CodeCollection (
 import           Control.Lens
 import           Control.DeepSeq
 import           Data.Aeson as A
+import           Data.Default
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Data.Source
@@ -76,6 +78,31 @@ instance FromJSON a => FromJSON (CodeCollectionF a)
 type CodeCollection = Positioned CodeCollectionF
 
 makeLenses ''CodeCollectionF
+
+emptyCodeCollection :: CodeCollectionF a
+emptyCodeCollection = CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty [] []
+
+instance Default (CodeCollectionF a) where
+  def = emptyCodeCollection
+
+mergeCodeCollections :: CodeCollectionF a -> CodeCollectionF a -> CodeCollectionF a
+mergeCodeCollections cc1 cc2 = CodeCollection
+  { _contracts = cc1 ^. contracts <> cc2 ^. contracts
+  , _flFuncs = cc1 ^. flFuncs <> cc2 ^. flFuncs
+  , _flConstants = cc1 ^. flConstants <> cc2 ^. flConstants
+  , _flEnums = cc1 ^. flEnums <> cc2 ^. flEnums
+  , _flStructs = cc1 ^. flStructs <> cc2 ^. flStructs
+  , _flErrors = cc1 ^. flErrors <> cc2 ^. flErrors
+  , _pragmas     = cc1 ^. pragmas <> cc2 ^. pragmas
+  , _imports     = cc1 ^. imports <> cc2 ^. imports
+  }
+
+instance Semigroup (CodeCollectionF a) where
+  (<>) = mergeCodeCollections
+
+instance Monoid (CodeCollectionF a) where
+  mempty = def
+  mappend = (<>)
 
 type SolidEither = Either (Positioned ((,) SolidException))
 
