@@ -26,18 +26,17 @@ import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import { actions as eventActions } from "../../contexts/event/actions";
+import { actions as serviceActions } from "../../contexts/service/actions";
 import {
-  useEventDispatch,
-  useEventState,
-} from "../../contexts/event";
+  useServiceDispatch,
+  useServiceState,
+} from "../../contexts/service";
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useNavigate, useLocation } from "react-router-dom";
-//Items - ownership history
 import { actions as itemsActions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { epochToDate } from "../../helpers/utils";
@@ -61,39 +60,33 @@ const ProductDetails = ({ user, users }) => {
     isCalledFromInventory = true
   }
 
-  const [eventList, setEventList] = useState([])
-  const [eventDetailList, setEventDetailList] = useState([])
+  const [serviceList, setServiceList] = useState([])
   const [Id, setId] = useState(undefined);
-  const [isEventSelected, setIsEventSelected] = useState(false);
-  const [isSerialNumberSelected, setIsSerialNumberSelected] = useState(false);
-  const [serialNumber, setSerialNumber] = useState(false);
+  const [isServiceSelected, setIsServiceSelected] = useState(false);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { inventoryEvents, isInventoryEventsLoading, eventDetails, iseventDetailsLoading } =
-    useEventState();
-  const eventDispatch = useEventDispatch();
+  const { inventoryServices, isInventoryServicesLoading } =
+  useServiceState();
+const serviceDispatch = useServiceDispatch();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-
+  
   useEffect(() => {
     if (user) {
       if (Id !== undefined) {
-        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+        serviceActions.fetchServiceOfInventory(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
       }
     }
-  }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
-
-
+  }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user])
+  
   useEffect(() => {
-    let events = [];
-    inventoryEvents.forEach(element => {
-      events.push({ "key": element.eventTypeName, "eventName": element, "eventDesc": element.eventTypeDescription },)
+    let services = [];
+    inventoryServices.forEach(element => {
+      services.push({ "key": element.name, "serviceName": element, "serviceDesc": element.description, "memberPrice": element.memberPrice, "nonMemberPrice": element.nonMemberPrice, "uses": element.uses},)
     });
-    setEventList(events);
-  }, [inventoryEvents])
+    setServiceList(services);
+  }, [inventoryServices])
 
-  const [isTransformationSelected, setIsTransformationSelected] =
-    useState(false);
   const { Text, Paragraph, Title } = Typography;
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
@@ -109,8 +102,6 @@ const ProductDetails = ({ user, users }) => {
   const {
     serialNumbers,
     isSerialNumbersLoading,
-    ownershipHistory,
-    isOwnershipHistoryLoading,
     isRawMaterialsLoading
   } = useItemState();
 
@@ -189,26 +180,9 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
-  useEffect(() => {
-    let temp = [];
-    if (eventDetails != null) {
-      temp = eventDetails.events.map(elem => {
-        return {
-          ...elem,
-          key: elem.eventBatchId,
-          date: epochToDate(elem['date']),
-          summary: elem['summary'],
-          certifier: elem['certifierName'],
-          certifiedDate: elem['certifiedDate'] ? epochToDate(elem['certifiedDate']) : '',
-        }
-      });
-    }
-    setEventDetailList(temp);
-  }, [eventDetails])
-
   const ownerSameAsUser = () => {
 
-    if (user && user.organization === inventoryDetails?.ownerOrganization) {
+    if (user && user.organization !== inventoryDetails?.ownerOrganization) {
       return true;
     }
 
@@ -252,223 +226,38 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
-  const eventColumn = [
+  const serviceColumn = [
     {
       title: <Text className="text-primaryC text-[13px]">NAME</Text>,
-      dataIndex: "eventName",
-      key: "eventName",
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px] whitespace-normal text-left"
-          onClick={() => {
-            if (isEventSelected) {
-              if (text.eventTypeId === eventDetailList[0].eventTypeId) {
-                setIsEventSelected(false);
-                return;
-              }
-            }
-            setIsEventSelected(true);
-            eventActions.fetchEventDetails(eventDispatch, Id, text.eventTypeId)
-          }}
-        >
-          {decodeURIComponent(text.eventTypeName)}
-        </Button>
-      ),
+      dataIndex: "serviceName",
+      key: "name",
+      render: (text) => <p>{decodeURIComponent(text.name)}</p>
     },
     {
       title: <Text className="text-primaryC text-[13px]">DESCRIPTION</Text>,
-      dataIndex: "eventDesc",
-      key: "eventDesc",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-  ];
-
-  const ownershipColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      // Fixes UI issue of children having the same key
-      key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            if (isEventSelected) setIsEventSelected(false);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
-            );
-          },
-        };
-      },
-      render: (serialNumber) => (
-        <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
-        </Button>
-      ),
-    },
-  ];
-
-  const eventDetailColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">DATE</Text>,
-      dataIndex: "date",
-      key: "date",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">SUMMARY</Text>,
-      dataIndex: "summary",
-      key: "summary",
+      dataIndex: "serviceDesc",
+      key: "serviceDesc",
       render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">CERTIFIED BY</Text>,
-      dataIndex: "certifier",
-      key: "certifier",
-      render: (text) => <p>{text}</p>,
+      title: <Text className="text-primaryC text-[13px]">MEMBER PRICE</Text>,
+      dataIndex: "memberPrice",
+      key: "memberPrice",
+      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">CERTIFIED DATE</Text>,
-      dataIndex: "certifiedDate",
-      key: "certifiedDate",
-      render: (text) => <p>{text}</p>,
+      title: <Text className="text-primaryC text-[13px]">NON-MEMBER PRICE</Text>,
+      dataIndex: "nonMemberPrice",
+      key: "nonMemberPrice",
+      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
-
     {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNo",
-      key: "serialNo",
-      render: (text) => (
-        <div className="group flex items-center cursor-pointer" onClick={() => passSerialNumber(text, eventDetails.eventTypeName)}>
-          <EyeOutlined className="mr-2 group-hover:text-primary" />
-          <p className="group-hover:text-primary">View</p>
-        </div>
-      ),
+      title: <Text className="text-primaryC text-[13px]">USES</Text>,
+      dataIndex: "uses",
+      key: "uses",
+      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
   ];
-
-  const passSerialNumber = (serialNumbers, eventTypeName) => {
-    navigate(routes.EventSerialNumberList.url,
-      { state: { serialNumbers: serialNumbers, eventTypeName: eventTypeName } });
-  }
-
-  const ownershipDetailColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
-      dataIndex: "seller",
-      key: "seller",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
-      dataIndex: "newOwner",
-      key: "newOwner",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">
-          OWNERSHIP START DATE
-        </Text>
-      ),
-      dataIndex: "ownershipStartDate",
-      key: "ownershipStartDate",
-      align: "center",
-      render: (epoch) => <p>{epochToDate(epoch)}</p>,
-    },
-  ];
-
-  const transformationColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-        >
-          {text}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            if (isEventSelected) setIsEventSelected(false);
-            if (isSerialNumberSelected) setIsSerialNumberSelected(false);
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-          onClick={() => {
-
-          }}
-        >
-          {text}
-        </Button>
-      ),
-    },
-  ];
-
 
   const DescTitle = ({ text }) => {
     return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
@@ -511,29 +300,9 @@ const ProductDetails = ({ user, users }) => {
     );
   };
 
-  const EventDetailsComponent = ({ title, value, id }) => {
-    return (
-      <Col id={id}>
-        <Text className="block text-primaryC text-xs mb-2">{title}</Text>
-        <Text className="block text-primaryB">{value}</Text>
-      </Col>
-    );
-  };
-
   const onTabChange = (tab) => {
     if (tab === "1") {
-      if (isEventSelected) setIsEventSelected(false)
-      if (isSerialNumberSelected) setIsSerialNumberSelected(false)
-      if (isTransformationSelected) setIsTransformationSelected(false)
-    } else if (tab === "2") {
-      if (isSerialNumberSelected) setIsSerialNumberSelected(false)
-      if (isTransformationSelected) setIsTransformationSelected(false)
-    } else if (tab === "3") {
-      if (isEventSelected) setIsEventSelected(false)
-      if (isTransformationSelected) setIsTransformationSelected(false)
-    } else {
-      if (isEventSelected) setIsEventSelected(false)
-      if (isSerialNumberSelected) setIsSerialNumberSelected(false)
+      if (isServiceSelected) setIsServiceSelected(false)
     }
   }
 
@@ -585,33 +354,6 @@ const ProductDetails = ({ user, users }) => {
               </div>
               {details.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
-                  {ownerSameAsUser() ? <Button
-                    className="group w-1/3 h-9 border border-primary"
-                    disabled={true}
-                    id="addToCart"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        addItemToCart();
-                      }
-                    }}
-                  >
-                    Add To Cart
-                  </Button> : <Button
-                    className="group w-1/3 h-9 border border-primary hover:bg-primary"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        addItemToCart();
-                      }
-                    }}
-                  >
-                    <div className="text-primary group-hover:text-white">
-                      Add To Cart
-                    </div>
-                  </Button>}
                   <Button
                     type="primary"
                     className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
@@ -626,7 +368,7 @@ const ProductDetails = ({ user, users }) => {
                     disabled={ownerSameAsUser()}
                     id="buyNow"
                   >
-                    Buy Now
+                    Sell
                   </Button>
                 </Row>
                 :
@@ -714,121 +456,21 @@ const ProductDetails = ({ user, users }) => {
                     children: <DescriptionComponent />,
                   },
                   {
-                    label: `Events`,
+                    label: `Services`,
                     key: "2",
                     children: (
                       <DataTableComponent
-                        columns={eventColumn}
-                        data={eventList}
+                        columns={serviceColumn}
+                        data={serviceList}
                         scrollX="100%"
-                        isLoading={isInventoryEventsLoading}
+                        isLoading={isInventoryServicesLoading}
                       />
                     ),
-                  },
-                  {
-                    label: `Ownership History`,
-                    key: "3",
-                    children: (
-                      <DataTableComponent
-                        columns={ownershipColumn}
-                        data={serialNumbers}
-                        scrollX="100%"
-                        isLoading={isSerialNumbersLoading}
-                        pagination={{
-                          defaultPageSize: 5,
-                          showSizeChanger: false,
-                          position: ["bottomCenter"],
-                        }}
-                        rowKey={(record) => record.serialNumber}
-                      />
-                    ),
-                  },
-                  {
-                    label: `Transformation`,
-                    key: "4",
-                    children: (
-                      <DataTableComponent
-                        columns={transformationColumn}
-                        data={serialNumbers}
-                        isLoading={false}
-                        scrollX="100%"
-                        pagination={{
-                          defaultPageSize: 5,
-                          showSizeChanger: false,
-                          position: ["bottomCenter"],
-                        }}
-                        rowKey={(record) => record.serialNumber}
-                      />
-                    ),
-                  },
+                  }
                   ]}
               />
             </div>
           </div>
-
-          {isEventSelected ?
-            iseventDetailsLoading || eventDetails == null ?
-              <div className="h-80 flex justify-center items-center">
-                <Spin
-                  spinning={iseventDetailsLoading}
-                  size="large"
-                />
-              </div> :
-              (
-                <Card className="mb-12 mx-16">
-                  <Text className="font-semibold text-lg">Event Details</Text>
-                  <Row className="my-6">
-                    <EventDetailsComponent title="NAME" value={decodeURIComponent(eventDetails.eventTypeName)} />
-                    <Divider type="vertical" className="h-10 mx-6 bg-grayLight" />
-                    <EventDetailsComponent
-                      title="DESCRIPTION"
-                      value={decodeURIComponent(eventDetails.eventTypeDescription)}
-                    />
-                  </Row>
-                  <DataTableComponent
-                    columns={eventDetailColumn}
-                    data={eventDetailList}
-                    isLoading={iseventDetailsLoading}
-                    scrollX="100%"
-                  />
-                </Card>
-              ) : null}
-
-          {isSerialNumberSelected ? (
-            <Card className="mb-12 mx-16">
-              <Text className="font-semibold text-lg">Ownership History</Text>
-              <Row className="my-6">
-                <EventDetailsComponent
-                  title="SERIAL NUMBER"
-                  value={serialNumber}
-                  id="ownership-serial"
-                />
-              </Row>
-              <DataTableComponent
-                columns={ownershipDetailColumn}
-                scrollX="100%"
-                data={ownershipHistory}
-                isLoading={isOwnershipHistoryLoading}
-                pagination={{
-                  defaultPageSize: 10,
-                  position: ["bottomCenter"],
-                  showSizeChanger: false,
-                }}
-              />
-            </Card>
-          ) : null}
-
-          {isTransformationSelected ? (
-            <Card className="mb-12 mx-16" id="transformation">
-              <Text className="font-semibold text-lg">Transformation</Text>
-              <Row className="my-6">
-                <EventDetailsComponent title="SERIAL NUMBER" value={serialNumber} id="trans-serial" />
-              </Row>
-              <Spin spinning={isRawMaterialsLoading} delay={500} size="large">
-                <NestedComponent clickedSerialNumber={serialNumber} />
-              </Spin>
-            </Card>
-          ) : null}
         </div>
       )}
     </>

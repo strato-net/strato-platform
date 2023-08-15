@@ -21,6 +21,7 @@ import { EventTypesProvider } from "./contexts/eventType";
 import Event from "./components/Event";
 import EventDetails from "./components/Event/EventDetails";
 import { EventsProvider } from "./contexts/event";
+import { ServicesProvider } from "./contexts/service";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
@@ -52,9 +53,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       <Route
         exact
         path={routes.LoginRedirect.url}
-        element={
-          <LoginRedirect/>
-        }
+        element={<LoginRedirect />}
       />
       <Route
         exact
@@ -144,15 +143,17 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <EventsProvider>
-              <CategorysProvider>
-                <SubCategorysProvider>
-                  <InventoriesProvider>
-                    <ItemsProvider>
-                      <ProductDetails user={user} users={users} />
-                    </ItemsProvider>
-                  </InventoriesProvider>
-                </SubCategorysProvider>
-              </CategorysProvider>
+              <ServicesProvider>
+                <CategorysProvider>
+                  <SubCategorysProvider>
+                    <InventoriesProvider>
+                      <ItemsProvider>
+                        <ProductDetails user={user} users={users} />
+                      </ItemsProvider>
+                    </InventoriesProvider>
+                  </SubCategorysProvider>
+                </CategorysProvider>
+              </ServicesProvider>
             </EventsProvider>
           </UsersProvider>
         }
@@ -203,15 +204,17 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <EventsProvider>
-              <CategorysProvider>
-                <SubCategorysProvider>
-                  <InventoriesProvider>
-                    <ItemsProvider>
-                      <ProductDetails user={user} users={users} />
-                    </ItemsProvider>
-                  </InventoriesProvider>
-                </SubCategorysProvider>
-              </CategorysProvider>
+              <ServicesProvider>
+                <CategorysProvider>
+                  <SubCategorysProvider>
+                    <InventoriesProvider>
+                      <ItemsProvider>
+                        <ProductDetails user={user} users={users} />
+                      </ItemsProvider>
+                    </InventoriesProvider>
+                  </SubCategorysProvider>
+                </CategorysProvider>
+              </ServicesProvider>
             </EventsProvider>
           </UsersProvider>
         }
@@ -385,18 +388,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
-        path="/"
-        element={<Navigate
-          to={"/marketplace"}
-          replace />}
-      />
-      <Route
-        path="*"
-        element={<Navigate
-          to={"/"}
-          replace />}
-      />
+      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
+      <Route path="*" element={<Navigate to={"/"} replace />} />
     </Routes>
   );
 };
