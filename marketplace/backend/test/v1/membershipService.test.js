@@ -6,7 +6,7 @@ import oauthHelper from '/helpers/oauthHelper'
 import { get, post, put } from '/helpers/rest'
 import RestStatus from 'http-status-codes'
 
-import { membershipServiceArgs, updateMembershipServiceArgs } from './factories/membershipService'
+import { membershipServiceArgs, membershipServiceArgsSingle, updateMembershipServiceArgs } from './factories/membershipService'
 import { MembershipService } from '../../api/v1/endpoints'
 
 const options = { config }
@@ -52,7 +52,7 @@ describe('MembershipService End-To-End Tests', function () {
 
   it('Create a MembershipService', async () => {
     const createArgs = {
-      ...membershipServiceArgs(util.uid()),
+      ...membershipServiceArgsSingle(util.uid()),
     }
 
     const createResponse = await post(
