@@ -78,14 +78,11 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
-        return next()
+        return rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, err)
       }
-
-      rest.response.status(RestStatus.UNAUTHORIZED, res, {
-        loginUrl: getLoginUrl(req),
+      return rest.response.status(RestStatus.UNAUTHORIZED, res, {
+        loginUrl: await getLoginUrl(req),
       })
-      return next()
     }
   }
 

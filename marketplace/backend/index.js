@@ -62,7 +62,13 @@ app.use(
   })
 );
 
-app.oauth = authHandler.initOauth()
+(async () => {
+  try {
+    app.oauth = await authHandler.initOauth();
+  } catch (err) {
+    console.error("Error starting the server:", err);
+  }
+})();
 
 app.set(constants.s3ParamName, {
   bucket: {
