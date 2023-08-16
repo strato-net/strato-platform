@@ -325,19 +325,19 @@
       "label": "Select"
     },
     {
-      "value": "minPrice",
+      "value": "minlistPrice",
       "label": "Sort By Lowest Price"
     },
     {
-      "value": "maxPrice",
+      "value": "maxlistPrice",
       "label": "Sort By Highest Price"
     },
     {
-      "value": "minSqFt",
+      "value": "minlotSizeArea",
       "label": "Sort By Lowest Sq Ft."
     },
     {
-      "value": "maxSqFt",
+      "value": "maxlotSizeArea",
       "label": "Sort By Highest Sq Ft."
     }
   ]

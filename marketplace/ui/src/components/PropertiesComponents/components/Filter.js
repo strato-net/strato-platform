@@ -18,12 +18,11 @@ import filterData from "../helpers/filterOptions.json";
 const { Panel } = Collapse;
 
 const Filter = (props) => {
-
   const [isDrawerOpen, setDrawerOpen] = useState(false);
   const { filterOption } = props;
 
   const { sortBy, states, amenities, parkingType, propertyTypes } = filterData;
-  const { maxPriceValue, zipcodeValue, minPriceValue, stateValue, minBedrooms, minBathrooms, minSqFt, } = filterOption;
+  const { maxPriceValue, postalcode, minPriceValue, stateOrProvince, bedroomsTotal, bathroomsTotalInteger, lotSizeArea, } = filterOption;
 
   const handleChange = (key, value) => {
     props.handleChange(key, value)
@@ -165,12 +164,12 @@ const Filter = (props) => {
               min={0}
               max={99999}
               type="number"
-              value={zipcodeValue}
+              value={postalcode}
               style={{ width: "100%" }}
               placeholder="Enter Zipcode"
               controls={false}
               onChange={(value) => {
-                handleChange("zipcodeValue", value);
+                handleChange("postalcode", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -183,9 +182,9 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
-              value={stateValue}
+              value={stateOrProvince}
               onChange={(value) => {
-                handleChange("stateValue", value);
+                handleChange("stateOrProvince", value);
               }}
               options={states}
             />
@@ -206,26 +205,24 @@ const Filter = (props) => {
             <Slider
               step={1}
               min={0}
-              max={7}
               onChange={(value) => {
-                handleChange("minBedrooms", value);
+                handleChange("bedroomsTotal", value);
               }}
               value={
-                typeof minBedrooms === "number"
-                  ? minBedrooms
+                typeof bedroomsTotal === "number"
+                  ? bedroomsTotal
                   : 0
               }
             />
             <InputNumber
               min={0}
-              max={7}
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Bedrooms"
-              value={minBedrooms}
+              value={bedroomsTotal}
               controls={false}
               onChange={(value) => {
-                handleChange("minBedrooms", value);
+                handleChange("bedroomsTotal", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -239,33 +236,30 @@ const Filter = (props) => {
             <Slider
               step={1}
               min={0}
-              max={7}
               onChange={(value) => {
-                handleChange("minBathrooms", value);
+                handleChange("bathroomsTotalInteger", value);
               }}
               value={
-                typeof minBathrooms === "number"
-                  ? minBathrooms
+                typeof bathroomsTotalInteger === "number"
+                  ? bathroomsTotalInteger
                   : 0
               }
             />
             <InputNumber
               min={0}
-              max={7}
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Bathrooms"
-              value={minBathrooms}
+              value={bathroomsTotalInteger}
               controls={false}
               onChange={(value) => {
-                handleChange("minBathrooms", value);
+                handleChange("bathroomsTotalInteger", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
           </Panel>
 
           <Panel style={{ fontWeight: 700 }} header="Amenities" key="4">
-            {/* <div style={{ display: "flex", flexDirection: "column" }}> */}
             <Checkbox.Group
               style={{ display: "grid", lineHeight: "30px" }}
               options={amenities}
@@ -274,7 +268,6 @@ const Filter = (props) => {
                 handleChange("amenities", value);
               }}
             />
-            {/* </div> */}
           </Panel>
 
           <Panel style={{ fontWeight: 700 }} header="Sq. Footage" key="5">
@@ -290,10 +283,10 @@ const Filter = (props) => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Sq Ft."
-              value={minSqFt}
+              value={lotSizeArea}
               controls={false}
               onChange={(value) => {
-                handleChange("minSqFt", value);
+                handleChange("lotSizeArea", value);
               }}
               onWheel={(e) => e.target.blur()}
             />

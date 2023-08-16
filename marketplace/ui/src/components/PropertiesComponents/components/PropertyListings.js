@@ -21,6 +21,7 @@ function PropertyListings() {
   const dispatch = usePropertiesDispatch()
   const { properties, isPropertiesLoading, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
+
   useEffect(() => {
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
@@ -52,11 +53,14 @@ function PropertyListings() {
       return { name: item.name, value: (item.value === ("select" || item.value.length === 0) ? "" : item.value) }
     })
     setAppliedFilter(filteredData)
+    console.log(filteredData)
+    console.log(filteredData)
+    actions.fetchProperties(dispatch, limit, currentPage - 1, filteredData)
   }
 
   const clearFilter = () => {
     setCurrentPage(1)
-    // actions.fetchProperties(dispatch, limit,1,options)
+    actions.fetchProperties(dispatch, limit, currentPage - 1)
   }
 
   const handleTagClose = (name) => {
@@ -129,6 +133,7 @@ function PropertyListings() {
     : (properties.length === LIMIT_PER_PAGE
       ? (currentPage * LIMIT_PER_PAGE) + 1
       : currentPage * LIMIT_PER_PAGE)
+
   return (
     <>
       {message && openToast("bottom")}

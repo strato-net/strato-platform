@@ -131,16 +131,29 @@ const actions = {
     }
   },
 
-  fetchProperties: async (dispatch, limit, offset, queryValue) => {
+  fetchProperties: async (dispatch, limit, offset, options = {}, queryValue) => {
+
+    dispatch({ type: actionDescriptors.fetchProperties });
+
+    const { minPriceValue, maxPriceValue, bathroomsTotalInteger, postalcode, stateOrProvince, bedroomsTotal, lotSizeArea, sortBy, parkingType } = options
+    const priceQuery = minPriceValue || maxPriceValue ? `&range[]=listPrice,${minPriceValue},${maxPriceValue}` : '';
+    const postalcodeQuery = postalcode ? `&postalcode=${postalcode}` : '';
+    const stateOrProvinceQuery = stateOrProvince && stateOrProvince !== 'Select' ? `&stateOrProvince=${stateOrProvince}` : '';
+    const bedroomsTotalQuery = bedroomsTotal ? `&gteQuery[]=bedroomsTotal,${bedroomsTotal}` : '';
+    const bathroomsTotalIntegerQuery = bathroomsTotalInteger ? `&gteQuery[]=bathroomsTotalInteger,${bathroomsTotalInteger}` : '';
+    const lotSizeAreaQuey = lotSizeArea ? `&lotSizeArea=${lotSizeArea}` : '';
+    const parkingTypeQuery = parkingType ? `&${parkingType}=true` : '';
+    const sortByQuery = sortBy && sortBy !== 'Select' ? `&sort=${sortBy.includes('min') ? encodeURIComponent(`+${sortBy.replace('min', '')}`) : encodeURIComponent(`-${sortBy.replace('max', '')}`)}` : '';
+
     const query = queryValue
       ? `&queryValue=${queryValue}&queryFields=name`
       : "";
 
-    dispatch({ type: actionDescriptors.fetchProperties });
+    const queryBuilder = `${query}${priceQuery}${postalcodeQuery}${stateOrProvinceQuery}${bedroomsTotalQuery}${bathroomsTotalIntegerQuery}${lotSizeAreaQuey}${sortByQuery}${parkingTypeQuery}`
 
     try {
       const response = await fetch(
-        `${apiUrl}/properties?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/properties?limit=${limit}&offset=${offset}${queryBuilder}`,
         {
           method: HTTP_METHODS.GET,
         }
