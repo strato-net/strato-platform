@@ -151,7 +151,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         bool _isReduce
     ) returns (uint256) {
         for (uint i = 0; i < _inventories.length; i++) {
-            Inventory_2 inventory = Inventory_2(_inventories[i]);
+            Inventory_3 inventory = Inventory_3(_inventories[i]);
 
             if (_isReduce) {
                 if (_quantities[i] > inventory.availableQuantity()) {

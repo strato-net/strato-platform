@@ -3,7 +3,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory_2 is InventoryStatus {
+contract Inventory_3 is InventoryStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -11,14 +11,14 @@ contract Inventory_2 is InventoryStatus {
 
     address public productId;
     string public category;
-    uint public purchasedQuantity;
+    int public purchasedQuantity;
     int public quantity;
     int public pricePerUnit;
     uint public vintage;
     int public availableQuantity;
     InventoryStatus public status;
     uint public createdDate;
-    uint public retiredQuantity;
+    int public retiredQuantity;
 
     constructor(
         string _category,
@@ -73,6 +73,12 @@ contract Inventory_2 is InventoryStatus {
 
     function updateQuantity(int _quantity) returns (uint) {
         availableQuantity = _quantity;
+        return RestStatus.OK;
+    }
+
+    function updateRetiredQuantity(int _quantity) returns (uint) {
+        availableQuantity = availableQuantity - _quantity;
+        retiredQuantity = retiredQuantity + _quantity;
         return RestStatus.OK;
     }
 

@@ -6,29 +6,6 @@ import config from '../../../load.config'
 const options = { config, cacheNonce: true }
 
 class ItemController {
-  //unused route
-  // static async get(req, res, next) {
-  //   try {
-  //     const { dapp, params } = req
-  //     const { address } = params
-
-  //     let args
-  //     let chainOptions = options
-
-  //     if (address) {
-  //       args = { address }
-  //       chainOptions = { ...options, chainIds: [dapp.chainId] }
-  //     }
-
-  //     const result = await dapp.getItem(args, chainOptions)
-  //     rest.response.status200(res, result)
-
-  //     return next()
-  //   } catch (e) {
-  //     return next(e)
-  //   }
-  // }
-
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
@@ -64,6 +41,21 @@ class ItemController {
       ItemController.validateCreateItemArgs(body)
 
       const result = await dapp.addItem(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async retire(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      ItemController.validateRetireItemArgs(body)
+
+      const result = await dapp.retireItem(body)
       rest.response.status200(res, result)
 
       return next()
@@ -142,6 +134,25 @@ class ItemController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Item Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateRetireItemArgs(args) {
+    const retireItemSchema = Joi.object({
+      productId: Joi.string().required(),
+      inventoryId: Joi.string().required(),
+      retiredBy: Joi.string().required(),
+      retiredOnBehalfOf: Joi.string().required(),
+      quantity: Joi.number().integer().min(0).required(),
+      purpose: Joi.string().required()
+    });
+
+    const validation = retireItemSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Retire Item Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

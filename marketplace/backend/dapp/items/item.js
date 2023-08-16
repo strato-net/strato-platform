@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 
-const contractName = 'Item_4';
+const contractName = 'Item_5';
 const contractFilename = `${util.cwd}/dapp/items/contracts/Item.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
@@ -173,6 +173,11 @@ async function getAll(admin, args = {}, options) {
     return items.map((item) => marshalOut(item))
 }
 
+async function getAllRetiredItems(admin, args = {}, options) {
+    const retiredItems = await searchAllWithQueryArgs("RetiredItem", args, options, admin)
+    return retiredItems.map((retiredItem) => marshalOut(retiredItem))
+}
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -219,6 +224,7 @@ export default {
     bindAddress,
     get,
     getAll,
+    getAllRetiredItems,
     getAllOwnershipEvents,
     transferOwnership,
     marshalIn,

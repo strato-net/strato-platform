@@ -584,7 +584,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.retireItem = async function (args, options = defaultOptions) {
-    return managers.itemManager.retireItem(rawAdmin, contract, args, options);
+    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    const{ productId, inventoryId, ...newArgs } = args;
+    const items = await managers.itemManager.getItems({ productId: productId, inventoryId: inventoryId }, createOptions);
+    const itemAddress = items[0].address;
+    return managers.itemManager.retireItem({ itemAddress: itemAddress, ...newArgs}, rawAdmin, contract, options);
   }
 
   contract.getRawMaterials = async function (args = {}, options = optionsNoChainIds) {

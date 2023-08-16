@@ -6,18 +6,21 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
+  SyncOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
+import RetireModal from "./RetireModal";
 import routes from "../../helpers/routes";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [openPop, setOpenPop] = useState(false);
   const [open, setOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [retireModalOpen, setRetireModalOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -49,6 +52,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
 
   const handleEditModalClose = () => {
     setEditModalOpen(false);
+  };
+
+  const showRetireModal = () => {
+    hide();
+    setRetireModalOpen(true);
+  };
+
+  const handleRetireModalClose = () => {
+    setRetireModalOpen(false);
   };
 
   const callDetailPage = () => {
@@ -107,6 +119,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                       <EditOutlined />
                       <p className="ml-3">Edit</p>
                     </div>
+                    <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showRetireModal}
+                    >
+                      <SyncOutlined />
+                      <p className="ml-3">Retire</p>
+                    </div>
                   </div>
                 }
                 trigger="click"
@@ -131,6 +150,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </p>
             <p className="text-error text-sm ml-3">
               {inventory.availableQuantity}
+            </p>
+          </div>
+          <div className="flex mt-1 items-center">
+            <p className="text-primaryC text-sm w-40">Retired Quantity</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-error text-sm ml-3">
+              {inventory.retiredQuantity}
             </p>
           </div>
           <div className="flex mt-1 items-center">
@@ -204,6 +232,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             inventory: inventory,
             category: category,
           }}
+        />
+      )}
+      {retireModalOpen && (
+        <RetireModal
+          open={retireModalOpen}
+          handleCancel={handleRetireModalClose}
+          inventory={inventory}
         />
       )}
     </Card>

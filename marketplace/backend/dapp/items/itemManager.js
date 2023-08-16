@@ -117,6 +117,7 @@ function bind(user, _contract, options) {
     contract.getState = async () => getState(user, contract, options);
     contract.getItem = async (args, options) => itemJs.get(user, args, options);
     contract.getItems = async (args, options) => itemJs.getAll(user, args, options);
+    contract.getRetiredItems = async (args, options) => itemJs.getAllRetiredItems(user, args, options);
     contract.getAllOwnershipEvents = async (args, options) => itemJs.getAllOwnershipEvents(user, args, options);
     contract.addItem = async (args) => addItem(user, contract, args, options);
     contract.transferOwnership = async (args) => transferOwnership(user, contract, args, options);

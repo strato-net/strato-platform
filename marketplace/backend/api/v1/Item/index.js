@@ -29,6 +29,13 @@ router.post(
 );
 
 router.post(
+  Item.retire,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ItemController.retire
+);
+
+router.post(
   Item.transferOwnership,
   authHandler.authorizeRequest(),
   loadDapp,
