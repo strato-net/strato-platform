@@ -22,6 +22,7 @@ so that they could be properly moved to their respective version's subsection.
 - `/transaction/unsigned` endpoint for generating raw transaction inputs
 - Bi-directional sync functionality
 - Mappings in SolidVM receive their own table in Cirrus
+- Support for imports from addresses in SolidVM
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 ### Fixed
