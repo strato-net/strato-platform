@@ -25,6 +25,7 @@ import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
 import membershipJs from "../membership/membership";
 import membershipServiceJs from "../membershipService/membershipService";
+import membershipManagerJs from "../membershipManager/membershipManager";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -36,6 +37,7 @@ const allAssetNames = [
   productFileJs.contractName,
   membershipJs.contractName,
   membershipServiceJs.contractName,
+  membershipManagerJs.contractName,
 ];
 
 const contractName = "Dapp";
@@ -128,10 +130,11 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const serviceManager = await serviceManagerJS.bindAddress(admin, state.serviceManager, options)
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
+  const membershipManager = await membershipManagerJs.bindAddress(admin, state.membershipManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager, membershipManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
@@ -1008,6 +1011,31 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the order");
     }
   }
+
+
+  contract.createMembership = async function (args, options = defaultOptions) {
+    try {
+        const { dappAddress, membershipArgs, membershipServiceArgs, productFileArgs } = args;
+
+        const dapp = { name: dappJs.contractName, address: dappAddress };
+
+        const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+
+        const [membership] = await managers.membershipManager.createMembership({ dapp, membershipArgs, membershipServiceArgs, productFileArgs });
+
+        return { membership };
+    } catch (error) {
+        if (error.response) {
+            throw new rest.RestError(error.response.status, error.response.statusText);
+        }
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the membership");
+    }   
+
+  };
+
+
+
+
 
   contract.updateBuyerDetails = async function (args, options = defaultOptions) {
     try {
