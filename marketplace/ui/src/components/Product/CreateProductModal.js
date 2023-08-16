@@ -315,6 +315,7 @@ const CreateProductModal = ({
             <Upload
               id="images"
               listType="picture-card"
+              multiple={true}
               fileList={imageList}
               onPreview={handlePreview}
               onChange={handleImageChange}
