@@ -60,65 +60,65 @@ class PropertiesController {
       console.log('DAPP++', dapp)
       console.log('REQ++++', req)
 
-      // const propertyArgs = {
-      //   ...body,
-      //   standardStatus: "Active",
-      //   //use google maps api to get lat and long, then convert to string
-      //   latitude: "",
-      //   longitude: "",
-      // }
+      const propertyArgs = {
+        ...body,
+        standardStatus: "Active",
+        //use google maps api to get lat and long, then convert to string
+        latitude: "",
+        longitude: "",
+      }
 
-      // PropertiesController.validateCreatePropertyArgs(propertyArgs)
+      PropertiesController.validateCreatePropertyArgs(propertyArgs)
 
-      // const propertyResult = await dapp.createProperty(propertyArgs)
-      // if (propertyResult) {
+      const propertyResult = await dapp.createProperty(propertyArgs)
+      if (propertyResult) {
 
   /* -------upload the documents and images if necessary-------- */
-        // if (files) {
-        //   files.forEach(async (file) => {
-        //     const fileKey = `${moment()
-        //       .utc()
-        //       .valueOf()}_${file.originalname}`;
+        if (files) {
+          files.forEach(async (file) => {
+            const fileKey = `${moment()
+              .utc()
+              .valueOf()}_${file.originalname}`;
     
-        //     const fileHash = crypto
-        //       .createHmac("sha256", file.buffer)
-        //       .digest("hex");
+            const fileHash = crypto
+              .createHmac("sha256", file.buffer)
+              .digest("hex");
     
-        //     const fileLocation = await uploadFileToS3(
-        //       `${fileKey}`,
-        //       file.buffer,
-        //       req.app.get(constants.s3ParamName)
-        //     );
+            const fileLocation = await uploadFileToS3(
+              `${fileKey}`,
+              file.buffer,
+              req.app.get(constants.s3ParamName)
+            );
           
-        //     const productDocumentArgs = {
-        //       productId: propertyResult.productContractAddress,
-        //       fileKey: fileKey,
-        //       fileHash: fileHash,
-        //       fileName: file.originalname,
-        //       fileLocation: fileLocation,
-        //       documentType: file.mimetype,
-        //     }
+            const productDocumentArgs = {
+              productId: propertyResult.productContractAddress,
+              fileKey: fileKey,
+              fileHash: fileHash,
+              fileName: file.originalname,
+              fileLocation: fileLocation,
+              documentType: file.mimetype,
+            }
 
-        //     PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
+            PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
 
-        //     await dapp.createProductDocument(productDocumentArgs)
-        //   })
-        // }
+            await dapp.createProductDocument(productDocumentArgs)
+          })
+        }
 
-      //   const inventoryBody = {
-      //     productAddress: propertyResult.productContractAddress,
-      //     quantity: 1,
-      //     pricePerUnit: propertyArgs.listPrice,
-      //     batchId: '1',
-      //     status: 1,
-      //     serialNumber: [],
-      //   }
-      //   const inventoryResult = await dapp.createInventory(inventoryBody)
-      //   if (inventoryResult) {
-      //     console.log('propertyResult', propertyResult)
-      //     rest.response.status200(res, propertyResult)
-      //   }
-      // }
+        const inventoryBody = {
+          productAddress: propertyResult.productContractAddress,
+          quantity: 1,
+          pricePerUnit: propertyArgs.listPrice,
+          batchId: '1',
+          status: 1,
+          serialNumber: [],
+        }
+        const inventoryResult = await dapp.createInventory(inventoryBody)
+        if (inventoryResult) {
+          console.log('propertyResult', propertyResult)
+          rest.response.status200(res, propertyResult)
+        }
+      }
 
       return next()
     } catch (e) {

@@ -1,4 +1,6 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
+import "/dapp/dapp/contracts/Dapp.sol";
+
 
 /// @title A representation of Product assets
 contract ProductDocument {
@@ -9,10 +11,8 @@ contract ProductDocument {
     string public fileLocation;
     int public uploadDate;
     string public documentType;
-    address public uploadedByUser;
+    string public uploadedByUser;
     uint public delDate;
-    string public events;
-
 
     constructor(
         address _productId,
@@ -22,8 +22,8 @@ contract ProductDocument {
         string _fileLocation,
         int _uploadDate,
         string _documentType,
+        string _uploadedByUser,
         int _delDate
-
     ) public {
         productId = _productId;
         fileKey = _fileKey;
@@ -32,15 +32,13 @@ contract ProductDocument {
         fileLocation = _fileLocation;
         uploadDate = _uploadDate;
         documentType = _documentType;
-        uploadedByUser = tx.origin;
+        uploadedByUser = _uploadedByUser;
         delDate = 0;
     }
 
-        // Delete the product document
-    function deleteProductDocument() public returns(uint256, string){
-
+    // Delete the product document
+    function deleteProductDocument() public returns (uint256, string) {
         delDate = block.timestamp;
         return (RestStatus.OK, "ProductDocunent is deleted successfully.");
-      }
     }
 }

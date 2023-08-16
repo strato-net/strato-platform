@@ -465,7 +465,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         bool _waterFront,
         uint _scheme
     ) returns (uint256) {
-        Property_0_4 property = Property_0_4(_productAddress);
+        Property_0_5 property = Property_0_5(_productAddress);
         return
             property.update(
                 _listPrice,

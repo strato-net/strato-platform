@@ -2,7 +2,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "./ProductDocument.sol";
 
 /// @title A representation of ProductManager to manage product and inventory
-contract ProductDocumentManager is RestStatus {
+contract ProductDocumentManager {
     // constructor() public {}
 
     function createProductDocument(

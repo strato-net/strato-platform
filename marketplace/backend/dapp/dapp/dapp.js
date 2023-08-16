@@ -118,7 +118,7 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
-  const productDocumentManager = await productDocumentManagerJs.bindAddress(admin, state.productDocumentManager, options)
+  const productDocumentManager = await productDocumentManagerJs.bindAddress(admin, state["productDocumentManager"], options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 

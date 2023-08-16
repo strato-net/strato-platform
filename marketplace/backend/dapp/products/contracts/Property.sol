@@ -378,11 +378,9 @@ contract Property_0_5 {
         if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
-
         if (_scheme == 0) {
             return RestStatus.OK;
         }
-
         if ((_scheme & (1 << 0)) == (1 << 0)) {
             listPrice = _listPrice;
         }

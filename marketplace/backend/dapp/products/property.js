@@ -239,7 +239,7 @@ function bindAddress(user, address, options) {
 async function get(user, args, options) {
     const { uniqueProductID, address, ...restArgs } = args;
     let property;
-    console.log('productJS',uniqueProductID, address)
+    console.log('propertyJS',uniqueProductID, address)
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
         property = await searchOne(contractName, searchArgs, options, user);
