@@ -1,15 +1,13 @@
 import React, { useState } from "react";
-import { useFormik, getIn } from "formik";
+import { useFormik } from "formik";
 import {
   Form,
   Modal,
   Input,
   InputNumber,
   Select,
-  DatePicker,
   Button,
   Upload,
-  message,
   Spin,
   notification,
   Typography,
@@ -20,25 +18,21 @@ import getSchema from "./ProductSchema";
 //sub-categories
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
-import { unitOfMeasures } from "../../helpers/constants";
 
-const { Option } = Select;
 const { Dragger } = Upload;
 
 const CreateProductModal = ({
   open,
   handleCancel,
   categorys,
-  resetPage,
-  page,
-  debouncedSearchTerm,
 }) => {
-  const schema = getSchema();
+  // const schema = getSchema();
   const dispatch = useProductDispatch();
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageList, setImageList] = useState([]);
+  const [fileList, setFileList] = useState([]);
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
     useProductState();
@@ -146,26 +140,29 @@ const CreateProductModal = ({
     formik.setFieldValue("services", updatedServices);
   };
 
-  // These were used in the AntD example. Not sure if we need them for our upload
-  // See action linkn below
+  const handleDocumentChange = (info) => {
+    let fileList = [...info.fileList];
+    fileList = fileList.slice(-info.fileList.length);
+    setFileList(fileList);
+    formik.setFieldValue("documents", fileList);
+  };
+
   const props = {
     name: "file",
     multiple: true,
-    onChange(info) {
-      const { status } = info.file;
-      if (status === "done") {
-        message.success(`${info.file.name} file uploaded successfully.`);
-      } else if (status === "error") {
-        message.error(`${info.file.name} file upload failed.`);
-      }
-    },
+    onChange: handleDocumentChange,
     onDrop(e) {
       console.log("Dropped files", e.dataTransfer.files);
+    },
+    fileList: fileList,
+    accept: ".pdf, .doc, .docx .txt, .png, .jpg, .jpeg, .webp",
+    // If we don't use the action parameter, antd can get errors uploading the file. Set before upload to false to prevent this behavior.
+    beforeUpload: () => {
+      return false;
     },
   };
 
   const handleCreateFormSubmit = async (values) => {
-
     console.log("formik", formik.values);
     console.log("values", values);
   };
@@ -176,16 +173,8 @@ const CreateProductModal = ({
     handleCancel();
   };
 
-  function beforeUpload(file) {
-    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
-    if (!isJpgOrPng) {
-      openToast("bottom", "Image must be of jpeg or png format");
-    }
-    const isLt1M = file.size / 1024 / 1024 < 1;
-    if (!isLt1M) {
-      openToast("bottom", "Cannot upload an image of size more than 1mb");
-    }
-    return isJpgOrPng && isLt1M;
+  function beforeUpload() {
+    return false;
   }
 
   const [api, contextHolder] = notification.useNotification();
@@ -301,6 +290,7 @@ const CreateProductModal = ({
               onPreview={handlePreview}
               onChange={handleImageChange}
               beforeUpload={beforeUpload}
+              accept="image/png, image/webp, image/jpeg"
             >
               {imageList.length >= 10 ? null : uploadButton}
             </Upload>
@@ -416,10 +406,7 @@ const CreateProductModal = ({
                   value={service.serviceName}
                 >
                   {categorys.map((category) => (
-                    <Select.Option
-                      key={category.id}
-                      value={category.name}
-                    >
+                    <Select.Option key={category.id} value={category.name}>
                       {category.name}
                     </Select.Option>
                   ))}
@@ -500,7 +487,7 @@ const CreateProductModal = ({
         <div className="flex flex-col">
           {/* TODO: make sure this works for uploading multiple files */}
           <Typography.Title level={5}>Documents</Typography.Title>
-          <Form.Item label="Documents" name="documents" className="">
+          <Form.Item label="Documents" name="documents">
             <Dragger {...props}>
               <p className="ant-upload-drag-icon">
                 <InboxOutlined />
