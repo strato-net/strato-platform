@@ -14,6 +14,7 @@ import {
 } from "antd";
 import { FilterFilled, ClearOutlined } from "@ant-design/icons";
 import filterData from "../helpers/filterOptions.json";
+import { propertyConstants } from "../helpers/constants";
 
 const { Panel } = Collapse;
 
@@ -127,7 +128,7 @@ const Filter = (props) => {
             <Slider
               step={50000}
               min={0}
-              max={2000000}
+              max={propertyConstants.MAX_PRICE_VALUE}
               type="number"
               onChange={(value) => {
                 handleChange("maxPriceValue", value);

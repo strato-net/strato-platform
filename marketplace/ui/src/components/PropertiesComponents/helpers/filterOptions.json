@@ -17,7 +17,7 @@
       "label": "BuiltIn"
     },
     {
-      "value": "Carport",
+      "value": "carport",
       "label": "Carport"
     },
     {
@@ -93,15 +93,15 @@
       "label": "OffAlley"
     },
     {
-      "value": "OffStreet",
+      "value": "offStreet",
       "label": "OffStreet"
     },
     {
-      "value": "OffSite",
+      "value": "offSite",
       "label": "OffSite"
     },
     {
-      "value": "OnStreet",
+      "value": "onStreet",
       "label": "OnStreet"
     },
     {

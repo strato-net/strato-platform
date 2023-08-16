@@ -55,7 +55,7 @@ function PropertyListings() {
     setAppliedFilter(filteredData)
     console.log(filteredData)
     console.log(filteredData)
-    actions.fetchProperties(dispatch, limit, currentPage - 1, filteredData)
+    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
   const clearFilter = () => {

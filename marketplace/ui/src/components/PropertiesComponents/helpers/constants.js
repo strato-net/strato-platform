@@ -222,7 +222,7 @@ export const propertyCheckBox = {
 
 export const propertyConstants = {
   LIMIT_PER_PAGE: 10,
-  MAX_PRICE_VALUE: 200000
+  MAX_PRICE_VALUE: 99999999
 }
 
 export const filterSchema = {

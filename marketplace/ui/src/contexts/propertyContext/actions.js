@@ -138,12 +138,16 @@ const actions = {
     const { minPriceValue, maxPriceValue, bathroomsTotalInteger, postalcode, stateOrProvince, bedroomsTotal, lotSizeArea, sortBy, parkingType } = options
     const priceQuery = minPriceValue || maxPriceValue ? `&range[]=listPrice,${minPriceValue},${maxPriceValue}` : '';
     const postalcodeQuery = postalcode ? `&postalcode=${postalcode}` : '';
-    const stateOrProvinceQuery = stateOrProvince && stateOrProvince !== 'Select' ? `&stateOrProvince=${stateOrProvince}` : '';
+    const stateOrProvinceQuery = stateOrProvince && stateOrProvince !== 'select' ? `&stateOrProvince=${stateOrProvince}` : '';
     const bedroomsTotalQuery = bedroomsTotal ? `&gteQuery[]=bedroomsTotal,${bedroomsTotal}` : '';
     const bathroomsTotalIntegerQuery = bathroomsTotalInteger ? `&gteQuery[]=bathroomsTotalInteger,${bathroomsTotalInteger}` : '';
-    const lotSizeAreaQuey = lotSizeArea ? `&lotSizeArea=${lotSizeArea}` : '';
-    const parkingTypeQuery = parkingType ? `&${parkingType}=true` : '';
-    const sortByQuery = sortBy && sortBy !== 'Select' ? `&sort=${sortBy.includes('min') ? encodeURIComponent(`+${sortBy.replace('min', '')}`) : encodeURIComponent(`-${sortBy.replace('max', '')}`)}` : '';
+    const lotSizeAreaQuey = lotSizeArea ? `&gteQuery[]=lotSizeArea,${lotSizeArea}` : '';
+    const parkingTypeQuery = parkingType && parkingType !== 'select' ? `&${parkingType}=true` : '';
+    const sortByQuery = sortBy && sortBy !== 'select'
+      ? `&sort=${sortBy.includes('min')
+        ? encodeURIComponent(`+${sortBy.replace('min', '')}`)
+        : encodeURIComponent(`-${sortBy.replace('max', '')}`)}`
+      : '';
 
     const query = queryValue
       ? `&queryValue=${queryValue}&queryFields=name`
