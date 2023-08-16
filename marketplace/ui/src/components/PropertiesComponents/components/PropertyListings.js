@@ -82,6 +82,7 @@ function PropertyListings() {
     })
     setAppliedFilter(check);
     setSelectedFilter(check);
+    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
   const propertyList = () => {
