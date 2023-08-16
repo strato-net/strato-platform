@@ -1,0 +1,165 @@
+import { actionDescriptors } from "./actions";
+
+const reducer = (state, action) => {
+  switch (action.type) {
+    case actionDescriptors.resetMessage:
+      return {
+        ...state,
+        success: false,
+        message: null
+      };
+    case actionDescriptors.setMessage:
+      return {
+        ...state,
+        success: action.success,
+        message: action.message
+      };
+    case actionDescriptors.createMembership:
+      return {
+        ...state,
+        isCreateMembershipSubmitting: true
+      };
+    case actionDescriptors.createMembershipSuccessful:
+      return {
+        ...state,
+        membership: action.payload,
+        isCreateMembershipSubmitting: false
+      };
+    case actionDescriptors.createMembershipFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateMembershipSubmitting: false
+      };
+    case actionDescriptors.fetchMembership:
+      return {
+        ...state,
+        isMembershipsLoading: true
+      };
+    case actionDescriptors.fetchMembershipSuccessful:
+      return {
+        ...state,
+        memberships: action.payload.memberships,
+        totalMemberships: action.payload.total,
+        isMembershipsLoading: false
+      };
+    case actionDescriptors.fetchMembershipFailed:
+      return {
+        ...state,
+        error: action.error,
+        isMembershipsLoading: false
+      };
+    case actionDescriptors.fetchMembershipDetails:
+      return {
+        ...state,
+        ismembershipDetailsLoading: true
+      };
+    case actionDescriptors.fetchMembershipDetailsSuccessful:
+      return {
+        ...state,
+        membershipDetails: action.payload,
+        ismembershipDetailsLoading: false
+      };
+    case actionDescriptors.fetchMembershipDetailsFailed:
+      return {
+        ...state,
+        error: action.error,
+        ismembershipDetailsLoading: false
+      };
+    case actionDescriptors.transferMembershipOwnership:
+      return {
+        ...state,
+        isOwnershipmembershipTransferring: true
+      };
+    case actionDescriptors.transferMembershipOwnershipSuccessful:
+      return {
+        ...state,
+        membershipOwnership: action.payload,
+        isOwnershipmembershipTransferring: false
+      };
+    case actionDescriptors.transferMembershipOwnershipFailed:
+      return {
+        ...state,
+        error: action.error,
+        isOwnershipmembershipTransferring: false
+      };
+    case actionDescriptors.updateMembership:
+      return {
+        ...state,
+        ismembershipUpdating: true
+      };
+    case actionDescriptors.updateMembershipSuccessful:
+      return {
+        ...state,
+        membershipUpdateObject: action.payload,
+        ismembershipUpdating: false
+      };
+    case actionDescriptors.updateMembershipFailed:
+      return {
+        ...state,
+        error: action.error,
+        ismembershipUpdating: false
+      };
+    case actionDescriptors.fetchMembershipAudit:
+      return {
+        ...state,
+        ismembershipsAuditLoading: true
+      };
+    case actionDescriptors.fetchMembershipAuditSuccessful:
+      return {
+        ...state,
+        membershipsAudit: action.payload,
+        ismembershipsAuditLoading: false
+      };
+    case actionDescriptors.fetchMembershipAuditFailed:
+      return {
+        ...state,
+        error: action.error,
+        ismembershipsAuditLoading: false
+      };
+    case actionDescriptors.importAssetRequest:
+      return {
+        ...state,
+        isAssetImportInProgress: true,
+        assetsUploaded: 0,
+        assetsUploadedErrors: []
+      }
+    case actionDescriptors.importAssetSuccess:
+      return {
+        ...state,
+        isAssetImportInProgress: false,
+        error: null
+      }
+    case actionDescriptors.importAssetFailure:
+      return {
+        ...state,
+        error: action.error,
+        isAssetImportInProgress: false,
+        isImportAssetsModalOpen: true
+      }
+    case actionDescriptors.updateAssetImportCount:
+      return {
+        ...state,
+        assetsUploaded: action.count
+      }
+    case actionDescriptors.updateAssetUploadError:
+      return {
+        ...state,
+        assetsUploadedErrors: action.errors
+      }
+    case actionDescriptors.openImportCSVModal:
+      return {
+        ...state,
+        isImportAssetsModalOpen: true
+      }
+    case actionDescriptors.closeImportCSVModal:
+      return {
+        ...state,
+        isImportAssetsModalOpen: false
+      }
+    default:
+      throw new Error(`Unhandled action: '${action.type}'`);
+  }
+};
+
+export default reducer;
