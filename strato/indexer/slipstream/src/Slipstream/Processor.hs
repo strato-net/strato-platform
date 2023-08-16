@@ -141,7 +141,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
-  , abstractInsert     :: Maybe (ProcessedContract, T.Text, [T.Text])
+  , abstractInsert     :: Maybe (ProcessedContract, T.Text, TableColumns)
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)

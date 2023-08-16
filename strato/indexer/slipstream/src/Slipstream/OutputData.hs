@@ -686,7 +686,7 @@ insertHistoryTable contracts@(E.ProcessedContract { organization = org, applicat
   yieldMany $ insertHistoryTableQuery contracts
 
 insertAbstractTable :: OutputM m
-                 => [Maybe (E.ProcessedContract, T.Text, [T.Text])]
+                 => [Maybe (E.ProcessedContract, T.Text, TableColumns)]
                  -> ConduitM () Text m ()
 insertAbstractTable [] = return () -- no data, do nothing
 insertAbstractTable contracts = do
@@ -870,7 +870,7 @@ insertContractInAbstractTableQuery globalsIORef (o,a,n) ab = do
     let list = ["data"]
     setTableCreated globalsIORef abstractTableName list
 
-insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, [T.Text])] -> [Text]
+insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, TableColumns)] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs = concat $
   let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab, abC) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abC))) <$> cs
@@ -886,7 +886,7 @@ insertAbstractTableQuery cs = concat $
                   (E.application x)
                   (E.contractName x)
                   (ab)
-              abTableName' = tableNameToDoubleQuoteText abTableName             
+              abTableName' = tableNameToDoubleQuoteText abTableName 
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractTableColumns ++ abC
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
@@ -898,7 +898,7 @@ insertAbstractTableQuery cs = concat $
                          , tshow . E.transactionSender
                          ]
               vals = flip map contracts $ \((row, rowList),_) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ abC ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`notElem` abC) rowList]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ map snd (Map.toList $ Map.filter (`elem` abC) rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`notElem` abC) rowList]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
