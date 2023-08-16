@@ -887,7 +887,7 @@ insertAbstractTableQuery cs = concat $
                   (E.contractName x)
                   (ab)
               abTableName' = tableNameToDoubleQuoteText abTableName 
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractTableColumns ++ abC
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ (baseAbstractTableColumns ++ abC)
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain

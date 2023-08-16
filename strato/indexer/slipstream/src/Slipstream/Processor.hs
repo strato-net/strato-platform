@@ -419,6 +419,7 @@ processTheMessages env conn g messages = do
           abstractColumns <- case abstracts of
                               [] -> return Nothing
                               (firstAbstract:_) -> getTableColumns g $ AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract) firstAbstract
+          $logInfoS "DAVIDprocessTheMessages/abstractColumns'" $ T.pack $ show abstractColumns
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
