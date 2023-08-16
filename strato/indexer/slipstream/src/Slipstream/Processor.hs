@@ -141,7 +141,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
-  , abstractInsert     :: Maybe (ProcessedContract, T.Text)
+  , abstractInsert     :: Maybe (ProcessedContract, T.Text, [T.Text])
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -376,8 +376,6 @@ processTheMessages env conn g messages = do
                 when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTable g c nameParts (head parentAbstractContractsName)
 
                 when(length parentAbstractContractsName >=1 ) $ do outputData conn $ insertContractInAbstractTableQuery g nameParts (head parentAbstractContractsName) --Tables are created
-
-                -- map (\parent -> outputData conn $ insertContractInAbstractTableQuery g nameParts parent) parentAbstractContractsName
   
                 return deferredForeignKeys
 
@@ -418,6 +416,7 @@ processTheMessages env conn g messages = do
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          abstractColumns <- getTableColumns g $ AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract) (head abstracts)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
@@ -425,7 +424,9 @@ processTheMessages env conn g messages = do
           if null abstracts
             then pure . Right $ BatchedInserts indexContract Nothing hs pMappings
           else
-            pure . Right $ BatchedInserts indexContract (Just (indexContract, head abstracts)) hs pMappings
+            case abstractColumns of 
+              Just abC -> pure . Right $ BatchedInserts indexContract (Just (indexContract, head abstracts, abC)) hs pMappings
+              Nothing -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
             
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"

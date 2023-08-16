@@ -686,14 +686,14 @@ insertHistoryTable contracts@(E.ProcessedContract { organization = org, applicat
   yieldMany $ insertHistoryTableQuery contracts
 
 insertAbstractTable :: OutputM m
-                 => [Maybe (E.ProcessedContract, T.Text)]
+                 => [Maybe (E.ProcessedContract, T.Text, [T.Text])]
                  -> ConduitM () Text m ()
 insertAbstractTable [] = return () -- no data, do nothing
 insertAbstractTable contracts = do
     let validContracts = catMaybes contracts
     case validContracts of
         [] -> return () -- no valid contracts, do nothing
-        ((E.ProcessedContract { organization = org, application = app, contractName = cName },_) : _) -> do
+        ((E.ProcessedContract { organization = org, application = app, contractName = cName },_,_) : _) -> do
             let tableName = indexTableName org app cName
             $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show tableName
             yieldMany $ insertAbstractTableQuery validContracts
@@ -870,13 +870,13 @@ insertContractInAbstractTableQuery globalsIORef (o,a,n) ab = do
     let list = ["data"]
     setTableCreated globalsIORef abstractTableName list
 
-insertAbstractTableQuery :: [(E.ProcessedContract, T.Text)] -> [Text]
+insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, [T.Text])] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs = concat $
-  let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), ab)) <$> cs
+  let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab, abC) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abC))) <$> cs
    in flip map (map snd $ partitionWith (length . snd . fst) cs') $ \case
         [] -> []
-        contracts@(((x, _), ab):_) ->
+        contracts@(((x, _), (ab, abC)):_) ->
           let contractTableName = indexTableName
                   (E.organization x)
                   (E.application x)
@@ -887,7 +887,7 @@ insertAbstractTableQuery cs = concat $
                   (E.contractName x)
                   (ab)
               abTableName' = tableNameToDoubleQuoteText abTableName             
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractTableColumns
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractTableColumns ++ abC
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -897,9 +897,8 @@ insertAbstractTableQuery cs = concat $
                          , T.pack . keccak256ToHex . E.transactionHash
                          , tshow . E.transactionSender
                          ]
-
               vals = flip map contracts $ \((row, rowList),_) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper rowList]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ abC ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`notElem` abC) rowList]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
