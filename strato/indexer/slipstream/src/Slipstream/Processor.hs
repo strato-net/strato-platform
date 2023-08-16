@@ -416,7 +416,7 @@ processTheMessages env conn g messages = do
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          abstractColumns <- getTableColumns g $ AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract) (head abstracts)
+          when(length abstracts >=1 ) $ do abstractColumns <- getTableColumns g $ AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract) (head abstracts)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
