@@ -63,6 +63,18 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string _purpose
     ) returns (uint256, address) {
         Item_5 item = Item_5(_itemAddress);
+
+        Inventory_3 inventory = Inventory_3(item.inventoryId());
+        if (_quantity > inventory.availableQuantity()) {
+            return (RestStatus.BAD_REQUEST, address(0));
+        }
+
+        uint256 currentTimestamp = block.timestamp;
+        uint256 currentYear = (currentTimestamp / 31536000) + 1970;
+        if (inventory.vintage() > currentYear) {
+            return (RestStatus.BAD_REQUEST, address(0));
+        }
+
         return
             item.retireItem(
                 _retiredBy,
