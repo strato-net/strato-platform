@@ -222,13 +222,13 @@ export const propertyCheckBox = {
 
 export const propertyConstants = {
   LIMIT_PER_PAGE: 10,
-  MAX_PRICE_VALUE: 99999999
+  MAX_PRICE_VALUE: 0
 }
 
 export const filterSchema = {
   sort_By: "select",
   min_Price: 0,
-  max_Price: propertyConstants.MAX_PRICE_VALUE,
+  max_Price: 0,
   zip_code: 0,
   state: "select",
   min_Bedrooms: 0,

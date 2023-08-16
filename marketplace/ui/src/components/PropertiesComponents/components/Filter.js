@@ -38,8 +38,7 @@ const Filter = (props) => {
   };
 
   const handleClear = () => {
-    // setDrawerOpen(false);
-    // setFilterOption(filterSchema);
+    setDrawerOpen(false);
     props.clearFilter()
   };
 
@@ -91,20 +90,6 @@ const Filter = (props) => {
             >
               Min Price
             </Typography.Title>
-            <Slider
-              step={50000}
-              min={0}
-              max={max_Price}
-              type="number"
-              onChange={(value) => {
-                handleChange("min_Price", value);
-              }}
-              value={
-                typeof min_Price === "number"
-                  ? min_Price
-                  : 0
-              }
-            />
             <InputNumber
               min={0}
               max={max_Price}
@@ -125,23 +110,8 @@ const Filter = (props) => {
             >
               Max Price
             </Typography.Title>
-            <Slider
-              step={50000}
-              min={0}
-              max={propertyConstants.MAX_PRICE_VALUE}
-              type="number"
-              onChange={(value) => {
-                handleChange("max_Price", value);
-              }}
-              value={
-                typeof max_Price === "number"
-                  ? max_Price
-                  : 0
-              }
-            />
             <InputNumber
               min={0}
-              max={2000000}
               type="number"
               style={{ width: "100%" }}
               placeholder="Max Price"
