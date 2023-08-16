@@ -1,170 +1,103 @@
 import React, { useState } from "react";
-import { useFormik } from "formik";
+import { useFormik, getIn } from "formik";
 import {
   Form,
   Modal,
   Input,
-  InputNumber,
   Select,
+  Radio,
   Button,
   Upload,
   Spin,
   notification,
-  Typography,
 } from "antd";
-import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
+import TextArea from "antd/es/input/TextArea";
+import { PictureOutlined } from "@ant-design/icons";
 import getSchema from "./ProductSchema";
 
 //sub-categories
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import { unitOfMeasures } from "../../helpers/constants";
 
-const { Dragger } = Upload;
+const { Option } = Select;
 
 const CreateProductModal = ({
   open,
   handleCancel,
   categorys,
+  resetPage,
+  page,
+  debouncedSearchTerm,
 }) => {
-  // const schema = getSchema();
+  const schema = getSchema();
+  const [selectedImage, setSelectedImage] = useState(null);
   const dispatch = useProductDispatch();
-  const [previewImage, setPreviewImage] = useState("");
-  const [previewTitle, setPreviewTitle] = useState("");
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [imageList, setImageList] = useState([]);
-  const [fileList, setFileList] = useState([]);
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
     useProductState();
 
   const initialValues = {
+    image: null,
     name: "",
-    category: "",
-    duration: "",
-    additionalInformation: "",
-    images: [],
+    category: {
+      name: null,
+      address: "",
+    },
+    subCategory: {
+      name: null,
+      address: "",
+    },
+    manufacturer: "",
+    unitofmeasurement: {
+      name: null,
+      value: "",
+    },
+    leastSellableUnit: "",
     description: "",
-    yearlyPrice: "",
-    monthlyPrice: "",
-    quantity: "",
-    services: [
-      {
-        serviceName: "",
-        numberOfUses: "",
-        memberPrice: null,
-        percentDiscount: null,
-      },
-    ],
-    documents: [],
+    active: true,
+    userUniqueProductCode: "",
   };
 
   const formik = useFormik({
     initialValues: initialValues,
-    // validationSchema: schema,
-    setFieldValue: (field, value) => {
-      formik.setFieldValue(field, value);
-    },
-    onSubmit: function (values) {
+    validationSchema: schema,
+    onSubmit: function (values, onSubmitProps) {
       handleCreateFormSubmit(values);
     },
     enableReinitialize: true,
   });
 
-  const getBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-    });
-
-  const handlePreview = async (file) => {
-    if (!file.url && !file.preview) {
-      file.preview = await getBase64(file.originFileObj);
-    }
-    setPreviewImage(file.url || file.preview);
-    setPreviewOpen(true);
-    setPreviewTitle(
-      file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
-    );
-  };
-
-  const handleImageChange = ({ fileList }) => {
-    setImageList(fileList);
-    formik.setFieldValue("images", fileList);
-  };
-
-  const uploadButton = (
-    <div
-      style={{ display: "inline-block", verticalAlign: "top", marginRight: 8 }}
-    >
-      <PlusOutlined />
-      <div>Upload</div>
-    </div>
-  );
-
-  const addServiceRow = () => {
-    const updatedServices = [...formik.values.services];
-    updatedServices.push({
-      serviceName: "",
-      numberOfUses: "",
-      memberPrice: "",
-      percentDiscount: "",
-    });
-    formik.setFieldValue("services", updatedServices);
-  };
-
-  const removeServiceRow = (indexToRemove) => {
-    const updatedServices = [...formik.values.services];
-    updatedServices.splice(indexToRemove, 1);
-    formik.setFieldValue("services", updatedServices);
-  };
-
-  const handleMemberPriceChange = (index, value) => {
-    const updatedServices = [...formik.values.services];
-    updatedServices[index] = {
-      ...updatedServices[index],
-      memberPrice: value,
-      percentDiscount: null, // Clear discount
-    };
-    formik.setFieldValue("services", updatedServices);
-  };
-
-  const handlePercentDiscountChange = (index, value) => {
-    const updatedServices = [...formik.values.services];
-    updatedServices[index] = {
-      ...updatedServices[index],
-      percentDiscount: value,
-      memberPrice: null, // Clear member price
-    };
-    formik.setFieldValue("services", updatedServices);
-  };
-
-  const handleDocumentChange = (info) => {
-    let fileList = [...info.fileList];
-    fileList = fileList.slice(-info.fileList.length);
-    setFileList(fileList);
-    formik.setFieldValue("documents", fileList);
-  };
-
-  const props = {
-    name: "file",
-    multiple: true,
-    onChange: handleDocumentChange,
-    onDrop(e) {
-      console.log("Dropped files", e.dataTransfer.files);
-    },
-    fileList: fileList,
-    accept: ".pdf, .doc, .docx .txt, .png, .jpg, .jpeg, .webp",
-    // If we don't use the action parameter, antd can get errors uploading the file. Set before upload to false to prevent this behavior.
-    beforeUpload: () => {
-      return false;
-    },
-  };
-
   const handleCreateFormSubmit = async (values) => {
-    console.log("formik", formik.values);
-    console.log("values", values);
+    const formData = new FormData();
+    formData.append("fileUpload", formik.values.image);
+
+    let imageData = await actions.uploadImage(dispatch, formData);
+    if (imageData) {
+      const body = {
+        productArgs: {
+          name: encodeURIComponent(values.name),
+          description: encodeURIComponent(values.description),
+          manufacturer: encodeURIComponent(values.manufacturer),
+          unitOfMeasurement: values.unitofmeasurement.value,
+          leastSellableUnit: parseInt(values.leastSellableUnit),
+          imageKey: imageData.imageKey,
+          isActive: values.active,
+          category: values.category.name,
+          subCategory: values.subCategory.name,
+          userUniqueProductCode: values.userUniqueProductCode,
+        },
+      };
+
+      let isDone = await actions.createProduct(dispatch, body);
+
+      if (isDone) {
+        if (page === 1)
+          actions.fetchProduct(dispatch, 10, 0, debouncedSearchTerm);
+        resetPage(1);
+        handleCancel();
+      }
+    }
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
@@ -173,8 +106,16 @@ const CreateProductModal = ({
     handleCancel();
   };
 
-  function beforeUpload() {
-    return false;
+  function beforeUpload(file) {
+    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
+    if (!isJpgOrPng) {
+      openToast("bottom", "Image must be of jpeg or png format");
+    }
+    const isLt1M = file.size / 1024 / 1024 < 1;
+    if (!isLt1M) {
+      openToast("bottom", "Cannot upload an image of size more than 1mb");
+    }
+    return isJpgOrPng && isLt1M;
   }
 
   const [api, contextHolder] = notification.useNotification();
@@ -193,17 +134,18 @@ const CreateProductModal = ({
       open={open}
       centered
       onCancel={closeModal}
-      width={1000}
+      width={885}
       footer={[
         <div className="flex justify-center">
           <Button
+            className="w-40"
             id="create-product-button"
             key="submit"
             type="primary"
             onClick={formik.handleSubmit}
             disabled={disabled}
           >
-            {disabled ? <Spin /> : "Create Membership"}
+            {disabled ? <Spin /> : "Create Product"}
           </Button>
         </div>,
       ]}
@@ -213,293 +155,261 @@ const CreateProductModal = ({
         id="modal-title"
         className="text-center font-semibold text-lg text-primaryB"
       >
-        Create Membership
+        Add Product
       </h1>
       <hr className="text-secondryD mt-3" />
       <Form layout="vertical" className="mt-5">
-        <div className="flex flex-col mb-7">
-          <Typography.Title level={5}>Membership</Typography.Title>
-          <div className="grid grid-cols-5 mb-6">
-            <Form.Item label="Membership Name" name="name">
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Membership Name"
-                onChange={(e) => {
-                  formik.setFieldValue("name", e.target.value);
-                }}
-                value={formik.values.name}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="Category" name="category" className="w-10/12">
-              <Select
-                id="category"
-                name="category"
-                placeholder="Select Category"
-                onChange={(value) => {
-                  formik.setFieldValue("category", value);
-                }}
-                value={formik.values.category}
-              >
-                {categorys.map((category) => (
-                  <Select.Option key={category.name} value={category.id}>
-                    {category.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-            <Form.Item label="Duration (Months)" name="duration">
-              <InputNumber
-                id="duration"
-                name="duration"
-                type="number"
-                min={0}
-                value={formik.values.duration}
-                onChange={(value) => {
-                  formik.setFieldValue("duration", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item
-              label="Additional Information"
-              name="additionalInformation"
-              className="col-span-2"
-            >
-              <Input.TextArea
-                id="additionalInformation"
-                name="additionalInformation"
-                type="text"
-                onChange={(e) => {
-                  formik.setFieldValue("additionalInformation", e.target.value);
-                }}
-                value={formik.values.additionalInformation}
-                className=""
-              />
-            </Form.Item>
-          </div>
-
-          <Form.Item label="Images" name="images">
-            <Upload
-              id="images"
-              listType="picture-card"
-              multiple={true}
-              fileList={imageList}
-              onPreview={handlePreview}
-              onChange={handleImageChange}
-              beforeUpload={beforeUpload}
-              accept="image/png, image/webp, image/jpeg"
-            >
-              {imageList.length >= 10 ? null : uploadButton}
-            </Upload>
-            <Modal
-              open={previewOpen}
-              title={previewTitle}
-              footer={null}
-              onCancel={() => setPreviewOpen(false)}
-            >
-              <img
-                alt="example"
-                style={{
-                  width: "100%",
-                }}
-                src={previewImage}
-              />
-            </Modal>
-          </Form.Item>
-          <Form.Item label="Description" name="description">
-            <Input.TextArea
-              id="description"
-              name="description"
-              type="text"
-              placeholder="Description"
-              onChange={(e) => {
-                formik.setFieldValue("description", e.target.value);
-              }}
-              value={formik.values.description}
-              className=""
-            />
-          </Form.Item>
-        </div>
-        <div className="flex flex-col mb-7">
-          <Typography.Title level={5}>Pricing</Typography.Title>
-          <div className="grid grid-cols-5">
-            <Form.Item label="Yearly Price" name="price">
-              <InputNumber
-                id="yearlyPrice"
-                name="yearlyPrice"
-                type="number"
-                min={0}
-                addonBefore="$"
-                value={formik.values.yearlyPrice}
-                onChange={(value) => {
-                  formik.setFieldValue("yearlyPrice", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="Monthly Price" name="monthlyPrice">
-              <InputNumber
-                id="monthlyPrice"
-                name="monthlyPrice"
-                type="number"
-                min={0}
-                addonBefore="$"
-                value={formik.values.monthlyPrice}
-                onChange={(value) => {
-                  formik.setFieldValue("monthlyPrice", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="Quantity" name="quantity">
-              <InputNumber
-                id="quantity"
-                name="quantity"
-                type="number"
-                min={0}
-                value={formik.values.quantity}
-                onChange={(value) => {
-                  formik.setFieldValue("quantity", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-          </div>
-        </div>
-        <div className="flex flex-col mb-7">
-          <Typography.Title level={5}>Services</Typography.Title>
-          <Button
-            className="w-80"
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              addServiceRow();
-            }}
-          >
-            Add Service
-          </Button>
-
-          {formik.values.services.map((service, index) => (
-            <div className="grid grid-cols-6 mt-3" key={`row_${index}`}>
-              <Form.Item
-                label="Service Name"
-                name={`serviceName_${index}`}
-                className="col-span-2 mr-7"
-                key={`serviceName_${index}`}
-                value={formik.values.services[index].serviceName}
-              >
-                <Select
-                  id={`serviceName_${index}`}
-                  name={`serviceName_${index}`}
-                  placeholder="Select Service"
-                  onChange={(value) => {
-                    const updatedServices = [...formik.values.services];
-                    updatedServices[index] = {
-                      ...updatedServices[index],
-                      serviceName: value,
-                    };
-                    formik.setFieldValue("services", updatedServices);
+        <div className="flex w-full">
+          <div className="w-1/4">
+            <Form.Item label="Upload Image" name="image">
+              <div className="w-48 h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
+                {selectedImage ? (
+                  <div className="h-20">
+                    <img
+                      alt="Product"
+                      src={selectedImage}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                    <br />
+                  </div>
+                ) : (
+                  <PictureOutlined className="text-7xl text-primary opacity-10" />
+                )}
+                <Upload
+                  onChange={(e) => {
+                    setSelectedImage(URL.createObjectURL(e.file.originFileObj));
+                    formik.setFieldValue("image", e.file.originFileObj);
                   }}
-                  value={service.serviceName}
+                  customRequest={() => {}}
+                  style={{ display: "none" }}
+                  accept="image/png, image/jpeg"
+                  maxCount={1}
+                  showUploadList={false}
+                  beforeUpload={beforeUpload}
                 >
-                  {categorys.map((category) => (
-                    <Select.Option key={category.id} value={category.name}>
-                      {category.name}
-                    </Select.Option>
+                  <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                    Browse
+                  </div>
+                </Upload>
+              </div>
+
+              <div className="flex items-start">
+                <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                <p className="mt-1 text-xs italic ml-1 mr-4">
+                  use jpg, png format of size less than 1mb
+                </p>
+              </div>
+              {formik.touched.image && formik.errors.image && (
+                <span className="text-error text-xs">
+                  {formik.errors.image}
+                </span>
+              )}
+            </Form.Item>
+          </div>
+          <div className="w-3/4 mb-3">
+            <div className="flex justify-between ">
+              <Form.Item label="Name" name="name" className="w-72">
+                <Input
+                  label="name"
+                  name="name"
+                  placeholder="Enter Name"
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.name && formik.errors.name && (
+                  <span className="text-error text-xs">
+                    {formik.errors.name}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item label="Category" className="w-72">
+                <Select
+                  id="category"
+                  placeholder="Select Category"
+                  showSearch
+                  allowClear
+                  name="category.name"
+                  value={formik.values.category.name}
+                  onChange={(value) => {
+                    formik.setFieldValue("category.name", value);
+                    formik.setFieldValue("subCategory.name", null);
+                  }}
+                >
+                  {categorys.map((e, index) => (
+                    <Option value={e.name} key={index}>
+                      {e.name}
+                    </Option>
                   ))}
                 </Select>
+                {getIn(formik.touched, "category.name") &&
+                  getIn(formik.errors, "category.name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "category.name")}
+                    </span>
+                  )}
               </Form.Item>
-              <Form.Item
-                label="Number of Uses"
-                name={`numberOfUses_${index}`}
-                key={`numberOfUses_${index}`}
-                value={service.numberOfUses}
-              >
-                <InputNumber
-                  id={`numberOfUses_${index}`}
-                  name={`numberOfUses_${index}`}
-                  type="number"
-                  min={0}
-                  value={service.numberOfUses}
-                  onChange={(value) => {
-                    const updatedServices = [...formik.values.services];
-                    updatedServices[index] = {
-                      ...updatedServices[index],
-                      numberOfUses: value,
-                    };
-                    formik.setFieldValue("services", updatedServices);
-                  }}
-                  className="w-10/12"
-                />
-              </Form.Item>
-              <Form.Item
-                label="Member Price"
-                name={`memberPrice_${index}`}
-                key={`memberPrice_${index}`}
-              >
-                <InputNumber
-                  id={`memberPrice_${index}`}
-                  name={`memberPrice_${index}`}
-                  type="number"
-                  min={0}
-                  addonBefore="$"
-                  value={service.memberPrice}
-                  onChange={(value) => {
-                    handleMemberPriceChange(index, value);
-                  }}
-                  className="w-10/12"
-                />
-              </Form.Item>
-              <Form.Item
-                label="Percent Discount"
-                name={`percentDiscount_${index}`}
-                key={`percentDiscount_${index}`}
-              >
-                <InputNumber
-                  id={`percentDiscount_${index}`}
-                  name={`percentDiscount_${index}`}
-                  type="number"
-                  min={0}
-                  addonBefore="%"
-                  value={service.percentDiscount}
-                  onChange={(value) => {
-                    handlePercentDiscountChange(index, value);
-                  }}
-                  className="w-10/12"
-                />
-              </Form.Item>
-
-              <Button
-                className="w-10/12 self-end"
-                key={`removeService_${index}`}
-                type="primary"
-                icon={<MinusOutlined />}
-                onClick={() => {
-                  removeServiceRow();
-                }}
-              ></Button>
             </div>
-          ))}
-        </div>
-        <div className="flex flex-col">
-          {/* TODO: make sure this works for uploading multiple files */}
-          <Typography.Title level={5}>Documents</Typography.Title>
-          <Form.Item label="Documents" name="documents">
-            <Dragger {...props}>
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined />
-              </p>
-              <p className="ant-upload-text">
-                Click or drag file to this area to upload
-              </p>
-              <p className="ant-upload-hint">
-                Support for a single or bulk upload.
-              </p>
-            </Dragger>
-          </Form.Item>
+            <div className="flex justify-between mt-4">
+              <Form.Item
+                label="Sub Category"
+                name="subCategory"
+                className="w-72"
+              >
+                <Select
+                  id="subCategory"
+                  showSearch
+                  placeholder="Select Sub Category"
+                  allowClear
+                  name="subCategory.name"
+                  value={formik.values.subCategory.name}
+                  onChange={(value) => {
+                    formik.setFieldValue("subCategory.name", value);
+                  }}
+                >
+                  {categorys.map((category) =>
+                    category.name === formik.values.category.name
+                      ? category.subCategories.map((e, index) => (
+                          <Option value={e.name} key={index}>
+                            {e.name}
+                          </Option>
+                        ))
+                      : null
+                  )}
+                </Select>
+                {getIn(formik.touched, "subCategory.name") &&
+                  getIn(formik.errors, "subCategory.name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "subCategory.name")}
+                    </span>
+                  )}
+              </Form.Item>
+              <Form.Item
+                label="Manufacturer"
+                name="manufacturer"
+                className="w-72"
+              >
+                <Input
+                  label="manufacturer"
+                  placeholder="Enter Manufacturer"
+                  name="manufacturer"
+                  value={formik.values.manufacturer}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.manufacturer && formik.errors.manufacturer && (
+                  <span className="text-error text-xs">
+                    {formik.errors.manufacturer}
+                  </span>
+                )}
+              </Form.Item>
+            </div>
+            <div className="flex justify-between mt-4 ">
+              <Form.Item
+                label="Unit of Measurement "
+                name="unitofmeasurement "
+                className="w-72"
+              >
+                <Select
+                  id="unitofmeasurement"
+                  placeholder="Select Unit of Measurement "
+                  allowClear
+                  name="unitofmeasurement.name"
+                  value={formik.values.unitofmeasurement.name}
+                  onChange={(value) => {
+                    let selectedUOM = unitOfMeasures.find(
+                      (u) => u.value === value
+                    );
+                    formik.setFieldValue(
+                      "unitofmeasurement.name",
+                      selectedUOM.name
+                    );
+                    formik.setFieldValue("unitofmeasurement.value", value);
+                  }}
+                >
+                  {unitOfMeasures.map((e, index) => (
+                    <Option value={e.value} key={index}>
+                      {e.name}
+                    </Option>
+                  ))}
+                </Select>
+                {getIn(formik.touched, "unitofmeasurement.name") &&
+                  getIn(formik.errors, "unitofmeasurement.name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "unitofmeasurement.name")}
+                    </span>
+                  )}
+              </Form.Item>
+              <Form.Item
+                label="Least Sellable Unit"
+                name="leastSellableUnit"
+                className="w-72"
+              >
+                <Input
+                  label="leastSellableUnit"
+                  name="leastSellableUnit"
+                  value={formik.values.leastSellableUnit}
+                  onChange={formik.handleChange}
+                  placeholder="Enter Least Sellable Unit"
+                />
+                {formik.touched.leastSellableUnit &&
+                  formik.errors.leastSellableUnit && (
+                    <span className="text-error text-xs">
+                      {formik.errors.leastSellableUnit}
+                    </span>
+                  )}
+              </Form.Item>
+            </div>
+            <Form.Item label="Description" name="description" className="mt-4">
+              <TextArea
+                label="description"
+                placeholder="Enter Description"
+                name="description"
+                value={formik.values.description}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.description && formik.errors.description && (
+                <span className="text-error text-xs">
+                  {formik.errors.description}
+                </span>
+              )}
+            </Form.Item>
+            <div className="flex justify-between mt-4 items-center">
+              <Form.Item label="Active" name="active">
+                <Radio.Group
+                  value={formik.values.active}
+                  onChange={formik.handleChange}
+                  name="active"
+                >
+                  <Radio value={true}>Yes</Radio>
+                  <Radio value={false}>No</Radio>
+                </Radio.Group>
+
+                {formik.touched.active && formik.errors.active && (
+                  <span className="text-error text-xs">
+                    {formik.errors.active}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item
+                label="Unique Product Code"
+                name="userUniqueProductCode"
+                className="w-72"
+              >
+                <Input
+                  label="userUniqueProductCode"
+                  placeholder="Enter Unique Product Code"
+                  name="userUniqueProductCode"
+                  value={formik.values.userUniqueProductCode}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.userUniqueProductCode &&
+                  formik.errors.userUniqueProductCode && (
+                    <span className="text-error text-xs">
+                      {formik.errors.userUniqueProductCode}
+                    </span>
+                  )}
+              </Form.Item>
+            </div>
+          </div>
         </div>
       </Form>
     </Modal>
