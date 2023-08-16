@@ -23,8 +23,9 @@ class MembershipController {
       }
 
       const result = await dapp.getMembership(args, chainOptions)
+      console.log('result:', result)
       rest.response.status200(res, result)
-
+      
       return next()
     } catch (e) {
       return next(e)

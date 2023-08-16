@@ -21,12 +21,13 @@ import { EventTypesProvider } from "./contexts/eventType";
 import Event from "./components/Event";
 import EventDetails from "./components/Event/EventDetails";
 import { EventsProvider } from "./contexts/event";
+import { MembershipsProvider } from "./contexts/membership";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
-import ProductDetails from "./components/MarketPlace/ProductDetail";
+import MembershipDetails from "./components/MarketPlace/MembershipDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
 import EventSerialNumberList from "./components/Event/EventSerialNumberList";
@@ -52,9 +53,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       <Route
         exact
         path={routes.LoginRedirect.url}
-        element={
-          <LoginRedirect/>
-        }
+        element={<LoginRedirect />}
       />
       <Route
         exact
@@ -144,15 +143,17 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <EventsProvider>
-              <CategorysProvider>
-                <SubCategorysProvider>
-                  <InventoriesProvider>
-                    <ItemsProvider>
-                      <ProductDetails user={user} users={users} />
-                    </ItemsProvider>
-                  </InventoriesProvider>
-                </SubCategorysProvider>
-              </CategorysProvider>
+              <MembershipsProvider>
+                <CategorysProvider>
+                  <SubCategorysProvider>
+                    <InventoriesProvider>
+                      <ItemsProvider>
+                        <MembershipDetails user={user} users={users} />
+                      </ItemsProvider>
+                    </InventoriesProvider>
+                  </SubCategorysProvider>
+                </CategorysProvider>
+              </MembershipsProvider>
             </EventsProvider>
           </UsersProvider>
         }
@@ -203,15 +204,17 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <EventsProvider>
-              <CategorysProvider>
-                <SubCategorysProvider>
-                  <InventoriesProvider>
-                    <ItemsProvider>
-                      <ProductDetails user={user} users={users} />
-                    </ItemsProvider>
-                  </InventoriesProvider>
-                </SubCategorysProvider>
-              </CategorysProvider>
+              <MembershipsProvider>
+                <CategorysProvider>
+                  <SubCategorysProvider>
+                    <InventoriesProvider>
+                      <ItemsProvider>
+                        <MembershipDetails user={user} users={users} />
+                      </ItemsProvider>
+                    </InventoriesProvider>
+                  </SubCategorysProvider>
+                </CategorysProvider>
+              </MembershipsProvider>
             </EventsProvider>
           </UsersProvider>
         }
@@ -385,18 +388,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
-        path="/"
-        element={<Navigate
-          to={"/marketplace"}
-          replace />}
-      />
-      <Route
-        path="*"
-        element={<Navigate
-          to={"/"}
-          replace />}
-      />
+      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
+      <Route path="*" element={<Navigate to={"/"} replace />} />
     </Routes>
   );
 };
