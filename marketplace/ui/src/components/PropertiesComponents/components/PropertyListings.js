@@ -166,7 +166,12 @@ function PropertyListings() {
             return (value && <Tag style={{ margin: "5px" }} key={index}
               closable onClose={() => { handleTagClose(name) }}
             >
-              {name.split("_").join(" ").toUpperCase()}: {name === "amenities" ? value.join(", ") : value}
+              {name.split("_").join(" ").toUpperCase()}: {name === "amenities"
+                ? value.join(", ")
+                : (name === "sort_By" ? (value.includes("min")
+                  ? value.replace("min", "Lowest ")
+                  : value.replace("max", "Highest "))
+                  : value)}
             </Tag>)
           })}
 
