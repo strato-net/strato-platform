@@ -23,7 +23,7 @@ const Filter = (props) => {
   const { filterOption } = props;
 
   const { sortBy, states, amenities, parkingType, propertyTypes } = filterData;
-  const { maxPriceValue, postalcode, minPriceValue, stateOrProvince, bedroomsTotal, bathroomsTotalInteger, lotSizeArea, } = filterOption;
+  const { sort_By, min_Price, max_Price, zip_code, parking_Type, property_Type, state, min_Bedrooms, min_Bathrooms, lot_Size_Area, } = filterOption;
 
   const handleChange = (key, value) => {
     props.handleChange(key, value)
@@ -68,10 +68,10 @@ const Filter = (props) => {
       >
         <Typography.Title level={5}>Sort By</Typography.Title>
         <Select
-          value={filterOption?.sortBy}
+          value={sort_By}
           style={{ width: "100%" }}
           onChange={(value) => {
-            handleChange("sortBy", value);
+            handleChange("sort_By", value);
           }}
           options={sortBy}
         />
@@ -94,27 +94,27 @@ const Filter = (props) => {
             <Slider
               step={50000}
               min={0}
-              max={maxPriceValue}
+              max={max_Price}
               type="number"
               onChange={(value) => {
-                handleChange("minPriceValue", value);
+                handleChange("min_Price", value);
               }}
               value={
-                typeof minPriceValue === "number"
-                  ? minPriceValue
+                typeof min_Price === "number"
+                  ? min_Price
                   : 0
               }
             />
             <InputNumber
               min={0}
-              max={maxPriceValue}
+              max={max_Price}
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Price"
-              value={minPriceValue}
+              value={min_Price}
               controls={false}
               onChange={(value) => {
-                handleChange("minPriceValue", value);
+                handleChange("min_Price", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -131,11 +131,11 @@ const Filter = (props) => {
               max={propertyConstants.MAX_PRICE_VALUE}
               type="number"
               onChange={(value) => {
-                handleChange("maxPriceValue", value);
+                handleChange("max_Price", value);
               }}
               value={
-                typeof maxPriceValue === "number"
-                  ? maxPriceValue
+                typeof max_Price === "number"
+                  ? max_Price
                   : 0
               }
             />
@@ -145,10 +145,10 @@ const Filter = (props) => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Max Price"
-              value={maxPriceValue}
+              value={max_Price}
               controls={false}
               onChange={(value) => {
-                handleChange("maxPriceValue", value);
+                handleChange("max_Price", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -165,12 +165,12 @@ const Filter = (props) => {
               min={0}
               max={99999}
               type="number"
-              value={postalcode}
+              value={zip_code}
               style={{ width: "100%" }}
               placeholder="Enter Zipcode"
               controls={false}
               onChange={(value) => {
-                handleChange("postalcode", value);
+                handleChange("zip_code", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -183,9 +183,9 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
-              value={stateOrProvince}
+              value={state}
               onChange={(value) => {
-                handleChange("stateOrProvince", value);
+                handleChange("state", value);
               }}
               options={states}
             />
@@ -207,11 +207,11 @@ const Filter = (props) => {
               step={1}
               min={0}
               onChange={(value) => {
-                handleChange("bedroomsTotal", value);
+                handleChange("min_Bedrooms", value);
               }}
               value={
-                typeof bedroomsTotal === "number"
-                  ? bedroomsTotal
+                typeof min_Bedrooms === "number"
+                  ? min_Bedrooms
                   : 0
               }
             />
@@ -220,10 +220,10 @@ const Filter = (props) => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Bedrooms"
-              value={bedroomsTotal}
+              value={min_Bedrooms}
               controls={false}
               onChange={(value) => {
-                handleChange("bedroomsTotal", value);
+                handleChange("min_Bedrooms", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -238,11 +238,11 @@ const Filter = (props) => {
               step={1}
               min={0}
               onChange={(value) => {
-                handleChange("bathroomsTotalInteger", value);
+                handleChange("min_Bathrooms", value);
               }}
               value={
-                typeof bathroomsTotalInteger === "number"
-                  ? bathroomsTotalInteger
+                typeof min_Bathrooms === "number"
+                  ? min_Bathrooms
                   : 0
               }
             />
@@ -251,10 +251,10 @@ const Filter = (props) => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Bathrooms"
-              value={bathroomsTotalInteger}
+              value={min_Bathrooms}
               controls={false}
               onChange={(value) => {
-                handleChange("bathroomsTotalInteger", value);
+                handleChange("min_Bathrooms", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -284,10 +284,10 @@ const Filter = (props) => {
               type="number"
               style={{ width: "100%" }}
               placeholder="Min Sq Ft."
-              value={lotSizeArea}
+              value={lot_Size_Area}
               controls={false}
               onChange={(value) => {
-                handleChange("lotSizeArea", value);
+                handleChange("lot_Size_Area", value);
               }}
               onWheel={(e) => e.target.blur()}
             />
@@ -306,9 +306,9 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
-              value={filterOption?.parkingType}
+              value={parking_Type}
               onChange={(value) => {
-                handleChange("parkingType", value);
+                handleChange("parking_Type", value);
               }}
               options={parkingType}
             />
@@ -322,9 +322,9 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
-              value={filterOption?.propertyType}
+              value={property_Type}
               onChange={(value) => {
-                handleChange("propertyType", value);
+                handleChange("property_Type", value);
               }}
               options={propertyTypes}
             />

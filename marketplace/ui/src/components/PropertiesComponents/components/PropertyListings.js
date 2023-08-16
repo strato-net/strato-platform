@@ -47,20 +47,24 @@ function PropertyListings() {
   };
 
   const applyFilter = () => {
-    // actions.fetchProperties(dispatch, limit,currentPage,options)
     let data = [...selectedFilter];
     let filteredData = data.map((item, index) => {
       return { name: item.name, value: (item.value === ("select" || item.value.length === 0) ? "" : item.value) }
     })
     setAppliedFilter(filteredData)
-    console.log(filteredData)
-    console.log(filteredData)
     actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
   const clearFilter = () => {
-    setCurrentPage(1)
-    actions.fetchProperties(dispatch, limit, currentPage - 1)
+    setCurrentPage(1);
+    setAppliedFilter([]);
+    setSelectedFilter([]);
+    setFilterOption(filterSchema);
+    if (currentPage === 1) {
+      actions.fetchProperties(dispatch, limit, currentPage - 1);
+    } else {
+      setCurrentPage(1);
+    }
   }
 
   const handleTagClose = (name) => {
@@ -161,7 +165,7 @@ function PropertyListings() {
             return (value && <Tag style={{ margin: "5px" }} key={index}
               closable onClose={() => { handleTagClose(name) }}
             >
-              {name}: {name === "amenities" ? value.join(", ") : value}
+              {name.split("_").join(" ").toUpperCase()}: {name === "amenities" ? value.join(", ") : value}
             </Tag>)
           })}
 

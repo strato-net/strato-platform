@@ -135,18 +135,18 @@ const actions = {
 
     dispatch({ type: actionDescriptors.fetchProperties });
 
-    const { minPriceValue, maxPriceValue, bathroomsTotalInteger, postalcode, stateOrProvince, bedroomsTotal, lotSizeArea, sortBy, parkingType } = options
-    const priceQuery = minPriceValue || maxPriceValue ? `&range[]=listPrice,${minPriceValue},${maxPriceValue}` : '';
-    const postalcodeQuery = postalcode ? `&postalcode=${postalcode}` : '';
-    const stateOrProvinceQuery = stateOrProvince && stateOrProvince !== 'select' ? `&stateOrProvince=${stateOrProvince}` : '';
-    const bedroomsTotalQuery = bedroomsTotal ? `&gteQuery[]=bedroomsTotal,${bedroomsTotal}` : '';
-    const bathroomsTotalIntegerQuery = bathroomsTotalInteger ? `&gteQuery[]=bathroomsTotalInteger,${bathroomsTotalInteger}` : '';
-    const lotSizeAreaQuey = lotSizeArea ? `&gteQuery[]=lotSizeArea,${lotSizeArea}` : '';
-    const parkingTypeQuery = parkingType && parkingType !== 'select' ? `&${parkingType}=true` : '';
-    const sortByQuery = sortBy && sortBy !== 'select'
-      ? `&sort=${sortBy.includes('min')
-        ? encodeURIComponent(`+${sortBy.replace('min', '')}`)
-        : encodeURIComponent(`-${sortBy.replace('max', '')}`)}`
+    const { min_Price, max_Price, min_Bathrooms, zip_code, state, min_Bedrooms, lot_Size_Area, sort_By, parking_Type } = options
+    const priceQuery = min_Price || max_Price ? `&range[]=listPrice,${min_Price},${max_Price}` : '';
+    const postalcodeQuery = zip_code ? `&postalcode=${zip_code}` : '';
+    const stateOrProvinceQuery = state && state !== 'select' ? `&stateOrProvince=${state}` : '';
+    const bedroomsTotalQuery = min_Bedrooms ? `&gteQuery[]=bedroomsTotal,${min_Bedrooms}` : '';
+    const bathroomsTotalIntegerQuery = min_Bathrooms ? `&gteQuery[]=bathroomsTotalInteger,${min_Bathrooms}` : '';
+    const lotSizeAreaQuey = lot_Size_Area ? `&gteQuery[]=lotSizeArea,${lot_Size_Area}` : '';
+    const parkingTypeQuery = parking_Type && parking_Type !== 'select' ? `&${parking_Type}=true` : '';
+    const sortByQuery = sort_By && sort_By !== 'select'
+      ? `&sort=${sort_By.includes('min')
+        ? encodeURIComponent(`+${sort_By.replace('min', '')}`)
+        : encodeURIComponent(`-${sort_By.replace('max', '')}`)}`
       : '';
 
     const query = queryValue

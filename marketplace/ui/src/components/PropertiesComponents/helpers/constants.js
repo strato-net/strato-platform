@@ -226,15 +226,15 @@ export const propertyConstants = {
 }
 
 export const filterSchema = {
-  sortBy: "select",
-  minPriceValue: 0,
-  maxPriceValue: propertyConstants.MAX_PRICE_VALUE,
-  zipcodeValue: 0,
-  stateValue: "select",
-  minBedrooms: 0,
-  minBathrooms: 0,
+  sort_By: "select",
+  min_Price: 0,
+  max_Price: propertyConstants.MAX_PRICE_VALUE,
+  zip_code: 0,
+  state: "select",
+  min_Bedrooms: 0,
+  min_Bathrooms: 0,
   amenities: [],
-  minSqFt: 0,
-  parkingType: "select",
-  propertyType: "select",
+  lot_Size_Area: 0,
+  parking_Type: "select",
+  property_Type: "select",
 };
