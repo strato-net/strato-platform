@@ -66,9 +66,6 @@ const ProductCard = ({
                   <h3 className="font-semibold text-primaryB text-xl">
                     {decodeURIComponent(state.name)}
                   </h3>
-                  <p className="font-medium text-secondryB text-base ml-2">
-                    ({state.category})
-                  </p>
                 </div>
                 <Popover
                   placement="bottomLeft"
@@ -99,13 +96,6 @@ const ProductCard = ({
                   <MoreOutlined />
                 </Popover>
               </div>
-              <p className="text-sm text-secondryB mt-1.5">
-              {decodeURIComponent(state.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    <br />
-                  </React.Fragment>
-                ))}              </p>
               <div className="flex mt-1.5 items-center">
                 <p className="text-primaryC text-sm w-40">Sub Category</p>
                 <p text-secondryB text-sm>
@@ -116,34 +106,23 @@ const ProductCard = ({
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Manufacturer</p>
+                <p className="text-primaryC text-sm w-40">Company Name</p>
                 <p text-secondryB text-sm>
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                  {decodeURIComponent(state.manufacturer)}
+                  Equinox Labs
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
                 <p className="text-primaryC text-sm w-40">
-                  Unit of Measurement
+                  Duration
                 </p>
                 <p text-secondryB text-sm>
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                  {UNIT_OF_MEASUREMENTS[state.unitOfMeasurement]}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">
-                  Least Sellable Unit
-                </p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {state.leastSellableUnit}
+                 1 Year
                 </p>
               </div>
               <div
@@ -182,3 +161,4 @@ const ProductCard = ({
 };
 
 export default ProductCard;
+

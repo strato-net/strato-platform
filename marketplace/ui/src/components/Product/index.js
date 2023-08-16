@@ -4,12 +4,15 @@ import {
   Breadcrumb,
   Input,
   Button,
+  Col,
   notification,
+  Dropdown,
   Spin,
   Image,
   Typography,
   Pagination,
 } from "antd";
+import { DownOutlined } from '@ant-design/icons';
 import ProductCard from "./ProductCard";
 import CreateProductModal from "./CreateProductModal";
 import { actions } from "../../contexts/product/actions";
@@ -111,6 +114,16 @@ const Product = () => {
     setOffset((page - 1) * limit);
     setPage(page);
   };
+  const dummyData= [ //TODO, unhardcode this
+      {              //When the utility of this
+        label: 'All',//understood
+        key: '1',
+      },
+      {
+        label: 'Health',
+        key: '2',
+      },
+  ];
 
   return (
     <>
@@ -140,33 +153,67 @@ const Product = () => {
                   }
                 }}
               >
-                Add Product
+                Add Memberships
               </Button>
             </div>
           ) : (
             <>
               <div className="flex justify-between">
-                <Breadcrumb>
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.Marketplace.url}>
-                      Home
-                    </ClickableCell>
-                  </Breadcrumb.Item>
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <p className="text-primary">
-                      Products
-                    </p>
-                  </Breadcrumb.Item>
-                </Breadcrumb>
+                <Col>
+                  <Breadcrumb>
+                    <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                      <ClickableCell href={routes.Marketplace.url}>
+                        Home
+                      </ClickableCell>
+                    </Breadcrumb.Item>
+                    <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                      <p className="text-primary">
+                      Memberships  
+                      </p>
+                    </Breadcrumb.Item>
+                  </Breadcrumb>
+                  <Typography.Text className="text-2xl">
+                      Memberships
+                  </Typography.Text>
+                  <div>
+                    <Typography.Text style={{ fontSize: '7px' }}>
+                      {products.length}  Memberships found
+                    </Typography.Text>
+                  </div>
+                </Col>
+                <Col>
+                  <Button
+                    id="add-product-button"
+                    type="primary"
+                    style={{ backgroundColor: '#6e7ddd', color: 'white' , margin:'10px', fontWeight: 'bold' }}
+                    className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40"
+                    >
+                        <span style={{ fontWeight: 'normal' }}>Connect with </span>
+                        <span style={{ fontWeight: '900',  margin:'1px' }}>  Stripe</span> 
+                  </Button>
+                  <Dropdown.Button
+                      style={{margin:'10px'}}
+                      icon={<DownOutlined />}
+                      menu={{ dummyData }}
+                       >
+                    All
+                  </Dropdown.Button>
+                </Col>
                 <div className="flex">
-                  <Search
-                    placeholder="Search"
-                    className="w-80 mr-6"
-                    allowClear
-                    onChange={queryHandle}
-                    value={queryValue}
-                  />
-                  <Button id="add-product-button" type="primary" className="w-48"
+                  <Button
+                  id="add-product-button"
+                  type="primary"
+                  style={{ backgroundColor: 'red', color: 'white' , margin:'10px' }}
+                  className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                  >Create Services</Button>
+                  <Button
+                    id="add-product-button"
+                    type="primary"
+                    style={{ backgroundColor: 'green', color: 'white' , margin:'10px'}}
+                    className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                  >Sell Eixisting Membership </Button>
+                  <Button id="add-product-button" type="primary" className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                    style={{ backgroundColor: 'blue', color: 'white' , margin:'10px'}}
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
@@ -175,7 +222,7 @@ const Product = () => {
                       }
                     }}
                   >
-                    Add Product
+                    Create New Membership
                   </Button>
                 </div>
               </div>
