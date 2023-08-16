@@ -34,7 +34,6 @@ const CreateProductModal = ({
   debouncedSearchTerm,
 }) => {
   const schema = getSchema();
-  // const [selectedImage, setSelectedImage] = useState(null);
   const dispatch = useProductDispatch();
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
@@ -47,8 +46,8 @@ const CreateProductModal = ({
   const initialValues = {
     name: "",
     category: "",
-    location: "",
     duration: "",
+    additionalInformation: "",
     images: [],
     description: "",
     yearlyPrice: "",
@@ -67,7 +66,10 @@ const CreateProductModal = ({
 
   const formik = useFormik({
     initialValues: initialValues,
-    validationSchema: schema,
+    // validationSchema: schema,
+    setFieldValue: (field, value) => {
+      formik.setFieldValue(field, value);
+    },
     onSubmit: function (values) {
       handleCreateFormSubmit(values);
     },
@@ -163,34 +165,9 @@ const CreateProductModal = ({
   };
 
   const handleCreateFormSubmit = async (values) => {
-    const formData = new FormData();
-    formData.append("fileUpload", formik.values.image);
-    let imageData = await actions.uploadImage(dispatch, formData);
-    if (imageData) {
-      const body = {
-        memberShipArgs: {
-          name: formik.values.name,
-          category: formik.values.category,
-          duration: formik.values.duration,
-          additionalInformation: formik.values.additionalInformation,
-          description: formik.values.description,
-          yearlyPrice: formik.values.yearlyPrice,
-          monthlyPrice: formik.values.monthlyPrice,
-          quantity: formik.values.quantity,
-          services: formik.values.services,
-          documents: formik.values.documents,
-        },
-      };
 
-      let isDone = await actions.createProduct(dispatch, body);
-
-      if (isDone) {
-        if (page === 1)
-          actions.fetchProduct(dispatch, 10, 0, debouncedSearchTerm);
-        resetPage(1);
-        handleCancel();
-      }
-    }
+    console.log("formik", formik.values);
+    console.log("values", values);
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
@@ -260,7 +237,9 @@ const CreateProductModal = ({
                 name="name"
                 type="text"
                 placeholder="Membership Name"
-                onChange={formik.handleChange}
+                onChange={(e) => {
+                  formik.setFieldValue("name", e.target.value);
+                }}
                 value={formik.values.name}
                 className="w-10/12"
               />
@@ -304,7 +283,9 @@ const CreateProductModal = ({
                 id="additionalInformation"
                 name="additionalInformation"
                 type="text"
-                onChange={formik.handleChange}
+                onChange={(e) => {
+                  formik.setFieldValue("additionalInformation", e.target.value);
+                }}
                 value={formik.values.additionalInformation}
                 className=""
               />
@@ -344,7 +325,9 @@ const CreateProductModal = ({
               name="description"
               type="text"
               placeholder="Description"
-              onChange={formik.handleChange}
+              onChange={(e) => {
+                formik.setFieldValue("description", e.target.value);
+              }}
               value={formik.values.description}
               className=""
             />
@@ -416,6 +399,7 @@ const CreateProductModal = ({
                 name={`serviceName_${index}`}
                 className="col-span-2 mr-7"
                 key={`serviceName_${index}`}
+                value={formik.values.services[index].serviceName}
               >
                 <Select
                   id={`serviceName_${index}`}
@@ -423,16 +407,18 @@ const CreateProductModal = ({
                   placeholder="Select Service"
                   onChange={(value) => {
                     const updatedServices = [...formik.values.services];
-                    updatedServices[index].serviceName = value;
+                    updatedServices[index] = {
+                      ...updatedServices[index],
+                      serviceName: value,
+                    };
                     formik.setFieldValue("services", updatedServices);
                   }}
                   value={service.serviceName}
                 >
-                  {/* TODO: Replace this with the services when they are added. */}
                   {categorys.map((category) => (
                     <Select.Option
-                      key={`service_${category.name}_${index}`}
-                      value={category.id}
+                      key={category.id}
+                      value={category.name}
                     >
                       {category.name}
                     </Select.Option>
@@ -443,6 +429,7 @@ const CreateProductModal = ({
                 label="Number of Uses"
                 name={`numberOfUses_${index}`}
                 key={`numberOfUses_${index}`}
+                value={service.numberOfUses}
               >
                 <InputNumber
                   id={`numberOfUses_${index}`}
@@ -452,7 +439,10 @@ const CreateProductModal = ({
                   value={service.numberOfUses}
                   onChange={(value) => {
                     const updatedServices = [...formik.values.services];
-                    updatedServices[index].numberOfUses = value;
+                    updatedServices[index] = {
+                      ...updatedServices[index],
+                      numberOfUses: value,
+                    };
                     formik.setFieldValue("services", updatedServices);
                   }}
                   className="w-10/12"
