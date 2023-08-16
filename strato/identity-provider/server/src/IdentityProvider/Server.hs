@@ -166,27 +166,22 @@ putIdentity :: ( MonadIO m
                => Text 
                -> Text 
                -> Text 
-               -> Maybe Text
+               -> Text
                -> Maybe Text
                -> m Address
-putIdentity accessToken uuid idProv mName mCo = do
-    $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> T.pack (show mName) <> " and company " <> T.pack (show mCo)
-    case mName of
-        Nothing -> do
-            $logErrorS "putIdentity" "No name was provided or deduced from JWT. Cannot operate with such little info"
-            throwIO $ IdentityError "Name param was not provided and could not be deduced"
-        Just name -> do
-            -- check if a user exists in vault
-            let realm = extractRealmName $ T.unpack idProv
-            getVaultKey accessToken >>= \case
-                Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
-                    hasCert <- certInCirrus accessToken realm a (T.unpack name)
-                    unless hasCert $ createAndRegisterCert name mCo uuid realm k
-                    return a
-                Nothing -> do -- no vault key, so make key and register cert
-                    AddressAndKey a k <- postVaultKey accessToken
-                    createAndRegisterCert name mCo uuid realm k
-                    return a
+putIdentity accessToken uuid idProv name mCo = do
+    $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
+    -- check if a user exists in vault
+    let realm = extractRealmName $ T.unpack idProv
+    getVaultKey accessToken >>= \case
+        Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
+            hasCert <- certInCirrus accessToken realm a (T.unpack name) (T.unpack uuid) (T.unpack <$> mCo)
+            unless hasCert $ createAndRegisterCert name mCo uuid realm k
+            return a
+        Nothing -> do -- no vault key, so make key and register cert
+            AddressAndKey a k <- postVaultKey accessToken
+            createAndRegisterCert name mCo uuid realm k
+            return a
 
 -- This is just a dummy function
 -- This never gets called on the sevrvant backend
@@ -202,7 +197,7 @@ putIdentityExternal ::  ( MonadIO m
                         , Accessible PrivateKey m
                         , Accessible RealmData m
                         ) => Text -> m Address
-putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" "" Nothing Nothing
+putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" "" "" Nothing
 
 
 blocEndpoint :: String
@@ -216,15 +211,16 @@ data CertificateInCirrus = CertificateInCirrus{
 instance FromJSON CertificateInCirrus
 instance ToJSON CertificateInCirrus
 
-certInCirrus :: (MonadIO m, MonadLogger m, Accessible RealmData m) => Text -> String -> Address -> String -> m Bool
-certInCirrus token realm a commonName = do
+certInCirrus :: (MonadIO m, MonadLogger m, Accessible RealmData m) 
+             => Text -> String -> Address -> String -> String -> Maybe String -> m Bool
+certInCirrus token realm a name uuid mCo = do
     rd <- access (Proxy @RealmData)
     case M.lookup realm rd of
         Nothing -> do 
             $logErrorS "certInCirrus" "Trying to find a cert on a network whose realm we don't support (How?? We should never reach this error)"
             throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown sooner"
         Just (RealmDetails _ _ _ nurl) -> do 
-            let cirrusEndpoint = "/cirrus/search/Certificate?or=(userAddress.eq." <> show a <> ",commonName.eq." <> commonName <> ")"
+            let cirrusEndpoint = cirrusSearchPath a name uuid mCo
                 url = showBaseUrl nurl{baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
             mgr <- liftIO $ case baseUrlScheme nurl of
                 Http -> newManager defaultManagerSettings
@@ -241,6 +237,15 @@ certInCirrus token realm a commonName = do
                 Nothing -> do 
                     $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
                     throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
+    
+    where 
+        cirrusSearchPath :: Address -> String -> String -> Maybe String -> String 
+        cirrusSearchPath address commonName uuid' mOrg = 
+            let orgParam = case mOrg of 
+                    Nothing -> ""
+                    Just "" -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
+                    Just org -> ",organization.eq." <> org
+            in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> orgParam <> ")"
 
 createAndRegisterCert :: ( MonadIO m
                          , MonadLogger m

@@ -20,7 +20,7 @@ type PutIdentity = "identity"
                 :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text -- pass along for vault calls
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text -- need for keycloak query
                 :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
-                :> QueryParam "name" Text 
+                :> Header' '[Required, Strict] "X-USER-COMMON-NAME" Text
                 :> QueryParam "company" Text 
                 :> Put '[JSON] Address --should return user address
 
