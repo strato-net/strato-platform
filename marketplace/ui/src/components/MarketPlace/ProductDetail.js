@@ -61,6 +61,7 @@ const ProductDetails = ({ user, users }) => {
   }
 
   const [serviceList, setServiceList] = useState([])
+  const [savingsList, setSavingsList] = useState([])
   const [Id, setId] = useState(undefined);
   const [isServiceSelected, setIsServiceSelected] = useState(false);
   const limit = 10, offset = 0;
@@ -81,10 +82,13 @@ const serviceDispatch = useServiceDispatch();
   
   useEffect(() => {
     let services = [];
+    let savings = [];
     inventoryServices.forEach(element => {
       services.push({ "key": element.name, "serviceName": element, "serviceDesc": element.description, "memberPrice": element.memberPrice, "nonMemberPrice": element.nonMemberPrice, "uses": element.uses},)
+      savings.push({ "key": element.name, "serviceName": element, "serviceCost": (element.nonMemberPrice - element.memberPrice)*element.uses},)
     });
     setServiceList(services);
+    setSavingsList(savings);
   }, [inventoryServices])
 
   const { Text, Paragraph, Title } = Typography;
@@ -226,6 +230,21 @@ const serviceDispatch = useServiceDispatch();
     }
   };
 
+  const savingsColumn = [
+    {
+      title: <Text className="text-primaryC text-[13px]">NAME</Text>,
+      dataIndex: "serviceName",
+      key: "name",
+      render: (text) => <p>{decodeURIComponent(text.name)}</p>
+    },
+    {
+      title: <Text className="text-primaryC text-[13px]">EFFECTIVE COST SAVING FROM MEMBERMSHIP </Text>,
+      dataIndex: "serviceCost",
+      key: "serviceCost",
+      render: (text) => <p style={{ textAlign: 'center'}}>${decodeURIComponent(text)}</p>,
+    },
+  ];
+  
   const serviceColumn = [
     {
       title: <Text className="text-primaryC text-[13px]">NAME</Text>,
@@ -243,19 +262,19 @@ const serviceDispatch = useServiceDispatch();
       title: <Text className="text-primaryC text-[13px]">MEMBER PRICE</Text>,
       dataIndex: "memberPrice",
       key: "memberPrice",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
+      render: (text) => <p style={{ textAlign: 'center'}}>${decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">NON-MEMBER PRICE</Text>,
       dataIndex: "nonMemberPrice",
       key: "nonMemberPrice",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
+      render: (text) => <p style={{ textAlign: 'center'}}>${decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">USES</Text>,
       dataIndex: "uses",
       key: "uses",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
+      render: (text) => <p style={{ textAlign: 'center'}}>{decodeURIComponent(text)}</p>,
     },
   ];
 
@@ -459,12 +478,22 @@ const serviceDispatch = useServiceDispatch();
                     label: `Services`,
                     key: "2",
                     children: (
+                      <div>
+                        <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Services</h1>
                       <DataTableComponent
                         columns={serviceColumn}
                         data={serviceList}
                         scrollX="100%"
                         isLoading={isInventoryServicesLoading}
                       />
+                      <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Savings</h1>
+                       <DataTableComponent
+                        columns={savingsColumn}
+                        data={savingsList}
+                        scrollX="100%"
+                        isLoading={isInventoryServicesLoading}
+                      />
+                      </div>
                     ),
                   }
                   ]}
