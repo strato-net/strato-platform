@@ -4,8 +4,8 @@ Amazon Elastic Kubernetes Service (Amazon EKS) is a managed service that we can 
 # Installing kubectl
 Follow steps from [AWS documentation](https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html)
 
-# AWS EBS for volumes
-This template uses AWS EBS volumes for container volumes. For AWS EFS volumes see the ./efs subfolder
+# Update kubectl with the EKS cluster
+* *aws eks update-kubeconfig --name ba-dev3 --region us-east-1*
 
 # Delete Existing Resources (Deployement, EFS Storage Class, Persistent Volume Claims and Persistent Volumes)
 kubectl delete -f strato-platform-manifest.yaml
