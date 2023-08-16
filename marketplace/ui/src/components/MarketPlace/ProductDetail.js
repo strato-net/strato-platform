@@ -640,6 +640,7 @@ const ProductDetails = ({ user, users }) => {
                 </div>
               }
             </div>
+
             <div className="w-1/2 ml-8  mb-6" id="details">
               <Row className="items-center">
                 <Text className="font-semibold text-xl text-primaryB">
