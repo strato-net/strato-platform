@@ -554,14 +554,14 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwtToken) Nothing
         Just addr' -> return addr'
-      -- let err = CouldNotFind $ Text.concat
-      --           [ "postBlocTransaction': Couldn't find common name for user address "
-      --           , Text.pack $ formatAddressWithoutColor addr
-      --           ]
-      -- userCert <- maybe (throwIO err) pure =<<
-      --   A.select (A.Proxy @Certificate) addr
-      -- let userContractAddr = deriveAddressWithSalt Nothing (certificateCommonName userCert) Nothing "OrderedVals []"
-      -- $logInfoS "DEBUG" $ Text.pack $ show userContractAddr
+      let err = CouldNotFind $ Text.concat
+                [ "postBlocTransaction': Couldn't find common name for user address "
+                , Text.pack $ formatAddressWithoutColor addr
+                ]
+      userCert <- maybe (throwIO err) pure =<<
+        A.select (A.Proxy @Certificate) addr
+      let userContractAddr = deriveAddressWithSalt Nothing (certificateCommonName userCert) Nothing "OrderedVals []"
+      $logInfoS "DEBUG" $ Text.pack $ show userContractAddr
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0

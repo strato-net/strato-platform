@@ -906,7 +906,7 @@ contract User {
         // Only the user that this contract is associated with, can use this function.
         require((authenticate() && isActive), "You don't have permission to use this function!");
 
-        variadic result = contractToCall.call(f, args);
+        variadic result = address(contractToCall).call(f, args);
         return result;
     }
 } 
@@ -916,6 +916,7 @@ contract User {
 insertUserRegistryContract :: GenesisInfo -> GenesisInfo
 insertUserRegistryContract gi =
     gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct],
+    -- gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct, testAcct],
         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
     where 
         addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
@@ -933,6 +934,7 @@ insertUserRegistryContract gi =
             (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
                 (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+                (".isActive", rlpWrap $ BBool True),
                 (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
             ]
 
@@ -940,7 +942,8 @@ insertUserRegistryContract gi =
         --     (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
         --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
         --         (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
-        --         (BC.pack $ ".userCertificates<" ++ (show rootAddress') ++ ">", addrToCertIdx "a5540deed8550b8846b56825e9239ebdaff53ba1")
+        --         (".isActive", rlpWrap $ BBool True),
+        --         (BC.pack $ ".userCertificates<a:a13bf5afbd9e23e92568b546880b55d8ee0d54a5>", addrToCertIdx "a5540deed8550b8846b56825e9239ebdaff53ba1")
         --     ]
 
         registryAcct = SolidVMContractWithStorage 0x720 720

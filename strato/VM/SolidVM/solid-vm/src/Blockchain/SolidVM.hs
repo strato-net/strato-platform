@@ -547,16 +547,31 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                 return (f', args')
           -- Handles .call() and .delegatecall() logic
           (Just theFunction, _) -> do
+                valList <- case argExps of
+                  (CC.OrderedArgs oa) -> mapM (getVar <=< expToVar) oa
+                  (CC.NamedArgs _) -> error "Named args for .call not implemented."
                 let mtheFunction' = do
-                      let boolTrueIfArgsSameLength thyFunc = (length argsParsed) == (length $ CC._funcArgs thyFunc)
+                      let boolTrueIfArgsSameLength thyFunc = (length argExps) == (length $ CC._funcArgs thyFunc)
                           filteredFuncsWithSameArgLength   = filter boolTrueIfArgsSameLength ([theFunction] ++ (CC._funcOverload  theFunction))
-                          boolTrueIfSignatureTheSame funck = all (\(a, (_, (CC.IndexedType _ d))) -> a == d) $ zip argsParsed (CC._funcArgs funck)
+                          boolTrueIfSignatureTheSame funck = all (\(a, (_, (CC.IndexedType _ d))) -> 
+                            case (a, d) of
+                              (SInteger _, SVMType.Int _ _) -> True
+                              (SString _, SVMType.String _) -> True
+                              (SString _, SVMType.Bytes _ _) -> True
+                              (SBool _, SVMType.Bool) -> True
+                              (SAccount _ _, SVMType.Address _) -> True
+                              (SAccount _ _, SVMType.Account _) -> True
+                              (SStruct _ _, SVMType.UnknownLabel _ _) -> True
+                              (SContract x _, SVMType.UnknownLabel y _) -> x == y
+                              (SArray x _, y@(SVMType.Array _ _)) -> x == y
+                              (SReference _, _) -> error "Reference variables not implemented for .call"
+                              _ -> False) $ zip valList (CC._funcArgs funck)
                           finalFuncFind                    = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
                       case finalFuncFind of
                         [a] -> Just a
                         _   -> Nothing
                 case mtheFunction' of
-                      Just theFunction' | (length argsParsed) == (length argExps) -> do
+                      Just theFunction' | (((length argsParsed) == (length argExps)) || ((length valList) == (length argExps))) -> do
                                 args' <- argsToVals contract' theFunction' argExps
                                 mCallInfo <- getCurrentCallInfoIfExists
                                 let ro = case mCallInfo of
@@ -1907,11 +1922,15 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
         (CC.MemberAccess _ expr name) -> do
           var1 <- expToVar expr
           val1 <- getVar var1
+          convertedFirstArg <- case args of
+            (CC.OrderedArgs []) -> pure $ SNULL
+            (CC.OrderedArgs a) -> getVar <=< expToVar $ head a
+            (CC.NamedArgs _) -> pure $ SNULL
           case (val1, name) of
             (SAccount addr _, "delegatecall") -> do
               let  (funcName, args') = (case args of
-                    (CC.OrderedArgs [])  -> typeError "delegate call needs atleast one arguement, none were given " args
-                    (CC.OrderedArgs a)  -> case head a of  (CC.StringLiteral _  fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first argument to be a string" args
+                    (CC.OrderedArgs []) -> typeError "delegate call needs atleast one arguement, none were given " args
+                    (CC.OrderedArgs a) -> case convertedFirstArg of (SString fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first argument to be a string" args
                     (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
               fromAddress <- getCurrentAccount
               let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
@@ -1922,7 +1941,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
             (SAccount addr _, "call") -> do
               let (funcName, args') = (case args of
                     (CC.OrderedArgs [])  -> typeError "call needs atleast one argument, none were given " args
-                    (CC.OrderedArgs a)  -> case head a of  (CC.StringLiteral _  fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "delegate call needs first argument to be a string" args
+                    (CC.OrderedArgs a)  -> case convertedFirstArg of (SString fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "call needs first argument to be a string" args
                     (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to call" args)
               fromAddress <- getCurrentAccount
               let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
@@ -2025,7 +2044,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       (SAccount _ _, SVMType.Account _) -> pure $ True
                       (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
                       (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                      (SArray x _, SVMType.Array y _) -> pure $ x == y
+                      (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
                       (SReference addressedPath, _) -> do
                         refType <- getXabiValueType addressedPath
                         if (refType == t)

@@ -174,6 +174,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , HasSelectX509CertDB m
                  , HasSelectX509FieldDB m
                  , A.Selectable Word256 ParentChainIds m
+                 , A.Selectable (Address,T.Text) X509CertificateField m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
