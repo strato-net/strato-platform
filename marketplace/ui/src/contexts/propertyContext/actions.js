@@ -138,48 +138,6 @@ const actions = {
 
     const { min_Price, max_Price, min_Bathrooms, zip_code, state, min_Bedrooms, lot_Size_Area, sort_By, parking_Type } = options
 
-    let queryBuilder = "";
-    Object.keys(options).map((item, index) => {
-      console.log("QueryKeys[item]", QueryKeys[item], options[item], "item", item);
-    
-      switch (item) {
-        case "min_Price":
-          if (min_Price && max_Price) {
-            queryBuilder += `&range[]=listPrice,${min_Price},${max_Price}`;
-          }
-          break;
-    
-        case "max_Price":
-          if (min_Price && max_Price) {
-            queryBuilder += `&range[]=listPrice,${min_Price},${max_Price}`;
-          }
-          break;
-    
-        case "lot_Size_Area":
-          queryBuilder += `&gteQuery[]=${QueryKeys[item]},${options[item]}`;
-          break;
-    
-        case "zip_code":
-        case "state":
-          queryBuilder += `&${QueryKeys[item]}=${options[item]}`;
-          break;
-    
-        case "parking_Type":
-          queryBuilder += `&${options[item]}=true`;
-          break;
-    
-        case "sort_By":
-          queryBuilder += `&sort=${QueryKeys[options[item]]}`;
-          break;
-    
-        default:
-          if (item.includes("min") || item.includes("max")) {
-            queryBuilder += `&${item.includes("min") ? "gte" : "lte"}Query[]=${QueryKeys[options[item]]},${options[item]}`;
-          }
-          break;
-      }
-    });
-    
     const priceQuery = min_Price || max_Price ? `&range[]=listPrice,${min_Price},${max_Price}` : '';
     const postalcodeQuery = zip_code ? `&postalcode=${zip_code}` : '';
     const stateOrProvinceQuery = state && state !== 'select' ? `&stateOrProvince=${state}` : '';
@@ -197,7 +155,7 @@ const actions = {
       ? `&queryValue=${queryValue}&queryFields=name`
       : "";
 
-    // const queryBuilder = `${query}${priceQuery}${postalcodeQuery}${stateOrProvinceQuery}${bedroomsTotalQuery}${bathroomsTotalIntegerQuery}${lotSizeAreaQuey}${sortByQuery}${parkingTypeQuery}`
+    const queryBuilder = `${query}${priceQuery}${postalcodeQuery}${stateOrProvinceQuery}${bedroomsTotalQuery}${bathroomsTotalIntegerQuery}${lotSizeAreaQuey}${sortByQuery}${parkingTypeQuery}`
 
     try {
       const response = await fetch(
