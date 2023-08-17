@@ -85,7 +85,7 @@ tableNameToText (AbstractTableName o a c) =
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
-  in prefix <> c
+  in "abstract@" <> prefix <> c
 tableNameToText (AbstractTableRowName o a c ab) =
   let prefix
         | T.null o = ""

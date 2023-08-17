@@ -367,7 +367,14 @@ processTheMessages env conn g messages = do
                   outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
 -- mark        
-                deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+                $logInfoS "DAVIDprocessTheMessages/AbstractType" $ T.pack $ show ((_contractType c == AbstractType )) ++ show (_contractName c)
+
+                deferredForeignKeys <- case (_contractType c ) of
+                  AbstractType -> do
+                    outputData conn $ createAbstractTable g c (o, a', n)
+                    return []
+                  _ -> do
+                    outputData conn $ createExpandIndexTable g c nameParts
                 
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
@@ -375,8 +382,7 @@ processTheMessages env conn g messages = do
 
                 --create contract table
 
-                $logInfoS "DAVIDprocessTheMessages/AbstractType" $ T.pack $ show ((_contractType c == AbstractType )) ++ show (_contractName c)
-                when(_contractType c == AbstractType ) $ do outputData conn $ createAbstractTable g c (o, a', n)
+                -- when(_contractType c == AbstractType ) $ do 
                 
 
                 --update globals
