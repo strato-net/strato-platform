@@ -436,7 +436,9 @@ processTheMessages env conn g messages = do
                               [] -> return Nothing
                               (firstAbstract:_) -> do
                                 $logInfoS "DAVIDprocessTheMessages/abstracttablename" $ T.pack $ show (AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract) ++ show((SE.contractName indexContract))
-                                getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract
+                                case  (SE.application indexContract) of
+                                  "" -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.contractName indexContract) firstAbstract
+                                  _ -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract
           
           $logInfoS "DAVIDprocessTheMessages/abstractColumns'" $ T.pack $ show abstractColumns
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)

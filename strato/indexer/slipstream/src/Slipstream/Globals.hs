@@ -92,7 +92,7 @@ getAbstractTableRow globalsIORef org app contract = do
                           isAbstractTableName (AbstractTableRowName o a n _) _ = 
                             o == org && a == app && n == contract
                           isAbstractTableName _ _ = False
-  let result = map atAbstractName (M.keys abstractTables)
+  let result = map atrAbstractName (M.keys abstractTables)
   return result
 
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
