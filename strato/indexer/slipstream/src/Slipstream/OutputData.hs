@@ -409,9 +409,8 @@ createAbstractTable globalsIORef contract (o, a, n) ab = do
   tableExists <- isTableCreated globalsIORef tableName
   when (not tableExists) $ do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
-        finalList = list ++ ["data"]
     yield $ createAbstractTableQuery contract (o,a,n,ab)
-    setTableCreated globalsIORef tableName finalList
+    setTableCreated globalsIORef tableName list
 
 createAssetTable :: OutputM m
                  => IORef Globals
@@ -898,7 +897,7 @@ insertAbstractTableQuery cs = concat $
                          , tshow . E.transactionSender
                          ]
               vals = flip map contracts $ \((row, rowList),_) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`notElem` abC) rowList]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`elem` abC) rowList]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
