@@ -14,7 +14,6 @@ import {
 } from "antd";
 import { FilterFilled, ClearOutlined } from "@ant-design/icons";
 import filterData from "../helpers/filterOptions.json";
-import { propertyConstants } from "../helpers/constants";
 
 const { Panel } = Collapse;
 
@@ -69,6 +68,7 @@ const Filter = (props) => {
         <Select
           value={sort_By}
           style={{ width: "100%" }}
+          placeholder="Sort By"
           onChange={(value) => {
             handleChange("sort_By", value);
           }}
@@ -153,6 +153,7 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
+              placeholder="State"
               value={state}
               onChange={(value) => {
                 handleChange("state", value);
@@ -276,6 +277,7 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
+              placeholder="Parking Type"
               value={parking_Type}
               onChange={(value) => {
                 handleChange("parking_Type", value);
@@ -292,6 +294,7 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
+              placeholder="Property Type"
               value={property_Type}
               onChange={(value) => {
                 handleChange("property_Type", value);

@@ -321,10 +321,6 @@
   ],
   "sortBy": [
     {
-      "value": "Select",
-      "label": "Select"
-    },
-    {
       "value": "minlistPrice",
       "label": "Sort By Lowest Price"
     },
