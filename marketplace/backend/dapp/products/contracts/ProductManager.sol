@@ -96,7 +96,7 @@ contract ProductManager is InventoryStatus, RestStatus {
             address isUnique = checkForInventory(_vintage,_productAddress,_pricePerUnit,tx.origin);
             if(isUnique!=address(0))
             {
-                 Inventory_2 inventory = Inventory_2(isUnique);
+                 Inventory_3 inventory = Inventory_3(isUnique);
                  inventory.updateQuantityForVintages(inventory.availableQuantity()+_quantity);
                  return (RestStatus.OK, isUnique);
             }

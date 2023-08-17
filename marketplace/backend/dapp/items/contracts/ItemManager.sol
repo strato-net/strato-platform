@@ -163,12 +163,12 @@ contract ItemManager is ItemStatus, InventoryStatus {
                                                                                     block.timestamp,
                                                                                     _newOwner
                                                                                 );
-            inventory = Inventory_2(inventoryAddr);
+            inventory = Inventory_3(inventoryAddr);
 
                    
         }else{
             //inventory retreived
-            Inventory_2 inventoryToBeAdded = Inventory_2(uniqueInventoryAddress);
+            Inventory_3 inventoryToBeAdded = Inventory_3(uniqueInventoryAddress);
             int availableQuantity = inventoryToBeAdded.availableQuantity();
             //quantity updated
             uint256 status = inventoryToBeAdded.updateQuantityForVintages(availableQuantity+_newQuantity);
