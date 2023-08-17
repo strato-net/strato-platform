@@ -8,6 +8,8 @@ const MembershipsProvider = ({ children }) => {
   const initialState = {
     membership: null,
     membershipServices: [],
+    productFile: null,
+    isProductFileLoading: false,
     isMembershipLoading: false,
   };
 

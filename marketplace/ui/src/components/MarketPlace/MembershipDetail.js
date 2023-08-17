@@ -56,7 +56,7 @@ const MembershipDetails = ({ user, users }) => {
   const [membershipDetails, setMembershipDetails] = useState(undefined);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { membershipServices, membership, isMembershipLoading } =
+  const { membershipServices, membership, isMembershipLoading, isProductFileLoading, productFile } =
   useMembershipState();
 const serviceDispatch = useMembershipDispatch();
 
@@ -66,6 +66,7 @@ const serviceDispatch = useMembershipDispatch();
     if (user) {
       if (Id !== undefined) {
         membershipActions.fetchMembershipOfInventory(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
+        membershipActions.fetchProductFileOfInventory(serviceDispatch, debouncedSearchTerm, Id);
       }
     }
   }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user])
