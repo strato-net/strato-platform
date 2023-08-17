@@ -59,8 +59,6 @@ function PropertyCreateModal({
 
   const { message, success, isCreatePropertySubmitting } = usePropertiesState();
   const [propertyData, setPropertyData] = useState(formData);
-
-  const [selectedOptions, setSelectedOptions] = useState(propertyCheckBox);
   //TODO:- Can uncomment when use image upload ***
   // const [selectedImage, setSelectedImage] = useState(null);
   // const [previewOpen, setPreviewOpen] = useState(false);
@@ -149,36 +147,16 @@ function PropertyCreateModal({
   //creates the listing for property
   const handleSubmitCreateProperty = async () => {
 
-    const body = {
-      title,
-      description,
-      propertyType,
-      listPrice,
-      streetNumber,
-      streetName,
-      unitNumber,
-      postalCity,
-      stateOrProvince,
-      postalcode,
-      bathroomsTotalInteger,
-      bedroomsTotal,
-      lotSizeArea,
-      lotSizeUnits,
-      livingArea,
-      livingAreaUnits,
-      numberOfUnitsTotal,
-
-      ...selectedOptions,
-    };
+    const body = propertyData
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
     if (isEdit) {
-      let response = await actions.createProperty(dispatch, body);
+      let response = await actions.updateProperty(dispatch, body);
       if (response) {
         toggleCreateModal(false)
         toggleCreateConfirmModal(false)
         setModalView(!modalView);
-        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+        // actions.fetchPropertyDetails(dispatch, id)
       }
     } else {
       let response = await actions.createProperty(dispatch, body);
@@ -253,11 +231,6 @@ function PropertyCreateModal({
     }
   };
 
-  const handleCheckbox = (value, check) => {
-    let data = { ...selectedOptions };
-    data[value] = check;
-    setSelectedOptions(data);
-  };
 
   function convertCategories() {
     const convertedData = [];
@@ -718,10 +691,10 @@ function PropertyCreateModal({
                     <Checkbox
                       key={key}
                       name={opt.label}
-                      checked={selectedOptions[opt.value]}
-                      defaultChecked={selectedOptions[opt.value]}
+                      checked={propertyData[opt.value]}
+                      defaultChecked={propertyData[opt.value]}
                       onChange={(e) => {
-                        handleCheckbox(opt.value, e.target.checked);
+                        handleChange(opt.value, e.target.checked);
                       }}
                     >
                       {opt.label}
@@ -745,7 +718,7 @@ function PropertyCreateModal({
         title={primaryAction.content}
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
-        okText={modalView ? "Continue" : isEdit ? "Create Property" : "Update Property"}
+        okText={modalView ? "Continue" : isEdit ? "Update Property" : "Create Property"}
         okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
@@ -762,6 +735,7 @@ function PropertyCreateModal({
         toggleCreateConfirmModal={toggleCreateConfirmModal}
         handleSubmitCreateProperty={handleSubmitCreateProperty}
         isCreatePropertySubmitting={isCreatePropertySubmitting}
+        isEdit={isEdit}
       />
     </>
   );

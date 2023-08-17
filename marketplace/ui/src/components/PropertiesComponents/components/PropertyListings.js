@@ -6,7 +6,7 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-import { filterSchema, propertyConstants } from '../helpers/constants'
+import { filterSchema, propertyCheckBox, propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
@@ -16,6 +16,7 @@ function PropertyListings() {
     lotSizeUnits: "sqft",
     livingAreaUnits: "sqft",
     numberOfUnitsTotal: 1,
+    ...propertyCheckBox
   })
   const [selectedFilter, setSelectedFilter] = useState([])
   const [appliedFilter, setAppliedFilter] = useState([])
