@@ -90,6 +90,9 @@ instance (Account `Alters` AddressState) StorM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
+instance Selectable Account AddressState StorM where
+  select _ = getAddressStateMaybe
+
 instance (MP.StateRoot `Alters` MP.NodeData) StorM where
   lookup _ = MP.genericLookupDB $ use sdb
   insert _ = MP.genericInsertDB $ use sdb

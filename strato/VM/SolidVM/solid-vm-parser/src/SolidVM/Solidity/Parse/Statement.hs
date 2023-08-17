@@ -394,6 +394,7 @@ primaryExpression = do
             pure $ NumberLiteral a val nu
         )
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+    <|> (uncurry AccountLiteral <$> withPosition accountLiteral)
 
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do
@@ -432,6 +433,20 @@ parseExternalCallArgs = do
     args <- parens $ commaSep simpleType
     return (name, args)
   return (fname, args)
+
+accountLiteral :: SolidityParser NamedAccount
+accountLiteral = do
+  void $ char '<'
+  addr <- many1 hexDigit
+  cId <- optionMaybe $ do
+    void $ char ':'
+    (reserved "main" >> pure "main") <|> many1 hexDigit
+  let acctStr = addr ++ maybe "" (':':) cId
+  acct <- case readMaybe acctStr of
+    Nothing -> fail $ "accountLiteral: Could not parse account from " ++ acctStr
+    Just acct -> pure acct
+  void $ char '>'
+  pure acct
 
 literal :: SolidityParser Expression
 literal =

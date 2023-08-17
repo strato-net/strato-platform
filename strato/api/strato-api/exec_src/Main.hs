@@ -109,6 +109,11 @@ instance Selectable Account Contract m => Selectable Account Contract (IdentityM
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
+instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+  lookup _ k   = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
+  delete _ _   = error "API: Keccak256 `Alters` DBCode delete"
+
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
   select p = lift . select p
 
@@ -117,6 +122,21 @@ instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceM
 
 instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
   select p = lift . select p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (VaultM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (IdentityM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT BlocEnv m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
 
 instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do

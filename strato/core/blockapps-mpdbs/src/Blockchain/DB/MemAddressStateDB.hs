@@ -34,6 +34,26 @@ import Data.Maybe
 import GHC.Generics
 import Text.Format
 
+newtype MemAddressStateDB m a = MemAddressStateDB { unMemAddressStateDB :: StateT (M.Map Account AddressState) m a }
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+instance MonadTrans MemAddressStateDB where
+  lift = MemAddressStateDB . lift
+
+instance Monad m => (Account `A.Alters` AddressState) (MemAddressStateDB m) where
+  lookup _   = MemAddressStateDB . gets . M.lookup
+  insert _ k = MemAddressStateDB . modify' . M.insert k
+  delete _   = MemAddressStateDB . modify' . M.delete
+
+instance Monad m => A.Selectable Account AddressState (MemAddressStateDB m) where
+  select = A.lookup
+
+runMemAddressStateDB :: Monad m => MemAddressStateDB m a -> M.Map Account AddressState -> m a
+runMemAddressStateDB f m = evalStateT (unMemAddressStateDB f) m
+
+runNewMemAddressStateDB :: Monad m => MemAddressStateDB m a -> m a
+runNewMemAddressStateDB f = runMemAddressStateDB f M.empty
+
 data AddressStateModification = ASModification AddressState | ASDeleted deriving (Show, Eq, Generic)
 
 instance NFData AddressStateModification

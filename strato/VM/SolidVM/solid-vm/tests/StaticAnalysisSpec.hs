@@ -1,4 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -22,6 +25,11 @@ import SolidVM.Solidity.StaticAnalysis.Types
 import qualified SolidVM.Solidity.StaticAnalysis.Variables.StateVariables as StateVariables
 import Test.Hspec
 import Text.RawString.QQ
+
+instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (MainChainT (MemAddressStateDB m)) where
+  lookup p   = lift . lift . A.lookup p
+  insert p k = lift . lift . A.insert p k
+  delete p   = lift . lift . A.delete p
 
 forSource :: ParserDetector -> String -> [SourceAnnotation Text]
 forSource detector c = case parseSourceWithAnnotations "" $ T.pack c of
@@ -112,7 +120,7 @@ contract B is A {
   }
 }
 |]
-       in length anns `shouldBe` 1
+      length anns `shouldBe` 1
 
   describe "Boolean literal detectors" $ do
     it "can assign a boolean literal to a variable" $
@@ -182,7 +190,7 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 4
+      length anns `shouldBe` 4
 
   describe "Divide before multiply detector" $ do
     it "can multiply before divide" $
@@ -271,7 +279,7 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      length anns `shouldBe` 2
 
   describe "Missing inheritance detectors" $ do
     it "can resolve state variables inherited from a contract" $
@@ -335,7 +343,7 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      length anns `shouldBe` 2
 
   describe "State variable shadowing" $ do
     it "can create local variables that don't shadow state variable names" $
@@ -389,7 +397,7 @@ contract B is A {
   }
 }
 |]
-       in length anns `shouldBe` 1
+      length anns `shouldBe` 1
 
   describe "Uninitialized local variables" $ do
     it "can initialize local variables" $
@@ -424,7 +432,7 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 1
+      length anns `shouldBe` 1
 
   describe "Redundant writes" $ do
     it "can write to variables" $
@@ -528,7 +536,7 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
+      length anns `shouldBe` 0
 
   describe "State variable detectors" $ do
     it "can use a state variable without warning" $
@@ -577,7 +585,7 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 1
+      length anns `shouldBe` 1
 
     it "can detect duplicate declarations" $
       let anns =

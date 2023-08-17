@@ -287,8 +287,13 @@ codeServer cHash =
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
 getCodeFromPostgres cHash =
-  let getSourceMap = deserializeSourceMap . decodeUtf8 . codeRefCode . E.entityVal
-   in fmap (listToMaybe . map getSourceMap) . sqlQuery . E.select $
+  let getSourceMap = deserializeSourceMap . decodeUtf8
+   in fmap getSourceMap <$> getCodeByteStringFromPostgres cHash
+
+getCodeByteStringFromPostgres :: HasSQL m => Keccak256 -> m (Maybe B.ByteString)
+getCodeByteStringFromPostgres cHash =
+  let getBS = codeRefCode . E.entityVal
+   in fmap (listToMaybe . map getBS) . sqlQuery . E.select $
         E.from $ \(codeRef) -> do
           E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)
           return codeRef

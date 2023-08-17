@@ -1,5 +1,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
@@ -60,16 +63,24 @@ data ParseTypeCheckOrSolidVMError
   | SVMEx (Positioned ((,) SolidException))
   deriving (Show)
 
-data SUnitIntermediary = Con Contract | FLC ConstantDecl | FLS Def.Def | FLE Def.Def | FLF Func | FLER Def.Def | Prag (String, String)
+instance Monad m => (Account `A.Alters` AddressState) (MemCompilerT m) where
+  lookup p   = MemCompilerT . MainChainT . A.lookup p
+  insert p k = MemCompilerT . MainChainT . A.insert p k
+  delete p   = MemCompilerT . MainChainT . A.delete p
 
--- | OTHER CACHE OPTIONS
--- {-# NOINLINE unsafeCodeMapIORef #-}
--- unsafeCodeMapIORef :: IORef (Map Keccak256 CodeCollection)
--- unsafeCodeMapIORef = unsafePerformIO $ newIORef M.empty
+instance Monad m => A.Selectable Account AddressState (MemCompilerT m) where
+  select = A.lookup
 
--- {-# NOINLINE unsafeCodeCahcheIO #-}
--- unsafeCodeCahcheIORef :: IORef (DC.Cache Keccak256 CodeCollection)
--- unsafeCodeCahcheIORef = unsafePerformIO $ newIORef $ newCache timeLife
+instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCompilerT m) where
+  lookup p   = MemCompilerT . MainChainT . MemAddressStateDB . lift . A.lookup p
+  insert p k = MemCompilerT . MainChainT . MemAddressStateDB . lift . A.insert p k
+  delete p   = MemCompilerT . MainChainT . MemAddressStateDB . lift . A.delete p
+
+instance Monad m => A.Selectable Word256 ParentChainIds (MemCompilerT m) where
+  select p   = MemCompilerT . A.select p
+
+runMemCompilerT :: Monad m => MemCompilerT m a -> m a
+runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT
 
 maxCacheSize :: Integer
 maxCacheSize = 10
@@ -85,17 +96,21 @@ withAnnotations f = first unwind . f
     unwind (SVMEx (e, x)) = [T.pack (show e) <$ x]
     unwind (TCEx errs) = errs
 
-parseSource :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [SourceUnit]
+parseSource :: T.Text -> T.Text -> Either CompilationError [SourceUnit]
 parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "" M.empty) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
-parseSourceWithAnnotations = withAnnotations . parseSource
+parseSourceWithAnnotations fileName = runIdentity . withAnnotations (Identity . parseSource fileName)
 
-compileSourceNoInheritance :: Map T.Text T.Text -> Either ParseTypeCheckOrSolidVMError CodeCollection
-compileSourceNoInheritance initCodeMap = do
-  let getNamedSUnits :: T.Text -> T.Text -> Either ParseTypeCheckOrSolidVMError [(SolidString, SUnitIntermediary)]
+compileSourceNoInheritance :: ( HasCodeDB m
+                              , A.Selectable Account AddressState m
+                              )
+                           => Bool -> Map T.Text T.Text -> m (Either CompilationError CodeCollection)
+compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
+  let getNamedSUnits :: T.Text -> T.Text -> Either CompilationError (Positioned UnresolvedFileUnitsF)
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
+        foldrM (\u ufu -> maybe (pure ufu) (first IEx . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
 
         let userDefinedFromFile = M.fromList $ map (\case (Alias _ alias typ) -> (alias, typ); _ -> ("", "")) $ filter (\case (Alias _ _ _) -> True; _ -> False) sourceUnits
         fmap catMaybes . for sourceUnits $ \case
@@ -175,7 +190,10 @@ compileSource typeCheck mTT = do
       [] -> Right ecc
       xs -> Left $ TCEx xs
 
-compileSourceWithAnnotations :: Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
+compileSourceWithAnnotations :: ( HasCodeDB m
+                                , A.Selectable Account AddressState m
+                                )
+                             => Bool -> Map T.Text T.Text -> m (Either [SourceAnnotation T.Text] CodeCollection)
 compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
 
 codeCollectionFromSource ::

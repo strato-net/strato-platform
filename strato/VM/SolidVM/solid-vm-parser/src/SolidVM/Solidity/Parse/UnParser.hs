@@ -38,7 +38,7 @@ unparse (File units) = List.concat $ List.map unparseSourceUnit units
 
 unparseSourceUnit :: SourceUnit -> String
 unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
-unparseSourceUnit (Import _ path) = "import \"" ++ Text.unpack path ++ "\";\n"
+unparseSourceUnit (Import _ imp) = "import \"" ++ unparseFileImport imp ++ "\";\n"
 unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (Text.unpack name, conDecl)
 unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
 unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
@@ -429,3 +429,12 @@ unparseVals (name, theType) =
 
 unparseIndexedType :: IndexedType -> Text
 unparseIndexedType = Text.pack . unparseVarType . indexedTypeType
+
+unparseFileImport :: Show a => FileImportF a -> String
+unparseFileImport (Simple e _) = unparseExpression e
+unparseFileImport (Qualified e q _) = unparseExpression e ++ " as " ++ Text.unpack q
+unparseFileImport (Braced i e _) = "{ " ++ (List.intercalate ", " $ unparseItemImport <$> i) ++ " } from " ++ unparseExpression e
+
+unparseItemImport :: ItemImportF a -> String
+unparseItemImport (Named n _) = Text.unpack n
+unparseItemImport (Aliased n a _) = Text.unpack $ n <> " as " <> a

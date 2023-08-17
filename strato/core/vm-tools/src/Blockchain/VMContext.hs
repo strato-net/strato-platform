@@ -437,6 +437,9 @@ instance (Account `A.Alters` AddressState) ContextM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
+instance A.Selectable Account AddressState ContextM where
+  select _ = getAddressStateMaybe
+
 instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
   lookup _ chainId = do
     mBH <- gets $ view $ memDBs . currentBlock

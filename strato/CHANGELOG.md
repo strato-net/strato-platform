@@ -22,6 +22,7 @@ so that they could be properly moved to their respective version's subsection.
 - `/transaction/unsigned` endpoint for generating raw transaction inputs
 - Bi-directional sync functionality
 - Mappings in SolidVM receive their own table in Cirrus
+- Support for imports from addresses in SolidVM
 - More lenient P2P disable times to prevent non-validators from being "locked out"
 - `make pretty` triggers Ormolu code formatting on STRATO and `gen-hie` for HLS support
 ### Changed

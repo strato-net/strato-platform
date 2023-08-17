@@ -560,7 +560,7 @@ getVariableOfName name = do
     ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract {..}) =
         catMaybes

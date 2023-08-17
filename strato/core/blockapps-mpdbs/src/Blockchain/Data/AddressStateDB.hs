@@ -1,8 +1,13 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -119,7 +124,7 @@ resolveCodePtr' ::
   CodePtr ->
   m (Maybe CodePtr)
 resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
-  lookup Proxy acct >>= \case
+  select Proxy acct >>= \case
     Nothing -> pure Nothing
     Just AddressState {..} -> do
       let codeAccountChainId = (acct ^. accountChainId)
@@ -236,7 +241,7 @@ getAppAccount ::
   Account ->
   m (Maybe Account)
 getAppAccount chainId acct = do
-  lookup Proxy acct >>= \case
+  select Proxy acct >>= \case
     Nothing -> pure Nothing
     Just AddressState {..} -> do
       let codeAccountChainId = (acct ^. accountChainId)

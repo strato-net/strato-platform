@@ -98,6 +98,11 @@ instance Selectable Account Contract m => Selectable Account Contract (ReaderT B
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
+instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+  lookup _ k   = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  insert _ _ _ = error "Slipstream: Keccak256 `Alters` DBCode insert"
+  delete _ _   = error "Slipstream: Keccak256 `Alters` DBCode delete"
+
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -291,7 +296,11 @@ parseEvents = concatMap parseEvent
           eventEvent = e
         }
 
-getCodeCollection :: MonadIO m => CodePtr -> Text -> m (Either String CodeCollection)
+getCodeCollection :: ( MonadIO m
+                     , HasCodeDB m
+                     , Selectable Account AddressState m
+                     )
+                  => CodePtr -> Text -> m (Either String CodeCollection)
 getCodeCollection cp ccString = do
   let initList =
         case Aeson.decodeStrict $ encodeUtf8 ccString of

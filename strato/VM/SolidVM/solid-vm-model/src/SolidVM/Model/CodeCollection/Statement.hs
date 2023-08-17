@@ -158,6 +158,7 @@ data ExpressionF a
   | BoolLiteral a Bool
   | NumberLiteral a Integer (Maybe NumberUnit)
   | StringLiteral a String
+  | AccountLiteral a NamedAccount
   | TupleExpression a [Maybe (ExpressionF a)]
   | ArrayExpression a [(ExpressionF a)]
   | Variable a SolidString
@@ -178,6 +179,7 @@ extractExpression (Ternary a _ _ _) = a
 extractExpression (BoolLiteral a _) = a
 extractExpression (NumberLiteral a _ _) = a
 extractExpression (StringLiteral a _) = a
+extractExpression (AccountLiteral a _) = a
 extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a

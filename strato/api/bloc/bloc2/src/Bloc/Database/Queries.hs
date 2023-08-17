@@ -98,7 +98,11 @@ getContractDetailsForContract src mContract = do
         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
       Just c -> pure . fmap (SolidVMCode (Text.unpack c) ch,) $ Map.lookup (Text.unpack c) _contracts
 
-sourceToContractDetails :: SourceMap -> Either [SourceAnnotation Text] (Keccak256, CodeCollection)
+sourceToContractDetails :: ( MonadIO m
+                           , HasCodeDB m
+                           , A.Selectable Account AddressState m
+                           )
+                        => SourceMap -> m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
 sourceToContractDetails = createMetadataNoCompile
 
 -- SolidVM only

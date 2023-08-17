@@ -1,4 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -728,7 +731,7 @@ contract qq {
   uint x = 0;
 
   constructor() {
-    x = f(6,5);   
+    x = f(6,5);
   }
   function f(string, uint) public returns (uint) {
     return 7;
@@ -797,7 +800,7 @@ contract A {
   uint public x = 75;
   function f() {
     g = x;
-  } 
+  }
 }
 |]
      in length anns `shouldBe` 2
@@ -863,7 +866,7 @@ contract qq {
   uint immutable d = 22;
   constructor() public {
     d = g;
-  } 
+  }
 }|]
      in length anns `shouldBe` 1
   it "can throw exception when receive() function has return values" $
@@ -1091,7 +1094,8 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
+
+      length anns `shouldBe` 2
 
   describe "Check contract inheritance solidvm 3.3" $ do
     it "can resolve state variables inherited from a contract" $
@@ -1159,7 +1163,8 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 2
+
+      length anns `shouldBe` 2
 
   -- start of 3.2 tests
   describe "pure and view modifier for solidvm 3.2" $ do
@@ -1229,7 +1234,8 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
+
+      length anns `shouldBe` 2
 
   describe "Check contract inheritance" $ do
     it "can resolve state variables inherited from a contract" $
@@ -1297,7 +1303,8 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 2
+
+      length anns `shouldBe` 2
 
   describe "Constant function detectors" $ do
     it "can write pure and view functions" $
@@ -1366,7 +1373,8 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
+
+      length anns `shouldBe` 2
 
   describe "Missing inheritance detectors" $ do
     it "can resolve state variables inherited from a contract" $
@@ -1434,14 +1442,15 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 2
+
+      length anns `shouldBe` 2
 
   describe "User Defined Value Types" $ do
     it "must pass the associated type within the wrap function " $
       let anns =
             runTypechecker
               [r|
-  
+
   type MagicInt is int;
   type MysticalString is string;
     type UBool is bool;
@@ -1452,7 +1461,7 @@ contract B {
     MagicInt cayley1        = MagicInt.wrap(helper);  //Should Error -- passing string var into int alias wrap function
     MagicInt cayley2        = MagicInt.wrap("12");   //Should Error  -- passing string literal into int alias wrap function
     MagicInt cayley3        = 12;                   //Should Error   -- assigning int literal to user defined type
-    MagicInt yoneda         = MagicInt.wrap(12);        
+    MagicInt yoneda         = MagicInt.wrap(12);
     MysticalString shakeYo2 = MysticalString.wrap(yoneda); //Should Error -- passing user defined type to alias wrap function
     MagicInt felixKlein     = MagicInt.wrap(yoneda);      //Should Error  -- passing user defined type to alias wrap function
     MagicInt mrBool         = UBool.wrap(true);          //Error          -- passing wrong type to alias wrap function
@@ -1465,8 +1474,8 @@ contract B {
       let anns =
             runTypechecker
               [r|
-  
-  
+
+
   type MagicInt       is int;
   type MysticalString is string;
   type UBool          is bool;
@@ -1477,13 +1486,13 @@ contract B {
     bool  fermet       =  UBool.unwrap(UBool.wrap(true));
     bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
 
-    
+
     //Int
     MagicInt cayley   =  MagicInt.wrap(123);
     int      yoneda   =  MagicInt.unwrap(cayley);
     int      lagrange =  MagicInt.unwrap(MagicInt.wrap(123));
     MagicInt gauss    =  MagicInt.wrap(MagicInt.unwrap(MagicInt.wrap(123)));
-    
+
     //String
     MysticalString hilbert  = MysticalString.wrap("vector");
     string         banach   = MysticalString.unwrap(hilbert);
@@ -1496,7 +1505,7 @@ contract B {
       let anns =
             runTypechecker
               [r|
-  
+
   type UBool is bool;
   type MagicInt is int;
   type MysticalString is string;
