@@ -410,7 +410,10 @@ createAbstractTable :: OutputM m
 createAbstractTable globalsIORef contract (o, a, n) = do
   let tableName = abstractTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
+  $logInfoS "DAVIDcreateAbstractTable/tableName" $ T.pack $ show (tableName) ++ show (_contractName contract)
+  $logInfoS "DAVIDcreateAbstractTable/tableExists" $ T.pack $ show (tableExists) ++ show (_contractName contract)
   when (not tableExists) $ do
+
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     yield $ createAbstractTableQuery contract (o,a,n)
     setTableCreated globalsIORef tableName (list++ ["data"])

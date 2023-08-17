@@ -352,7 +352,7 @@ processTheMessages env conn g messages = do
                     parentAbstractContractsName = map (labelToText ._contractName) parentAbstractContracts
                 
                 $logInfoS "DAVIDprocessTheMessages/parents'" $ T.pack $ show parents'
-                $logInfoS "DAVIDprocessTheMessages/parentContracts" $ T.pack $ show parentContracts
+                -- $logInfoS "DAVIDprocessTheMessages/parentContracts" $ T.pack $ show parentContracts
                 $logInfoS "DAVIDprocessTheMessages/parentAbstractContracts" $ T.pack $ show parentAbstractContracts
                 $logInfoS "DAVIDprocessTheMessages/parentAbstractContractsName" $ T.pack $ show parentAbstractContractsName
 
@@ -375,7 +375,7 @@ processTheMessages env conn g messages = do
 
                 --create contract table
 
-                $logInfoS "DAVIDprocessTheMessages/AbstractType" $ T.pack $ show (_contractType c) ++ show (_contractName c)
+                $logInfoS "DAVIDprocessTheMessages/AbstractType" $ T.pack $ show ((_contractType c == AbstractType )) ++ show (_contractName c)
                 when(_contractType c == AbstractType ) $ do outputData conn $ createAbstractTable g c (o, a', n)
                 
 
