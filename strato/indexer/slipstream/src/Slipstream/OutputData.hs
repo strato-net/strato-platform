@@ -243,7 +243,6 @@ baseAbstractColumns = [ "record_id"
               , "transaction_hash"
               , "transaction_sender"
               , "contractname"
-              , "data"
               ]
 
 baseTableColumns :: TableColumns
@@ -415,7 +414,7 @@ createAbstractTable globalsIORef contract (o, a, n) = do
   when (not tableExists) $ do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     yield $ createAbstractTableQuery contract (o,a,n)
-    setTableCreated globalsIORef tableName (list++ ["data"])
+    setTableCreated globalsIORef tableName (list++ ["\"data\" jsonb"])
 
 createAbstractTableRow :: OutputM m
                  => IORef Globals
@@ -914,7 +913,7 @@ insertAbstractTableQuery cs = concat $
                          , tshow . E.transactionSender
                          ]
               vals = flip map contracts $ \((row, rowList),_) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`elem` abC) rowList]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`notElem` abC) rowList]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
