@@ -934,22 +934,6 @@ insertAbstractTableQuery cs = concat $
                 , ";"
                 ]
 
--- abstractcolumns = [a]
-
--- rowlist=
--- dav a
--- sam b 
--- cat c
--- dna d
-
--- case 1
--- sam b 
--- cat c
--- dna d
-
--- case 2
--- dav a
-
 
 insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
