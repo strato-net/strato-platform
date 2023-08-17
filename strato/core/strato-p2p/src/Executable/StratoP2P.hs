@@ -12,8 +12,6 @@ import Control.Exception hiding (catch)
 import Control.Exception.Lifted (catch)
 import qualified Data.Text as T
 import Executable.StratoP2PClient
--- import           Executable.StratoP2PClientDirect
-
 import Executable.StratoP2PLoopback
 import Executable.StratoP2PServer
 

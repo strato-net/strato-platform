@@ -11,11 +11,6 @@ module Blockchain.Blockstanbul.Authentication
   )
 where
 
--- import Control.Monad (liftM2, liftM3, unless)
---import Control.Monad.Trans.Except
-
--- import Data.List (intercalate)
-
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Model.Authentication

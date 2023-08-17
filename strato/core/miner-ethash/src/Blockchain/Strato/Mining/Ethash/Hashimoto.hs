@@ -16,8 +16,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Word
 
---import Debug.Trace
-
 -- type Dataset =  Repa.Array BN.Word32 Repa.DIM1 Int
 
 {- def hashimoto(header, nonce, full_size, dataset_lookup):

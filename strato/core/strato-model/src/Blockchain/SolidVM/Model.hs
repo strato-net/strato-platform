@@ -16,7 +16,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import Data.Swagger
 import Data.Swagger.Internal.Schema (named)
-import Data.Swagger.Schema
 import qualified Data.Text as T
 import Data.Text.Encoding
 import GHC.Generics

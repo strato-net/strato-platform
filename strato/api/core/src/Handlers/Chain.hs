@@ -32,8 +32,6 @@ module Handlers.Chain
   )
 where
 
--- import qualified Data.Map                       as M
-
 import BlockApps.Logging
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.ChainInfoDB
@@ -50,7 +48,6 @@ import Control.Lens
 import Control.Monad
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
-import Control.Monad.IO.Class
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
 import Data.Swagger

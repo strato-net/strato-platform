@@ -16,8 +16,6 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-{-# HLINT ignore "Use if" #-}
-
 module Blockchain.SolidVM
   ( SolidVMBase,
     call,
@@ -96,8 +94,6 @@ import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 import qualified LabeledError
---import           SolidVM.Solidity.Parse.UnParser (unparseStatement, unparseExpression, unparseVarType, unparseContract)
-
 import Network.Haskoin.Crypto.BigWord ()
 import qualified Numeric (readHex)
 import qualified SolidVM.Model.CodeCollection as CC
@@ -116,8 +112,6 @@ import Text.Printf
 import Text.Read (readEither, readMaybe)
 import Text.Tools
 import UnliftIO hiding (assert)
-
---import           Debug.Trace
 
 -- | Copying from Data.List.Extra, since our version of the extra library seems to not contain it.
 -- | A total variant of the list index function `(!!)`.

@@ -9,10 +9,6 @@ module Blockchain.Data.ExecResults
   )
 where
 
--- import           Data.Map                as M
-
--- import           Blockchain.Strato.Model.Address
-
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.SolidVM.Model
@@ -25,8 +21,6 @@ import Blockchain.VMOptions
 import Control.DeepSeq
 import qualified Data.Set as S
 import GHC.Generics
-
--- import           BlockApps.X509.Certificate
 
 data ExecResults = ExecResults
   { erRemainingTxGas :: Integer,

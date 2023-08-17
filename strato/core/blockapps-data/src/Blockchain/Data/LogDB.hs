@@ -10,7 +10,6 @@ where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Database.Persist hiding (get)
 import qualified Database.Persist.Postgresql as SQL
 
 class (Monad m) => HasMemLogDB m where

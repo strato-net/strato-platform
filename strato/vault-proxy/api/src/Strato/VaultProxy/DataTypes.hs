@@ -8,7 +8,6 @@ module Strato.VaultProxy.DataTypes
   )
 where
 
--- import           Control.Lens
 import Control.Concurrent.Lock as L
 import Data.Aeson
 import qualified Data.Aeson.Key as DAK

@@ -3,8 +3,6 @@
 
 module DumpKafkaStateDiff where
 
---import qualified Data.ByteString.Char8  as BC
-
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 import Blockchain.Stream.Action (Action)

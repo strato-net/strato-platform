@@ -26,10 +26,8 @@ import Conduit
 import Control.Concurrent
 import Control.Lens.Combinators (uses)
 import Control.Monad
-import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Resource
 import Control.Monad.Trans.State
 import qualified Data.Aeson as Ae
 import Data.Either.Combinators (whenLeft)

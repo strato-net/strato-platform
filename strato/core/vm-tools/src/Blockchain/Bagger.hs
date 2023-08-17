@@ -15,8 +15,6 @@ import BlockApps.Logging
 import Blockapps.Crossmon
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.Bagger.Transactions
---import           Blockchain.Data.Block
-
 import Blockchain.DB.ChainDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StorageDB
@@ -58,7 +56,6 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime, utcTimeToPOSIXSeconds)
-import Data.Word
 import Executable.EVMFlags (flags_maxTxsPerBlock)
 import Text.Format
 

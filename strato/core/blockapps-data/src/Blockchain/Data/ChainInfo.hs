@@ -39,8 +39,6 @@ import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import Control.Applicative (many)
 import qualified Control.Monad.Change.Alter as A
 import qualified Crypto.Secp256k1 as SEC
--- import           Blockchain.TypeLits
-
 import Data.Aeson
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B

@@ -5,8 +5,6 @@
 
 module Blockchain.Strato.RedisBlockDB.Test.Chain where
 
--- import qualified Text.PrettyPrint.ANSI.Leijen as L
-
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs

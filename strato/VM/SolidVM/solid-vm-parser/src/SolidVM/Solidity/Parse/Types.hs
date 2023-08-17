@@ -16,8 +16,6 @@ import SolidVM.Solidity.Parse.ParserTypes
 import Text.Parsec
 import Text.Read (readMaybe)
 
---import SolidVM.Solidity.Parse.Lexer (identifier)
-
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
 simpleTypeExpression :: SolidityParser SVMType.Type

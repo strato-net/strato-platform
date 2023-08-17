@@ -16,8 +16,6 @@ module Executable.EthereumVM
   )
 where
 
---import           Data.List.Split                       (chunksOf)
-
 import BlockApps.Logging
 import Blockapps.Crossmon
 import qualified Blockchain.Bagger as Bagger

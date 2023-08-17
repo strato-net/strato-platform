@@ -6,12 +6,6 @@ module Blockchain.Strato.StateDiff.Kafka
   )
 where
 
---import           Data.Aeson
---import qualified Data.ByteString.Lazy              as L
-
---import qualified Network.Kafka.Producer            as KW
-
---import           Blockchain.Strato.Model.Action    (Action)
 import Blockchain.KafkaTopics (lookupTopic)
 import Control.Lens.Getter (view)
 import qualified Network.Kafka as K
