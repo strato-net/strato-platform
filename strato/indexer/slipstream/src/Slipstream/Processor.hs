@@ -431,6 +431,7 @@ processTheMessages env conn g messages = do
           --check id current contract is derived contract
           abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           --get columns for abstract table
+          $logInfoS "DAVIDprocessTheMessages/abstracts" $ T.pack $ show abstracts ++ show((SE.contractName indexContract))
           abstractColumns <- case abstracts of
                               [] -> return Nothing
                               (firstAbstract:_) -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract
