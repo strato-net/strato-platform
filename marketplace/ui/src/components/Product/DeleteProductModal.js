@@ -3,6 +3,8 @@ import { DeleteOutlined } from "@ant-design/icons";
 import { Modal, Spin } from "antd";
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import TagManager from "react-gtm-module";
+
 
 const DeleteProductModal = ({
   open,
@@ -19,6 +21,11 @@ const DeleteProductModal = ({
         productAddress: product.address,
       };
      
+      TagManager.dataLayer({
+        dataLayer: {
+          event: 'delete_product',
+        },
+      });
       let isDone = await actions.deleteProduct(dispatch, body);
 
       if (isDone) {
