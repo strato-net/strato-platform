@@ -374,6 +374,8 @@ processTheMessages env conn g messages = do
                 outputData conn $ createExpandEventTables g c nameParts
 
                 --create contract table
+
+                $logInfoS "DAVIDprocessTheMessages/AbstractType" $ T.pack $ show (_contractType c) ++ show (_contractName c)
                 when(_contractType c == AbstractType ) $ do outputData conn $ createAbstractTable g c (o, a', n)
                 
 
