@@ -217,15 +217,37 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
       onCancel={closeModal}
       width={1000}
       footer={[
-        <div className="flex justify-center">
+        <div className="flex justify-end mr-10">
           <Button
-            id="create-product-button"
+            id="cancel-membership-button"
+            key="cancel"
+            type="secondary"
+            style={{ borderColor: 'blue', color: 'blue'}}
+            className="mx-4 px-10"
+            onClick={closeModal}
+          >
+            Cancel
+          </Button>
+          <Button
+            id="create-membership-button"
             key="submit"
             type="primary"
+            style={{ backgroundColor: 'green', color: 'white'}}
+            className="mx-4 px-10"
             onClick={formik.handleSubmit}
             disabled={disabled}
           >
-            {disabled ? <Spin /> : "Create Membership"}
+            {disabled ? <Spin /> : "Create"}
+          </Button>
+          <Button
+            id="list-membership-button"
+            key="list"
+            type="primary"
+            className="ml-4 mr-8 px-10"
+            onClick={formik.handleSubmit}
+            disabled={disabled}
+          >
+            {disabled ? <Spin /> : "List Now"}
           </Button>
         </div>,
       ]}
