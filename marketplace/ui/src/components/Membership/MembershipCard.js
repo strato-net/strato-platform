@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { Card, Popover, Spin } from "antd";
+import { Card, Popover, Spin, Button } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import routes from "../../helpers/routes";
+import { useNavigate } from "react-router-dom";
 
 const MembershipCard = ({
   product,
@@ -14,6 +16,8 @@ const MembershipCard = ({
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const naviroute = routes.MembershipDetail.url;
 
   const showModal = () => {
     hide();
@@ -43,7 +47,12 @@ const MembershipCard = ({
 
   useEffect(() => {
     setState(product);
+    console.log("state", state);
   }, [product]);
+  
+  const callDetailPage = () => {
+    navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true } });
+  }
 
 
   return (
@@ -67,6 +76,13 @@ const MembershipCard = ({
                     {decodeURIComponent(state.name)}
                   </h3>
                 </div>
+                <div className="flex items-center">
+                <Button type="text"
+                  className="text-primary text-sm cursor-pointer"
+                  onClick={callDetailPage}
+                >
+                  Preview
+                </Button>
                 <Popover
                   placement="bottomLeft"
                   open={openPop}
@@ -95,6 +111,7 @@ const MembershipCard = ({
                 >
                   <MoreOutlined />
                 </Popover>
+                </div>
               </div>
               <div className="flex mt-1.5 items-center">
                 <p className="text-primaryC text-sm w-40">Sub Category</p>

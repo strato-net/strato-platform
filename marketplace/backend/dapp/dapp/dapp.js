@@ -1307,7 +1307,47 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   contract.getMembership = async function (args, options = optionsNoChainIds) {
     // May need to insert contractName in options when this goes throught the product manager
     // This param was hard coded for the get and getAll functions for Membership and MembershipService below
-    return membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+    
+    // Get The membership
+    const membership = await membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+    
+    // Get The productFiles
+    console.log("start", membership.productId)
+    const productFiles = undefined
+    if(membership.productId){
+      productFiles = await productFileJs.getAll(rawAdmin, { productId: membership.productId}, {...options, org: managers.cirrusOrg, app: ""})
+    }
+    
+    
+    // Get all membershipServices
+    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: "" }))?.membershipServices ?? [];
+
+    // Get all services
+    const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
+
+    // Combine the data and merge the service data into the membershipService data
+    const combinedData = {
+      membership: membership,
+      membershipServices: membershipServices.map(membershipService => {
+        const matchingService = servicesAll.find(service => service.address === membershipService.serviceId);
+    
+        if (matchingService) {
+          return {
+            ...membershipService,
+            savings: membershipService.maxQuantity * (matchingService.price - membershipService.price),
+            serviceName: matchingService.name,
+            serviceDescription: matchingService.description,
+            servicePrice: matchingService.price,
+            serviceCreatedDate: matchingService.createdDate
+          };
+        } else {
+          return membershipService;
+        }
+      }),
+      productFiles: productFiles
+    };
+    console.log("Dapp-getMembership combinedData: ", combinedData);
+    return combinedData
   }
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
@@ -1357,9 +1397,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   contract.getMembershipServices = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = {...options, org: managers.cirrusOrg, app: ""}
-    return membershipServiceJs.getAll(rawAdmin, { 
+    const out = await membershipServiceJs.getAll(rawAdmin, { 
       ...args
     }, getOptions)
+    console.log("getMembershipServices getOptions: ", getOptions)
+    console.log("getMembershipServices: ", out)
+    return out
   }
 
   contract.transferOwnershipMembershipService = async function (args, options = defaultOptions) {
