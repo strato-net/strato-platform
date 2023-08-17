@@ -430,7 +430,7 @@ processTheMessages env conn g messages = do
           else
             case abstractColumns of 
               Just abC -> do
-                let finalColumns = map (T.filter (\c -> c /= '"' && c /= '\\')) abC
+                let finalColumns = map extractTextInsideQuotes abC
                 pure . Right $ BatchedInserts indexContract (Just (indexContract, head abstracts, finalColumns)) hs pMappings
               Nothing -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
             
@@ -480,3 +480,11 @@ generateUserTable :: (MonadLogger m, HasSQL m) =>
                       PGConnection -> IORef Globals -> m ()
 generateUserTable conn g = do
   outputData conn $ createUserTable g
+
+extractTextInsideQuotes :: T.Text -> T.Text
+extractTextInsideQuotes input =
+    case T.stripPrefix "\"" input of
+        Just rest ->
+            case T.break (== '"') rest of
+                (extracted, _) -> extracted
+        Nothing -> ""
