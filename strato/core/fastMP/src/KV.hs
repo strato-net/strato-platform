@@ -6,7 +6,6 @@ module KV
   )
 where
 
---import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.NodeData as MP
 import qualified Data.NibbleString as N
 

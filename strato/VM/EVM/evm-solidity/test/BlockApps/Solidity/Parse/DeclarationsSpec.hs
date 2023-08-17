@@ -2,13 +2,10 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
--- import qualified Data.Text as Text
-
 import BlockApps.Solidity.Parse.Declarations
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Xabi
--- import BlockApps.Solidity.Parse.UnParser
 import BlockApps.Solidity.Xabi.Type
 import Test.Hspec
 import Text.Parsec hiding (parse)

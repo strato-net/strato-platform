@@ -71,8 +71,6 @@ import Test.QuickCheck.Instances.Text ()
 import Text.Format
 import Text.Printf
 
--- import           Test.QuickCheck
-
 data BoundedData a = LowerBound | Middle a | UpperBound deriving (Eq, Generic, Show)
 
 data ChainMemberF f = ChainMemberF

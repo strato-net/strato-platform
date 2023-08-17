@@ -24,7 +24,6 @@ import Debugger.Options
 import Debugger.Types
 import Debugger.Util
 import UnliftIO
-import UnliftIO.STM
 
 status :: MonadIO m => DebugSettings -> m DebuggerStatus
 status DebugSettings {..} = atomically $ readTVar current

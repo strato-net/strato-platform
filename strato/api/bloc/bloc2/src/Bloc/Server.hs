@@ -25,7 +25,6 @@ import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
 import Control.Monad.Logger
 import Data.HashMap.Strict.InsOrd
-import Data.Proxy
 import Data.Source.Map
 import Data.Swagger
 import Servant

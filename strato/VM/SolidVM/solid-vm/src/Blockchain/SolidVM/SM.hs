@@ -57,8 +57,6 @@ module Blockchain.SolidVM.SM
   )
 where
 
---import           Data.IORef
-
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.DB.CodeDB

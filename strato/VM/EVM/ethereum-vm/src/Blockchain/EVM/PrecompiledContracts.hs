@@ -20,8 +20,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Short as Short
 import Prelude hiding (EQ, GT, LT)
 
---import Debug.Trace
-
 ecdsaRecover :: B.ByteString -> B.ByteString
 ecdsaRecover input =
   let h = B.take 32 input

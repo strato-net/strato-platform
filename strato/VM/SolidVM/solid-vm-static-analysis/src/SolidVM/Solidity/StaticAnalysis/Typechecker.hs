@@ -15,7 +15,6 @@ import Control.Lens hiding (enum)
 import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Data.Foldable (traverse_)
--- import           Data.Functor.Identity (runIdentity)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
@@ -33,10 +32,6 @@ import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
-
---import qualified Text.Colors                          as C
---import           Control.Monad.IO.Class
---import Debug.Trace
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")

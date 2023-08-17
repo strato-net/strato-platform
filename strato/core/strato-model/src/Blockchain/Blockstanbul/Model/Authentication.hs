@@ -3,8 +3,6 @@
 module Blockchain.Blockstanbul.Model.Authentication where
 
 import Blockchain.Data.RLP
--- import Blockchain.Strato.Model.Address
-
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Secp256k1
 import Control.Lens

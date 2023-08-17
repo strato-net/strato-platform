@@ -1,8 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
 
---import Control.Monad
---import Control.Monad.Trans.Class
---import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import Data.Conduit
 import Data.Conduit.List (sourceList)

@@ -16,10 +16,6 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
--- import           Blockchain.Mining
--- import           Blockchain.Mining.Instant
--- import           Blockchain.Mining.Normal
--- import           Blockchain.Mining.SHA
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Class

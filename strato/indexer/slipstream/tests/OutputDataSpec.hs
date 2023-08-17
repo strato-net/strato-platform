@@ -5,8 +5,6 @@
 
 module OutputDataSpec where
 
---import qualified Data.Text as T
-
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
@@ -26,8 +24,6 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
--- import Slipstream.Processor
-
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType

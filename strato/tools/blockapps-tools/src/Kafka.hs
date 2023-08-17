@@ -14,7 +14,6 @@ import Conduit
 import Control.Lens.Combinators (use, uses, _1, _2)
 import Control.Lens.Operators ((%=), (+=), (.=))
 import Control.Monad
-import Control.Monad.IO.Class
 import Control.Monad.Trans.State
 import Data.Binary
 import qualified Data.ByteString as B

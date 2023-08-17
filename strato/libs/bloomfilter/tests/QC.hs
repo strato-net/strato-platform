@@ -1,14 +1,11 @@
 module Main where
 
--- import Control.Monad (forM_)
 import qualified Data.BloomFilter.Easy as B
 import Data.BloomFilter.Hash (Hashable (..), hash64)
 import qualified Data.ByteString.Char8 as SB
 import qualified Data.ByteString.Lazy.Char8 as LB
 import Data.Int (Int16, Int32, Int64, Int8)
 import Data.Word (Word16, Word32, Word64, Word8)
--- import System.IO (BufferMode(..), hSetBuffering, stdout)
-
 --Testable
 
 import QCSupport (P (..))

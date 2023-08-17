@@ -34,7 +34,6 @@ where
 
 import Bloc.API
 import BlockApps.X509.Certificate
--- import BlockApps.Solidity.Xabi
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256

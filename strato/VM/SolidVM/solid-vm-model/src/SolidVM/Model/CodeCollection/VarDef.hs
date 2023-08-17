@@ -8,8 +8,6 @@ module SolidVM.Model.CodeCollection.VarDef where
 import Control.DeepSeq
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
--- import qualified Data.Map.Strict as M
--- import qualified Data.HashMap.Lazy         as HashMap
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Int (Int32)
 import Data.Swagger

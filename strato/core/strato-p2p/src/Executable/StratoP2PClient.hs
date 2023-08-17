@@ -18,8 +18,6 @@ module Executable.StratoP2PClient
   )
 where
 
--- import           Data.Traversable                      (for)
-
 import BlockApps.Logging
 import Blockchain.CommunicationConduit
 import Blockchain.Context

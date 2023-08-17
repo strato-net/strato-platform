@@ -46,9 +46,6 @@ import Test.QuickCheck
 import Web.FormUrlEncoded
 import Web.HttpApiData
 
---import Control.Applicative (liftA2)
---import Text.Read hiding (String)
-
 predicate :: Path -> Bool
 predicate (_, _) = True
 predicate _ = False

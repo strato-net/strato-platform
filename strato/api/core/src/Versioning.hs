@@ -9,9 +9,7 @@ where
 
 import Control.Exception
 import Control.Monad
---import           Control.Monad.IO.Class
 import Data.Aeson
---import qualified Data.ByteString.Char8      as BS
 import Data.Maybe
 import GHC.Generics
 import Language.Haskell.TH
@@ -20,8 +18,6 @@ import System.Directory
 import System.Exit
 import System.FilePath
 import System.Process
-
---import qualified Data.Yaml                  as Y
 
 data StackRepo = StackRepo {package :: Package} deriving (Show, Generic)
 

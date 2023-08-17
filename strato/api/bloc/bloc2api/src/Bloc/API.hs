@@ -18,8 +18,6 @@ module Bloc.API
   )
 where
 
---import           Servant.Mock
-
 import Bloc.API.Chain
 import Bloc.API.Contracts
 import Bloc.API.Git

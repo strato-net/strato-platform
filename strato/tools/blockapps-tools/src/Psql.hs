@@ -8,7 +8,6 @@ import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.EthConf
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 import Database.Persist.Postgresql
-import Database.Persist.Sql
 import HFlags
 
 psql :: IO ()

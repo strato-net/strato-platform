@@ -23,7 +23,6 @@ import Data.Bits (shiftL, shiftR)
 import qualified Data.ByteString as B
 import Data.Time
 import Data.Time.Clock.POSIX
-import Data.Word
 import Numeric
 import qualified Text.Colors as CL
 import Text.Format

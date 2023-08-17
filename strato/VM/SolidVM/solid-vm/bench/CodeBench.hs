@@ -4,12 +4,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 
---import Data.Either
-
---import SolidVM.Solidity.Parse.Declarations
-
---import SolidVM.CodeCollectionTools
-
 import BlockApps.Logging
 import Blockchain.MemVMContext
 import Blockchain.SolidVM.CodeCollectionDB
@@ -33,9 +27,6 @@ import SolidVM.Solidity.Parse.File
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.StaticAnalysis.Typechecker
 import Text.Parsec (ParseError, runParser)
-
--- for HFlags
--- import Executable.EVMFlags() -- for HFlags
 
 instance NFData ParseError where
   rnf = rwhnf

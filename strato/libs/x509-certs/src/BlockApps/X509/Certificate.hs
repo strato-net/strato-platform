@@ -98,11 +98,6 @@ import qualified Text.Colors as CL
 import Text.Format
 import Time.System
 
--- import           Blockchain.Data.PubKey
--- import           Data.ASN1.Encoding
--- import           Data.ASN1.BinaryEncoding
--- import           Data.ASN1.Types
-
 -----------------------------------------------------------------------------------------------
 --------------------------------- TYPES AND TYPECLASS INSTANCES -------------------------------
 -----------------------------------------------------------------------------------------------

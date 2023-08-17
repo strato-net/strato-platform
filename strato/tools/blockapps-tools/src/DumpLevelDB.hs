@@ -18,8 +18,6 @@ import qualified LabeledError
 import System.FilePath
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
 
---import Debug.Trace
-
 instance Pretty B.ByteString where
   pretty = blue . text . BC.unpack . B16.encode
 

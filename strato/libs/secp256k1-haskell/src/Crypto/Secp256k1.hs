@@ -98,7 +98,6 @@ import           Foreign                   (ForeignPtr, alloca, allocaArray,
                                             allocaBytes, mallocForeignPtr,
                                             nullFunPtr, nullPtr, peek, poke,
                                             pokeArray, withForeignPtr)
---import           Foreign.C                 (CInt)
 import           System.IO.Unsafe          (unsafePerformIO)
 import           Test.QuickCheck           (Arbitrary (..),
                                             arbitraryBoundedRandom, suchThat)

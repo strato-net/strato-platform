@@ -2,17 +2,10 @@
 
 module BlockApps.SolidityVarReaderSpec where
 
---import qualified Data.Map.Strict as M
-
 import BlockApps.Solidity.Struct
---import BlockApps.Storage
---import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Type
---import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 import BlockApps.SolidityVarReader (structSort)
---import BlockApps.SolidityVarReader (decodeCacheValues, structSort)
-
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Control.Monad

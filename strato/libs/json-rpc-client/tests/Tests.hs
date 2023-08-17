@@ -5,14 +5,6 @@
 
 module Tests (tests) where
 
--- import qualified Data.Aeson.KeyMap as KM
--- import qualified Data.Aeson.Key    as DAK
-
--- import Data.Maybe (fromJust)
-
--- import Data.Scientific (Scientific)
--- import qualified Data.Vector as V
-
 import Control.Applicative (empty, (<|>))
 import Control.Monad.Except (runExceptT, throwError)
 import Control.Monad.State (State, modify, runState, when)

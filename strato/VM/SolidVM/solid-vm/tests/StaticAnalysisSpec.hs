@@ -13,7 +13,6 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors as ParentConstructors
--- import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
 import qualified SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals as BooleanLiterals
 import qualified SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply as DivideBeforeMultiply
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions as ConstantFunctions

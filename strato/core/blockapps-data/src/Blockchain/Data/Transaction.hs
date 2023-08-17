@@ -44,7 +44,6 @@ import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
--- import qualified Data.ByteString.Short as B (ShortByteString, toShort, fromShort)
 import Control.DeepSeq
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
@@ -60,8 +59,6 @@ import Data.Time.Clock
 import Data.Word
 import qualified Database.Persist.Postgresql as SQL
 import System.Clock
-
--- import Data.ByteString (ByteString)
 
 instance TransactionLike Transaction where
   txHash = \case
