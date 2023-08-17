@@ -41,6 +41,7 @@ import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json hiding (Contract)
+import           Blockchain.DB.CodeDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
@@ -94,6 +95,7 @@ getContractsData (ContractName cName) = do
   return $ (\(AddressStateRef' r _)-> addressStateRefAddress r) <$> svmRefs
 
 getContractsContract :: ( A.Selectable Account AddressState m
+                        , HasCodeDB m
                         , (Keccak256 `A.Selectable` SourceMap) m
                         , HasSQL m
                         )
@@ -131,6 +133,7 @@ translateStorageMap storage' =
 
 getContractsState :: ( MonadLogger m
                      , A.Selectable Account AddressState m
+                     , HasCodeDB m
                      , (Keccak256 `A.Selectable` SourceMap) m
                      , HasSQL m
                      )
@@ -195,6 +198,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
 
 postContractsBatchStates :: ( MonadLogger m
                             , A.Selectable Account AddressState m
+                            , HasCodeDB m
                             , (Keccak256 `A.Selectable` SourceMap) m
                             , HasSQL m
                             )
@@ -211,6 +215,7 @@ postContractsBatchStates = traverse flattenRequest
                             (fromMaybe False postcontractsbatchstatesrequestLength)
 
 getContractsDetails' :: ( A.Selectable Account AddressState m
+                        , HasCodeDB m
                         , (Keccak256 `A.Selectable` SourceMap) m
                         , HasSQL m
                         )
@@ -237,6 +242,7 @@ getContractsDetails' contractAddress chainId = do
         Right contract -> pure $ snd contract
 
 getContractsDetails :: ( A.Selectable Account AddressState m
+                       , HasCodeDB m
                        , (Keccak256 `A.Selectable` SourceMap) m
                        , HasSQL m
                        )
@@ -244,6 +250,7 @@ getContractsDetails :: ( A.Selectable Account AddressState m
 getContractsDetails = getContractsDetails'
 
 getContractsFunctions :: ( A.Selectable Account AddressState m
+                         , HasCodeDB m
                          , (Keccak256 `A.Selectable` SourceMap) m
                          , HasSQL m
                          )
@@ -253,6 +260,7 @@ getContractsFunctions _ contractId chainId = do
   pure . map (FunctionName . Text.pack) . Map.keys $ _functions contract
 
 getContractsSymbols :: ( A.Selectable Account AddressState m
+                       , HasCodeDB m
                        , (Keccak256 `A.Selectable` SourceMap) m
                        , HasSQL m
                        )
@@ -262,6 +270,7 @@ getContractsSymbols _ contractId chainId = do
   pure . map (SymbolName . Text.pack) . Map.keys $ _storageDefs contract
 
 getContractsEnum :: ( A.Selectable Account AddressState m
+                    , HasCodeDB m
                     , (Keccak256 `A.Selectable` SourceMap) m
                     , HasSQL m
                     )
@@ -313,12 +322,15 @@ getContractsStates :: MonadIO m =>
                       ContractName -> m [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwIO $ Unimplemented "getContractsStates"
 
-postContractsCompile :: MonadIO m
+postContractsCompile :: ( MonadIO m
+                        , HasCodeDB m
+                        , A.Selectable Account AddressState m
+                        )
                      => [PostCompileRequest] -> m [PostCompileResponse]
 postContractsCompile = traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      let eContract = sourceToContractDetails postcompilerequestSource
+      eContract <- sourceToContractDetails postcompilerequestSource
       case eContract of
         Left anns -> throwIO . UserError . Text.pack $ show anns
         Right (srcHash, _) -> pure $ PostCompileResponse (fromMaybe "" postcompilerequestContractName) srcHash

@@ -8,12 +8,18 @@ import { BrowserRouter } from "react-router-dom";
 import "./styles/app.css";
 import { Layout } from "antd";
 import HeaderComponent from "./components/Header/Header";
-
+import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 
 const { Content } = Layout;
 
 const App = () => {
+
+  const tagManagerArgs = {
+    gtmId: 'GTM-NHBZ2BX'
+  };
+
+  TagManager.initialize(tagManagerArgs);
 
   const {user, loginUrl, users } =
     useAuthenticateState();

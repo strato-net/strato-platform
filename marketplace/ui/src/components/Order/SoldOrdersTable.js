@@ -11,7 +11,7 @@ import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination } from "antd";
-
+import TagManager from "react-gtm-module";
 
 
 const SoldOrdersTable = ({ user }) => {
@@ -101,12 +101,20 @@ const SoldOrdersTable = ({ user }) => {
       dataIndex: "invoice",
       key: "invoice",
       render: (text) => (
-        <Link to={`${routes.Invoice.url.replace(":id", text.address)}`} target="_blank" >
+        <button onClick={() => {
+          TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_invoice_in_orders_sold',
+            },
+          });
+        }}>
+          <Link to={`${routes.Invoice.url.replace(":id", text.address)}`} target="_blank" >
           <div className="flex items-center cursor-pointer hover:text-primary">
-            <EyeOutlined className="mr-2" />
-            <p>View</p>
+          <EyeOutlined className="mr-2" />
+          <p>View</p>
           </div>
-        </Link>
+          </Link>
+        </button>
       ),
     },
     {

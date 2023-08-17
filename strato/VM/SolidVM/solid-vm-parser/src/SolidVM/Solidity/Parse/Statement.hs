@@ -11,7 +11,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Text.Parsec
 import           Text.Parsec.Expr
+import           Text.Read (readMaybe)
 
+import           Blockchain.Strato.Model.Account
 import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type
@@ -374,6 +376,7 @@ primaryExpression = do
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+    <|> (uncurry AccountLiteral <$> withPosition accountLiteral)
 
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do
@@ -413,12 +416,27 @@ parseExternalCallArgs = do
       return (name, args)
   return (fname, args)
 
+accountLiteral :: SolidityParser NamedAccount
+accountLiteral = do
+  void $ char '<'
+  addr <- many1 hexDigit
+  cId <- optionMaybe $ do
+    void $ char ':'
+    (reserved "main" >> pure "main") <|> many1 hexDigit
+  let acctStr = addr ++ maybe "" (':':) cId
+  acct <- case readMaybe acctStr of
+    Nothing -> fail $ "accountLiteral: Could not parse account from " ++ acctStr
+    Just acct -> pure acct
+  void $ char '>'
+  pure acct
+
 literal :: SolidityParser Expression
 literal = asum
         [ do
             ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
             pure $ NumberLiteral a n u
         , uncurry StringLiteral <$> withPosition stringLiteral
+        , uncurry AccountLiteral <$> withPosition accountLiteral
         , uncurry BoolLiteral <$> withPosition (False <$ reserved "false")
         , uncurry BoolLiteral <$> withPosition (True <$ reserved "true")
         , uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal)

@@ -13,6 +13,7 @@
     , ScopedTypeVariables
     , TemplateHaskell
     , TupleSections
+    , TypeApplications
     , TypeOperators
 #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -63,6 +64,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
+import Blockchain.DB.CodeDB
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
@@ -107,6 +109,11 @@ instance Selectable Account Contract m => Selectable Account Contract (ReaderT B
 
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
+
+instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+  lookup _ k   = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  insert _ _ _ = error "Slipstream: Keccak256 `Alters` DBCode insert"
+  delete _ _   = error "Slipstream: Keccak256 `Alters` DBCode delete"
 
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT BlocEnv m) where
   select p = lift . select p
@@ -276,7 +283,11 @@ parseEvents = concatMap parseEvent
           , eventEvent          = e
           }
 
-getCodeCollection :: MonadIO m => CodePtr -> Text -> m (Either String CodeCollection)
+getCodeCollection :: ( MonadIO m
+                     , HasCodeDB m
+                     , Selectable Account AddressState m
+                     )
+                  => CodePtr -> Text -> m (Either String CodeCollection)
 getCodeCollection cp ccString = do
   let initList =
         case Aeson.decodeStrict $ encodeUtf8 ccString of
@@ -289,8 +300,7 @@ getCodeCollection cp ccString = do
   --bad contract into the blockchain (the API shouldn't allow this)
 
   case cp of
-    SolidVMCode _ _ ->
-      case fmap resolveLabels $ compileSource False $ Map.fromList initList of
+    SolidVMCode _ _ -> (fmap resolveLabels <$> compileSource False (Map.fromList initList)) >>= \case
         Left e -> return $ Left $ "failed parse: "  ++ show e --- return $ CodeCollection Map.empty
         Right v -> return $ Right v
     EVMCode _ -> return $ Left "EVM contracts are not indexed by Slipstream"
@@ -301,8 +311,12 @@ getContractsForParents parents' cc =
   let getContractForParent parent = Map.lookup parent cc
   in mapMaybe getContractForParent parents'
 
-processTheMessages :: (MonadLogger m, HasSQL m) =>
-                      BlocEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
+processTheMessages :: ( MonadLogger m
+                      , HasSQL m
+                      , Selectable Account AddressState m
+                      , HasCodeDB m
+                      )
+                   => BlocEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env conn g messages = do
 
   case length messages of
