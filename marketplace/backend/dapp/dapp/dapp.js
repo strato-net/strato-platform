@@ -1311,6 +1311,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     // Get The membership
     const membership = await membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
     
+    // Get The productFile
+    const productFile = await productFileJs.get(rawAdmin, {productId: membership.productId}, {...options, org: managers.cirrusOrg, app: ""})
+    console.log("productFile: ", productFile)
+    
     // Get all membershipServices
     const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.productId }, { ...options, org: managers.cirrusOrg, app: "" }))?.membershipServices ?? [];
 
@@ -1319,7 +1323,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
     // Combine the data and merge the service data into the membershipService data
     const combinedData = {
-      membership: membership,
+      membership: { ...membership, productFileFileLocaiton: productFile.fileLocation},
       membershipServices: membershipServices.map(membershipService => {
         const matchingService = servicesAll.find(service => service.address === membershipService.serviceId);
     

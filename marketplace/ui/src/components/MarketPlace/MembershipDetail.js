@@ -56,7 +56,7 @@ const MembershipDetails = ({ user, users }) => {
   const [membershipDetails, setMembershipDetails] = useState(undefined);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { membershipServices, membership, isMembershipLoading, isProductFileLoading, productFile } =
+  const { membershipServices, membership, isMembershipLoading} =
   useMembershipState();
 const serviceDispatch = useMembershipDispatch();
 
@@ -66,7 +66,7 @@ const serviceDispatch = useMembershipDispatch();
     if (user) {
       if (Id !== undefined) {
         membershipActions.fetchMembershipOfInventory(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
-        membershipActions.fetchProductFileOfInventory(serviceDispatch, debouncedSearchTerm, Id);
+        // membershipActions.fetchProductFileOfInventory(serviceDispatch, debouncedSearchTerm, Id);
       }
     }
   }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user])
@@ -337,7 +337,7 @@ const serviceDispatch = useMembershipDispatch();
           <div className="flex mx-16">
             <div className="w-1/2">
               <div className="h-96 flex items-center justify-center border border-grayLight">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.imageUrl} />
+                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={membershipDetails?.imageUrl} />
               </div>
               {details.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
