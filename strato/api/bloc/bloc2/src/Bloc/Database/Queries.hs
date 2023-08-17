@@ -32,6 +32,7 @@ import qualified Data.Text.Encoding              as Text
 import           Text.Format
 import           UnliftIO
 
+import           Blockchain.DB.CodeDB
 import           Blockchain.SolidVM.CodeCollectionDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.CodePtr
@@ -44,7 +45,9 @@ import           SQLM
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
-getContractDetailsByCodeHash :: ( A.Selectable Account AddressState m
+getContractDetailsByCodeHash :: ( MonadIO m
+                                , HasCodeDB m
+                                , A.Selectable Account AddressState m
                                 , (Keccak256 `A.Selectable` SourceMap) m
                                 )
                              => CodePtr -> m (Either Text (CodePtr, Contract))
@@ -59,7 +62,7 @@ getContractDetailsByCodeHash codePtr = do
         Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
         Just s -> pure s
       let nameStr = Text.unpack name
-      ~(cHash, cc) <- either (throwE . Text.pack . show) pure $ sourceToContractDetails srcMap
+      ~(cHash, cc) <- either (throwE . Text.pack . show) pure =<< lift (sourceToContractDetails srcMap)
       case Map.lookup nameStr $ _contracts cc of
           Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
           Just d -> pure (SolidVMCode nameStr cHash, d)
@@ -75,11 +78,14 @@ evmContractSolidVMError = Text.concat
   , "If you are intending to use EVM, please modify your contracts and try again."
   ]
 
-getContractDetailsForContract :: MonadIO m
+getContractDetailsForContract :: ( MonadIO m
+                                 , HasCodeDB m
+                                 , A.Selectable Account AddressState m
+                                 )
                               => SourceMap -> Maybe Text -> m (Maybe (CodePtr, Contract))
 getContractDetailsForContract src mContract = do
   eCodeCollection <- if hasAnyNonEmptySources src
-                       then pure $ sourceToContractDetails src
+                       then sourceToContractDetails src
                        else throwIO . UserError $ "No source code given for contract"
   case eCodeCollection of
     Left annotations -> throwIO . UserError . Text.pack $ "Detected errors during compilation: " ++ show annotations
@@ -90,12 +96,20 @@ getContractDetailsForContract src mContract = do
         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
       Just c -> pure . fmap (SolidVMCode (Text.unpack c) ch,) $ Map.lookup (Text.unpack c) _contracts
 
-sourceToContractDetails :: SourceMap -> Either [SourceAnnotation Text] (Keccak256, CodeCollection)
+sourceToContractDetails :: ( MonadIO m
+                           , HasCodeDB m
+                           , A.Selectable Account AddressState m
+                           )
+                        => SourceMap -> m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
 sourceToContractDetails = createMetadataNoCompile
 
 -- SolidVM only
-createMetadataNoCompile :: SourceMap -> Either [SourceAnnotation Text] (Keccak256, CodeCollection)
-createMetadataNoCompile sourceList =
-  let compiledSource = compileSourceWithAnnotations True (Map.fromList $ unSourceMap sourceList)
-      srcHash = hash . Text.encodeUtf8 $ serializeSourceMap sourceList
-   in (srcHash,) <$> compiledSource
+createMetadataNoCompile :: ( MonadIO m
+                           , HasCodeDB m
+                           , A.Selectable Account AddressState m
+                           )
+                        => SourceMap -> m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
+createMetadataNoCompile sourceList = do
+  compiledSource <- compileSourceWithAnnotations True (Map.fromList $ unSourceMap sourceList)
+  let srcHash = hash . Text.encodeUtf8 $ serializeSourceMap sourceList
+  pure $ (srcHash,) <$> compiledSource

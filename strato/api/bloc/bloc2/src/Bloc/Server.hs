@@ -31,6 +31,7 @@ import Bloc.Monad
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Data.AddressStateDB
+import Blockchain.DB.CodeDB
 
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault
@@ -43,6 +44,7 @@ bloc :: ( MonadLogger m
         , HasSQL m
         , Selectable Account Contract m
         , Selectable Account AddressState m
+        , HasCodeDB m
         , (Keccak256 `Selectable` SourceMap) m
         )
      => ServerT BlocAPI m
