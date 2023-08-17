@@ -9,12 +9,14 @@ module Main (main) where
 
 import           BlockApps.X509
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as C8
 import qualified Data.Map as Map (null)
 import           Data.Yaml
 
 import           Network.Wai.Handler.Warp (run)
-import           IdentityProvider.Server
+import           IdentityProvider.Email (SendgridAPIKey(..))
 import           IdentityProvider.OAuth
+import           IdentityProvider.Server
 
 import           HFlags
 import           Options
@@ -50,4 +52,7 @@ main = do
     putStrLn "Initializing identity server..."
     let p = flags_port 
         vp = flags_vaultProxyUrl
-    run p $ identityProviderApp vp iss crt privk realmData
+        mEmailK = if null flags_SENDGRID_APIKEY 
+            then Nothing 
+            else Just (SendgridAPIKey (C8.pack flags_SENDGRID_APIKEY))
+    run p $ identityProviderApp vp iss crt privk realmData mEmailK

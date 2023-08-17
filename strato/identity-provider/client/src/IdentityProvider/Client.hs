@@ -16,7 +16,7 @@ import           Blockchain.Strato.Model.Address
 getPing :: ClientM Int
 getPing = client (Proxy @GetPingIdentity)
 
-putIdentity :: Text -> Text -> Text -> Text -> Maybe Text -> ClientM Address
+putIdentity :: Text -> Text -> Text -> Text -> Maybe Text -> Maybe Text -> ClientM Address
 putIdentity = client (Proxy @PutIdentity)
 
 putIdentityExternal :: Text -> ClientM Address

@@ -33,6 +33,7 @@ import           Network.HTTP.Types.Status
 
 import           Data.Aeson
 import qualified Data.ByteString.Lazy                    as BL
+import           Data.List                               (elemIndex)
 import qualified Data.Map as M
 import           Data.Text                               (Text)
 import qualified Data.Text as T
@@ -48,6 +49,7 @@ import qualified IdentityProvider.API                    as IDAPI
 import           Strato.Strato23.API
 import           Strato.Strato23.Client
 import           IdentityProvider.OAuth                  hiding (issuer)
+import           IdentityProvider.Email
 
 import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.Vault
@@ -87,10 +89,10 @@ getAccessTokenForRealm realm = do
 -- }
 
 getDefaultEmptyOrg :: String -> String -> String
-getDefaultEmptyOrg name uuid = case words name of 
-    firstN : lastN : _ -> head firstN : lastN ++ take 8 uuid
-    firstN : _ -> head firstN: take 8 uuid 
-    _ -> error "name param is empty"
+getDefaultEmptyOrg name uuid = case elemIndex ' ' name of
+    Nothing -> head name : take 8 uuid
+    Just idx -> let lastNs = drop (idx + 1) name 
+                in head name : lastNs ++ take 8 uuid
 
 getSubject :: ( MonadIO m
               , MonadLogger m ) 
@@ -119,7 +121,6 @@ getSubject name mCo uuid _ pk
         -- the GET /users endpoint on keycloak to get the user's information. We are trying to be less keycloak
         -- dependent, so this flow is not being used, but I'll just leave it in here just in case we ever need it
 
-
         -- getAccessTokenForRealm "master" >>= \case 
         --     Nothing -> do 
         --         $logErrorS "createAndRegisterCert" "uh oh! We couldn't get an access token for the master realm"
@@ -132,12 +133,13 @@ getSubject name mCo uuid _ pk
         --             Right user -> do
         --                 $logInfoS "createAndRegisterCert" $ "The user's info from the OAuth server is " <> T.pack (show user)
         --                 return $ oAuthUserToSubject user pk
- 
+
 data IdentityServerData = IdentityServerData
     { issuer             :: Issuer          -- issuer of signing cert
     , issuerCert         :: X509Certificate -- the signing cert
     , issuerPrivKey      :: PrivateKey      -- the signing private key
     , realmNameToDetails :: RealmData
+    , sendgridAPIKey     :: Maybe SendgridAPIKey
 }
 instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
     access _ = asks issuer
@@ -147,6 +149,8 @@ instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
     access _ = asks issuerPrivKey
 instance Monad m => Accessible RealmData (ReaderT IdentityServerData m) where
     access _ = asks realmNameToDetails
+instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
+    access _ = asks sendgridAPIKey
 instance Monad m => Accessible VaultData (VaultM m) where
   access _ = ask
 instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
@@ -162,25 +166,27 @@ putIdentity :: ( MonadIO m
                , Accessible Issuer m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
-               , Accessible RealmData m ) 
-               => Text 
-               -> Text 
-               -> Text 
+               , Accessible RealmData m
+               , Accessible (Maybe SendgridAPIKey) m)
+               => Text
+               -> Text
+               -> Text
                -> Text
                -> Maybe Text
+               -> Maybe Text
                -> m Address
-putIdentity accessToken uuid idProv name mCo = do
+putIdentity accessToken uuid idProv name mEmail mCo = do
     $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
     -- check if a user exists in vault
     let realm = extractRealmName $ T.unpack idProv
     getVaultKey accessToken >>= \case
         Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
             hasCert <- certInCirrus accessToken realm a (T.unpack name) (T.unpack uuid) (T.unpack <$> mCo)
-            unless hasCert $ createAndRegisterCert name mCo uuid realm k
+            unless hasCert $ createAndRegisterCert name mEmail mCo uuid realm k
             return a
         Nothing -> do -- no vault key, so make key and register cert
             AddressAndKey a k <- postVaultKey accessToken
-            createAndRegisterCert name mCo uuid realm k
+            createAndRegisterCert name mEmail mCo uuid realm k
             return a
 
 -- This is just a dummy function
@@ -196,8 +202,9 @@ putIdentityExternal ::  ( MonadIO m
                         , Accessible X509Certificate m
                         , Accessible PrivateKey m
                         , Accessible RealmData m
+                        , Accessible (Maybe SendgridAPIKey) m
                         ) => Text -> m Address
-putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" "" "" Nothing
+putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" "" "" Nothing Nothing
 
 
 blocEndpoint :: String
@@ -252,14 +259,16 @@ createAndRegisterCert :: ( MonadIO m
                          , Accessible Issuer m
                          , Accessible X509Certificate m
                          , Accessible PrivateKey m
-                         , Accessible RealmData m ) 
-                         => Text 
-                         -> Maybe Text 
+                         , Accessible RealmData m
+                         , Accessible (Maybe SendgridAPIKey) m)
+                         => Text
+                         -> Maybe Text
+                         -> Maybe Text
                          -> Text
-                         -> String 
-                         -> PublicKey 
+                         -> String
+                         -> PublicKey
                          -> m ()
-createAndRegisterCert name mCo uuid realm k = do
+createAndRegisterCert name mEmail mCo uuid realm k = do
     sub <- getSubject name mCo uuid realm k
     createNewCert sub >>= \case
         Just newCert -> do
@@ -267,7 +276,12 @@ createAndRegisterCert name mCo uuid realm k = do
                 Nothing -> do
                     $logErrorS "createAndRegisterCert" "uh oh! We couldn't retrieve an access token for our realm"
                     throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
-                Just realmToken -> registerCert newCert realmToken realm
+                Just realmToken -> do
+                    registerCert newCert realmToken realm
+                    mEmailK <- access (Proxy @(Maybe SendgridAPIKey))
+                    case (mEmail, mEmailK) of
+                        (Just email, Just emailK) -> sendWelcomeEmail (T.unpack email) (T.unpack name) (T.unpack uuid) emailK
+                        (_, _) -> return ()
         Nothing -> do
             $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
             throwIO $ IdentityError "Unable to sign new cert for user"
@@ -318,13 +332,16 @@ getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe Addres
 getVaultKey accessToken = do
     VaultData url mgr <- access Proxy
     eAddressNKey <- liftIO $ runClientM (getKey (Just accessToken) Nothing) (mkClientEnv mgr url)
-    $logInfoS "getVaultKey" $ T.pack $ "Vault's response from GET /key is " <> show eAddressNKey
-    case eAddressNKey of 
-        Right a -> return $ Just a
+    case eAddressNKey of
+        Right a -> do
+            $logInfoS "getVaultKey" $ T.pack $ "User already has key in vault: " <> show a
+            return $ Just a
         -- only errors from GET /key are user doesn't exist (400) or incorrect pw (503)
         -- beware if the error behavior for /key changes
-        Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> return Nothing
-        Left err -> do 
+        Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> do
+            $logInfoS "getVaultKey" "User has no vault key yet. Will create one now"
+            return Nothing
+        Left err -> do
             $logInfoS "getVaultKey" $ T.pack $ "Vault error when trying to get user's key: " <> show err
             throwIO $ IdentityError $ T.pack $ "Vault error when trying to get user's key: " <> show err
 
@@ -347,6 +364,7 @@ server :: ( MonadIO m
           , Accessible X509Certificate m
           , Accessible PrivateKey m
           , Accessible RealmData m
+          , Accessible (Maybe SendgridAPIKey) m
           ) => ServerT IDAPI.IdentityProviderAPI m
 server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
 
@@ -355,8 +373,9 @@ hoistCoreServer :: String
                 -> X509Certificate 
                 -> PrivateKey
                 -> RealmData
+                -> Maybe SendgridAPIKey
                 -> Server IDAPI.IdentityProviderAPI
-hoistCoreServer vaulturl iss cert privk rd = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
+hoistCoreServer vaulturl iss cert privk rd mEmailK = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     convertErrors r x = Handler $ do
       eRes <- liftIO . try $ r x
@@ -364,7 +383,7 @@ hoistCoreServer vaulturl iss cert privk rd = hoistServer (Proxy :: Proxy IDAPI.I
         Right a -> return a
         Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd mEmailK x
     reThrowError :: IdentityError -> ServerError
     reThrowError
       = \case
@@ -374,8 +393,9 @@ runIdentityM :: Issuer
              -> X509Certificate
              -> PrivateKey
              -> RealmData
+             -> Maybe SendgridAPIKey
              -> ReaderT IdentityServerData m a -> m a
-runIdentityM iss cert privk rd x = runReaderT x $ IdentityServerData iss cert privk rd
+runIdentityM iss cert privk rd mEmailK x = runReaderT x $ IdentityServerData iss cert privk rd mEmailK
 
 
 identityProviderApp :: String
@@ -383,5 +403,6 @@ identityProviderApp :: String
                     -> X509Certificate
                     -> PrivateKey
                     -> RealmData
+                    -> Maybe SendgridAPIKey
                     -> Application
-identityProviderApp vurl iss cert pk rd = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd
+identityProviderApp vurl iss cert pk rd mEmailK = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd mEmailK

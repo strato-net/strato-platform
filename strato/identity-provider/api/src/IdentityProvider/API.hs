@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeOperators        #-}
 
 module IdentityProvider.API (
@@ -21,6 +20,7 @@ type PutIdentity = "identity"
                 :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text -- need for keycloak query
                 :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
                 :> Header' '[Required, Strict] "X-USER-COMMON-NAME" Text
+                :> Header' '[Optional, Strict] "X-USER-EMAIL" Text
                 :> QueryParam "company" Text 
                 :> Put '[JSON] Address --should return user address
 

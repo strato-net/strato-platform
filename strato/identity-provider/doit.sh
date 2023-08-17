@@ -35,7 +35,9 @@ function runIdentityServer {
   if [ -n "${nodeUrl}" ]; then
       nuFlag="--nodeUrl=${nodeUrl}"
   fi
-  
+  if [ -n "${SENDGRID_APIKEY}" ]; then
+      sgFlag="--SENDGRID_APIKEY=${SENDGRID_APIKEY}"
+  fi  
   RED='\033[0;31m'
   NC='\033[0m' # No Color
   
@@ -63,7 +65,7 @@ function runIdentityServer {
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
-    "${vpFlag}" "${nuFlag}" &>> logs/identity-provider-server
+    "${vpFlag}" "${nuFlag}" "${sgFlag}" &>> logs/identity-provider-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

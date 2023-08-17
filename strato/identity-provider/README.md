@@ -25,6 +25,7 @@ Make sure your options/configuration are set properly.
 ```console
 HTTP_PORT=8080 \
   ssl=false \
+  SENDGRID_APIKEY=<key> \
   OAUTH_DISCOVERY_URL=<keycloak> \
   OAUTH_CLIENT_ID=<localhost> \
   OAUTH_CLIENT_SECRET=<secret> \
