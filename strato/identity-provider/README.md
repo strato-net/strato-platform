@@ -37,10 +37,15 @@ Like all our getting-started scripts, this should be run within the same directo
 3. Keep in mind that due to the identity server's reliance on `name` and `company` claims in the provided bearer token, we ideally want to have our realms support these claims. The identity server can function without those claims being in the token, but these certs may take a different form than is expected (for example, if a user's JWT has no `name` claim and their `preferred_username` is their email, then the common name in the certificate would be their email instead of their actual name). 
 
 [!IMPORTANT]
-The below is important!
+The information below is important!
 
 4. An important step is setting the URL to you ID-server for your strato node. As of writing this, you can pass the argument in your strato-getting-started script for your node `idServerUrl="https://yourIdServerUrl.com"`, but that is not needed. If that variable is not set in the `sgs` script, it will use `https://identity.blockapps.net` by default.
 
 5.  The `strato-getting-started` directory has an `identity-provider` subdirectory from which files will be mounted onto the docker container. These files include `identity-provider/certs/rootPriv.pem`, `identity-provider/certs/rootCert.pem`, and `identity-provider/idconf.yaml`. These files are not included in the docker image for security reasons, as they contain sensitive information. If you do not provide these files within the `identity-provider` subdirectory, the identity docker images will not build.
 
 7. Keep in mind the client credentials you provide use MUST already have keys within the vault specified, and have a cert registered on the associated network.
+
+### Things to consider when updating/restarting an identity server
+1. The main reason for wanting to update the identity server is to update the realms it supports. To do this, add a list element in `identity-provider/idconf.yaml` and specify at minimum a `clientId`, `clientSecret`, and `discoveryUrl` for the realm. You will need to explicitly stop the docker containers and restart them in order to have the identity server read in the new realm information. 
+
+2. The identity server is fairly stateless, so it's quite safe to wipe and restart the server arbitrarily.

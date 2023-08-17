@@ -242,7 +242,7 @@ certInCirrus token realm a name uuid mCo = do
         cirrusSearchPath :: Address -> String -> String -> Maybe String -> String 
         cirrusSearchPath address commonName uuid' mOrg = 
             let orgParam = case mOrg of 
-                    Nothing -> ""
+                    Nothing -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
                     Just "" -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
                     Just org -> ",organization.eq." <> org
             in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> orgParam <> ")"
@@ -265,7 +265,7 @@ createAndRegisterCert name mCo uuid realm k = do
         Just newCert -> do
             getAccessTokenForRealm realm >>= \case
                 Nothing -> do
-                    $logErrorS "createAndRegisterCert" "uh oh! We couldn't an access token for our realm"
+                    $logErrorS "createAndRegisterCert" "uh oh! We couldn't retrieve an access token for our realm"
                     throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
                 Just realmToken -> registerCert newCert realmToken realm
         Nothing -> do
