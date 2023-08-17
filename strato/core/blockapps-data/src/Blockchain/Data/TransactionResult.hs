@@ -21,6 +21,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Data.Swagger hiding (Format, format)
+import Database.Persist hiding (get)
 import qualified Database.Persist.Postgresql as SQL
 import qualified Generic.Random as GR
 import Servant.Docs hiding (pretty)

@@ -5,11 +5,14 @@ module Server
   )
 where
 
+--import Control.Monad.IO.Class
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString.Lazy as BL
 import Network.HTTP.Types (status200)
 import Network.Wai
 import Network.Wai.Handler.Warp
+--import Data.Monoid
+
 import RPC
 
 startServer :: IO ()

@@ -14,6 +14,8 @@
 
 module Handlers.AccountInfo where
 
+--import           Servant.Swagger.Tags
+
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
@@ -31,6 +33,8 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
+-- import qualified LabeledError
+
 import SQLM
 import Servant
 import Servant.Client

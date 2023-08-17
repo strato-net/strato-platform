@@ -29,6 +29,8 @@ module SolidVM.Model.CodeCollection.Statement
   )
 where
 
+--import Data.Swagger
+
 import Control.DeepSeq
 import Data.Aeson
 import qualified Data.Map.Strict as Map

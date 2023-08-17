@@ -13,6 +13,8 @@
 
 module Blockchain.Data.ChainInfoDB where
 
+-- import           Control.Monad                      (when)
+
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.Data.ChainInfo

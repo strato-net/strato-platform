@@ -73,6 +73,8 @@ module Blockchain.Context
   )
 where
 
+-- import           Control.Arrow                         ( (***))
+
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul (WireMessage)

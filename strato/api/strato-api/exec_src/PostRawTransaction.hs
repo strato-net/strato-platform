@@ -6,6 +6,9 @@ module Main where
 
 import Bloc.API
 import Bloc.Server.Utils
+-- import           BlockApps.Solidity.Parse.Parser     (parseXabi)
+-- import           BlockApps.Solidity.Type
+-- import           BlockApps.XAbiConverter             (funcToType)
 import BlockApps.X509
 import Blockchain.Data.AlternateTransaction
 import Blockchain.Strato.Model.Address

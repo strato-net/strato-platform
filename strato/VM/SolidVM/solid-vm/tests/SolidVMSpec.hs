@@ -19,6 +19,8 @@ import BlockApps.Logging
 
 import BlockApps.X509.Certificate
 import BlockApps.X509.Keys as X509
+-- import Executable.EthereumVM (writeBlockSummary)
+
 import Blockchain.Bagger (processNewBestBlock)
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB

@@ -34,6 +34,7 @@ import Data.Text.Encoding (decodeUtf8)
 import GHC.Generics
 import Text.Printf
 
+--import           Debug.Trace
 data SolidityValue
   = SolidityValueAsString Text
   | SolidityBool Bool

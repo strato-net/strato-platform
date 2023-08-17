@@ -48,6 +48,8 @@ import Text.Format
 import Text.Printf
 import UnliftIO
 
+--import Debug.Trace
+
 {-
 {-# INLINE putSolid #-}
 putSolid :: Either LocalVar Address -> MS.StoragePath -> MS.BasicValue -> SM ()

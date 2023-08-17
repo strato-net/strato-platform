@@ -19,6 +19,7 @@ import Data.Hourglass
 import Data.Maybe
 import System.Console.GetOpt
 import System.Environment
+import Time.Types
 
 -- a simple ReaderT to keep the private key
 type CertGenM = ReaderT PrivateKey IO

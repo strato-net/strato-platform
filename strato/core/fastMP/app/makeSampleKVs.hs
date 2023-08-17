@@ -1,3 +1,5 @@
+--import Crypto.Hash.Keccak
+
 import Blockchain.Strato.Model.Keccak256
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC

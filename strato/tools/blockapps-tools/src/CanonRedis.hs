@@ -2,6 +2,7 @@
 
 module CanonRedis where
 
+-- import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.RedisBlockDB

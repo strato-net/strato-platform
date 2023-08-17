@@ -3,7 +3,33 @@
 
 module AuthenticationSpec where
 
+-- import           Control.Lens               hiding (children)
+-- import qualified Control.Monad.Change.Alter as A
+-- import           Control.Monad.Reader
+-- import qualified Data.ByteString            as B
+-- import qualified Data.ByteString.Char8      as C8
+-- import           Data.Maybe
+-- import           Data.Map.Strict            (Map)
+-- import qualified Data.Map.Strict            as M
+-- import qualified Data.Set                   as S
+-- import           Data.Time.Clock.POSIX
 import Test.Hspec hiding (shouldBe, shouldSatisfy)
+
+-- import           Test.Hspec.Expectations.Lifted
+-- import           Test.QuickCheck
+
+-- import           BlockApps.X509.Certificate
+-- import           Blockchain.Blockstanbul.Authentication
+-- import           Blockchain.Data.Block
+-- import           Blockchain.Data.DataDefs
+-- import           Blockchain.Strato.Model.Address
+-- import           Blockchain.Strato.Model.ChainMember
+-- import           Blockchain.Strato.Model.Class
+-- import           Blockchain.Strato.Model.Keccak256
+-- import           Blockchain.Strato.Model.Secp256k1
+-- import           Blockchain.Strato.Model.StateRoot
+
+-- import qualified LabeledError
 
 -- testBlock :: Block
 -- testBlock =

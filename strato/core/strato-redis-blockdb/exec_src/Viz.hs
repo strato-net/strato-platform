@@ -6,6 +6,8 @@
 
 module Main where
 
+--import           Diagrams.Backend.Canvas.CmdLine
+
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockDB
 import Blockchain.Strato.RedisBlockDB.Test.Chain

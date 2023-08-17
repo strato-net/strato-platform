@@ -5,11 +5,32 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+--import           Control.Monad.IO.Class
+--import qualified Data.ByteString.Char8              as C8
+--import           Data.Maybe
+--import qualified Data.Set                           as S
+--import           Data.Word
+
+--import qualified Test.Hspec                         as HS
+--import           Test.Hspec.Expectations.Lifted
+
+--import BlockApps.Logging
+--import Blockchain.Blockstanbul.Authentication
+--import Blockchain.Blockstanbul.BenchmarkLib
+--import Blockchain.Data.Block
+--import Blockchain.Data.DataDefs
+--import Blockchain.Strato.Model.Address
+--import Blockchain.Strato.Model.ChainMember
+--import Blockchain.Strato.Model.Secp256k1
+--import Blockchain.VMContext
+
 import Blockchain.VMOptions ()
 import Control.Monad
 import Executable.EVMFlags ()
 import HFlags
 import Test.Hspec (Spec, describe, hspec)
+
+--import qualified LabeledError
 
 --it :: String -> ContextM () -> HS.SpecWith ()
 --it qual act = HS.it qual . void . runNoLoggingT . runTestContextM $ act

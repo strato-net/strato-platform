@@ -6,6 +6,8 @@ module BlockApps.Solidity.ArgValue where
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
+-- import qualified Data.HashMap.Strict          as HM
+
 import Blockchain.Strato.Model.Address
 import Control.Lens ((&), (?~))
 import Control.Monad

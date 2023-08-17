@@ -13,15 +13,17 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
+-- {-# OPTIONS -fno-warn-unused-top-binds #-}
+
 module Bloc.Monad
   ( Should (..),
     Compile (..),
     CacheNonce (..),
-    BlocEnv (..),
     HasBlocEnv,
     blocMaybe,
     getBlocEnv,
     blocVaultWrapper,
+    BlocEnv (..),
   )
 where
 
@@ -37,6 +39,7 @@ import Data.Cache
 import Data.Text (Text)
 import GHC.Stack
 import SQLM
+import Servant
 import Servant.Client
 import UnliftIO hiding (Handler (..))
 

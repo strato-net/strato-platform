@@ -7,6 +7,13 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module SolidVM.Solidity.Parse.ParserTypes where
 
+--import           Control.Monad
+--import           Data.Either.Extra
+--import           Data.Maybe
+--import           Data.SemVer
+--import qualified Data.Text as T
+
+--import Debug.Trace
 import qualified Data.Map as M
 import Text.Parsec
 

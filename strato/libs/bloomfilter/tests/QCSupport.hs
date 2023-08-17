@@ -7,6 +7,8 @@ module QCSupport
   )
 where
 
+-- import Data.Int (Int8, Int16, Int32, Int64)
+-- import Data.Word (Word8, Word16, Word32, Word64)
 import qualified Data.ByteString.Char8 as SB
 import qualified Data.ByteString.Lazy.Char8 as LB
 import System.Random (Random (..)) --RandomGen

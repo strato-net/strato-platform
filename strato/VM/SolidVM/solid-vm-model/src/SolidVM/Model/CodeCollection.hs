@@ -41,9 +41,11 @@ import Data.Traversable (for)
 import GHC.Generics
 import SolidVM.Model.CodeCollection.ConstantDecl
 import SolidVM.Model.CodeCollection.Contract
+--import qualified SolidVM.Model.CodeCollection.Def as Def
 import SolidVM.Model.CodeCollection.Event
 import SolidVM.Model.CodeCollection.Function
 import SolidVM.Model.CodeCollection.Statement
+--import           SolidVM.Model.CodeCollection.Type
 import SolidVM.Model.CodeCollection.VarDef
 import SolidVM.Model.CodeCollection.VariableDecl
 import SolidVM.Model.SolidString

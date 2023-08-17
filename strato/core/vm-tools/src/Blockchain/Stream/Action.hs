@@ -8,6 +8,8 @@
 
 module Blockchain.Stream.Action where
 
+-- import qualified Data.HashMap.Strict          as HM
+
 import Blockchain.MiscJSON ()
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account

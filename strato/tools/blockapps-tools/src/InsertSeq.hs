@@ -4,6 +4,7 @@
 
 module InsertSeq where
 
+-- import Control.Monad
 import Blockchain.Blockstanbul
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs

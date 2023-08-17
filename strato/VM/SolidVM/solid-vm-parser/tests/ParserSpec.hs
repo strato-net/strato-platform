@@ -6,6 +6,11 @@ module ParserSpec where
 import Control.Monad
 import Data.Either (isLeft)
 import qualified Data.Map as M
+-- import SolidVM.Solidity.Parse.Declarations
+-- import SolidVM.Model.CodeCollection.Def as Def
+
+-- import SolidVM.Solidity.Parse.UnParser
+
 import Data.Source.Annotation as SA
 import Data.Source.Position as SP
 import SolidVM.Model.CodeCollection.Statement

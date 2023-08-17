@@ -26,6 +26,7 @@ import Data.Source.Annotation
 import Data.Source.Map
 import Data.Source.Position
 import Data.String (IsString (..))
+import Data.Swagger
 import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Generics

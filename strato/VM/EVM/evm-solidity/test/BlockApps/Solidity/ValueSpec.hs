@@ -2,6 +2,8 @@
 
 module BlockApps.Solidity.ValueSpec where
 
+-- import Data.Word
+
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import qualified Data.IntMap as I

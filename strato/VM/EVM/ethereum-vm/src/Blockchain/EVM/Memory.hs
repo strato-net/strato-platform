@@ -20,6 +20,8 @@ module Blockchain.EVM.Memory
   )
 where
 
+--import qualified Data.ByteString.Base16       as B16
+
 import BlockApps.Logging
 import Blockchain.EVM.OpcodePrices
 import Blockchain.EVM.VMM

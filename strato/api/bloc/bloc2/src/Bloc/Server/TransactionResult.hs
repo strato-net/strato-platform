@@ -24,6 +24,8 @@ module Bloc.Server.TransactionResult
   )
 where
 
+-- import qualified Data.Text.Encoding                as Text
+
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
@@ -82,6 +84,8 @@ import Text.Format
 import Text.Parsec (runParser)
 import Text.Read (readMaybe)
 import UnliftIO
+
+--import           Debug.Trace
 
 data TRD = TRD -- transaction resolution data
   { trdStatus :: BlocTransactionStatus,
