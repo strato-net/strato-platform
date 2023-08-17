@@ -22,10 +22,11 @@ import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../contexts/membership";
+import ListNowModal from "./ListNowModal";
 
 const { Dragger } = Upload;
 
-const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
+const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   // const schema = getSchema();
   const dispatch = useMembershipDispatch();
   const [previewImage, setPreviewImage] = useState("");
@@ -34,6 +35,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
   const [imageList, setImageList] = useState([]);
   const [fileList, setFileList] = useState([]);
   const [memberDiscount, setMemberDiscount] = useState([1]);
+  const [visible, setVisible] = useState(false);
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
     useMembershipState();
@@ -45,8 +47,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
     additionalInformation: "",
     images: [],
     description: "",
-    yearlyPrice: "",
-    monthlyPrice: "",
+    price: "", 
     quantity: "",
     services: [
       {
@@ -201,6 +202,15 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
 
   const [api, contextHolder] = notification.useNotification();
 
+  const closeListNowModal = () => {
+    setVisible(false);
+  };
+
+  const openListNowModal = () => {
+    setVisible(true);
+  };
+
+
   const openToast = (placement, message) => {
     api.error({
       message: message,
@@ -211,6 +221,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
   };
 
   return (
+    <>
     <Modal
       open={open}
       centered
@@ -244,7 +255,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
             key="list"
             type="primary"
             className="ml-4 mr-8 px-10"
-            onClick={formik.handleSubmit}
+            onClick={openListNowModal}
             disabled={disabled}
           >
             {disabled ? <Spin /> : "List Now"}
@@ -367,52 +378,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
             />
           </Form.Item>
         </div>
-        <div className="flex flex-col mb-7">
-          <Typography.Title level={5}>Pricing</Typography.Title>
-          <div className="grid grid-cols-5">
-            <Form.Item label="Yearly Price" name="price">
-              <InputNumber
-                id="yearlyPrice"
-                name="yearlyPrice"
-                type="number"
-                min={0}
-                addonBefore="$"
-                value={formik.values.yearlyPrice}
-                onChange={(value) => {
-                  formik.setFieldValue("yearlyPrice", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="Monthly Price" name="monthlyPrice">
-              <InputNumber
-                id="monthlyPrice"
-                name="monthlyPrice"
-                type="number"
-                min={0}
-                addonBefore="$"
-                value={formik.values.monthlyPrice}
-                onChange={(value) => {
-                  formik.setFieldValue("monthlyPrice", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="Quantity" name="quantity">
-              <InputNumber
-                id="quantity"
-                name="quantity"
-                type="number"
-                min={0}
-                value={formik.values.quantity}
-                onChange={(value) => {
-                  formik.setFieldValue("quantity", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-          </div>
-        </div>
+
         <div className="flex flex-col mb-7">
           <Typography.Title level={5}>Services</Typography.Title>
           <Button
@@ -561,6 +527,17 @@ const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
         </div>
       </Form>
     </Modal>
+    {visible && (
+        <ListNowModal
+          open={visible}
+          user={user}
+          handleCancel={closeListNowModal}
+          onClick={openListNowModal}
+          formik={formik}
+        />
+      )}
+      {/* {message && openToast("bottom")} */}
+    </>
   );
 };
 
