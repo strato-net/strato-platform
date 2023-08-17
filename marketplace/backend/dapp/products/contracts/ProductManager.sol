@@ -10,6 +10,10 @@ contract ProductManager is InventoryStatus, RestStatus {
         private uniqueSerialNumberByProductAddress;
     mapping(string => mapping(uint => address)) orgToUPCToProduct;
 
+    /////////////////////// carbon specific //////////////////////////////////////////////////////
+    mapping(string => mapping(address => mapping(uint => mapping(int => address)))) orgxProductxVintagexPricexInventory;
+    /////////////////////////////////////////////////////////////////////////////////////////////
+
     function addProduct(
         string _name,
         string _description,
@@ -89,7 +93,14 @@ contract ProductManager is InventoryStatus, RestStatus {
     ) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
             Product_4 product = Product_4(_productAddress);
-            return
+            address isUnique = checkForInventory(_vintage,_productAddress,_pricePerUnit,tx.origin);
+            if(isUnique!=address(0))
+            {
+                 Inventory_2 inventory = Inventory_2(isUnique);
+                 inventory.updateQuantityForVintages(inventory.availableQuantity()+_quantity);
+                 return (RestStatus.OK, isUnique);
+            }
+            (uint256 status, address inventoryAddress) =
                 product.addInventory(
                     _quantity,
                     _pricePerUnit,
@@ -98,36 +109,45 @@ contract ProductManager is InventoryStatus, RestStatus {
                     _createdDate,
                     tx.origin
                 );
-        } else {
-            for (uint256 i = 0; i < _serialNumbers.length; i++) {
-                if (
-                    uniqueSerialNumberByProductAddress[_productAddress][
-                        _serialNumbers[i]
-                    ]
-                ) {
-                    return (RestStatus.CONFLICT, address(0));
-                }
-            }
-
-            for (uint256 j = 0; j < _serialNumbers.length; j++) {
-                uniqueSerialNumberByProductAddress[_productAddress][
-                    _serialNumbers[j]
-                ] = true;
-            }
-
-            Product_4 product = Product_4(_productAddress);
-            return
-                product.addInventory(
-                    _quantity,
-                    _pricePerUnit,
-                    _vintage,
-                    _status,
-                    _createdDate,
-                    tx.origin
-                );
+        string _organization = getOrganization(tx.origin);
+        orgxProductxVintagexPricexInventory[_organization][_productAddress][_vintage][_pricePerUnit] = address(inventoryAddress);
+        
+        return (status, inventoryAddress);
         }
+        return (RestStatus.FORBIDDEN,address(0));
     }
 
+
+        function addInventoryForBuyer(
+                                    address _productAddress,
+                                    int _quantity,
+                                    int _pricePerUnit,
+                                    uint _vintage,
+                                    InventoryStatus _status,
+                                    uint _createdDate,
+                                    address _newOwner
+                                    ) returns (uint256, address) {
+            string _organization = getOrganization(_newOwner);
+
+            Product_4 product = Product_4(_productAddress);
+            
+           
+           (uint256 status, address inventoryAddress) = product.addInventory(
+                                                            _quantity,
+                                                            _pricePerUnit,
+                                                            _vintage,
+                                                            _status,
+                                                            _createdDate,
+                                                            _newOwner
+                                                        );
+
+            orgxProductxVintagexPricexInventory[_organization][_productAddress][_vintage][_pricePerUnit] = inventoryAddress;
+
+            return (status, inventoryAddress);
+         
+        }
+
+        
     function updateInventory(
         address _productAddress,
         address _inventory,
@@ -191,6 +211,24 @@ contract ProductManager is InventoryStatus, RestStatus {
         ) {
             return orgToUPCToProduct[_organization][_uniqueProductCode];
         }
+        return address(0);
+    }
+
+    function checkForInventory(
+        uint _vintage,
+        address _product,
+        int _pricePerUnit,
+        address _owner
+    ) public returns (address) 
+    
+    {
+        string _organization = getOrganization(_owner);
+
+        if((_vintage !=0)  &&
+            (orgxProductxVintagexPricexInventory[_organization][_product][_vintage][_pricePerUnit]!= address(0)) )
+                {
+                    return orgxProductxVintagexPricexInventory[_organization][_product][_vintage][_pricePerUnit];
+                }
         return address(0);
     }
 }

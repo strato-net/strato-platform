@@ -115,14 +115,39 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         Inventory_2 oldInventory = Inventory_2(item.inventoryId());
 
-        (uint status, address inventory) = product.addInventory(
-            _newQuantity,
-            oldInventory.pricePerUnit(),
-            oldInventory.vintage(),
-            InventoryStatus.UNPUBLISHED,
-            block.timestamp,
-            _newOwner
-        );
+        address uniqueInventoryAddress = _productManager.checkForInventory(
+                                                                            oldInventory.vintage(),
+                                                                            productAddress,
+                                                                            oldInventory.pricePerUnit(),
+                                                                            _newOwner
+                                                                            );
+                                                                            
+         //if no inventory is created before && vintage is invalid                                                             );
+        if(uniqueInventoryAddress == address(0)) 
+        {
+            (uint256 status, address inventoryAddr)= _productManager.addInventoryForBuyer(
+                                                                                    address(product),
+                                                                                    _newQuantity,
+                                                                                    oldInventory.pricePerUnit(),
+                                                                                    oldInventory.vintage(),
+                                                                                    InventoryStatus.UNPUBLISHED,
+                                                                                    block.timestamp,
+                                                                                    _newOwner
+                                                                                );
+            inventory = Inventory_2(inventoryAddr);
+
+                   
+        }else{
+            //inventory retreived
+            Inventory_2 inventoryToBeAdded = Inventory_2(uniqueInventoryAddress);
+            int availableQuantity = inventoryToBeAdded.availableQuantity();
+            //quantity updated
+            uint256 status = inventoryToBeAdded.updateQuantityForVintages(availableQuantity+_newQuantity);
+            inventory = inventoryToBeAdded;
+
+            //return existing product, updated inventory
+            return (address(product),address(inventory));
+        }
 
         for (uint i = 0; i < _itemAddress.length; i++) {
             Item_4 _item = Item_4(_itemAddress[i]);

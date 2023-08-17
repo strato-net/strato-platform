@@ -84,6 +84,12 @@ contract Inventory_2 is InventoryStatus{
       return RestStatus.OK;
     }
 
+    function updateQuantityForVintages(int _quantity) returns(uint){
+      quantity = _quantity;
+      availableQuantity = _quantity;
+      return RestStatus.OK;
+    }
+
     // Get the userOrganization
     function getUserOrganization(address caller) public returns (string) {
       mapping(string => string) ownerCert = getUserCert(caller);
