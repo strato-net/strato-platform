@@ -350,11 +350,7 @@ processTheMessages env conn g messages = do
                     parentContracts = getContractsForParents parents' (cc^.contracts)
                     parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType) parentContracts
                     parentAbstractContractsName = map (labelToText ._contractName) parentAbstractContracts
-                
-                $logInfoS "DAVIDprocessTheMessages/parents'" $ T.pack $ show parents'
-                -- $logInfoS "DAVIDprocessTheMessages/parentContracts" $ T.pack $ show parentContracts
-                $logInfoS "DAVIDprocessTheMessages/parentAbstractContracts" $ T.pack $ show parentAbstractContracts
-                $logInfoS "DAVIDprocessTheMessages/parentAbstractContractsName" $ T.pack $ show parentAbstractContractsName
+              
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
@@ -367,7 +363,6 @@ processTheMessages env conn g messages = do
                   outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
 -- mark        
-                $logInfoS "DAVIDprocessTheMessages/AbstractType" $ T.pack $ show ((_contractType c == AbstractType )) ++ show (_contractName c)
 
                 deferredForeignKeys <- case (_contractType c ) of
                   AbstractType -> do
@@ -379,16 +374,9 @@ processTheMessages env conn g messages = do
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn $ createExpandEventTables g c nameParts
-
-                --create contract table
-
-                -- when(_contractType c == AbstractType ) $ do 
                 
-
-                --update globals
                 when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTableRow g c (o, a', n) (head parentAbstractContractsName)
 
-                -- when(length parentAbstractContractsName >=1 ) $ do outputData conn $ insertContractInAbstractTableQuery g (o, a') (head parentAbstractContractsName) --Tables are created
   
                 return deferredForeignKeys
 
@@ -428,19 +416,15 @@ processTheMessages env conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          --check id current contract is derived contract
           abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
           --get columns for abstract table
-          $logInfoS "DAVIDprocessTheMessages/abstracts" $ T.pack $ show abstracts ++ show((SE.contractName indexContract))
           abstractColumns <- case abstracts of
                               [] -> return Nothing
                               (firstAbstract:_) -> do
-                                $logInfoS "DAVIDprocessTheMessages/abstracttablename" $ T.pack $ show (AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract) ++ show((SE.contractName indexContract))
                                 case  (SE.application indexContract) of
                                   "" -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.contractName indexContract) firstAbstract
                                   _ -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract
           
-          $logInfoS "DAVIDprocessTheMessages/abstractColumns'" $ T.pack $ show abstractColumns
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs

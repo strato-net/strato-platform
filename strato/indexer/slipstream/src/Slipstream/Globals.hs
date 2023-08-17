@@ -99,8 +99,6 @@ getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColu
 getTableColumns globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
   let columns = M.lookup tableName createdTables
-  -- $logInfoS "DAVIDprocessTheMessages/getTableColumnstableName" $ T.pack $ show tableName
-  -- $logInfoS "DAVIDprocessTheMessages/getTableColumnscreatedTables" $ T.pack $ show createdTables
   if isJust columns
     then return columns
     else do
