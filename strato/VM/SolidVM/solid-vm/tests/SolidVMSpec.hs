@@ -7222,4 +7222,46 @@ contract qq is SafeMath {
     getFields ["x"] `shouldReturn` [BInteger 4]
 
 
+  it "can parse variadic arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 1;
+  uint y = 2;
+  string z = "hi";
+  uint zz = 3;
 
+  function myVariadic(variadic args) {
+    x = 2;
+  }
+
+  function myVariadic2(variadic args) {
+    y = 3;
+  }
+
+  function myVariadic3(string f, uint i, variadic args) {
+    z = f;
+    zz = i;
+  }
+
+  constructor() {
+    myVariadic();
+    myVariadic2(1, 2, 3, 4, 5);
+    myVariadic3("bye", 10, 55, 66, 77);
+  }
+}|]
+    getFields ["x", "y", "z", "zz"] `shouldReturn` [BInteger 2, BInteger 3, BString "bye", BInteger 10]
+
+
+  it "can handle parsing invalid variadic signatures - more than 1 variadic parameter" $ runTest (
+    runBS [r|
+contract qq {
+    function badVariadic (uint a, variadic b, variadic c) {}
+}|]) `shouldThrow` anyParseError
+
+
+
+  it "can handle parsing invalid variadic signatures - misplaced variadic parameter" $ runTest (
+    runBS [r|
+contract qq {
+  function badVariadic (uint a, variadic b, string c) {}
+}|]) `shouldThrow` anyParseError

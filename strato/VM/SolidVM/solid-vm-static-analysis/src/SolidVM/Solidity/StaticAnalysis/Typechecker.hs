@@ -98,6 +98,7 @@ showType (SVMType.Array t l) = T.concat
                      ]
 showType (SVMType.Contract n) = "contract " <> labelToText n
 showType (SVMType.Mapping _ k v) = "mapping (" <> showType k <> " => " <> showType v <> ")"
+showType SVMType.Variadic = "variadic"
 
 showType' :: Type' -> Text
 showType' (Top _ _)  = "var"
@@ -383,6 +384,8 @@ infixl 5 !>
 typecheckProduct :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
 typecheckProduct f c t1 t2 = typecheckProduct' (Product t1 c) (Product t2 c) t1 t2
   where
+    typecheckProduct' _ _ a [Static SVMType.Variadic _] = pure $ Product a c
+    typecheckProduct' _ _ [Static SVMType.Variadic _] b = pure $ Product b c
     typecheckProduct' _ _ []     []     = pure $ Product [] c
     typecheckProduct' e a []     _      = pure . bottom $
       (T.concat
@@ -528,6 +531,7 @@ typecheckStatic (SVMType.UserDefined a c) b  = Left $ "Type mismatch Test1: "
 
 typecheckStatic _ (SVMType.UserDefined _ _)   = Left "Type mismatch"
 typecheckStatic theType (SVMType.Bytes _ _) = Right theType
+typecheckStatic SVMType.Variadic _ = Right SVMType.Variadic
 typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t1
                             <> " and "

@@ -537,6 +537,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
   (!f, !args) <-
         case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
           -- Standard contract call
+          -- (Just theFunction, _)
           (Just theFunction, CC.DefaultCall) -> do
                 args' <- argsToVals contract' theFunction argExps
                 mCallInfo <- getCurrentCallInfoIfExists
@@ -564,6 +565,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                               (SStruct _ _, SVMType.UnknownLabel _ _) -> True
                               (SContract x _, SVMType.UnknownLabel y _) -> x == y
                               (SArray x _, y@(SVMType.Array _ _)) -> x == y
+                              (_, SVMType.Variadic) -> True
                               (SReference _, _) -> error "Reference variables not implemented for .call"
                               _ -> False) $ zip valList (CC._funcArgs funck)
                           finalFuncFind                    = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
@@ -571,24 +573,32 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                         [a] -> Just a
                         _   -> Nothing
                 case mtheFunction' of
+                      Just theFunction' | validVariadicSignature argsParsed -> do
+                        args' <- argsToVals contract' theFunction' argExps
+                        mCallInfo <- getCurrentCallInfoIfExists
+                        let ro = case mCallInfo of
+                                  Nothing -> False
+                                  Just ci -> if fromChain == toChain then readOnly ci else True
+                            f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
+                        return (f', args')
                       Just theFunction' | (((length argsParsed) == (length argExps)) || ((length valList) == (length argExps))) -> do
-                                args' <- argsToVals contract' theFunction' argExps
-                                mCallInfo <- getCurrentCallInfoIfExists
-                                let ro = case mCallInfo of
-                                          Nothing -> False
-                                          Just ci -> if fromChain == toChain then readOnly ci else True
-                                    f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
-                                return (f', args')
+                        args' <- argsToVals contract' theFunction' argExps
+                        mCallInfo <- getCurrentCallInfoIfExists
+                        let ro = case mCallInfo of
+                                  Nothing -> False
+                                  Just ci -> if fromChain == toChain then readOnly ci else True
+                            f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
+                        return (f', args')
                       _ ->  (case M.lookup "fallback" functionsIncludingConstructor of
-                                  Just fallbackFunc -> do
-                                                args'     <- argsToVals contract' fallbackFunc argExps
-                                                mCallInfo <- getCurrentCallInfoIfExists
-                                                let ro = case mCallInfo of
-                                                              Nothing -> False
-                                                              Just ci -> if fromChain == toChain then readOnly ci else True
-                                                    f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
-                                                return (f', args')
-                                  _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))
+                        Just fallbackFunc -> do
+                                      args'     <- argsToVals contract' fallbackFunc argExps
+                                      mCallInfo <- getCurrentCallInfoIfExists
+                                      let ro = case mCallInfo of
+                                                    Nothing -> False
+                                                    Just ci -> if fromChain == toChain then readOnly ci else True
+                                          f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
+                                      return (f', args')
+                        _ -> unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName))
           -- Maybe the function is actually a getter
           _ -> do
             case M.lookup functionName $ contract^.CC.storageDefs of
@@ -807,7 +817,8 @@ argsToValsModifiers ctract md args =
 argsToVals :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
 argsToVals ctract fn args = case args of
   CC.OrderedArgs xs -> do
-    when (length xs /= length orderedTypes) $ invalidArguments "arity mismatch" (xs, orderedTypes)
+    when (length xs /= length orderedTypes && not (validVariadicSignature orderedTypes)) $
+      invalidArguments "arity mismatch" (xs, orderedTypes)
     OrderedVals <$> zipWithM eval32 orderedTypes xs
   CC.NamedArgs xs -> NamedVals . M.toList <$> do
     let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
@@ -820,7 +831,6 @@ argsToVals ctract fn args = case args of
   where orderedTypes :: [SVMType.Type]
         orderedTypes = map CC.indexedTypeType
                      . map snd $ CC._funcArgs fn
-
         eval32 :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
         eval32 t x = do
           case x of
@@ -872,6 +882,10 @@ expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head x
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
 
+-- | There can only be 1 variadic parameter and it must be the last parameter
+validVariadicSignature :: [SVMType.Type] -> Bool
+validVariadicSignature a = length (filter (SVMType.Variadic ==) a) == 1 &&
+                           maybe False ((==) SVMType.Variadic . fst) (Data.List.uncons . reverse $ a)
 
 runStatementBlock :: MonadSM m => [CC.Statement] -> m (Maybe Value)
 runStatementBlock stmts = do
@@ -2036,15 +2050,16 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                   testNameAndTypes (_, (t, v)) =
                     -- These cases might not be all inclusive of all valid combinations.
                     case (v, t) of
-                      (SInteger _, SVMType.Int _ _) -> pure $ True
-                      (SString _, SVMType.String _) -> pure $ True
-                      (SString _, SVMType.Bytes _ _) -> pure $ True
-                      (SBool _, SVMType.Bool) -> pure $ True
-                      (SAccount _ _, SVMType.Address _) -> pure $ True
-                      (SAccount _ _, SVMType.Account _) -> pure $ True
-                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                      (SInteger _, SVMType.Int _ _) -> pure True
+                      (SString _, SVMType.String _) -> pure True
+                      (SString _, SVMType.Bytes _ _) -> pure True
+                      (SBool _, SVMType.Bool) -> pure True
+                      (SAccount _ _, SVMType.Address _) -> pure True
+                      (SAccount _ _, SVMType.Account _) -> pure True
+                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
                       (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
                       (SArray x _, y@(SVMType.Array _ _)) -> pure $ x == y
+                      (_, SVMType.Variadic) -> pure True
                       (SReference addressedPath, _) -> do
                         refType <- getXabiValueType addressedPath
                         if (refType == t)

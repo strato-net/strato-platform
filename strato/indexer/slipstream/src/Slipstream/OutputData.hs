@@ -39,7 +39,7 @@ import           BlockApps.Solidity.Value
 import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
-import qualified Data.Aeson                      as Aeson                  
+import qualified Data.Aeson                      as Aeson
 import           Data.Bifunctor                  (first)
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
@@ -117,7 +117,7 @@ fillEmptyEntries = zipWith go [(1 :: Int)..]
   where go i = fmap (\t -> if T.null t then "val_" <> tshow i else t)
 
 fillFirstEmptyEntries :: [(Text, a)] -> [(Text, a)]
-fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First 
+fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First
 
 tableColumns :: [(Text, SVMType.Type)] -> TableColumns
 tableColumns = mapMaybe go . fillFirstEmptyEntries
@@ -573,7 +573,7 @@ insertForeignKeys :: (MonadLogger m, MonadUnliftIO m) =>
 insertForeignKeys conn contracts = do
   forM_ contracts $ \c@E.ProcessedContract { organization = org, application = app, contractName= cName, contractData = contractData } -> do
     let tableName = indexTableName
-                            (org) 
+                            (org)
                             (app)
                             (cName)
 
@@ -808,7 +808,7 @@ insertAssetTableQuery cs = concat $
           let tableName = tableNameToText $ indexTableName
                   (E.organization x)
                   (E.application x)
-                  (E.contractName x)  
+                  (E.contractName x)
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAssetTableColumns
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
@@ -827,7 +827,7 @@ insertAssetTableQuery cs = concat $
                 [ "INSERT INTO \"Asset\" "
                 , keySt
                 , "\n  VALUES "
-                , inserts 
+                , inserts
                 , [r|
   ON CONFLICT (contractname) DO UPDATE SET
     record_id = excluded.record_id,
@@ -889,7 +889,7 @@ createExpandEventTables globalsIORef c nameParts = mapM_ go . Map.toList $ c ^. 
   where go (evName, ev) = do
           createEventTable globalsIORef nameParts evName ev
           expandEventTable globalsIORef nameParts evName ev
-          
+
 
 createEventTable :: OutputM m
                  => IORef Globals
@@ -1026,6 +1026,7 @@ solidityTypeToSQLType (SVMType.Struct _ _) = Just "jsonb"
 solidityTypeToSQLType (SVMType.Enum _ _ _) = Just "text"
 solidityTypeToSQLType (SVMType.Contract _) = Just "text"
 solidityTypeToSQLType (SVMType.Error _ _) = Just "text"
+solidityTypeToSQLType SVMType.Variadic = error "type (variadic) is not an indexable type"
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 
