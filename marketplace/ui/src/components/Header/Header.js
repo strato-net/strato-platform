@@ -8,6 +8,7 @@ import {
   Badge,
   Avatar,
   Dropdown,
+  Typography,
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
@@ -23,7 +24,7 @@ import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 
-
+const { Title } = Typography;
 const { Header } = Layout;
 
 const HeaderComponent = ({ isOauth, user, loginUrl }) => {
@@ -34,9 +35,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
-  console.log("oauth", isOauth)
-  console.log("user", user)
-  console.log("loginUrl", loginUrl)
 
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
@@ -242,7 +240,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
                 })
               } } > 
               Login / Register 
-              </a> : (isOauth  ?  <h1> Something went wrong, try to refresh page</h1> : null)  
+              </a> : (isOauth  ?  <Title  style={{backgroundColor: 'red', border: 3, padding:10,  color: '#FFFFFF'}} level={3} >Something went wrong, try to refresh page</Title> : null)  
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
