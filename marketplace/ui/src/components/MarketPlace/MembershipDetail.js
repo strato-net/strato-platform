@@ -40,13 +40,13 @@ import { useAuthenticateState } from "../../contexts/authentication";
 const MembershipDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
 
-  let isCalledFromInventory = false;
+  let isCalledFromMembership = false;
 
   if (state !== null && state !== undefined) {
-    isCalledFromInventory = state.isCalledFromInventory
+    isCalledFromMembership = state.isCalledFromMembership
   }
-  else if (pathname.includes("inventories")) {
-    isCalledFromInventory = true
+  else if (pathname.includes("memberships")) {
+    isCalledFromMembership = true
   }
 
   const [serviceList, setServiceList] = useState([])
@@ -95,7 +95,7 @@ const serviceDispatch = useMembershipDispatch();
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+  const { inventoryDetails, inventories, isInventoryDetailsLoading } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
@@ -106,27 +106,29 @@ const serviceDispatch = useMembershipDispatch();
   });
 
   const routeMatch1 = useMatch({
-    path: routes.InventoryDetail.url,
+    path: routes.MembershipDetail.url,
     strict: true,
   });
 
   useEffect(() => {
-    if (isCalledFromInventory) setId(routeMatch1?.params?.id);
+    if (isCalledFromMembership) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
   }, [routeMatch, routeMatch1]);
 
 
   useEffect(() => {
-    if (Id !== undefined) {
-      actions.fetchInventoryDetail(dispatch, Id);
+    if (Id !== undefined && membershipDetails) {
+      // should Use membershipDetails.productId
+      actions.fetchInventory(dispatch, limit, offset, '90defbb4c55e706c25a5950d5ffe4376c79a456e');
     }
-  }, [Id, dispatch, user]);
+  }, [Id, dispatch, user, membershipDetails]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
-  const details = inventoryDetails;
+  const details = inventories[0];
+  console.log("details: ", details)
 
   const subtract = () => {
     if (qty !== 1) {
@@ -136,7 +138,7 @@ const serviceDispatch = useMembershipDispatch();
   };
 
   const add = () => {
-    if (qty < details.availableQuantity) {
+    if (qty < details?.availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -162,7 +164,7 @@ const serviceDispatch = useMembershipDispatch();
 
   const ownerSameAsUser = () => {
 
-    if (user && user.organization !== inventoryDetails?.ownerOrganization) {
+    if (user && user.organization !== inventories?.ownerOrganization) {
       return true;
     }
 
@@ -172,7 +174,7 @@ const serviceDispatch = useMembershipDispatch();
   const addItemToCart = () => {
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === details.address) {
+      if (cartList[i].product.address === details?.address) {
         found = true;
         break;
       }
@@ -187,8 +189,8 @@ const serviceDispatch = useMembershipDispatch();
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
-        if (element.product.address === details.address) {
-          if (items[index].qty + qty <= details.availableQuantity) {
+        if (element.product.address === details?.address) {
+          if (items[index].qty + qty <= details?.availableQuantity) {
             items[index].qty += qty;
             marketPlaceActions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
@@ -264,18 +266,18 @@ const serviceDispatch = useMembershipDispatch();
         <Space>
           <DescTitle text="Seller" />
           <DescTitle text="                                :" />
-          <Text className="text-[13px]">{details.ownerCommonName}</Text>
+          <Text className="text-[13px]">{details?.ownerCommonName}</Text>
         </Space>
 
         <Space>
           <DescTitle text="Sub-Category" />
           <DescTitle text="                :" />
-          <Text className="text-[13px]">{details.subCategory}</Text>
+          <Text className="text-[13px]">{details?.subCategory}</Text>
         </Space>
         <Space>
           <DescTitle text="Time in Months" />
           <DescTitle text="            :" />
-          <Text className="text-[13px]">{membershipDetails?.timePeriodInMonths ?? ""}</Text>
+          <Text className="text-[13px]">{membershipDetails?.timeperiodInMonths ?? ""}</Text>
         </Space>
 
         <Space>
@@ -317,7 +319,7 @@ const serviceDispatch = useMembershipDispatch();
                 </ClickableCell>
               </Breadcrumb.Item>
               {
-                isCalledFromInventory ?
+                isCalledFromMembership ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                     <ClickableCell href={routes.Inventories.url}>
                       <p
@@ -329,7 +331,7 @@ const serviceDispatch = useMembershipDispatch();
                   </Breadcrumb.Item> : null
               }
               <Breadcrumb.Item className="text-primary">
-                {decodeURIComponent(details.name)}
+                {decodeURIComponent(details?.name)}
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
@@ -339,7 +341,7 @@ const serviceDispatch = useMembershipDispatch();
               <div className="h-96 flex items-center justify-center border border-grayLight">
                 <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={membershipDetails?.imageUrl} />
               </div>
-              {details.availableQuantity !== 0 ?
+              {details?.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
                   <Button
                     type="primary"
@@ -373,10 +375,10 @@ const serviceDispatch = useMembershipDispatch();
             <div className="w-1/2 ml-8  mb-6" id="details">
               <Row className="items-center">
                 <Text className="font-semibold text-xl text-primaryB">
-                  {decodeURIComponent(details.name)}&nbsp;
+                  {decodeURIComponent(details?.name)}&nbsp;
                 </Text>
                 <Text className="font-medium text-sm text-secondryB ">
-                  ({membershipDetails?.timePeriodInMonths ?? ""})-month Duration
+                  ({membershipDetails?.timeperiodInMonths ?? ""})-month Duration
                 </Text>
               </Row>
               <Paragraph
@@ -391,9 +393,9 @@ const serviceDispatch = useMembershipDispatch();
                 ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
-                $ {details.pricePerUnit}
+                $ {details?.pricePerUnit}
               </Title>
-              {details.availableQuantity !== 0 ?
+              {details?.availableQuantity !== 0 ?
                 <Space>
                   <Text className="text-primaryB text-base">Quantity</Text>
                   <div className="flex items-center my-2 ml-5" id="quantity">
@@ -402,9 +404,9 @@ const serviceDispatch = useMembershipDispatch();
                       className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
                       <MinusOutlined className="text-xs text-secondryD" />
                     </div>
-                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
+                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details?.availableQuantity} value={qty} defaultValue={qty} controls={false}
                       onChange={e => {
-                        if (e < details.availableQuantity) {
+                        if (e < details?.availableQuantity) {
                           setQty(e)
                         } else {
                           openToast(
@@ -412,7 +414,7 @@ const serviceDispatch = useMembershipDispatch();
                             true,
                             "Cannot add more than available quantity"
                           );
-                          setQty(details.availableQuantity)
+                          setQty(details?.availableQuantity)
                         }
                       }} />
                     <div

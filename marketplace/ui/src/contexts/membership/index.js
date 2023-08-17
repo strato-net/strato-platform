@@ -8,9 +8,26 @@ const MembershipsProvider = ({ children }) => {
   const initialState = {
     membership: null,
     membershipServices: [],
-    // productFile: null,
-    // isProductFileLoading: false,
     isMembershipLoading: false,
+    isCreateMembershipSubmitting: false,
+    memberships: [],
+    ismembershipsLoading: false,
+    membershipDetails: null,
+    ismembershipDetailsLoading: false,
+    membershipOwnership: null,
+    isOwnershipmembershipTransferring: false,
+    membershipUpdateObject: null,
+    ismembershipUpdating: false,
+    membershipsAudit: [],
+    ismembershipsAuditLoading: false,
+    error: undefined,
+    success: false,
+    message: null,
+    isAssetImportInProgress: false,
+    assetsUploaded: 0,
+    assetsUploadedErrors: [],
+    isImportAssetsModalOpen: false,
+    totalMemberships: 0
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

@@ -35,6 +35,7 @@ import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
+import Membership from "./components/Membership";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -175,6 +176,23 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
+        path={routes.Memberships.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ProductsProvider>
+                <MembershipsProvider>
+                  <Membership user={user} users={users}/>
+                </MembershipsProvider>                  
+                </ProductsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
         path={routes.Inventories.url}
         element={
           <UsersProvider>
@@ -200,7 +218,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
-        path={routes.InventoryDetail.url}
+        path={routes.MembershipDetail.url}
         element={
           <UsersProvider>
             <EventsProvider>

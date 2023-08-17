@@ -1316,7 +1316,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     console.log("productFile: ", productFile)
     
     // Get all membershipServices
-    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.productId }, { ...options, org: managers.cirrusOrg, app: "" }))?.membershipServices ?? [];
+    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: "" }))?.membershipServices ?? [];
 
     // Get all services
     const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });

@@ -2,16 +2,273 @@ import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
+  createMembership: "create_membership",
+  createMembershipSuccessful: "create_membership_successful",
+  createMembershipFailed: "create_membership_failed",
+  fetchMembership: "fetch_memberships",
+  fetchMembershipSuccessful: "fetch_membership_successful",
+  fetchMembershipFailed: "fetch_membership_failed",
+  fetchMembershipDetails: "fetch_membership_details",
+  fetchMembershipDetailsSuccessful: "fetch_membership_details_successful",
+  fetchMembershipDetailsFailed: "fetch_membership_details_failed",
+  transferMembershipOwnership: "transfer_membership_ownership",
+  transferMembershipOwnershipSuccessful: "transfer_membership_ownership_successful",
+  transferMembershipOwnershipFailed: "transfer_membership_ownership_failed",
+  updateMembership: "update_membership",
+  updateMembershipSuccessful: "update_membership_successful",
+  updateMembershipFailed: "update_membership_failed",
+  resetMessage: "reset_message",
+  setMessage: "set_message",
+  fetchMembershipAudit: "fetch_membership_audit",
+  fetchMembershipAuditSuccessful: "fetch_membership_audit_successful",
+  fetchMembershipAuditFailed: "fetch_membership_audit_failed",
+  importAssetRequest: "import_asset_request",
+  importAssetSuccess: "import_asset_success",
+  importAssetFailure: "import_asset_failure",
+  updateAssetImportCount: "update_asset_import_count",
+  updateAssetUploadError: "update_asset_upload_error",
+  openImportCSVModal: "open_import_csv_modal",
+  closeImportCSVModal: "close_import_csv_modal",
   fetchMembershipOfInventory: "fetch_membership_of_inventory",
   fetchMembershipOfInventorySuccessful: "fetch_membership_of_inventory_successful",
   fetchMembershipOfInventoryFailed: "fetch_membership_of_inventory_failed",
-  fetchProductFileOfInventory: "fetch_productFile_of_inventory",
-  fetchProductFileOfInventorySuccessful: "fetch_productFile_of_inventorysuccessful",
-  fetchProductFileOfInventoryFailed: "fetch_productFile_of_inventoryfailed",
 };
 
 const actions = {
+  resetMessage: (dispatch) => {
+    dispatch({ type: actionDescriptors.resetMessage });
+  },
 
+  setMessage: (dispatch, message, success = false) => {
+    dispatch({ type: actionDescriptors.setMessage, message, success });
+  },
+
+  openImportCSVmodal: (dispatch) => {
+    dispatch({ type: actionDescriptors.openImportCSVModal });
+  },
+
+  closeImportCSVmodal: (dispatch) => {
+    dispatch({ type: actionDescriptors.closeImportCSVModal });
+  },
+
+  createMembership: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.createMembership });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.createMembershipSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Membership created successfully", true)
+        return true;
+      }
+
+      dispatch({ type: actionDescriptors.createMembershipFailed, error: 'Error while creating Membership' });
+      actions.setMessage(dispatch, "Error while creating Membership")
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.createMembershipFailed, error: "Error while creating Membership" });
+      actions.setMessage(dispatch, "Error while creating Membership")
+    }
+  },
+
+  fetchMembershipDetails: async (dispatch, id, chainId) => {
+    dispatch({ type: actionDescriptors.fetchMembershipDetails });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/${id}/${chainId}`, {
+        method: HTTP_METHODS.GET
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchMembershipDetailsSuccessful,
+          payload: body.data,
+        });
+
+        return true;
+      }
+
+      dispatch({ type: actionDescriptors.fetchMembershipDetailsFailed, error: 'Error while fetching Membership' });
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchMembershipDetailsFailed, error: "Error while fetching Membership" });
+    }
+  },
+
+  fetchMembership: async (dispatch, limit, offset, queryValue) => {
+    const query = queryValue
+      ? `&productId=${queryValue}`
+      : "";
+
+    dispatch({ type: actionDescriptors.fetchMembership });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership?limit=${limit}&offset=${offset}${query}`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchMembershipSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchMembershipFailed, error: undefined });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchMembershipFailed, error: undefined });
+    }
+  },
+  transferMembershipOwnership: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.transferMembershipOwnership });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/transferOwnership`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.transferMembershipOwnershipSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Membership has been transferred", true);
+        return true;
+      }
+
+      dispatch({ type: actionDescriptors.transferMembershipOwnershipFailed, error: 'Error while transfer ownership Membership' });
+      actions.setMessage(dispatch, "Error while transfer ownership Membership")
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.transferMembershipOwnershipFailed, error: "Error while transfer ownership Membership" });
+      actions.setMessage(dispatch, "Error while transfer ownership Membership")
+    }
+  },
+  updateMembership: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.updateMembership });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/update`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.updateMembershipSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Membership has been updated", true);
+        return true;
+      }
+
+      dispatch({ type: actionDescriptors.updateMembershipFailed, error: 'Error while updating Membership' });
+      actions.setMessage(dispatch, "Error while updating Membership")
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.updateMembershipFailed, error: "Error while updating Membership" });
+      actions.setMessage(dispatch, "Error while updating Membership")
+    }
+  },
+  fetchMembershipAudit: async (dispatch, address, chainId) => {
+    dispatch({ type: actionDescriptors.fetchMembershipDetails });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/${address}/${chainId}/audit`, {
+        method: HTTP_METHODS.GET
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchMembershipAuditSuccessful,
+          payload: body.data,
+        });
+
+        return true;
+      }
+
+      dispatch({ type: actionDescriptors.fetchMembershipAuditFailed, error: 'Error while fetching audit' });
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchMembershipAuditFailed, error: "Error while fetching audit" });
+    }
+  },
+  importAssets: async (dispatch, assets) => {
+    dispatch({ type: actionDescriptors.importAssetRequest });
+    const errors = [];
+
+    for (let i = 0; i < assets.length; i++) {
+      try {
+        const response = await fetch(`${apiUrl}/membership`, {
+          method: HTTP_METHODS.POST,
+          credentials: "same-origin",
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(assets[i])
+        });
+
+        const body = await response.json();
+
+        if (response.status === RestStatus.OK) {
+          dispatch({
+            type: actionDescriptors.updateAssetImportCount,
+            count: i+1,
+          });
+        } else {
+          errors.push({ status: response.error.status, error: response.error.data.method, id: i })
+        }        
+      } catch (err) {
+        //  nothing
+      }
+    }
+
+    dispatch({ type: actionDescriptors.importAssetSuccess });
+    dispatch({ type: actionDescriptors.updateAssetUploadError, errors });
+    actions.setMessage(dispatch, `Imported ${assets.length} records`, true)
+  },
+  
   fetchMembershipOfInventory: async (dispatch, limit, offset, queryValue, membershipId) => {
     const query = queryValue
       ? `&serviceTypeId=${queryValue}`
@@ -21,7 +278,7 @@ const actions = {
 
     try {
       //would use membershipId here and use getAll
-      const response = await fetch(`${apiUrl}/membership/1ed714e2661de2678f934ee8e6c30d3df58021b0?limit=${limit}&offset=${offset}${query}`, {
+      const response = await fetch(`${apiUrl}/membership/${membershipId}?limit=${limit}&offset=${offset}${query}`, {
         method: HTTP_METHODS.GET,
       });
 
@@ -39,33 +296,6 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchMembershipOfInventoryFailed, error: undefined });
     }
   },
-  // fetchProductFileOfInventory: async (dispatch, queryValue, productId) => {
-  //   const query = queryValue
-  //     ? `&serviceTypeId=${queryValue}`
-  //     : "";
-
-  //   dispatch({ type: actionDescriptors.fetchProductFileOfInventory });
-
-  //   try {
-  //     //would use membershipId here
-  //     const response = await fetch(`${apiUrl}/productFile?productId=0000000000000000000000000000000007338632`, {
-  //       method: HTTP_METHODS.GET
-  //     });
-  //     //to get the imgurl, use getSignedUrlFromS3 in productFile.controller.js
-  //     const body = await response.json();
-  //     console.log("fetchProductFileOfInventory response: ", body.data[0])
-  //     if (response.status === RestStatus.OK) {
-  //       dispatch({
-  //         type: actionDescriptors.fetchProductFileOfInventorySuccessful,
-  //         payload: body.data[0],
-  //       });
-  //       return;
-  //     }
-  //     dispatch({ type: actionDescriptors.fetchProductFileOfInventorySuccessful, error: undefined });
-  //   } catch (err) {
-  //     dispatch({ type: actionDescriptors.fetchProductFileOfInventorySuccessful, error: undefined });
-  //   }
-  // },
 };
 
 export { actionDescriptors, actions };
