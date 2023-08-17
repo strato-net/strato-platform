@@ -1311,9 +1311,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     // Get The membership
     const membership = await membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
     
-    // Get The productFile
-    const productFile = await productFileJs.get(rawAdmin, {productId: membership.productId}, {...options, org: managers.cirrusOrg, app: ""})
-    console.log("productFile: ", productFile)
+    // Get The productFiles
+    console.log("start", membership.productId)
+    const productFiles = undefined
+    if(membership.productId){
+      productFiles = await productFileJs.getAll(rawAdmin, { productId: membership.productId}, {...options, org: managers.cirrusOrg, app: ""})
+    }
+    
     
     // Get all membershipServices
     const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: "" }))?.membershipServices ?? [];
@@ -1323,13 +1327,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
     // Combine the data and merge the service data into the membershipService data
     const combinedData = {
-      membership: { ...membership, productFileFileLocaiton: productFile.fileLocation},
+      membership: membership,
       membershipServices: membershipServices.map(membershipService => {
         const matchingService = servicesAll.find(service => service.address === membershipService.serviceId);
     
         if (matchingService) {
           return {
             ...membershipService,
+            savings: membershipService.maxQuantity * (matchingService.price - membershipService.price),
             serviceName: matchingService.name,
             serviceDescription: matchingService.description,
             servicePrice: matchingService.price,
@@ -1338,9 +1343,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         } else {
           return membershipService;
         }
-      })
+      }),
+      productFiles: productFiles
     };
-    
     console.log("Dapp-getMembership combinedData: ", combinedData);
     return combinedData
   }

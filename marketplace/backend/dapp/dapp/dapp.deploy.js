@@ -92,12 +92,12 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     assert.equal(deployment.dapp.contract.address, dapp.address)
   })
   
-  // it('Should populate services', async () => {
-  //   let _dapp = await dappJs.uploadDappContract(adminUser, options)
-  //   const result = await ServiceSeederJs.createServices(_dapp)
-  //   assert(Array.isArray(result), 'result should be an array')
-  //   assert.equal(result.length, ServiceJson.services.length)
-  // })
+  it('Should populate services', async () => {
+    let _dapp = await dappJs.uploadDappContract(adminUser, options)
+    const result = await ServiceSeederJs.createServices(_dapp)
+    assert(Array.isArray(result), 'result should be an array')
+    assert.equal(result.length, ServiceJson.services.length)
+  })
 
 
 })

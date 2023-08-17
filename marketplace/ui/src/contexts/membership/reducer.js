@@ -2,19 +2,20 @@ import { actionDescriptors } from "./actions";
 
 const reducer = (state, action) => {
   switch (action.type) {
-    case actionDescriptors.fetchMembershipOfInventory:
+    case actionDescriptors.fetchMembershipFromDetails:
       return {
         ...state,
         isMembershipLoading: true
       };
-    case actionDescriptors.fetchMembershipOfInventorySuccessful:
+    case actionDescriptors.fetchMembershipFromDetailsSuccessful:
       return {
         ...state,
         membershipServices: action.payload.membershipServices,
         membership: action.payload.membership,
+        productFiles: action.payload.productFiles,
         isMembershipLoading: false
       };
-    case actionDescriptors.fetchMembershipOfInventoryFailed:
+    case actionDescriptors.fetchMembershipFromDetailsFailed:
       return {
         ...state,
         error: action.error,

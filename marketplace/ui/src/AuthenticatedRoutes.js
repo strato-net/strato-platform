@@ -27,6 +27,7 @@ import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
+import ProductDetails from "./components/MarketPlace/ProductDetail";
 import MembershipDetails from "./components/MarketPlace/MembershipDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
@@ -228,6 +229,27 @@ const AuthenticatedRoutes = ({ user, users }) => {
                     <InventoriesProvider>
                       <ItemsProvider>
                         <MembershipDetails user={user} users={users} />
+                      </ItemsProvider>
+                    </InventoriesProvider>
+                  </SubCategorysProvider>
+                </CategorysProvider>
+              </MembershipsProvider>
+            </EventsProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.InventoryDetail.url}
+        element={
+          <UsersProvider>
+            <EventsProvider>
+              <MembershipsProvider>
+                <CategorysProvider>
+                  <SubCategorysProvider>
+                    <InventoriesProvider>
+                      <ItemsProvider>
+                        <ProductDetails user={user} users={users} />
                       </ItemsProvider>
                     </InventoriesProvider>
                   </SubCategorysProvider>

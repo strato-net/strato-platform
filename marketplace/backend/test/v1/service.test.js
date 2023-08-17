@@ -67,8 +67,6 @@ describe('Service End-To-End Tests', function () {
     )
     
     test = createResponse.body.data[1]
-    console.log("test: ", test)
-    //f7bc339caea0e8815434812ffb09c842dd0234db
     assert.equal(createResponse.status, 200, 'should be 200');
     assert.isDefined(createResponse.body, 'body should be defined')
   })

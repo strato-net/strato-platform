@@ -54,9 +54,10 @@ const MembershipDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
   const [isServiceSelected, setIsServiceSelected] = useState(false);
   const [membershipDetails, setMembershipDetails] = useState(undefined);
+  const [allProductFiles, setAllProductFiles] = useState(undefined);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { membershipServices, membership, isMembershipLoading} =
+  const { membershipServices, membership, isMembershipLoading, productFiles} =
   useMembershipState();
 const serviceDispatch = useMembershipDispatch();
 
@@ -65,29 +66,29 @@ const serviceDispatch = useMembershipDispatch();
   useEffect(() => {
     if (user) {
       if (Id !== undefined) {
-        membershipActions.fetchMembershipOfInventory(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
-        // membershipActions.fetchProductFileOfInventory(serviceDispatch, debouncedSearchTerm, Id);
+        membershipActions.fetchMembershipFromDetails(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
       }
     }
   }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user])
   
   useEffect(() => {
-    console.log("membershipServices: ", membershipServices)
     let services = [];
     let savings = [];
     membershipServices.forEach(element => {
-      console.log(element)
       services.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceDesc": element.serviceDescription, "memberPrice": element.membershipPrice, "nonMemberPrice": element.servicePrice, "uses": element.maxQuantity},)
-      savings.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceCost": (element.servicePrice - element.membershipPrice)*element.maxQuantity},)
+      savings.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceCost": element.savings},)
     });
     setServiceList(services);
     setSavingsList(savings);
   }, [membershipServices])
   
   useEffect(() => {
-    console.log("membership: ", membership)
     setMembershipDetails(membership)
   }, [membership])
+  
+  useEffect(() => {
+    setAllProductFiles(productFiles)
+  }, [productFiles])
   
   
 
@@ -118,7 +119,7 @@ const serviceDispatch = useMembershipDispatch();
 
   useEffect(() => {
     if (Id !== undefined && membershipDetails) {
-      // should Use membershipDetails.productId
+      // TODO: should Use membershipDetails.productId
       actions.fetchInventory(dispatch, limit, offset, '90defbb4c55e706c25a5950d5ffe4376c79a456e');
     }
   }, [Id, dispatch, user, membershipDetails]);
@@ -339,7 +340,8 @@ const serviceDispatch = useMembershipDispatch();
           <div className="flex mx-16">
             <div className="w-1/2">
               <div className="h-96 flex items-center justify-center border border-grayLight">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={membershipDetails?.imageUrl} />
+                {/* TODO: figure out how to show multiple images */}
+                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={allProductFiles !== undefined ? (allProductFiles[0] ? allProductFiles[0].imgUrl : null) : null} />
               </div>
               {details?.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">

@@ -29,9 +29,9 @@ const actionDescriptors = {
   updateAssetUploadError: "update_asset_upload_error",
   openImportCSVModal: "open_import_csv_modal",
   closeImportCSVModal: "close_import_csv_modal",
-  fetchMembershipOfInventory: "fetch_membership_of_inventory",
-  fetchMembershipOfInventorySuccessful: "fetch_membership_of_inventory_successful",
-  fetchMembershipOfInventoryFailed: "fetch_membership_of_inventory_failed",
+  fetchMembershipFromDetails: "fetch_membership_of_inventory",
+  fetchMembershipFromDetailsSuccessful: "fetch_membership_of_inventory_successful",
+  fetchMembershipFromDetailsFailed: "fetch_membership_of_inventory_failed",
 };
 
 const actions = {
@@ -269,12 +269,12 @@ const actions = {
     actions.setMessage(dispatch, `Imported ${assets.length} records`, true)
   },
   
-  fetchMembershipOfInventory: async (dispatch, limit, offset, queryValue, membershipId) => {
+  fetchMembershipFromDetails: async (dispatch, limit, offset, queryValue, membershipId) => {
     const query = queryValue
       ? `&serviceTypeId=${queryValue}`
       : "";
 
-    dispatch({ type: actionDescriptors.fetchMembershipOfInventory });
+    dispatch({ type: actionDescriptors.fetchMembershipFromDetails });
 
     try {
       //would use membershipId here and use getAll
@@ -283,17 +283,17 @@ const actions = {
       });
 
       const body = await response.json();
-      console.log("fetchMembershipOfInventory response: ", body.data)
+      console.log("fetchMembershipFromDetails response: ", body.data)
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchMembershipOfInventorySuccessful,
+          type: actionDescriptors.fetchMembershipFromDetailsSuccessful,
           payload: body.data,
         });
         return;
       }
-      dispatch({ type: actionDescriptors.fetchMembershipOfInventoryFailed, error: undefined });
+      dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchMembershipOfInventoryFailed, error: undefined });
+      dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
     }
   },
 };
