@@ -20,7 +20,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     ) public returns (uint, string) {
         string itemAddresses = "";
 
-        Item_4 itemAddr = new Item_4(
+        Item_5 itemAddr = new Item_5(
             _productId,
             _inventoryId,
             _batchSerializationNumber,
@@ -49,10 +49,39 @@ contract ItemManager is ItemStatus, InventoryStatus {
         uint _scheme
     ) public returns (uint) {
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
-            Item_4 item = Item_4(_itemsAddress[i]);
+            Item_5 item = Item_5(_itemsAddress[i]);
             item.update(_status, _scheme);
         }
         return (RestStatus.OK);
+    }
+
+    function retireItem(
+        address _itemAddress,
+        string _retiredBy,
+        string _retiredOnBehalfOf,
+        int _quantity,
+        string _purpose
+    ) returns (uint256, address) {
+        Item_5 item = Item_5(_itemAddress);
+
+        Inventory_3 inventory = Inventory_3(item.inventoryId());
+        if (_quantity > inventory.availableQuantity()) {
+            return (RestStatus.BAD_REQUEST, address(0));
+        }
+
+        uint256 currentTimestamp = block.timestamp;
+        uint256 currentYear = (currentTimestamp / 31536000) + 1970;
+        if (inventory.vintage() > currentYear) {
+            return (RestStatus.BAD_REQUEST, address(0));
+        }
+
+        return
+            item.retireItem(
+                _retiredBy,
+                _retiredOnBehalfOf,
+                _quantity,
+                _purpose
+            );
     }
 
     function transferOwnership(
@@ -87,9 +116,9 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _newOwner,
         int _newQuantity
     ) public returns (address, address) {
-        Item_4 item = Item_4(_itemAddress[0]);
+        Item_5 item = Item_5(_itemAddress[0]);
         Product_4 product;
-        Inventory_2 inventory;
+        Inventory_3 inventory;
 
         Product_4 oldProduct = Product_4(item.productId());
         address productAddress = _productManager.checkForProduct(
@@ -113,19 +142,44 @@ contract ItemManager is ItemStatus, InventoryStatus {
             product = Product_4(productAddress);
         }
 
-        Inventory_2 oldInventory = Inventory_2(item.inventoryId());
+        Inventory_3 oldInventory = Inventory_3(item.inventoryId());
 
-        (uint status, address inventory) = product.addInventory(
-            _newQuantity,
-            oldInventory.pricePerUnit(),
-            oldInventory.vintage(),
-            InventoryStatus.UNPUBLISHED,
-            block.timestamp,
-            _newOwner
-        );
+        address uniqueInventoryAddress = _productManager.checkForInventory(
+                                                                            oldInventory.vintage(),
+                                                                            productAddress,
+                                                                            oldInventory.pricePerUnit(),
+                                                                            _newOwner
+                                                                            );
+                                                                            
+         //if no inventory is created before && vintage is invalid                                                             );
+        if(uniqueInventoryAddress == address(0)) 
+        {
+            (uint256 status, address inventoryAddr)= _productManager.addInventoryForBuyer(
+                                                                                    address(product),
+                                                                                    _newQuantity,
+                                                                                    oldInventory.pricePerUnit(),
+                                                                                    oldInventory.vintage(),
+                                                                                    InventoryStatus.UNPUBLISHED,
+                                                                                    block.timestamp,
+                                                                                    _newOwner
+                                                                                );
+            inventory = Inventory_3(inventoryAddr);
+
+                   
+        }else{
+            //inventory retreived
+            Inventory_3 inventoryToBeAdded = Inventory_3(uniqueInventoryAddress);
+            int availableQuantity = inventoryToBeAdded.availableQuantity();
+            //quantity updated
+            uint256 status = inventoryToBeAdded.updateQuantityForVintages(availableQuantity+_newQuantity);
+            inventory = inventoryToBeAdded;
+
+            //return existing product, updated inventory
+            return (address(product),address(inventory));
+        }
 
         for (uint i = 0; i < _itemAddress.length; i++) {
-            Item_4 _item = Item_4(_itemAddress[i]);
+            Item_5 _item = Item_5(_itemAddress[i]);
             if (oldInventory.availableQuantity() == _newQuantity) {
                 _item.transferOwnership(
                     _newOwner,
@@ -133,7 +187,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     address(inventory)
                 );
             } else {
-                Item_4 itemAddr = new Item_4(
+                Item_5 itemAddr = new Item_5(
                     _item.productId(),
                     _item.inventoryId(),
                     _item.batchSerializationNumber(),

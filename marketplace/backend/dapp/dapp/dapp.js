@@ -583,6 +583,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return itemJs.update(rawAdmin, contract, updates, chainOptions);
   };
 
+  contract.retireItem = async function (args, options = defaultOptions) {
+    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    const{ productId, inventoryId, ...newArgs } = args;
+    const items = await managers.itemManager.getItems({ productId: productId, inventoryId: inventoryId }, createOptions);
+    const itemAddress = items[0].address;
+    return managers.itemManager.retireItem({ itemAddress: itemAddress, ...newArgs}, rawAdmin, contract, options);
+  }
+
   contract.getRawMaterials = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.itemManager.getRawMaterials({
