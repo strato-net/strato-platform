@@ -48,9 +48,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
       items: [
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">Inventory</div>, key: '2' },
-        { label: <div id="Products">Products</div>, key: '3' },
-        { label: <div id="Events">Events</div>, key: '4' },
+        // { label: <div id="Inventory">Inventory</div>, key: '2' },
+        // { label: <div id="Products">Products</div>, key: '3' },
+        { label: <div id="Products">Memberships</div>, key: '5' },
+        // { label: <div id="Events">Events</div>, key: '4' },
       ]
     },
     {
@@ -67,6 +68,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
+    routes.Memberships.url,
   ];
 
   const logout = () => {
@@ -84,6 +86,8 @@ const HeaderComponent = ({ user, loginUrl }) => {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
+    } else if (pathName.includes("/memberships")) {
+      setSelectedTab("5");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
     }

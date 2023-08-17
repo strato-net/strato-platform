@@ -14,9 +14,10 @@ import {
 } from "antd";
 import { DownOutlined } from '@ant-design/icons';
 import MembershipCard from "./MembershipCard";
-// import CreateProductModal from "./CreateProductModal";
-// import { actions } from "../../contexts/product/actions";
-// import { useProductDispatch, useProductState } from "../../contexts/product";
+import CreateMembershipModal from "./CreateMembershipModal";
+import { actions } from "../../contexts/membership/actions";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+
 import useDebounce from "../UseDebounce";
 //categories
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -35,7 +36,7 @@ const { Title, Text } = Typography;
 
 const Membership = () => {
     const [open, setOpen] = useState(false);
-    //   const dispatch = useProductDispatch();
+      const dispatch = useMembershipDispatch();
     const [api, contextHolder] = notification.useNotification();
     const [queryValue, setQueryValue] = useState("");
     const limit = 10;
@@ -77,29 +78,25 @@ const Membership = () => {
         }
     };
 
-    // const { products, isProductsLoading, message, success } = useProductState();
-    const products = []
-    const isProductsLoading = false
-    const message = ''
-    const success = false
+    const { memberships, ismembershipsLoading, message, success } = useMembershipState();
 
     useEffect(() => {
         if (isSearch) {
             setOffset(0);
-            //   actions.fetchProduct(dispatch, limit, 0, debouncedSearchTerm);
+              actions.fetchMembership(dispatch, limit, 0, debouncedSearchTerm);
             setIsSearch(false)
         } else
             setIsSearch(true)
-        //   actions.fetchProduct(dispatch, limit, offset, debouncedSearchTerm);
+          actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
     }, [limit, offset, debouncedSearchTerm]);
 
     useEffect(() => {
-        let len = products.length;
+        let len = memberships.length;
         let total;
         if (len === limit) total = page * 10 + limit;
         else total = (page - 1) * 10 + limit;
         setTotal(total);
-    }, [products]);
+    }, [memberships]);
 
     const showModal = () => {
         hasChecked && !isAuthenticated && loginUrl !== undefined ? window.location.href = loginUrl : setOpen(true)
@@ -133,13 +130,13 @@ const Membership = () => {
     return (
         <>
             {contextHolder}
-            {isProductsLoading || iscategorysLoading || issubCategorysLoading ? (
+            {ismembershipsLoading || iscategorysLoading || issubCategorysLoading ? (
                 <div className="h-screen flex justify-center items-center">
-                    <Spin spinning={isProductsLoading} size="large" />
+                    <Spin spinning={ismembershipsLoading} size="large" />
                 </div>
             ) : (
                 <div className="mx-16 mt-14 h-screen">
-                    {products.length === 0 && offset === 0 ? (
+                    {memberships.length === 0 && offset === 0 ? (
                         <div className="h-screen justify-center flex flex-col items-center">
                             <Image src={Images.noProductSymbol} preview={false} />
                             <Title level={3} className="mt-2">
@@ -182,7 +179,7 @@ const Membership = () => {
                                     </Typography.Text>
                                     <div>
                                         <Typography.Text style={{ fontSize: '7px' }}>
-                                            {products.length}  Memberships found
+                                            {memberships.length}  Memberships found
                                         </Typography.Text>
                                     </div>
                                 </Col>
@@ -216,7 +213,7 @@ const Membership = () => {
                                         type="primary"
                                         style={{ backgroundColor: 'green', color: 'white', margin: '10px' }}
                                         className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                                    >Sell Eixisting Membership </Button>
+                                    >Sell Existing Membership </Button>
                                     <Button id="add-product-button" type="primary" className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
                                         style={{ backgroundColor: 'blue', color: 'white', margin: '10px' }}
                                         onClick={() => {
@@ -232,9 +229,9 @@ const Membership = () => {
                                 </div>
                             </div>
                             <>
-                                {products.length !== 0 ? (
+                                {memberships.length !== 0 ? (
                                     <div className="my-4">
-                                        {products.map((product, index) => {
+                                        {memberships.map((product, index) => {
                                             return (
                                                 <MembershipCard
                                                     product={product}
@@ -261,8 +258,8 @@ const Membership = () => {
                     )}
                 </div>
             )}
-            {/* {open && (
-        <CreateProductModal
+            {open && (
+        <CreateMembershipModal
           open={open}
           handleCancel={handleCancel}
           categorys={categorys}
@@ -270,8 +267,8 @@ const Membership = () => {
           page={page}
           debouncedSearchTerm={debouncedSearchTerm}
         />
-      )} */}
-            {message && openToast("bottom")}
+      )}
+       {message && openToast("bottom")}
         </>
     );
 };
