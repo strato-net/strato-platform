@@ -2030,15 +2030,16 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                   testNameAndTypes (_, (t, v)) =
                     -- These cases might not be all inclusive of all valid combinations.
                     case (v, t) of
-                      (SInteger _, SVMType.Int _ _) -> pure $ True
-                      (SString _, SVMType.String _) -> pure $ True
-                      (SString _, SVMType.Bytes _ _) -> pure $ True
-                      (SBool _, SVMType.Bool) -> pure $ True
-                      (SAccount _ _, SVMType.Address _) -> pure $ True
-                      (SAccount _ _, SVMType.Account _) -> pure $ True
-                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure $ True
+                      (SInteger _, SVMType.Int _ _) -> pure True
+                      (SString _, SVMType.String _) -> pure True
+                      (SString _, SVMType.Bytes _ _) -> pure True
+                      (SBool _, SVMType.Bool) -> pure True
+                      (SAccount _ _, SVMType.Address _) -> pure True
+                      (SAccount _ _, SVMType.Account _) -> pure True
+                      (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
                       (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
                       (SArray x _, SVMType.Array y _) -> pure $ x == y
+                      (_, SVMType.Variadic) -> pure True
                       (SReference addressedPath, _) -> do
                         refType <- getXabiValueType addressedPath
                         if (refType == t)
