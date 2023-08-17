@@ -7,6 +7,7 @@ import {
   InputNumber,
   Select,
   Button,
+  Radio,
   Upload,
   Spin,
   notification,
@@ -17,15 +18,14 @@ import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 
 //sub-categories
 import { actions } from "../../contexts/membership/actions";
-import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import {
+  useMembershipDispatch,
+  useMembershipState,
+} from "../../contexts/membership";
 
 const { Dragger } = Upload;
 
-const CreateMembershipModal = ({
-  open,
-  handleCancel,
-  categorys,
-}) => {
+const CreateMembershipModal = ({ open, handleCancel, categorys }) => {
   // const schema = getSchema();
   const dispatch = useMembershipDispatch();
   const [previewImage, setPreviewImage] = useState("");
@@ -33,9 +33,10 @@ const CreateMembershipModal = ({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageList, setImageList] = useState([]);
   const [fileList, setFileList] = useState([]);
+  const [memberDiscount, setMemberDiscount] = useState([1]);
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
-  useMembershipState();
+    useMembershipState();
 
   const initialValues = {
     name: "",
@@ -120,24 +121,16 @@ const CreateMembershipModal = ({
     formik.setFieldValue("services", updatedServices);
   };
 
-  const handleMemberPriceChange = (index, value) => {
-    const updatedServices = [...formik.values.services];
-    updatedServices[index] = {
-      ...updatedServices[index],
-      memberPrice: value,
-      percentDiscount: null, // Clear discount
-    };
-    formik.setFieldValue("services", updatedServices);
+  const handlePriceDiscountClick = (index) => {
+    const updatedMemberDiscount = [...memberDiscount];
+    updatedMemberDiscount[index] = 1;
+    setMemberDiscount(updatedMemberDiscount);
   };
 
-  const handlePercentDiscountChange = (index, value) => {
-    const updatedServices = [...formik.values.services];
-    updatedServices[index] = {
-      ...updatedServices[index],
-      percentDiscount: value,
-      memberPrice: null, // Clear member price
-    };
-    formik.setFieldValue("services", updatedServices);
+  const handlePercentDiscountClick = (index) => {
+    const updatedMemberDiscount = [...memberDiscount];
+    updatedMemberDiscount[index] = 2;
+    setMemberDiscount(updatedMemberDiscount);
   };
 
   const handleDocumentChange = (info) => {
@@ -162,11 +155,37 @@ const CreateMembershipModal = ({
     },
   };
 
+  // This will check the discount type and null the other value in formik
+  // Both member price and discount percent are passed. We will null the one that is not being used.
+  const checkDiscountType = (discountArray) => {
+    for (let i = 0; i < discountArray.length; i++) {
+      // If the discount is a 1 we will null the discount percent value in formik
+      if (discountArray[i] === 1) {
+        const updatedServices = [...formik.values.services];
+        updatedServices[i] = {
+          ...updatedServices[i],
+          percentDiscount: null,
+        };
+        formik.values.services = updatedServices;
+      } else {
+        // If the discount is a 2 we will null the discount price value in formik
+        const updatedServices = [...formik.values.services];
+        updatedServices[i] = {
+          ...updatedServices[i],
+          memberPrice: null,
+        };
+        formik.values.services = updatedServices;
+      }
+    }
+    return formik.values;
+  };
+
   const handleCreateFormSubmit = async (values) => {
-    console.log("formik", formik.values);
+    const updatedValues = checkDiscountType(memberDiscount);
+    console.log("updated Values", updatedValues);
     console.log("values", values);
-    
-    // TODO: Update this data to match whats needed in the backend. 
+
+    // TODO: Update this data to match whats needed in the backend.
     // Might have to send images and documents separately.
   };
 
@@ -380,6 +399,7 @@ const CreateMembershipModal = ({
             icon={<PlusOutlined />}
             onClick={() => {
               addServiceRow();
+              memberDiscount.push(1);
             }}
           >
             Add Service
@@ -438,43 +458,55 @@ const CreateMembershipModal = ({
                   className="w-10/12"
                 />
               </Form.Item>
-              <Form.Item
-                label="Member Price"
-                name={`memberPrice_${index}`}
-                key={`memberPrice_${index}`}
-              >
-                <InputNumber
-                  id={`memberPrice_${index}`}
+              <div className="col-span-2 flex flex-col items-center">
+                <Radio.Group
+                  defaultValue={1}
+                  buttonStyle="solid"
+                  className="col-span-2"
+                  size="small"
+                >
+                  <Radio.Button
+                    value={1}
+                    onClick={() => {
+                      handlePriceDiscountClick(index);
+                    }}
+                  >
+                    Discount Price
+                  </Radio.Button>
+                  <Radio.Button
+                    value={2}
+                    onClick={() => {
+                      handlePercentDiscountClick(index);
+                    }}
+                  >
+                    Discount Percent
+                  </Radio.Button>
+                </Radio.Group>
+                <Form.Item
                   name={`memberPrice_${index}`}
-                  type="number"
-                  min={0}
-                  addonBefore="$"
-                  value={service.memberPrice}
-                  onChange={(value) => {
-                    handleMemberPriceChange(index, value);
-                  }}
-                  className="w-10/12"
-                />
-              </Form.Item>
-              <Form.Item
-                label="Percent Discount"
-                name={`percentDiscount_${index}`}
-                key={`percentDiscount_${index}`}
-              >
-                <InputNumber
-                  id={`percentDiscount_${index}`}
-                  name={`percentDiscount_${index}`}
-                  type="number"
-                  min={0}
-                  addonBefore="%"
-                  value={service.percentDiscount}
-                  onChange={(value) => {
-                    handlePercentDiscountChange(index, value);
-                  }}
-                  className="w-10/12"
-                />
-              </Form.Item>
-
+                  key={`memberPrice_${index}`}
+                  className="mt-2"
+                >
+                  <InputNumber
+                    id={`memberPrice_${index}`}
+                    name={`memberPrice_${index}`}
+                    type="number"
+                    min={0}
+                    value={service.memberPrice}
+                    onChange={(value) => {
+                      const updatedServices = [...formik.values.services];
+                      updatedServices[index] = {
+                        ...updatedServices[index],
+                        memberPrice: value,
+                        percentDiscount: value, // Update both fields with the same value
+                      };
+                      formik.setFieldValue("services", updatedServices);
+                    }}
+                    className="w-10/12"
+                    addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
+                  />
+                </Form.Item>
+              </div>
               <Button
                 className="w-10/12 self-end"
                 key={`removeService_${index}`}
@@ -482,6 +514,7 @@ const CreateMembershipModal = ({
                 icon={<MinusOutlined />}
                 onClick={() => {
                   removeServiceRow();
+                  memberDiscount.pop();
                 }}
               ></Button>
             </div>
