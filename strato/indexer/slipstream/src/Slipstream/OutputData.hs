@@ -899,7 +899,7 @@ insertAbstractTableQuery cs = concat $
                   (E.contractName x)   
               abTableName = abstractTableName
                   (E.organization x)
-                  (E.application x)
+                  (E.contractName x)
                   (ab)
               abTableName' = tableNameToDoubleQuoteText abTableName 
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ (baseAbstractTableColumns ++ abC)
@@ -913,7 +913,7 @@ insertAbstractTableQuery cs = concat $
                          , tshow . E.transactionSender
                          ]
               vals = flip map contracts $ \((row, rowList),_) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (`notElem` abC) rowList]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (\v -> v `notElem` abC) rowList]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
