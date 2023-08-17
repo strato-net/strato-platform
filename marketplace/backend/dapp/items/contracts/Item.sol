@@ -1,10 +1,11 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
+import "./RetiredItem.sol";
+import "/dapp/products/contracts/Inventory.sol";
 
 /// @title A representation of Item assets
-contract Item_4 is ItemStatus {
+contract Item_5 is ItemStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -74,6 +75,30 @@ contract Item_4 is ItemStatus {
 
     function updateQuantity(int _newQuantity) {
         quantity = _newQuantity;
+    }
+
+    function retireItem(
+        string _retiredBy,
+        string _retiredOnBehalfOf,
+        int _quantity,
+        string _purpose
+    ) public returns (uint256, address) {
+        RetiredItem retiredItem = new RetiredItem(
+            inventoryId,
+            owner,
+            _retiredBy,
+            _retiredOnBehalfOf,
+            _quantity,
+            _purpose,
+            block.timestamp,
+            batchSerializationNumber
+        );
+
+        Inventory_3 inventory = Inventory_3(inventoryId);
+        inventory.updateRetiredQuantity(_quantity);
+        quantity = quantity - _quantity;
+
+        return (RestStatus.OK, address(retiredItem));
     }
 
     // Get the userOrganization

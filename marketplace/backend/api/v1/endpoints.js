@@ -50,7 +50,8 @@ export const Item = {
   update: '/update',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
-  getRawMaterials: '/rawmaterials'
+  getRawMaterials: '/rawmaterials',
+  retire: '/retire'
 }
 
 export const Order = {

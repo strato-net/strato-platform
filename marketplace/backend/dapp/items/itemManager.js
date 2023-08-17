@@ -117,10 +117,12 @@ function bind(user, _contract, options) {
     contract.getState = async () => getState(user, contract, options);
     contract.getItem = async (args, options) => itemJs.get(user, args, options);
     contract.getItems = async (args, options) => itemJs.getAll(user, args, options);
+    contract.getRetiredItems = async (args, options) => itemJs.getAllRetiredItems(user, args, options);
     contract.getAllOwnershipEvents = async (args, options) => itemJs.getAllOwnershipEvents(user, args, options);
     contract.addItem = async (args) => addItem(user, contract, args, options);
     contract.transferOwnership = async (args) => transferOwnership(user, contract, args, options);
     contract.updateItem = async (args) => updateItem(user, contract, args, options);
+    contract.retireItem = async (args) => retireItem(user, contract, args, options);
     contract.addEvent = async (args) => addEvent(user, contract, args, options);
     contract.certifyEvent = async (args) => certifyEvent(user, contract, args, options);
     contract.getEvents = async (args, options) => eventJs.getAll(user, args, options);
@@ -203,6 +205,34 @@ async function updateItem(admin, contract, _args, baseOptions) {
     return [restStatus, itemAddress];
 }
 
+/**
+ * Retire an item
+ */
+async function retireItem(admin, contract, _args, baseOptions) {
+    const callArgs = {
+      contract,
+      method: "retireItem",
+      args: util.usc({
+        ..._args,
+      }),
+    };
+    const options = {
+      ...baseOptions,
+      history: [contractName],
+    };
+  
+    const [restStatus, retiredItemAddress] = await rest.call(
+      admin,
+      callArgs,
+      options
+    );
+  
+    if (parseInt(restStatus, 10) !== RestStatus.OK)
+      throw new rest.RestError(restStatus, 0, { callArgs });
+  
+    return [restStatus, retiredItemAddress];
+  }
+
 // * Add the event
 async function addEvent(admin, contract, _args, baseOptions) {
     // const itemArgs = marshalIn(_args);
@@ -278,6 +308,7 @@ export default {
     marshalOut,
     addItem,
     updateItem,
+    retireItem,
     addEvent,
     certifyEvent
 }

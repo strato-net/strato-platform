@@ -18,7 +18,9 @@ const ItemsProvider = ({ children }) => {
     isOwnershipHistoryLoading: false,
     rawMaterials:[],
     isRawMaterialsLoading: false,
-    actualRawMaterials: []
+    actualRawMaterials: [],
+    retiredItem: null,
+    isRetiringItem: false
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);
