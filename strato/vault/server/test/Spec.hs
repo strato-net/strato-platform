@@ -1,27 +1,21 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE BangPatterns #-}
 
 module Main where
 
-import           Test.Hspec
-
-
-import qualified Data.ByteString                as B
-import qualified Data.ByteString.Char8          as C8
-
-import           Crypto.Random.Entropy
-import qualified Crypto.Secp256k1               as SEC
-
-import           Data.Maybe
-import           System.IO.Unsafe
-
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Data.AlternateTransaction as E
-import           Clockwork
-
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Secp256k1
+import Clockwork
+import Crypto.Random.Entropy
+import qualified Crypto.Secp256k1 as SEC
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as C8
+import Data.Maybe
 import qualified LabeledError
+import System.IO.Unsafe
+import Test.Hspec
 
 -- some dummy test values
 testPriv :: B.ByteString
@@ -33,19 +27,15 @@ ent = unsafePerformIO $ getEntropy 32
 newPriv :: SEC.SecKey
 newPriv = fromMaybe (error "couldn't get secp-haskell key") (SEC.secKey ent)
 
-
-
 main :: IO ()
 main = do
   hspec secp256k1_haskell_spec
   timingTests
 
-
 -- TODO: maybe this should be somewhere else, like in strato-model
 secp256k1_haskell_spec :: Spec
-secp256k1_haskell_spec = 
+secp256k1_haskell_spec =
   describe "secp256k1-haskell can do crypto operations just like haskoin" $ do
-    
     it "verify signatures" $ do
       let mesg = E.rlpHash ("STRATO is a permissioned blockchain" :: String)
           newMsg = fromMaybe (error "couldn't get new messsage") (SEC.msg mesg)
@@ -53,7 +43,6 @@ secp256k1_haskell_spec =
 
           newValid = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig newSig) newMsg
       newValid `shouldBe` True
-
 
 -- be warned, ye who enter here: you must time your pure functions the way it's done below
 -- (with strict !let bindings in the cwPrintTime block), otherwise the value is thunked
@@ -63,7 +52,7 @@ timingTests = do
   e <- getEntropy 32
 
   putStrLn "\nLET'S TIME IT! comparing secp256k1-haskell and haskoin for all things EC"
-    
+
   putStrLn "\nPrivate Key import (from the same pre-pulled entropy):"
   putStrLn "secp256k1-haskell: "
   _ <- cwPrintTime $ do
@@ -76,7 +65,6 @@ timingTests = do
     let !pub = SEC.derivePubKey newPriv
     return pub
 
-  
   putStrLn "\nAddress derivation:"
   putStrLn "secp256k1-haskell: "
   _ <- cwPrintTime $ do
@@ -86,7 +74,7 @@ timingTests = do
   -- message hashes for signatures
   let mesg = E.rlpHash ("A monad is like a burrito, or so the Glaswegians would have us believe" :: String)
       sMesg = fromMaybe (error "couldnt get secp256k1 message hash") (SEC.msg mesg)
-  
+
   putStrLn "\nECDSA Signatures:"
   putStrLn "secp256k1-haskell: "
   _ <- cwPrintTime $ do
@@ -101,11 +89,11 @@ timingTests = do
   _ <- cwPrintTime $ do
     let !pub = fromMaybe (error "couldnt recover secp256k1 pubkey") (SEC.recover sSig sMesg)
     return pub
-          
+
   putStrLn "\nSignature Verification:"
   putStrLn "secp256k1-haskell:"
   _ <- cwPrintTime $ do
-    let !bl  = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
+    let !bl = SEC.verifySig (SEC.derivePubKey newPriv) (SEC.convertRecSig sSig) sMesg
     return bl
-  
+
   putStrLn "\nDone"

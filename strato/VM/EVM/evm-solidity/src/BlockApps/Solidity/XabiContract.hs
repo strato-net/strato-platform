@@ -1,69 +1,69 @@
-
-
 --this module is used to convert an EVM XABI to a partial Contract type (defined in SolidVM).  Since the XABI is missing a lot of the stuff in Contract, this conversion will always be incomplete, but the resulting type can be used anywhere that doesn't need the missing stuff.  This will allow us to unify some code that works with both solidvm and EVM
-module BlockApps.Solidity.XabiContract (
-  xabiToPartialContract,
-  indexedTypeToEvmIndexedType
-  ) where
+module BlockApps.Solidity.XabiContract
+  ( xabiToPartialContract,
+    indexedTypeToEvmIndexedType,
+  )
+where
 
-
+import qualified BlockApps.Solidity.Xabi as OLDXABI
+import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
 import qualified Data.Map as M
 import Data.Source.Annotation
 import Data.Source.Position
-import qualified BlockApps.Solidity.Xabi      as OLDXABI
-import qualified BlockApps.Solidity.Xabi.Type as OLDXABI
-
-import SolidVM.Model.SolidString
-
-import SelectAccessible                         ()
-
+import SelectAccessible ()
 import SolidVM.Model.CodeCollection hiding (contractName, events)
-
-import qualified SolidVM.Model.Type               as SVMType
+import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type as SVMType
 
 --I am leaving a lot of this undefined....  Partly because the values don't exist in a XABI,
 --and partly just because we don't need some of these values yet.  If a dev uses one of these
 --undefined values, the error messages will let them know something needs to be filled in.
 xabiToPartialContract :: OLDXABI.Xabi -> Contract
 xabiToPartialContract xabi =
-  Contract {
-    _contractName=error "_contractName undefined",
-    _parents=error "_parents undefined",
-    _constants=error "_constants undefined",
-    _storageDefs=M.mapKeys textToLabel $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
-    _userDefined = error "_userDefined undefined", 
-    _enums=error "_enums undefined",
-    _structs=error "_structs undefined",
-    _errors=error "_errors undefined",
-    _events=M.mapKeys textToLabel $ fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
-    _functions=error "_functions undefined",
-    _constructor=error "_constructor undefined",
-    _modifiers=error "_modifiers undefined",
-    _usings=error "_usings undefined",
-    _contractContext = error "_contractContext undefined",
-    _contractType = error "_contractType undefined"
+  Contract
+    { _contractName = error "_contractName undefined",
+      _parents = error "_parents undefined",
+      _constants = error "_constants undefined",
+      _storageDefs = M.mapKeys textToLabel $ fmap varTypeToVariableDecl $ OLDXABI.xabiVars xabi,
+      _userDefined = error "_userDefined undefined",
+      _enums = error "_enums undefined",
+      _structs = error "_structs undefined",
+      _errors = error "_errors undefined",
+      _events = M.mapKeys textToLabel $ fmap evmEventToEvent $ OLDXABI.xabiEvents xabi,
+      _functions = error "_functions undefined",
+      _constructor = error "_constructor undefined",
+      _modifiers = error "_modifiers undefined",
+      _usings = error "_usings undefined",
+      _contractContext = error "_contractContext undefined",
+      _contractType = error "_contractType undefined"
     }
 
 evmEventToEvent :: OLDXABI.Event -> Event
-evmEventToEvent e = Event {
-  _eventAnonymous = OLDXABI.eventAnonymous e,
-  _eventLogs = map (fmap evmIndexedTypeToIndexedType) $ OLDXABI.eventLogs e,
-  _eventContext = dummyAnnotation
-  }
+evmEventToEvent e =
+  Event
+    { _eventAnonymous = OLDXABI.eventAnonymous e,
+      _eventLogs = map (fmap evmIndexedTypeToIndexedType) $ OLDXABI.eventLogs e,
+      _eventContext = dummyAnnotation
+    }
 
 evmIndexedTypeToIndexedType :: OLDXABI.IndexedType -> IndexedType
-evmIndexedTypeToIndexedType x = IndexedType {
-  indexedTypeIndex = OLDXABI.indexedTypeIndex x,
-  indexedTypeType = evmTypeToType $ OLDXABI.indexedTypeType x
-  }
+evmIndexedTypeToIndexedType x =
+  IndexedType
+    { indexedTypeIndex = OLDXABI.indexedTypeIndex x,
+      indexedTypeType = evmTypeToType $ OLDXABI.indexedTypeType x
+    }
 
 indexedTypeToEvmIndexedType :: IndexedType -> Maybe OLDXABI.IndexedType
 indexedTypeToEvmIndexedType x =
   let mType = typeToEvmType $ indexedTypeType x
-   in fmap (\t -> OLDXABI.IndexedType {
-        OLDXABI.indexedTypeIndex = indexedTypeIndex x,
-        OLDXABI.indexedTypeType = t
-        }) mType
+   in fmap
+        ( \t ->
+            OLDXABI.IndexedType
+              { OLDXABI.indexedTypeIndex = indexedTypeIndex x,
+                OLDXABI.indexedTypeType = t
+              }
+        )
+        mType
 
 evmTypeToType :: OLDXABI.Type -> SVMType.Type
 evmTypeToType (OLDXABI.Int x y) = SVMType.Int x y
@@ -96,30 +96,29 @@ typeToEvmType _ = Nothing
 
 varTypeToVariableDecl :: OLDXABI.VarType -> VariableDeclF (SourceAnnotation ())
 varTypeToVariableDecl x =
-  VariableDecl {
-  _varType=evmTypeToType $ OLDXABI.varTypeType x,
-  _varIsPublic=False,
-  _varInitialVal=Nothing,
-  _varContext=dummyAnnotation,
-  _isImmutable=False,
-  _isRecord=False
-  }
+  VariableDecl
+    { _varType = evmTypeToType $ OLDXABI.varTypeType x,
+      _varIsPublic = False,
+      _varInitialVal = Nothing,
+      _varContext = dummyAnnotation,
+      _isImmutable = False,
+      _isRecord = False
+    }
 
 dummyAnnotation :: SourceAnnotation ()
 dummyAnnotation =
   SourceAnnotation
-  {
-    _sourceAnnotationStart=SourcePosition {
-      _sourcePositionName="",
-      _sourcePositionLine=0,
-      _sourcePositionColumn=0
-      },
-    _sourceAnnotationEnd=SourcePosition {
-      _sourcePositionName="",
-        _sourcePositionLine=0,
-        _sourcePositionColumn=0
-      },
-    _sourceAnnotationAnnotation = ()
-  }
-
-
+    { _sourceAnnotationStart =
+        SourcePosition
+          { _sourcePositionName = "",
+            _sourcePositionLine = 0,
+            _sourcePositionColumn = 0
+          },
+      _sourceAnnotationEnd =
+        SourcePosition
+          { _sourcePositionName = "",
+            _sourcePositionLine = 0,
+            _sourcePositionColumn = 0
+          },
+      _sourceAnnotationAnnotation = ()
+    }

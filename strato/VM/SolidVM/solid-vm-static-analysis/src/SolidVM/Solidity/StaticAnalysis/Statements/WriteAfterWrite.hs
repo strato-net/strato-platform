@@ -1,32 +1,34 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE LambdaCase        #-}
-module SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
-  ( detector
-  ) where
+{-# LANGUAGE RecordWildCards #-}
 
-import           Control.Monad.State
-import           Data.Foldable (for_)
+module SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
+  ( detector,
+  )
+where
+
+import Control.Monad.State
+import Data.Foldable (for_)
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (maybeToList)
-import           Data.Source
-import           Data.Text       (Text)
-import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.SolidString
-import           SolidVM.Solidity.StaticAnalysis.Types
+import Data.Maybe (maybeToList)
+import Data.Source
+import Data.Text (Text)
+import SolidVM.Model.CodeCollection
+import SolidVM.Model.SolidString
+import SolidVM.Solidity.StaticAnalysis.Types
 
 type SSS = State (M.Map SolidString (SourceAnnotation ()))
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 
 detector :: CompilerDetector
-detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
+detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
+contractHelper Contract {..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case _funcContents of
+functionHelper Func {..} = case _funcContents of
   Nothing -> []
   Just stmts -> statementsHelper stmts
 
@@ -104,19 +106,18 @@ statementHelper (EmitStatement _ vals _) =
 statementHelper (RevertStatement _ (OrderedArgs vals) _) =
   concat <$> traverse expressionHelper vals
 statementHelper (RevertStatement _ (NamedArgs vals) _) =
-  concat <$> traverse (expressionHelper . snd) vals  
+  concat <$> traverse (expressionHelper . snd) vals
 statementHelper (UncheckedStatement body _) =
   statementsHelper' body
 statementHelper (AssemblyStatement _ _) = pure []
 statementHelper (SimpleStatement stmt _) = simpleStatementHelper stmt
-
 
 simpleStatementHelper :: SimpleStatement -> SSS [SourceAnnotation Text]
 simpleStatementHelper (VariableDefinition vs mExpr) = case mExpr of
   Nothing -> pure []
   Just expr -> do
     anns <- expressionHelper expr
-    for_ vs $ \case VarDefEntry{..} -> modify $ M.insert vardefName vardefContext; _ -> pure (); -- second case should be impossible?
+    for_ vs $ \case VarDefEntry {..} -> modify $ M.insert vardefName vardefContext; _ -> pure () -- second case should be impossible?
     pure anns
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
@@ -125,8 +126,8 @@ expressionHelper :: Expression -> SSS [SourceAnnotation Text]
 expressionHelper (Binary y "=" (Variable x name) b) = do
   s <- get
   let ann = case M.lookup name s of
-              Just a -> [const "Redundant write." <$> a]
-              Nothing -> []
+        Just a -> [const "Redundant write." <$> a]
+        Nothing -> []
   modify $ M.insert name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
@@ -182,8 +183,8 @@ expressionHelper (MemberAccess _ e _) = expressionHelper e
 expressionHelper (FunctionCall _ e args) = do
   as <- expressionHelper e
   bs <- case args of
-          OrderedArgs es -> concat <$> traverse expressionHelper es
-          NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
+    OrderedArgs es -> concat <$> traverse expressionHelper es
+    NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
   put M.empty
   pure $ concat [as, bs]
 expressionHelper (Unitary _ _ a) = expressionHelper a

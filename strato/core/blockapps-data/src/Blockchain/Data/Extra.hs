@@ -1,17 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Data.Extra
-    ( getGenesisHash
-    , putGenesisHash
-    ) where
+  ( getGenesisHash,
+    putGenesisHash,
+  )
+where
 
-import           Control.Monad               (void)
-import qualified Database.Persist.Sql        as SQL
-
-import           Blockchain.Data.DataDefs
-import           Blockchain.DB.SQLDB
-import           Blockchain.Strato.Model.Keccak256
+import Blockchain.DB.SQLDB
+import Blockchain.Data.DataDefs
+import Blockchain.Strato.Model.Keccak256
+import Control.Monad (void)
+import qualified Database.Persist.Sql as SQL
 import qualified LabeledError
 
 getGenesisHash :: HasSQLDB m => m Keccak256

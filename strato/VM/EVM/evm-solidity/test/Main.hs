@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
-import Test.Hspec.Runner
 
 import qualified Spec
+import Test.Hspec.Runner
 
 predicate :: Path -> Bool
 predicate (_, _) = True

@@ -1,10 +1,10 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Options where
 
-import           HFlags
-import           Blockchain.Strato.Model.Options (computeNetworkID)
+import Blockchain.Strato.Model.Options (computeNetworkID)
+import HFlags
 
 --defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 --defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
@@ -27,10 +27,13 @@ defineFlag "identityServerUrl" ("" :: String) "The URL of the identity server" -
 defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"
 
 --Simple helper functions
-getIdServerUrl ::  String
-getIdServerUrl = if flags_identityServerUrl == "" 
-      then (case computeNetworkID of  
-            7596898649924658542 -> "https://multinode301.ci.blockapps.net:8080" --todo: update this with actual id server for mercata-hydrogen
-            6909499098523985262 -> "http://prodnet:8014" --todo: update this with actual id server for mercata prod net
-            _ -> "http://172.17.0.1:8014")
-      else flags_identityServerUrl
+getIdServerUrl :: String
+getIdServerUrl =
+  if flags_identityServerUrl == ""
+    then
+      ( case computeNetworkID of
+          7596898649924658542 -> "https://multinode301.ci.blockapps.net:8080" --todo: update this with actual id server for mercata-hydrogen
+          6909499098523985262 -> "http://prodnet:8014" --todo: update this with actual id server for mercata prod net
+          _ -> "http://172.17.0.1:8014"
+      )
+    else flags_identityServerUrl

@@ -1,14 +1,16 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Options 
-    ( flags_port
-    , flags_vaultProxyUrl
-    , flags_nodeUrl
-    , flags_OAUTH_CLIENT_ID
-    , flags_OAUTH_CLIENT_SECRET
-    , flags_OAUTH_MASTER_CLIENT_ID
-    , flags_OAUTH_MASTER_CLIENT_SECRET
-    , flags_OAUTH_DISCOVERY_URL
-    ) where 
+
+module Options
+  ( flags_port,
+    flags_vaultProxyUrl,
+    flags_nodeUrl,
+    flags_OAUTH_CLIENT_ID,
+    flags_OAUTH_CLIENT_SECRET,
+    flags_OAUTH_MASTER_CLIENT_ID,
+    flags_OAUTH_MASTER_CLIENT_SECRET,
+    flags_OAUTH_DISCOVERY_URL,
+  )
+where
 
 import HFlags
 

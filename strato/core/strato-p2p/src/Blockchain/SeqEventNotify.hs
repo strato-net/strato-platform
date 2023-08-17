@@ -1,43 +1,47 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# OPTIONS_GHC -fno-warn-orphans  #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.SeqEventNotify (
-  seqEventNotificationSource
-  ) where
+module Blockchain.SeqEventNotify
+  ( seqEventNotificationSource,
+  )
+where
 
-import           Conduit
-import           Control.Monad.Change.Modify (Modifiable(..))
-import           Control.Monad
+import BlockApps.Logging
+import qualified Blockchain.MilenaTools as K
+import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)
+import Conduit
+import Control.Monad
+import Control.Monad.Change.Modify (Modifiable (..))
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Text                   as T
-import qualified Network.Kafka               as K
-import qualified Blockchain.MilenaTools      as K
-import qualified Network.Kafka.Protocol      as KP
-
-import           BlockApps.Logging
-import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Kafka (readSeqP2pEvents, seqP2pEventsTopicName)
+import qualified Data.Text as T
+import qualified Network.Kafka as K
+import qualified Network.Kafka.Protocol as KP
 
 instance Monad m => Modifiable K.KafkaState (State.StateT K.KafkaState m) where
   get _ = State.get
   put _ = State.put
 
-seqEventNotificationSource :: ( MonadIO m
-                              , MonadLogger m
-                              )
-                           => K.KafkaState -> ConduitM () P2pEvent m ()
+seqEventNotificationSource ::
+  ( MonadIO m,
+    MonadLogger m
+  ) =>
+  K.KafkaState ->
+  ConduitM () P2pEvent m ()
 seqEventNotificationSource ks = evalStateC ks $ do
-    ofs' <- lift $ K.withKafkaRetry1s $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
-    loop ofs'
-    where loop nextOffset = do
-              events <- lift $ K.withKafkaRetry1s $ readSeqP2pEvents nextOffset
-              unless (null events) $ do -- stop bloating the logs
-                $logInfoS "seqEventNotify" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
-                forM_ events $ \e -> do
-                    yield $ e
-              loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
+  ofs' <- lift $ K.withKafkaRetry1s $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
+  loop ofs'
+  where
+    loop nextOffset = do
+      events <- lift $ K.withKafkaRetry1s $ readSeqP2pEvents nextOffset
+      unless (null events) $ do
+        -- stop bloating the logs
+        $logInfoS "seqEventNotify" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
+        forM_ events $ \e -> do
+          yield $ e
+      loop . (nextOffset +) . KP.Offset . fromIntegral $ length events

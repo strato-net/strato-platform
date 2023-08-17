@@ -1,3 +1,5 @@
+{- ORMOLU_DISABLE -}
+
 -- This program is intended for performance analysis.  It simply
 -- builds a Bloom filter from a list of words, one per line, and
 -- queries it exhaustively.

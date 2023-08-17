@@ -1,5 +1,6 @@
 module Blockchain.Watchdog where
 
+import Blockchain.Metrics
 import Control.Concurrent
 import Control.Concurrent.AlarmClock
 import Control.Exception
@@ -8,8 +9,6 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
 import Data.Time
 import UnliftIO.STM
-
-import Blockchain.Metrics
 
 -- Watchdogs are used to check that particular threads don't hang
 -- indefinitely. In particular each p2p connection should be
@@ -20,7 +19,7 @@ data Watchdog = Watchdog (TVar Bool)
 
 data WatchdogBite = WatchdogBite ThreadId NominalDiffTime deriving (Show)
 
-instance Exception WatchdogBite where
+instance Exception WatchdogBite
 
 -- mkWatchdog will bite the passed in `mtid` when `interval` has
 -- elapsed without a pet.

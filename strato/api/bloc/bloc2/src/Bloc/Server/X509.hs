@@ -1,35 +1,38 @@
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE TypeApplications #-}
 
+module Bloc.Server.X509
+  ( createCertificate,
+  )
+where
 
-module Bloc.Server.X509 (
-    createCertificate
-  ) where
+-- For the error handling
 
-import           Data.ByteString
-import           Data.Maybe
-import           Data.Text                              (Text)
-import           SQLM                                   -- For the error handling
-import           Strato.Strato23.API.Types
-import           Strato.Strato23.Client
-import           UnliftIO
+import Bloc.API.X509
+import Bloc.Monad
+import BlockApps.Logging
+import BlockApps.X509.Certificate
+import Control.Monad.Composable.Vault
+import Data.ByteString
+import Data.Maybe
+import Data.Text (Text)
+import SQLM
+import Strato.Strato23.API.Types
+import Strato.Strato23.Client
+import UnliftIO
 
-import           Bloc.API.X509
-import           Bloc.Monad
-import           BlockApps.Logging
-import           BlockApps.X509.Certificate
-import           Control.Monad.Composable.Vault
-
-
-createCertificate
-  :: (MonadIO m, MonadLogger m, HasVault m)
-  => Text                 -- ^ The user name of the issuer of the new certificate
-  -> CreateCertEndpoint   -- ^ The subject of the new certificate and the issuer's certificate
-  -> m X509Certificate    -- ^ The new X.509 certificate. N.B. This doesn't register the cert
-createCertificate userName CreateCertEndpoint{..} = do
+createCertificate ::
+  (MonadIO m, MonadLogger m, HasVault m) =>
+  -- | The user name of the issuer of the new certificate
+  Text ->
+  -- | The subject of the new certificate and the issuer's certificate
+  CreateCertEndpoint ->
+  -- | The new X.509 certificate. N.B. This doesn't register the cert
+  m X509Certificate
+createCertificate userName CreateCertEndpoint {..} = do
   let mIssuer = fmap subjectToIssuer $ getCertSubject =<< parentCertificate
       -- Make a self-signed cert if no parentCert is provided
       issuer = fromMaybe (subjectToIssuer subject) mIssuer
@@ -39,12 +42,13 @@ createCertificate userName CreateCertEndpoint{..} = do
     Nothing -> throwIO $ UserError "Certificate could not be signed!"
 
 signViaVault :: (MonadIO m, MonadLogger m, HasVault m) => Text -> ByteString -> m Signature
-signViaVault userName bs = blocVaultWrapper $ postSignature (Just  userName) (MsgHash bs)
+signViaVault userName bs = blocVaultWrapper $ postSignature (Just userName) (MsgHash bs)
 
 subjectToIssuer :: Subject -> Issuer
-subjectToIssuer Subject{..} = Issuer
-  { issCommonName = subCommonName
-  , issOrg        = subOrg
-  , issUnit       = subUnit
-  , issCountry    = subCountry
-  }
+subjectToIssuer Subject {..} =
+  Issuer
+    { issCommonName = subCommonName,
+      issOrg = subOrg,
+      issUnit = subUnit,
+      issCountry = subCountry
+    }

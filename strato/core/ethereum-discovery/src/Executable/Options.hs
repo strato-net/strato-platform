@@ -2,8 +2,7 @@
 
 module Executable.Options where
 
-import           HFlags
-
+import HFlags
 
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "Vault-Wrapper URL"
 

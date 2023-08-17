@@ -1,61 +1,56 @@
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE DeriveFoldable     #-}
-{-# LANGUAGE DeriveTraversable  #-}
-{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances    #-}
 
-module SolidVM.Model.CodeCollection.Contract (
-  ContractF(..),
-  Contract,
-  ContractType(..),
-  contractName,
-  parents,
-  constants,
-  storageDefs,
-  enums,
-  userDefined,
-  structs,
-  errors,
-  events,
-  functions,
-  modifiers,
-  usings,
-  constructor,
-  contractType,
-  contractContext
-  ) where
+module SolidVM.Model.CodeCollection.Contract
+  ( ContractF (..),
+    Contract,
+    ContractType (..),
+    contractName,
+    parents,
+    constants,
+    storageDefs,
+    enums,
+    userDefined,
+    structs,
+    errors,
+    events,
+    functions,
+    modifiers,
+    usings,
+    constructor,
+    contractType,
+    contractContext,
+  )
+where
 
-import Control.Lens
 import Control.DeepSeq
+import Control.Lens
 import Data.Aeson as A
 import Data.Default
 import Data.Map (Map, empty, fromList)
 import Data.Source
 import Data.Swagger
 import GHC.Generics
-
-
-import           Test.QuickCheck.Instances    ()
-import           Test.QuickCheck
-
-import           SolidVM.Model.CodeCollection.ConstantDecl
+import SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Event as SolidVM
-import           SolidVM.Model.CodeCollection.Function
+import SolidVM.Model.CodeCollection.Function
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
-import           SolidVM.Model.CodeCollection.VariableDecl
-import           SolidVM.Model.SolidString
-
+import SolidVM.Model.CodeCollection.VariableDecl
+import SolidVM.Model.SolidString
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 
 data ContractType = ContractType | LibraryType | AbstractType | InterfaceType deriving (Show, Generic, NFData, Eq, ToJSON, FromJSON)
 
-
 -- Changes to this structure should also have changes in the Unparser :)
-data ContractF a =
-  Contract {     
-    _contractName :: SolidString,
+data ContractF a = Contract
+  { _contractName :: SolidString,
     _parents :: [SolidString],
     _constants :: Map SolidString (ConstantDeclF a),
     _storageDefs :: Map SolidString (VariableDeclF a),
@@ -70,58 +65,67 @@ data ContractF a =
     _usings :: Map SolidString [UsingF a],
     _contractType :: ContractType,
     _contractContext :: a
-  } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
+  }
+  deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
 
 instance ToJSON a => ToJSON (ContractF a)
+
 instance FromJSON a => FromJSON (ContractF a)
 
 instance Default a => Default (ContractF a) where
-  def = Contract {
-    _contractName = "",
-    _parents = [],
-    _constants = empty,
-    _storageDefs = empty,
-    _userDefined = empty,
-    _enums = empty,
-    _structs = empty,
-    _errors = empty,
-    _events = empty,
-    _functions = empty,
-    _constructor = Nothing,
-    _modifiers = empty,
-    _contractContext = def,
-    _usings = empty,
-    _contractType = ContractType
-  }
+  def =
+    Contract
+      { _contractName = "",
+        _parents = [],
+        _constants = empty,
+        _storageDefs = empty,
+        _userDefined = empty,
+        _enums = empty,
+        _structs = empty,
+        _errors = empty,
+        _events = empty,
+        _functions = empty,
+        _constructor = Nothing,
+        _modifiers = empty,
+        _contractContext = def,
+        _usings = empty,
+        _contractType = ContractType
+      }
 
 type Contract = Positioned ContractF
 
 makeLenses ''ContractF
 
 instance Arbitrary Contract where
-  arbitrary = do 
+  arbitrary = do
     a <- arbitrary
-    varName <- vectorOf 7 $ Test.QuickCheck.elements ['a'..'z'] --There is a chance this won't be unique
+    varName <- vectorOf 7 $ Test.QuickCheck.elements ['a' .. 'z'] --There is a chance this won't be unique
     varDecl <- arbitrary
-    oneof [return $ Contract {     
-    _contractName = "qq",
-    _parents = [],
-    _constants  =  empty ,                          -- :: Map SolidString (ConstantDeclF a),
-    _storageDefs =  fromList [(varName, varDecl)],  -- :: Map SolidString (VariableDeclF a),
-    _userDefined = empty ,
-    _enums  =  empty ,
-    _structs  =  empty ,
-    _errors  =  empty ,
-    _events  =  empty ,
-    _functions =  empty ,
-    _constructor  =  Nothing ,
-    _modifiers  =  empty ,
-    _usings  =  empty ,
-    _contractType  =  ContractType ,
-    _contractContext = a
-  }]
+    oneof
+      [ return $
+          Contract
+            { _contractName = "qq",
+              _parents = [],
+              _constants = empty, -- :: Map SolidString (ConstantDeclF a),
+              _storageDefs = fromList [(varName, varDecl)], -- :: Map SolidString (VariableDeclF a),
+              _userDefined = empty,
+              _enums = empty,
+              _structs = empty,
+              _errors = empty,
+              _events = empty,
+              _functions = empty,
+              _constructor = Nothing,
+              _modifiers = empty,
+              _usings = empty,
+              _contractType = ContractType,
+              _contractContext = a
+            }
+      ]
 
 instance ToSchema Contract where
-  declareNamedSchema = pure . pure $ NamedSchema (Just "Contract") $ mempty
-      & description ?~ "A Solidity contract parsed for SolidVM"
-      & example ?~ toJSON (def :: Contract)
+  declareNamedSchema =
+    pure . pure $
+      NamedSchema (Just "Contract") $
+        mempty
+          & description ?~ "A Solidity contract parsed for SolidVM"
+          & example ?~ toJSON (def :: Contract)

@@ -1,37 +1,36 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Blockchain.DB.SQLDB
-  ( HasSQLDB
-  , SQLDB(..)
-  , sqlQuery
-  , sqlQueryNoTransaction
-  , runSqlPool
-  , runPostgresConn
-  , createPostgresqlPool
-  , withGlobalSQLPool
-  ) where
+  ( HasSQLDB,
+    SQLDB (..),
+    sqlQuery,
+    sqlQueryNoTransaction,
+    runSqlPool,
+    runPostgresConn,
+    createPostgresqlPool,
+    withGlobalSQLPool,
+  )
+where
 
-import           Control.DeepSeq
-import           Control.Monad.Change.Modify  (Accessible(..), Proxy(..))
-import           Control.Monad.IO.Class
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger         (MonadLoggerIO)
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Resource
-import           qualified Database.Persist.Sql as SQL
-import           qualified Database.Persist.Postgresql as PSQL
+import BlockApps.Logging (runNoLoggingT)
+import Blockchain.EthConf (connStr)
+import Control.DeepSeq
+import Control.Monad.Change.Modify (Accessible (..), Proxy (..))
+import Control.Monad.IO.Class
+import Control.Monad.IO.Unlift
+import Control.Monad.Logger (MonadLoggerIO)
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Resource
+import Data.IORef
+import qualified Database.Persist.Postgresql as PSQL
+import qualified Database.Persist.Sql as SQL
+import System.IO.Unsafe (unsafePerformIO)
 
-import           Data.IORef
-import           System.IO.Unsafe             (unsafePerformIO)
-
-import           BlockApps.Logging            (runNoLoggingT)
-import           Blockchain.EthConf           (connStr)
-
-newtype SQLDB = SQLDB { unSQLDB :: SQL.ConnectionPool }
+newtype SQLDB = SQLDB {unSQLDB :: SQL.ConnectionPool}
 
 instance NFData SQLDB where
   rnf (SQLDB db) = db `seq` ()
@@ -47,14 +46,18 @@ sqlQueryNoTransaction q = runResourceT . flip (SQL.runSqlPoolNoTransaction q) No
 runSqlPool :: MonadUnliftIO m => SQL.SqlPersistT (ResourceT m) a -> SQLDB -> m a
 runSqlPool q = runResourceT . SQL.runSqlPool q . unSQLDB
 
-runPostgresConn :: (MonadUnliftIO m, MonadLoggerIO m, backend ~ SQL.SqlBackend)
-                => PSQL.ConnectionString
-                -> ReaderT backend m a
-                -> m a
+runPostgresConn ::
+  (MonadUnliftIO m, MonadLoggerIO m, backend ~ SQL.SqlBackend) =>
+  PSQL.ConnectionString ->
+  ReaderT backend m a ->
+  m a
 runPostgresConn pgConn = PSQL.withPostgresqlConn pgConn . runReaderT
 
-createPostgresqlPool :: (MonadUnliftIO m, MonadLoggerIO m)
-                     => PSQL.ConnectionString -> Int -> m SQLDB
+createPostgresqlPool ::
+  (MonadUnliftIO m, MonadLoggerIO m) =>
+  PSQL.ConnectionString ->
+  Int ->
+  m SQLDB
 createPostgresqlPool cString n = SQLDB <$> PSQL.createPostgresqlPool cString n
 
 globalSQLPool :: IORef SQLDB

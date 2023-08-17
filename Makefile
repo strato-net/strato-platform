@@ -97,11 +97,11 @@ build_common_profiled: build_buildbase
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
-formatification: build_buildbase
-	@echo formatting STRATO Haskell code...
+pretty: build_buildbase
+	@echo formatting STRATO Haskell code and generating hie.yaml...
 	cd strato && \
 		gen-hie > hie.yaml && \
-		git ls-files '*.hs' | ormolu --mode inplace
+		ormolu --mode inplace `git ls-files '*.hs'`
 
 strato: build_common
 	@echo Now building core-strato...
@@ -122,7 +122,7 @@ vault-nginx:
 
 identity-provider: build_common
 	@echo Now building Identity Server...
-	cp strato/identity-provider/doit.sh ${IDENTITYDIR}
+	cp strato/identity-provider/doit.sh ${IDENTIT`YDIR}
 	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
 

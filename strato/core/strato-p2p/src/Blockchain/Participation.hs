@@ -5,21 +5,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-module Blockchain.Participation
-  ( checkOutbound
-  , ParticipationMode(..)
-  , setParticipationMode
-  , getParticipationMode
-  , remoteSetParticipationMode
-  , p2pApp
-  ) where
 
+module Blockchain.Participation
+  ( checkOutbound,
+    ParticipationMode (..),
+    setParticipationMode,
+    getParticipationMode,
+    remoteSetParticipationMode,
+    p2pApp,
+  )
+where
+
+import Blockchain.Data.Wire
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Data
 import qualified Data.Text as T
 import GHC.Generics
-import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Prometheus
 import Servant
 import Servant.Client
@@ -28,22 +31,22 @@ import System.IO.Unsafe
 import Text.Printf
 import UnliftIO.IORef
 
-import Blockchain.Data.Wire
-
-data ParticipationMode = Full
-                       | None
-                       | NoConsensus
-                       deriving (Show, Read, Eq, Enum, Generic, FromJSON, ToJSON, Data)
+data ParticipationMode
+  = Full
+  | None
+  | NoConsensus
+  deriving (Show, Read, Eq, Enum, Generic, FromJSON, ToJSON, Data)
 
 {-# NOINLINE globalParticipationMode #-}
 globalParticipationMode :: IORef ParticipationMode
 globalParticipationMode = unsafePerformIO $ newIORef Full
 
 participationStats :: Vector T.Text Counter
-participationStats = unsafeRegister
-                   . vector "decision"
-                   . counter
-                   $ Info "p2p_participation_stats" "Statistics about participation filters"
+participationStats =
+  unsafeRegister
+    . vector "decision"
+    . counter
+    $ Info "p2p_participation_stats" "Statistics about participation filters"
 
 allow :: MonadIO m => m Bool
 allow = liftIO $ withLabel participationStats "allow" incCounter >> return True
@@ -64,15 +67,17 @@ checkOutbound msg = do
     None -> deny
     Full -> allow
     NoConsensus -> case msg of
-                    Blockstanbul{} -> deny
-                    _ -> allow
+      Blockstanbul {} -> deny
+      _ -> allow
 
-type P2PAPI = "participation_mode" :> Get '[JSON] ParticipationMode
-         :<|> "participation_mode" :> ReqBody '[JSON] ParticipationMode :> Post '[JSON] ParticipationMode
+type P2PAPI =
+  "participation_mode" :> Get '[JSON] ParticipationMode
+    :<|> "participation_mode" :> ReqBody '[JSON] ParticipationMode :> Post '[JSON] ParticipationMode
 
 p2pServer :: Server P2PAPI
-p2pServer = getParticipationMode
-       :<|> \m -> setParticipationMode m >> getParticipationMode
+p2pServer =
+  getParticipationMode
+    :<|> \m -> setParticipationMode m >> getParticipationMode
 
 p2pApp :: Application
 p2pApp = serve (Proxy :: Proxy P2PAPI) p2pServer

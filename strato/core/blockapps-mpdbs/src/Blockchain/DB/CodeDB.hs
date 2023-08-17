@@ -6,43 +6,42 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Blockchain.DB.CodeDB (
-  CodeDB(..),
-  CodeKind(..),
-  HasCodeDB,
-  DBCode,
-  shaToKey,
-  dbCodeToValue,
-  genericLookupCodeDB,
-  genericInsertCodeDB,
-  genericDeleteCodeDB,
-  addCode,
-  getCode,
-  getCodeKind,
-  getEVMCode,
-  codeDBGet,
-  codeDBPut
-  ) where
 
+module Blockchain.DB.CodeDB
+  ( CodeDB (..),
+    CodeKind (..),
+    HasCodeDB,
+    DBCode,
+    shaToKey,
+    dbCodeToValue,
+    genericLookupCodeDB,
+    genericInsertCodeDB,
+    genericDeleteCodeDB,
+    addCode,
+    getCode,
+    getCodeKind,
+    getEVMCode,
+    codeDBGet,
+    codeDBPut,
+  )
+where
 
+import Blockchain.Database.MerklePatricia
+import Blockchain.SolidVM.Model
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import Control.Monad.Change.Alter
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Data.Bifunctor (first)
+import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Data.Default
+import qualified Database.LevelDB as DB
+import Prelude hiding (lookup)
 
-import           Control.DeepSeq
-import           Control.Monad.Change.Alter
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Reader
-import           Data.Bifunctor                     (first)
-import           Data.Binary
-import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Lazy               as BL
-import           Data.Default
-import qualified Database.LevelDB                   as DB
-import           Prelude                            hiding (lookup)
-
-import           Blockchain.Database.MerklePatricia
-import           Blockchain.SolidVM.Model
-import           Blockchain.Strato.Model.Keccak256
-
-newtype CodeDB = CodeDB { unCodeDB :: DB.DB }
+newtype CodeDB = CodeDB {unCodeDB :: DB.DB}
 
 instance NFData CodeDB where
   rnf (CodeDB a) = a `seq` ()
@@ -102,7 +101,7 @@ getCodeKind hsh = maybe (error $ "no codekind found for " ++ show hsh) fst <$> g
 codeDBPut :: HasCodeDB m => CodeKind -> B.ByteString -> m Keccak256
 codeDBPut kind code = do
   let hsh = hash code
-  insert Proxy hsh (kind,code)
+  insert Proxy hsh (kind, code)
   return hsh
 
 codeDBGet :: HasCodeDB m => Keccak256 -> m (Maybe DBCode)
