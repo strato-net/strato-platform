@@ -357,9 +357,7 @@ lengthenPeerDisableBy :: (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m)
 lengthenPeerDisableBy secs peer' = try $ do
   currentTime <- liftIO getCurrentTime
   let peer = peer'{pPeerTcpPort=30303}
-      disable = if (currentTime < pPeerDisableExpiration peer)
-                  then ExtendPeerDisableTime (TcpEnableTime $ fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime) 2
-                  else SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
+      disable = SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
   A.replace (A.Proxy @PeerDisable) peer disable
 
 -- A variation of 'lengthenPeerDisable' but for UDP instead, currently used for ethereum-discovery.
