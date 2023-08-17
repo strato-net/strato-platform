@@ -64,7 +64,24 @@ const reducer = (state, action) => {
       return {
         ...state,
         isPropertyDetailsLoading: false,
-        propertyDetails: action.payload
+        message: action.error
+      };
+    case actionDescriptors.updateProperty:
+      return {
+        ...state,
+        isUpdatePropertySubmitting: true,
+      };
+    case actionDescriptors.updatePropertySuccessful:
+      return {
+        ...state,
+        propertyDetails: action.payload,
+        isUpdatePropertySubmitting: false,
+      };
+    case actionDescriptors.updatePropertyFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUpdatePropertySubmitting: false,
       };
     // review cases:-
     case actionDescriptors.addReview:

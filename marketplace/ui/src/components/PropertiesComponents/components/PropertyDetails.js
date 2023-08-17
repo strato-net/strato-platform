@@ -259,7 +259,7 @@ function PropertyDetails() {
                       </Row>
 
                       {Object.entries(formattedResults).map(([key, value]) => (
-                        <Row>
+                        <Row key={key}>
                           <Col span={8}>
                             <Text strong>{key}</Text>
                           </Col>
@@ -334,6 +334,7 @@ function PropertyDetails() {
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
         formData={propertyDetails}
+        isEdit={true}
       />}
     </>
   );
