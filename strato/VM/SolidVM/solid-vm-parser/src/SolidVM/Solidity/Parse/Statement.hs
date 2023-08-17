@@ -409,7 +409,7 @@ parseExternalCallArgs :: SolidityParser (SolidString, [SVMType.Type])
 parseExternalCallArgs = do
   ~(fname, args) <-  do
       name <- fromMaybe "fallback" <$> optionMaybe identifier
-      args <-  parens $ commaSep  simpleType
+      args <-  parens $ commaSep simpleType
       return (name, args)
   return (fname, args)
 
