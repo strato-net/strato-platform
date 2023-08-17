@@ -48,6 +48,8 @@ const { Text } = Typography;
 function PropertyCreateModal({
   isCreateModalOpen,
   toggleCreateModal,
+  formData,
+  isEdit
 }) {
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
@@ -56,14 +58,9 @@ function PropertyCreateModal({
   const dispatch = usePropertiesDispatch();
 
   const { message, success, isCreatePropertySubmitting } = usePropertiesState();
-  const [propertyData, setPropertyData] = useState({
-    lotSizeUnits: "sqft",
-    livingAreaUnits: "sqft",
-    numberOfUnitsTotal: 1,
-  });
+  const [propertyData, setPropertyData] = useState(formData);
 
   const [selectedOptions, setSelectedOptions] = useState(propertyCheckBox);
-
   //TODO:- Can uncomment when use image upload ***
   // const [selectedImage, setSelectedImage] = useState(null);
   // const [previewOpen, setPreviewOpen] = useState(false);
@@ -175,12 +172,22 @@ function PropertyCreateModal({
     };
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
-    let response = await actions.createProperty(dispatch, body);
-    if (response) {
-      toggleCreateModal(false)
-      toggleCreateConfirmModal(false)
-      setModalView(!modalView);
-      actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+    if (isEdit) {
+      let response = await actions.createProperty(dispatch, body);
+      if (response) {
+        toggleCreateModal(false)
+        toggleCreateConfirmModal(false)
+        setModalView(!modalView);
+        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+      }
+    } else {
+      let response = await actions.createProperty(dispatch, body);
+      if (response) {
+        toggleCreateModal(false)
+        toggleCreateConfirmModal(false)
+        setModalView(!modalView);
+        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+      }
     }
 
     //TODO:- Can uncomment when use image upload ***
@@ -281,7 +288,8 @@ function PropertyCreateModal({
         >
           <Input
             label="title"
-            // value={title}
+            value={title}
+            defaultValue={title}
             maxLength={100}
             placeholder="Listing Title"
             showCount
@@ -303,6 +311,7 @@ function PropertyCreateModal({
           <Input.TextArea
             label="Project Description"
             value={description}
+            defaultValue={description}
             maxLength={500}
             showCount
             placeholder="Project Description"
@@ -329,6 +338,7 @@ function PropertyCreateModal({
                 placeholder="Total Units"
                 controls={false}
                 value={numberOfUnitsTotal}
+                defaultValue={numberOfUnitsTotal}
                 onChange={(value) => {
                   handleChange("numberOfUnitsTotal", value);
                 }}
@@ -356,6 +366,7 @@ function PropertyCreateModal({
                 controls={false}
                 addonBefore="$"
                 value={listPrice}
+                defaultValue={listPrice}
                 onChange={(e) => {
                   handleChange("listPrice", e);
                 }}
@@ -377,6 +388,7 @@ function PropertyCreateModal({
             id="streetname"
             placeholder="Street Name"
             value={streetName}
+            defaultValue={streetName}
             onChange={(e) => {
               handleChange("streetName", e.target.value);
             }}
@@ -399,6 +411,7 @@ function PropertyCreateModal({
                 placeholder="Street Number"
                 controls={false}
                 value={streetNumber}
+                defaultValue={streetNumber}
                 onChange={(value) => {
                   handleChange("streetNumber", value);
                 }}
@@ -423,6 +436,7 @@ function PropertyCreateModal({
                 placeholder="House Number"
                 controls={false}
                 value={unitNumber}
+                defaultValue={unitNumber}
                 onChange={(e) => {
                   handleChange("unitNumber", e.target.value);
                 }}
@@ -442,6 +456,7 @@ function PropertyCreateModal({
           <Select
             label="State"
             value={stateOrProvince}
+            defaultValue={stateOrProvince}
             placeholder="Select State"
             onSelect={(e) => {
               handleChange("stateOrProvince", e);
@@ -462,6 +477,7 @@ function PropertyCreateModal({
                 id="city"
                 placeholder="City"
                 value={postalCity}
+                defaultValue={postalCity}
                 onChange={(e) => {
                   handleChange("postalCity", e.target.value);
                 }}
@@ -486,6 +502,7 @@ function PropertyCreateModal({
                 max={99999}
                 controls={false}
                 value={postalcode}
+                defaultValue={postalcode}
                 onChange={(value) => {
                   handleChange("postalcode", value);
                 }}
@@ -553,6 +570,7 @@ function PropertyCreateModal({
             label="homeType"
             placeholder="Property Type"
             value={propertyType}
+            defaultValue={propertyType}
             onSelect={(value) => {
               handleChange("propertyType", value);
             }}
@@ -581,6 +599,7 @@ function PropertyCreateModal({
                 controls={false}
                 min={0}
                 value={bedroomsTotal}
+                defaultValue={bedroomsTotal}
                 onChange={(value) => {
                   handleChange("bedroomsTotal", value);
                 }}
@@ -610,6 +629,7 @@ function PropertyCreateModal({
                 controls={false}
                 min={0}
                 value={bathroomsTotalInteger}
+                defaultValue={bathroomsTotalInteger}
                 onChange={(value) => {
                   handleChange("bathroomsTotalInteger", value);
                 }}
@@ -638,6 +658,7 @@ function PropertyCreateModal({
                 addonAfter={LivingAreaUnitElement}
                 min={0}
                 value={livingArea}
+                defaultValue={livingArea}
                 onChange={(value) => {
                   handleChange("livingArea", value);
                 }}
@@ -668,6 +689,7 @@ function PropertyCreateModal({
                 addonAfter={LotSizeAreaUnitElement}
                 min={0}
                 value={lotSizeArea}
+                defaultValue={lotSizeArea}
                 onChange={(value) => {
                   handleChange("lotSizeArea", value);
                 }}
@@ -696,6 +718,8 @@ function PropertyCreateModal({
                     <Checkbox
                       key={key}
                       name={opt.label}
+                      checked={selectedOptions[opt.value]}
+                      defaultChecked={selectedOptions[opt.value]}
                       onChange={(e) => {
                         handleCheckbox(opt.value, e.target.checked);
                       }}
@@ -721,7 +745,7 @@ function PropertyCreateModal({
         title={primaryAction.content}
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
-        okText={modalView ? "Continue" : "Next"}
+        okText={modalView ? "Continue" : isEdit ? "Create Property" : "Update Property"}
         okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);

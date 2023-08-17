@@ -15,6 +15,7 @@ import FeaturesTab from "./ListingTabs/FeaturesTab";
 import PriceHistoryTab from "./ListingTabs/PriceHistoryTab";
 import ReviewTab from "./ListingTabs/ReviewTab";
 import { useParams } from "react-router-dom";
+import { EditOutlined, UploadOutlined } from "@ant-design/icons"
 import { actions } from "../../../contexts/propertyContext/actions";
 import {
   usePropertiesDispatch,
@@ -22,9 +23,11 @@ import {
 } from "../../../contexts/propertyContext";
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj } from "../helpers/constants";
+import PropertyCreateModal from "./PropertyCreateModal";
 
 function PropertyDetails() {
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
+  const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const dispatch = usePropertiesDispatch();
   const {
     property,
@@ -158,7 +161,7 @@ function PropertyDetails() {
   };
 
   const formattedResults = getFormattedResults(getSelectedCategories());
-  
+
   return (
     <>
       {contextHolder}
@@ -180,7 +183,18 @@ function PropertyDetails() {
             }}
             disabled
           >
+            <UploadOutlined />
             Upload Images
+          </Button>
+          <Button
+            type="primary"
+            onClick={() => {
+              toggleCreateModal(true);
+            }}
+            style={{ marginLeft: "5px" }}
+          >
+            <EditOutlined />
+            Edit
           </Button>
         </Col>
       </Row>
@@ -316,6 +330,11 @@ function PropertyDetails() {
           handleModal={setUploadPhotosModal}
         />
       )}
+      {propertyDetails && <PropertyCreateModal
+        isCreateModalOpen={isCreateModalOpen}
+        toggleCreateModal={toggleCreateModal}
+        formData={propertyDetails}
+      />}
     </>
   );
 }

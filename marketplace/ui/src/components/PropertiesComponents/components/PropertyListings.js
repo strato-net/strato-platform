@@ -12,6 +12,11 @@ const { LIMIT_PER_PAGE } = propertyConstants;
 function PropertyListings() {
 
   const [filterOption, setFilterOption] = useState(filterSchema);
+  const [formData, setFormData] = useState({
+    lotSizeUnits: "sqft",
+    livingAreaUnits: "sqft",
+    numberOfUnitsTotal: 1,
+  })
   const [selectedFilter, setSelectedFilter] = useState([])
   const [appliedFilter, setAppliedFilter] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -197,6 +202,7 @@ function PropertyListings() {
       <PropertyCreateModal
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
+        formData={formData}
       />
     </>
   );
