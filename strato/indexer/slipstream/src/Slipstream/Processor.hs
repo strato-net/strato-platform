@@ -373,7 +373,12 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
 
-                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTable g c (o, a') (head parentAbstractContractsName)
+                --create contract table
+                when(_contractType c == AbstractType ) $ do outputData conn $ createAbstractTable g c (o, a', n)
+                
+
+                --update globals
+                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTableRow g c (o, a', n) (head parentAbstractContractsName)
 
                 -- when(length parentAbstractContractsName >=1 ) $ do outputData conn $ insertContractInAbstractTableQuery g (o, a') (head parentAbstractContractsName) --Tables are created
   
@@ -415,10 +420,12 @@ processTheMessages env conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract)
+          --check id current contract is derived contract
+          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          --get columns for abstract table
           abstractColumns <- case abstracts of
                               [] -> return Nothing
-                              (firstAbstract:_) -> getTableColumns g $ AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) firstAbstract
+                              (firstAbstract:_) -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract
           
           $logInfoS "DAVIDprocessTheMessages/abstractColumns'" $ T.pack $ show abstractColumns
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)

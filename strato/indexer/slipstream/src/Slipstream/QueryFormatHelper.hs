@@ -80,12 +80,18 @@ tableNameToText (EventTableName o a c e) =
         | otherwise = o <> tableSeparator <> a <> tableSeparator
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
-tableNameToText (AbstractTableRowName o a ab) =
+tableNameToText (AbstractTableName o a c) =
   let prefix
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
-      contractAndAbstract =  "." <> ab
+  in prefix <> c
+tableNameToText (AbstractTableRowName o a c ab) =
+  let prefix
+        | T.null o = ""
+        | T.null a = o <> tableSeparator
+        | otherwise = o <> tableSeparator <> a <> tableSeparator
+      contractAndAbstract =  c <> "." <> ab
   in "abstract@" <> prefix <> contractAndAbstract
 
 

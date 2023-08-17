@@ -25,6 +25,7 @@ module Slipstream.OutputData (
   createMappingTable,
   createHistoryTable,
   createAbstractTable,
+  createAbstractTableRow,
   createAssetTable,
   createSaleTable,
   createUserTable,
@@ -285,8 +286,11 @@ historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameter
 indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
-abstractTableRowName :: Text -> Text -> Text -> TableName
-abstractTableRowName o a ab = uncurry3 AbstractTableRowName $ constructTableNameParameters o a ab
+abstractTableName :: Text -> Text -> Text -> TableName
+abstractTableName o a n = uncurry3 AbstractTableName $ constructTableNameParameters o a n
+
+abstractTableRowName :: Text -> Text -> Text -> Text -> TableName
+abstractTableRowName o a n ab = uncurry4 AbstractTableRowName $ constructMappingOrAbstractTableNameParameters o a n ab
 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingOrAbstractTableNameParameters o a n m
@@ -401,15 +405,27 @@ createUserTableQuery =
 createAbstractTable :: OutputM m
                  => IORef Globals
                  -> Contract
-                 -> (Text, Text)
-                 -> Text
+                 -> (Text, Text, Text)
                  -> ConduitM () Text m ()
-createAbstractTable globalsIORef contract (o, a) ab = do
-  let tableName = abstractTableRowName o a ab
+createAbstractTable globalsIORef contract (o, a, n) = do
+  let tableName = abstractTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
   when (not tableExists) $ do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
-    yield $ createAbstractTableQuery contract (o,a,ab)
+    yield $ createAbstractTableQuery contract (o,a,n)
+    setTableCreated globalsIORef tableName (list++ ["data"])
+
+createAbstractTableRow :: OutputM m
+                 => IORef Globals
+                 -> Contract
+                 -> (Text, Text, Text)
+                 -> Text
+                 -> ConduitM () Text m ()
+createAbstractTableRow globalsIORef contract (o, a, n) ab = do
+  let tableName = abstractTableRowName o a n ab
+  tableExists <- isTableCreated globalsIORef tableName
+  when (not tableExists) $ do
+    let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     setTableCreated globalsIORef tableName list
 
 createAssetTable :: OutputM m
@@ -720,8 +736,8 @@ createMappingTableQuery (o, a, n, m) =
         ]
 
 createAbstractTableQuery ::  Contract -> (Text, Text, Text) -> Text
-createAbstractTableQuery contract (o, a, ab) =
-  let tableName = abstractTableRowName o a ab
+createAbstractTableQuery contract (o, a, n) =
+  let tableName = abstractTableName o a n
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
@@ -880,7 +896,7 @@ insertAbstractTableQuery cs = concat $
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)   
-              abTableName = abstractTableRowName
+              abTableName = abstractTableName
                   (E.organization x)
                   (E.application x)
                   (ab)

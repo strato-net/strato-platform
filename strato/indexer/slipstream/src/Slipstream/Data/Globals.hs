@@ -64,9 +64,15 @@ data TableName =
       , mtContractName :: T.Text
       , mtMappingName  :: T.Text
       } 
+  | AbstractTableName
+      { itOrganization :: T.Text
+      , itApplication  :: T.Text
+      , itContractName :: T.Text
+      }
   | AbstractTableRowName
       { atOrganization :: T.Text
       , atApplication  :: T.Text
+      , atContractName :: T.Text
       , atAbstractName :: T.Text
       } deriving (Show, Eq, Ord)
 

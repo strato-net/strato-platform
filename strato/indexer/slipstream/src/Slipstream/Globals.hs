@@ -83,14 +83,14 @@ getMappingTables globalsIORef org app contract = do
   let mapNames = map mtMappingName (M.keys mappingTables)
   return mapNames
 
-getAbstractTableRow :: MonadIO m => IORef Globals -> T.Text -> T.Text -> m ([T.Text])
-getAbstractTableRow globalsIORef org app = do
+getAbstractTableRow :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m ([T.Text])
+getAbstractTableRow globalsIORef org app contract = do
   Globals{..} <- readIORef globalsIORef
   let abstractTables = M.filterWithKey isAbstractTableName (createdTables)
                         where
                           isAbstractTableName :: TableName -> TableColumns -> Bool
-                          isAbstractTableName (AbstractTableRowName o a _) _ = 
-                            o == org && a == app 
+                          isAbstractTableName (AbstractTableRowName o a n _) _ = 
+                            o == org && a == app && n == contract
                           isAbstractTableName _ _ = False
   let result = map atAbstractName (M.keys abstractTables)
   return result
