@@ -1,0 +1,40 @@
+pipeline {
+    agent { label "test3" }
+    parameters {
+        string(name: 'VERSION')
+    }
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('BLOCKAPPS_SERVICE_USER_AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('BLOCKAPPS_SERVICE_USER_AWS_SECRET_ACCESS_KEY')
+        OAUTH_CLIENT_ID     = 'localhost'
+        OAUTH_CLIENT_SECRET     = credentials('EKS_OAUTH_CLIENT_SECRET')
+        EXT_STORAGE_S3_ACCESS_KEY_ID     = credentials('EKS_EXT_STORAGE_S3_ACCESS_KEY_ID')
+        EXT_STORAGE_S3_SECRET_ACCESS_KEY     = credentials('EKS_EXT_STORAGE_S3_SECRET_ACCESS_KEY')
+        STRIPE_PUBLISHABLE_KEY     = credentials('EKS_STRIPE_PUBLISHABLE_KEY')
+        STRIPE_SECRET_KEY     = credentials('EKS_STRIPE_SECRET_KEY')
+        KUBECTL='/home/ubuntu/bin/kubectl'
+        MANIFEST_PATH = './devops/eks/strato'
+    }
+    stages {
+        stage('Stage 1') {
+            steps {
+                sh 'AWS_CONFIG="AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION=us-east-1"'
+                sh '$AWS_CONFIG aws eks update-kubeconfig --name ba-dev3 --region us-east-1'
+                sh '$AWS_CONFIG $KUBECTL get pods -n strato-platform'
+                sh 'cp $MANIFEST_PATH/strato-platform-manifest.tpl.yaml strato-platform-manifest.yaml'
+                sh "sed -i 's/<REPLACE_WITH_OAUTH_CLIENT_ID>/$OAUTH_CLIENT_ID/g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<REPLACE_WITH_OAUTH_CLIENT_SECRET>/$OAUTH_CLIENT_SECRET/g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<REPLACE_WITH_EXT_STORAGE_S3_ACCESS_KEY_ID>/$EXT_STORAGE_S3_ACCESS_KEY_ID/g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY>/EXT_STORAGE_S3_SECRET_ACCESS_KEY/g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<REPLACE_WITH_STRIPE_PUBLISHABLE_KEY>/$STRIPE_PUBLISHABLE_KEY/g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<REPLACE_WITH_STRIPE_SECRET_KEY>/$STRIPE_SECRET_KEY/g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<REPO_URL>/406773134706.dkr.ecr.us-east-1.amazonaws.com\\/strato\\//g' strato-platform-manifest.yaml"
+                sh "sed -i 's/<VERSION>/${params.VERSION}/g' strato-platform-manifest.yaml"
+                //sh 'cat strato-platform-manifest.yaml'
+                //sh '$KUBECTL delete -f strato-platform-manifest.yaml'
+                sh '$KUBECTL apply -f strato-platform-manifest.yaml'
+            }
+        }
+    }
+}
