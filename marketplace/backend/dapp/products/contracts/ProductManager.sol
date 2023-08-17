@@ -8,11 +8,11 @@ contract ProductManager is InventoryStatus, RestStatus {
     // constructor() public {}
     mapping(address => mapping(string => bool))
         private uniqueSerialNumberByProductAddress;
-    mapping(string => mapping(uint => address)) orgToUPCToProduct;
+    mapping(string => mapping(uint => address)) record orgToUPCToProduct;
 
-    /////////////////////// carbon specific //////////////////////////////////////////////////////
-    mapping(string => mapping(address => mapping(uint => mapping(int => address)))) orgxProductxVintagexPricexInventory;
-    /////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////// carbon specific ///////////////////////////////////////////////////////////////////////////////////
+    mapping(string => mapping(address => mapping(uint => mapping(int => address)))) record orgxProductxVintagexPricexInventory;
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     function addProduct(
         string _name,
