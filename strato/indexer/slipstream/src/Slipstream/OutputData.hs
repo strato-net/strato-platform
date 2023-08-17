@@ -20,7 +20,7 @@ module Slipstream.OutputData (
   insertMappingTable,
   insertAbstractTable,
   insertAbstractTableQuery,
-  insertContractInAbstractTableQuery,
+  -- insertContractInAbstractTableQuery,
   createIndexTable,
   createMappingTable,
   createHistoryTable,
@@ -285,8 +285,8 @@ historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameter
 indexTableName :: Text -> Text -> Text -> TableName
 indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o a n
 
-abstractTableRowName :: Text -> Text -> Text -> Text -> TableName
-abstractTableRowName o a n ab = uncurry4 AbstractTableRowName $ constructMappingOrAbstractTableNameParameters o a n ab
+abstractTableRowName :: Text -> Text -> Text -> TableName
+abstractTableRowName o a ab = uncurry3 AbstractTableRowName $ constructTableNameParameters o a ab
 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
 mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingOrAbstractTableNameParameters o a n m
@@ -401,15 +401,15 @@ createUserTableQuery =
 createAbstractTable :: OutputM m
                  => IORef Globals
                  -> Contract
-                 -> (Text, Text, Text)
+                 -> (Text, Text)
                  -> Text
                  -> ConduitM () Text m ()
-createAbstractTable globalsIORef contract (o, a, n) ab = do
-  let tableName = abstractTableRowName o a n ab
+createAbstractTable globalsIORef contract (o, a) ab = do
+  let tableName = abstractTableRowName o a ab
   tableExists <- isTableCreated globalsIORef tableName
   when (not tableExists) $ do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
-    yield $ createAbstractTableQuery contract (o,a,n,ab)
+    yield $ createAbstractTableQuery contract (o,a,ab)
     setTableCreated globalsIORef tableName list
 
 createAssetTable :: OutputM m
@@ -719,9 +719,9 @@ createMappingTableQuery (o, a, n, m) =
         , ",\n  PRIMARY KEY (address, key));"
         ]
 
-createAbstractTableQuery ::  Contract -> (Text, Text, Text, Text) -> Text
-createAbstractTableQuery contract (o, a, n, ab) =
-  let tableName = abstractTableRowName o a n ab
+createAbstractTableQuery ::  Contract -> (Text, Text, Text) -> Text
+createAbstractTableQuery contract (o, a, ab) =
+  let tableName = abstractTableRowName o a ab
       list = Map.toList $ contract^.storageDefs
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
@@ -856,18 +856,18 @@ insertMappingTableQuery ms = concat $
                 , ";"
                 ]
 
-insertContractInAbstractTableQuery :: OutputM m => IORef Globals -> (Text, Text, Text) -> Text -> ConduitM () Text m ()
-insertContractInAbstractTableQuery globalsIORef (o,a,n) ab = do
-  let abstractTableName = abstractTableRowName o a n ab
-      contractTableName = indexTableName o a n
-  tableExists <- isTableCreated globalsIORef abstractTableName
-  $logInfoLS "insertContractInAbstractTableQuery/abstractTableRowExists" (abstractTableName, tableExists)
+-- insertContractInAbstractTableQuery :: OutputM m => IORef Globals -> (Text, Text) -> Text -> ConduitM () Text m ()
+-- insertContractInAbstractTableQuery globalsIORef (o,a) ab = do
+--   let abstractTableName = abstractTableRowName o a ab
+--       contractTableName = indexTableName o a 
+--   tableExists <- isTableCreated globalsIORef abstractTableName
+--   $logInfoLS "insertContractInAbstractTableQuery/abstractTableRowExists" (abstractTableName, tableExists)
 
-  when (not tableExists) $ do
-    incNumAbstractRowTables
-    yield $ T.concat [ "INSERT INTO ",tableNameToDoubleQuoteText abstractTableName," (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
-    let list = ["data"]
-    setTableCreated globalsIORef abstractTableName list
+--   when (not tableExists) $ do
+--     incNumAbstractRowTables
+--     yield $ T.concat [ "INSERT INTO ",tableNameToDoubleQuoteText abstractTableName," (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
+--     let list = ["data"]
+--     setTableCreated globalsIORef abstractTableName list
 
 insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, TableColumns)] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
@@ -883,7 +883,6 @@ insertAbstractTableQuery cs = concat $
               abTableName = abstractTableRowName
                   (E.organization x)
                   (E.application x)
-                  (E.contractName x)
                   (ab)
               abTableName' = tableNameToDoubleQuoteText abTableName 
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ (baseAbstractTableColumns ++ abC)

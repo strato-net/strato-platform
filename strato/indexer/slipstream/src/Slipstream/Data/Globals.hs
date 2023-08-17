@@ -67,7 +67,6 @@ data TableName =
   | AbstractTableRowName
       { atOrganization :: T.Text
       , atApplication  :: T.Text
-      , atContractName :: T.Text
       , atAbstractName :: T.Text
       } deriving (Show, Eq, Ord)
 

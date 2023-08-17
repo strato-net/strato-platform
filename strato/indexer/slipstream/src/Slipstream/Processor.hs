@@ -373,9 +373,9 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
 
-                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTable g c nameParts (head parentAbstractContractsName)
+                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTable g c (o, a') (head parentAbstractContractsName)
 
-                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ insertContractInAbstractTableQuery g nameParts (head parentAbstractContractsName) --Tables are created
+                -- when(length parentAbstractContractsName >=1 ) $ do outputData conn $ insertContractInAbstractTableQuery g (o, a') (head parentAbstractContractsName) --Tables are created
   
                 return deferredForeignKeys
 
@@ -415,10 +415,10 @@ processTheMessages env conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract)
           abstractColumns <- case abstracts of
                               [] -> return Nothing
-                              (firstAbstract:_) -> getTableColumns g $ AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract) firstAbstract
+                              (firstAbstract:_) -> getTableColumns g $ AbstractTableRowName (SE.organization indexContract) (SE.application indexContract) firstAbstract
           
           $logInfoS "DAVIDprocessTheMessages/abstractColumns'" $ T.pack $ show abstractColumns
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
@@ -426,7 +426,8 @@ processTheMessages env conn g messages = do
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
           if null abstracts
-            then pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+            then pure . Right $ BatchedInserts
+             indexContract Nothing hs pMappings
           else
             case abstractColumns of 
               Just abC -> do
