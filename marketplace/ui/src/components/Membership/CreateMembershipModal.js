@@ -16,18 +16,18 @@ import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 // import getSchema from "./ProductSchema";
 
 //sub-categories
-import { actions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
+import { actions } from "../../contexts/membership/actions";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
 
 const { Dragger } = Upload;
 
-const CreateProductModal = ({
+const CreateMembershipModal = ({
   open,
   handleCancel,
   categorys,
 }) => {
   // const schema = getSchema();
-  const dispatch = useProductDispatch();
+  const dispatch = useMembershipDispatch();
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -35,7 +35,7 @@ const CreateProductModal = ({
   const [fileList, setFileList] = useState([]);
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
-    useProductState();
+  useMembershipState();
 
   const initialValues = {
     name: "",
@@ -509,4 +509,4 @@ const CreateProductModal = ({
   );
 };
 
-export default CreateProductModal;
+export default CreateMembershipModal;
