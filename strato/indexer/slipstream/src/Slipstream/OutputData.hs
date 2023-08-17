@@ -889,10 +889,10 @@ insertMappingTableQuery ms = concat $
 insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, TableColumns)] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs = concat $
-  let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab, abC) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abC))) <$> cs
+  let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab, abColumns) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns))) <$> cs
    in flip map (map snd $ partitionWith (length . snd . fst) cs') $ \case
         [] -> []
-        contracts@(((x, _), (ab, abC)):_) ->
+        contracts@(((x, _), (ab, abColumns)):_) ->
           let contractTableName = indexTableName
                   (E.organization x)
                   (E.application x)
@@ -902,7 +902,7 @@ insertAbstractTableQuery cs = concat $
                   (E.contractName x)
                   (ab)
               abTableName' = tableNameToDoubleQuoteText abTableName 
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ (baseAbstractTableColumns ++ abC)
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ (baseAbstractTableColumns ++ abColumns)
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -912,8 +912,8 @@ insertAbstractTableQuery cs = concat $
                          , T.pack . keccak256ToHex . E.transactionHash
                          , tshow . E.transactionSender
                          ]
-              vals = flip map contracts $ \((row, rowList),_) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList rowList) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filter (\v -> v `notElem` abC) rowList]
+              vals = flip map contracts $ \((row, contractColumns),_) ->
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns)) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns]
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
@@ -935,6 +935,23 @@ insertAbstractTableQuery cs = concat $
     data = excluded.data|]
                 , ";"
                 ]
+
+-- abstractcolumns = [a]
+
+-- rowlist=
+-- dav a
+-- sam b 
+-- cat c
+-- dna d
+
+-- case 1
+-- sam b 
+-- cat c
+-- dna d
+
+-- case 2
+-- dav a
+
 
 insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
 insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
