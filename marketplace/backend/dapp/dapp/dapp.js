@@ -1369,7 +1369,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         if (matchingService) {
           return {
             ...membershipService,
-            savings: membershipService.maxQuantity * (matchingService.price - membershipService.price),
+            savings: membershipService.maxQuantity * (matchingService.price - membershipService.membershipPrice),
             serviceName: matchingService.name,
             serviceDescription: matchingService.description,
             servicePrice: matchingService.price,
