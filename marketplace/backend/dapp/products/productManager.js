@@ -123,6 +123,8 @@ function bind(user, _contract, options) {
     getProperties(user, args, _options);
   contract.createProperty = async (args) =>
     createProperty(user, contract, args, options);
+  contract.updateProperty = async (args) =>
+    updateProperty(user, contract, args, options);
   return contract;
 }
 
@@ -434,6 +436,31 @@ async function createProperty(admin, contract, _args, baseOptions) {
   return [restStatus, propertyAddress];
 }
 
+async function updateProperty(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "updateProperty",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, propertyAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, propertyAddress];
+}
+
 export default {
   bindAddress,
   uploadContract,
@@ -449,4 +476,5 @@ export default {
   getProperty,
   getProperties,
   createProperty,
+  updateProperty
 };

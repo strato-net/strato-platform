@@ -609,11 +609,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //Get the product contract
     console.log('dapp.getProperty - property', property)
     console.log('dapp.getProperty - productId', property.productId)
-    const productData = await managers.productManager.getProduct({ 
+    const productData = await managers.productManager.getProduct({
       address: property.productId,
       uniqueProductID: property.productId,
-      ownerOrganization: userOrganization }, getOptions);
-      console.log('dapp.getProperty - productData', productData)
+      ownerOrganization: userOrganization
+    }, getOptions);
     const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
     return propertyData
   };
@@ -624,13 +624,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const propertiesWProducts = []
 
     for (const property of allPropertiesData) {
-      const productData = await managers.productManager.getProduct({ 
+      const productData = await managers.productManager.getProduct({
         ...args,
         offset: 0,
         sort: null,
         address: property.productId,
         uniqueProductID: property.productId,
-        ownerOrganization: userOrganization }, 
+        ownerOrganization: userOrganization
+      },
         getOptions
       );
       propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
@@ -758,6 +759,136 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       }
       const propertyContract = await managers.productManager.createProperty(propertyArgs);
+      return {
+        productContractRest: productContract[0],
+        productContractAddress: productContract[1],
+        propertyContractRest: propertyContract[0],
+        propertyContractAddress: propertyContract[1],
+      }
+    }
+  }
+
+  contract.updateProperty = async function (args, options = optionsNoChainIds) {
+    //create the product contract
+    // const createdDate = Math.floor(Date.now() / 1000);
+    const productArgs = {
+      name: args.title,
+      description: args.description,
+      manufacturer: "",
+      unitOfMeasurement: 1,
+      userUniqueProductCode: "",
+      leastSellableUnit: 1,
+      imageKey: "",
+      isActive: true,
+      category: "Real Estate",
+      // subCategory: args.propertyType,
+    }
+
+
+    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...productArgs }
+    const productContract = await managers.productManager.updateProduct(newArgs);
+
+    //create the property contract that matches product id with the property id
+    if (productContract[0] == 200) {
+      const propertyArgs = {
+        productId: productContract[1],
+        listPrice: args.listPrice,
+        unparsedAddress: args.unparsedAddress,
+        streetNumber: args.streetNumber,
+        streetName: args.streetName,
+        unitNumber: args.unitNumber,
+        postalCity: args.postalCity,
+        stateOrProvince: args.stateOrProvince,
+        postalcode: args.postalcode,
+        bathroomsTotalInteger: args.bathroomsTotalInteger,
+        bedroomsTotal: args.bedroomsTotal,
+        standardStatus: args.standardStatus,
+        lotSizeArea: args.lotSizeArea,
+        lotSizeUnits: args.lotSizeUnits,
+        livingArea: args.livingArea,
+        livingAreaUnits: args.livingAreaUnits,
+        latitude: args.latitude,
+        longitude: args.longitude,
+        numberOfUnitsTotal: args.numberOfUnitsTotal,
+        // Appliances
+        dishwasher: args.dishwasher,
+        dryer: args.dryer,
+        freezer: args.freezer,
+        garbageDisposal: args.garbageDisposal,
+        microwave: args.microwave,
+        ovenOrRange: args.ovenOrRange,
+        refrigerator: args.refrigerator,
+        washer: args.washer,
+        waterHeater: args.waterHeater,
+
+        // Cooling
+        centralAir: args.centralAir,
+        evaporative: args.evaporative,
+        geoThermal: args.geoThermal,
+        refrigeration: args.refrigeration,
+        solar: args.solar,
+        wallUnit: args.wallUnit,
+
+        // Heating
+        baseboard: args.baseboard,
+        forceAir: args.forceAir,
+        geoThermalHeat: args.geoThermal,
+        heatPump: args.heatPump,
+        hotWater: args.hotWater,
+        radiant: args.radiant,
+        solarHeat: args.solarHeat,
+        steam: args.steam,
+
+        // Flooring
+        carpet: args.carpet,
+        concrete: args.concrete,
+        hardwood: args.hardwood,
+        laminate: args.laminate,
+        linoleumVinyl: args.linoleumVinyl,
+        slate: args.slate,
+        softwood: args.softwood,
+        tile: args.tile,
+
+        // Parking
+        carport: args.carport,
+        garage: args.garage,
+        offStreet: args.offStreet,
+        onStreet: args.onStreet,
+
+        // Interior Features
+        attic: args.attic,
+        cableReady: args.cableReady,
+        ceilingFan: args.ceilingFan,
+        doublePaneWindows: args.doublePaneWindows,
+        elevator: args.elevator,
+        fireplace: args.fireplace,
+        flooring: args.flooring,
+        furnished: args.furnished,
+        jettedTub: args.jettedTub,
+        securitySystem: args.securitySystem,
+        vaultedCeiling: args.vaultedCeiling,
+        skylight: args.skylight,
+        wetBar: args.wetBar,
+
+        // Exterior Features
+        barbecueArea: args.barbecueArea,
+        deck: args.deck,
+        dock: args.dock,
+        fence: args.fence,
+        garden: args.garden,
+        hotTubOrSpa: args.hotTubOrSpa,
+        lawn: args.lawn,
+        patio: args.patio,
+        pond: args.pond,
+        pool: args.pool,
+        porch: args.porch,
+        rvParking: args.rvParking,
+        sauna: args.sauna,
+        sprinklerSystem: args.sprinklerSystem,
+        waterFront: args.waterFront,
+
+      }
+      const propertyContract = await managers.productManager.updateProperty(propertyArgs);
       return {
         productContractRest: productContract[0],
         productContractAddress: productContract[1],

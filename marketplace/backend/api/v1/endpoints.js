@@ -136,5 +136,5 @@ export const Properties = {
   getAll: '/',
   get: '/:address',
   create: '/',
-  update: '/update',
+  update: '/',
 }
