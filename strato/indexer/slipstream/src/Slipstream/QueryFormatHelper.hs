@@ -80,12 +80,19 @@ tableNameToText (EventTableName o a c e) =
         | otherwise = o <> tableSeparator <> a <> tableSeparator
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
-tableNameToText (AssetTableRowName o a c) =
+tableNameToText (AbstractTableName o a c) =
   let prefix
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
-  in prefix <> c
+  in "abstract@" <> prefix <> c
+tableNameToText (AbstractTableRowName o a c ab) =
+  let prefix
+        | T.null o = ""
+        | T.null a = o <> tableSeparator
+        | otherwise = o <> tableSeparator <> a <> tableSeparator
+      contractAndAbstract =  c <> "." <> ab
+  in "abstract@" <> prefix <> contractAndAbstract
 
 
 tableNameToTextPostgres :: TableName -> T.Text

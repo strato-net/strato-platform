@@ -22,6 +22,8 @@ so that they could be properly moved to their respective version's subsection.
 - `/transaction/unsigned` endpoint for generating raw transaction inputs
 - Bi-directional sync functionality
 - Mappings in SolidVM receive their own table in Cirrus
+- Abstract contracts generate Cirrus tables
+- Derived contracts are inserted as rows in abstract tables
 - Support for imports from addresses in SolidVM
 - More lenient P2P disable times to prevent non-validators from being "locked out"
 ### Changed

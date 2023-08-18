@@ -22,6 +22,8 @@ module Slipstream.Processor
   ( processTheMessages
   , parseActions
   , generateAssetTable
+  , generateSaleTable
+  , generateUserTable
   ) where
 
 import Prelude hiding (lookup)
@@ -146,7 +148,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
-  , assetInsert     :: Maybe ProcessedContract
+  , abstractInsert     :: Maybe (ProcessedContract, T.Text, TableColumns)
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -360,7 +362,9 @@ processTheMessages env conn g messages = do
                     mapNames = map fst listOfMappingsWithRecords
                     parents' = c ^. parents
                     parentContracts = getContractsForParents parents' (cc^.contracts)
-                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
+                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType) parentContracts
+                    parentAbstractContractsName = map (labelToText ._contractName) parentAbstractContracts
+              
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
@@ -373,15 +377,21 @@ processTheMessages env conn g messages = do
                   outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
 -- mark        
-                deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+
+                deferredForeignKeys <- case (_contractType c ) of
+                  AbstractType -> do
+                    outputData conn $ createAbstractTable g c (o, a', n)
+                    return []
+                  _ -> do
+                    outputData conn $ createExpandIndexTable g c nameParts
                 
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn $ createExpandEventTables g c nameParts
+                
+                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTableRow g c (o, a', n) (head parentAbstractContractsName)
 
-                when (length parentAbstractContracts >= 1) $ do
-                  outputData conn $ insertContractInAssetTableQuery g nameParts 
-
+  
                 return deferredForeignKeys
 
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
@@ -420,15 +430,29 @@ processTheMessages env conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          assets <- getAssetTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          --get columns for abstract table
+          abstractColumns <- case abstracts of
+                              [] -> return Nothing
+                              (firstAbstract:_) -> do
+                                case  (SE.application indexContract) of
+                                  "" -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.contractName indexContract) firstAbstract
+                                  _ -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract
+          
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          if (AssetTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)) `elem` assets
-            then  pure . Right $ BatchedInserts indexContract (Just indexContract) hs pMappings
+          if null abstracts
+            then pure . Right $ BatchedInserts
+             indexContract Nothing hs pMappings
           else
-            pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+            case abstractColumns of 
+              Just abC -> do
+                let finalColumns = map extractTextInsideQuotes abC
+                pure . Right $ BatchedInserts indexContract (Just (indexContract, head abstracts, finalColumns)) hs pMappings
+              Nothing -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+            
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -443,7 +467,7 @@ processTheMessages env conn g messages = do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
     unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
-    unless (null ins) $ outputData conn . insertAssetTable $ map assetInsert ins
+    unless (null ins) $ outputData conn . insertAbstractTable $ map abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
@@ -466,3 +490,20 @@ generateAssetTable :: (MonadLogger m, HasSQL m) =>
 generateAssetTable conn g = do
   outputData conn $ createAssetTable g
 
+generateSaleTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateSaleTable conn g = do
+  outputData conn $ createSaleTable g
+
+generateUserTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateUserTable conn g = do
+  outputData conn $ createUserTable g
+
+extractTextInsideQuotes :: T.Text -> T.Text
+extractTextInsideQuotes input =
+    case T.stripPrefix "\"" input of
+        Just rest ->
+            case T.break (== '"') rest of
+                (extracted, _) -> extracted
+        Nothing -> ""

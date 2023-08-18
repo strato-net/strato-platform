@@ -94,7 +94,9 @@ main = do
     handle <- runSqlConn initStorage workerConn
     gref <- newGlobals handle (CirrusHandle conn S.empty)
 
-    --Create Asset table
+    --Create Mercata Abstract tables
     generateAssetTable conn gref
+    generateSaleTable conn gref
+    generateUserTable conn gref
     
     getAndProcessMessages env conn gref
