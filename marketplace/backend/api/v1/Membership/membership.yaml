@@ -1,16 +1,16 @@
 paths:
   /membership/:
-    #get:
-    #  security:              
-    #    - bearerAuth: []                    
-    #  tags:               
-    #    - Membership        
-    #  summary: Retrieve membership
-    #  produces:
-    #  - application/json
-    #  responses:         
-    #    200:
-    #      description: Array of memberships
+    get:
+     security:              
+       - bearerAuth: []                    
+     tags:               
+       - Membership        
+     summary: Retrieve membership
+     produces:
+     - application/json
+     responses:         
+       200:
+         description: Array of memberships
     post:  
       security:              
         - bearerAuth: []                  
@@ -113,12 +113,31 @@ paths:
             #    responses:         
             #      200:
             #        description: indicates success of transfer ownership
+/membership/{address}:
+    get:                 
+      security:              
+        - bearerAuth: []   
+      tags:               
+        - Membership        
+      summary: Retrieve a membership
+      produces:
+      - application/json
+      parameters:         
+      - in: path          
+        name: address     
+        description: address to retrieve the membership
+        required: true      
+        schema:       
+          $ref: '#/definitions/fetchMembership' 
+      responses:         
+        200:
+          description: Retrieve a membership 
 definitions:        
-  #fetchMembership:
-  #  address:
-  #    type: string
-  #  chainId:
-  #    type: string
+  fetchMembership:
+   address:
+     type: string
+   chainId:
+     type: string
   createMembership:
     type: object
     properties:

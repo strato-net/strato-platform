@@ -6,19 +6,19 @@ import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
-//router.get(
-//  Membership.get,
-//  authHandler.authorizeRequest(),
-//  loadDapp,
-//  MembershipController.get
-//);
-//
-//router.get(
-//  Membership.getAll,
-//  authHandler.authorizeRequest(),
-//  loadDapp,
-//  MembershipController.getAll
-//);
+router.get(
+ Membership.get,
+ authHandler.authorizeRequest(),
+ loadDapp,
+ MembershipController.get
+);
+
+router.get(
+ Membership.getAll,
+ authHandler.authorizeRequest(),
+ loadDapp,
+ MembershipController.getAll
+);
 
 router.post(
   Membership.create,

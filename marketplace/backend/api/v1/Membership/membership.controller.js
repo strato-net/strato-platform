@@ -26,7 +26,7 @@ class MembershipController {
 
       const result = await dapp.getMembership(args, chainOptions)
       const temp = result.productFiles?.map(async (productFile) => {
-        const productFileImageUrl = await getSignedUrlFromS3(productFile.productFileFileLocaiton, req.app.get(constants.s3ParamName))
+        const productFileImageUrl = await getSignedUrlFromS3(productFile.fileLocation, req.app.get(constants.s3ParamName))
         return { ...productFile, imageUrl: productFileImageUrl }
       }) || []
       const out = { membership : result.membership, membershipServices: result.membershipServices, productFiles: temp }
