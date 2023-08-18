@@ -57,6 +57,7 @@ createBlocEnv = liftIO $ do
                  , gasLimit=0
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
+                 , userRegistryAddress=0x0
     }
 
 

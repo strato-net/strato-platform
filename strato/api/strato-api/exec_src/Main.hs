@@ -28,7 +28,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Maybe                      (listToMaybe, maybeToList, isJust)
+import           Data.Maybe                      (listToMaybe, maybeToList, isJust, fromJust)
 import           Data.Source.Map
 import           Data.Swagger                    hiding (delete, Http)
 import           HFlags
@@ -336,7 +336,8 @@ main = do
           gasLimit = flags_gasLimit,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
-          txTBQueue = tbqueue
+          txTBQueue = tbqueue,
+          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress
           }
   run 3000 $ app env theDoc
 
