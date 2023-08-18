@@ -2,7 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { uploadFileToS3, getFileStreamFromS3, getSignedUrlFromS3, deleteFileFromS3 } from "../../../helpers/s3";
+import { uploadFileToS3, getFileStreamFromS3, getSignedUrlFromS3, deleteFileFromS3 } from "../../../../../blockapps-rest/src/api";
 import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
@@ -76,26 +76,30 @@ class PropertiesController {
   /* -------upload the documents and images if necessary-------- */
         if (files) {
           files.forEach(async (file) => {
-            const fileKey = `${moment()
-              .utc()
-              .valueOf()}_${file.originalname}`;
+            // const fileKey = `${moment()
+            //   .utc()
+            //   .valueOf()}_${file.originalname}`;
     
-            const fileHash = crypto
-              .createHmac("sha256", file.buffer)
-              .digest("hex");
+            // const fileHash = crypto
+            //   .createHmac("sha256", file.buffer)
+            //   .digest("hex");
     
-            const fileLocation = await uploadFileToS3(
-              `${fileKey}`,
-              file.buffer,
-              req.app.get(constants.s3ParamName)
+            // const fileLocation = await uploadFileToS3(
+            //   `${fileKey}`,
+            //   file.buffer,
+            //   req.app.get(constants.s3ParamName)
+            // );
+
+            const uploadedFile = await uploadFileToS3(
+                file
             );
           
             const productDocumentArgs = {
               productId: propertyResult.productContractAddress,
-              fileKey: fileKey,
-              fileHash: fileHash,
+              fileKey: uploadedFile,
+              // fileHash: fileHash,
               fileName: file.originalname,
-              fileLocation: fileLocation,
+              // fileLocation: fileLocation,
               documentType: file.mimetype,
             }
 
