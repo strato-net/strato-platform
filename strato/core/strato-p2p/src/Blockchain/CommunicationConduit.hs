@@ -324,10 +324,15 @@ maxMessageSize :: Int
 maxMessageSize = 1 `shiftL` 25
 
 messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
-messageToBytes = mapC $ \msg ->
-  let (theWord, o) = wireMessage2Obj msg
-      bs = theWord `B.cons` rlpSerialize o
-  in if B.length bs >= maxMessageSize
-        then error $ printf "messageToBytes: message (%s...) too large for TCP send (%d >= %d)"
-                            (take 50 $ show msg) (B.length bs) maxMessageSize
-        else bs
+messageToBytes = mapC serializeWithRespectToMaxMessageSize
+  where 
+    serializeWithRespectToMaxMessageSize :: Message -> B.ByteString
+    serializeWithRespectToMaxMessageSize msg = 
+      let (theWord, o) = wireMessage2Obj msg 
+          bs = theWord `B.cons` rlpSerialize o 
+      in  if B.length bs >= maxMessageSize
+          then case msg of
+            BlockBodies arr -> serializeWithRespectToMaxMessageSize (BlockBodies $ take (length arr `div` 2) arr)
+            _ -> error $ printf "messageToBytes: message (%s...) too large for TCP send (%d >= %d)"
+              (take 50 $ show msg) (B.length bs) maxMessageSize
+          else bs
