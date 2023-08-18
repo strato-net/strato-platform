@@ -278,7 +278,7 @@ const serviceDispatch = useMembershipDispatch();
         <Space>
           <DescTitle text="Time in Months" />
           <DescTitle text="            :" />
-          <Text className="text-[13px]">{membershipDetails?.timeperiodInMonths ?? ""}</Text>
+          <Text className="text-[13px]">{membershipDetails?.timePeriodInMonths ?? ""}</Text>
         </Space>
 
         <Space>
@@ -380,14 +380,14 @@ const serviceDispatch = useMembershipDispatch();
                   {decodeURIComponent(details?.name)}&nbsp;
                 </Text>
                 <Text className="font-medium text-sm text-secondryB ">
-                  ({membershipDetails?.timeperiodInMonths ?? ""})-month Duration
+                  ({membershipDetails?.timePeriodInMonths ?? ""})-month Duration
                 </Text>
               </Row>
               <Paragraph
                 // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(membershipDetails?.description ?? "").replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                {decodeURIComponent(details?.description ?? "").replace(/%0A/g, "\n").split('\n').map((line, index) => (
                   <React.Fragment key={index}>
                     {line}
                     <br />

@@ -1,8 +1,8 @@
 
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "./Membership.sol";
-import "/dapp/membershipservice/contracts/MembershipService.sol";
-import "/dapp/ProductFile/contracts/ProductFile.sol";
+import "/dapp/membershipService/contracts/MembershipService.sol";
+import "/dapp/productFile/contracts/ProductFile.sol";
 import "/dapp/products/contracts/ProductManager.sol";
 import "/dapp/Dapp/contracts/Dapp.sol";
 
