@@ -33,8 +33,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const limit = 10;
   // Can update these values for service search later on
   const [offset, setOffset] = useState(0);
-  const [queryValue, setQueryValue] = useState("");
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const dispatch = useMembershipDispatch();
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
@@ -50,15 +48,18 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const { services, isservicesLoading } = useServiceState();
   const serviceDispatch = useServiceDispatch();
 
+  const queryValue = user.user.organization;
+
   // TODO: We should probably only query services made by the user's organization
   useEffect(() => {
     serviceActions.fetchService(
       serviceDispatch,
       limit,
       offset,
-      debouncedSearchTerm
+      queryValue,
     );
-  }, [serviceDispatch, limit, offset, debouncedSearchTerm]);
+  }, [serviceDispatch, limit, offset, queryValue]);
+
 
   const initialValues = {
     name: "",

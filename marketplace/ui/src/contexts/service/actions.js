@@ -112,7 +112,7 @@ const actions = {
 
   fetchService: async (dispatch, limit, offset, queryValue) => {
     const query = queryValue
-      ? `&name=${queryValue}`
+      ? `&ownerOrganization=${queryValue}`
       : "";
 
     dispatch({ type: actionDescriptors.fetchService });

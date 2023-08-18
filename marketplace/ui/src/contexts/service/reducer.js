@@ -37,7 +37,6 @@ const reducer = (state, action) => {
         isServicesLoading: true
       };
     case actionDescriptors.fetchServiceSuccessful:
-      console.log('action.payload', action.payload)
       return {
         ...state,
         services: action.payload,
