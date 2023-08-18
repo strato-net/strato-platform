@@ -47,7 +47,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     additionalInformation: "",
     images: [],
     description: "",
-    price: "", 
+    price: "",
     quantity: "",
     services: [
       {
@@ -183,8 +183,54 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
 
   const handleCreateFormSubmit = async (values) => {
     const updatedValues = checkDiscountType(memberDiscount);
-    console.log("updated Values", updatedValues);
-    console.log("values", values);
+    // console.log("updated Values", updatedValues);
+    // console.log("values", values);
+
+    const body = {
+      membershipArgs: {
+        name: updatedValues.name,
+        description: updatedValues.description,
+        manufacturer: user.user.organization,
+        unitOfMeasurement: 1,
+        // Generate random code for now
+        userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+        // Generate random number for now
+        uniqueMembershipCode: Math.floor(Math.random() * 1000000),
+        leastSellableUnit: 1,
+        imageKey: updatedValues.images[0].name,
+        category: updatedValues.category,
+        subCategory: updatedValues.category,
+        createdDate: new Date().getTime(),
+        timePeriodInMonths: updatedValues.duration,
+        additionalInfo: updatedValues.additionalInformation,
+        isActive: visible ? true : false,
+      },
+      membershipServiceArgs: updatedValues.services.map((service) => ({
+        // Using a random service id for now will integrate later
+        serviceId: "79d45dec737779c0ebb1a949c9465e81c1bb0ba7",
+        membershipPrice: service.memberPrice ? service.memberPrice : 0,
+        discountPrice: service.percentDiscount ? service.percentDiscount : 0,
+        maxQuantity: service.numberOfUses,
+        createdDate: new Date().getTime(),
+        isActive: visible ? true : false,
+      })),
+      productFileArgs: updatedValues.documents.map((document, index) => ({
+        fileLocation: `https://s3.us-east-2.amazonaws.com/elasticbeanstalk-us-east-2-837725889976/${document.name}`,
+        fileHash: `fileHash${index}`,
+        fileName: document.name,
+        uploadDate: new Date().getTime(),
+        createdDate: new Date().getTime(),
+        section: 1,
+        type: 1,
+      })),
+    };
+
+    console.log("body", body);
+    const isDone = await actions.createMembership(dispatch, body);
+    if (isDone) {
+      formik.resetForm();
+      handleCancel();
+    }
 
     // TODO: Update this data to match whats needed in the backend.
     // Might have to send images and documents separately.
@@ -210,7 +256,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     setVisible(true);
   };
 
-
   const openToast = (placement, message) => {
     api.error({
       message: message,
@@ -222,312 +267,315 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
 
   return (
     <>
-    <Modal
-      open={open}
-      centered
-      onCancel={closeModal}
-      width={1000}
-      footer={[
-        <div className="flex justify-end mr-10">
-          <Button
-            id="cancel-membership-button"
-            key="cancel"
-            type="secondary"
-            style={{ borderColor: 'blue', color: 'blue'}}
-            className="mx-4 px-10"
-            onClick={closeModal}
-          >
-            Cancel
-          </Button>
-          <Button
-            id="create-membership-button"
-            key="submit"
-            type="primary"
-            style={{ backgroundColor: 'green', color: 'white'}}
-            className="mx-4 px-10"
-            onClick={formik.handleSubmit}
-            disabled={disabled}
-          >
-            {disabled ? <Spin /> : "Create"}
-          </Button>
-          <Button
-            id="list-membership-button"
-            key="list"
-            type="primary"
-            className="ml-4 mr-8 px-10"
-            onClick={openListNowModal}
-            disabled={disabled}
-          >
-            {disabled ? <Spin /> : "List Now"}
-          </Button>
-        </div>,
-      ]}
-    >
-      {contextHolder}
-      <h1
-        id="modal-title"
-        className="text-center font-semibold text-lg text-primaryB"
+      <Modal
+        open={open}
+        centered
+        onCancel={closeModal}
+        width={1000}
+        footer={[
+          <div className="flex justify-end mr-10">
+            <Button
+              id="cancel-membership-button"
+              key="cancel"
+              type="secondary"
+              style={{ borderColor: "blue", color: "blue" }}
+              className="mx-4 px-10"
+              onClick={closeModal}
+            >
+              Cancel
+            </Button>
+            <Button
+              id="create-membership-button"
+              key="submit"
+              type="primary"
+              style={{ backgroundColor: "green", color: "white" }}
+              className="mx-4 px-10"
+              onClick={formik.handleSubmit}
+              disabled={disabled}
+            >
+              {disabled ? <Spin /> : "Create"}
+            </Button>
+            <Button
+              id="list-membership-button"
+              key="list"
+              type="primary"
+              className="ml-4 mr-8 px-10"
+              onClick={openListNowModal}
+              disabled={disabled}
+            >
+              {disabled ? <Spin /> : "List Now"}
+            </Button>
+          </div>,
+        ]}
       >
-        Create Membership
-      </h1>
-      <hr className="text-secondryD mt-3" />
-      <Form layout="vertical" className="mt-5">
-        <div className="flex flex-col mb-7">
-          <Typography.Title level={5}>Membership</Typography.Title>
-          <div className="grid grid-cols-5 mb-6">
-            <Form.Item label="Membership Name" name="name">
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Membership Name"
-                onChange={(e) => {
-                  formik.setFieldValue("name", e.target.value);
-                }}
-                value={formik.values.name}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item label="Category" name="category" className="w-10/12">
-              <Select
-                id="category"
-                name="category"
-                placeholder="Select Category"
-                onChange={(value) => {
-                  formik.setFieldValue("category", value);
-                }}
-                value={formik.values.category}
-              >
-                {categorys.map((category) => (
-                  <Select.Option key={category.name} value={category.id}>
-                    {category.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-            <Form.Item label="Duration (Months)" name="duration">
-              <InputNumber
-                id="duration"
-                name="duration"
-                type="number"
-                min={0}
-                value={formik.values.duration}
-                onChange={(value) => {
-                  formik.setFieldValue("duration", value);
-                }}
-                className="w-10/12"
-              />
-            </Form.Item>
-            <Form.Item
-              label="Additional Information"
-              name="additionalInformation"
-              className="col-span-2"
-            >
-              <Input.TextArea
-                id="additionalInformation"
-                name="additionalInformation"
-                type="text"
-                onChange={(e) => {
-                  formik.setFieldValue("additionalInformation", e.target.value);
-                }}
-                value={formik.values.additionalInformation}
-                className=""
-              />
-            </Form.Item>
-          </div>
-
-          <Form.Item label="Images" name="images">
-            <Upload
-              id="images"
-              listType="picture-card"
-              multiple={true}
-              fileList={imageList}
-              onPreview={handlePreview}
-              onChange={handleImageChange}
-              beforeUpload={beforeUpload}
-              accept="image/png, image/webp, image/jpeg"
-            >
-              {imageList.length >= 10 ? null : uploadButton}
-            </Upload>
-            <Modal
-              open={previewOpen}
-              title={previewTitle}
-              footer={null}
-              onCancel={() => setPreviewOpen(false)}
-            >
-              <img
-                alt="example"
-                style={{
-                  width: "100%",
-                }}
-                src={previewImage}
-              />
-            </Modal>
-          </Form.Item>
-          <Form.Item label="Description" name="description">
-            <Input.TextArea
-              id="description"
-              name="description"
-              type="text"
-              placeholder="Description"
-              onChange={(e) => {
-                formik.setFieldValue("description", e.target.value);
-              }}
-              value={formik.values.description}
-              className=""
-            />
-          </Form.Item>
-        </div>
-
-        <div className="flex flex-col mb-7">
-          <Typography.Title level={5}>Services</Typography.Title>
-          <Button
-            className="w-80"
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              addServiceRow();
-              memberDiscount.push(1);
-            }}
-          >
-            Add Service
-          </Button>
-
-          {formik.values.services.map((service, index) => (
-            <div className="grid grid-cols-6 mt-3" key={`row_${index}`}>
-              <Form.Item
-                label="Service Name"
-                name={`serviceName_${index}`}
-                className="col-span-2 mr-7"
-                key={`serviceName_${index}`}
-                value={formik.values.services[index].serviceName}
-              >
-                <Select
-                  id={`serviceName_${index}`}
-                  name={`serviceName_${index}`}
-                  placeholder="Select Service"
-                  onChange={(value) => {
-                    const updatedServices = [...formik.values.services];
-                    updatedServices[index] = {
-                      ...updatedServices[index],
-                      serviceName: value,
-                    };
-                    formik.setFieldValue("services", updatedServices);
+        {contextHolder}
+        <h1
+          id="modal-title"
+          className="text-center font-semibold text-lg text-primaryB"
+        >
+          Create Membership
+        </h1>
+        <hr className="text-secondryD mt-3" />
+        <Form layout="vertical" className="mt-5">
+          <div className="flex flex-col mb-7">
+            <Typography.Title level={5}>Membership</Typography.Title>
+            <div className="grid grid-cols-5 mb-6">
+              <Form.Item label="Membership Name" name="name">
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="Membership Name"
+                  onChange={(e) => {
+                    formik.setFieldValue("name", e.target.value);
                   }}
-                  value={service.serviceName}
+                  value={formik.values.name}
+                  className="w-10/12"
+                />
+              </Form.Item>
+              <Form.Item label="Category" name="category" className="w-10/12">
+                <Select
+                  id="category"
+                  name="category"
+                  placeholder="Select Category"
+                  onChange={(value) => {
+                    formik.setFieldValue("category", value);
+                  }}
+                  value={formik.values.category}
                 >
                   {categorys.map((category) => (
-                    <Select.Option key={category.id} value={category.name}>
+                    <Select.Option key={category.name} value={category.id}>
                       {category.name}
                     </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
-              <Form.Item
-                label="Number of Uses"
-                name={`numberOfUses_${index}`}
-                key={`numberOfUses_${index}`}
-                value={service.numberOfUses}
-              >
+              <Form.Item label="Duration (Months)" name="duration">
                 <InputNumber
-                  id={`numberOfUses_${index}`}
-                  name={`numberOfUses_${index}`}
+                  id="duration"
+                  name="duration"
                   type="number"
                   min={0}
-                  value={service.numberOfUses}
+                  value={formik.values.duration}
                   onChange={(value) => {
-                    const updatedServices = [...formik.values.services];
-                    updatedServices[index] = {
-                      ...updatedServices[index],
-                      numberOfUses: value,
-                    };
-                    formik.setFieldValue("services", updatedServices);
+                    formik.setFieldValue("duration", value);
                   }}
                   className="w-10/12"
                 />
               </Form.Item>
-              <div className="col-span-2 flex flex-col items-center">
-                <Radio.Group
-                  defaultValue={1}
-                  buttonStyle="solid"
-                  className="col-span-2"
-                  size="small"
-                >
-                  <Radio.Button
-                    value={1}
-                    onClick={() => {
-                      handlePriceDiscountClick(index);
-                    }}
-                  >
-                    Discount Price
-                  </Radio.Button>
-                  <Radio.Button
-                    value={2}
-                    onClick={() => {
-                      handlePercentDiscountClick(index);
-                    }}
-                  >
-                    Discount Percent
-                  </Radio.Button>
-                </Radio.Group>
+              <Form.Item
+                label="Additional Information"
+                name="additionalInformation"
+                className="col-span-2"
+              >
+                <Input.TextArea
+                  id="additionalInformation"
+                  name="additionalInformation"
+                  type="text"
+                  onChange={(e) => {
+                    formik.setFieldValue(
+                      "additionalInformation",
+                      e.target.value
+                    );
+                  }}
+                  value={formik.values.additionalInformation}
+                  className=""
+                />
+              </Form.Item>
+            </div>
+
+            <Form.Item label="Images" name="images">
+              <Upload
+                id="images"
+                listType="picture-card"
+                multiple={true}
+                fileList={imageList}
+                onPreview={handlePreview}
+                onChange={handleImageChange}
+                beforeUpload={beforeUpload}
+                accept="image/png, image/webp, image/jpeg"
+              >
+                {imageList.length >= 10 ? null : uploadButton}
+              </Upload>
+              <Modal
+                open={previewOpen}
+                title={previewTitle}
+                footer={null}
+                onCancel={() => setPreviewOpen(false)}
+              >
+                <img
+                  alt="example"
+                  style={{
+                    width: "100%",
+                  }}
+                  src={previewImage}
+                />
+              </Modal>
+            </Form.Item>
+            <Form.Item label="Description" name="description">
+              <Input.TextArea
+                id="description"
+                name="description"
+                type="text"
+                placeholder="Description"
+                onChange={(e) => {
+                  formik.setFieldValue("description", e.target.value);
+                }}
+                value={formik.values.description}
+                className=""
+              />
+            </Form.Item>
+          </div>
+
+          <div className="flex flex-col mb-7">
+            <Typography.Title level={5}>Services</Typography.Title>
+            <Button
+              className="w-80"
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                addServiceRow();
+                memberDiscount.push(1);
+              }}
+            >
+              Add Service
+            </Button>
+
+            {formik.values.services.map((service, index) => (
+              <div className="grid grid-cols-6 mt-3" key={`row_${index}`}>
                 <Form.Item
-                  name={`memberPrice_${index}`}
-                  key={`memberPrice_${index}`}
-                  className="mt-2"
+                  label="Service Name"
+                  name={`serviceName_${index}`}
+                  className="col-span-2 mr-7"
+                  key={`serviceName_${index}`}
+                  value={formik.values.services[index].serviceName}
                 >
-                  <InputNumber
-                    id={`memberPrice_${index}`}
-                    name={`memberPrice_${index}`}
-                    type="number"
-                    min={0}
-                    value={service.memberPrice}
+                  <Select
+                    id={`serviceName_${index}`}
+                    name={`serviceName_${index}`}
+                    placeholder="Select Service"
                     onChange={(value) => {
                       const updatedServices = [...formik.values.services];
                       updatedServices[index] = {
                         ...updatedServices[index],
-                        memberPrice: value,
-                        percentDiscount: value, // Update both fields with the same value
+                        serviceName: value,
+                      };
+                      formik.setFieldValue("services", updatedServices);
+                    }}
+                    value={service.serviceName}
+                  >
+                    {categorys.map((category) => (
+                      <Select.Option key={category.id} value={category.name}>
+                        {category.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+                <Form.Item
+                  label="Number of Uses"
+                  name={`numberOfUses_${index}`}
+                  key={`numberOfUses_${index}`}
+                  value={service.numberOfUses}
+                >
+                  <InputNumber
+                    id={`numberOfUses_${index}`}
+                    name={`numberOfUses_${index}`}
+                    type="number"
+                    min={0}
+                    value={service.numberOfUses}
+                    onChange={(value) => {
+                      const updatedServices = [...formik.values.services];
+                      updatedServices[index] = {
+                        ...updatedServices[index],
+                        numberOfUses: value,
                       };
                       formik.setFieldValue("services", updatedServices);
                     }}
                     className="w-10/12"
-                    addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
                   />
                 </Form.Item>
+                <div className="col-span-2 flex flex-col items-center">
+                  <Radio.Group
+                    defaultValue={1}
+                    buttonStyle="solid"
+                    className="col-span-2"
+                    size="small"
+                  >
+                    <Radio.Button
+                      value={1}
+                      onClick={() => {
+                        handlePriceDiscountClick(index);
+                      }}
+                    >
+                      Discount Price
+                    </Radio.Button>
+                    <Radio.Button
+                      value={2}
+                      onClick={() => {
+                        handlePercentDiscountClick(index);
+                      }}
+                    >
+                      Discount Percent
+                    </Radio.Button>
+                  </Radio.Group>
+                  <Form.Item
+                    name={`memberPrice_${index}`}
+                    key={`memberPrice_${index}`}
+                    className="mt-2"
+                  >
+                    <InputNumber
+                      id={`memberPrice_${index}`}
+                      name={`memberPrice_${index}`}
+                      type="number"
+                      min={0}
+                      value={service.memberPrice}
+                      onChange={(value) => {
+                        const updatedServices = [...formik.values.services];
+                        updatedServices[index] = {
+                          ...updatedServices[index],
+                          memberPrice: value,
+                          percentDiscount: value, // Update both fields with the same value
+                        };
+                        formik.setFieldValue("services", updatedServices);
+                      }}
+                      className="w-10/12"
+                      addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
+                    />
+                  </Form.Item>
+                </div>
+                <Button
+                  className="w-10/12 self-end"
+                  key={`removeService_${index}`}
+                  type="primary"
+                  icon={<MinusOutlined />}
+                  onClick={() => {
+                    removeServiceRow();
+                    memberDiscount.pop();
+                  }}
+                ></Button>
               </div>
-              <Button
-                className="w-10/12 self-end"
-                key={`removeService_${index}`}
-                type="primary"
-                icon={<MinusOutlined />}
-                onClick={() => {
-                  removeServiceRow();
-                  memberDiscount.pop();
-                }}
-              ></Button>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col">
-          {/* TODO: make sure this works for uploading multiple files */}
-          <Typography.Title level={5}>Documents</Typography.Title>
-          <Form.Item label="Documents" name="documents">
-            <Dragger {...props}>
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined />
-              </p>
-              <p className="ant-upload-text">
-                Click or drag file to this area to upload
-              </p>
-              <p className="ant-upload-hint">
-                Support for a single or bulk upload.
-              </p>
-            </Dragger>
-          </Form.Item>
-        </div>
-      </Form>
-    </Modal>
-    {visible && (
+            ))}
+          </div>
+          <div className="flex flex-col">
+            {/* TODO: make sure this works for uploading multiple files */}
+            <Typography.Title level={5}>Documents</Typography.Title>
+            <Form.Item label="Documents" name="documents">
+              <Dragger {...props}>
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">
+                  Click or drag file to this area to upload
+                </p>
+                <p className="ant-upload-hint">
+                  Support for a single or bulk upload.
+                </p>
+              </Dragger>
+            </Form.Item>
+          </div>
+        </Form>
+      </Modal>
+      {visible && (
         <ListNowModal
           open={visible}
           user={user}
