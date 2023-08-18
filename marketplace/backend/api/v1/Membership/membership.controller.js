@@ -2,10 +2,55 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import { getSignedUrlFromS3 } from '../../../helpers/s3'
+import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
 
 class MembershipController {
+
+  static async get(req, res, next) {
+    try {
+      const { dapp, params } = req
+      const { address, chainId } = params 
+     
+      let args
+      let chainOptions = options
+      
+      if (address) {
+        args = { address }
+        if (chainId) {
+          chainOptions = { ...options, chainIds: [chainId] }
+        }
+      }
+
+      const result = await dapp.getMembership(args, chainOptions)
+      const temp = result.productFiles?.map(async (productFile) => {
+        const productFileImageUrl = await getSignedUrlFromS3(productFile.productFileFileLocaiton, req.app.get(constants.s3ParamName))
+        return { ...productFile, imageUrl: productFileImageUrl }
+      }) || []
+      const out = { membership : result.membership, membershipServices: result.membershipServices, productFiles: temp }
+
+      rest.response.status200(res, out)
+      
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getAll(req, res, next) {
+    try {
+      const { dapp, query } = req
+      
+      const memberships = await dapp.getMemberships({ ...query })
+      rest.response.status200(res, memberships)
+     
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
   static async create(req, res, next) {
     try {
