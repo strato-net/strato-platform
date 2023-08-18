@@ -25,6 +25,7 @@ import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
 import membershipJs from "../membership/membership";
 import membershipServiceJs from "../membershipService/membershipService";
+import membershipManagerJs from "../membership/membershipManager";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -36,6 +37,7 @@ const allAssetNames = [
   productFileJs.contractName,
   membershipJs.contractName,
   membershipServiceJs.contractName,
+  membershipManagerJs.contractName,
 ];
 
 const contractName = "Dapp";
@@ -128,10 +130,11 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const serviceManager = await serviceManagerJS.bindAddress(admin, state.serviceManager, options)
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
+  const membershipManager = await membershipManagerJs.bindAddress(admin, state.membershipManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager, membershipManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
@@ -1009,6 +1012,35 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     }
   }
 
+
+  contract.createMembership = async function (args, options = defaultOptions) {
+    try {
+      
+        const { membershipArgs, membershipServiceArgs, productFileArgs } = args;
+
+        const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+
+        const [membership] = await managers.membershipManager.createMembership({ 
+          dappAddress: contract.address,
+          membershipArgs: membershipArgs, 
+          membershipServiceArgs: membershipServiceArgs, 
+          productFileArgs: productFileArgs
+        });
+
+        return { membership };
+    } catch (error) {
+        if (error.response) {
+            throw new rest.RestError(error.response.status, error.response.statusText);
+        }
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the membership");
+    }   
+
+  };
+
+
+
+
+
   contract.updateBuyerDetails = async function (args, options = defaultOptions) {
     try {
       const { address, chainId, updates } = args;
@@ -1299,15 +1331,58 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   //-----------------------------Order ends here -------------------------------
   //-----------------------------Membership starts here -------------------------------
-  contract.createMembership = async function (args, options = defaultOptions) {
-    const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
-    return membershipJs.uploadContract(rawAdmin, args, createOptions)
-  }
+  // contract.createMembership = async function (args, options = defaultOptions) {
+  //   const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
+
+  //   const membership = membershipManagerJs.createMembership(rawAdmin, args, createOptions)
+  //   console.log('dapp membershipManagerJs.createMembership', membership)
+  //   return membership
+  // }
 
   contract.getMembership = async function (args, options = optionsNoChainIds) {
     // May need to insert contractName in options when this goes throught the product manager
     // This param was hard coded for the get and getAll functions for Membership and MembershipService below
-    return membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+    
+    // Get The membership
+    const membership = await membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+    
+    // Get The productFiles
+    console.log("start", membership.productId)
+    const productFiles = undefined
+    if(membership.productId){
+      productFiles = await productFileJs.getAll(rawAdmin, { productId: membership.productId}, {...options, org: managers.cirrusOrg, app: ""})
+    }
+    
+    
+    // Get all membershipServices
+    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: "" }))?.membershipServices ?? [];
+
+    // Get all services
+    const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
+
+    // Combine the data and merge the service data into the membershipService data
+    const combinedData = {
+      membership: membership,
+      membershipServices: membershipServices.map(membershipService => {
+        const matchingService = servicesAll.find(service => service.address === membershipService.serviceId);
+    
+        if (matchingService) {
+          return {
+            ...membershipService,
+            savings: membershipService.maxQuantity * (matchingService.price - membershipService.price),
+            serviceName: matchingService.name,
+            serviceDescription: matchingService.description,
+            servicePrice: matchingService.price,
+            serviceCreatedDate: matchingService.createdDate
+          };
+        } else {
+          return membershipService;
+        }
+      }),
+      productFiles: productFiles
+    };
+    console.log("Dapp-getMembership combinedData: ", combinedData);
+    return combinedData
   }
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
@@ -1357,9 +1432,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   contract.getMembershipServices = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = {...options, org: managers.cirrusOrg, app: ""}
-    return membershipServiceJs.getAll(rawAdmin, { 
+    const out = await membershipServiceJs.getAll(rawAdmin, { 
       ...args
     }, getOptions)
+    console.log("getMembershipServices getOptions: ", getOptions)
+    console.log("getMembershipServices: ", out)
+    return out
   }
 
   contract.transferOwnershipMembershipService = async function (args, options = defaultOptions) {

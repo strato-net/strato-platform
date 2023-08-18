@@ -98,7 +98,7 @@ describe('Membership End-To-End Tests', function () {
   })
 
   it('Get a Membership', async () => {
-    // create
+    create
     const createArgs = {
       ...membershipArgs(util.uid()),
     }

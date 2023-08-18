@@ -28,7 +28,10 @@ const actionDescriptors = {
   updateAssetImportCount: "update_asset_import_count",
   updateAssetUploadError: "update_asset_upload_error",
   openImportCSVModal: "open_import_csv_modal",
-  closeImportCSVModal: "close_import_csv_modal"
+  closeImportCSVModal: "close_import_csv_modal",
+  fetchMembershipFromDetails: "fetch_membership_of_inventory",
+  fetchMembershipFromDetailsSuccessful: "fetch_membership_of_inventory_successful",
+  fetchMembershipFromDetailsFailed: "fetch_membership_of_inventory_failed",
 };
 
 const actions = {
@@ -264,6 +267,34 @@ const actions = {
     dispatch({ type: actionDescriptors.importAssetSuccess });
     dispatch({ type: actionDescriptors.updateAssetUploadError, errors });
     actions.setMessage(dispatch, `Imported ${assets.length} records`, true)
+  },
+  
+  fetchMembershipFromDetails: async (dispatch, limit, offset, queryValue, membershipId) => {
+    const query = queryValue
+      ? `&serviceTypeId=${queryValue}`
+      : "";
+
+    dispatch({ type: actionDescriptors.fetchMembershipFromDetails });
+
+    try {
+      //would use membershipId here and use getAll
+      const response = await fetch(`${apiUrl}/membership/${membershipId}?limit=${limit}&offset=${offset}${query}`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+      console.log("fetchMembershipFromDetails response: ", body.data)
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchMembershipFromDetailsSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
+    }
   },
 };
 
