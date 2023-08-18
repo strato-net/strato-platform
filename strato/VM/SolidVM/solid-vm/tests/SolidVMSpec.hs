@@ -745,19 +745,6 @@ bAccount a =
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
 
--- hash(0xFF, sender, salt, code_hash, args)[12::]
-deriveAddressWithSalt :: String -> BC.ByteString -> String -> Address
-deriveAddressWithSalt salt src args = do
-  let theAddress = fromJust $ stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe"
-      theHash = hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
-                                               , rlpEncode theAddress
-                                               , rlpEncode salt
-                                               , rlpEncode $ keccak256ToByteString $ hash src
-                                               , rlpEncode args
-                                               ]
-  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
-  (decode $ BL.drop 12 $ encode theHash)
-
 spec :: Spec
 spec = do
   xdescribe "Ballot" $ do
@@ -5744,9 +5731,9 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn`
-      [ bContract "X" $ deriveAddressWithSalt "salt" (BC.pack src) "[]"
-      , bContract "Y" $ deriveAddressWithSalt "something" (BC.pack src) "[]"
+    getFields ["x", "y"] `shouldReturn` 
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) "OrderedVals []"
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just $ BC.pack src) "OrderedVals []"
       ]
 
   it "can deterministically create multiple salted contract with args" . runTest $ do
@@ -5779,9 +5766,9 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn`
-      [ bContract "X" $ deriveAddressWithSalt "salt" (BC.pack src) "[Constant: SString \"xNum\"]"
-      , bContract "Y" $ deriveAddressWithSalt "salt" (BC.pack src) "[Constant: SInteger 100]"
+    getFields ["x", "y"] `shouldReturn` 
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) "OrderedVals [SString \"xNum\"]"
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) "OrderedVals [SInteger 100]"
       ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -5807,7 +5794,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt "Dustin Norwood" (BC.pack src) "[Constant: SString \"Dustin Norwood\",Constant: SString \"Thebestcertyoucangetfor$99.99\"]"]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just $ BC.pack src) "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]"]
     [BContract "User" x] <- getFields["x"]
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
@@ -7235,4 +7222,46 @@ contract qq is SafeMath {
     getFields ["x"] `shouldReturn` [BInteger 4]
 
 
+  it "can parse variadic arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 1;
+  uint y = 2;
+  string z = "hi";
+  uint zz = 3;
 
+  function myVariadic(variadic args) {
+    x = 2;
+  }
+
+  function myVariadic2(variadic args) {
+    y = 3;
+  }
+
+  function myVariadic3(string f, uint i, variadic args) {
+    z = f;
+    zz = i;
+  }
+
+  constructor() {
+    myVariadic();
+    myVariadic2(1, 2, 3, 4, 5);
+    myVariadic3("bye", 10, 55, 66, 77);
+  }
+}|]
+    getFields ["x", "y", "z", "zz"] `shouldReturn` [BInteger 2, BInteger 3, BString "bye", BInteger 10]
+
+
+  it "can handle parsing invalid variadic signatures - more than 1 variadic parameter" $ runTest (
+    runBS [r|
+contract qq {
+    function badVariadic (uint a, variadic b, variadic c) {}
+}|]) `shouldThrow` anyParseError
+
+
+
+  it "can handle parsing invalid variadic signatures - misplaced variadic parameter" $ runTest (
+    runBS [r|
+contract qq {
+  function badVariadic (uint a, variadic b, string c) {}
+}|]) `shouldThrow` anyParseError
