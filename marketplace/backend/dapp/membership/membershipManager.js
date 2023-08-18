@@ -42,7 +42,7 @@ async function uploadContract(user, _constructorArgs, options) {
 }
 
 
-///// @title A representation of MembershipManager to manage membership and inventory
+//@title A representation of MembershipManager to manage membership and inventory
 //contract MembershipManager is RestStatus{
 //
 //
@@ -172,7 +172,6 @@ async function uploadContract(user, _constructorArgs, options) {
 //Multidimensional arrays can be sent as normal multidimensional JSON arrays.
 //
 //Example
-/
 //Structs
 //
 //Structs can be sent to the API as JSON objects, where each key of the object represents a data-point in the Solidity struct.
