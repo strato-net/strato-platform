@@ -1344,18 +1344,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     // This param was hard coded for the get and getAll functions for Membership and MembershipService below
     
     // Get The membership
-    const membership = await membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: ""})
+    const membership = await membershipJs.get(rawAdmin, args, {...options, org: managers.cirrusOrg, app: contractName})
     
     // Get The productFiles
     console.log("start", membership.productId)
-    const productFiles = undefined
+    var productFiles = undefined
     if(membership.productId){
-      productFiles = await productFileJs.getAll(rawAdmin, { productId: membership.productId}, {...options, org: managers.cirrusOrg, app: ""})
+      productFiles = await productFileJs.getAll(rawAdmin, { productId: membership.productId}, {...options, org: managers.cirrusOrg, app: contractName})
     }
     
     
     // Get all membershipServices
-    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: "" }))?.membershipServices ?? [];
+    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }))?.membershipServices ?? [];
 
     // Get all services
     const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
@@ -1386,7 +1386,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   }
 
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = {...options, org: managers.cirrusOrg, app: ""}
+    const getOptions = {...options, org: managers.cirrusOrg, app: contractName}
     return membershipJs.getAll(rawAdmin, { 
       ...args
     }, getOptions)
