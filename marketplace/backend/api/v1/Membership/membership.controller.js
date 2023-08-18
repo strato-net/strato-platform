@@ -24,7 +24,6 @@ class MembershipController {
         
   static validateCreateMembershipArgs(args) {
     const createMembershipSchema = Joi.object({
-        dappAddress: Joi.string().required(),
         membershipArgs: Joi.object({
             name: Joi.string().required(),
             description: Joi.string().required(),
@@ -55,8 +54,8 @@ class MembershipController {
             fileName: Joi.string().required(),
             uploadDate: Joi.number().required(),
             createdDate: Joi.number().required(),
-            section: Joi.string().required(),
-            type: Joi.string().required(),
+            section: Joi.number().required(),
+            type: Joi.number().required(),
         })).required(),
     });
 

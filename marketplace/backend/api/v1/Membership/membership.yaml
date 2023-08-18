@@ -122,8 +122,6 @@ definitions:
   createMembership:
     type: object
     properties:
-      dappAddress:
-        type: string
       membershipArgs:
         type: object
         properties:

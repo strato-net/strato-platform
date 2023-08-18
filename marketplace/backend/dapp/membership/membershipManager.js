@@ -302,7 +302,7 @@ async function createMembership(user, contract, args, options) {
 
     const callArgs = {
         contract,
-        method: 'createMembership',
+        method: 'addMembership',
         args: util.usc(args),
     };
     const createMembershipStatus = await rest.call(user, callArgs, options);

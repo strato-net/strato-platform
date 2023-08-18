@@ -1,7 +1,7 @@
 
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "./Membership.sol";
-import "/dapp/membershipService/contracts/MembershipService.sol";
+import "/dapp/membershipservice/contracts/MembershipService.sol";
 import "/dapp/ProductFile/contracts/ProductFile.sol";
 import "/dapp/products/contracts/ProductManager.sol";
 import "/dapp/Dapp/contracts/Dapp.sol";
@@ -17,7 +17,7 @@ contract MembershipManager is RestStatus{
     mapping(address => address[]) private membershipServices; 
     mapping(address => address[]) private productFiles; 
 
-
+    Dapp public dapp;
 
     constructor() public returns (address){
         owner = msg.sender;
@@ -68,33 +68,33 @@ contract MembershipManager is RestStatus{
         returns (uint256, address) {
 
 
-        Dapp dapp = Dapp(account(_dappAddress, "parent"));
+        dapp = Dapp(account(_dappAddress, "parent"));
 
-        if (dapp == address(0)) {
-            return (RestStatus.NOT_FOUND, address(0));
-        }
+        // if (dapp == address(0)) {
+        //     return (RestStatus.NOT_FOUND, address(0));
+        // }
 
         ProductManager productManager = ProductManager(dapp.productManager());
 
 
 
         address product;
-        RestStatus rs;
+        uint256 rs;
 
-        (rs,product) = productManager.addProduct(_membershipArgs.name, _membershipArgs.description, _membershipArgs.manufacturer, 
+        (rs, product) = productManager.addProduct(_membershipArgs.name, _membershipArgs.description, _membershipArgs.manufacturer, 
                                                  _membershipArgs.unitOfMeasurement, _membershipArgs.userUniqueMembershipCode,
                                                  _membershipArgs.uniqueMembershipCode, _membershipArgs.leastSellableUnit,
                                                  _membershipArgs.imageKey, _membershipArgs.isActive, _membershipArgs.category,
                                                  _membershipArgs.subCategory, _membershipArgs.createdDate);
         
-        Membership membership = new Membership_2(address(product), _timePeriodInMonths, _additionalInfo, _createdDate);
+        Membership_2 membership = new Membership_2(address(product), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
 
         //iterate throught MembershipServiceArgs array and create MembershipServices 
 
         for(uint i = 0; i < _membershipServiceArgs.length; i++) {
             MembershipServiceArgs membershipServiceArg = _membershipServiceArgs[i];
             MembershipService membershipService = new MembershipService(address(membership), 
-                                                                        membershipServiceArg.serviceId, 
+                                                                        address(membershipServiceArg.serviceId), 
                                                                         membershipServiceArg.membershipPrice, 
                                                                         membershipServiceArg.discountPrice, 
                                                                         membershipServiceArg.maxQuantity, 
@@ -105,8 +105,8 @@ contract MembershipManager is RestStatus{
 
         }
 
-        for (uint i = 0; i < _productFileArgs.length; i++) {
-            ProductFileArgs productFileArg = _productFileArgs[i];
+        for (uint ip = 0; ip < _productFileArgs.length; ip++) {
+            ProductFileArgs productFileArg = _productFileArgs[ip];
             ProductFile productFile = new ProductFile(address(product), 
                                                         productFileArg.fileLocation, 
                                                         productFileArg.fileHash, 

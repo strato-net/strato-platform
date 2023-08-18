@@ -1015,13 +1015,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   contract.createMembership = async function (args, options = defaultOptions) {
     try {
-        const { dappAddress, membershipArgs, membershipServiceArgs, productFileArgs } = args;
-
-        const dapp = { name: dappJs.contractName, address: dappAddress };
+      
+        const { membershipArgs, membershipServiceArgs, productFileArgs } = args;
 
         const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
 
-        const [membership] = await managers.membershipManager.createMembership({ dapp, membershipArgs, membershipServiceArgs, productFileArgs });
+        const [membership] = await managers.membershipManager.createMembership({ 
+          dappAddress: contract.address,
+          membershipArgs: membershipArgs, 
+          membershipServiceArgs: membershipServiceArgs, 
+          productFileArgs: productFileArgs
+        });
 
         return { membership };
     } catch (error) {
@@ -1327,10 +1331,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   //-----------------------------Order ends here -------------------------------
   //-----------------------------Membership starts here -------------------------------
-  contract.createMembership = async function (args, options = defaultOptions) {
-    const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
-    return membershipJs.uploadContract(rawAdmin, args, createOptions)
-  }
+  // contract.createMembership = async function (args, options = defaultOptions) {
+  //   const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
+
+  //   const membership = membershipManagerJs.createMembership(rawAdmin, args, createOptions)
+  //   console.log('dapp membershipManagerJs.createMembership', membership)
+  //   return membership
+  // }
 
   contract.getMembership = async function (args, options = optionsNoChainIds) {
     // May need to insert contractName in options when this goes throught the product manager
