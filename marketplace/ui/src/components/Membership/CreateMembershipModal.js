@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useFormik } from "formik";
 import {
   Form,
@@ -15,19 +15,26 @@ import {
 } from "antd";
 import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 // import getSchema from "./ProductSchema";
-
+import useDebounce from "../UseDebounce";
 //sub-categories
 import { actions } from "../../contexts/membership/actions";
+import { actions as serviceActions } from "../../contexts/service/actions";
 import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../contexts/membership";
+import { useServiceState, useServiceDispatch } from "../../contexts/service";
 import ListNowModal from "./ListNowModal";
 
 const { Dragger } = Upload;
 
 const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   // const schema = getSchema();
+  const limit = 10;
+  // Can update these values for service search later on
+  const [offset, setOffset] = useState(0);
+  const [queryValue, setQueryValue] = useState("");
+  const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const dispatch = useMembershipDispatch();
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
@@ -40,6 +47,19 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
     useMembershipState();
 
+  const { services, isservicesLoading } = useServiceState();
+  const serviceDispatch = useServiceDispatch();
+
+  // TODO: We should probably only query services made by the user's organization
+  useEffect(() => {
+    serviceActions.fetchService(
+      serviceDispatch,
+      limit,
+      offset,
+      debouncedSearchTerm
+    );
+  }, [serviceDispatch, limit, offset, debouncedSearchTerm]);
+
   const initialValues = {
     name: "",
     category: "",
@@ -51,6 +71,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     quantity: "",
     services: [
       {
+        serviceId: "",
         serviceName: "",
         numberOfUses: "",
         memberPrice: null,
@@ -186,6 +207,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     // console.log("updated Values", updatedValues);
     // console.log("values", values);
 
+    // TODO: Add image and file upload to S3
     const body = {
       membershipArgs: {
         name: updatedValues.name,
@@ -197,21 +219,23 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
         // Generate random number for now
         uniqueMembershipCode: Math.floor(Math.random() * 1000000),
         leastSellableUnit: 1,
+        // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array. 
         imageKey: updatedValues.images[0].name,
         category: updatedValues.category,
         subCategory: updatedValues.category,
         createdDate: new Date().getTime(),
         timePeriodInMonths: updatedValues.duration,
         additionalInfo: updatedValues.additionalInformation,
+        // If visible is true the List Now form is open and the membership is active
         isActive: visible ? true : false,
       },
       membershipServiceArgs: updatedValues.services.map((service) => ({
-        // Using a random service id for now will integrate later
-        serviceId: "79d45dec737779c0ebb1a949c9465e81c1bb0ba7",
+        serviceId: service.serviceId,
         membershipPrice: service.memberPrice ? service.memberPrice : 0,
         discountPrice: service.percentDiscount ? service.percentDiscount : 0,
         maxQuantity: service.numberOfUses,
         createdDate: new Date().getTime(),
+        // If visible is true the List Now form is open and the membership is active
         isActive: visible ? true : false,
       })),
       productFileArgs: updatedValues.documents.map((document, index) => ({
@@ -225,15 +249,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
       })),
     };
 
-    console.log("body", body);
+    // console.log("body", body);
     const isDone = await actions.createMembership(dispatch, body);
     if (isDone) {
       formik.resetForm();
       handleCancel();
     }
-
-    // TODO: Update this data to match whats needed in the backend.
-    // Might have to send images and documents separately.
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
@@ -459,16 +480,24 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                       updatedServices[index] = {
                         ...updatedServices[index],
                         serviceName: value,
+                        serviceId: services.find(
+                          (service) => service.name === value
+                        ).address,
                       };
                       formik.setFieldValue("services", updatedServices);
                     }}
                     value={service.serviceName}
                   >
-                    {categorys.map((category) => (
-                      <Select.Option key={category.id} value={category.name}>
-                        {category.name}
-                      </Select.Option>
-                    ))}
+                    {/* TODO: We should think about how we want to load services. If its a long list it might not be the best way to display them this way. */}
+                    {isservicesLoading === false &&
+                      services.map((service) => (
+                        <Select.Option
+                          key={service.address}
+                          value={service.name}
+                        >
+                          {service.name}
+                        </Select.Option>
+                      ))}
                   </Select>
                 </Form.Item>
                 <Form.Item
@@ -534,7 +563,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                         updatedServices[index] = {
                           ...updatedServices[index],
                           memberPrice: value,
-                          percentDiscount: value, // Update both fields with the same value
+                          percentDiscount: value, // Update both fields with the same value later on we will remove the one that is not being used
                         };
                         formik.setFieldValue("services", updatedServices);
                       }}
