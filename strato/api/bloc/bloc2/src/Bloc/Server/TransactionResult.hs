@@ -73,10 +73,10 @@ import           BlockApps.SolidityVarReader
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
+import           Blockchain.DB.CodeDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.CodePtr   (CodeKind(..))
 import           Blockchain.Strato.Model.Keccak256
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import           Bloc.API.TypeWrappers
@@ -107,6 +107,7 @@ emptyBatchState = BatchState Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' :: ( (Keccak256 `A.Selectable` SourceMap) m
+                             , HasCodeDB m
                              , A.Selectable Account AddressState m
                              , MonadLogger m
                              , HasSQL m
@@ -127,6 +128,7 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: ( (Keccak256 `A.Selectable` SourceMap) m
+                            , HasCodeDB m
                             , A.Selectable Account AddressState m
                             , MonadLogger m
                             , HasSQL m
@@ -136,6 +138,7 @@ getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults
 
 
 getBatchBlocTransactionResult' :: ( (Keccak256 `A.Selectable` SourceMap) m
+                                  , HasCodeDB m
                                   , A.Selectable Account AddressState m
                                   , MonadLogger m
                                   , HasSQL m
@@ -147,6 +150,7 @@ getBatchBlocTransactionResult' hashes resolve =
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults :: ( (Keccak256 `A.Selectable` SourceMap) m
+                              , HasCodeDB m
                               , A.Selectable Account AddressState m
                               , MonadLogger m
                               , HasSQL m
@@ -214,6 +218,7 @@ rawTx2PostTx RawTransaction{..} = Deprecated.PostTransaction
   }
 
 evalAndReturn :: ( (Keccak256 `A.Selectable` SourceMap) m
+                 , HasCodeDB m
                  , A.Selectable Account AddressState m
                  , MonadLogger m
                  , HasSQL m
@@ -267,6 +272,7 @@ contractResult i txHash txResult@TransactionResult{..} mmd = do
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
 
 functionResult :: ( A.Selectable Account AddressState m
+                  , HasCodeDB m
                   , (Keccak256 `A.Selectable` SourceMap) m
                   , MonadLogger m
                   , HasSQL m

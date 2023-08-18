@@ -244,6 +244,7 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable GasCap m
                 , HasMemAddressStateDB m
                 , A.Selectable Word256 ParentChainIds m
+                , A.Selectable Account AddressState m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
@@ -426,6 +427,9 @@ instance (Account `A.Alters` AddressState) ContextM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
+
+instance A.Selectable Account AddressState ContextM where
+  select _ = getAddressStateMaybe
 
 instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
   lookup _ chainId = do

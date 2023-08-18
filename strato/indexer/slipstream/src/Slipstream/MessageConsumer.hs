@@ -10,6 +10,8 @@ module Slipstream.MessageConsumer (
   getAndProcessMessages
   ) where
 
+import Prelude hiding (lookup)
+import Control.Monad.Change.Alter
 import Control.Monad.IO.Unlift
 import Data.IORef
 import Data.String
@@ -19,8 +21,11 @@ import qualified Network.Kafka.Protocol as K hiding (Message)
 
 import Bloc.Monad (BlocEnv)
 import BlockApps.Logging
+import Blockchain.Data.AddressStateDB
+import Blockchain.DB.CodeDB
 import Blockchain.MilenaTools
 import Blockchain.Stream.VMEvent
+import Blockchain.Strato.Model.Account
 
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
@@ -64,15 +69,25 @@ putStatediffOffset off = do
         error $ show err
       Right () -> return ()
 
-getAndProcessMessages :: (MonadLogger m, HasKafka m, HasSQL m) =>
-                         BlocEnv -> PGConnection -> IORef Globals -> m ()
+getAndProcessMessages :: ( MonadLogger m
+                         , HasKafka m
+                         , HasSQL m
+                         , Selectable Account AddressState m
+                         , HasCodeDB m
+                         )
+                      => BlocEnv -> PGConnection -> IORef Globals -> m ()
 getAndProcessMessages env conn cache = do
   let errorCount = 0
   offset <- getStatediffOffset
   getAndProcessMessages' env conn cache offset errorCount
 
-getAndProcessMessages' :: (MonadLogger m, HasKafka m, HasSQL m) =>
-                          BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
+getAndProcessMessages' :: ( MonadLogger m
+                          , HasKafka m
+                          , HasSQL m
+                          , Selectable Account AddressState m
+                          , HasCodeDB m
+                          )
+                       => BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
 getAndProcessMessages' env conn cache offset errorCounter = do
   $logInfoS "getAndProcessMessages'" $ T.pack $ "#### fetching VMEvents: Offset=" ++ show offset
   recordOffset offset
