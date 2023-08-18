@@ -558,6 +558,7 @@ postBlocTransaction' :: ( MonadLogger m
 postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
   accountNonceLimit <- fmap accountNonceLimit getBlocEnv
+  userRegistry <- fmap userRegistryAddress getBlocEnv
   case mJwtToken of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
     Just jwtToken -> do
@@ -570,8 +571,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                 ]
       userCert <- maybe (throwIO err) pure =<<
         A.select (A.Proxy @Certificate) addr
-      let userContractAddr = deriveAddressWithSalt Nothing (certificateCommonName userCert) Nothing "OrderedVals []"
-      $logInfoS "DEBUG" $ Text.pack $ show userContractAddr
+      let userContractAddr = deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) Nothing "OrderedVals []"
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0
