@@ -38,7 +38,7 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage
 import Slipstream.Options
 import Slipstream.OutputData
-import Slipstream.Processor
+-- import Slipstream.Processor
 
 import SelectAccessible ()
 
@@ -96,8 +96,8 @@ main = do
     gref <- newGlobals handle (CirrusHandle conn S.empty)
 
     --Create Mercata Abstract tables
-    generateAssetTable conn gref
-    generateSaleTable conn gref
-    generateUserTable conn gref
+    -- generateAssetTable conn gref
+    -- generateSaleTable conn gref
+    -- generateUserTable conn gref
     
     getAndProcessMessages env conn gref

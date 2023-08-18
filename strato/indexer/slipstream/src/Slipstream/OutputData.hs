@@ -894,11 +894,12 @@ insertAbstractTableQuery cs = concat $
           let contractTableName = indexTableName
                   (E.organization x)
                   (E.application x)
-                  (E.contractName x)   
-              abTableName = abstractTableName
-                  (E.organization x)
-                  (E.contractName x)
-                  (ab)
+                  (E.contractName x)  
+              abTableName = case ab of
+                "Asset" -> abstractTableName "" "" "Asset"
+                "Sale"  -> abstractTableName "" "" "Sale"
+                "User"  -> abstractTableName "" "" "User"
+                _ -> abstractTableName (E.organization x) (E.contractName x) (ab)
               abTableName' = tableNameToDoubleQuoteText abTableName 
               keySt  = wrapAndEscapeDouble . map escapeQuotes $ (baseAbstractTableColumns ++ abColumns)
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
