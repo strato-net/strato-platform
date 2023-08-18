@@ -335,6 +335,8 @@ processTheMessages env conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
+  let hardCodeAbstracts (o,a,n) | n `elem` ["Asset", "Sale", "User"] = ("", "", n)
+                                | otherwise                          = (o, a, n)
 
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
@@ -370,7 +372,7 @@ processTheMessages env conn g messages = do
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
-                let nameParts = (o, a', n)
+                let nameParts = hardCodeAbstracts (o, a', n)
 
                 --Create mapping tables
                 forM_ mapNames $ \m -> do 
@@ -380,7 +382,7 @@ processTheMessages env conn g messages = do
 
                 deferredForeignKeys <- case (_contractType c ) of
                   AbstractType -> do
-                    outputData conn $ createAbstractTable g c (o, a', n)
+                    outputData conn $ createAbstractTable g c $ hardCodeAbstracts (o, a', n)
                     return []
                   _ -> do
                     outputData conn $ createExpandIndexTable g c nameParts
@@ -389,7 +391,7 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
                 
-                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTableRow g c (o, a', n) (head parentAbstractContractsName)
+                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTableRow g c (hardCodeAbstracts (o, a', n)) (head parentAbstractContractsName)
 
   
                 return deferredForeignKeys
@@ -436,21 +438,21 @@ processTheMessages env conn g messages = do
                               [] -> return Nothing
                               (firstAbstract:_) -> do
                                 case  (SE.application indexContract) of
-                                  "" -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.contractName indexContract) firstAbstract
-                                  _ -> getTableColumns g $ AbstractTableName (SE.organization indexContract) (SE.application indexContract) firstAbstract
+                                  "" -> let (o',a',n') = hardCodeAbstracts (SE.organization indexContract, SE.contractName indexContract, firstAbstract)
+                                         in getTableColumns g $ AbstractTableName o' a' n'
+                                  _ -> let (o',a',n') = hardCodeAbstracts (SE.organization indexContract, SE.application indexContract, firstAbstract)
+                                        in getTableColumns g $ AbstractTableName o' a' n'
           
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          if null abstracts
-            then pure . Right $ BatchedInserts
-             indexContract Nothing hs pMappings
-          else
-            case abstractColumns of 
+          case abstracts of
+            [] -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+            (firstAbstract:_) -> case abstractColumns of 
               Just abC -> do
                 let finalColumns = map extractTextInsideQuotes abC
-                pure . Right $ BatchedInserts indexContract (Just (indexContract, head abstracts, finalColumns)) hs pMappings
+                pure . Right $ BatchedInserts indexContract (Just (indexContract, firstAbstract, finalColumns)) hs pMappings
               Nothing -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
             
 
