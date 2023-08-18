@@ -20,6 +20,7 @@ import userAddressJs from "/dapp/addresses/userAddress.js";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
+import productDocumentManagerJs from '/dapp/productDocuments/productDocumentManager';
 
 const allAssetNames = [
   orderJs.contractName,
@@ -114,13 +115,14 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const state = await rest.getState(admin, contract, options);
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
+  const productDocumentManager = await productDocumentManagerJs.bindAddress(admin, state["productDocumentManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager, productDocumentManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -609,12 +611,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //Get the product contract
     console.log('dapp.getProperty - property', property)
     console.log('dapp.getProperty - productId', property.productId)
-    const productData = await managers.productManager.getProduct({ 
+    const productData = await managers.productManager.getProduct({
       address: property.productId,
       uniqueProductID: property.productId,
-      ownerOrganization: userOrganization }, getOptions);
-      console.log('dapp.getProperty - productData', productData)
-    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
+      ownerOrganization: userOrganization
+    }, getOptions);
+    const propertyImages = await managers.productDocumentManager.getProductDocuments({ ...args, productId: property.productId }, getOptions);
+    const propertyData = {
+      ...property,
+      title: productData.name,
+      description: productData.description,
+      propertyType: productData.subCategory,
+      images: propertyImages
+    }
     return propertyData
   };
 
@@ -624,16 +633,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const propertiesWProducts = []
 
     for (const property of allPropertiesData) {
-      const productData = await managers.productManager.getProduct({ 
+      const productData = await managers.productManager.getProduct({
         ...args,
         offset: 0,
         sort: null,
         address: property.productId,
         uniqueProductID: property.productId,
-        ownerOrganization: userOrganization }, 
+        ownerOrganization: userOrganization
+      },
         getOptions
       );
-      propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
+      const propertyImages = await managers.productDocumentManager.getProductDocuments({ ...args, productId: property.productId }, getOptions);
+      propertiesWProducts.push({ ...property, 
+        title: productData.name,
+        description: productData.description, 
+        propertyType: productData.subCategory,
+        images: propertyImages
+      })
     }
     return propertiesWProducts
   };

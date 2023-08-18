@@ -11,6 +11,7 @@ import "/dapp/items/contracts/Event.sol";
 import "/dapp/items/contracts/ItemManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
 import "/dapp/orders/contracts/OrderManager.sol";
+import "/dapp/productDocuments/contracts/ProductDocumentManager.sol";
 /**
  * Single entry point to all the project's contracts
  * Deployed by the deploy script
@@ -35,6 +36,7 @@ contract Dapp {
     EventTypeManager_10 eventTypeManager;
     PaymentManager paymentManager;
     OrderManager orderManager;
+    ProductDocumentManager productDocumentManager;
     
     account public bootUserAccount;
     string public bootUserCommonName;
@@ -54,6 +56,7 @@ contract Dapp {
         productManager = new ProductManager();
         eventTypeManager = new EventTypeManager_10();
         paymentManager = new PaymentManager();
+        productDocumentManager = new ProductDocumentManager();
     }
 
     function getProductManager() public returns (ProductManager) {
