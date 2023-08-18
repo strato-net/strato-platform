@@ -70,6 +70,43 @@ class PropertiesController {
 
       const propertyResult = await dapp.createProperty(propertyArgs)
       if (propertyResult) {
+
+        /* -------upload the documents and images if necessary-------- */
+        if (files) {
+          files.forEach(async (file) => {
+            // const fileKey = `${moment()
+            //   .utc()
+            //   .valueOf()}_${file.originalname}`;
+
+            // const fileHash = crypto
+            //   .createHmac("sha256", file.buffer)
+            //   .digest("hex");
+
+            // const fileLocation = await uploadFileToS3(
+            //   `${fileKey}`,
+            //   file.buffer,
+            //   req.app.get(constants.s3ParamName)
+            // );
+
+            const uploadedFile = await uploadFileToS3(
+              file
+            );
+
+            const productDocumentArgs = {
+              productId: propertyResult.productContractAddress,
+              fileKey: uploadedFile,
+              // fileHash: fileHash,
+              fileName: file.originalname,
+              // fileLocation: fileLocation,
+              documentType: file.mimetype,
+            }
+
+            PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
+
+            await dapp.createProductDocument(productDocumentArgs)
+          })
+        }
+
         const inventoryBody = {
           productAddress: propertyResult.productContractAddress,
           quantity: 1,
@@ -200,6 +237,27 @@ class PropertiesController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateCreateProductDocumentArgs(args) {
+    const createProductDocumentSchema = Joi.object({
+      productDocumentArgs: Joi.object({
+        productId: Joi.string().required(),
+        fileKey: Joi.string().required(),
+        fileHash: Joi.string().required(),
+        fileName: Joi.string().required(),
+        fileLocation: Joi.string().required(),
+        documentType: Joi.string().required(),
+      })
+    });
+
+    const validation = createProductDocumentSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create ProductDocument Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

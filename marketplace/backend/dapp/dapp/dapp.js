@@ -602,7 +602,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
 
-  /* PROPERTIES DAPP */
+  /* -------------------------PROPERTIES DAPP------------------------- */
   contract.getProperty = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     console.log('getOptions', getOptions)
@@ -783,7 +783,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   }
 
-  // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
+  /* ------------------------------ PRODUCT MANAGER ENDS------------------------------ */
+
+  /* ------------------------------PRODUCTDOCUMENT MANAGER---------------------------- */
+
+  // Create productDocuments
+  contract.createProductDocument = async function (args, options = defaultOptions) {
+    const uploadDate = Math.floor(Date.now() / 1000);
+    return managers.productDocumentManager.createProductDocument({ ...args, uploadDate: uploadDate });
+  }
+
+  // Delete productDocuments by the productId/productAddress
+  contract.deleteProductDocument = async function (args, options = defaultOptions) {
+    return managers.productDocumentManager.deleteProductDocument(args);
+  };
+
+  /* ----------------------------PRODUCTDOCUMENT MANAGER ENDS-------------------------- */
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
