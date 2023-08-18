@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useFormik } from "formik";
 import { Form, Modal, InputNumber, Button, Spin, Table} from "antd";
 
-const ListNowModal = ({ open, handleCancel, user, formik }) => {
+const ListNowModal = ({ open, handleCancel, user, formik, isCreateMembershipSubmitting }) => {
 
   const seller = user.user.organization;
   const membership = formik.values.name
@@ -68,7 +68,7 @@ const ListNowModal = ({ open, handleCancel, user, formik }) => {
       onCancel={handleCancel}
       onOk={formik.handleSubmit}
       footer={[
-        <Button key="list-now" onClick={formik.handleSubmit} type="primary">
+        <Button key="list-now" onClick={formik.handleSubmit} loading={isCreateMembershipSubmitting} type="primary">
           List Now
         </Button>,
       ]}

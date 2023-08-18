@@ -42,7 +42,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const [memberDiscount, setMemberDiscount] = useState([1]);
   const [visible, setVisible] = useState(false);
 
-  const { isCreateProductSubmitting, isuploadImageSubmitting } =
+  const { isCreateProductSubmitting, isuploadImageSubmitting, isCreateMembershipSubmitting } =
     useMembershipState();
 
   const { services, isservicesLoading } = useServiceState();
@@ -310,6 +310,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
               id="create-membership-button"
               key="submit"
               type="primary"
+              loading={isCreateMembershipSubmitting}
               style={{ backgroundColor: "green", color: "white" }}
               className="mx-4 px-10"
               onClick={formik.handleSubmit}
@@ -612,6 +613,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
+          isCreateMembershipSubmitting={isCreateMembershipSubmitting}
         />
       )}
       {/* {message && openToast("bottom")} */}
