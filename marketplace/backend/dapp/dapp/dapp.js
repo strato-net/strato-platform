@@ -25,6 +25,7 @@ import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
 import membershipJs from "../membership/membership";
 import membershipServiceJs from "../membershipService/membershipService";
+import membershipManagerJs from "../membership/membershipManager";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -36,6 +37,7 @@ const allAssetNames = [
   productFileJs.contractName,
   membershipJs.contractName,
   membershipServiceJs.contractName,
+  membershipManagerJs.contractName,
 ];
 
 const contractName = "Dapp";
@@ -128,10 +130,11 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const serviceManager = await serviceManagerJS.bindAddress(admin, state.serviceManager, options)
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
+  const membershipManager = await membershipManagerJs.bindAddress(admin, state.membershipManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager, membershipManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
@@ -1009,6 +1012,35 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     }
   }
 
+
+  contract.createMembership = async function (args, options = defaultOptions) {
+    try {
+      
+        const { membershipArgs, membershipServiceArgs, productFileArgs } = args;
+
+        const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+
+        const [membership] = await managers.membershipManager.createMembership({ 
+          dappAddress: contract.address,
+          membershipArgs: membershipArgs, 
+          membershipServiceArgs: membershipServiceArgs, 
+          productFileArgs: productFileArgs
+        });
+
+        return { membership };
+    } catch (error) {
+        if (error.response) {
+            throw new rest.RestError(error.response.status, error.response.statusText);
+        }
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while creating the membership");
+    }   
+
+  };
+
+
+
+
+
   contract.updateBuyerDetails = async function (args, options = defaultOptions) {
     try {
       const { address, chainId, updates } = args;
@@ -1299,10 +1331,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   //-----------------------------Order ends here -------------------------------
   //-----------------------------Membership starts here -------------------------------
-  contract.createMembership = async function (args, options = defaultOptions) {
-    const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
-    return membershipJs.uploadContract(rawAdmin, args, createOptions)
-  }
+  // contract.createMembership = async function (args, options = defaultOptions) {
+  //   const createOptions = {...options, org: managers.cirrusOrg, app: contractName }
+
+  //   const membership = membershipManagerJs.createMembership(rawAdmin, args, createOptions)
+  //   console.log('dapp membershipManagerJs.createMembership', membership)
+  //   return membership
+  // }
 
   contract.getMembership = async function (args, options = optionsNoChainIds) {
     // May need to insert contractName in options when this goes throught the product manager
