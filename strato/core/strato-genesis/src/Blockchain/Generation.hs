@@ -906,8 +906,7 @@ contract User {
         // Only the user that this contract is associated with, can use this function.
         require((authenticate() && isActive), "You don't have permission to use this function!");
 
-        variadic result = address(contractToCall).call(functionName, args);
-        return result;
+        return address(contractToCall).call(functionName, args);
     }
 } 
 |]
@@ -930,9 +929,9 @@ insertUserRegistryContract gi =
         rootAddress'    = fromPublicKey rootPubKey
         rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
         rootSub         = fromJust $ getCertSubject rootCert
-        rootAcct = SolidVMContractWithStorage 0x420 420
+        rootAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing Nothing) 123
             (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
                 (".isActive", rlpWrap $ BBool True),
                 (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
@@ -940,7 +939,7 @@ insertUserRegistryContract gi =
 
         -- testAcct = SolidVMContractWithStorage 0xb923e14a528a19cb16a8b91af9b682f7006d51ea 123
         --     (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
-        --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "420") UnspecifiedChain)),
+        --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
         --         (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
         --         (".isActive", rlpWrap $ BBool True),
         --         (BC.pack $ ".userCertificates<a:a13bf5afbd9e23e92568b546880b55d8ee0d54a5>", addrToCertIdx "a5540deed8550b8846b56825e9239ebdaff53ba1")

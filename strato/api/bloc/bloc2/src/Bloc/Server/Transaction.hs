@@ -571,7 +571,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                 ]
       userCert <- maybe (throwIO err) pure =<<
         A.select (A.Proxy @Certificate) addr
-      let userContractAddr = deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) Nothing "OrderedVals []"
+      let userContractAddr = deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) Nothing Nothing
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0
