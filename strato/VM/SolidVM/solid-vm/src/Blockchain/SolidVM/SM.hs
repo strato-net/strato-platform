@@ -168,6 +168,7 @@ makeLenses ''SState
 type SM m = ReaderT (IORef SState) m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
+                 , A.Selectable Account AddressState m
                  , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , (Keccak256 `A.Alters` BlockSummary) m
@@ -235,6 +236,14 @@ instance ( MonadUnliftIO m
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
+
+instance ( MonadUnliftIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         ) => A.Selectable Account AddressState (SM m) where
+  select _ = getAddressStateMaybe
 
 instance (MonadUnliftIO m, (Maybe Word256 `A.Alters` MP.StateRoot) m)
          => (Maybe Word256 `A.Alters` MP.StateRoot) (SM m) where
@@ -519,7 +528,7 @@ getVariableOfName name = do
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)

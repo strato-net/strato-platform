@@ -64,10 +64,16 @@ data TableName =
       , mtContractName :: T.Text
       , mtMappingName  :: T.Text
       } 
-  | AssetTableRowName
+  | AbstractTableName
       { atOrganization :: T.Text
       , atApplication  :: T.Text
       , atContractName :: T.Text
+      }
+  | AbstractTableRowName
+      { atrOrganization :: T.Text
+      , atrApplication  :: T.Text
+      , atrContractName :: T.Text
+      , atrAbstractName :: T.Text
       } deriving (Show, Eq, Ord)
 
 type TableColumns = [T.Text]

@@ -2,4 +2,4 @@
 
 echo 'Starting ui server...'
 
-serve --single build
+serve --single -l 3003 build

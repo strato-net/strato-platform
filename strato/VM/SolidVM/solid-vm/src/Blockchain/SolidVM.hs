@@ -784,6 +784,7 @@ argsToValsModifiers ctract md args =
                                                 CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer)))
             CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
+            CC.AccountLiteral _ a          -> return . coerceType ctract t $ SAccount a False
             CC.ArrayExpression _ as        -> case t of
               SVMType.Array{SVMType.entry=t'} ->
                 SArray t . V.fromList <$> mapM (fmap Constant . eval32 t') as
@@ -849,6 +850,7 @@ argsToVals ctract fn args = case args of
                                                   CC.Ether -> return . coerceType ctract t $ SInteger (n * (10 ^ (18 :: Integer)))
             CC.BoolLiteral _ b             -> return . coerceType ctract t $ SBool b
             CC.StringLiteral _ s           -> return . coerceType ctract t $ SString s
+            CC.AccountLiteral _ a          -> return . coerceType ctract t $ SAccount a False
             CC.ArrayExpression _ as        -> case t of
               SVMType.Array{SVMType.entry=t'} ->
                 SArray t . V.fromList <$> mapM (fmap Constant . eval32 t') as
@@ -886,6 +888,7 @@ expressionType :: CC.Expression -> SVMType.Type
 expressionType (CC.BoolLiteral _ _ ) = SVMType.Bool
 expressionType (CC.NumberLiteral _ _ _) = SVMType.Int (Just True) Nothing
 expressionType (CC.StringLiteral _ _) = SVMType.String $ Just True
+expressionType (CC.AccountLiteral _ _) = SVMType.Account False
 expressionType (CC.ArrayExpression _ xs) = SVMType.Array (expressionType (head xs)) Nothing
 
 expressionType ex = typeError "Cannot deduce a type from" (ex, ex)
@@ -1488,6 +1491,7 @@ expToVar' (CC.NumberLiteral _ v (Just nu)) =
     CC.Finney -> return . Constant $ SInteger (v * (10 ^ (15 :: Integer)))
     CC.Ether -> return . Constant $ SInteger (v * (10 ^ (18 :: Integer)))
 expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
+expToVar' (CC.AccountLiteral _ a) = return $ Constant $ SAccount a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim

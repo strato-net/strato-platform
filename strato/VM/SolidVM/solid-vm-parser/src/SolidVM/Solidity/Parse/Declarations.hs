@@ -44,7 +44,7 @@ import qualified SolidVM.Solidity.Xabi              as Xabi
 import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
-                   | Import a Text.Text
+                   | Import a (SolidVM.FileImportF a)
                    | Alias a String String
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | FLFunc String SolidVM.Func

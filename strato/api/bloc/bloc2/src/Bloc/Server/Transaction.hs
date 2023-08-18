@@ -89,6 +89,7 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json             hiding (Contract)
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Data.Transaction      (rawTX2TX, transactionHash)
+import           Blockchain.DB.CodeDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
 import           Blockchain.Strato.Model.ChainId
@@ -127,6 +128,7 @@ txWorker :: ( MonadLogger m
             , A.Selectable Account Contract m
             , A.Selectable Account AddressState m
             , A.Selectable Address Certificate m
+            , HasCodeDB m
             , (Keccak256 `A.Selectable` SourceMap) m
             , HasBlocEnv m
             , HasVault m
@@ -229,6 +231,8 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest{..} = do
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody :: ( MonadLogger m
                            , A.Selectable Account Contract m
+                           , A.Selectable Account AddressState m
+                           , HasCodeDB m
                            , HasBlocEnv m
                            , HasSQL m
                            , HasVault m
@@ -352,6 +356,8 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
 -- | postBlocTransactionUnsigned
 postBlocTransactionUnsigned :: ( MonadLogger m
                                , A.Selectable Account Contract m
+                               , A.Selectable Account AddressState m
+                               , HasCodeDB m
                                , HasBlocEnv m
                                , HasSQL m
                                , HasVault m
@@ -476,6 +482,7 @@ postBlocTransactionParallel :: ( MonadLogger m
                                , A.Selectable Account Contract m
                                , A.Selectable Account AddressState m
                                , A.Selectable Address Certificate m
+                               , HasCodeDB m
                                , (Keccak256 `A.Selectable` SourceMap) m
                                , HasBlocEnv m
                                , HasVault m
@@ -501,6 +508,7 @@ postBlocTransaction :: ( MonadLogger m
                        , A.Selectable Account Contract m
                        , A.Selectable Account AddressState m
                        , A.Selectable Address Certificate m
+                       , HasCodeDB m
                        , (Keccak256 `A.Selectable` SourceMap) m
                        , HasBlocEnv m
                        , HasVault m
@@ -517,6 +525,7 @@ postBlocTransactionExternal :: ( MonadLogger m
                               , A.Selectable Account Contract m
                               , A.Selectable Account AddressState m
                               , A.Selectable Address Certificate m
+                              , HasCodeDB m
                               , (Keccak256 `A.Selectable` SourceMap) m
                               , HasBlocEnv m
                               , HasVault m
@@ -534,6 +543,7 @@ postBlocTransaction' :: ( MonadLogger m
                         , A.Selectable Account Contract m
                         , A.Selectable Account AddressState m
                         , A.Selectable Address Certificate m
+                        , HasCodeDB m
                         , (Keccak256 `A.Selectable` SourceMap) m
                         , HasBlocEnv m
                         , HasVault m
@@ -731,6 +741,7 @@ data TransactionHeader = TransactionHeader
 
 postUsersSend' :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Selectable` SourceMap) m
+                  , HasCodeDB m
                   , MonadLogger m
                   , HasBlocEnv m
                   , HasVault m
@@ -754,6 +765,7 @@ postUsersSend' cacheNonce TransferParameters{..} jwtToken = do
 postUsersContractSolidVM' :: ( MonadLogger m
                              , A.Selectable Account AddressState m
                              , (Keccak256 `A.Selectable` SourceMap) m
+                             , HasCodeDB m
                              , HasBlocEnv m
                              , HasVault m
                              , HasSQL m
@@ -791,6 +803,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} jwtToken = do
 postUsersUploadListSolidVM' :: ( MonadLogger m
                                , A.Selectable Account AddressState m
                                , (Keccak256 `A.Selectable` SourceMap) m
+                               , HasCodeDB m
                                , HasBlocEnv m
                                , HasVault m
                                , HasSQL m
@@ -829,6 +842,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} jwtToken = do
 
 postUsersSendList' :: ( MonadLogger m
                       , A.Selectable Account AddressState m
+                      , HasCodeDB m
                       , (Keccak256 `A.Selectable` SourceMap) m
                       , HasBlocEnv m
                       , HasVault m
@@ -856,6 +870,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} jwtToken = do
 postUsersContractMethodList' :: ( MonadLogger m
                                 , A.Selectable Account Contract m
                                 , A.Selectable Account AddressState m
+                                , HasCodeDB m
                                 , (Keccak256 `A.Selectable` SourceMap) m
                                 , HasBlocEnv m
                                 , HasVault m
@@ -907,6 +922,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} jwtToken = do
 postUsersContractMethod' :: ( MonadLogger m
                             , A.Selectable Account Contract m
                             , A.Selectable Account AddressState m
+                            , HasCodeDB m
                             , (Keccak256 `A.Selectable` SourceMap) m
                             , HasBlocEnv m
                             , HasVault m
@@ -1242,6 +1258,7 @@ getSolidityType _ Xabi.Variadic              = Right $ TypeVariadic
 
 
 getResultAndRespond :: ( A.Selectable Account AddressState m
+                       , HasCodeDB m
                        , (Keccak256 `A.Selectable` SourceMap) m
                        , MonadLogger m
                        , HasSQL m

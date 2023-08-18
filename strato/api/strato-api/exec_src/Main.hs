@@ -5,6 +5,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
 
@@ -13,6 +15,7 @@
 
 module Main where
 
+import           Prelude                         hiding (lookup)
 import           Control.Lens.Operators
 import           Control.Monad.Change.Modify  (Accessible)
 import           Control.Monad.Change.Alter
@@ -61,6 +64,7 @@ import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.Json
+import           Blockchain.DB.CodeDB
 
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Identity
@@ -122,6 +126,11 @@ instance Selectable Account Contract m => Selectable Account Contract (IdentityM
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
+instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+  lookup _ k   = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
+  delete _ _   = error "API: Keccak256 `Alters` DBCode delete"
+
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
   select p = lift . select p
 
@@ -133,6 +142,21 @@ instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceM
 
 instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
   select p = lift . select p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (VaultM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (IdentityM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT BlocEnv m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
 
 instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do
@@ -240,6 +264,7 @@ fullServer :: ( MonadLogger m
               , Selectable Account Contract m
               , Selectable Account AddressState m
               , Selectable Address Certificate m
+              , HasCodeDB m
               , Selectable Keccak256 SourceMap m
               )
            => ServerT FullAPI m
