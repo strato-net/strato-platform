@@ -531,6 +531,7 @@ typecheckStatic (SVMType.UserDefined a c) b  = Left $ "Type mismatch Test1: "
 
 typecheckStatic _ (SVMType.UserDefined _ _)   = Left "Type mismatch"
 typecheckStatic theType (SVMType.Bytes _ _) = Right theType
+typecheckStatic _ SVMType.Variadic = Right SVMType.Variadic
 typecheckStatic SVMType.Variadic _ = Right SVMType.Variadic
 typecheckStatic t1 t2 = Left $ "Type mismatch: "
                             <> showType t1
