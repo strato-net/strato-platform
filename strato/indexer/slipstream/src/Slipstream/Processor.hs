@@ -13,6 +13,7 @@
     , ScopedTypeVariables
     , TemplateHaskell
     , TupleSections
+    , TypeApplications
     , TypeOperators
 #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -21,6 +22,8 @@ module Slipstream.Processor
   ( processTheMessages
   , parseActions
   , generateAssetTable
+  , generateSaleTable
+  , generateUserTable
   ) where
 
 import Prelude hiding (lookup)
@@ -61,6 +64,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
+import Blockchain.DB.CodeDB
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
@@ -106,6 +110,11 @@ instance Selectable Account Contract m => Selectable Account Contract (ReaderT B
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
+instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+  lookup _ k   = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  insert _ _ _ = error "Slipstream: Keccak256 `Alters` DBCode insert"
+  delete _ _   = error "Slipstream: Keccak256 `Alters` DBCode delete"
+
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -139,7 +148,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
-  , assetInsert     :: Maybe ProcessedContract
+  , abstractInsert     :: Maybe (ProcessedContract, T.Text, TableColumns)
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -274,7 +283,11 @@ parseEvents = concatMap parseEvent
           , eventEvent          = e
           }
 
-getCodeCollection :: MonadIO m => CodePtr -> Text -> m (Either String CodeCollection)
+getCodeCollection :: ( MonadIO m
+                     , HasCodeDB m
+                     , Selectable Account AddressState m
+                     )
+                  => CodePtr -> Text -> m (Either String CodeCollection)
 getCodeCollection cp ccString = do
   let initList =
         case Aeson.decodeStrict $ encodeUtf8 ccString of
@@ -287,8 +300,7 @@ getCodeCollection cp ccString = do
   --bad contract into the blockchain (the API shouldn't allow this)
 
   case cp of
-    SolidVMCode _ _ ->
-      case fmap resolveLabels $ compileSource False $ Map.fromList initList of
+    SolidVMCode _ _ -> (fmap resolveLabels <$> compileSource False (Map.fromList initList)) >>= \case
         Left e -> return $ Left $ "failed parse: "  ++ show e --- return $ CodeCollection Map.empty
         Right v -> return $ Right v
     EVMCode _ -> return $ Left "EVM contracts are not indexed by Slipstream"
@@ -299,8 +311,12 @@ getContractsForParents parents' cc =
   let getContractForParent parent = Map.lookup parent cc
   in mapMaybe getContractForParent parents'
 
-processTheMessages :: (MonadLogger m, HasSQL m) =>
-                      BlocEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
+processTheMessages :: ( MonadLogger m
+                      , HasSQL m
+                      , Selectable Account AddressState m
+                      , HasCodeDB m
+                      )
+                   => BlocEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
 processTheMessages env conn g messages = do
 
   case length messages of
@@ -319,6 +335,8 @@ processTheMessages env conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
+  let hardCodeAbstracts (o,a,n) | n `elem` ["Asset", "Sale", "User"] = ("", "", n)
+                                | otherwise                          = (o, a, n)
 
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
@@ -346,28 +364,36 @@ processTheMessages env conn g messages = do
                     mapNames = map fst listOfMappingsWithRecords
                     parents' = c ^. parents
                     parentContracts = getContractsForParents parents' (cc^.contracts)
-                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType  && _contractName contract == "Asset") parentContracts
+                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType) parentContracts
+                    parentAbstractContractsName = map (labelToText ._contractName) parentAbstractContracts
+              
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
-                let nameParts = (o, a', n)
+                let nameParts = hardCodeAbstracts (o, a', n)
 
                 --Create mapping tables
                 forM_ mapNames $ \m -> do 
                   outputData conn $ createMappingTable g nameParts (T.pack m) --Tables are created
 
 -- mark        
-                deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+
+                deferredForeignKeys <- case (_contractType c ) of
+                  AbstractType -> do
+                    outputData conn $ createAbstractTable g c $ hardCodeAbstracts (o, a', n)
+                    return []
+                  _ -> do
+                    outputData conn $ createExpandIndexTable g c nameParts
                 
                 outputData' conn $ createExpandHistoryTable g c nameParts
 
                 outputData conn $ createExpandEventTables g c nameParts
+                
+                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTableRow g c (hardCodeAbstracts (o, a', n)) (head parentAbstractContractsName)
 
-                when (length parentAbstractContracts >= 1) $ do
-                  outputData conn $ insertContractInAssetTableQuery g nameParts 
-
+  
                 return deferredForeignKeys
 
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
@@ -406,15 +432,29 @@ processTheMessages env conn g messages = do
           indexContract <- rowToInsert g abiid row cont oldState
           stateDiff <- rowToMappings row
           mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          assets <- getAssetTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
+          --get columns for abstract table
+          abstractColumns <- case abstracts of
+                              [] -> return Nothing
+                              (firstAbstract:_) -> do
+                                case  (SE.application indexContract) of
+                                  "" -> let (o',a',n') = hardCodeAbstracts (SE.organization indexContract, SE.contractName indexContract, firstAbstract)
+                                         in getTableColumns g $ AbstractTableName o' a' n'
+                                  _ -> let (o',a',n') = hardCodeAbstracts (SE.organization indexContract, SE.application indexContract, firstAbstract)
+                                        in getTableColumns g $ AbstractTableName o' a' n'
+          
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
           $logDebugLS "History inserts are: " $ show hs
           pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          if (AssetTableRowName (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)) `elem` assets
-            then  pure . Right $ BatchedInserts indexContract (Just indexContract) hs pMappings
-          else
-            pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+          case abstracts of
+            [] -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+            (firstAbstract:_) -> case abstractColumns of 
+              Just abC -> do
+                let finalColumns = map extractTextInsideQuotes abC
+                pure . Right $ BatchedInserts indexContract (Just (indexContract, firstAbstract, finalColumns)) hs pMappings
+              Nothing -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
+            
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -429,7 +469,7 @@ processTheMessages env conn g messages = do
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
     unless ((length (concatMap mappingInserts ins) < 1) ) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
-    unless (null ins) $ outputData conn . insertAssetTable $ map assetInsert ins
+    unless (null ins) $ outputData conn . insertAbstractTable $ map abstractInsert ins
 
   forM_ insertsByCodeHash $ \ins -> do
     unless (null ins) $ insertForeignKeys conn $ map indexInsert ins
@@ -452,3 +492,20 @@ generateAssetTable :: (MonadLogger m, HasSQL m) =>
 generateAssetTable conn g = do
   outputData conn $ createAssetTable g
 
+generateSaleTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateSaleTable conn g = do
+  outputData conn $ createSaleTable g
+
+generateUserTable :: (MonadLogger m, HasSQL m) =>
+                      PGConnection -> IORef Globals -> m ()
+generateUserTable conn g = do
+  outputData conn $ createUserTable g
+
+extractTextInsideQuotes :: T.Text -> T.Text
+extractTextInsideQuotes input =
+    case T.stripPrefix "\"" input of
+        Just rest ->
+            case T.break (== '"') rest of
+                (extracted, _) -> extracted
+        Nothing -> ""

@@ -78,6 +78,7 @@ evmTypeToType (OLDXABI.Enum x y z) = SVMType.Enum x (textToLabel y) $ fmap (map 
 evmTypeToType (OLDXABI.Array x y) = SVMType.Array (evmTypeToType x) y
 evmTypeToType (OLDXABI.Contract x) = SVMType.Contract $ textToLabel x
 evmTypeToType (OLDXABI.Mapping x y z) = SVMType.Mapping x (evmTypeToType y) (evmTypeToType z)
+evmTypeToType OLDXABI.Variadic = SVMType.Variadic
 
 typeToEvmType :: SVMType.Type -> Maybe OLDXABI.Type
 typeToEvmType (SVMType.Int x y) = Just $ OLDXABI.Int x y
@@ -92,6 +93,7 @@ typeToEvmType (SVMType.Enum x y z) = Just $ OLDXABI.Enum x (labelToText y) (map 
 typeToEvmType (SVMType.Array x y) = flip OLDXABI.Array y <$> typeToEvmType x
 typeToEvmType (SVMType.Contract x) = Just $ OLDXABI.Contract (labelToText x)
 typeToEvmType (SVMType.Mapping x y z) = OLDXABI.Mapping x <$> typeToEvmType y <*> typeToEvmType z
+typeToEvmType (SVMType.Variadic) = Just $ OLDXABI.Variadic
 typeToEvmType _ = Nothing
 
 varTypeToVariableDecl :: OLDXABI.VarType -> VariableDeclF (SourceAnnotation ())

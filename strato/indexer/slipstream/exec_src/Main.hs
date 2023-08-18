@@ -38,7 +38,7 @@ import Slipstream.Globals
 import Slipstream.GlobalsColdStorage
 import Slipstream.Options
 import Slipstream.OutputData
-import Slipstream.Processor
+-- import Slipstream.Processor
 
 import SelectAccessible ()
 
@@ -57,6 +57,7 @@ createBlocEnv = liftIO $ do
                  , gasLimit=0
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
+                 , userRegistryAddress=0x0
     }
 
 
@@ -94,7 +95,9 @@ main = do
     handle <- runSqlConn initStorage workerConn
     gref <- newGlobals handle (CirrusHandle conn S.empty)
 
-    --Create Asset table
-    generateAssetTable conn gref
+    --Create Mercata Abstract tables
+    -- generateAssetTable conn gref
+    -- generateSaleTable conn gref
+    -- generateUserTable conn gref
     
     getAndProcessMessages env conn gref
