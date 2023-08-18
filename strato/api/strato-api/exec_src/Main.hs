@@ -158,6 +158,11 @@ instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT B
   insert p k = lift . insert p k
   delete p   = lift . delete p
 
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (CirrusM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
 instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
