@@ -408,13 +408,15 @@ getArgValues argsMap argNamesTypes = do
                   Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"
                   Xabi.Contract name     -> Right $ TypeContract name
                   Xabi.Mapping{}         -> Left "Arrays of mappings are not allowed as function arguments"
-                  Xabi.UnknownLabel{}           -> Right $ SimpleType typeUInt
+                  Xabi.UnknownLabel{}    -> Right $ SimpleType typeUInt
+                  Xabi.Variadic          -> Left "Arrays of variadics are not allowed as function arguments"
               in case len of
                    Just l                -> TypeArrayFixed l <$> ettyty
                    Nothing               -> TypeArrayDynamic <$> ettyty
             Xabi.Contract name           -> Right $ TypeContract name
             Xabi.Mapping _ _ _           -> Left "Mappings are not allowed as function arguments"
-            Xabi.UnknownLabel _                 -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
+            Xabi.UnknownLabel _          -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
+            Xabi.Variadic                -> Right $ TypeVariadic 
         in do
           ty <- either (blocError . UserError) return typeM
           either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)

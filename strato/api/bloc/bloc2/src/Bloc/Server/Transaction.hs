@@ -45,7 +45,7 @@ import           Data.Int                          (Int32)
 import           Data.List                         (partition, sortOn)
 import qualified Data.Vector                       as V
 
--- import qualified Data.Map                          as M
+import qualified Data.Map                          as M
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
@@ -646,47 +646,31 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
             p <- fromFunction x
             let bfp = FunctionParameters
                         addr
-                        (functionpayloadContractAddress p)
-                        (functionpayloadMethod p)
-                        (functionpayloadArgs p)
+                        userContractAddr
+                        "callContract"
+                        (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
                         (functionpayloadValue p)
                         (mergeTxParams (functionpayloadTxParams p) txParams)
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
-            -- let bfp = FunctionParameters
-            --             addr
-            --             userContractAddr
-            --             "callContract"
-            --             (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p)] ++ (M.toList $ functionpayloadArgs p))
-            --             (functionpayloadValue p)
-            --             (mergeTxParams (functionpayloadTxParams p) txParams)
-            --             (functionpayloadMetadata p)
-            --             (functionpayloadChainid p <|> chainId)
-            --             resolve
             fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp jwtToken
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
                         (map (\(FunctionPayload a m r v x c md) ->
-                                MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                                MethodCall 
+                                  userContractAddr 
+                                  "callContract"  
+                                  (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
+                                  (fromMaybe (Strung 0) v) 
+                                  (mergeTxParams x txParams) 
+                                  c 
+                                  md
+                              ) p)
                         chainId
                         resolve
-            -- let bflp = FunctionListParameters
-            --             addr
-            --             (map (\(FunctionPayload a m r v x c md) ->
-            --                     MethodCall 
-            --                       userContractAddr 
-            --                       "callContract"  
-            --                       (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m)] ++ (M.toList r))
-            --                       (fromMaybe (Strung 0) v) 
-            --                       (mergeTxParams x txParams) 
-            --                       c 
-            --                       md
-            --                   ) p)
-            --             chainId
-            --             resolve
             fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp jwtToken
         GENESIS -> case txs of
           [] -> return []
@@ -1239,11 +1223,11 @@ getSolidityType _  Xabi.Account            = Right . SimpleType $ TypeAccount
 getSolidityType _ (Xabi.Struct _ name)     = Right $ TypeStruct name
 getSolidityType _ (Xabi.Enum _ name _)     = Right $ TypeEnum name
 getSolidityType _ (Xabi.Contract name)     = Right $ TypeContract name
-getSolidityType (ArgInt _) (Xabi.UnknownLabel _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
+getSolidityType (ArgInt _) (Xabi.UnknownLabel _)     = Right $ SimpleType typeUInt -- since Enums are converted to Ints
 getSolidityType (ArgString _) (Xabi.UnknownLabel s)  = Right $ TypeEnum $ Text.pack s
 getSolidityType (ArgObject _) (Xabi.UnknownLabel s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
 getSolidityType av (Xabi.UnknownLabel _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
-getSolidityType (ArgArray v) (Xabi.Array typ len)     =
+getSolidityType (ArgArray v) (Xabi.Array typ len)    =
   let arrType = case len of
         Just l -> TypeArrayFixed l
         Nothing -> TypeArrayDynamic
@@ -1254,6 +1238,7 @@ getSolidityType (ArgArray v) (Xabi.Array typ len)     =
 getSolidityType av (Xabi.Array _ _)          = Left $ Text.pack $ "Expected Array but got " ++ show av
 getSolidityType (ArgObject _) Xabi.Mapping{} = Right $ TypeStruct "s"
 getSolidityType av Xabi.Mapping{}            = Left $ Text.pack $ "Expected Object for Mapping type, but got " ++ show av
+getSolidityType _ Xabi.Variadic              = Right $ TypeVariadic
 
 
 getResultAndRespond :: ( A.Selectable Account AddressState m

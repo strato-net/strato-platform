@@ -549,8 +549,14 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
           -- Handles .call() and .delegatecall() logic
           (Just theFunction, _) -> do
                 valList <- case argExps of
-                  (CC.OrderedArgs oa) -> mapM (getVar <=< expToVar) oa
+                  (CC.OrderedArgs oa) -> mapM (\a -> do
+                    theVar <- expToVar a
+                    theVal <- getVar theVar
+                    case theVal of
+                      SVariadic x -> return x 
+                      x -> return [x]) oa
                   (CC.NamedArgs _) -> error "Named args for .call not implemented."
+                let valList' = concatMap flattenVals valList 
                 let mtheFunction' = do
                       let boolTrueIfArgsSameLength thyFunc = (length argExps) == (length $ CC._funcArgs thyFunc)
                           filteredFuncsWithSameArgLength   = filter boolTrueIfArgsSameLength ([theFunction] ++ (CC._funcOverload  theFunction))
@@ -567,21 +573,13 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                               (SArray x _, y@(SVMType.Array _ _)) -> x == y
                               (_, SVMType.Variadic) -> True
                               (SReference _, _) -> error "Reference variables not implemented for .call"
-                              _ -> False) $ zip valList (CC._funcArgs funck)
+                              _ -> False) $ zip valList' (CC._funcArgs funck)
                           finalFuncFind                    = filter boolTrueIfSignatureTheSame (filteredFuncsWithSameArgLength)
                       case finalFuncFind of
                         [a] -> Just a
                         _   -> Nothing
                 case mtheFunction' of
-                      Just theFunction' | validVariadicSignature argsParsed -> do
-                        args' <- argsToVals contract' theFunction' argExps
-                        mCallInfo <- getCurrentCallInfoIfExists
-                        let ro = case mCallInfo of
-                                  Nothing -> False
-                                  Just ci -> if fromChain == toChain then readOnly ci else True
-                            f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
-                        return (f', args')
-                      Just theFunction' | (((length argsParsed) == (length argExps)) || ((length valList) == (length argExps))) -> do
+                      Just theFunction' | (((length argsParsed) == (length argExps)) || ((length valList') == (length argExps))) -> do
                         args' <- argsToVals contract' theFunction' argExps
                         mCallInfo <- getCurrentCallInfoIfExists
                         let ro = case mCallInfo of
@@ -633,6 +631,9 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
+  where
+    flattenVals (x:xs) = [x] ++ flattenVals xs
+    flattenVals x = x
 
 
 callWithResult :: MonadSM m => Account -> Account -> CC.FunctionCallType -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
@@ -819,7 +820,13 @@ argsToVals ctract fn args = case args of
   CC.OrderedArgs xs -> do
     when (length xs /= length orderedTypes && not (validVariadicSignature orderedTypes)) $
       invalidArguments "arity mismatch" (xs, orderedTypes)
-    OrderedVals <$> zipWithM eval32 orderedTypes xs
+    valList <- zipWithM eval32 orderedTypes xs
+    let maybeVariadic = last valList
+    let unpackedList = case maybeVariadic of
+          SVariadic x -> init valList ++ x
+          _ -> valList
+    pure $ OrderedVals unpackedList
+    
   CC.NamedArgs xs -> NamedVals . M.toList <$> do
     let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
     M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
@@ -845,6 +852,7 @@ argsToVals ctract fn args = case args of
             CC.ArrayExpression _ as        -> case t of
               SVMType.Array{SVMType.entry=t'} ->
                 SArray t . V.fromList <$> mapM (fmap Constant . eval32 t') as
+              SVMType.Variadic -> SVariadic <$> mapM (\a -> eval32 (expressionType a) a) as
               _ -> typeError "array literal for non array" (t, x)
               -- This is something of a hack, where if an incoming value is not one
               -- of the accepted literals, assume that this is not the context of

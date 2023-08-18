@@ -902,11 +902,11 @@ contract User {
         return userCertificates[msg.sender] != address(0);
     }
 
-    function callContract(address contractToCall, string f, variadic args) public returns (variadic) {
+    function callContract(address contractToCall, string functionName, variadic args) public returns (variadic) {
         // Only the user that this contract is associated with, can use this function.
         require((authenticate() && isActive), "You don't have permission to use this function!");
 
-        variadic result = address(contractToCall).call(f, args);
+        variadic result = address(contractToCall).call(functionName, args);
         return result;
     }
 } 
