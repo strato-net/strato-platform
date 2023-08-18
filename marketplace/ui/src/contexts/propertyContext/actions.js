@@ -132,34 +132,40 @@ const actions = {
     }
   },
 
-  fetchProperties: async (dispatch, limit, offset, options = {}, queryValue) => {
+  fetchProperties: async (dispatch, limit, offset, options = {}) => {
 
     dispatch({ type: actionDescriptors.fetchProperties });
 
-    const { min_Price, max_Price, min_Bathrooms, zip_code, state, min_Bedrooms, lot_Size_Area, sort_By, parking_Type } = options
+    const queryParams = [];
 
-    const priceQuery = min_Price || max_Price ? `&range[]=listPrice,${min_Price},${max_Price}` : '';
-    const postalcodeQuery = zip_code ? `&postalcode=${zip_code}` : '';
-    const stateOrProvinceQuery = state && state !== 'select' ? `&stateOrProvince=${state}` : '';
-    const bedroomsTotalQuery = min_Bedrooms ? `&gteQuery[]=bedroomsTotal,${min_Bedrooms}` : '';
-    const bathroomsTotalIntegerQuery = min_Bathrooms ? `&gteQuery[]=bathroomsTotalInteger,${min_Bathrooms}` : '';
-    const lotSizeAreaQuey = lot_Size_Area ? `&gteQuery[]=lotSizeArea,${lot_Size_Area}` : '';
-    const parkingTypeQuery = parking_Type && parking_Type !== 'select' ? `&${parking_Type}=true` : '';
-    const sortByQuery = sort_By && sort_By !== 'select'
-      ? `&sort=${sort_By.includes('min')
-        ? encodeURIComponent(`+${sort_By.replace('min', '')}`)
-        : encodeURIComponent(`-${sort_By.replace('max', '')}`)}`
-      : '';
+    if (options.min_Price && options.max_Price) {
+      queryParams.push(`&range[]=listPrice,${options.min_Price},${options.max_Price}`);
+    } else if (options.min_Price || options.max_Price) {
+      const item = options.min_Price ? 'min_Price' : 'max_Price';
+      queryParams.push(`&${item.includes('min') ? 'gte' : 'lte'}Query[]=${QueryKeys[item]},${options[item]}`);
+    }
 
-    const query = queryValue
-      ? `&queryValue=${queryValue}&queryFields=name`
-      : "";
+    for (const item in options) {
+      if (item.includes('min') || item.includes('max')) {
+        continue;
+      }
 
-    const queryBuilder = `${query}${priceQuery}${postalcodeQuery}${stateOrProvinceQuery}${bedroomsTotalQuery}${bathroomsTotalIntegerQuery}${lotSizeAreaQuey}${sortByQuery}${parkingTypeQuery}`
+      if (item === 'parking_Type') {
+        queryParams.push(`&${options[item]}=true`);
+      } else if (item === 'sort_By') {
+        queryParams.push(`&sort=${QueryKeys[options[item]]}`);
+      } else if (item === 'lot_Size_Area') {
+        queryParams.push(`&gteQuery[]=${QueryKeys[item]},${options[item]}`);
+      } else if (item === 'zip_code' || item === 'state' || item === 'property_Type') {
+        queryParams.push(`&${QueryKeys[item]}=${options[item]}`);
+      }
+    }
+
+    const queryString = queryParams.join('');
 
     try {
       const response = await fetch(
-        `${apiUrl}/properties?limit=${limit}&offset=${offset}${queryBuilder}`,
+        `${apiUrl}/properties?limit=${limit}&offset=${offset}${queryString}`,
         {
           method: HTTP_METHODS.GET,
         }

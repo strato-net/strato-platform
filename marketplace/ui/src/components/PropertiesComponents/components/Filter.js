@@ -14,6 +14,7 @@ import {
 } from "antd";
 import { FilterFilled, ClearOutlined } from "@ant-design/icons";
 import filterData from "../helpers/filterOptions.json";
+import { categoriesObj, homeTypeData } from "../helpers/constants";
 
 const { Panel } = Collapse;
 
@@ -21,7 +22,8 @@ const Filter = (props) => {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
   const { filterOption } = props;
 
-  const { sortBy, states, amenities, parkingType, propertyTypes } = filterData;
+  const { sortBy, states, amenities } = filterData;
+  const { parking_features } = categoriesObj
   const { sort_By, min_Price, max_Price, zip_code, parking_Type, property_Type, state, min_Bedrooms, min_Bathrooms, lot_Size_Area, } = filterOption;
 
   const handleChange = (key, value) => {
@@ -282,7 +284,7 @@ const Filter = (props) => {
               onChange={(value) => {
                 handleChange("parking_Type", value);
               }}
-              options={parkingType}
+              options={parking_features}
             />
 
             <Typography.Title
@@ -299,7 +301,7 @@ const Filter = (props) => {
               onChange={(value) => {
                 handleChange("property_Type", value);
               }}
-              options={propertyTypes}
+              options={homeTypeData}
             />
           </Panel>
         </Collapse>

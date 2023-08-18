@@ -252,6 +252,7 @@ export const QueryKeys = {
   min_Bedrooms: "bedroomsTotal",
   min_Bathrooms: "bathroomsTotalInteger",
   lot_Size_Area: "lotSizeArea",
+  property_Type: "propertyType",
   minlistPrice: "-listPrice",
   maxlistPrice: "+listPrice",
   minlotSizeArea: "-lotSizeArea",
