@@ -7,6 +7,7 @@ import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
 import { filterlabel, propertyConstants } from '../helpers/constants'
+import TagManager from "react-gtm-module";
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
@@ -132,6 +133,11 @@ function PropertyListings() {
                 handleChange={handleChange} filterOption={filterOption} />
               <Button type="primary"
                 onClick={() => {
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: 'PROPERTIES_OPEN_CREATE_MODAL',
+                    },
+                  });
                   toggleCreateModal(true)
                 }}
               >List Property</Button>

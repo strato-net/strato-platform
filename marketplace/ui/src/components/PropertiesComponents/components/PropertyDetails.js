@@ -22,6 +22,7 @@ import {
 } from "../../../contexts/propertyContext";
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj } from "../helpers/constants";
+import TagManager from "react-gtm-module";
 
 function PropertyDetails() {
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
@@ -283,6 +284,13 @@ function PropertyDetails() {
               <Button
                 type="primary"
                 style={{ marginLeft: "50px", marginTop: "30px" }}
+                onClick={() => {
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: "PROPERTIES_SUBMIT_INQUIRY",
+                    },
+                  });
+                }}
                 disabled
               >
                 Submit Inquiry

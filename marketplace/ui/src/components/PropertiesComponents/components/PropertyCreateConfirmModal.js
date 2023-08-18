@@ -1,12 +1,19 @@
 import React from 'react'
 import { Modal, Divider, Typography } from 'antd'
+import TagManager from "react-gtm-module";
 
 function PropertyCreateConfirmModal({ isCreateConfirmModalOpen, toggleCreateConfirmModal, handleSubmitCreateProperty, isCreatePropertySubmitting }) {
 
   const primaryAction = {
     content: "Create a Property Listing - Confirmation",
     disabled: false,
-    onAction: handleSubmitCreateProperty,
+    onAction: () => {handleSubmitCreateProperty()
+    TagManager.dataLayer({
+      dataLayer: {
+        event: "PROPERTIES_SUBMIT_CREATE_PROPERTY",
+      },
+    })
+  },
     loading: isCreatePropertySubmitting
   };
 

@@ -15,7 +15,7 @@ import {
   Typography,
   Upload,
 } from "antd";
-
+import axios from "axios";
 import {
   ArrowLeftOutlined,
   PlusOutlined
@@ -264,6 +264,44 @@ function PropertyCreateModal({
     return convertedData;
   }
 
+  const uploadImage = async options => {
+    const { onSuccess, onError, file, onProgress } = options;
+
+    const data = {
+      accessToken: "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiJmNjQwMjQ3Yy0yOTAxLTQwNmMtYWRlZC1kNTkyNGZiYjM1MjIiLCJleHAiOjE2OTIzNzc2NjgsIm5iZiI6MCwiaWF0IjoxNjkyMzc3MzY4LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiNmViMWUwMjMtOGUyOS00NjA4LWEyMzYtNzEwZDdiNjRlMzViIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.U00fcTxHEp-HebX2V6d3UVvSPSMJlSSjBN1WIANDVVnuHanlzaqR_TRAgOv_jAOumGqo4unhal6DcNUmpoPiq37FRbA8hzKI6TXbydPT-u5U0VyC1WwA87Av8Yc_3igELhsuovhvNmKqcJfAdeQ6_DomF9z7GEjhVxS4Iiel5JHwkF-D5GVEMzil7VYfS2Xwo76ZBfYW5Mn9OfiqfgJrMgxiEK12HWXkiWr41gIpK3iPI3AUDISWS4BhYFq68IkEFMBxk8MO0OGrJeSM5kyHi9wU1KyvxWkt-8PhDh0Bddixrs7vcwAWXgHe8bK7rvSow4cwWWhIPko5kpwgQbQlcA"
+    }
+
+    const fmData = new FormData();
+    const config = {
+      headers: { "content-type": "multipart/form-data" ,
+      'Authorization': `Bearer ${data.accessToken}`
+    }
+      // onUploadProgress: event => {
+      //   const percent = Math.floor((event.loaded / event.total) * 100);
+      //   setProgress(percent);
+      //   if (percent === 100) {
+      //     setTimeout(() => setProgress(0), 1000);
+      //   }
+      //   onProgress({ percent: (event.loaded / event.total) * 100 });
+      // }
+    };
+    fmData.append("image", file);
+    try {
+      const res = await axios.post(
+        'https://multinode203.ci.blockapps.net/api/v1/image',
+        fmData,
+        config
+      );
+
+      onSuccess("Ok");
+      console.log("server res: ", res);
+    } catch (err) {
+      console.log("Eroor: ", err);
+      const error = new Error("Some error");
+      onError({ err });
+    }
+  };
+
   const collapseData = convertCategories();
 
   const formStepFirst = () => {
@@ -495,7 +533,9 @@ function PropertyCreateModal({
         </Row>
         <Form.Item>
         <Upload
-        action="https://multinode203.ci.blockapps.net/api/v1/image"
+        // action="https://multinode203.ci.blockapps.net/api/v1/image"
+        accept="image/*"
+        customRequest={uploadImage}
         listType="picture-card"
         fileList={fileList}
         onPreview={handlePreview}
