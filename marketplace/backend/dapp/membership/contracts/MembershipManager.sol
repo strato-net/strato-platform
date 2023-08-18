@@ -64,7 +64,7 @@ contract MembershipManager is RestStatus{
         ProductFileType type;
     }
 
-    function addMembership(address _dappAdress, MembershipArgs _membershipArgs, MembershipServiceArgs[] _membershipServiceArgs, ProductFileArgs[] _productFileArgs) 
+    function addMembership(address _dappAddress, MembershipArgs _membershipArgs, MembershipServiceArgs[] _membershipServiceArgs, ProductFileArgs[] _productFileArgs) 
         returns (uint256, address) {
 
 
@@ -87,7 +87,7 @@ contract MembershipManager is RestStatus{
                                                  _membershipArgs.imageKey, _membershipArgs.isActive, _membershipArgs.category,
                                                  _membershipArgs.subCategory, _membershipArgs.createdDate);
         
-        Membership membership = new Membership(address(product), _timePeriodInMonths, _additionalInfo, _createdDate);
+        Membership membership = new Membership_2(address(product), _timePeriodInMonths, _additionalInfo, _createdDate);
 
         //iterate throught MembershipServiceArgs array and create MembershipServices 
 
