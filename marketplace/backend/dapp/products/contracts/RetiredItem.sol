@@ -1,13 +1,12 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 
-contract RetiredItem {
+contract RetiredItem_2 {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
     address public inventoryId;
-    address public itemId;
     string public retiredBy;
     string public retiredOnBehalfOf;
     int public quantity;
@@ -17,7 +16,6 @@ contract RetiredItem {
 
     constructor(
         address _inventoryId,
-        address _itemId,
         string _retiredBy,
         string _retiredOnBehalfOf,
         int _quantity,
@@ -28,7 +26,6 @@ contract RetiredItem {
         owner = tx.origin;
 
         inventoryId = _inventoryId;
-        itemId = _itemId;
         retiredBy = _retiredBy;
         retiredOnBehalfOf = _retiredOnBehalfOf;
         quantity = _quantity;

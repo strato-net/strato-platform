@@ -6,7 +6,6 @@ import { deployParamName } from "../../helpers/constants"
 import category from './Category'
 import product from './Product'
 import inventory from './Inventory'
-import item from './Item'
 import order from './Order'
 import eventType from './EventType'
 import event from './Event'
@@ -23,7 +22,6 @@ import {
   Category,
   Product,
   Inventory,
-  Item,
   Order,
   EventType,
   Event,
@@ -41,7 +39,6 @@ router.use(Users.prefix, users)
 router.use(Category.prefix, category)
 router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
-router.use(Item.prefix, item)
 router.use(Order.prefix, order)
 router.use(EventType.prefix, eventType)
 router.use(Event.prefix, event)

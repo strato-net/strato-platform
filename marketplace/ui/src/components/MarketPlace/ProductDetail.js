@@ -36,13 +36,9 @@ import {
 } from "../../contexts/marketplace";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useNavigate, useLocation } from "react-router-dom";
-//Items - ownership history
-import { actions as itemsActions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
 import { epochToDate } from "../../helpers/utils";
 import DataTableComponent from "../DataTableComponent";
 import useDebounce from "../UseDebounce";
-import NestedComponent from "./NestedComponent";
 import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -97,7 +93,6 @@ const ProductDetails = ({ user, users }) => {
   const { Text, Paragraph, Title } = Typography;
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
-  const itemDispatch = useItemDispatch();
   const categoryDispatch = useCategoryDispatch();
   const [categoryName, setCategoryName] = useState("");
   const [api, contextHolder] = notification.useNotification();
@@ -106,13 +101,6 @@ const ProductDetails = ({ user, users }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
-  const {
-    serialNumbers,
-    isSerialNumbersLoading,
-    ownershipHistory,
-    isOwnershipHistoryLoading,
-    isRawMaterialsLoading
-  } = useItemState();
 
   const routeMatch = useMatch({
     path: routes.MarketplaceProductDetail.url,
@@ -136,11 +124,8 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      if (user) {
-        itemsActions.fetchSerialNumbers(itemDispatch, Id);
-      }
     }
-  }, [Id, dispatch, itemDispatch, user]);
+  }, [Id, dispatch, user]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -284,57 +269,6 @@ const ProductDetails = ({ user, users }) => {
     },
   ];
 
-  const ownershipColumn = [
-    // {
-    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-    //   dataIndex: "serialNumber",
-    //   // Fixes UI issue of children having the same key
-    //   key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
-    //   align: "center",
-    //   onCell: (record) => {
-    //     return {
-    //       onClick: (ev) => {
-    //         setIsSerialNumberSelected(true);
-    //         setSerialNumber(record.serialNumber);
-    //         itemsActions.fetchItemOwnershipHistory(
-    //           itemDispatch,
-    //           record.address
-    //         );
-    //       },
-    //     };
-    //   },
-    //   render: (serialNumber) => (
-    //     <Button type="link" className="text-primary text-[17px]">
-    //       {serialNumber}
-    //     </Button>
-    //   ),
-    // },
-    // {
-    //   title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-    //   dataIndex: "itemNumber",
-    //   key: "itemNumber",
-    //   align: "center",
-    //   onCell: (record, rowIndex) => {
-    //     return {
-    //       onClick: (ev) => {
-    //         setIsSerialNumberSelected(true);
-    //         if (isEventSelected) setIsEventSelected(false);
-    //         setSerialNumber(record.serialNumber);
-    //         itemsActions.fetchItemOwnershipHistory(
-    //           itemDispatch,
-    //           record.address
-    //         );
-    //       },
-    //     };
-    //   },
-    //   render: (serialNumber) => (
-    //     <Button type="link" className="text-primary text-[17px]">
-    //       {serialNumber}
-    //     </Button>
-    //   ),
-    // },
-  ];
-
   const eventDetailColumn = [
     {
       title: <Text className="text-primaryC text-[13px]">DATE</Text>,
@@ -407,69 +341,6 @@ const ProductDetails = ({ user, users }) => {
     },
   ];
 
-  const transformationColumn = [
-    // {
-    //   title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-    //   dataIndex: "serialNumber",
-    //   key: "serialNumber",
-    //   align: "center",
-    //   onCell: (record) => {
-    //     return {
-    //       onClick: (ev) => {
-    //         setIsTransformationSelected(true);
-    //         setSerialNumber(record.serialNumber);
-    //         itemsActions.fetchItemRawMaterials(
-    //           itemDispatch,
-    //           details.uniqueProductCode,
-    //           record.serialNumber
-    //         );
-    //       }
-    //     };
-    //   },
-    //   render: (text) => (
-    //     <Button
-    //       type="link"
-    //       className="text-primary text-[17px]"
-    //     >
-    //       {text}
-    //     </Button>
-    //   ),
-    // },
-    // {
-    //   title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-    //   dataIndex: "itemNumber",
-    //   key: "itemNumber",
-    //   align: "center",
-    //   onCell: (record, rowIndex) => {
-    //     return {
-    //       onClick: (ev) => {
-    //         if (isEventSelected) setIsEventSelected(false);
-    //         if (isSerialNumberSelected) setIsSerialNumberSelected(false);
-    //         setIsTransformationSelected(true);
-    //         setSerialNumber(record.serialNumber);
-    //         itemsActions.fetchItemRawMaterials(
-    //           itemDispatch,
-    //           details.uniqueProductCode,
-    //           record.serialNumber
-    //         );
-    //       }
-    //     };
-    //   },
-    //   render: (text) => (
-    //     <Button
-    //       type="link"
-    //       className="text-primary text-[17px]"
-    //       onClick={() => {
-
-    //       }}
-    //     >
-    //       {text}
-    //     </Button>
-    //   ),
-    // },
-  ];
-
-
   const DescTitle = ({ text }) => {
     return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
   };
@@ -513,8 +384,7 @@ const ProductDetails = ({ user, users }) => {
       {contextHolder}
       {details === null ||
         isInventoryDetailsLoading ||
-        iscategorysLoading ||
-        isSerialNumbersLoading ? (
+        iscategorysLoading ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isInventoryDetailsLoading} size="large" />
         </div>
@@ -729,42 +599,42 @@ const ProductDetails = ({ user, users }) => {
                       />
                     ),
                   },
-                  {
-                    label: `Ownership History`,
-                    key: "3",
-                    children: (
-                      <DataTableComponent
-                        columns={ownershipColumn}
-                        data={serialNumbers}
-                        scrollX="100%"
-                        isLoading={isSerialNumbersLoading}
-                        pagination={{
-                          defaultPageSize: 5,
-                          showSizeChanger: false,
-                          position: ["bottomCenter"],
-                        }}
-                        rowKey={(record) => record.serialNumber}
-                      />
-                    ),
-                  },
-                  {
-                    label: `Transformation`,
-                    key: "4",
-                    children: (
-                      <DataTableComponent
-                        columns={transformationColumn}
-                        data={serialNumbers}
-                        isLoading={false}
-                        scrollX="100%"
-                        pagination={{
-                          defaultPageSize: 5,
-                          showSizeChanger: false,
-                          position: ["bottomCenter"],
-                        }}
-                        rowKey={(record) => record.serialNumber}
-                      />
-                    ),
-                  },
+                  // {
+                  //   label: `Ownership History`,
+                  //   key: "3",
+                  //   children: (
+                  //     <DataTableComponent
+                  //       columns={ownershipColumn}
+                  //       data={serialNumbers}
+                  //       scrollX="100%"
+                  //       isLoading={isSerialNumbersLoading}
+                  //       pagination={{
+                  //         defaultPageSize: 5,
+                  //         showSizeChanger: false,
+                  //         position: ["bottomCenter"],
+                  //       }}
+                  //       rowKey={(record) => record.serialNumber}
+                  //     />
+                  //   ),
+                  // },
+                  // {
+                  //   label: `Transformation`,
+                  //   key: "4",
+                  //   children: (
+                  //     <DataTableComponent
+                  //       columns={transformationColumn}
+                  //       data={serialNumbers}
+                  //       isLoading={false}
+                  //       scrollX="100%"
+                  //       pagination={{
+                  //         defaultPageSize: 5,
+                  //         showSizeChanger: false,
+                  //         position: ["bottomCenter"],
+                  //       }}
+                  //       rowKey={(record) => record.serialNumber}
+                  //     />
+                  //   ),
+                  // },
                   ]}
               />
             </div>
@@ -798,7 +668,7 @@ const ProductDetails = ({ user, users }) => {
                 </Card>
               ) : null}
 
-          {isSerialNumberSelected ? (
+          {/* {isSerialNumberSelected ? (
             <Card className="mb-12 mx-16">
               <Text className="font-semibold text-lg">Ownership History</Text>
               <Row className="my-6">
@@ -820,7 +690,7 @@ const ProductDetails = ({ user, users }) => {
                 }}
               />
             </Card>
-          ) : null}
+          ) : null} */}
 
           {isTransformationSelected ? (
             <Card className="mb-12 mx-16" id="transformation">
@@ -828,9 +698,6 @@ const ProductDetails = ({ user, users }) => {
               <Row className="my-6">
                 <EventDetailsComponent title="SERIAL NUMBER" value={serialNumber} id="trans-serial" />
               </Row>
-              <Spin spinning={isRawMaterialsLoading} delay={500} size="large">
-                <NestedComponent clickedSerialNumber={serialNumber} />
-              </Spin>
             </Card>
           ) : null}
         </div>

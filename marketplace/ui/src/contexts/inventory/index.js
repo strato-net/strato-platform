@@ -21,6 +21,8 @@ const InventoriesProvider = ({ children }) => {
     onboardedSeller: null,
     stripeStatus: null,
     isLoadingStripeStatus: false,
+    retiredCredits: null,
+    isRetiringCredits: false
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

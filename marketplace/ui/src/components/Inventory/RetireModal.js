@@ -1,7 +1,7 @@
 import { Button, Input, InputNumber, Modal, Table } from "antd";
 import { useEffect, useState } from "react";
-import { actions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
+import { actions } from "../../contexts/inventory/actions";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import dayjs from 'dayjs';
 
 
@@ -10,11 +10,11 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
     const [quantity, setQuantity] = useState(1);
     const [retiredOnBehalfOf, setRetiredOnBehalfOf] = useState("");
     const [purpose, setPurpose] = useState("");
-    const itemsDispatch = useItemDispatch();
+    const inventoryDispatch = useInventoryDispatch();
     const [canRetire, setCanRetire] = useState(true);
     const {
-        isRetiringItem
-    } = useItemState();
+        isRetiringCredits
+    } = useInventoryState();
 
     useEffect(() => {
         if (quantity > inventory.availableQuantity) {
@@ -58,7 +58,6 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
 
     const handleSubmit = async () => {
         const body = {
-            productId: inventory.productId,
             inventoryId: inventory.address,
             retiredBy: inventory.name,
             retiredOnBehalfOf: retiredOnBehalfOf,
@@ -66,7 +65,7 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
             purpose: purpose
         };
         if (quantity > 0 && quantity <= inventory.availableQuantity && inventory.vintage <= dayjs().year()) {
-            await actions.retireItem(itemsDispatch, body);
+            await actions.retireCredits(inventoryDispatch, body);
             handleCancel();
         }
     }
@@ -78,7 +77,7 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
             title={`Retire - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canRetire} loading={isRetiringItem}>
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canRetire} loading={isRetiringCredits}>
                     Retire
                 </Button>
             ]}

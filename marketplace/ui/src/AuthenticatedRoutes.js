@@ -7,8 +7,6 @@ import Product from "./components/Product";
 import { ProductsProvider } from "./contexts/product";
 import Inventory from "./components/Inventory";
 import { InventoriesProvider } from "./contexts/inventory";
-import Item from "./components/Item";
-import { ItemsProvider } from "./contexts/item";
 import Order from "./components/Order";
 import SoldOrderDetails from "./components/Order/SoldOrderDetails";
 import BoughtOrderDetails from "./components/Order/BoughtOrderDetails";
@@ -143,9 +141,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <EventsProvider>
               <CategorysProvider>
                 <InventoriesProvider>
-                  <ItemsProvider>
-                    <ProductDetails user={user} users={users} />
-                  </ItemsProvider>
+                  <ProductDetails user={user} users={users} />
                 </InventoriesProvider>
               </CategorysProvider>
             </EventsProvider>
@@ -174,13 +170,11 @@ const AuthenticatedRoutes = ({ user, users }) => {
               <CategorysProvider>
                 <EventTypesProvider>
                   <EventsProvider>
-                    <ItemsProvider>
-                      <ProductsProvider>
-                        <InventoriesProvider>
-                          <Inventory user={user} users={users} />
-                        </InventoriesProvider>
-                      </ProductsProvider>
-                    </ItemsProvider>
+                    <ProductsProvider>
+                      <InventoriesProvider>
+                        <Inventory user={user} users={users} />
+                      </InventoriesProvider>
+                    </ProductsProvider>
                   </EventsProvider>
                 </EventTypesProvider>
               </CategorysProvider>
@@ -196,9 +190,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <EventsProvider>
               <CategorysProvider>
                 <InventoriesProvider>
-                  <ItemsProvider>
-                    <ProductDetails user={user} users={users} />
-                  </ItemsProvider>
+                  <ProductDetails user={user} users={users} />
                 </InventoriesProvider>
               </CategorysProvider>
             </EventsProvider>
@@ -216,7 +208,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* <Route
         exact
         path={routes.EventList.url}
         element={
@@ -226,8 +218,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventsProvider>
           </UsersProvider>
         }
-      />
-      df
+      /> */}
+
       <Route
         exact
         path={routes.InventoryEventDetail.url}
@@ -238,17 +230,6 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 <InventoryEventDetails user={user} users={users} />
               </EventsProvider>
             </EventTypesProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.Items.url}
-        element={
-          <UsersProvider>
-            <ItemsProvider>
-              <Item user={user} users={users} />
-            </ItemsProvider>
           </UsersProvider>
         }
       />
@@ -320,7 +301,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* <Route
         exact
         path={routes.Events.url}
         element={
@@ -338,8 +319,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </CertifiersProvider>
           </UsersProvider>
         }
-      />
-      <Route
+      /> */}
+      {/* <Route
         exact
         path={routes.EventDetail.url}
         element={
@@ -360,7 +341,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventsProvider>
           </UsersProvider>
         }
-      />
+      /> */}
       <Route
         exact
         path={routes.InventoryEventSerialNumberList.url}
