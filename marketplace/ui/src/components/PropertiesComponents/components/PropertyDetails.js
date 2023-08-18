@@ -158,7 +158,7 @@ function PropertyDetails() {
   };
 
   const formattedResults = getFormattedResults(getSelectedCategories());
-  console.log(propertyDetails)
+  
   return (
     <>
       {contextHolder}

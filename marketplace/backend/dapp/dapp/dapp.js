@@ -633,6 +633,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const productData = await managers.productManager.getProduct({
         ...args,
         offset: 0,
+        sort: null,
         address: property.productId,
         uniqueProductID: property.productId,
         ownerOrganization: userOrganization

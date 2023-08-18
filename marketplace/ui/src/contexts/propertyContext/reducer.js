@@ -34,6 +34,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchProperties:
       return {
         ...state,
+        properties: [],
         isPropertiesLoading: true,
       };
     case actionDescriptors.fetchPropertiesSuccessful:

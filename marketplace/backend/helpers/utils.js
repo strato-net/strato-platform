@@ -192,7 +192,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
 }
 
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteQuery', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key)) {
       if (Array.isArray(args[key])) {
@@ -214,9 +214,18 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       }
     }
 
-    if (key === 'gteValue') {
-      const { gteField, gteValue } = args
-      result.push({ key: gteField, value: gteValue, predicate: 'gte' })
+    if (key === 'gteQuery') {
+      const { gteQuery } = args
+
+      if (Array.isArray(gteQuery)) {
+        const queries = gteQuery.reduce((agg, cum) => {
+          const [name, value] = cum.split(',')
+          agg.push({ key: name, value: value, predicate: 'gte' })
+          return agg
+        }, [])
+
+        queries.length && result.push(...queries)
+      }
     }
 
     if (key === 'notEqualsValue') {

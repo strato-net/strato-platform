@@ -1,5 +1,6 @@
 import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { QueryKeys } from "../../components/PropertiesComponents/helpers/constants";
 
 const actionDescriptors = {
   createProperty: "create_property",
@@ -127,16 +128,40 @@ const actions = {
     }
   },
 
-  fetchProperties: async (dispatch, limit, offset, queryValue) => {
-    const query = queryValue
-      ? `&queryValue=${queryValue}&queryFields=name`
-      : "";
+  fetchProperties: async (dispatch, limit, offset, options = {}) => {
 
     dispatch({ type: actionDescriptors.fetchProperties });
 
+    const queryParams = [];
+
+    if (options.min_Price && options.max_Price) {
+      queryParams.push(`&range[]=listPrice,${options.min_Price},${options.max_Price}`);
+    } else if (options.min_Price || options.max_Price) {
+      const item = options.min_Price ? 'min_Price' : 'max_Price';
+      queryParams.push(`&${item.includes('min') ? 'gte' : 'lte'}Query[]=${QueryKeys[item]},${options[item]}`);
+    }
+
+    for (const item in options) {
+      if (item.includes('min') || item.includes('max')) {
+        continue;
+      }
+
+      if (item === 'parking_Type') {
+        queryParams.push(`&${options[item]}=true`);
+      } else if (item === 'sort_By') {
+        queryParams.push(`&sort=${QueryKeys[options[item]]}`);
+      } else if (item === 'lot_Size_Area') {
+        queryParams.push(`&gteQuery[]=${QueryKeys[item]},${options[item]}`);
+      } else if (item === 'zip_code' || item === 'state' || item === 'property_Type') {
+        queryParams.push(`&${QueryKeys[item]}=${options[item]}`);
+      }
+    }
+
+    const queryString = queryParams.join('');
+
     try {
       const response = await fetch(
-        `${apiUrl}/properties?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/properties?limit=${limit}&offset=${offset}${queryString}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -158,7 +183,7 @@ const actions = {
       }
       dispatch({
         type: actionDescriptors.fetchPropertiesFailed,
-        error: body.error,
+        error: "Error while fetching property list",
       });
     } catch (err) {
       dispatch({
