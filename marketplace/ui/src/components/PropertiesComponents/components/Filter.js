@@ -14,7 +14,7 @@ import {
 } from "antd";
 import { FilterFilled, ClearOutlined } from "@ant-design/icons";
 import filterData from "../helpers/filterOptions.json";
-import { propertyConstants } from "../helpers/constants";
+import { categoriesObj, homeTypeData } from "../helpers/constants";
 
 const { Panel } = Collapse;
 
@@ -22,7 +22,8 @@ const Filter = (props) => {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
   const { filterOption } = props;
 
-  const { sortBy, states, amenities, parkingType, propertyTypes } = filterData;
+  const { sortBy, states, amenities } = filterData;
+  const { parking_features } = categoriesObj
   const { sort_By, min_Price, max_Price, zip_code, parking_Type, property_Type, state, min_Bedrooms, min_Bathrooms, lot_Size_Area, } = filterOption;
 
   const handleChange = (key, value) => {
@@ -69,6 +70,7 @@ const Filter = (props) => {
         <Select
           value={sort_By}
           style={{ width: "100%" }}
+          placeholder="Sort By"
           onChange={(value) => {
             handleChange("sort_By", value);
           }}
@@ -153,6 +155,7 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
+              placeholder="State"
               value={state}
               onChange={(value) => {
                 handleChange("state", value);
@@ -276,11 +279,12 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
+              placeholder="Parking Type"
               value={parking_Type}
               onChange={(value) => {
                 handleChange("parking_Type", value);
               }}
-              options={parkingType}
+              options={parking_features}
             />
 
             <Typography.Title
@@ -292,11 +296,12 @@ const Filter = (props) => {
             </Typography.Title>
             <Select
               style={{ width: "100%" }}
+              placeholder="Property Type"
               value={property_Type}
               onChange={(value) => {
                 handleChange("property_Type", value);
               }}
-              options={propertyTypes}
+              options={homeTypeData}
             />
           </Panel>
         </Collapse>

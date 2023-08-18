@@ -6,20 +6,19 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-import { filterSchema, propertyCheckBox, propertyConstants } from '../helpers/constants'
+import { filterlabel, propertyCheckBox, propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
 
-  const [filterOption, setFilterOption] = useState(filterSchema);
+  const [filterOption, setFilterOption] = useState({});
   const [formData, setFormData] = useState({
     lotSizeUnits: "sqft",
     livingAreaUnits: "sqft",
     numberOfUnitsTotal: 1,
     ...propertyCheckBox
   })
-  const [selectedFilter, setSelectedFilter] = useState([])
-  const [appliedFilter, setAppliedFilter] = useState([])
+  const [appliedFilter, setAppliedFilter] = useState({})
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(LIMIT_PER_PAGE)
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
@@ -53,19 +52,14 @@ function PropertyListings() {
   };
 
   const applyFilter = () => {
-    let data = [...selectedFilter];
-    let filteredData = data.map((item, index) => {
-      return { name: item.name, value: (item.value === ("select" || item.value.length === 0) ? "" : item.value) }
-    })
-    setAppliedFilter(filteredData)
+    setAppliedFilter(filterOption)
     actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
   const clearFilter = () => {
     setCurrentPage(1);
-    setAppliedFilter([]);
-    setSelectedFilter([]);
-    setFilterOption(filterSchema);
+    setAppliedFilter({});
+    setFilterOption({});
     if (currentPage === 1) {
       actions.fetchProperties(dispatch, limit, currentPage - 1);
     } else {
@@ -74,21 +68,11 @@ function PropertyListings() {
   }
 
   const handleTagClose = (name) => {
-    let data = [...appliedFilter];
-    const check = data.map((item, index) => {
-      let data = { ...filterOption }
-      data[name] = filterSchema[name];
-      setFilterOption(data);
-
-      if (item.name === name) {
-        return { name: name, value: (filterSchema[name] === 0 ? "" : filterSchema[name]) }
-      } else {
-        return item;
-      }
-    })
-    setAppliedFilter(check);
-    setSelectedFilter(check);
-    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
+    let data = { ...appliedFilter };
+    delete data[name]
+    setFilterOption(data);
+    setAppliedFilter(data);
+    actions.fetchProperties(dispatch, limit, currentPage - 1, data)
   }
 
   const propertyList = () => {
@@ -131,12 +115,6 @@ function PropertyListings() {
     let filter = { ...filterOption };
     filter[key] = value;
     setFilterOption(filter);
-
-    const convertedData = Object.keys(filter).map((key) => ({
-      name: key,
-      value: filter[key] || ""
-    }));
-    setSelectedFilter(convertedData)
   }
 
   totalValue.current = properties.length === 0
@@ -166,18 +144,15 @@ function PropertyListings() {
             </Col>
           </Row>
 
-          {appliedFilter.map((item, index) => {
-            const { name, value } = item;
-            if (name === "amenities" && value.length === 0) return false;
-            return (value && <Tag style={{ margin: "5px" }} key={index}
-              closable onClose={() => { handleTagClose(name) }}
+          {Object.keys(appliedFilter).map((item, index) => {
+            if (item === "amenities" && filterOption[item].length === 0) return false;
+            return (filterOption[item] && <Tag style={{ margin: "5px" }} key={index}
+              closable onClose={() => { handleTagClose(item) }}
             >
-              {name.split("_").join(" ").toUpperCase()}: {name === "amenities"
-                ? value.join(", ")
-                : (name === "sort_By" ? (value.includes("min")
-                  ? value.replace("min", "Lowest ")
-                  : value.replace("max", "Highest "))
-                  : value)}
+              {filterlabel[item]}: {item === "amenities"
+                ? filterOption[item].join(", ")
+                : (item === "sort_By" ? (filterlabel[filterOption[item]])
+                  : filterOption[item])}
             </Tag>)
           })}
 
