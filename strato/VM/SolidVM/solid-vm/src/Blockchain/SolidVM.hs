@@ -526,13 +526,13 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
               _sourceAnnotationAnnotation = ()
             }
 
-  let (functionName', argsParsed) =
+  let functionName' =
         case fnCalltype of
-          CC.DefaultCall -> (functionName, [])
+          CC.DefaultCall -> functionName
           -- Handles RawCall and DelegateCall function signature parsing
           _ -> (case runParser parseExternalCallArgs (ParserState "" "" M.empty) "" functionName of
-            Right (funcTocall, typesArr) -> (funcTocall, typesArr)
-            _                            -> (functionName, []))
+            Right (funcTocall, _) -> funcTocall
+            _ -> functionName)
 
   (!f, !args) <-
         case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
@@ -558,7 +558,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                   (CC.NamedArgs _) -> error "Named args for .call not implemented."
                 let valList' = concatMap flattenVals valList
                 let mtheFunction' = do
-                      let boolTrueIfArgsSameLength thyFunc = (length argExps) == (length $ CC._funcArgs thyFunc)
+                      let boolTrueIfArgsSameLength thyFunc = (length valList') == (length $ CC._funcArgs thyFunc)
                           filteredFuncsWithSameArgLength   = filter boolTrueIfArgsSameLength ([theFunction] ++ (CC._funcOverload  theFunction))
                           boolTrueIfSignatureTheSame funck = all (\(a, (_, (CC.IndexedType _ d))) ->
                             case (a, d) of
@@ -579,8 +579,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                         [a] -> Just a
                         _   -> Nothing
                 case mtheFunction' of
-                      Just theFunction' | ((length argsParsed) == (length argExps) || (length valList') == (length argExps)) -> do
-                        args' <- argsToVals contract' theFunction' argExps
+                      Just theFunction' -> do
+                        args' <- argsToVals contract' theFunction' $ case valList' of [] -> CC.OrderedArgs []; _ -> argExps
                         mCallInfo <- getCurrentCallInfoIfExists
                         let ro = case mCallInfo of
                                   Nothing -> False
