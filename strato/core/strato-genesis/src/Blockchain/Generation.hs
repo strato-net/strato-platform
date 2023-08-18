@@ -906,7 +906,8 @@ contract User {
         // Only the user that this contract is associated with, can use this function.
         require((authenticate() && isActive), "You don't have permission to use this function!");
 
-        return address(contractToCall).call(functionName, args);
+        variadic result = address(contractToCall).call(functionName, args);
+        return result;
     }
 } 
 |]
