@@ -221,6 +221,40 @@ export const propertyCheckBox = {
 };
 
 export const propertyConstants = {
-  LIMIT_PER_PAGE:10,
-  MAX_PRICE_VALUE:200000
+  LIMIT_PER_PAGE: 10,
+  MAX_PRICE_VALUE: 0
+}
+
+export const filterlabel = {
+  sort_By: "Sort By",
+  min_Price: "Minimum Price",
+  max_Price: "Maximum Price",
+  zip_code: "ZipCode",
+  state: "State",
+  min_Bedrooms: "Minimum Bedroom",
+  min_Bathrooms: "Minimum Bathroom",
+  amenities: "Amenities",
+  lot_Size_Area: "Minimum Lot Area",
+  parking_Type: "Parking Type",
+  property_Type: "Property Type",
+
+  minlistPrice: "Lowest Price",
+  maxlistPrice: "Highest Price",
+  minlotSizeArea: "Lowest Area",
+  maxlotSizeArea: "Highest Area",
+};
+
+export const QueryKeys = {
+  min_Price: "listPrice",
+  max_Price: "listPrice",
+  zip_code: "postalcode",
+  state: "stateOrProvince",
+  min_Bedrooms: "bedroomsTotal",
+  min_Bathrooms: "bathroomsTotalInteger",
+  lot_Size_Area: "lotSizeArea",
+  property_Type: "propertyType",
+  minlistPrice: "-listPrice",
+  maxlistPrice: "+listPrice",
+  minlotSizeArea: "-lotSizeArea",
+  maxlotSizeArea: "+lotSizeArea",
 }

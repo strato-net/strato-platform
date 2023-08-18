@@ -35,7 +35,6 @@ import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
 import PropertyListings from "./components/PropertiesComponents/components/PropertyListings";
-import PropertyLayout from "./components/PropertiesComponents/components/PropertyLayout";
 import PropertyDetails from "./components/PropertiesComponents/components/PropertyDetails";
 import { PropertyProvider } from "./contexts/propertyContext";
 

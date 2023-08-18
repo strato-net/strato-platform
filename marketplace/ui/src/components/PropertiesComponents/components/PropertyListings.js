@@ -1,25 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Spin, Pagination, notification, Button } from 'antd'
+import { Row, Col, Typography, Spin, Pagination, notification, Button, Tag } from 'antd'
 import PropertyCard from './PropertyCard'
 import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-import { propertyConstants } from '../helpers/constants'
+import { filterlabel, propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
+
+  const [filterOption, setFilterOption] = useState({});
+  const [appliedFilter, setAppliedFilter] = useState({})
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(LIMIT_PER_PAGE)
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
-  const [modalView, setModalView] = useState(true);
-  const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
   const totalValue = useRef(0);
-
   const dispatch = usePropertiesDispatch()
-  const { properties, isPropertiesLoading, isCreatePropertySubmitting, message, success, error } = usePropertiesState();
+  const { properties, isPropertiesLoading, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
+
   useEffect(() => {
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
@@ -44,13 +45,28 @@ function PropertyListings() {
     }
   };
 
-  const applyFilter = (options) => {
-    // actions.fetchProperties(dispatch, limit,currentPage,options)
+  const applyFilter = () => {
+    setAppliedFilter(filterOption)
+    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
   const clearFilter = () => {
-    setCurrentPage(1)
-    // actions.fetchProperties(dispatch, limit,1,options)
+    setCurrentPage(1);
+    setAppliedFilter({});
+    setFilterOption({});
+    if (currentPage === 1) {
+      actions.fetchProperties(dispatch, limit, currentPage - 1);
+    } else {
+      setCurrentPage(1);
+    }
+  }
+
+  const handleTagClose = (name) => {
+    let data = { ...appliedFilter };
+    delete data[name]
+    setFilterOption(data);
+    setAppliedFilter(data);
+    actions.fetchProperties(dispatch, limit, currentPage - 1, data)
   }
 
   const propertyList = () => {
@@ -89,11 +105,18 @@ function PropertyListings() {
     )
   }
 
+  const handleChange = (key, value) => {
+    let filter = { ...filterOption };
+    filter[key] = value;
+    setFilterOption(filter);
+  }
+
   totalValue.current = properties.length === 0
     ? currentPage * LIMIT_PER_PAGE
     : (properties.length === LIMIT_PER_PAGE
       ? (currentPage * LIMIT_PER_PAGE) + 1
       : currentPage * LIMIT_PER_PAGE)
+
   return (
     <>
       {message && openToast("bottom")}
@@ -105,7 +128,8 @@ function PropertyListings() {
               Recommended Properties
             </Typography.Title>
             <Col style={{ display: "flex", justifyContent: "space-between" }}>
-              <Filter applyFilter={applyFilter} clearFilter={clearFilter} />
+              <Filter applyFilter={applyFilter} clearFilter={clearFilter}
+                handleChange={handleChange} filterOption={filterOption} />
               <Button type="primary"
                 onClick={() => {
                   toggleCreateModal(true)
@@ -113,6 +137,19 @@ function PropertyListings() {
               >List Property</Button>
             </Col>
           </Row>
+
+          {Object.keys(appliedFilter).map((item, index) => {
+            if (item === "amenities" && filterOption[item].length === 0) return false;
+            return (filterOption[item] && <Tag style={{ margin: "5px" }} key={index}
+              closable onClose={() => { handleTagClose(item) }}
+            >
+              {filterlabel[item]}: {item === "amenities"
+                ? filterOption[item].join(", ")
+                : (item === "sort_By" ? (filterlabel[filterOption[item]])
+                  : filterOption[item])}
+            </Tag>)
+          })}
+
           {isPropertiesLoading && loader(isPropertiesLoading)}
           {!isPropertiesLoading && properties.length > 0 && propertyList()}
           {!isPropertiesLoading && !properties.length && dataNotFound()}
@@ -135,10 +172,6 @@ function PropertyListings() {
       <PropertyCreateModal
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
-        modalView={modalView}
-        setModalView={setModalView}
-        isCreateConfirmModalOpen={isCreateConfirmModalOpen}
-        toggleCreateConfirmModal={toggleCreateConfirmModal}
       />
     </>
   );
