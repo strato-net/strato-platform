@@ -25,7 +25,7 @@ import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
 import membershipJs from "../membership/membership";
 import membershipServiceJs from "../membershipService/membershipService";
-import membershipManagerJs from "../membershipManager/membershipManager";
+import membershipManagerJs from "../membership/membershipManager";
 
 const allAssetNames = [
   orderJs.contractName,
