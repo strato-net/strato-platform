@@ -34,7 +34,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 const { Search } = Input;
 const { Title, Text } = Typography;
 
-const Membership = () => {
+const Membership = ( user ) => {
     const [open, setOpen] = useState(false);
       const dispatch = useMembershipDispatch();
     const [api, contextHolder] = notification.useNotification();
@@ -261,6 +261,7 @@ const Membership = () => {
             {open && (
         <CreateMembershipModal
           open={open}
+          user={user}
           handleCancel={handleCancel}
           categorys={categorys}
           resetPage={onPageChange}
