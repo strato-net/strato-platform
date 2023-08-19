@@ -526,13 +526,13 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
               _sourceAnnotationAnnotation = ()
             }
 
-  let (functionName', argsParsed) =
+  let functionName' =
         case fnCalltype of
-          CC.DefaultCall -> (functionName, [])
+          CC.DefaultCall -> functionName
           -- Handles RawCall and DelegateCall function signature parsing
           _ -> (case runParser parseExternalCallArgs (ParserState "" "" M.empty) "" functionName of
-            Right (funcTocall, typesArr) -> (funcTocall, typesArr)
-            _                            -> (functionName, []))
+            Right (funcTocall, _) -> funcTocall
+            _ -> functionName)
 
   (!f, !args) <-
         case (M.lookup functionName' functionsIncludingConstructor, fnCalltype) of
@@ -553,14 +553,14 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                     theVar <- expToVar a
                     theVal <- getVar theVar
                     case theVal of
-                      SVariadic x -> return x 
+                      SVariadic x -> return x
                       x -> return [x]) oa
                   (CC.NamedArgs _) -> error "Named args for .call not implemented."
-                let valList' = concatMap flattenVals valList 
+                let valList' = concatMap flattenVals valList
                 let mtheFunction' = do
-                      let boolTrueIfArgsSameLength thyFunc = (length argExps) == (length $ CC._funcArgs thyFunc)
+                      let boolTrueIfArgsSameLength thyFunc = (length valList') == (length $ CC._funcArgs thyFunc)
                           filteredFuncsWithSameArgLength   = filter boolTrueIfArgsSameLength ([theFunction] ++ (CC._funcOverload  theFunction))
-                          boolTrueIfSignatureTheSame funck = all (\(a, (_, (CC.IndexedType _ d))) -> 
+                          boolTrueIfSignatureTheSame funck = all (\(a, (_, (CC.IndexedType _ d))) ->
                             case (a, d) of
                               (SInteger _, SVMType.Int _ _) -> True
                               (SString _, SVMType.String _) -> True
@@ -579,8 +579,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                         [a] -> Just a
                         _   -> Nothing
                 case mtheFunction' of
-                      Just theFunction' | (((length argsParsed) == (length argExps)) || ((length valList') == (length argExps))) -> do
-                        args' <- argsToVals contract' theFunction' argExps
+                      Just theFunction' -> do
+                        args' <- argsToVals contract' theFunction' $ case valList' of [] -> CC.OrderedArgs []; _ -> argExps
                         mCallInfo <- getCurrentCallInfoIfExists
                         let ro = case mCallInfo of
                                   Nothing -> False
@@ -804,7 +804,7 @@ argsToValsModifiers ctract md args =
               (SVMType.Mapping _ keyType valueType) -> do
                 m <- mapM go $ M.toList mp
                 return $ SMap valueType $ M.fromList m
-                where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
+                where
                       go (k, v) = do
                                 let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
                                 case maybeExp of
@@ -822,12 +822,12 @@ argsToVals ctract fn args = case args of
     when (length xs /= length orderedTypes && not (validVariadicSignature orderedTypes)) $
       invalidArguments "arity mismatch" (xs, orderedTypes)
     valList <- zipWithM eval32 orderedTypes xs
-    let maybeVariadic = last valList
-    let unpackedList = case maybeVariadic of
-          SVariadic x -> init valList ++ x
+    let maybeVariadic = Data.List.uncons valList
+        unpackedList = case maybeVariadic of
+          Just (SVariadic x, _) -> init valList ++ x
           _ -> valList
     pure $ OrderedVals unpackedList
-    
+
   CC.NamedArgs xs -> NamedVals . M.toList <$> do
     let strTypes = M.mapKeys (fromMaybe "") $ M.fromList $ CC._funcArgs fn
     M.mergeA (M.mapMissing $ curry $ invalidArguments "missing argument")
@@ -1571,7 +1571,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
   chainId <- view accountChainId <$> getCurrentAccount
 
   case (val, name) of
---    Constant c -> case (c, name) of
       (SEnum enumName, _) -> do
         contract' <- getCurrentContract
         let maybeEnumValues = M.lookup enumName $ contract' ^. CC.enums
@@ -1965,14 +1964,17 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                   Just a  -> return $ Constant  a
                   Nothing -> return $ Constant SNULL
             (SAccount addr _, "call") -> do
-              let (funcName, args') = (case args of
-                    (CC.OrderedArgs [])  -> typeError "call needs atleast one argument, none were given " args
-                    (CC.OrderedArgs a)  -> case convertedFirstArg of (SString fname) -> (fname, (CC.OrderedArgs $ tail a)); _ -> typeError "call needs first argument to be a string" args
-                    (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to call" args)
+              let (funcName, args') = case args of
+                    CC.OrderedArgs [] -> typeError "call needs at least one argument, none were given " args
+                    CC.OrderedArgs (_ : as) -> case convertedFirstArg of
+                      (SString fname) -> (fname, CC.OrderedArgs as)
+                      _ -> typeError "call needs first argument to be a string" args
+                    CC.NamedArgs _ -> typeError "Cannot provide named args to call" args
               fromAddress <- getCurrentAccount
               let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
               res <- callWithResult fromAddress toAddress CC.RawCall Nothing funcName False args'
               case res of
+                  -- TODO: call() should return (bool, variadic)... (Constant BBool , Constant a)
                   Just a  -> return $ Constant  a
                   Nothing -> return $ Constant SNULL
             (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
