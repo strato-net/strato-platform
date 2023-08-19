@@ -913,10 +913,9 @@ contract User {
 |]
 
 -- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
-insertUserRegistryContract :: GenesisInfo -> GenesisInfo
-insertUserRegistryContract gi =
-    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct],
-    -- gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct, testAcct],
+insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
+insertUserRegistryContract certs gi =
+    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
         genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
     where 
         addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
@@ -938,7 +937,23 @@ insertUserRegistryContract gi =
                 (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
             ]
 
-        -- testAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing "Jin Huai Xuan" Nothing Nothing) 123
+        userAccts = map (\cert -> do
+                let certSub' crt =
+                        case getCertSubject crt of
+                            Just s -> s
+                            Nothing -> error "Certificate requires a subject"
+                    certUserAddress = fromPublicKey . subPub . certSub'
+                    certSub = certSub' cert
+                    reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
+                SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing Nothing) 0 
+                    (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+                        (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
+                        (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
+                        (".isActive", rlpWrap $ BBool True),
+                        (BC.pack $ ".userCertificates<a:" ++ (show $ certUserAddress cert) ++ ">", addrToCertIdx . show . reverseAddr $ cert)]
+            ) certs
+
+        -- testAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing "Jin Huai Xuan" Nothing Nothing) 0
         --     (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
         --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
         --         (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
