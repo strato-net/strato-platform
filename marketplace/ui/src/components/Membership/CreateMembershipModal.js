@@ -248,7 +248,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   // Generate random number for now
                   uniqueMembershipCode: Math.floor(Math.random() * 1000000),
                   leastSellableUnit: 1,
-                  // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array. 
+                  // TODO: This might have to be changed into an array. 
                   imageKey: arrayOfImageData[0]?.imageKey,
                   category: updatedValues.category,
                   subCategory: updatedValues.category,
