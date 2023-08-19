@@ -211,67 +211,73 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     
     // for every image in formki.values.images, upload it to s3 and get the url back
     const arrayOfImageData = [];
-    values.images.forEach(async (image) => {
+    const uploadPromises = values.images.map(async (image) => {
       const formData = new FormData();
       formData.append("fileUpload", image.originFileObj);
-      arrayOfImageData.push(await prodActions.uploadImage(prodDispatch, formData))
+      return prodActions.uploadImage(prodDispatch, formData);
     });
-    console.log("arrayOfImageData", arrayOfImageData);
-    // for every document in formik.values.documents, upload it to s3 and get the url back
 
-    
-    console.log(formik.values.images.length)
-    if (formik.values.images.length === arrayOfImageData.length) {
-      console.log("all images uploaded");
-      // TODO: Add image and file upload to S3
-      const body = {
-        membershipArgs: {
-          name: updatedValues.name,
-          description: updatedValues.description,
-          manufacturer: user.user.organization,
-          unitOfMeasurement: 1,
-          // Generate random code for now
-          userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-          // Generate random number for now
-          uniqueMembershipCode: Math.floor(Math.random() * 1000000),
-          leastSellableUnit: 1,
-          // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array. 
-          imageKey: arrayOfImageData[0]?.imageKey,
-          category: updatedValues.category,
-          subCategory: updatedValues.category,
-          createdDate: new Date().getTime(),
-          timePeriodInMonths: updatedValues.duration,
-          additionalInfo: updatedValues.additionalInformation,
-          // If visible is true the List Now form is open and the membership is active
-          isActive: visible ? true : false,
-        },
-        membershipServiceArgs: updatedValues.services.map((service) => ({
-          serviceId: service.serviceId,
-          membershipPrice: service.memberPrice ? service.memberPrice : 0,
-          discountPrice: service.percentDiscount ? service.percentDiscount : 0,
-          maxQuantity: service.numberOfUses,
-          createdDate: new Date().getTime(),
-          // If visible is true the List Now form is open and the membership is active
-          isActive: visible ? true : false,
-        })),
-        productFileArgs: updatedValues.documents.map((document, index) => ({
-          fileLocation: `https://s3.us-east-2.amazonaws.com/elasticbeanstalk-us-east-2-837725889976/${document.name}`,
-          fileHash: `fileHash${index}`,
-          fileName: document.name,
-          uploadDate: new Date().getTime(),
-          createdDate: new Date().getTime(),
-          section: 1,
-          type: 1,
-        })),
-      };
+    Promise.all(uploadPromises)
+      .then(async (results) => {
+        arrayOfImageData.push(...results);
+        console.log(values.images.length, arrayOfImageData.length);
 
-      console.log("body", body);
-      const isDone = await actions.createMembership(dispatch, body);
-      if (isDone) {
-        formik.resetForm();
-        handleCancel();
-      }
-    }
+        if (values.images.length === arrayOfImageData.length) {
+          // Your code for when all images have been uploaded
+          console.log("all images uploaded");
+          // TODO: Add image and file upload to S3
+          const body = {
+            membershipArgs: {
+              name: updatedValues.name,
+              description: updatedValues.description,
+              manufacturer: user.user.organization,
+              unitOfMeasurement: 1,
+              // Generate random code for now
+              userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+              // Generate random number for now
+              uniqueMembershipCode: Math.floor(Math.random() * 1000000),
+              leastSellableUnit: 1,
+              // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array. 
+              imageKey: arrayOfImageData[0]?.imageKey,
+              category: updatedValues.category,
+              subCategory: updatedValues.category,
+              createdDate: new Date().getTime(),
+              timePeriodInMonths: updatedValues.duration,
+              additionalInfo: updatedValues.additionalInformation,
+              // If visible is true the List Now form is open and the membership is active
+              isActive: visible ? true : false,
+            },
+            membershipServiceArgs: updatedValues.services.map((service) => ({
+              serviceId: service.serviceId,
+              membershipPrice: service.memberPrice ? service.memberPrice : 0,
+              discountPrice: service.percentDiscount ? service.percentDiscount : 0,
+              maxQuantity: service.numberOfUses,
+              createdDate: new Date().getTime(),
+              // If visible is true the List Now form is open and the membership is active
+              isActive: visible ? true : false,
+            })),
+            productFileArgs: updatedValues.documents.map((document, index) => ({
+              fileLocation: `https://s3.us-east-2.amazonaws.com/elasticbeanstalk-us-east-2-837725889976/${document.name}`,
+              fileHash: `fileHash${index}`,
+              fileName: document.name,
+              uploadDate: new Date().getTime(),
+              createdDate: new Date().getTime(),
+              section: 1,
+              type: 1,
+            })),
+          };
+
+          console.log("body", body);
+          const isDone = await actions.createMembership(dispatch, body);
+          if (isDone) {
+            formik.resetForm();
+            handleCancel();
+          }
+        }
+      })
+      .catch((error) => {
+        // Handle errors if any of the promises fail
+      });
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
