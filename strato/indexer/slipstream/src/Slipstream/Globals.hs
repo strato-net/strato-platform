@@ -16,6 +16,8 @@ module Slipstream.Globals
     setContractState,
     flushPendingWrites,
     getContractState,
+    getCCFromGlobals,
+    putCCIntoGlobals,
     forceGlobalEval,
     newGlobals,
     getAbstractTableRow,
@@ -48,7 +50,7 @@ import           Slipstream.Metrics
 import           Slipstream.QueryFormatHelper
 
 newGlobals :: MonadIO m => Handle -> CirrusHandle -> m (IORef Globals)
-newGlobals h ch = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) h ch
+newGlobals h ch = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) (LRU.newLRU (Just 1024)) h ch
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -168,6 +170,24 @@ setContractState gref account values = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{contractStates = LRU.insert account values contractStates}
   asyncWriteToStorage coldStorageHandle account values
+
+getCCFromGlobals :: MonadIO m => IORef Globals -> Account -> m (Maybe CodeCollection)
+getCCFromGlobals globalsIORef account = do
+  g@Globals{..} <- readIORef globalsIORef
+  case LRU.lookup account ccMap of
+    (newCache, jv@Just{}) -> do
+      recordCacheHit
+      writeIORef globalsIORef g{ ccMap = newCache }
+      return jv
+    (newCache, Nothing) -> do
+      recordCacheMiss
+      writeIORef globalsIORef g{ ccMap = newCache }
+      return Nothing
+
+putCCIntoGlobals :: MonadIO m => IORef Globals -> Account -> CodeCollection -> m ()
+putCCIntoGlobals gref account cc = do
+  globals@Globals{..} <- readIORef gref
+  updateGlobals gref globals{ccMap = LRU.insert account cc ccMap}
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force

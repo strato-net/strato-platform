@@ -21,6 +21,7 @@ import           Database.PostgreSQL.Typed (PGConnection)
 import           BlockApps.Solidity.Value
 import           Blockchain.Strato.Model.Account
 import           Slipstream.Data.GlobalsColdStorage (Handle)
+import           SolidVM.Model.CodeCollection
 
 
 instance NFData (LRU key val) where
@@ -37,6 +38,7 @@ data CirrusHandle = CirrusHandle {cirrusConn :: PGConnection, queriedMaps ::S.Se
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , contractStates :: LRU Account [(T.Text, Value)]
+                       , ccMap :: LRU Account CodeCollection
                        , coldStorageHandle :: Handle
                        , cirrusHandle :: CirrusHandle
                        } deriving (Generic, NFData)

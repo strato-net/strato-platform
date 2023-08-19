@@ -69,6 +69,7 @@ data ContractF a =
     _modifiers :: Map SolidString (ModifierF a),
     _usings :: Map SolidString [UsingF a],
     _contractType :: ContractType,
+    _importedFrom :: Maybe Account,
     _contractContext :: a
   } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
 
@@ -89,9 +90,10 @@ instance Default a => Default (ContractF a) where
     _functions = empty,
     _constructor = Nothing,
     _modifiers = empty,
-    _contractContext = def,
     _usings = empty,
-    _contractType = ContractType
+    _contractType = ContractType,
+    _importedFrom = Nothing,
+    _contractContext = def
   }
 
 type Contract = Positioned ContractF
@@ -118,6 +120,7 @@ instance Arbitrary Contract where
     _modifiers  =  empty ,
     _usings  =  empty ,
     _contractType  =  ContractType ,
+    _importedFrom = Nothing,
     _contractContext = a
   }]
 

@@ -31,13 +31,14 @@ import qualified Data.Aeson                           as Aeson
 import Control.Arrow ((&&&))
 import Control.Lens ((^.), (.~), (?~))
 import Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Except
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
-import Data.Foldable (toList)
+import Data.Foldable (for_, toList)
 import Data.Function
 import Data.IORef
 import qualified Data.Set as S
@@ -104,6 +105,24 @@ instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
+instance (MonadUnliftIO m, Mod.Accessible (IORef Globals) m) => Selectable Account CodeCollection (SQLM m) where
+  select _ a = do
+    g <- lift $ Mod.access (Mod.Proxy @(IORef Globals))
+    mCC <- getCCFromGlobals g a
+    case mCC of
+      Just cc -> pure $ Just cc
+      Nothing -> runMaybeT $ do
+        (AddressStateRef' r _) <- MaybeT
+                                . fmap listToMaybe
+                                . Account.getAccount'
+                                $ Account.accountsFilterParams
+                                & Account.qaAddress ?~ (a ^. accountAddress)
+                                & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+        codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+        cc <- MaybeT $ either (const Nothing) Just <$> getCodeCollectionByCodePtr codePtr
+        for_ cc $ putCCIntoGlobals g
+        pure cc
+
 instance Selectable Account Contract m => Selectable Account Contract (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -148,7 +167,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert     :: ProcessedContract
-  , abstractInsert     :: Maybe (ProcessedContract, T.Text, TableColumns)
+  , abstractInsert  :: [(ProcessedContract, T.Text, TableColumns)]
   , historyInserts  :: [ProcessedContract]
   , mappingInserts  :: [ProcessedMappingRow]
   } deriving (Show)
@@ -311,13 +330,29 @@ getContractsForParents parents' cc =
   let getContractForParent parent = Map.lookup parent cc
   in mapMaybe getContractForParent parents'
 
+getMapNamesFromContract :: Contract -> [String]
+getMapNamesFromContract c =
+  let storageDefs' = c ^. storageDefs
+      storageDefsList = Map.toList storageDefs'
+      listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
+      listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
+   in fst <$> listOfMappingsWithRecords
+
+getAbstractParentsFromContract :: Contract -> [Contract]
+getAbstractParentsFromContract c =
+  let parents' = c ^. parents
+      parentContracts = getContractsForParents parents' (cc^.contracts)
+   in filter ((== AbstractType) . _contractType) parentContracts
+
 processTheMessages :: ( MonadLogger m
                       , HasSQL m
                       , Selectable Account AddressState m
                       , HasCodeDB m
+                      , Mod.Accessible (IORef Globals) m
                       )
-                   => BlocEnv -> PGConnection -> IORef Globals -> [VMEvent] -> m ()
-processTheMessages env conn g messages = do
+                   => BlocEnv -> PGConnection -> [VMEvent] -> m ()
+processTheMessages env conn messages = do
+  g <- Mod.access (Mod.Proxy @(IORef Globals))
 
   case length messages of
    0 -> return ()
@@ -335,8 +370,18 @@ processTheMessages env conn g messages = do
   -- forM :: [a] -> (a -> m b) -> m [b]
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
-  let hardCodeAbstracts (o,a,n) | n `elem` ["Asset", "Sale", "User"] = ("", "", n)
-                                | otherwise                          = (o, a, n)
+  
+  let resolveNameParts (o, a) c = case c ^. importedFrom of
+        Nothing -> pure (o, a, c ^. contractName)
+        Just acct -> A.select (A.Proxy @AddressState) acct >>= \case
+          Nothing -> do
+            $logWarnS "processTheMessages/resolveNameParts" . T.pack $ "Could not find address state for account " ++ show acct
+            pure (o, a, c ^. contractName)
+          Just s -> resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
+            Just (SolidVMCode appName _) -> pure (o, appName, c ^. contractName) -- TODO: Get org from :creator field
+            _ -> do
+              $logWarnS "processTheMessages/resolveNameParts" . T.pack $ "Could not resolve code for account " ++ show acct
+              pure (o, a, c ^. contractName)
 
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC cp ccString
@@ -357,22 +402,13 @@ processTheMessages env conn g messages = do
                 -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
                 -- We will then create a table for each of these mappings and add a foreign key to the main table
 
-                let storageDefs' = c ^. storageDefs
-                    storageDefsList = Map.toList storageDefs'
-                    listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _ -> True ; _ -> False;) storageDefsList
-                    listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
-                    mapNames = map fst listOfMappingsWithRecords
-                    parents' = c ^. parents
-                    parentContracts = getContractsForParents parents' (cc^.contracts)
-                    parentAbstractContracts = filter (\contract -> _contractType contract == AbstractType) parentContracts
-                    parentAbstractContractsName = map (labelToText ._contractName) parentAbstractContracts
-              
+                let mapNames = getMapNamesFromContract c
 
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
-                let nameParts = hardCodeAbstracts (o, a', n)
+                nameParts <- resolveNameParts (o, a') c
 
                 --Create mapping tables
                 forM_ mapNames $ \m -> do 
@@ -382,7 +418,7 @@ processTheMessages env conn g messages = do
 
                 deferredForeignKeys <- case (_contractType c ) of
                   AbstractType -> do
-                    outputData conn $ createAbstractTable g c $ hardCodeAbstracts (o, a', n)
+                    outputData conn $ createAbstractTable g c nameParts
                     return []
                   _ -> do
                     outputData conn $ createExpandIndexTable g c nameParts
@@ -391,8 +427,10 @@ processTheMessages env conn g messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
                 
-                when(length parentAbstractContractsName >=1 ) $ do outputData conn $ createAbstractTableRow g c (hardCodeAbstracts (o, a', n)) (head parentAbstractContractsName)
-
+                -- I suspect these lines aren't needed
+                -- for_ parentAbstractContracts $ \p -> do
+                --   parentNameParts <- resolveNameParts (o, a') p
+                --   outputData conn $ createAbstractTable g c parentNameParts
   
                 return deferredForeignKeys
 
@@ -430,31 +468,27 @@ processTheMessages env conn g messages = do
           $logDebugLS "Contract name is: " $ show name
           oldState <- readPreviousSolidVMState g acct
           indexContract <- rowToInsert g abiid row cont oldState
-          stateDiff <- rowToMappings row
-          mapNames <- getMappingTables g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          abstracts <- getAbstractTableRow g (SE.organization indexContract) (SE.application indexContract) (SE.contractName indexContract)
-          --get columns for abstract table
-          abstractColumns <- case abstracts of
-                              [] -> return Nothing
-                              (firstAbstract:_) -> do
-                                case  (SE.application indexContract) of
-                                  "" -> let (o',a',n') = hardCodeAbstracts (SE.organization indexContract, SE.contractName indexContract, firstAbstract)
-                                         in getTableColumns g $ AbstractTableName o' a' n'
-                                  _ -> let (o',a',n') = hardCodeAbstracts (SE.organization indexContract, SE.application indexContract, firstAbstract)
-                                        in getTableColumns g $ AbstractTableName o' a' n'
-          
-          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
           hs <- rowToHistories g abiid actions cont oldState
-          $logDebugLS "History inserts are: " $ show hs
-          pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
-          case abstracts of
-            [] -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
-            (firstAbstract:_) -> case abstractColumns of 
-              Just abC -> do
-                let finalColumns = map extractTextInsideQuotes abC
-                pure . Right $ BatchedInserts indexContract (Just (indexContract, firstAbstract, finalColumns)) hs pMappings
-              Nothing -> pure . Right $ BatchedInserts indexContract Nothing hs pMappings
-            
+          let cName = SE.contractName indexContract
+          mContract <- do
+            mCC <- select (Proxy @CodeCollection) (actionAccount row)
+            pure $ M.lookup cName . _contracts =<< mCC
+          case mContract of
+            Nothing -> pure . Right $ BatchedInserts indexContract [] hs []
+            Just c -> do
+              stateDiff <- rowToMappings row
+              let mapNames = getMapNamesFromContract c
+                  abstracts = getAbstractParentsFromContract c
+              --get columns for abstract table
+              abstractColumns <- for abstracts $ \ab -> do
+                (o',a',n') <- resolveNameParts (SE.organization indexContract, SE.application indexContract) ab
+                cols <- getTableColumns g $ AbstractTableName o' a' n'
+                pure $ extractTextInsideQuotes <$> cols
+          
+              $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
+              $logDebugLS "History inserts are: " $ show hs
+              pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid--get all mapping rows to insert
+              pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 

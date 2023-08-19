@@ -264,15 +264,6 @@ constructTableNameParameters org app contract =
          then (org, "", contract)
          else (org, app, contract)
 
-constructMappingOrAbstractTableNameParameters :: Text -> Text -> Text -> Text -> (Text, Text, Text, Text)
-constructMappingOrAbstractTableNameParameters org app contract m_or_a=
-  if T.null org
-    then ("", "", contract, m_or_a)
-    else if app == contract
-         then (org, "", contract, m_or_a)
-         else (org, app, contract, m_or_a)
-
-
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
@@ -289,10 +280,14 @@ abstractTableName :: Text -> Text -> Text -> TableName
 abstractTableName o a n = uncurry3 AbstractTableName $ constructTableNameParameters o a n
 
 abstractTableRowName :: Text -> Text -> Text -> Text -> TableName
-abstractTableRowName o a n ab = uncurry4 AbstractTableRowName $ constructMappingOrAbstractTableNameParameters o a n ab
+abstractTableRowName o a n ab =
+  let (o', a', n') = constructTableNameParameters o a n
+   in AbstractTableRowName o' a' n' ab
 
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
-mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingOrAbstractTableNameParameters o a n m
+mappingTableName o a n m =
+  let (o', a', n') = constructTableNameParameters o a n
+   in MappingTableRowName o' a' n' m
 
 createExpandIndexTable
   :: OutputM m
