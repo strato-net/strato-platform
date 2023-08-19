@@ -17,7 +17,9 @@ import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 
 //sub-categories
 import { actions } from "../../contexts/membership/actions";
+import { actions as prodActions} from "../../contexts/product/actions";
 import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useProductDispatch, useProductState } from "../../contexts/product";
 
 const { Dragger } = Upload;
 
@@ -27,12 +29,14 @@ const CreateMembershipModal = ({
   categorys,
 }) => {
   // const schema = getSchema();
+  const prodDispatch = useProductDispatch();
   const dispatch = useMembershipDispatch();
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [imageList, setImageList] = useState([]);
   const [fileList, setFileList] = useState([]);
+  
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
   useMembershipState();
@@ -163,11 +167,30 @@ const CreateMembershipModal = ({
   };
 
   const handleCreateFormSubmit = async (values) => {
-    console.log("formik", formik.values);
+    // console.log("formik", formik.values);
     console.log("values", values);
     
-    // TODO: Update this data to match whats needed in the backend. 
-    // Might have to send images and documents separately.
+    // for every image in formki.values.images, upload it to s3 and get the url back
+    let arrayOfImageData = [];
+    values.images.forEach(async (image) => {
+      const formData = new FormData();
+      console.log("image", image)
+      formData.append("fileUpload", image.originFileObj);
+      console.log("formData", formData)
+      const out = await prodActions.uploadImage(prodDispatch, formData)
+      console.log("hjere: ", out)
+      arrayOfImageData = {...arrayOfImageData, out};
+    });
+    console.log("arrayOfImageData", arrayOfImageData);
+    // for every document in formik.values.documents, upload it to s3 and get the url back
+
+    
+    
+    if (formik.values.images.length === arrayOfImageData.length) {
+      // TODO: Update this data to match whats needed in the backend. 
+      // Might have to send images and documents separately.
+      console.log("Horray");
+    }
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
