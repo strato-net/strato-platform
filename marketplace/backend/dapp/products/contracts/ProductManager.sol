@@ -118,35 +118,61 @@ contract ProductManager is InventoryStatus, RestStatus {
     }
 
 
-        function addInventoryForBuyer(
-                                    address _productAddress,
-                                    int _quantity,
-                                    int _pricePerUnit,
-                                    uint _vintage,
-                                    InventoryStatus _status,
-                                    uint _createdDate,
-                                    address _newOwner
-                                    ) returns (uint256, address) {
-            string _organization = getOrganization(_newOwner);
+    function addInventoryForBuyer(
+                                address _productAddress,
+                                int _quantity,
+                                int _pricePerUnit,
+                                uint _vintage,
+                                InventoryStatus _status,
+                                uint _createdDate,
+                                address _newOwner
+                                ) returns (uint256, address) {
+        string _organization = getOrganization(_newOwner);
 
-            Product_4 product = Product_4(_productAddress);
-            
-           
-           (uint256 status, address inventoryAddress) = product.addInventory(
-                                                            _quantity,
-                                                            _pricePerUnit,
-                                                            _vintage,
-                                                            _status,
-                                                            _createdDate,
-                                                            _newOwner
-                                                        );
+        Product_4 product = Product_4(_productAddress);
+        
+        
+        (uint256 status, address inventoryAddress) = product.addInventory(
+                                                        _quantity,
+                                                        _pricePerUnit,
+                                                        _vintage,
+                                                        _status,
+                                                        _createdDate,
+                                                        _newOwner
+                                                    );
 
-            orgxProductxVintagexPricexInventory[_organization][_productAddress][_vintage][_pricePerUnit] = inventoryAddress;
+        orgxProductxVintagexPricexInventory[_organization][_productAddress][_vintage][_pricePerUnit] = inventoryAddress;
 
-            return (status, inventoryAddress);
-         
+        return (status, inventoryAddress);
+        
+    }
+
+    function resellInventory(
+                        address _existingInventory,
+                        int quantity,
+                        uint price,
+                        address _seller
+                        ) returns (uint256, address) {
+
+        Inventory_3 existingInventory = Inventory_3(_existingInventory);
+        if(quantity>existingInventory.availableQuantity || quantity<=0)
+        {
+            return (RestStatus.BAD_REQUEST, address(0));
         }
 
+        uint256 isUpdated = existingInventory.updateQuantityForResell(_quantity);
+        (uint256 status, address inventoryAddress) = product.addInventory(
+                                                                        existingInventory.productId(),
+                                                                        quantity,
+                                                                        price,
+                                                                        existingInventory.vintage(),
+                                                                        InventoryStatus.PUBLISHED,
+                                                                        block.timestamp,
+                                                                        tx.origin
+                                                                        );
+        return (status, inventoryAddress);
+        
+    }
         
     function updateInventory(
         address _productAddress,

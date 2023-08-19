@@ -76,6 +76,11 @@ contract Inventory_3 is InventoryStatus {
         return RestStatus.OK;
     }
 
+    function updateQuantityForResell(int _quantity) returns (uint) {
+        availableQuantity = availableQuantity - _quantity;
+        return RestStatus.OK;
+    }
+
     function updateRetiredQuantity(int _quantity) returns (uint) {
         availableQuantity = availableQuantity - _quantity;
         retiredQuantity = retiredQuantity + _quantity;
