@@ -229,6 +229,18 @@ baseMappingColumns = [ "record_id"
               , "mapname"
               ]
 
+baseAbstractColumns :: TableColumns
+baseAbstractColumns = [ "record_id"
+              , "address"
+              , "chainId"
+              , "block_hash"
+              , "block_timestamp"
+              , "block_number"
+              , "transaction_hash"
+              , "transaction_sender"
+              , "contract_name"
+              ]
+
 baseTableColumns :: TableColumns
 baseTableColumns = baseColumns
 
@@ -768,7 +780,7 @@ insertAbstractTableQuery cs = concat $
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)  
-              keySt  = wrapAndEscapeDouble $ escapeQuotes <$> abColumns
+              keySt  = wrapAndEscapeDouble $ escapeQuotes <$> (baseAbstractColumns ++ filter (`notElem` baseAbstractColumns) abColumns)
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain

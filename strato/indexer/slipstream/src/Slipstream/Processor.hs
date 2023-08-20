@@ -6,6 +6,7 @@
     , FlexibleInstances
     , LambdaCase
     , GeneralizedNewtypeDeriving
+    , MonoLocalBinds
     , MultiParamTypeClasses
     , OverloadedStrings
     , QuasiQuotes
@@ -64,6 +65,7 @@ import Blockchain.Data.ChainInfo
 import Blockchain.Data.TransactionResult
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
+import Blockchain.Data.RLP
 import Blockchain.DB.CodeDB
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
@@ -75,6 +77,8 @@ import Blockchain.Stream.VMEvent
 
 import Control.Monad.Composable.SQL
 import qualified Handlers.AccountInfo            as Account
+import           Handlers.Storage
+import           MaybeNamed
 
 import Data.Source.Map
 
@@ -91,6 +95,7 @@ import Slipstream.QueryFormatHelper
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import SolidVM.Model.SolidString
+import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 
 import Text.Format
@@ -352,6 +357,47 @@ getAbstractParentsFromContract c cc =
       parentContracts = getContractsForParents parents' (cc ^. contracts)
    in filter ((== AbstractType) . _contractType) parentContracts
 
+resolveNameParts :: ( MonadLogger m
+                    , Selectable Account AddressState m
+                    , Selectable Word256 ParentChainIds m
+                    , Selectable StorageFilterParams [StorageAddress] m
+                    )
+                 => Text -> Text -> Contract -> m (Text, Text, Text)
+resolveNameParts o a c = do
+  let tName = T.pack . _contractName
+  case c ^. importedFrom of
+    Nothing -> pure (o, a, tName c)
+    Just acct -> select (Proxy @AddressState) acct >>= \case
+      Nothing -> do
+        $logWarnS "processTheMessages/resolveNameParts" . T.pack $
+          "Could not find address state for account " ++ show acct
+        pure (o, a, tName c)
+      Just s -> resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
+        Just (SolidVMCode appName _) -> do
+          let qs = storageFilterParams
+                 { qsKey = Just $ HexStorage ".:creator"
+                 , qsAddress = Just $ acct ^. accountAddress
+                 , qsChainId = Unnamed . ChainId <$> acct ^. accountChainId
+                 }
+          select (Proxy @[StorageAddress]) qs >>= \case
+            Just (sa : _) -> case value sa of
+              HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe orgHex of
+                Just (MS.BString orgBS) -> case decodeUtf8' orgBS of
+                  Right o' -> pure (o', T.pack appName, tName c)
+                  Left _ -> do
+                    $logWarnS "resolveNameParts" . T.pack $
+                      ":creator field is not valid UTF8 for account " ++ show acct ++ ": " ++ show orgBS
+                    pure (o, T.pack appName, tName c)
+                _ -> do
+                  $logWarnS "resolveNameParts" . T.pack $
+                    "Could not RLP decode :creator field for account " ++ show acct ++ ": " ++ show orgHex
+                  pure (o, T.pack appName, tName c)
+            _ -> pure ("", T.pack appName, tName c)
+        _ -> do
+          $logWarnS "resolveNameParts" . T.pack $
+            "Could not resolve code for account " ++ show acct
+          pure (o, a, tName c)
+
 processTheMessages :: ( MonadLogger m
                       , HasSQL m
                       , Selectable Account AddressState m
@@ -381,18 +427,6 @@ processTheMessages env conn messages = do
   -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
   -- m [c]
   
-  let tName = T.pack . _contractName
-      resolveNameParts (o, a) c = case c ^. importedFrom of
-        Nothing -> pure (o, a, tName c)
-        Just acct -> select (Proxy @AddressState) acct >>= \case
-          Nothing -> do
-            $logWarnS "processTheMessages/resolveNameParts" . T.pack $ "Could not find address state for account " ++ show acct
-            pure (o, a, tName c)
-          Just s -> resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> pure (o, T.pack appName, tName c) -- TODO: Get org from :creator field
-            _ -> do
-              $logWarnS "processTheMessages/resolveNameParts" . T.pack $ "Could not resolve code for account " ++ show acct
-              pure (o, a, tName c)
 
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC g cp ccString
@@ -402,8 +436,7 @@ processTheMessages env conn messages = do
 
 
               deferredForeignKeys <- fmap concat $ forM (Map.toList $ cc^.contracts) $ \(nameString, c) -> do
-                let n = labelToText nameString
-                    a' = if a /= ""
+                let a' = if a /= ""
                            then a
                            else case cp of
                             SolidVMCode n' _ | nameString /= n' -> T.pack n'
@@ -418,8 +451,8 @@ processTheMessages env conn messages = do
                 let historyTableNames = map (historyTableName o a') hl
                 $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
-                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o <> ", app=" <> a' <> ", name=" <> n <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
-                nameParts <- resolveNameParts (o, a') c
+                nameParts@(o'', a'', n'') <- resolveNameParts o a' c
+                $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n'' <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
 
                 --Create mapping tables
                 forM_ mapNames $ \m -> do 
@@ -488,7 +521,7 @@ processTheMessages env conn messages = do
                               else SE.application indexContract
               --get columns for abstract table
               abstractColumns <- fmap catMaybes . for abstracts $ \ab -> do
-                (o',a',n') <- lift $ resolveNameParts (SE.organization indexContract, appName) ab
+                (o',a',n') <- lift $ resolveNameParts (SE.organization indexContract) appName ab
                 let tableName = AbstractTableName o' a' n'
                     tableNameText = tableNameToDoubleQuoteText tableName
                 mCols <- getTableColumns g tableName

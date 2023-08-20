@@ -41,6 +41,7 @@ library:
     - core-api2
     - cross-monitoring
     - deepseq
+    - ethereum-rlp
     - extra
     - format
     - lens
