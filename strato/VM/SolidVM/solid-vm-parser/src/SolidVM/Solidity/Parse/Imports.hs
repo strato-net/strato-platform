@@ -29,10 +29,14 @@ solidityImport = do
   pure $ Import a imp
 
 fileImport :: Bool -> SolidityParser FileImport
-fileImport es6 =
+fileImport es6 = do
+  i <- bracedImport <|> try qualifiedImport <|> simpleImport
   if es6
-    then bracedImport <|> try qualifiedImport <|> simpleImport
-    else simpleImport
+    then pure i
+    else case i of
+      Simple{} -> pure i
+      Qualified{} -> fail "Please add `pragma es6;` to the top of the file to enable support for qualified imports."
+      Braced{} -> fail "Please add `pragma es6;` to the top of the file to enable support for braced imports."
 
 simpleImport :: SolidityParser FileImport
 simpleImport = do
