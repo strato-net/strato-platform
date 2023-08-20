@@ -25,6 +25,7 @@ module SolidVM.Model.CodeCollection.Contract (
   usings,
   constructor,
   contractType,
+  importedFrom,
   contractContext
   ) where
 
@@ -41,6 +42,7 @@ import GHC.Generics
 import           Test.QuickCheck.Instances    ()
 import           Test.QuickCheck
 
+import           Blockchain.Strato.Model.Account
 import           SolidVM.Model.CodeCollection.ConstantDecl
 import qualified SolidVM.Model.CodeCollection.Event as SolidVM
 import           SolidVM.Model.CodeCollection.Function

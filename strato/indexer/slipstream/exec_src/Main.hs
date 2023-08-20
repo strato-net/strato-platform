@@ -13,6 +13,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
+import Control.Monad.Trans.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.String
@@ -72,7 +73,6 @@ main = do
   runLoggingT
     . runResourceT
     . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
-    . runSQLM
     . withPostgresqlConn workerConnStr $ \workerConn -> do
 
     $logInfoS "main" "Welcome to Slipstream!!!!"
@@ -94,10 +94,6 @@ main = do
 
     handle <- runSqlConn initStorage workerConn
     gref <- newGlobals handle (CirrusHandle conn S.empty)
-
-    --Create Mercata Abstract tables
-    -- generateAssetTable conn gref
-    -- generateSaleTable conn gref
-    -- generateUserTable conn gref
     
-    getAndProcessMessages env conn gref
+    flip runReaderT gref . runSQLM $
+      getAndProcessMessages env conn

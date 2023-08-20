@@ -74,6 +74,7 @@ executables:
       - base
       - bloc2
       - blockapps-init
+      - blockapps-mpdbs
       - cache
       - clock
       - hflags
@@ -81,6 +82,7 @@ executables:
       - persistent-postgresql
       - postgresql-typed
       - slipstream
+      - transformers
       - wai-middleware-prometheus
       - warp
 

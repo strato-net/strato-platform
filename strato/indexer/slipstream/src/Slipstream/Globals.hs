@@ -20,7 +20,6 @@ module Slipstream.Globals
     putCCIntoGlobals,
     forceGlobalEval,
     newGlobals,
-    getAbstractTableRow,
     module Slipstream.Data.Globals
   ) where
 
@@ -43,11 +42,13 @@ import           UnliftIO.IORef
 
 import           BlockApps.Solidity.Value
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Keccak256
 
 import           Slipstream.Data.Globals
 import           Slipstream.GlobalsColdStorage
 import           Slipstream.Metrics
 import           Slipstream.QueryFormatHelper
+import           SolidVM.Model.CodeCollection
 
 newGlobals :: MonadIO m => Handle -> CirrusHandle -> m (IORef Globals)
 newGlobals h ch = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) (LRU.newLRU (Just 1024)) h ch
@@ -85,18 +86,6 @@ getMappingTables globalsIORef org app contract = do
   let mapNames = map mtMappingName (M.keys mappingTables)
   return mapNames
 
-getAbstractTableRow :: MonadIO m => IORef Globals -> T.Text -> T.Text -> T.Text -> m ([T.Text])
-getAbstractTableRow globalsIORef org app contract = do
-  Globals{..} <- readIORef globalsIORef
-  let abstractTables = M.filterWithKey isAbstractTableName (createdTables)
-                        where
-                          isAbstractTableName :: TableName -> TableColumns -> Bool
-                          isAbstractTableName (AbstractTableRowName o a n _) _ = 
-                            o == org && a == app && n == contract
-                          isAbstractTableName _ _ = False
-  let result = map atrAbstractName (M.keys abstractTables)
-  return result
-
 getTableColumns :: MonadIO m => IORef Globals -> TableName -> m (Maybe TableColumns)
 getTableColumns globalsIORef tableName = do
   Globals{..} <- readIORef globalsIORef
@@ -125,7 +114,7 @@ scrapeFor globalsIORef tableName = do
               setTableCreated globalsIORef (MappingTableName org app contract mapName) cols
             _ -> return ()
           ) 
-        g@(Globals createdTables' _ _ _) <- readIORef globalsIORef -- need to read again so have current ver of createdTables
+        g@Globals{createdTables=createdTables'} <- readIORef globalsIORef -- need to read again so have current ver of createdTables
         updateGlobals globalsIORef g{cirrusHandle = cirrusHandle{queriedMaps = (org, app, contract) `S.insert` queriedMaps}}
         return createdTables'
       _ -> do
@@ -134,7 +123,7 @@ scrapeFor globalsIORef tableName = do
           then return createdTables
           else do
             setTableCreated globalsIORef tableName cols
-            Globals createdTables' _ _ _ <- readIORef globalsIORef
+            Globals{createdTables=createdTables'} <- readIORef globalsIORef
             return createdTables'
 
   where scrapeForCols :: MonadIO m => T.Text -> PGConnection -> m TableColumns
@@ -171,10 +160,10 @@ setContractState gref account values = do
   updateGlobals gref globals{contractStates = LRU.insert account values contractStates}
   asyncWriteToStorage coldStorageHandle account values
 
-getCCFromGlobals :: MonadIO m => IORef Globals -> Account -> m (Maybe CodeCollection)
-getCCFromGlobals globalsIORef account = do
+getCCFromGlobals :: MonadIO m => IORef Globals -> Keccak256 -> m (Maybe CodeCollection)
+getCCFromGlobals globalsIORef codeHash = do
   g@Globals{..} <- readIORef globalsIORef
-  case LRU.lookup account ccMap of
+  case LRU.lookup codeHash ccMap of
     (newCache, jv@Just{}) -> do
       recordCacheHit
       writeIORef globalsIORef g{ ccMap = newCache }
@@ -184,10 +173,10 @@ getCCFromGlobals globalsIORef account = do
       writeIORef globalsIORef g{ ccMap = newCache }
       return Nothing
 
-putCCIntoGlobals :: MonadIO m => IORef Globals -> Account -> CodeCollection -> m ()
-putCCIntoGlobals gref account cc = do
+putCCIntoGlobals :: MonadIO m => IORef Globals -> Keccak256 -> CodeCollection -> m ()
+putCCIntoGlobals gref codeHash cc = do
   globals@Globals{..} <- readIORef gref
-  updateGlobals gref globals{ccMap = LRU.insert account cc ccMap}
+  updateGlobals gref globals{ccMap = LRU.insert codeHash cc ccMap}
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force

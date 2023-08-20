@@ -17,6 +17,7 @@ module Bloc.Database.Queries
   ( sourceToContractDetails
   , getContractDetailsForContract
   , getContractDetailsByCodeHash
+  , getCodeCollectionByCodePtr
   , evmContractSolidVMError
   ) where
 
@@ -29,7 +30,6 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
-import           Data.Traversable                (for)
 import           Text.Format
 import           UnliftIO
 
@@ -53,18 +53,15 @@ getContractDetailsByCodeHash :: ( MonadIO m
                                 )
                              => CodePtr -> m (Either Text (CodePtr, Contract))
 getContractDetailsByCodeHash codePtr = runExceptT $ do
-  nameStr <- fmap Text.unpack $ case codePtr of
+  nameStr <- case codePtr of
     SolidVMCode n _ -> pure n
     CodeAtAccount _ n -> pure n
     _ -> throwE "EVM contracts no longer supported"
   (cHash, cc) <- getCodeHashAndCollection codePtr
-  mDetails <- case Map.lookup nameStr $ _contracts cc of
-    Nothing -> throwE $ "Could not find contract " <> name <> " in code collection " <> Text.pack (format ch)
+  details <- case Map.lookup nameStr $ _contracts cc of
+    Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
     Just d -> pure (SolidVMCode nameStr cHash, d)
-  let !mDetails' = force mDetails
-  case mDetails' of
-    Nothing -> throwE $ "Could not resolve code pointer " <> Text.pack (format codePtr)
-    Just details -> pure details
+  pure $ force details
 
 getCodeCollectionByCodePtr :: ( MonadIO m
                               , HasCodeDB m
@@ -80,17 +77,16 @@ getCodeHashAndCollection :: ( MonadIO m
                             , (Keccak256 `A.Selectable` SourceMap) m
                             )
                          => CodePtr -> ExceptT Text m (Keccak256, CodeCollection)
-getCodeHashAndCollection codePtr = do
-  mcp <- lift $ unsafeResolveCodePtr codePtr
-  for mcp $ \codeHash -> do
-    (name, ch) <- case codeHash of
+getCodeHashAndCollection codePtr = lift (unsafeResolveCodePtr codePtr) >>= \case
+  Nothing -> throwE . Text.pack $ "Could not resolve code pointer: " ++ show codePtr
+  Just codeHash -> do
+    ch <- case codeHash of
       EVMCode _ -> throwE $ "EVM contracts no longer supported"
-      SolidVMCode name ch -> pure (Text.pack name, ch)
+      SolidVMCode _ ch -> pure ch
       CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
     srcMap <- lift (A.select (A.Proxy @SourceMap) ch) >>= \case
       Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)
       Just s -> pure s
-    let nameStr = Text.unpack name
     either (throwE . Text.pack . show) pure =<< lift (sourceToContractDetails srcMap)
 
 evmContractSolidVMError :: Text

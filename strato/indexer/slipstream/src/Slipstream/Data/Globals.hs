@@ -20,6 +20,7 @@ import           Database.PostgreSQL.Typed (PGConnection)
 
 import           BlockApps.Solidity.Value
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Keccak256
 import           Slipstream.Data.GlobalsColdStorage (Handle)
 import           SolidVM.Model.CodeCollection
 
@@ -38,7 +39,7 @@ data CirrusHandle = CirrusHandle {cirrusConn :: PGConnection, queriedMaps ::S.Se
 
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , contractStates :: LRU Account [(T.Text, Value)]
-                       , ccMap :: LRU Account CodeCollection
+                       , ccMap :: LRU Keccak256 CodeCollection
                        , coldStorageHandle :: Handle
                        , cirrusHandle :: CirrusHandle
                        } deriving (Generic, NFData)
@@ -70,12 +71,6 @@ data TableName =
       { atOrganization :: T.Text
       , atApplication  :: T.Text
       , atContractName :: T.Text
-      }
-  | AbstractTableRowName
-      { atrOrganization :: T.Text
-      , atrApplication  :: T.Text
-      , atrContractName :: T.Text
-      , atrAbstractName :: T.Text
       } deriving (Show, Eq, Ord)
 
 type TableColumns = [T.Text]

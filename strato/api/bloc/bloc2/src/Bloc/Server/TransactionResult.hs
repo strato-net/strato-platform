@@ -53,7 +53,7 @@ import           UnliftIO
 import           Text.Parsec                          (runParser)
 import           SolidVM.Solidity.Parse.Statement
 
-import           SolidVM.Solidity.Parse.ParserTypes   (ParserState(..))
+import           SolidVM.Solidity.Parse.ParserTypes   (initialParserState)
 
 
 import           Bloc.API.Users
@@ -343,7 +343,7 @@ convertResultResToVals byteResp responseTypes =
 convertSvmResultResToVals :: MonadLogger m => String ->  m (Maybe [SolidityValue])
 convertSvmResultResToVals resp = do
   $logDebugS "convertSvmResultResToVals" . Text.pack $ "response: " ++ resp
-  let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
+  let args = runParser parseArgs initialParserState "" resp
   $logDebugS "convertSvmResultResToVals" . Text.pack $ "args: " ++ show args
   case args of
     Left _ -> pure Nothing

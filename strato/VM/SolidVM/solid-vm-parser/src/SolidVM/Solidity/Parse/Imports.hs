@@ -6,6 +6,8 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Imports (solidityImport) where
 
+import           Data.Maybe (isJust)
+import qualified Data.Map.Strict as M
 import           Data.Source
 import qualified Data.Text   as T
 
@@ -19,14 +21,18 @@ import           Text.Parsec
 
 solidityImport :: SolidityParser SourceUnit
 solidityImport = do
+  es6 <- isJust . M.lookup "es6" . pragmas <$> getState
   ~(a, imp) <- withPosition $ do
     reserved "import"
-    fileImport
+    fileImport es6
   semi
   pure $ Import a imp
 
-fileImport :: SolidityParser FileImport
-fileImport = bracedImport <|> try qualifiedImport <|> simpleImport
+fileImport :: Bool -> SolidityParser FileImport
+fileImport es6 =
+  if es6
+    then bracedImport <|> try qualifiedImport <|> simpleImport
+    else simpleImport
 
 simpleImport :: SolidityParser FileImport
 simpleImport = do
