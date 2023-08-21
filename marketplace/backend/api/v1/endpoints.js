@@ -37,21 +37,9 @@ export const Inventory = {
   getAll: '/',
   create: '/',
   update: '/update',
+  retire: '/retire'
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership',
-}
-
-export const Item = {
-  prefix: '/item',
-  ownershipHistory: '/ownership/:address',
-  get: '/:address/:chainId/',
-  getAll: '/',
-  create: '/',
-  update: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
-  getRawMaterials: '/rawmaterials',
-  retire: '/retire'
 }
 
 export const Order = {

@@ -311,7 +311,7 @@ registerCert cert token = do
             functionpayloadMetadata = Nothing
         }
         txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-    eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing True txRequest) clientEnv
+    eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest) clientEnv
     $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse
     --TODO: how to tell if cert successfully added to blockchain?
 

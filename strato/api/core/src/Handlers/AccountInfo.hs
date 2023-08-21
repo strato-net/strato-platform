@@ -16,6 +16,7 @@ module Handlers.AccountInfo where
 
 import           Control.Monad.Change.Alter
 import           Control.Lens
+import qualified Data.ByteString             as B
 import           Data.List
 import           Data.Maybe
 import           Data.Source.Map
@@ -28,7 +29,7 @@ import           Servant
 import           Servant.Client
 --import           Servant.Swagger.Tags
 
-
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
@@ -243,8 +244,20 @@ codeServer cHash = select (Proxy @SourceMap) cHash >>= \case
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
 getCodeFromPostgres cHash =
-  let getSourceMap = deserializeSourceMap . decodeUtf8 . codeRefCode . E.entityVal
-   in fmap (listToMaybe . map getSourceMap) . sqlQuery . E.select $
+  let getSourceMap = deserializeSourceMap . decodeUtf8
+   in fmap getSourceMap <$> getCodeByteStringFromPostgres cHash
+
+getCodeByteStringFromPostgres :: HasSQL m => Keccak256 -> m (Maybe B.ByteString)
+getCodeByteStringFromPostgres cHash =
+  let getBS = codeRefCode . E.entityVal
+   in fmap (listToMaybe . map getBS) . sqlQuery . E.select $
         E.from $ \(codeRef) -> do
         E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)
         return codeRef
+
+getX509CertForAccount :: HasCirrus m => Address -> m (Maybe Certificate)
+getX509CertForAccount addr = do
+  fmap (listToMaybe . map E.entityVal) . cirrusQuery . E.select $
+    E.from $ \(certificate) -> do
+      E.where_ (certificate E.^. CertificateUserAddress E.==. E.val addr)
+      return $ certificate

@@ -34,4 +34,11 @@ router.put(
   InventoryController.update
 )
 
+router.post(
+  Inventory.retire,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.retire
+);
+
 export default router;

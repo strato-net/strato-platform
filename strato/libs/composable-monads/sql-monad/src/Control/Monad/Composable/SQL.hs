@@ -17,6 +17,14 @@ type SQLM = ReaderT SQLDB
 
 type HasSQL m = HasSQLDB m
 
+type CirrusM = ReaderT CirrusDB
+
+type HasCirrus m = HasCirrusDB m
+
 runSQLM :: (MonadUnliftIO m, MonadLoggerIO m) => SQLM m a -> m a
 runSQLM f =
   PSQL.withPostgresqlPool connStr 20 (\ppool -> runReaderT f $ SQLDB ppool)
+
+runCirrusM :: (MonadUnliftIO m, MonadLoggerIO m) => CirrusM m a -> m a 
+runCirrusM f =
+  PSQL.withPostgresqlPool cirrusConnStr 20 (\ppool -> runReaderT f $ CirrusDB ppool)

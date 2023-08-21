@@ -52,7 +52,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
         { label: <div id="Orders">Orders</div>, key: '1' },
         { label: <div id="Inventory">Inventory</div>, key: '2' },
         { label: <div id="Products">Products</div>, key: '3' },
-        { label: <div id="Events">Events</div>, key: '4' },
       ]
     },
     {
@@ -68,7 +67,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
     routes.Orders.url,
     routes.Inventories.url,
     routes.Products.url,
-    routes.Events.url,
   ];
 
   const logout = () => {
@@ -82,17 +80,12 @@ const HeaderComponent = ({ user, loginUrl }) => {
 
   useEffect(() => {
     let pathName = window.location.pathname;
-    // if (pathName.includes("/marketplace")) {
-    //   setSelectedTab("0");
-    // } else 
     if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
       setSelectedTab("1");
     } else if (pathName.includes("/inventories")) {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
-    } else if (pathName.includes("/events") || pathName === "/certifier") {
-      setSelectedTab("4");
     }
     else{
       setSelectedTab("0");
@@ -197,12 +190,8 @@ const HeaderComponent = ({ user, loginUrl }) => {
             },
           });}
           if (item.key === "4") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_events_page',
-              },
-            });
-            navigate(navUrls[item.key], { state: { tab: "EventType" } })}
+            navigate(navUrls[item.key])
+          }
           else navigate(navUrls[item.key]);
         }}
         items={navItems[roleIndex]?.items}

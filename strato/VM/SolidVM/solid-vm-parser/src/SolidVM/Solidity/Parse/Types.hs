@@ -35,22 +35,23 @@ simpleType =
   simple "account" (SVMType.Account False) <|>
   simple "string" (SVMType.String $ Just True) <|>
   bytes' <|>
-    fixedSuffixed "fixed" (SVMType.Fixed (Just True)) <|>
+  fixedSuffixed "fixed" (SVMType.Fixed (Just True)) <|>
   fixedSuffixed "ufixed" (SVMType.Fixed (Just False)) <|>
   intSuffixed "uint"  (SVMType.Int (Just False)) <|>
   intSuffixed "int"  (SVMType.Int (Just True)) <|>
+  simple "variadic" SVMType.Variadic <|>
   choice [optionParser, unknownLabelParser, unknownLabelMemberParser]
   where
     optionParser =  try $ do
       name <- identifier
-      salt <- braces $ do 
+      salt <- braces $ do
         reserved "salt"
         colon
-        let myReallyGoodParser = do    
+        let myReallyGoodParser = do
               myStr <- stringLiteral
               return ("\"" ++ myStr ++ "\"")
 
-        s <- identifier <|> myReallyGoodParser  
+        s <- identifier <|> myReallyGoodParser
         return s
       return $ SVMType.UnknownLabel name $ Just salt
     unknownLabelParser = try $ do
@@ -58,7 +59,7 @@ simpleType =
       isUserDefined <- isInUserDefinedTypes name
       if isUserDefined
         then do
-          typ <- getUserDefinedType name 
+          typ <- getUserDefinedType name
           return $ (SVMType.UserDefined name (userTypeHelper' typ ))
         else return $ (SVMType.UnknownLabel name Nothing)
     unknownLabelMemberParser = try $ do
@@ -73,7 +74,7 @@ simpleType =
       lexeme (try $ do
          let base = "bytes"
          chars <- many1 alphaNum
-         
+
          when (not (base `isPrefixOf` chars)) $ fail "missing 'bytes'"
 
          size <-
@@ -152,6 +153,6 @@ mappingType = do
 userTypeHelper' :: Maybe String -> SVMType.Type
 userTypeHelper' (Just "bool")   =  SVMType.Bool
 userTypeHelper' (Just "string") =  SVMType.String $ Just True
-userTypeHelper' (Just "int")    =  (SVMType.Int (Just True) Nothing) 
-userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing) 
+userTypeHelper' (Just "int")    =  (SVMType.Int (Just True) Nothing)
+userTypeHelper' (Just "uint")   =  (SVMType.Int (Just False) Nothing)
 userTypeHelper' _             =  SVMType.Bool  --TODO fix this
