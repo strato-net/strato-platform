@@ -263,16 +263,14 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                 manufacturer: user.user.organization,
                 unitOfMeasurement: 1,
                 // Generate random code for now
-                userUniqueMembershipCode: `U-ID-${Math.floor(
-                  Math.random() * 1000000
-                )}`,
+                userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
                 // Generate random number for now
                 uniqueMembershipCode: Math.floor(Math.random() * 1000000),
                 leastSellableUnit: 1,
-                // TODO: This might have to be changed into an array.
-                imageKey: `${arrayOfImageData[0].imageKey}`,
-                category: updatedValues.category,
-                subCategory: updatedValues.category,
+                // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array.
+                imageKey: updatedValues.images[0].name,
+                category: "Membership",
+                subCategory: updatedValues.subCategory,
                 createdDate: new Date().getTime(),
                 timePeriodInMonths: updatedValues.duration,
                 additionalInfo: updatedValues.additionalInformation,
@@ -282,9 +280,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
               membershipServiceArgs: updatedValues.services.map((service) => ({
                 serviceId: service.serviceId,
                 membershipPrice: service.memberPrice ? service.memberPrice : 0,
-                discountPrice: service.percentDiscount
-                  ? service.percentDiscount
-                  : 0,
+                discountPrice: service.percentDiscount ? service.percentDiscount : 0,
                 maxQuantity: service.numberOfUses,
                 createdDate: new Date().getTime(),
                 // If visible is true the List Now form is open and the membership is active
