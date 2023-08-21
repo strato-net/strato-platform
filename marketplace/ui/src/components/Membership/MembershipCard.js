@@ -47,7 +47,7 @@ const MembershipCard = ({
 
   useEffect(() => {
     setState(product);
-    console.log("state", state);
+    // console.log("state", state);
   }, [product]);
   
   const callDetailPage = () => {

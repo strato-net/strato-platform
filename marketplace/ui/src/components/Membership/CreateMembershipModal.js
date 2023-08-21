@@ -15,15 +15,24 @@ import {
 } from "antd";
 import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 // import getSchema from "./ProductSchema";
-import useDebounce from "../UseDebounce";
-//sub-categories
+// import useDebounce from "../UseDebounce";
+
+// Actions for the membership context
 import { actions } from "../../contexts/membership/actions";
 import { actions as prodActions} from "../../contexts/product/actions";
 import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { actions as serviceActions } from "../../contexts/service/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+
 import { useServiceState, useServiceDispatch } from "../../contexts/service";
+import {
+  useSubCategoryDispatch,
+  useSubCategoryState,
+} from "../../contexts/subCategory";
+import { useInventoryDispatch } from "../../contexts/inventory";
 import ListNowModal from "./ListNowModal";
+import { INVENTORY_STATUS } from "../../helpers/constants";
 
 const { Dragger } = Upload;
 
@@ -46,24 +55,27 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     useMembershipState();
 
   const { services, isservicesLoading } = useServiceState();
+  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+
+  // Dispatch for the membership context
   const serviceDispatch = useServiceDispatch();
+  const subCategoryDispatch = useSubCategoryDispatch();
+  const inventoryDispatch = useInventoryDispatch();
 
   const queryValue = user.user.organization;
 
   // TODO: We should probably only query services made by the user's organization
   useEffect(() => {
-    serviceActions.fetchService(
-      serviceDispatch,
-      limit,
-      offset,
-      queryValue,
-    );
+    serviceActions.fetchService(serviceDispatch, limit, offset, queryValue);
   }, [serviceDispatch, limit, offset, queryValue]);
 
+  useEffect(() => {
+    subCategoryActions.fetchSubCategory(subCategoryDispatch, "Membership");
+  }, [subCategoryDispatch]);
 
   const initialValues = {
     name: "",
-    category: "",
+    subCategory: "",
     duration: "",
     additionalInformation: "",
     images: [],
@@ -233,66 +245,104 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
             arrayOfImageData.push(...results);
             
             const allFiles = arrayOfFiles.concat(arrayOfImageData);
+            
+            if (allOriginalFile.length === allFiles.length) {
+              // Your code for when all images have been uploaded
+              console.log("all images uploaded");
+              // TODO: Add image and file upload to S3
+              const body = {
+                membershipArgs: {
+                  name: updatedValues.name,
+                  description: updatedValues.description,
+                  manufacturer: user.user.organization,
+                  unitOfMeasurement: 1,
+                  // Generate random code for now
+                  userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+                  // Generate random number for now
+                  uniqueMembershipCode: Math.floor(Math.random() * 1000000),
+                  leastSellableUnit: 1,
+                  // TODO: This might have to be changed into an array. 
+                  imageKey: `${arrayOfImageData[0].imageKey}`,
+                  category: updatedValues.category,
+                  subCategory: updatedValues.category,
+                  createdDate: new Date().getTime(),
+                  timePeriodInMonths: updatedValues.duration,
+                  additionalInfo: updatedValues.additionalInformation,
+                  // If visible is true the List Now form is open and the membership is active
+                  isActive: visible ? true : false,
+                },
+                membershipServiceArgs: updatedValues.services.map((service) => ({
+                  serviceId: service.serviceId,
+                  membershipPrice: service.memberPrice ? service.memberPrice : 0,
+                  discountPrice: service.percentDiscount ? service.percentDiscount : 0,
+                  maxQuantity: service.numberOfUses,
+                  createdDate: new Date().getTime(),
+                  // If visible is true the List Now form is open and the membership is active
+                  isActive: visible ? true : false,
+                })),
+                //TODO: where do I put the imageKey from the uploaded File?
+                productFileArgs: allFiles.map((file, index) => ({
+                  fileLocation: `${file.imageKey}`,
+                  fileHash: `${file.docHash}`,
+                  fileName: `${file.originalName}`,
+                  uploadDate: new Date().getTime(),
+                  createdDate: new Date().getTime(),
+                  section: 1,
+                  type: 2,
+                })),
+              };
+            }
+          })
+          .catch((e) => {
+            console.log("Inner promise", e);
+          });
+      })
+      .catch((e) => {
+        console.log("Outer promise", e);
+      });
 
-            // TODO: Add image and file upload to S3
-            const body = {
-              membershipArgs: {
-                name: updatedValues.name,
-                description: updatedValues.description,
-                manufacturer: user.user.organization,
-                unitOfMeasurement: 1,
-                // Generate random code for now
-                userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-                // Generate random number for now
-                uniqueMembershipCode: Math.floor(Math.random() * 1000000),
-                leastSellableUnit: 1,
-                // TODO: This might have to be changed into an array. 
-                imageKey: `${arrayOfImageData[0].imageKey}`,
-                category: updatedValues.category,
-                subCategory: updatedValues.category,
-                createdDate: new Date().getTime(),
-                timePeriodInMonths: updatedValues.duration,
-                additionalInfo: updatedValues.additionalInformation,
-                // If visible is true the List Now form is open and the membership is active
-                isActive: visible ? true : false,
-              },
-              membershipServiceArgs: updatedValues.services.map((service) => ({
-                serviceId: service.serviceId,
-                membershipPrice: service.memberPrice ? service.memberPrice : 0,
-                discountPrice: service.percentDiscount ? service.percentDiscount : 0,
-                maxQuantity: service.numberOfUses,
-                createdDate: new Date().getTime(),
-                // If visible is true the List Now form is open and the membership is active
-                isActive: visible ? true : false,
-              })),
-              //TODO: where do I put the imageKey from the uploaded File?
-              productFileArgs: allFiles.map((file) => ({
-                fileLocation: `${file.imageKey}`,
-                fileHash: `${file.docHash}`,
-                fileName: `${file.originalName}`,
-                uploadDate: new Date().getTime(),
-                createdDate: new Date().getTime(),
-                section: 1,
-                type: 2,
-              })),
+      switch (visible) {
+        // If the List Now form is open we will create the membership and inventory otherwise we will just create the membership
+        case false:
+          const isDone = await actions.createMembership(dispatch, body);
+          if (isDone) {
+            formik.resetForm();
+            handleCancel();
+          }
+          break;
+        case true:
+          const isDone2 = await actions.createMembership(dispatch, body);
+          if (isDone2) {
+            const getMembership = await actions.fetchMembershipDetails(
+              dispatch,
+              isDone2.address
+            );
+
+            const productId = getMembership.membership.productId;
+            const inventoryBody = {
+              productAddress: productId,
+              quantity: updatedValues.quantity,
+              pricePerUnit: updatedValues.price,
+              // Generate random code for now
+              batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+              // Status should always be published if we use List Now
+              status: INVENTORY_STATUS.PUBLISHED,
+              serialNumber: [],
             };
 
-            console.log("body", body);
-            const isDone = await actions.createMembership(dispatch, body);
-            if (isDone) {
+            const isDone3 = await inventoryActions.createInventory(
+              inventoryDispatch,
+              inventoryBody
+            );
+            if (isDone3) {
               formik.resetForm();
               handleCancel();
             }
-          })
-          .catch((error) => {
-            console.log("inner promise: ",error.message)
-            // Handle errors if any of the promises fail
-          });
-    })
-    .catch((error) => {
-      console.log("outer promise: ",error.message)
-      // Handle errors if any of the promises fail
-    });
+          }
+          break;
+        default:
+          break;
+      }
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
@@ -393,21 +443,29 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   className="w-10/12"
                 />
               </Form.Item>
-              <Form.Item label="Category" name="category" className="w-10/12">
+              <Form.Item
+                label="Sub Category"
+                name="subCategory"
+                className="w-10/12"
+              >
                 <Select
-                  id="category"
-                  name="category"
-                  placeholder="Select Category"
+                  id="subCategory"
+                  name="subCategory"
+                  placeholder="Select Sub Category"
                   onChange={(value) => {
-                    formik.setFieldValue("category", value);
+                    formik.setFieldValue("subCategory", value);
                   }}
                   value={formik.values.category}
                 >
-                  {categorys.map((category) => (
-                    <Select.Option key={category.name} value={category.id}>
-                      {category.name}
-                    </Select.Option>
-                  ))}
+                  {!issubCategorysLoading &&
+                    subCategorys.map((subCategory) => (
+                      <Select.Option
+                        key={subCategory.name}
+                        value={subCategory.name}
+                      >
+                        {subCategory.name}
+                      </Select.Option>
+                    ))}
                 </Select>
               </Form.Item>
               <Form.Item label="Duration (Months)" name="duration">
