@@ -231,9 +231,11 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
         Promise.all(uploadImagePromises)
           .then(async (results) => {
             arrayOfImageData.push(...results);
-            console.log(values.images.length, arrayOfImageData.length);
-
-            if (values.images.length === arrayOfImageData.length) {
+            
+            const allOriginalFile = values.documents.concat(values.images);
+            const allFiles = arrayOfFiles.concat(arrayOfImageData);
+            
+            if (allOriginalFile.length === allFiles.length) {
               // Your code for when all images have been uploaded
               console.log("all images uploaded");
               // TODO: Add image and file upload to S3
@@ -249,7 +251,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   uniqueMembershipCode: Math.floor(Math.random() * 1000000),
                   leastSellableUnit: 1,
                   // TODO: This might have to be changed into an array. 
-                  imageKey: arrayOfImageData[0]?.imageKey,
+                  imageKey: `${arrayOfImageData[0].imageKey}`,
                   category: updatedValues.category,
                   subCategory: updatedValues.category,
                   createdDate: new Date().getTime(),
@@ -268,10 +270,10 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   isActive: visible ? true : false,
                 })),
                 //TODO: where do I put the imageKey from the uploaded File?
-                productFileArgs: updatedValues.documents.map((document, index) => ({
-                  fileLocation: `https://s3.us-east-2.amazonaws.com/elasticbeanstalk-us-east-2-837725889976/${document.name}`,
-                  fileHash: `fileHash${index}`,
-                  fileName: document.name,
+                productFileArgs: allFiles.map((file, index) => ({
+                  fileLocation: `${file.imageKey}`,
+                  fileHash: `${file.docHash}`,
+                  fileName: `${allOriginalFile[index].name}`,
                   uploadDate: new Date().getTime(),
                   createdDate: new Date().getTime(),
                   section: 1,
@@ -288,9 +290,14 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
             }
           })
           .catch((error) => {
+            console.log("inner promise: ",error.message)
             // Handle errors if any of the promises fail
           });
     })
+    .catch((error) => {
+      console.log("outer promise: ",error.message)
+      // Handle errors if any of the promises fail
+    });
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
