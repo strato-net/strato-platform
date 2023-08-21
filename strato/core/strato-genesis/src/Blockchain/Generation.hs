@@ -951,14 +951,6 @@ insertUserRegistryContract certs gi =
                         (BC.pack $ ".userCertificates<a:" ++ (show $ certUserAddress cert) ++ ">", addrToCertIdx . show . reverseAddr $ cert)]
             ) certs
 
-        -- testAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing "Jin Huai Xuan" Nothing Nothing) 0
-        --     (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
-        --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
-        --         (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
-        --         (".isActive", rlpWrap $ BBool True),
-        --         (BC.pack $ ".userCertificates<a:a13bf5afbd9e23e92568b546880b55d8ee0d54a5>", addrToCertIdx "a5540deed8550b8846b56825e9239ebdaff53ba1")
-        --     ]
-
         registryAcct = SolidVMContractWithStorage 0x720 720
             (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry)) $
             [(".owner", rootAddress)]
