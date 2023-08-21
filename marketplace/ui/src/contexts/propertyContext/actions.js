@@ -89,8 +89,8 @@ const actions = {
   updateProperty: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateProperty });
     try {
-      const response = await fetch(`${apiUrl}/updateproperties`, {
-        method: HTTP_METHODS.POST,
+      const response = await fetch(`${apiUrl}/properties/update`, {
+        method: HTTP_METHODS.PUT,
         credentials: "same-origin",
         headers: {
           Accept: "application/json",
@@ -105,6 +105,7 @@ const actions = {
         dispatch({
           type: actionDescriptors.updatePropertySuccessful,
           payload: body.data,
+          success: true
         });
         actions.setMessage(dispatch, "Property updated successfully", true);
         return true;

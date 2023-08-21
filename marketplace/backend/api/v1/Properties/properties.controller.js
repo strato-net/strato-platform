@@ -228,7 +228,7 @@ class PropertiesController {
   }
 
   static validateUpdatePropertyArgs(args) {
-    const createPropertySchema = Joi.object({
+    const updatePropertySchema = Joi.object({
       productId: Joi.string().required(),
       propertyAddress: Joi.string().required(),
       title: Joi.string().required(),
@@ -331,10 +331,10 @@ class PropertiesController {
       waterFront: Joi.boolean().required(),
     });
 
-    const validation = createPropertySchema.validate(args);
+    const validation = updatePropertySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error', 
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Update Property Argument Validation Error`,
         `Missing args or bad format: ${validation.error.message}`,
       )
     }

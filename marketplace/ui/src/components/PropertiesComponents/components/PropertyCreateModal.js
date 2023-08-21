@@ -57,7 +57,7 @@ function PropertyCreateModal({
   const [api, contextHolder] = notification.useNotification();
   const dispatch = usePropertiesDispatch();
 
-  const { message, success, isCreatePropertySubmitting } = usePropertiesState();
+  const { message, success, isCreatePropertySubmitting, isUpdatePropertySubmitting } = usePropertiesState();
   const [propertyData, setPropertyData] = useState(formData);
   //TODO:- Can uncomment when use image upload ***
   // const [selectedImage, setSelectedImage] = useState(null);
@@ -151,7 +151,22 @@ function PropertyCreateModal({
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
     if (isEdit) {
-      let response = await actions.updateProperty(dispatch, body);
+      let updatedData = { ...body, propertyAddress: body.address };
+      delete updatedData["chainId"]
+      delete updatedData["block_hash"]
+      delete updatedData["block_number"]
+      delete updatedData["block_timestamp"]
+      delete updatedData["address"]
+      delete updatedData["record_id"]
+      delete updatedData["transaction_hash"]
+      delete updatedData["transaction_sender"]
+
+      delete updatedData["standardStatus"]
+      delete updatedData["unparsedAddress"]
+      delete updatedData["latitude"]
+      delete updatedData["longitude"]
+
+      let response = await actions.updateProperty(dispatch, updatedData);
       if (response) {
         toggleCreateModal(false)
         toggleCreateConfirmModal(false)
@@ -740,7 +755,7 @@ function PropertyCreateModal({
         isCreateConfirmModalOpen={isCreateConfirmModalOpen}
         toggleCreateConfirmModal={toggleCreateConfirmModal}
         handleSubmitCreateProperty={handleSubmitCreateProperty}
-        isCreatePropertySubmitting={isCreatePropertySubmitting}
+        isCreatePropertySubmitting={isCreatePropertySubmitting || isUpdatePropertySubmitting}
         isEdit={isEdit}
       />
     </>
