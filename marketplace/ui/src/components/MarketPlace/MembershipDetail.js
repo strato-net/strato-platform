@@ -126,7 +126,7 @@ const serviceDispatch = useMembershipDispatch();
 
   useEffect(() => {
     if (Id !== undefined && inventoryId) {
-      actions.fetchInventoryDetail(dispatch, limit, offset, inventoryId);
+      actions.fetchInventoryDetail(dispatch, inventoryId);
     }
     else if (Id !== undefined && membershipDetails) {
       productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
@@ -138,10 +138,10 @@ const serviceDispatch = useMembershipDispatch();
   }, [marketplaceDispatch, cartList]);
 
   let details = undefined;
-  if(inventoryId){
-    details = inventoryDetails[0];
+  if(inventoryId && inventoryDetails){
+    details = inventoryDetails;
   }
-  else {
+  else if(!inventoryId && productDetails) {
     details = productDetails;
   }
 
