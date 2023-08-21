@@ -909,22 +909,20 @@ contract User {
         variadic result = address(contractToCall).call(functionName, args);
         return result;
     }
-} 
-|]
+}|]
 
 -- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
 insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertUserRegistryContract certs gi =
     gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
-        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
+        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry userRegistryContract (Just "UserRegistry")]}
     where 
         addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
         initialAccounts = genesisInfoAccountInfo gi
         initialCode     = genesisInfoCodeInfo gi
 
         rlpWrap         = rlpSerialize . rlpEncode
-        contractSrc     = certificateRegistryContract <> "\n\n" <> userRegistryContract
-        encodedRegistry = encodeUtf8 contractSrc
+        encodedRegistry = encodeUtf8 userRegistryContract
 
         rootAddress'    = fromPublicKey rootPubKey
         rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
