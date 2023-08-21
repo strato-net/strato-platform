@@ -232,61 +232,56 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
           .then(async (results) => {
             arrayOfImageData.push(...results);
             
-            const allOriginalFile = values.documents.concat(values.images);
             const allFiles = arrayOfFiles.concat(arrayOfImageData);
-            
-            if (allOriginalFile.length === allFiles.length) {
-              // Your code for when all images have been uploaded
-              console.log("all images uploaded");
-              // TODO: Add image and file upload to S3
-              const body = {
-                membershipArgs: {
-                  name: updatedValues.name,
-                  description: updatedValues.description,
-                  manufacturer: user.user.organization,
-                  unitOfMeasurement: 1,
-                  // Generate random code for now
-                  userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-                  // Generate random number for now
-                  uniqueMembershipCode: Math.floor(Math.random() * 1000000),
-                  leastSellableUnit: 1,
-                  // TODO: This might have to be changed into an array. 
-                  imageKey: `${arrayOfImageData[0].imageKey}`,
-                  category: updatedValues.category,
-                  subCategory: updatedValues.category,
-                  createdDate: new Date().getTime(),
-                  timePeriodInMonths: updatedValues.duration,
-                  additionalInfo: updatedValues.additionalInformation,
-                  // If visible is true the List Now form is open and the membership is active
-                  isActive: visible ? true : false,
-                },
-                membershipServiceArgs: updatedValues.services.map((service) => ({
-                  serviceId: service.serviceId,
-                  membershipPrice: service.memberPrice ? service.memberPrice : 0,
-                  discountPrice: service.percentDiscount ? service.percentDiscount : 0,
-                  maxQuantity: service.numberOfUses,
-                  createdDate: new Date().getTime(),
-                  // If visible is true the List Now form is open and the membership is active
-                  isActive: visible ? true : false,
-                })),
-                //TODO: where do I put the imageKey from the uploaded File?
-                productFileArgs: allFiles.map((file, index) => ({
-                  fileLocation: `${file.imageKey}`,
-                  fileHash: `${file.docHash}`,
-                  fileName: `${allOriginalFile[index].name}`,
-                  uploadDate: new Date().getTime(),
-                  createdDate: new Date().getTime(),
-                  section: 1,
-                  type: 1,
-                })),
-              };
 
-              console.log("body", body);
-              const isDone = await actions.createMembership(dispatch, body);
-              if (isDone) {
-                formik.resetForm();
-                handleCancel();
-              }
+            // TODO: Add image and file upload to S3
+            const body = {
+              membershipArgs: {
+                name: updatedValues.name,
+                description: updatedValues.description,
+                manufacturer: user.user.organization,
+                unitOfMeasurement: 1,
+                // Generate random code for now
+                userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+                // Generate random number for now
+                uniqueMembershipCode: Math.floor(Math.random() * 1000000),
+                leastSellableUnit: 1,
+                // TODO: This might have to be changed into an array. 
+                imageKey: `${arrayOfImageData[0].imageKey}`,
+                category: updatedValues.category,
+                subCategory: updatedValues.category,
+                createdDate: new Date().getTime(),
+                timePeriodInMonths: updatedValues.duration,
+                additionalInfo: updatedValues.additionalInformation,
+                // If visible is true the List Now form is open and the membership is active
+                isActive: visible ? true : false,
+              },
+              membershipServiceArgs: updatedValues.services.map((service) => ({
+                serviceId: service.serviceId,
+                membershipPrice: service.memberPrice ? service.memberPrice : 0,
+                discountPrice: service.percentDiscount ? service.percentDiscount : 0,
+                maxQuantity: service.numberOfUses,
+                createdDate: new Date().getTime(),
+                // If visible is true the List Now form is open and the membership is active
+                isActive: visible ? true : false,
+              })),
+              //TODO: where do I put the imageKey from the uploaded File?
+              productFileArgs: allFiles.map((file) => ({
+                fileLocation: `${file.imageKey}`,
+                fileHash: `${file.docHash}`,
+                fileName: `${file.originalName}`,
+                uploadDate: new Date().getTime(),
+                createdDate: new Date().getTime(),
+                section: 1,
+                type: 2,
+              })),
+            };
+
+            console.log("body", body);
+            const isDone = await actions.createMembership(dispatch, body);
+            if (isDone) {
+              formik.resetForm();
+              handleCancel();
             }
           })
           .catch((error) => {
