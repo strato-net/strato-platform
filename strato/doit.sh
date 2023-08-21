@@ -423,7 +423,7 @@ fi
 setEnv requireCerts true
 setEnv genesisBlock ""
 setEnv bootnode ""
-setEnv maxReturnedHeaders 500
+setEnv maxReturnedHeaders 200
 
 setEnv mineBlocks true
 setEnv verifyBlocks false
