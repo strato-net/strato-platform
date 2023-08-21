@@ -111,7 +111,7 @@ contract Product_4 is InventoryStatus {
         if (!isInventoryAvailable) {
             isInventoryAvailable = true;
         }
-        Inventory_3 inventory = new Inventory_3(
+        Inventory_6 inventory = new Inventory_6(
             category,
             _quantity,
             _pricePerUnit,
@@ -134,7 +134,7 @@ contract Product_4 is InventoryStatus {
             return RestStatus.FORBIDDEN;
         }
 
-        Inventory_3 inventory = Inventory_3(_inventory);
+        Inventory_6 inventory = Inventory_6(_inventory);
         inventory.update(_pricePerUnit, _status, _scheme);
         return (RestStatus.OK);
     }
@@ -144,7 +144,7 @@ contract Product_4 is InventoryStatus {
         address _inventory,
         int _quantity
     ) public returns (uint256) {
-        Inventory_3 inventory = Inventory_3(_inventory);
+        Inventory_6 inventory = Inventory_6(_inventory);
         inventory.updateQuantity(_quantity);
         return (RestStatus.OK);
     }

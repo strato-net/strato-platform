@@ -94,7 +94,7 @@ contract Item_5 is ItemStatus {
             batchSerializationNumber
         );
 
-        Inventory_3 inventory = Inventory_3(inventoryId);
+        Inventory_6 inventory = Inventory_6(inventoryId);
         inventory.updateRetiredQuantity(_quantity);
         quantity = quantity - _quantity;
 

@@ -260,6 +260,7 @@ const UpdateInventoryModal = ({
                   name="pricePerUnit"
                   value={formik.values.pricePerUnit}
                   onChange={formik.handleChange}
+                  disabled={true}
                 />
                 {formik.touched.pricePerUnit && formik.errors.pricePerUnit && (
                   <span className="text-error text-xs">

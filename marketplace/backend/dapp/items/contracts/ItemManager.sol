@@ -64,7 +64,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     ) returns (uint256, address) {
         Item_5 item = Item_5(_itemAddress);
 
-        Inventory_3 inventory = Inventory_3(item.inventoryId());
+        Inventory_6 inventory = Inventory_6(item.inventoryId());
         if (_quantity > inventory.availableQuantity()) {
             return (RestStatus.BAD_REQUEST, address(0));
         }
@@ -118,7 +118,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     ) public returns (address, address) {
         Item_5 item = Item_5(_itemAddress[0]);
         Product_4 product;
-        Inventory_3 inventory;
+        Inventory_6 inventory;
 
         Product_4 oldProduct = Product_4(item.productId());
         address productAddress = _productManager.checkForProduct(
@@ -142,7 +142,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             product = Product_4(productAddress);
         }
 
-        Inventory_3 oldInventory = Inventory_3(item.inventoryId());
+        Inventory_6 oldInventory = Inventory_6(item.inventoryId());
 
         address uniqueInventoryAddress = _productManager.checkForInventory(
                                                                             oldInventory.vintage(),
@@ -163,12 +163,12 @@ contract ItemManager is ItemStatus, InventoryStatus {
                                                                                     block.timestamp,
                                                                                     _newOwner
                                                                                 );
-            inventory = Inventory_3(inventoryAddr);
+            inventory = Inventory_6(inventoryAddr);
 
                    
         }else{
             //inventory retreived
-            Inventory_3 inventoryToBeAdded = Inventory_3(uniqueInventoryAddress);
+            Inventory_6 inventoryToBeAdded = Inventory_6(uniqueInventoryAddress);
             int availableQuantity = inventoryToBeAdded.availableQuantity();
             //quantity updated
             uint256 status = inventoryToBeAdded.updateQuantityForVintages(availableQuantity+_newQuantity);
