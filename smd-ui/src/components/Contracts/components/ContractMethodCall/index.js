@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Button, Dialog, PopoverInteractionKind, Position, AnchorButton, Popover, Collapse } from '@blueprintjs/core';
+import { Button, Dialog, PopoverInteractionKind, Position, AnchorButton, Popover, Collapse, Switch } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { Link, withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
@@ -20,6 +20,7 @@ class ContractMethodCall extends Component {
     this.state = {
       isFunctionSourceOpen: false,
       isOpen: false,
+      useWallet: false,
     }
   }
 
@@ -34,6 +35,10 @@ class ContractMethodCall extends Component {
     this.props.reset();
     mixpanelWrapper.track("method_call_cancel");
     this.setState({isOpen : false})
+  }
+
+  toggleWalletUsage = (e) => {
+    this.setState({ useWallet : !this.state.useWallet }, () => {})
   }
 
   submit = (values) => {
@@ -62,7 +67,8 @@ class ContractMethodCall extends Component {
           password: isOauthEnabled() ? '' : values.modalPassword,
           value: values.modalValue,
           args: parsedArgs,
-          chainId: this.props.selectedChain ? this.props.selectedChain : undefined
+          chainId: this.props.selectedChain ? this.props.selectedChain : undefined,
+          useWallet: this.state.useWallet
         }
         mixpanelWrapper.track("method_call_submit");
         this.props.methodCall(this.props.methodKey, payload);
@@ -298,6 +304,15 @@ class ContractMethodCall extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   {this.renderAddress(isModeOauth)}
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-9 smd-pad-4">
+                  <Switch
+                    checked={this.state.useWallet}
+                    onChange={this.toggleWalletUsage}
+                    label="Use Wallet"
+                  />
                 </div>
               </div>
               <div className="row">

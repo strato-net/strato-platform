@@ -72,6 +72,7 @@ type PostBlocTransactionParallel = "transaction"
   :> "parallel"
   :> S.Header "X-USER-ACCESS-TOKEN" Text
   :> QueryParam "chainid" ChainId
+  :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
   :> QueryFlag "resolve"
   :> QueryFlag "queue"
   :> ReqBody '[JSON] PostBlocTransactionRequest
@@ -87,6 +88,7 @@ type PostBlocTransactionRaw = "transaction"
   :> Post '[JSON] BlocChainOrTransactionResult
 
 type PostBlocTransactionCommon = QueryParam "chainid" ChainId
+  :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
   :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostBlocTransactionRequest
   :> Post '[JSON] [BlocChainOrTransactionResult]

@@ -110,7 +110,7 @@ buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] 
 buildGenesisInfo extraFaucets extraCerts validators admins gi =
   let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
       faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-   in insertUserRegistryContract
+   in insertUserRegistryContract extraCerts
       . insertMercataGovernanceContract validators admins
       . insertCertRegistryContract extraCerts
       $ gi{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}

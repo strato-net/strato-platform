@@ -148,7 +148,7 @@ resolveFile getCCFromHash expr (seen, resolved) = if tShowExpr expr `S.member` s
             Nothing -> pure (seen, resolved)
             Just AddressState{..} -> lift (runMainChainT $ resolveCodePtr Nothing addressStateCodeHash) >>= \case
               Just (SolidVMCode _ ch) -> do
-                rfu <- lift $ codeCollectionToFileUnits <$> getCCFromHash ch
+                rfu <- lift $ codeCollectionToFileUnits (Just acct) <$> getCCFromHash ch
                 pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
               Just (EVMCode _) -> throwE . T.pack $ "Account referenced in import contains EVM code: " ++ show acct
               _ -> throwE . T.pack $ "Account referenced in import could not be resolved: " ++ show acct
@@ -165,9 +165,9 @@ resolveFile getCCFromHash expr (seen, resolved) = if tShowExpr expr `S.member` s
                     Right r -> Right . FileUnits (r ^. fuPragmas) $ M.singleton Nothing (l ^. ufuUnits) <> (r ^. fuUnits)
     _ -> throwE . T.pack $ "Unsupported expression in import: " ++ unparseExpression expr 
 
-codeCollectionToFileUnits :: CodeCollectionF a -> FileUnitsF a
-codeCollectionToFileUnits CodeCollection{..} =
-  let units = (FUContract <$> _contracts)
+codeCollectionToFileUnits :: Maybe Account -> CodeCollectionF a -> FileUnitsF a
+codeCollectionToFileUnits from CodeCollection{..} =
+  let units = (FUContract . (importedFrom %~ maybe from Just) <$> _contracts)
            <> (FUConstant <$> _flConstants)
            <> (FUStruct   <$> _flStructs)
            <> (FUEnum     <$> _flEnums)
