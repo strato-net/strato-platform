@@ -123,6 +123,7 @@ class MembershipController {
     const validation = createMembershipSchema.validate(args);
 
     if (validation.error) {
+      console.log(validation.error.message);
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Membership Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })

@@ -19,9 +19,13 @@ import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 
 // Actions for the membership context
 import { actions } from "../../contexts/membership/actions";
-import { actions as prodActions} from "../../contexts/product/actions";
-import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { actions as prodActions } from "../../contexts/product/actions";
+import {
+  useMembershipDispatch,
+  useMembershipState,
+} from "../../contexts/membership";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as serviceActions } from "../../contexts/service/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 
@@ -51,8 +55,11 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const [memberDiscount, setMemberDiscount] = useState([1]);
   const [visible, setVisible] = useState(false);
 
-  const { isCreateProductSubmitting, isuploadImageSubmitting, isCreateMembershipSubmitting } =
-    useMembershipState();
+  const {
+    isCreateProductSubmitting,
+    isuploadImageSubmitting,
+    isCreateMembershipSubmitting,
+  } = useMembershipState();
 
   const { services, isservicesLoading } = useServiceState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
@@ -220,7 +227,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     const updatedValues = checkDiscountType(memberDiscount);
     // console.log("updated Values", updatedValues);
     // console.log("values", values);
-    
+
     // for every image in formki.values.images, upload it to s3 and get the url back
     const arrayOfImageData = [];
     const uploadImagePromises = values.images.map(async (image) => {
@@ -228,7 +235,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
       formData.append("fileUpload", image.originFileObj);
       return prodActions.uploadImage(prodDispatch, formData);
     });
-    
+
     // for every image in formki.values.documents, upload it to s3 and get the url back
     const arrayOfFiles = [];
     const uploadFilePromises = values.documents.map(async (doc) => {
@@ -236,61 +243,106 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
       formData.append("fileUpload", doc.originFileObj);
       return prodActions.uploadImage(prodDispatch, formData);
     });
-    
+
     Promise.all(uploadFilePromises)
       .then(async (results0) => {
         arrayOfFiles.push(...results0);
         Promise.all(uploadImagePromises)
           .then(async (results) => {
             arrayOfImageData.push(...results);
-            
+
             const allFiles = arrayOfFiles.concat(arrayOfImageData);
-            
-            if (allOriginalFile.length === allFiles.length) {
-              // Your code for when all images have been uploaded
-              console.log("all images uploaded");
-              // TODO: Add image and file upload to S3
-              const body = {
-                membershipArgs: {
-                  name: updatedValues.name,
-                  description: updatedValues.description,
-                  manufacturer: user.user.organization,
-                  unitOfMeasurement: 1,
-                  // Generate random code for now
-                  userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-                  // Generate random number for now
-                  uniqueMembershipCode: Math.floor(Math.random() * 1000000),
-                  leastSellableUnit: 1,
-                  // TODO: This might have to be changed into an array. 
-                  imageKey: `${arrayOfImageData[0].imageKey}`,
-                  category: updatedValues.category,
-                  subCategory: updatedValues.category,
-                  createdDate: new Date().getTime(),
-                  timePeriodInMonths: updatedValues.duration,
-                  additionalInfo: updatedValues.additionalInformation,
-                  // If visible is true the List Now form is open and the membership is active
-                  isActive: visible ? true : false,
-                },
-                membershipServiceArgs: updatedValues.services.map((service) => ({
-                  serviceId: service.serviceId,
-                  membershipPrice: service.memberPrice ? service.memberPrice : 0,
-                  discountPrice: service.percentDiscount ? service.percentDiscount : 0,
-                  maxQuantity: service.numberOfUses,
-                  createdDate: new Date().getTime(),
-                  // If visible is true the List Now form is open and the membership is active
-                  isActive: visible ? true : false,
-                })),
-                //TODO: where do I put the imageKey from the uploaded File?
-                productFileArgs: allFiles.map((file, index) => ({
-                  fileLocation: `${file.imageKey}`,
-                  fileHash: `${file.docHash}`,
-                  fileName: `${file.originalName}`,
-                  uploadDate: new Date().getTime(),
-                  createdDate: new Date().getTime(),
-                  section: 1,
-                  type: 2,
-                })),
-              };
+
+            // Your code for when all images have been uploaded
+            console.log("all images uploaded");
+            // TODO: Add image and file upload to S3
+            const body = {
+              membershipArgs: {
+                name: updatedValues.name,
+                description: updatedValues.description,
+                manufacturer: user.user.organization,
+                unitOfMeasurement: 1,
+                // Generate random code for now
+                userUniqueMembershipCode: `U-ID-${Math.floor(
+                  Math.random() * 1000000
+                )}`,
+                // Generate random number for now
+                uniqueMembershipCode: Math.floor(Math.random() * 1000000),
+                leastSellableUnit: 1,
+                // TODO: This might have to be changed into an array.
+                imageKey: `${arrayOfImageData[0].imageKey}`,
+                category: updatedValues.category,
+                subCategory: updatedValues.category,
+                createdDate: new Date().getTime(),
+                timePeriodInMonths: updatedValues.duration,
+                additionalInfo: updatedValues.additionalInformation,
+                // If visible is true the List Now form is open and the membership is active
+                isActive: visible ? true : false,
+              },
+              membershipServiceArgs: updatedValues.services.map((service) => ({
+                serviceId: service.serviceId,
+                membershipPrice: service.memberPrice ? service.memberPrice : 0,
+                discountPrice: service.percentDiscount
+                  ? service.percentDiscount
+                  : 0,
+                maxQuantity: service.numberOfUses,
+                createdDate: new Date().getTime(),
+                // If visible is true the List Now form is open and the membership is active
+                isActive: visible ? true : false,
+              })),
+              //TODO: where do I put the imageKey from the uploaded File?
+              productFileArgs: allFiles.map((file, index) => ({
+                fileLocation: `${file.imageKey}`,
+                fileHash: `${file.docHash}`,
+                fileName: `${file.originalName}`,
+                uploadDate: new Date().getTime(),
+                createdDate: new Date().getTime(),
+                section: 1,
+                type: 2,
+              })),
+            };
+
+            switch (visible) {
+              // If the List Now form is open we will create the membership and inventory otherwise we will just create the membership
+              case false:
+                const isDone = await actions.createMembership(dispatch, body);
+                if (isDone) {
+                  formik.resetForm();
+                  handleCancel();
+                }
+                break;
+              case true:
+                const isDone2 = await actions.createMembership(dispatch, body);
+                if (isDone2) {
+                  const getMembership = await actions.fetchMembershipDetails(
+                    dispatch,
+                    isDone2.address
+                  );
+
+                  const productId = getMembership.membership.productId;
+                  const inventoryBody = {
+                    productAddress: productId,
+                    quantity: updatedValues.quantity,
+                    pricePerUnit: updatedValues.price,
+                    // Generate random code for now
+                    batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+                    // Status should always be published if we use List Now
+                    status: INVENTORY_STATUS.PUBLISHED,
+                    serialNumber: [],
+                  };
+
+                  const isDone3 = await inventoryActions.createInventory(
+                    inventoryDispatch,
+                    inventoryBody
+                  );
+                  if (isDone3) {
+                    formik.resetForm();
+                    handleCancel();
+                  }
+                }
+                break;
+              default:
+                break;
             }
           })
           .catch((e) => {
@@ -300,49 +352,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
       .catch((e) => {
         console.log("Outer promise", e);
       });
-
-      switch (visible) {
-        // If the List Now form is open we will create the membership and inventory otherwise we will just create the membership
-        case false:
-          const isDone = await actions.createMembership(dispatch, body);
-          if (isDone) {
-            formik.resetForm();
-            handleCancel();
-          }
-          break;
-        case true:
-          const isDone2 = await actions.createMembership(dispatch, body);
-          if (isDone2) {
-            const getMembership = await actions.fetchMembershipDetails(
-              dispatch,
-              isDone2.address
-            );
-
-            const productId = getMembership.membership.productId;
-            const inventoryBody = {
-              productAddress: productId,
-              quantity: updatedValues.quantity,
-              pricePerUnit: updatedValues.price,
-              // Generate random code for now
-              batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-              // Status should always be published if we use List Now
-              status: INVENTORY_STATUS.PUBLISHED,
-              serialNumber: [],
-            };
-
-            const isDone3 = await inventoryActions.createInventory(
-              inventoryDispatch,
-              inventoryBody
-            );
-            if (isDone3) {
-              formik.resetForm();
-              handleCancel();
-            }
-          }
-          break;
-        default:
-          break;
-      }
   };
 
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
