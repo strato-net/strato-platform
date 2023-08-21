@@ -78,8 +78,16 @@ const Membership = () => {
         }
     };
 
-    const { memberships, ismembershipsLoading, message, success } = useMembershipState();
+    let { memberships, ismembershipsLoading, message, success } = useMembershipState();
+    //We want to show all inventories associated to a membership, but also
+    //All memberships that do not have inventories
 
+    //So we create a new list of memberships, creating a new object for each inventory
+    //and then we flatten the list
+    const membershipsAsInventories = (memberships.filter((membership_) => membership_.inventories.length > 0).map((membership_) => { return membership_.inventories.map((inventory) => { return {...membership_, ...inventory  } }) })).flat();;
+    //Then we combine lists of memberships that do not have inventories with the list of inventories/memberhsips
+    memberships = [...memberships.filter((membership_) => membership_.inventories.length === 0), ...membershipsAsInventories];
+    
     useEffect(() => {
         if (isSearch) {
             setOffset(0);
@@ -234,7 +242,7 @@ const Membership = () => {
                                         {memberships.map((product, index) => {
                                             return (
                                                 <MembershipCard
-                                                    product={product}
+                                                    membership={product}
                                                     categorys={categorys}
                                                     subCategorys={subCategorys}
                                                     key={index}

@@ -1420,13 +1420,27 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const products    = await managers.productManager.getProducts({ address: addressOfProducts }, newOptions);
   
     //Attach product to membership
-    for (const obj in products){
+    for (const obj of products){
       const productAddress = obj.address;
       if (dictionaryOfMemberships.hasOwnProperty(productAddress)) {
           dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership => ({
               ...existingMembership,
               product: obj
           }));
+      }
+    }
+    
+    //Get Product Images
+    var productFiles = undefined;
+    if(addressOfProducts.length > 0){
+        for (const productAddress of addressOfProducts){
+          try { //TODO, make this one cirrus request, instead of many.
+            productFiles =  await productFileJs.getAll(rawAdmin, { productId: productAddress}, {...options, org: managers.cirrusOrg, app: contractName})
+            if(dictionaryOfMemberships.hasOwnProperty(productAddress) ) dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership =>  ({productImage : productFiles, ...existingMembership }  ));
+          } catch(error) { 
+            console.log("Failed to attain productFiles for product: ", productAddress, " with error: ", error);
+            if(dictionaryOfMemberships.hasOwnProperty(productAddress) ) dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership =>  ({productImage : [], ...existingMembership }  ));
+          }
       }
     }
   

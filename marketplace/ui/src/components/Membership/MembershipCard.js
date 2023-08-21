@@ -9,7 +9,7 @@ import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 
 const MembershipCard = ({
-  product,
+  membership,
   categorys,
   debouncedSearchTerm,
 }) => {
@@ -46,9 +46,8 @@ const MembershipCard = ({
   };
 
   useEffect(() => {
-    setState(product);
-    console.log("state", state);
-  }, [product]);
+    setState(membership);
+  }, [membership]);
   
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true } });
@@ -67,13 +66,13 @@ const MembershipCard = ({
             <img
               className="w-52 object-cover"
               alt=""
-              src={state.imageUrl}
+              src={membership.productImage1}
             />
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
                   <h3 className="font-semibold text-primaryB text-xl">
-                    {decodeURIComponent(state.name)}
+                    {decodeURIComponent(membership.product.name)}
                   </h3>
                 </div>
                 <div className="flex items-center">
@@ -119,7 +118,7 @@ const MembershipCard = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                  {state.subCategory}
+                  {membership.product.subCategory}
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
@@ -128,7 +127,7 @@ const MembershipCard = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                  Equinox Labs
+                  {membership.product.manufacturer}
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
@@ -139,7 +138,7 @@ const MembershipCard = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                 1 Year
+                 {membership.timePeriodInMonths} Month(s)
                 </p>
               </div>
               <div
