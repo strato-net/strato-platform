@@ -565,6 +565,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                               (SInteger _, SVMType.Int _ _) -> True
                               (SString _, SVMType.String _) -> True
                               (SString _, SVMType.Bytes _ _) -> True
+                              (SString _, SVMType.Address _) -> True
+                              (SString _, SVMType.Account _) -> True
                               (SBool _, SVMType.Bool) -> True
                               (SAccount _ _, SVMType.Address _) -> True
                               (SAccount _ _, SVMType.Account _) -> True
@@ -2067,6 +2069,8 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       (SInteger _, SVMType.Int _ _) -> pure True
                       (SString _, SVMType.String _) -> pure True
                       (SString _, SVMType.Bytes _ _) -> pure True
+                      (SString _, SVMType.Address _) -> pure True
+                      (SString _, SVMType.Account _) -> pure True
                       (SBool _, SVMType.Bool) -> pure True
                       (SAccount _ _, SVMType.Address _) -> pure True
                       (SAccount _ _, SVMType.Account _) -> pure True
