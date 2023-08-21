@@ -32,6 +32,7 @@ import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Lazy
 import qualified Crypto.Secp256k1                  as S
+import           Data.Bool
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Short             as BSS
@@ -141,8 +142,8 @@ txWorker = forever $ do
   case e of
     Left (ex :: SomeException) -> $logErrorS "txWorker/error" . Text.pack $ show ex
     Right () -> error "txWorker returned a Right (). This should never happen. Please contact Simon Peyton Jones."
-  where processTxs = awaitForever $ \(a,b,r,c) ->
-          lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
+  where processTxs = awaitForever $ \(a,b,w,r,c) ->
+          lift . void $ postBlocTransaction' (Do CacheNonce) a b w r c
 
 
 
@@ -490,18 +491,19 @@ postBlocTransactionParallel :: ( MonadLogger m
                                )
                             => Maybe Text
                             -> Maybe ChainId
+                            -> Maybe Bool -- use_wallet
                             -> Bool -- resolve
                             -> Bool -- queue
                             -> PostBlocTransactionRequest
                             -> m [BlocChainOrTransactionResult]
-postBlocTransactionParallel jwtToken b resolve queue c =
+postBlocTransactionParallel jwtToken b mUseWallet resolve queue c =
   if queue && not resolve
     then do
       checkIsSynced
       tbqueue <- fmap txTBQueue getBlocEnv
-      atomically $ writeTBQueue tbqueue (jwtToken,b,resolve,c)
+      atomically $ writeTBQueue tbqueue (jwtToken,b,mUseWallet,resolve,c)
       pure []
-    else postBlocTransaction' (Do CacheNonce) jwtToken b resolve c
+    else postBlocTransaction' (Do CacheNonce) jwtToken b mUseWallet resolve c
 
 
 postBlocTransaction :: ( MonadLogger m
@@ -516,6 +518,7 @@ postBlocTransaction :: ( MonadLogger m
                        )
                     => Maybe Text
                     -> Maybe ChainId
+                    -> Maybe Bool -- use_wallet
                     -> Bool
                     -> PostBlocTransactionRequest
                     -> m [BlocChainOrTransactionResult]
@@ -533,6 +536,7 @@ postBlocTransactionExternal :: ( MonadLogger m
                               )
                             => Maybe Text
                             -> Maybe ChainId
+                            -> Maybe Bool -- use_wallet
                             -> Bool
                             -> PostBlocTransactionRequest
                             -> m [BlocChainOrTransactionResult]
@@ -552,10 +556,11 @@ postBlocTransaction' :: ( MonadLogger m
                      => Should CacheNonce
                      -> Maybe Text
                      -> Maybe ChainId
+                     -> Maybe Bool -- use_wallet
                      -> Bool
                      -> PostBlocTransactionRequest
                      -> m [BlocChainOrTransactionResult]
-postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
   accountNonceLimit <- fmap accountNonceLimit getBlocEnv
   userRegistry <- fmap userRegistryAddress getBlocEnv
@@ -656,6 +661,16 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
             p <- fromFunction x
             let bfp = FunctionParameters
                         addr
+                        (functionpayloadContractAddress p)
+                        (functionpayloadMethod p)
+                        (functionpayloadArgs p)
+                        (functionpayloadValue p)
+                        (mergeTxParams (functionpayloadTxParams p) txParams)
+                        (functionpayloadMetadata p)
+                        (functionpayloadChainid p <|> chainId)
+                        resolve
+            let bfpWallet = FunctionParameters
+                        addr
                         userContractAddr
                         "callContract"
                         (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
@@ -664,10 +679,18 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
-            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp jwtToken
+            walletFlag <- useWalletsByDefault <$> getBlocEnv
+            let bfp' = bool bfp bfpWallet $ fromMaybe walletFlag mUseWallet
+            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp' jwtToken
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
+                        addr
+                        (map (\(FunctionPayload a m r v x c md) ->
+                          MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                        chainId
+                        resolve
+            let bflpWallet = FunctionListParameters
                         addr
                         (map (\(FunctionPayload a m r v x c md) ->
                                 MethodCall 
@@ -681,7 +704,9 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                               ) p)
                         chainId
                         resolve
-            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp jwtToken
+            walletFlag <- useWalletsByDefault <$> getBlocEnv
+            let bflp' = bool bflp bflpWallet $ fromMaybe walletFlag mUseWallet
+            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp' jwtToken
         GENESIS -> case txs of
           [] -> return []
           xs -> do

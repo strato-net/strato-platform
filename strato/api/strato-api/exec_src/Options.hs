@@ -26,6 +26,7 @@ defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transact
 defineFlag "identityServerUrl" ("" :: String) "The URL of the identity server" -- This could be used during the strato-getting started or default use with network flag
 defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"
 defineFlag "userRegistryAddress" ("0000000000000000000000000000000000000720" :: String) "Address of the User Registry contract"
+defineFlag "useWalletsByDefault" (False :: Bool) "Whether to redirect transactions to user wallet contracts by default"
 
 --Simple helper functions
 getIdServerUrl ::  String

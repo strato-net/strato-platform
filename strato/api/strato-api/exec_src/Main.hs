@@ -337,7 +337,8 @@ main = do
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
           txTBQueue = tbqueue,
-          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress
+          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
+          useWalletsByDefault = flags_useWalletsByDefault
           }
   run 3000 $ app env theDoc
 
