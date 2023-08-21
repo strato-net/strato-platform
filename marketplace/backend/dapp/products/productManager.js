@@ -444,12 +444,12 @@ async function updateProperty(admin, contract, _args, baseOptions) {
       ..._args,
     }),
   };
+
   const options = {
     ...baseOptions,
     history: [contractName],
   };
-
-  const [restStatus, propertyAddress] = await rest.call(
+  const [restStatus] = await rest.call(
     admin,
     callArgs,
     options
@@ -458,7 +458,7 @@ async function updateProperty(admin, contract, _args, baseOptions) {
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
 
-  return [restStatus, propertyAddress];
+  return [restStatus];
 }
 
 export default {

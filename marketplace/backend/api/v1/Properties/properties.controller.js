@@ -2,9 +2,6 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3, deleteFileFromS3 } from '../../../helpers/s3'
-import constants from '../../../helpers/constants'
-
 const options = { config, cacheNonce: true }
 
 class PropertiesController {
@@ -107,21 +104,8 @@ class PropertiesController {
 
       PropertiesController.validateUpdatePropertyArgs(propertyArgs)
 
-      const propertyResult = await dapp.updateProperty(propertyArgs)
-      if (propertyResult) {
-        const inventoryBody = {
-          productAddress: propertyResult.productContractAddress,
-          quantity: 1,
-          pricePerUnit: propertyArgs.listPrice,
-          batchId: '1',
-          status: 1,
-          serialNumber: [],
-        }
-        const inventoryResult = await dapp.updateInventory(inventoryBody)
-        if (inventoryResult) {
-          rest.response.status200(res, propertyResult)
-        }
-      }
+      const updatedProperty = await dapp.updateProperty(propertyArgs)
+      rest.response.status200(res, updatedProperty)
 
       return next()
     } catch (e) {
@@ -245,7 +229,8 @@ class PropertiesController {
 
   static validateUpdatePropertyArgs(args) {
     const createPropertySchema = Joi.object({
-      propertyId: Joi.string().required(),
+      productId: Joi.string().required(),
+      propertyAddress: Joi.string().required(),
       title: Joi.string().required(),
       description: Joi.string().required(),
       propertyType: Joi.string().required(),
@@ -349,9 +334,9 @@ class PropertiesController {
     const validation = createPropertySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error', 
+        `Missing args or bad format: ${validation.error.message}`,
+      )
     }
   }
 
