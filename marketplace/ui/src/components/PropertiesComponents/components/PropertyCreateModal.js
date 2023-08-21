@@ -362,6 +362,7 @@ function PropertyCreateModal({
             placeholder="Street Name"
             value={streetName}
             defaultValue={streetName}
+            disabled={isEdit}
             onChange={(e) => {
               handleChange("streetName", e.target.value);
             }}
@@ -382,6 +383,7 @@ function PropertyCreateModal({
                 id="streetnumber"
                 type="Number"
                 placeholder="Street Number"
+                disabled={isEdit}
                 controls={false}
                 value={streetNumber}
                 defaultValue={streetNumber}
@@ -407,6 +409,7 @@ function PropertyCreateModal({
                 label="House Number"
                 id="housenumber"
                 placeholder="House Number"
+                disabled={isEdit}
                 controls={false}
                 value={unitNumber}
                 defaultValue={unitNumber}
@@ -449,6 +452,7 @@ function PropertyCreateModal({
                 label="City"
                 id="city"
                 placeholder="City"
+                disabled={isEdit}
                 value={postalCity}
                 defaultValue={postalCity}
                 onChange={(e) => {
@@ -473,6 +477,7 @@ function PropertyCreateModal({
                 placeholder="ZipCode"
                 min={0}
                 max={99999}
+                disabled={isEdit}
                 controls={false}
                 value={postalcode}
                 defaultValue={postalcode}
@@ -544,6 +549,7 @@ function PropertyCreateModal({
             placeholder="Property Type"
             value={propertyType}
             defaultValue={propertyType}
+            disabled={isEdit}
             onSelect={(value) => {
               handleChange("propertyType", value);
             }}
