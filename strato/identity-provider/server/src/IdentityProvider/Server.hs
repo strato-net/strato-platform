@@ -298,6 +298,7 @@ createNewCert sub = do
     let signWIssuerPrivKey bs = return $ signMsg iK bs
     makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i sub
 
+
 registerCert :: (MonadIO m, MonadLogger m, Accessible RealmData m) 
              => X509Certificate 
              -> AccessToken 

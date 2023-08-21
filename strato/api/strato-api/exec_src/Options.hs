@@ -24,3 +24,5 @@ defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transact
 defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
 defineFlag "identityServerUrl" ("https://identity.blockapps.net" :: String) "The URL of the identity server" -- This could be used during the strato-getting started or default use with network flag
 defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"
+defineFlag "userRegistryAddress" ("0000000000000000000000000000000000000720" :: String) "Address of the User Registry contract"
+defineFlag "useWalletsByDefault" (False :: Bool) "Whether to redirect transactions to user wallet contracts by default"

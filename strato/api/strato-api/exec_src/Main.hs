@@ -28,7 +28,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Maybe                      (listToMaybe, maybeToList, isJust)
+import           Data.Maybe                      (listToMaybe, maybeToList, isJust, fromJust)
 import           Data.Source.Map
 import           Data.Swagger                    hiding (delete, Http)
 import           HFlags
@@ -56,11 +56,13 @@ import           Bloc.Server.Utils          (toMaybe)
 import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.CodeDB
 
@@ -108,6 +110,9 @@ instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
+instance Selectable Account Contract m => Selectable Account Contract (CirrusM m) where
+  select p = lift . select p
+
 instance Selectable Account Contract m => Selectable Account Contract (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -132,6 +137,8 @@ instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceM
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (IdentityM m) where
   select p = lift . select p
 
+instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (CirrusM m) where
+  select p = lift . select p
 
 instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
   select p = lift . select p
@@ -151,6 +158,11 @@ instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT B
   insert p k = lift . insert p k
   delete p   = lift . delete p
 
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (CirrusM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
 instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <- MaybeT
@@ -166,6 +178,24 @@ instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
       (addressStateRefContractRoot r)
       codePtr
       (toMaybe 0 $ addressStateRefChainId r)
+
+instance MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
+  select _ = Account.getX509CertForAccount
+
+instance Selectable Address Certificate m => Selectable Address Certificate (VaultM m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT BlocEnv m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (IdentityM m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (SQLM m) where
+  select p = lift . select p
+
+instance Selectable Account AddressState m => Selectable Account AddressState (CirrusM m) where
+  select p = lift . select p
 
 instance Selectable Account AddressState m => Selectable Account AddressState (VaultM m) where
   select p = lift . select p
@@ -238,6 +268,7 @@ fullServer :: ( MonadLogger m
               , HasVault m
               , Selectable Account Contract m
               , Selectable Account AddressState m
+              , Selectable Address Certificate m
               , HasCodeDB m
               , Selectable Keccak256 SourceMap m
               )
@@ -258,6 +289,7 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
     runM f =
       runLoggingT .
         runSQLM .
+        runCirrusM .
         flip runReaderT blocEnv .
         runVaultM ("http://localhost:8013/strato/v2.3" ) . 
         runIdentitytM flags_identityServerUrl $ f
@@ -304,7 +336,9 @@ main = do
           gasLimit = flags_gasLimit,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
-          txTBQueue = tbqueue
+          txTBQueue = tbqueue,
+          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
+          useWalletsByDefault = flags_useWalletsByDefault
           }
   run 3000 $ app env theDoc
 

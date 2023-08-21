@@ -23,6 +23,8 @@ so that they could be properly moved to their respective version's subsection.
 - Bi-directional sync functionality
 - Mappings in SolidVM receive their own table in Cirrus
 - `/eth/v1.2/identity` endpoint that will call identity server
+- UserRegistry and User Contract on the genesis block
+- Connection to Cirrus Certificate table added in the API
 - Abstract contracts generate Cirrus tables
 - Derived contracts are inserted as rows in abstract tables
 - Support for imports from addresses in SolidVM
@@ -30,6 +32,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
+- POST `/transaction` calls redirected to the corresponding User contract
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
 ### Removed

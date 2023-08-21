@@ -145,7 +145,7 @@ solidityFreeFunction :: SolidityParser SourceUnit
 solidityFreeFunction = do
   (fname, (FuncDeclaration a)) <- functionDeclaration True
   when (SolidVM._funcVisibility a /= Just SolidVM.Internal) $ fail "Free functions always have implicit Internal visibility."
-  return $ FLFunc fname $ SolidVM.Func 
+  return $ FLFunc fname $ SolidVM.Func
     { SolidVM._funcArgs = SolidVM._funcArgs a
     , SolidVM._funcVals = SolidVM._funcVals a
     , SolidVM._funcStateMutability = SolidVM._funcStateMutability a
@@ -185,7 +185,7 @@ solidityDeclaration free =
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
-  
+
 {- New types -}
 
 -- | Parses a struct definition
@@ -421,14 +421,23 @@ functionDeclaration free = do
   cName <- getContractName
   let xabi = xabi'{SolidVM._funcContext = a <> SolidVM._funcContext xabi'}
       tipe = if cName == functionName
-                then ConstructorDeclaration 
-                else FuncDeclaration 
+                then ConstructorDeclaration
+                else FuncDeclaration
   return (functionName, tipe xabi)
 
 functionXabi :: Bool -> SolidityParser SolidVM.Func
 functionXabi free = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
+
+  let lastParamIsVariadic = maybe False ((==) SVMType.Variadic . fst) (Data.List.uncons . reverse . map snd $ functionArgs)
+      containsOnly1       = length (filter (SVMType.Variadic ==) (map snd functionArgs)) == 1
+  case (lastParamIsVariadic, containsOnly1) of
+    (True, False)  -> unexpected "only one variadic parameter is allowed"
+    (False, True)  -> unexpected "variadic parameter must be the last parameter"
+    (True, True)   -> return ()
+    (False, False) -> return ()
+
   (functionRet, visibility, freevisibility, mutability, funcConstructorCallsOrModifiers) <- functionModifiers
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
@@ -569,10 +578,10 @@ functionModifiers = do
       <|> (reserved "view"     >> return SolidVM.View)
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
-    constructorCallModifiersOrOtherModifiers = do 
+    constructorCallModifiersOrOtherModifiers = do
       name <- stringToLabel <$> identifier
       exps <- optionMaybe (parens $ commaSep expression)
-      return (name, fromMaybe [] exps) 
+      return (name, fromMaybe [] exps)
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String
@@ -654,7 +663,7 @@ inCommentSingle
   where
     startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
 
---To make a new reserved word with a specific pragma version please add to the following function list, 
+--To make a new reserved word with a specific pragma version please add to the following function list,
   -- This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
 isReservedWord :: String -> String -> Bool
 isReservedWord version _ = do
