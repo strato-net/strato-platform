@@ -15,18 +15,27 @@ import {
 } from "antd";
 import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 // import getSchema from "./ProductSchema";
-import useDebounce from "../UseDebounce";
-//sub-categories
+// import useDebounce from "../UseDebounce";
+
+// Actions for the membership context
 import { actions } from "../../contexts/membership/actions";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as serviceActions } from "../../contexts/service/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+
+// Dispatch and States for the membership context
 import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../contexts/membership";
 import { useServiceState, useServiceDispatch } from "../../contexts/service";
-import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
+import {
+  useSubCategoryDispatch,
+  useSubCategoryState,
+} from "../../contexts/subCategory";
+import { useInventoryDispatch } from "../../contexts/inventory";
 import ListNowModal from "./ListNowModal";
+import { INVENTORY_STATUS } from "../../helpers/constants";
 
 const { Dragger } = Upload;
 
@@ -48,35 +57,26 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const { services, isservicesLoading } = useServiceState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
-  console.log(issubCategorysLoading, "categorys", subCategorys)
-
   // Dispatch for the membership context
   const dispatch = useMembershipDispatch();
   const serviceDispatch = useServiceDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
+  const inventoryDispatch = useInventoryDispatch();
 
   const queryValue = user.user.organization;
 
   // TODO: We should probably only query services made by the user's organization
   useEffect(() => {
-    serviceActions.fetchService(
-      serviceDispatch,
-      limit,
-      offset,
-      queryValue,
-    );
+    serviceActions.fetchService(serviceDispatch, limit, offset, queryValue);
   }, [serviceDispatch, limit, offset, queryValue]);
 
   useEffect(() => {
-    subCategoryActions.fetchSubCategory(
-      subCategoryDispatch,
-      "Membership"
-    );
+    subCategoryActions.fetchSubCategory(subCategoryDispatch, "Membership");
   }, [subCategoryDispatch]);
 
   const initialValues = {
     name: "",
-    category: "",
+    subCategory: "",
     duration: "",
     additionalInformation: "",
     images: [],
@@ -233,10 +233,10 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
         // Generate random number for now
         uniqueMembershipCode: Math.floor(Math.random() * 1000000),
         leastSellableUnit: 1,
-        // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array. 
+        // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array.
         imageKey: updatedValues.images[0].name,
-        category: updatedValues.category,
-        subCategory: updatedValues.category,
+        category: "Membership",
+        subCategory: updatedValues.subCategory,
         createdDate: new Date().getTime(),
         timePeriodInMonths: updatedValues.duration,
         additionalInfo: updatedValues.additionalInformation,
@@ -263,11 +263,47 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
       })),
     };
 
-    // console.log("body", body);
-    const isDone = await actions.createMembership(dispatch, body);
-    if (isDone) {
-      formik.resetForm();
-      handleCancel();
+    switch (visible) {
+      // If the List Now form is open we will create the membership and inventory otherwise we will just create the membership
+      case false:
+        const isDone = await actions.createMembership(dispatch, body);
+        if (isDone) {
+          formik.resetForm();
+          handleCancel();
+        }
+        break;
+      case true:
+        const isDone2 = await actions.createMembership(dispatch, body);
+        if (isDone2) {
+          const getMembership = await actions.fetchMembershipDetails(
+            dispatch,
+            isDone2.address
+          );
+
+          const productId = getMembership.membership.productId;
+          const inventoryBody = {
+            productAddress: productId,
+            quantity: updatedValues.quantity,
+            pricePerUnit: updatedValues.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
+            status: INVENTORY_STATUS.PUBLISHED,
+            serialNumber: [],
+          };
+
+          const isDone3 = await inventoryActions.createInventory(
+            inventoryDispatch,
+            inventoryBody
+          );
+          if (isDone3) {
+            formik.resetForm();
+            handleCancel();
+          }
+        }
+        break;
+      default:
+        break;
     }
   };
 
@@ -369,21 +405,29 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   className="w-10/12"
                 />
               </Form.Item>
-              <Form.Item label="Category" name="category" className="w-10/12">
+              <Form.Item
+                label="Sub Category"
+                name="subCategory"
+                className="w-10/12"
+              >
                 <Select
-                  id="category"
-                  name="category"
-                  placeholder="Select Category"
+                  id="subCategory"
+                  name="subCategory"
+                  placeholder="Select Sub Category"
                   onChange={(value) => {
-                    formik.setFieldValue("category", value);
+                    formik.setFieldValue("subCategory", value);
                   }}
                   value={formik.values.category}
                 >
-                  {!issubCategorysLoading && subCategorys.map((category) => (
-                    <Select.Option key={category.name} value={category.name}>
-                      {category.name}
-                    </Select.Option>
-                  ))}
+                  {!issubCategorysLoading &&
+                    subCategorys.map((subCategory) => (
+                      <Select.Option
+                        key={subCategory.name}
+                        value={subCategory.name}
+                      >
+                        {subCategory.name}
+                      </Select.Option>
+                    ))}
                 </Select>
               </Form.Item>
               <Form.Item label="Duration (Months)" name="duration">
