@@ -150,23 +150,23 @@ function bindAddress(user, address, options) {
 
 
 async function get(user, args, options) {
-    const { uniqueProductID, address, ...restArgs } = args;
-    let product;
+    const { productId, propertyId, ...restArgs } = args;
+    let review;
 
     if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        product = await searchOne(contractName, searchArgs, options, user);
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'propertyId', value: propertyId });
+        review = await searchOne(contractName, searchArgs, options, user);
     } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueProductID', value: uniqueProductID });
-        product = await searchOne(contractName, searchArgs, options, user);
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'productId', value: productId });
+        review = await searchOne(contractName, searchArgs, options, user);
     }
-    if (!product) {
+    if (!review) {
         return undefined;
     }
 
 
     return marshalOut({
-        ...product,
+        ...review,
     });
 }
 

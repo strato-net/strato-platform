@@ -611,12 +611,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //Get the product contract
     console.log('dapp.getProperty - property', property)
     console.log('dapp.getProperty - productId', property.productId)
-    const productData = await managers.productManager.getProduct({ 
+    const productData = await managers.productManager.getProduct({
       address: property.productId,
       uniqueProductID: property.productId,
-      ownerOrganization: userOrganization }, getOptions);
-      console.log('dapp.getProperty - productData', productData)
-    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
+      ownerOrganization: userOrganization
+    }, getOptions);
+    console.log('dapp.getProperty - productData', productData)
+    const reviews = await managers.reviewManager.getProduct({
+      productId: property.productId,
+      propertyId: property.address,
+      ownerOrganization: userOrganization
+    }, getOptions);
+    console.log('dapp.getProperty - reviews', reviews)
+    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
     return propertyData
   };
 
@@ -626,13 +633,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const propertiesWProducts = []
 
     for (const property of allPropertiesData) {
-      const productData = await managers.productManager.getProduct({ 
+      const productData = await managers.productManager.getProduct({
         ...args,
         offset: 0,
         sort: null,
         address: property.productId,
         uniqueProductID: property.productId,
-        ownerOrganization: userOrganization }, 
+        ownerOrganization: userOrganization
+      },
         getOptions
       );
       propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
@@ -773,17 +781,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ REVIEW MANAGER STARTS--------------------------------
 
-    // Create reviews
-    contract.createReview = async function (args, options = defaultOptions) {
-      const uploadDate = Math.floor(Date.now() / 1000);
-      return managers.reviewManager.createReview({ ...args, createdDate: uploadDate });
-    }
-  
-    // Delete reviews by the productId/productAddress
-    contract.deleteReview = async function (args, options = defaultOptions) {
-      return managers.reviewManager.deleteReview(args);
-    };
-  
+  // Create reviews
+  contract.createReview = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    return managers.reviewManager.createReview({ ...args, createdDate: createdDate });
+  }
+
+  // Delete reviews by the productId/productAddress
+  contract.deleteReview = async function (args, options = defaultOptions) {
+    return managers.reviewManager.deleteReview(args);
+  };
+
 
   // ------------------------------ REVIEW MANAGER ENDS--------------------------------
 
