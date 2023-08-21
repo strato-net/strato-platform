@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useFormik } from "formik";
 import { Form, Modal, InputNumber, Button, Spin, Table} from "antd";
 
 const ListNowModal = ({ open, handleCancel, user, formik, isCreateMembershipSubmitting }) => {
