@@ -41,6 +41,7 @@ import           Data.Maybe                           (fromJust, fromMaybe)
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
+import           Data.Text.Encoding                   (encodeUtf8)
 import           Database.Persist.Sql                 hiding (get)
 import           GHC.Generics
 import           Numeric
@@ -60,6 +61,7 @@ import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
 import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256, keccak256ToByteString)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
+import           Blockchain.Strato.Model.UserRegistry
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2
 import qualified LabeledError
@@ -256,7 +258,7 @@ deriveAddressWithSalt sender salt src args = do
       theHash = SHA.hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
                                                    , rlpEncode theAddress
                                                    , rlpEncode salt
-                                                   , rlpEncode $ maybe ("\130\234\RS\133\184\&4\198O\151\232\&1\RS\213\132\196\&8\n'\161\177\&5\247\200\157\&8\135\139\SYN\GS<\148\GS" :: BC.ByteString) (SHA.keccak256ToByteString . SHA.hash) src 
+                                                   , rlpEncode $ maybe (encodeUtf8 userRegistryContract) (SHA.keccak256ToByteString . SHA.hash) src 
                                                    , rlpEncode $ fromMaybe "OrderedVals []" args
                                                    ]
   -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
