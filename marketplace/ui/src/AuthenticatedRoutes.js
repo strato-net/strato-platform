@@ -22,6 +22,7 @@ import Event from "./components/Event";
 import EventDetails from "./components/Event/EventDetails";
 import { EventsProvider } from "./contexts/event";
 import { MembershipsProvider } from "./contexts/membership";
+import { ServicesProvider } from "./contexts/service";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
@@ -183,9 +184,13 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <CategorysProvider>
               <SubCategorysProvider>
                 <ProductsProvider>
-                <MembershipsProvider>
-                  <Membership user={user} users={users}/>
-                </MembershipsProvider>                  
+                  <InventoriesProvider>
+                    <ServicesProvider>
+                      <MembershipsProvider>
+                        <Membership user={user} users={users}/>
+                      </MembershipsProvider>  
+                    </ServicesProvider>  
+                  </InventoriesProvider>              
                 </ProductsProvider>
               </SubCategorysProvider>
             </CategorysProvider>

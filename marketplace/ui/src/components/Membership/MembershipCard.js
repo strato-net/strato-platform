@@ -48,6 +48,7 @@ const MembershipCard = ({
   useEffect(() => {
     setState(membership);
   }, [membership]);
+
   
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true } });
