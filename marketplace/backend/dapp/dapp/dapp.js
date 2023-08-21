@@ -20,7 +20,7 @@ import userAddressJs from "/dapp/addresses/userAddress.js";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
-import reviewManagerJs from '/dapp/review/reviewManager';
+import reviewManagerJs from '/dapp/reviews/reviewManager';
 
 const allAssetNames = [
   orderJs.contractName,

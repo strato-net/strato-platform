@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 const contractName = 'Review';
-const contractFilename = `${util.cwd}/dapp/review/contracts/Review.sol`;
+const contractFilename = `${util.cwd}/dapp/reviews/contracts/Review.sol`;
 /** 
  * Upload a new review 
  * @param user User token (typically an admin)
