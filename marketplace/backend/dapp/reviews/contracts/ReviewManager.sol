@@ -1,5 +1,5 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-import "./ProductDocument.sol";
+import "./Review.sol";
 
 /// @title A representation of ProductManager to manage product and inventory
 contract ReviewManager {
@@ -7,25 +7,25 @@ contract ReviewManager {
 
     function createReview(
         address _productId,
-        string _fileKey,
-        string _fileHash,
-        string _fileName,
-        string _fileLocation,
-        int _uploadDate,
-        string _documentType,
-        string _uploadedByUser,
+        address _propertyId,
+        address _reviewerAddress,
+        string _reviewerName,
+        string _title,
+        string _description,
+        string _rating,
+        uint _createdDate,
         int _delDate
     ) returns (uint256, address) {
         Review review = new Review(
-         _productId,
-         _fileKey,
-         _fileHash,
-         _fileName,
-         _fileLocation,
-         _uploadDate,
-         _documentType,
-         _uploadedByUser,
-         _delDate
+            _productId,
+            _propertyId,
+            _reviewerAddress,
+            _reviewerName,
+            _title,
+            _description,
+            _rating,
+            _createdDate,
+            _delDate
         );
 
         return (RestStatus.OK, address(review));
@@ -35,5 +35,4 @@ contract ReviewManager {
         Review review = Review(_reviewAddress);
         return review.deleteReview();
     }
-
 }

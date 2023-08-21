@@ -5,34 +5,34 @@ import "/dapp/dapp/contracts/Dapp.sol";
 /// @title A representation of Review assets
 contract Review {
     address public productId;
-    string public fileKey;
-    string public fileHash;
-    string public fileName;
-    string public fileLocation;
-    int public uploadDate;
-    string public documentType;
-    string public uploadedByUser;
-    uint public delDate;
+    address public propertyId;
+    address public reviewerAddress;
+    string public reviewerName;
+    string public title;
+    string public description;
+    string public rating;
+    uint public createdDate;
+    int public delDate;
 
     constructor(
-        address _productId,
-        string _fileKey,
-        string _fileHash,
-        string _fileName,
-        string _fileLocation,
-        int _uploadDate,
-        string _documentType,
-        string _uploadedByUser,
-        int _delDate
+    address _productId,
+    address _propertyId,
+    address _reviewerAddress,
+    string _reviewerName,
+    string _title,
+    string _description,
+    string _rating,
+    uint _createdDate,
+    int _delDate
     ) public {
         productId = _productId;
-        fileKey = _fileKey;
-        fileHash = _fileHash;
-        fileName = _fileName;
-        fileLocation = _fileLocation;
-        uploadDate = _uploadDate;
-        documentType = _documentType;
-        uploadedByUser = _uploadedByUser;
+        productId = _propertyId;
+        reviewerAddress = _reviewerAddress;
+        reviewerName = _reviewerName;
+        title = _title;
+        description = _description;
+        rating = _rating;
+        createdDate = _createdDate;
         delDate = 0;
     }
 
