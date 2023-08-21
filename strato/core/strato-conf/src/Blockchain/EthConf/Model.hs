@@ -41,6 +41,7 @@ data EthConf =
     EthConf {
         ethUniqueId        :: EthUniqueId,
         sqlConfig          :: SqlConf,
+        cirrusConfig       :: SqlConf,
         redisBlockDBConfig :: RedisBlockDBConf,
         kafkaConfig        :: KafkaConf,
         levelDBConfig      :: LevelDBConf,

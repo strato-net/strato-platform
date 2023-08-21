@@ -1,27 +1,45 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module TypecheckerSpec where
 
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.SolidVM.CodeCollectionDB
-import qualified Data.Map as M
+import           Blockchain.Strato.Model.Keccak256
+import qualified Control.Monad.Change.Alter as A
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
+import qualified Data.Map.Strict as M
 import           Data.Source
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified SolidVM.Solidity.StaticAnalysis.Typechecker                            as Typechecker
+import qualified SolidVM.Solidity.StaticAnalysis.Typechecker as Typechecker
 import           Test.Hspec
 import           Text.RawString.QQ
 
+instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (MainChainT (MemAddressStateDB m)) where 
+  lookup p   = lift . lift . A.lookup p
+  insert p k = lift . lift . A.insert p k
+  delete p   = lift . lift . A.delete p
 
-runTypechecker :: String -> [SourceAnnotation Text]
-runTypechecker c = case compileSourceWithAnnotations True (M.fromList [("",T.pack c)]) of
-  Left anns -> anns
-  Right cc -> Typechecker.detector cc
+runTypechecker :: String -> IO [SourceAnnotation Text]
+runTypechecker c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ do
+  eCC <- compileSourceWithAnnotations True (M.fromList [("",T.pack c)])
+  pure $ case eCC of
+    Left anns -> anns
+    Right cc -> Typechecker.detector cc
 
 spec :: Spec
 spec = describe "Typechecker tests" $ do
-  it "can declare state variables with the correct type" $
-    let anns = runTypechecker [r|
+  it "can declare state variables with the correct type" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint x = 8;
   string y = "string";
@@ -37,9 +55,10 @@ contract A {
   Complex i = Complex(0, 1);
 }
 |]
-     in length anns `shouldBe` 0
-  it "can detect type errors in state variable declarations" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can detect type errors in state variable declarations" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint x = "hello";
   string y = true;
@@ -55,9 +74,10 @@ contract A {
   Complex i = RestStatus.Z;
 }
 |]
-     in length anns `shouldBe` 7
-  it "can declare constants with the correct type" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 7
+  it "can declare constants with the correct type" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint constant x = 8;
   string constant y = "string";
@@ -73,9 +93,10 @@ contract A {
   Complex i = Complex(0, 1);
 }
 |]
-     in length anns `shouldBe` 0
-  it "can detect type errors in constant declarations" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can detect type errors in constant declarations" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint constant x = "hello";
   string constant y = true;
@@ -91,9 +112,10 @@ contract A {
   Complex i = RestStatus.Z;
 }
 |]
-     in length anns `shouldBe` 7
-  it "can call contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 7
+  it "can call contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function realFunction() {
   }
@@ -105,9 +127,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "can call public contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can call public contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function realFunction() public {
   }
@@ -119,9 +142,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "can call external contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can call external contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function realFunction() external {
   }
@@ -133,9 +157,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot call private contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot call private contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function realFunction() private {
   }
@@ -147,9 +172,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "cannot call internal contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "cannot call internal contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function realFunction() internal {
   }
@@ -161,9 +187,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can detect missing contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can detect missing contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
 }
 contract B {
@@ -173,9 +200,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can access public contract state variables" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can access public contract state variables" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint public x = 75;
 }
@@ -187,9 +215,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot access non-public state variables" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot access non-public state variables" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint x = 75;
 }
@@ -201,9 +230,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "cannot access private state variables" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "cannot access private state variables" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint private x = 75;
 }
@@ -215,9 +245,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "cannot access internal state variables" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "cannot access internal state variables" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   uint internal x = 75;
 }
@@ -229,9 +260,10 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can detect missing contract state variables" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can detect missing contract state variables" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
 }
 contract B {
@@ -242,27 +274,30 @@ contract B {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can detect treating a non-function type as a function" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can detect treating a non-function type as a function" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract B {
   constructor(uint y) {
     y();
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can detect treating a non-function type as a function" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can detect treating a non-function type as a function" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract B {
   constructor(uint y) {
     y();
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can declare local variables of the correct type" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can declare local variables of the correct type" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   enum RestStatus { W, X, Y, Z }
   struct Complex {
@@ -280,9 +315,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "can detect type errors in local variable declarations" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can detect type errors in local variable declarations" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   enum RestStatus { W, X, Y, Z }
   struct Complex {
@@ -300,9 +336,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 7
-  it "can declare tuple types" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 7
+  it "can declare tuple types" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   struct Complex {
     uint re;
@@ -314,9 +351,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "can detect arity mismatches in tuple type declarations from the left side" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can detect arity mismatches in tuple type declarations from the left side" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   struct Complex {
     uint re;
@@ -328,9 +366,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can detect arity mismatches in tuple type declarations from the right side" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can detect arity mismatches in tuple type declarations from the right side" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   struct Complex {
     uint re;
@@ -342,9 +381,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can detect signedness mismatch between int types" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can detect signedness mismatch between int types" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     uint x = 7;
@@ -353,9 +393,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can lookup integer index of array" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can lookup integer index of array" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   string[] myArray = ["one", "two", "three"];
   function f(uint i) returns (string) {
@@ -363,9 +404,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot lookup string index of array" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot lookup string index of array" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   string[] myArray = ["one", "two", "three"];
   function f(string i) {
@@ -373,9 +415,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can lookup value of mapping using correct key type" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can lookup value of mapping using correct key type" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   mapping (string => uint) myMapping;
   function f(string i) returns (uint) {
@@ -383,9 +426,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot lookup value of mapping using incorrect key type" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot lookup value of mapping using incorrect key type" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   mapping (string => uint) myMapping;
   function f(uint i) {
@@ -393,9 +437,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can get array length" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can get array length" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   string[] myArray;
   function f() returns (uint) {
@@ -403,9 +448,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "can push to an array" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can push to an array" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   string[] myArray;
   function f(string s) {
@@ -413,9 +459,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot get mapping length" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot get mapping length" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   mapping (string => uint) myMapping;
   function f() {
@@ -423,9 +470,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "cannot push to a mapping" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "cannot push to a mapping" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   mapping (string => uint) myMapping;
   function f(string s, uint i) {
@@ -435,9 +483,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 3
-  it "can access builtins" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 3
+  it "can access builtins" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     address a = msg.sender;
@@ -451,9 +500,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot change the type of builtins" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot change the type of builtins" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     string a = msg.sender;
@@ -467,9 +517,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 8
-  it "can call super on parent contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 8
+  it "can call super on parent contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function realFunction() {
   }
@@ -480,18 +531,20 @@ contract B is A {
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot call super without a parent contract" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot call super without a parent contract" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     super.fakeFunction();
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "cannot call super on missing parent contract functions" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "cannot call super on missing parent contract functions" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function realFunction() {
   }
@@ -502,9 +555,10 @@ contract B is A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "cannot access missing enum elements" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "cannot access missing enum elements" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   enum E { W, X, Y, Z }
   function f() {
@@ -512,9 +566,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 4 -- TODO: this should be 1
-  it "cannot access missing struct elements" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 4 -- TODO: this should be 1
+  it "cannot access missing struct elements" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   struct Complex {
     uint re;
@@ -526,44 +581,49 @@ contract A {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "cannot resolve unknown contracts" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "cannot resolve unknown contracts" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A is B {
   constructor() B() {
   }
 }
 |]
-     in length anns `shouldBe` 1
-  it "can use 'this' keyword" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 1
+  it "can use 'this' keyword" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() returns (address) {
     return this;
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "can use require" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can use require" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     require(true, "require");
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "can use assert" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "can use assert" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     assert(true);
   }
 }
 |]
-     in length anns `shouldBe` 0
-  it "cannot use require with incorrect arguments" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldBe` 0
+  it "cannot use require with incorrect arguments" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     require(7, "require");
@@ -573,9 +633,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldSatisfy` (>=4) -- TODO: should be exactly 4
-  it "cannot use assert with incorrect arguments" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldSatisfy` (>=4) -- TODO: should be exactly 4
+  it "cannot use assert with incorrect arguments" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     assert(true, "assert");
@@ -584,9 +645,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldSatisfy` (>=3) -- TODO: should be exactly 3
+    
+    length anns `shouldSatisfy` (>=3) -- TODO: should be exactly 3
   it "can cast to account" $ do
-    let anns = runTypechecker [r|
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     account a = account(0xdeadbeef);
@@ -604,8 +666,8 @@ contract A {
 |]
     putStrLn $ show anns
     length anns `shouldBe` 0
-  it "can cast to account with incorrect types" $
-    let anns = runTypechecker [r|
+  it "can cast to account with incorrect types" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     account a = account("1234");
@@ -614,9 +676,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldSatisfy` (>=3) -- TODO: should be exactly 3
-  it "can cast to account with incorrect types" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldSatisfy` (>=3) -- TODO: should be exactly 3
+  it "can cast to account with incorrect types" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   function f() {
     account a = account("1234");
@@ -625,9 +688,10 @@ contract A {
   }
 }
 |]
-     in length anns `shouldSatisfy` (>=3) -- TODO: should be exactly 3
-  it "can throw exception when the types are different from contructor and call" $
-    let anns = runTypechecker [r|
+    
+    length anns `shouldSatisfy` (>=3) -- TODO: should be exactly 3
+  it "can throw exception when the types are different from contructor and call" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract qq {
   uint x = 0;
 
@@ -639,10 +703,11 @@ contract qq {
   }
 
 }|]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can typecheck account(this, \"self\").chainId" $
-    let anns = runTypechecker [r|
+  it "can typecheck account(this, \"self\").chainId" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract qq {
   uint a1;
@@ -658,10 +723,11 @@ contract qq {
     a5 = account(this, "self").chainId;
   }
 }|]
-    in length anns `shouldBe` 0
+   
+    length anns `shouldBe` 0
 
-  it "can use the string.concat(x,y) function and succeeds when the types are strings" $
-    let anns = runTypechecker [r|
+  it "can use the string.concat(x,y) function and succeeds when the types are strings" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   function f() {
@@ -671,10 +737,11 @@ contract A {
   }
 }
 |]
-    in length anns `shouldBe` 0
+   
+    length anns `shouldBe` 0
 
-  it "can use the string.concat(x,y) function and fails when the types are not strings" $
-    let anns = runTypechecker [r|
+  it "can use the string.concat(x,y) function and fails when the types are not strings" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   function f() {
@@ -683,10 +750,11 @@ contract A {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "cannot assign an immutable a new value inside a function" $
-    let anns = runTypechecker [r|
+  it "cannot assign an immutable a new value inside a function" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   unint immutable g =2;
@@ -696,9 +764,10 @@ contract A {
   } 
 }
 |]
-    in length anns `shouldBe` 2
-  it "cannot incrument an immutable already assigned within the constructor" $
-    let anns = runTypechecker [r|
+   
+    length anns `shouldBe` 2
+  it "cannot incrument an immutable already assigned within the constructor" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract qq {
   uint g = 2022;
@@ -708,18 +777,20 @@ contract qq {
   }
 }
 |]
-    in length anns `shouldBe` 1
-  it "can have the receive() function and succeeds when there are no arguments, no return values, and is Payable and External" $
-    let anns = runTypechecker [r|
+   
+    length anns `shouldBe` 1
+  it "can have the receive() function and succeeds when there are no arguments, no return values, and is Payable and External" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   receive() external payable {
   }
 }
 |]
-    in length anns `shouldBe` 0
-  it "can throw exception when receive() function has arguments" $
-    let anns = runTypechecker [r|
+   
+    length anns `shouldBe` 0
+  it "can throw exception when receive() function has arguments" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   receive(uint i) external payable {
@@ -727,10 +798,11 @@ contract A {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
   
-  it "can assign a value to a declared unassigned immutable within the constructor" $
-    let anns = runTypechecker [r|
+  it "can assign a value to a declared unassigned immutable within the constructor" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract qq {
   uint g = 2022;
@@ -740,9 +812,10 @@ contract qq {
   }
 }
 |]
-    in length anns `shouldBe` 0
-  it "cannot assign an immutable a value after already assinged on contract level" $
-    let anns = runTypechecker [r|
+   
+    length anns `shouldBe` 0
+  it "cannot assign an immutable a value after already assinged on contract level" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract qq {
   uint g = 2022;
@@ -751,9 +824,10 @@ contract qq {
     d = g;
   } 
 }|]
-    in length anns `shouldBe` 1
-  it "can throw exception when receive() function has return values" $
-    let anns = runTypechecker [r|
+   
+    length anns `shouldBe` 1
+  it "can throw exception when receive() function has return values" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   receive() external payable returns (uint) {
@@ -762,30 +836,33 @@ contract A {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can throw exception when receive() function is not external" $
-    let anns = runTypechecker [r|
+  it "can throw exception when receive() function is not external" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   receive() internal payable {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can throw exception when receive() function is not payable" $
-    let anns = runTypechecker [r|
+  it "can throw exception when receive() function is not payable" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   receive() external {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "cannot assign an immutable after already assinged within a function" $
-    let anns = runTypechecker [r|
+  it "cannot assign an immutable after already assinged within a function" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract qq {
   uint c = 2022;
@@ -797,29 +874,32 @@ contract qq {
     x = 13;
   }
 }|]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can throw exception when receive() function is decalred with function keyword" $
-    let anns = runTypechecker [r|
+  it "can throw exception when receive() function is decalred with function keyword" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   function receive() external payable {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can have the fallback() function and succeeds when there are no arguments, no return values, and is External" $
-    let anns = runTypechecker [r|
+  it "can have the fallback() function and succeeds when there are no arguments, no return values, and is External" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
   fallback() external payable {
   }
 }
 |]
-    in length anns `shouldBe` 0
+   
+    length anns `shouldBe` 0
 
-  it "can throw exception when fallback() function has arguments" $
-    let anns = runTypechecker [r|
+  it "can throw exception when fallback() function has arguments" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   fallback(uint i) external payable {
@@ -827,10 +907,11 @@ contract A {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can use an immutable within a function" $
-    let anns = runTypechecker [r|
+  it "can use an immutable within a function" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract qq {
   uint c = 2022;
@@ -844,9 +925,10 @@ contract qq {
   }
 }
 |]
-    in length anns `shouldBe` 0
-  it "can throw exception when fallback() function has return values" $
-    let anns = runTypechecker [r|
+   
+    length anns `shouldBe` 0
+  it "can throw exception when fallback() function has return values" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
   fallback() external payable returns (uint) {
@@ -855,42 +937,46 @@ contract A {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can throw exception when fallback() function is not external" $
-    let anns = runTypechecker [r|
+  it "can throw exception when fallback() function is not external" $ do
+    anns <- liftIO $ runTypechecker [r|
 
 contract A {
    fallback() internal payable {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
-  it "can throw exception when fallback() function is declared with function keyword" $
-    let anns = runTypechecker [r|
+  it "can throw exception when fallback() function is declared with function keyword" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract A {
    function fallback() external payable {
   }
 }
 |]
-    in length anns `shouldBe` 1
+   
+    length anns `shouldBe` 1
 
 
-  it "Supports pure functions in 3.3" $
-      let anns = runTypechecker [r|
+  it "Supports pure functions in 3.3" $ do
+    anns <- liftIO $ runTypechecker [r|
 contract C {
     function f(uint a, uint b) public pure returns (uint) {
         return a * (b + 42);
     }
 }
 |]
-      in length anns `shouldBe` 0
+     
+    length anns `shouldBe` 0
 
 
   describe "pure and view modifier for solidvm 3.4" $ do
-    it "can write pure and view functions" $
-      let anns = runTypechecker [r|
+    it "can write pure and view functions" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -902,9 +988,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "error when reading from contract state in a pure function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "error when reading from contract state in a pure function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -913,9 +1000,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 1
-    it "error when writing to contract state from a pure or view function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 1
+    it "error when writing to contract state from a pure or view function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -929,9 +1017,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
-    it "error when using assembly code from a pure or view function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 2
+    it "error when using assembly code from a pure or view function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -947,11 +1036,12 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      
+      length anns `shouldBe` 2
 
   describe "Check contract inheritance solidvm 3.3" $ do
-    it "can resolve state variables inherited from a contract" $
-      let anns = runTypechecker [r|
+    it "can resolve state variables inherited from a contract" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -962,9 +1052,10 @@ contract B is A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can resolve state variables from multiple layers of inheritance" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can resolve state variables from multiple layers of inheritance" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -977,9 +1068,10 @@ contract C is B {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can inherit from multiple contracts" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can inherit from multiple contracts" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -994,9 +1086,10 @@ contract C is A, B {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "error when referencing a state variable from a non-inherited contract" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "error when referencing a state variable from a non-inherited contract" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1007,12 +1100,13 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      
+      length anns `shouldBe` 2
 
 -- start of 3.2 tests
   describe "pure and view modifier for solidvm 3.2" $ do
-    it "can write pure and view functions" $
-      let anns = runTypechecker [r|
+    it "can write pure and view functions" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1024,9 +1118,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "Warns when reading from contract state in a pure function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "Warns when reading from contract state in a pure function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1035,9 +1130,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 1
-    it "Warns when writing to contract state from a pure or view function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 1
+    it "Warns when writing to contract state from a pure or view function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1051,9 +1147,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
-    it "Warns when using assembly code from a pure or view function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 2
+    it "Warns when using assembly code from a pure or view function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1069,11 +1166,12 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      
+      length anns `shouldBe` 2
 
   describe "Check contract inheritance" $ do
-    it "can resolve state variables inherited from a contract" $
-      let anns = runTypechecker [r|
+    it "can resolve state variables inherited from a contract" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1084,9 +1182,10 @@ contract B is A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can resolve state variables from multiple layers of inheritance" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can resolve state variables from multiple layers of inheritance" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1099,9 +1198,10 @@ contract C is B {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can inherit from multiple contracts" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can inherit from multiple contracts" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1116,9 +1216,10 @@ contract C is A, B {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can detect when referencing a state variable from a non-inherited contract" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can detect when referencing a state variable from a non-inherited contract" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1129,12 +1230,13 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      
+      length anns `shouldBe` 2
 
 
   describe "Constant function detectors" $ do
-    it "can write pure and view functions" $
-      let anns = runTypechecker [r|
+    it "can write pure and view functions" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1146,9 +1248,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "Warns when reading from contract state in a pure function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "Warns when reading from contract state in a pure function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1157,9 +1260,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 1
-    it "Warns when writing to contract state from a pure or view function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 1
+    it "Warns when writing to contract state from a pure or view function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1173,9 +1277,10 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
-    it "Warns when using assembly code from a pure or view function" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 2
+    it "Warns when using assembly code from a pure or view function" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 5;
@@ -1191,11 +1296,12 @@ contract A {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      
+      length anns `shouldBe` 2
 
   describe "Missing inheritance detectors" $ do
-    it "can resolve state variables inherited from a contract" $
-      let anns = runTypechecker [r|
+    it "can resolve state variables inherited from a contract" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1206,9 +1312,10 @@ contract B is A {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can resolve state variables from multiple layers of inheritance" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can resolve state variables from multiple layers of inheritance" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1221,9 +1328,10 @@ contract C is B {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can inherit from multiple contracts" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can inherit from multiple contracts" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1238,9 +1346,10 @@ contract C is A, B {
   }
 }
 |]
-       in length anns `shouldBe` 0
-    it "can detect when referencing a state variable from a non-inherited contract" $
-      let anns = runTypechecker [r|
+      
+      length anns `shouldBe` 0
+    it "can detect when referencing a state variable from a non-inherited contract" $ do
+      anns <- liftIO $ runTypechecker [r|
 
 contract A {
   uint x = 7;
@@ -1251,12 +1360,13 @@ contract B {
   }
 }
 |]
-       in length anns `shouldBe` 2
+      
+      length anns `shouldBe` 2
 
 
   describe "User Defined Value Types" $ do
-    it "must pass the associated type within the wrap function " $ 
-        let anns = runTypechecker [r|
+    it "must pass the associated type within the wrap function " $ do
+      anns <- liftIO $ runTypechecker [r|
   
   type MagicInt is int;
   type MysticalString is string;
@@ -1274,10 +1384,11 @@ contract B {
     MagicInt mrBool         = UBool.wrap(true);          //Error          -- passing wrong type to alias wrap function
     bool shouldThrowError   = UBool.wrap(true);         //Error           -- assigning user defined to bool variable
 }
-|] in length anns `shouldBe` 7
+|]
+      length anns `shouldBe` 7
 
-    it "can use user defined unwrap and unwrap" $
-      let anns = runTypechecker [r|
+    it "can use user defined unwrap and unwrap" $ do
+      anns <- liftIO $ runTypechecker [r|
   
   
   type MagicInt       is int;
@@ -1302,10 +1413,11 @@ contract B {
     string         banach   = MysticalString.unwrap(hilbert);
     string krull            = MysticalString.unwrap(MysticalString.wrap(string.concat("33",  banach)));
 }
-|] in length anns `shouldBe` 0
+|]
+      length anns `shouldBe` 0
 
-    it "can use user-defined-types wrap and unwrap within fuctions" $
-      let anns = runTypechecker [r|
+    it "can use user-defined-types wrap and unwrap within fuctions" $ do
+      anns <- liftIO $ runTypechecker [r|
   
   type UBool is bool;
   type MagicInt is int;
@@ -1320,11 +1432,12 @@ contract B {
       bool  felixKlein   =  UBool.unwrap(UBool.wrap(mrBool));
     }
 
-}|] in length anns `shouldBe` 0
+}|]
+      length anns `shouldBe` 0
 
   describe "function tests calling other contracts" $ do
-    it "can call type(C).name, type(C).creationCode, type(C).runtimeCode" $
-      let anns = runTypechecker [r|
+    it "can call type(C).name, type(C).creationCode, type(C).runtimeCode" $ do
+      anns <- liftIO $ runTypechecker [r|
 contract A {
   string endofunctor1 = type(A).name;
   string endofunctor2 = type(A).creationCode;
@@ -1341,27 +1454,30 @@ contract C {
   string endofunctor1 = type(A).name;
   string endofunctor2 = type(A).creationCode;
   string endofunctor3 = type(A).runtimeCode;
-} |]  in length anns `shouldBe` 0
+} |] 
+      length anns `shouldBe` 0
   
-    it "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $
-      let anns = runTypechecker [r|
+    it "type(C).name, type(C).creationCode, type(C).runtimeCode only produce strings" $ do
+      anns <- liftIO $ runTypechecker [r|
 contract A {
   int endofunctor1   = type(A).name;
   int endofunctor2   = type(A).creationCode;
   int groupoid       = type(A).runtimeCode;
 }
-|] in length anns `shouldBe` 3
+|]
+      length anns `shouldBe` 3
     
-    it "Can only call accounts and addresses with delegate call" $
-      let anns = runTypechecker [r|
+    it "Can only call accounts and addresses with delegate call" $ do
+      anns <- liftIO $ runTypechecker [r|
 contract A {
   int endofunctor1   = address(0xdeadbeef).delegatecall("garbage()");
   int endofunctor2   = type(A).delegatecall("garbage()");
 }
-|] in length anns `shouldBe` 1
+|]
+      length anns `shouldBe` 1
     
-    it "Can typecheck `using` expressions" $
-      let anns = runTypechecker [r|
+    it "Can typecheck `using` expressions" $ do
+      anns <- liftIO $ runTypechecker [r|
 library SafeMath {
   function add(uint a, uint b) returns (uint) {
     return a + b;
@@ -1373,4 +1489,5 @@ contract A {
     return _x.add(1);
   }
 }
-|] in anns `shouldBe` []
+|]
+      anns `shouldBe` []
