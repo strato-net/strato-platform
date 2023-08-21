@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useFormik } from "formik";
+import { useFormik, getIn } from "formik";
 import {
   Form,
   Modal,
@@ -14,7 +14,7 @@ import {
   Typography,
 } from "antd";
 import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
-// import getSchema from "./ProductSchema";
+import getSchema from "./MembershipSchema";
 // import useDebounce from "../UseDebounce";
 
 // Actions for the membership context
@@ -40,7 +40,6 @@ import { INVENTORY_STATUS } from "../../helpers/constants";
 const { Dragger } = Upload;
 
 const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
-  // const schema = getSchema();
   const limit = 10;
   // Can update these values for service search later on
   const [offset, setOffset] = useState(0);
@@ -53,7 +52,11 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const [visible, setVisible] = useState(false);
   
   // States for the membership context
-  const { isCreateProductSubmitting, isuploadImageSubmitting, isCreateMembershipSubmitting } = useMembershipState();
+  const {
+    isCreateProductSubmitting,
+    isuploadImageSubmitting,
+    isCreateMembershipSubmitting,
+  } = useMembershipState();
   const { services, isservicesLoading } = useServiceState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
@@ -97,7 +100,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
 
   const formik = useFormik({
     initialValues: initialValues,
-    // validationSchema: schema,
+    validationSchema: getSchema(visible),
     setFieldValue: (field, value) => {
       formik.setFieldValue(field, value);
     },
@@ -145,8 +148,8 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     updatedServices.push({
       serviceName: "",
       numberOfUses: "",
-      memberPrice: "",
-      percentDiscount: "",
+      memberPrice: null,
+      percentDiscount: null,
     });
     formik.setFieldValue("services", updatedServices);
   };
@@ -373,7 +376,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
               type="primary"
               className="ml-4 mr-8 px-10"
               onClick={openListNowModal}
-              disabled={disabled}
+              disabled={!formik.isValid || !formik.dirty}
             >
               {disabled ? <Spin /> : "List Now"}
             </Button>
@@ -404,6 +407,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   value={formik.values.name}
                   className="w-10/12"
                 />
+                {getIn(formik.touched, "name") &&
+                  getIn(formik.errors, "name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "name")}
+                    </span>
+                  )}
               </Form.Item>
               <Form.Item
                 label="Sub Category"
@@ -429,6 +438,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                       </Select.Option>
                     ))}
                 </Select>
+                {getIn(formik.touched, "subCategory") &&
+                  getIn(formik.errors, "subCategory") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "subCategory")}
+                    </span>
+                  )}
               </Form.Item>
               <Form.Item label="Duration (Months)" name="duration">
                 <InputNumber
@@ -442,6 +457,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   }}
                   className="w-10/12"
                 />
+                {getIn(formik.touched, "duration") &&
+                  getIn(formik.errors, "duration") && ( 
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "duration")}
+                    </span>
+                  )}
               </Form.Item>
               <Form.Item
                 label="Additional Information"
@@ -461,6 +482,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   value={formik.values.additionalInformation}
                   className=""
                 />
+                {getIn(formik.touched, "additionalInformation") &&
+                  getIn(formik.errors, "additionalInformation") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "additionalInformation")}
+                    </span>
+                  )}
               </Form.Item>
             </div>
 
@@ -482,15 +509,22 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                 title={previewTitle}
                 footer={null}
                 onCancel={() => setPreviewOpen(false)}
-              >
+                >
                 <img
                   alt="example"
                   style={{
                     width: "100%",
                   }}
                   src={previewImage}
-                />
+                  />
               </Modal>
+
+                  {getIn(formik.touched, "images") &&
+                    getIn(formik.errors, "images") && (
+                      <span className="text-error text-xs">
+                        {getIn(formik.errors, "images")}
+                      </span>
+                  )}
             </Form.Item>
             <Form.Item label="Description" name="description">
               <Input.TextArea
@@ -504,6 +538,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                 value={formik.values.description}
                 className=""
               />
+              {getIn(formik.touched, "description") &&
+                getIn(formik.errors, "description") && (
+                  <span className="text-error text-xs">
+                    {getIn(formik.errors, "description")}
+                  </span>
+                )}
             </Form.Item>
           </div>
 
@@ -558,6 +598,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                         </Select.Option>
                       ))}
                   </Select>
+                  {getIn(formik.touched, `services[${index}].serviceName`) &&
+                    getIn(formik.errors, `services[${index}].serviceName`) && (
+                      <span className="text-error text-xs">
+                        {getIn(formik.errors, `services[${index}].serviceName`)}
+                      </span>
+                    )}
                 </Form.Item>
                 <Form.Item
                   label="Number of Uses"
@@ -581,6 +627,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                     }}
                     className="w-10/12"
                   />
+                  {getIn(formik.touched, `services[${index}].numberOfUses`) &&
+                    getIn(formik.errors, `services[${index}].numberOfUses`) && (
+                      <span className="text-error text-xs">
+                        {getIn(formik.errors, `services[${index}].numberOfUses`)}
+                      </span>
+                    )}
                 </Form.Item>
                 <div className="col-span-2 flex flex-col items-center">
                   <Radio.Group
@@ -629,6 +681,13 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                       className="w-10/12"
                       addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
                     />
+                    {/* We should throw the formik error to say we need either the discount price or  */}
+                    {getIn(formik.touched, `services[${index}].memberPrice`) &&
+                      getIn(formik.errors, `services[${index}].memberPrice`) && (
+                        <span className="text-error text-xs">
+                          {getIn(formik.errors, `services[${index}].memberPrice`)}
+                        </span>
+                      )}
                   </Form.Item>
                 </div>
                 <Button
@@ -670,6 +729,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
+          getIn={getIn}
           isCreateMembershipSubmitting={isCreateMembershipSubmitting}
         />
       )}
