@@ -18,12 +18,14 @@ import { PlusOutlined, InboxOutlined, MinusOutlined } from "@ant-design/icons";
 import useDebounce from "../UseDebounce";
 //sub-categories
 import { actions } from "../../contexts/membership/actions";
+import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as serviceActions } from "../../contexts/service/actions";
 import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../contexts/membership";
 import { useServiceState, useServiceDispatch } from "../../contexts/service";
+import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
 import ListNowModal from "./ListNowModal";
 
 const { Dragger } = Upload;
@@ -33,7 +35,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const limit = 10;
   // Can update these values for service search later on
   const [offset, setOffset] = useState(0);
-  const dispatch = useMembershipDispatch();
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -41,12 +42,18 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const [fileList, setFileList] = useState([]);
   const [memberDiscount, setMemberDiscount] = useState([1]);
   const [visible, setVisible] = useState(false);
-
-  const { isCreateProductSubmitting, isuploadImageSubmitting, isCreateMembershipSubmitting } =
-    useMembershipState();
-
+  
+  // States for the membership context
+  const { isCreateProductSubmitting, isuploadImageSubmitting, isCreateMembershipSubmitting } = useMembershipState();
   const { services, isservicesLoading } = useServiceState();
+  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+
+  console.log(issubCategorysLoading, "categorys", subCategorys)
+
+  // Dispatch for the membership context
+  const dispatch = useMembershipDispatch();
   const serviceDispatch = useServiceDispatch();
+  const subCategoryDispatch = useSubCategoryDispatch();
 
   const queryValue = user.user.organization;
 
@@ -60,6 +67,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
     );
   }, [serviceDispatch, limit, offset, queryValue]);
 
+  useEffect(() => {
+    subCategoryActions.fetchSubCategory(
+      subCategoryDispatch,
+      "Membership"
+    );
+  }, [subCategoryDispatch]);
 
   const initialValues = {
     name: "",
@@ -366,8 +379,8 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   }}
                   value={formik.values.category}
                 >
-                  {categorys.map((category) => (
-                    <Select.Option key={category.name} value={category.id}>
+                  {!issubCategorysLoading && subCategorys.map((category) => (
+                    <Select.Option key={category.name} value={category.name}>
                       {category.name}
                     </Select.Option>
                   ))}
