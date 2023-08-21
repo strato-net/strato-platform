@@ -102,6 +102,7 @@ contract Product_4 is InventoryStatus {
         uint _vintage,
         InventoryStatus _status,
         uint _createdDate,
+        string _batchSerializationNumber,
         address _owner
     ) public returns (uint256, address) {
         if (ownerOrganization != getUserOrganization(_owner)) {
@@ -111,13 +112,14 @@ contract Product_4 is InventoryStatus {
         if (!isInventoryAvailable) {
             isInventoryAvailable = true;
         }
-        Inventory_6 inventory = new Inventory_6(
+        Inventory_7 inventory = new Inventory_7(
             category,
             _quantity,
             _pricePerUnit,
             _vintage,
             _status,
             _createdDate,
+            _batchSerializationNumber,
             _owner
         );
         return (RestStatus.OK, address(inventory));
@@ -134,7 +136,7 @@ contract Product_4 is InventoryStatus {
             return RestStatus.FORBIDDEN;
         }
 
-        Inventory_6 inventory = Inventory_6(_inventory);
+        Inventory_7 inventory = Inventory_7(_inventory);
         inventory.update(_pricePerUnit, _status, _scheme);
         return (RestStatus.OK);
     }
@@ -144,7 +146,7 @@ contract Product_4 is InventoryStatus {
         address _inventory,
         int _quantity
     ) public returns (uint256) {
-        Inventory_6 inventory = Inventory_6(_inventory);
+        Inventory_7 inventory = Inventory_7(_inventory);
         inventory.updateQuantity(_quantity);
         return (RestStatus.OK);
     }

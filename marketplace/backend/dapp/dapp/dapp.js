@@ -1,19 +1,16 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
+import constants, { CHARGES, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import StripeService from "/payment-service/stripe.service";
 import dayjs from 'dayjs';
 import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
-import itemJs from "/dapp/items/item";
 import orderJs from "/dapp/orders/order";
-import orderLineJs from "/dapp/orders/orderLine";
 
 import eventTypeJs from "/dapp/eventType/eventType";
 import eventTypeManagerJs from "/dapp/eventType/eventTypeManager";
-import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import userAddressJs from "/dapp/addresses/userAddress.js";
@@ -111,7 +108,6 @@ async function uploadContract(token, options) {
 
 async function getManagersAndCirrusInfo(admin, contract, options) {
   const state = await rest.getState(admin, contract, options);
-  const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
@@ -119,7 +115,7 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, paymentManager, orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -221,228 +217,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return certificateJs.getCertificates(admin, args);
   };
 
-  // ------------------------------ ITEMS --------------------------------
-  contract.addItem = async function (args, options = defaultOptions) {
-    const createdDate = Math.floor(Date.now() / 1000);
-    return managers.itemManager.addItem({ ...args.itemArgs, createdDate: createdDate, });
-  };
-  contract.updateItem = async function (args, options = defaultOptions) {
-    return managers.itemManager.updateItem(args);
-  };
-  contract.getItems = async function (args = {}, options = defaultOptions) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.itemManager.getItems({ ...args }, getOptions);
-  };
-
-  // ------------------------------ EVENTS --------------------------------
-  contract.createEvent = async function (args, options = optionsNoChainIds) {
-    try {
-
-      const { productId, serialNumbers } = args;
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
-      const eventBatchId = util.uid();
-      const createdDate = Math.floor(Date.now() / 1000);
-
-      const serialNosBatch = 200
-      const itemsAddressArr = []
-
-      for (let i = 0; i < serialNumbers.length; i += serialNosBatch) {
-        const serialNumberArr = serialNumbers.slice(i, i + serialNosBatch);
-
-        const items = await managers.itemManager.getItems({ productId: productId, serialNumber: serialNumberArr }, getOptions)
-
-        if (items.length != serialNumberArr.length) {
-          throw new rest.RestError(RestStatus.CONFLICT,
-            "Invalid serial numbers for product")
-        }
-        items.forEach(item => itemsAddressArr.push(item.address))
-      }
-
-      if (!args.certifier) args.certifier = constants.zeroAddress
-      return managers.itemManager.addEvent({ itemsAddress: itemsAddressArr, ...args, eventBatchId: eventBatchId, createdDate: createdDate, });
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Creating event");
-    }
-  };
-
-  // TODO:getEvents need to be revisited for performance related issues.
-  contract.getEvents = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = {
-      ...options,
-      org: managers.cirrusOrg,
-      app: contractName,
-    };
-
-    const { filterByCertifier, ...restArgs } = args
-    if (filterByCertifier) {
-      restArgs.certifier = rawAdmin.address;
-    }
-
-    const events = await managers.itemManager.getEvents({
-
-      ...restArgs,
-      limit: 3000,
-    }, getOptions);
-
-    const eventTypeIdSet = new Set()
-    const groupByEventBatchId = events.reduce((group, event) => {
-      const { eventBatchId } = event;
-      if (!group[eventBatchId]) {
-        group[eventBatchId] = {
-          eventTypeId: event.eventTypeId,
-          eventBatchId: event.eventBatchId,
-          summary: event.summary,
-          date: event.date,
-          certifier: event.certifier,
-          certifiedDate: event.certifiedDate,
-          certifierComment: event.certifierComment,
-          serialNo: [event.itemSerialNumber]
-        };
-      } else {
-        group[eventBatchId].serialNo.push(event.itemSerialNumber)
-      }
-      if (!eventTypeIdSet.has(event.eventTypeId)) {
-        eventTypeIdSet.add(event.eventTypeId)
-      }
-      return group;
-    }, {});
-
-    const eventTypes = await managers.eventTypeManager.getAll({
-
-      address: [...eventTypeIdSet],
-    }, getOptions);
-
-    const response = []
-    for (const key in groupByEventBatchId) {
-      if (Object.hasOwnProperty.call(groupByEventBatchId, key)) {
-        const element = groupByEventBatchId[key];
-        const eventTypeId = element.eventTypeId
-        const eventTypesData = eventTypes.find(eventType => eventType.address == eventTypeId);
-        element.eventTypename = eventTypesData.name
-        element.eventTypeDescription = eventTypesData.description
-        response.push(element)
-      }
-    }
-
-    const certifiers = response.map(({ certifier }) => certifier);
-    const users = await certificateJs.getCertificates(admin, { userAddress: certifiers });
-
-    const certifierUsersObj = users.reduce((acc, { commonName, userAddress }) => {
-      acc[userAddress] = { commonName, userAddress };
-      return acc;
-    }, {});
-
-    const updatedResponse = response.map(cert => {
-      const certifierUser = certifierUsersObj[cert.certifier];
-      if (certifierUser) cert.certifierName = certifierUser.commonName;
-      return cert;
-    });
-
-    return updatedResponse;
-  };
-
-
-  contract.getInventoryEventTypes = async function (args = {}, options = optionsNoChainIds) {
-    const { inventoryId } = args;
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
-    const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
-
-    const itemsAddress = items.map((item) => item.address);
-    const events = await managers.itemManager.getEvents({ limit: 3000, itemAddress: [...itemsAddress] }, getOptions);
-
-    const eventTypeIdSet = new Set()
-    events.forEach((event) => {
-      if (!eventTypeIdSet.has(event.eventTypeId)) {
-        eventTypeIdSet.add(event.eventTypeId)
-      }
-    });
-
-    const eventTypes = await managers.eventTypeManager.getAll({
-
-      address: [...eventTypeIdSet]
-    }, getOptions);
-
-    const response = eventTypes.map((eventType) => {
-      return {
-        eventTypeName: eventType.name,
-        eventTypeDescription: eventType.description,
-        eventTypeId: eventType.address
-      }
-    })
-
-    return response
-  };
-
-  contract.getInventoryEventTypeDetails = async function (args = {}, options = optionsNoChainIds) {
-    const { inventoryId, eventTypeId } = args;
-
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
-
-    const itemsAddress = items.map((item) => item.address);
-    const events = await managers.itemManager.getEvents({ limit: 3000, eventTypeId, itemAddress: [...itemsAddress] }, getOptions);
-
-    const groupByEventBatchId = events.reduce((group, event) => {
-      const { eventBatchId } = event;
-      if (!group[eventBatchId]) {
-        group[eventBatchId] = {
-          eventTypeId: event.eventTypeId,
-          eventBatchId: event.eventBatchId,
-          summary: event.summary,
-          date: event.date,
-          certifier: event.certifier,
-          certifiedDate: event.certifiedDate,
-          certifierComment: event.certifierComment,
-          serialNo: [event.itemSerialNumber]
-        };
-      } else {
-        group[eventBatchId].serialNo.push(event.itemSerialNumber)
-      }
-      return group;
-    }, {});
-
-    const eventType = await managers.eventTypeManager.get({
-
-      address: eventTypeId
-    }, getOptions);
-
-    const eventsData = []
-    for (const key in groupByEventBatchId) {
-      if (Object.hasOwnProperty.call(groupByEventBatchId, key)) {
-        const element = groupByEventBatchId[key];
-        eventsData.push(element)
-      }
-    }
-
-    const certifiers = eventsData.map(({ certifier }) => certifier);
-    const users = await certificateJs.getCertificates(admin, { userAddress: certifiers });
-
-    const certifierUsersObj = users.reduce((acc, { commonName, userAddress }) => {
-      acc[userAddress] = { commonName, userAddress };
-      return acc;
-    }, {});
-
-    const updatedEventsData = eventsData.map(cert => {
-      const certifierUser = certifierUsersObj[cert.certifier];
-      if (certifierUser) cert.certifierName = certifierUser.commonName;
-      return cert;
-    });
-
-    const response = {
-      eventTypeName: eventType.name,
-      eventTypeDescription: eventType.description,
-      events: updatedEventsData
-    }
-
-    return response;
-  };
-
-
   // --------------------------------- ASSETS ---------------------------------
   // ------------------------------ PRODUCT MANAGER --------------------------------
   contract.createProduct = async function (args, options = defaultOptions) {
@@ -459,10 +233,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createInventory = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const { ...restArgs } = args;
+    const newArgs = { ...restArgs, batchSerializationNumber: util.uid() }
     const quantity = args.quantity;
     const serialNumbers = []
 
-    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
+    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
     if (quantity === 0) {
@@ -472,20 +247,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ]
     }
 
-    const itemParams = {
-      quantity,
-      batchSerializationNumber: util.uid(),
-      createdDate,
-      productId: restArgs.productAddress,
-      status: restArgs.status,
-      inventoryId: createdInventoryAddress,
-    };
-    const [itemStatus, itemAddress] = await managers.itemManager.addItem(itemParams);
-
     return [
-      itemStatus,
+      createInventoryStatus,
       createdInventoryAddress,
-      itemAddress.slice(0, -1),
     ];
 
   };
@@ -496,13 +260,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.updateInventory = async function (args, options = defaultOptions) {
-    const { inventory: inventoryId } = args;
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
-    const itemsAddress = items.map((item) => item.address);
-    await managers.productManager.updateInventory(args);
-    const itemParams = { itemsAddress, status: args.updates.status, };
-    return await managers.itemManager.updateItem(itemParams);
+    return await managers.productManager.updateInventory(args);
   };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
@@ -555,57 +313,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions)
   }
 
-  contract.getItem = async function (args, options = optionsNoChainIds) {
-    return itemJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName });
-  };
-
-  contract.getItems = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return itemJs.getAll(rawAdmin, { ...args, }, getOptions);
-  };
-
-  contract.getItemOwnershipHistory = function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return itemJs.getAllOwnershipEvents(rawAdmin, { ...args, }, getOptions);
-  };
-
-  contract.transferOwnershipItem = async function (args, options = defaultOptions) {
-    const { address, chainId, newOwner } = args;
-    const contract = { name: itemJs.contractName, address: address, };
-    const chainOptions = { chainIds: [chainId], ...options };
-    return itemJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  };
-
-  contract.auditItem = async function (args, options = defaultOptions) {
-    const { address, chainId } = args;
-    const auditOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return itemJs.getHistory(rawAdmin, chainId, address, auditOptions);
-  };
-
-  contract.updateItem = async function (args, options = defaultOptions) {
-    const { address, chainId, updates } = args;
-    const contract = { name: itemJs.contractName, address: address, };
-    const chainOptions = { chainIds: [chainId], ...options };
-    return itemJs.update(rawAdmin, contract, updates, chainOptions);
-  };
-
-  contract.retireItem = async function (args, options = defaultOptions) {
-    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    const{ productId, inventoryId, ...newArgs } = args;
-    const items = await managers.itemManager.getItems({ productId: productId, inventoryId: inventoryId }, createOptions);
-    const itemAddress = items[0].address;
-    return managers.itemManager.retireItem({ itemAddress: itemAddress, ...newArgs}, rawAdmin, contract, options);
+  contract.retireCredits = async function (args, options = defaultOptions) {
+    return managers.productManager.retireCredits(args, rawAdmin, contract, options);
   }
-
-  contract.getRawMaterials = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.itemManager.getRawMaterials({
-
-      ...args,
-    },
-      getOptions
-    );
-  };
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
@@ -910,13 +620,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         // add orderLine for inventories
         for (const inventoryObject of inventory.data) {
           const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
-          const items = await managers.itemManager.getItems({ productId: inventoryObject.productId, inventoryId: inventoryObject.address }, createOptions);
 
           await managers.orderManager.addOrderLine({
             orderAddress,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
-            batchSerializationNumber: items[0].batchSerializationNumber,
+            batchSerializationNumber: inventoryObject.batchSerializationNumber,
             quantity: inventoryObject.quantity,
             pricePerUnit: inventoryObject.pricePerUnit,
             tax,
@@ -984,9 +693,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         for (let orderLine of orderLines) {
           const orderLineProductId = orderLine.productId;
           const orderLineInventoryId = orderLine.inventoryId;
-          const items = await managers.itemManager.getItems({ productId: orderLineProductId, inventoryId: orderLineInventoryId }, createOptions);
-          const itemsAddresses = items.map(_item => _item.address);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemsAddresses, newOwner, dappAddress, newQuantity: orderLine.quantity });
+          const [status, productId, inventoryId] = await managers.productManager.sellItems({ productId: orderLineProductId, inventoryId: orderLineInventoryId, newOwner, newQuantity: orderLine.quantity });
           result.push({ status, productId, inventoryId });
         }
         return result;
@@ -1015,20 +722,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
-
-      for (let i = 0; i < result.orderLines.length; i++) {
-        const { productId, inventoryId } = result.orderLines[i];
-        const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
-
-        if (items === null || items === undefined || items.length === 0) {
-          result.orderLines[i].containsSerialNumber = false;
-        }
-        else if (items.length > 0 && items[0].serialNumber == "") {
-          result.orderLines[i].containsSerialNumber = false;
-        } else {
-          result.orderLines[i].containsSerialNumber = true;
-        }
-      }
 
       const productIds = [
         ...new Set(result.orderLines.map((orderLines) => orderLines.productId)),
@@ -1089,9 +782,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const orderLine = await managers.orderManager.getOrderLine({ ...args, }, getOptions);
 
       const inventory = await contract.getInventory({ address: orderLine.inventoryId, });
-      // const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address, }, getOptions);
 
-      // return { ...inventory, items: orderLineItems, };
       return { ...inventory, items: [], };
     } catch (error) {
       if (error.response) {
@@ -1144,23 +835,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const contract = { name: eventJs.contractName, address: address, };
     const chainOptions = { chainIds: [chainId], ...options };
     return eventJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
-  };
-
-  contract.certifyEvent = async function (args, options = defaultOptions) {
-    const { eventBatchId, updates } = args;
-    const certifiedDate = Math.floor(Date.now() / 1000);
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const eventAddress = [];
-    const events = await managers.itemManager.getEvents({ eventBatchId: [...eventBatchId] }, getOptions);
-
-    events.forEach(event => {
-      if (event.certifiedDate !== null) {
-        throw new rest.RestError(RestStatus.CONFLICT, { message: "events are already certified" });
-      }
-      eventAddress.push(event.address)
-    });
-
-    return managers.itemManager.certifyEvent({ eventAddress, certifiedDate, updates });
   };
 
   contract.auditEvent = async function (args, options = defaultOptions) {

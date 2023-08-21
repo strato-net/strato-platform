@@ -8,6 +8,7 @@ contract ProductManager is InventoryStatus, RestStatus {
     // constructor() public {}
     mapping(address => mapping(string => bool))
         private uniqueSerialNumberByProductAddress;
+
     mapping(string => mapping(uint => address)) record orgToUPCToProduct;
 
     /////////////////////// carbon specific ///////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +78,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         Product_4 product = Product_4(_productAddress);
         return product.update(_description, _imageKey, _isActive, _scheme);
     }
+
     function deleteProduct(address _productAddress) returns (uint256, string) {
         Product_4 product = Product_4(_productAddress);
         return product.deleteProduct();
@@ -89,6 +91,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint _vintage,
         InventoryStatus _status,
         uint _createdDate,
+        string _batchSerializationNumber,
         string[] _serialNumbers
     ) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
@@ -96,7 +99,7 @@ contract ProductManager is InventoryStatus, RestStatus {
             address isUnique = checkForInventory(_vintage,_productAddress,_pricePerUnit,tx.origin);
             if(isUnique!=address(0))
             {
-                 Inventory_6 inventory = Inventory_6(isUnique);
+                 Inventory_7 inventory = Inventory_7(isUnique);
                  inventory.updateQuantityForVintages(inventory.availableQuantity()+_quantity);
                  return (RestStatus.OK, isUnique);
             }
@@ -107,6 +110,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                     _vintage,
                     _status,
                     _createdDate,
+                    _batchSerializationNumber,
                     tx.origin
                 );
         string _organization = getOrganization(tx.origin);
@@ -125,6 +129,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                                 uint _vintage,
                                 InventoryStatus _status,
                                 uint _createdDate,
+                                string _batchSerializationNumber,
                                 address _newOwner
                                 ) returns (uint256, address) {
         string _organization = getOrganization(_newOwner);
@@ -138,6 +143,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                                                         _vintage,
                                                         _status,
                                                         _createdDate,
+                                                        _batchSerializationNumber,
                                                         _newOwner
                                                     );
 
@@ -153,7 +159,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                         int _price
                         ) returns (uint256, address) {
 
-        Inventory_6 existingInventory = Inventory_6(_existingInventory);
+        Inventory_7 existingInventory = Inventory_7(_existingInventory);
         if(_quantity>existingInventory.availableQuantity() || _quantity<=0)
         {
             return (RestStatus.BAD_REQUEST, address(0));
@@ -166,6 +172,7 @@ contract ProductManager is InventoryStatus, RestStatus {
                                                                         existingInventory.vintage(),
                                                                         InventoryStatus.PUBLISHED,
                                                                         block.timestamp,
+                                                                        existingInventory.batchSerializationNumber(),
                                                                         tx.origin
                                                                         );
         return (status, inventoryAddress);
@@ -195,7 +202,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         bool _isReduce
     ) returns (uint256) {
         for (uint i = 0; i < _inventories.length; i++) {
-            Inventory_6 inventory = Inventory_6(_inventories[i]);
+            Inventory_7 inventory = Inventory_7(_inventories[i]);
 
             if (_isReduce) {
                 if (_quantities[i] > inventory.availableQuantity()) {
@@ -243,16 +250,121 @@ contract ProductManager is InventoryStatus, RestStatus {
         address _product,
         int _pricePerUnit,
         address _owner
-    ) public returns (address) 
-    
-    {
+    ) public returns (address) {
         string _organization = getOrganization(_owner);
 
-        if((_vintage !=0)  &&
-            (orgxProductxVintagexPricexInventory[_organization][_product][_vintage][_pricePerUnit]!= address(0)) )
-                {
-                    return orgxProductxVintagexPricexInventory[_organization][_product][_vintage][_pricePerUnit];
-                }
+        if (
+            (_vintage != 0) &&
+            (orgxProductxVintagexPricexInventory[_organization][_product][
+                _vintage
+            ][_pricePerUnit] != address(0))
+        ) {
+            return
+                orgxProductxVintagexPricexInventory[_organization][_product][
+                    _vintage
+                ][_pricePerUnit];
+        }
         return address(0);
+    }
+
+    function sellItems(
+        address _productId,
+        address _inventoryId,
+        address _newOwner,
+        int _newQuantity
+    ) public returns (uint, address, address) {
+        Product_4 product;
+        Inventory_7 inventory;
+
+        Product_4 oldProduct = Product_4(_productId);
+        address productAddress = checkForProduct(
+            oldProduct.uniqueProductCode(),
+            _newOwner
+        );
+
+        if (productAddress == address(0)) {
+            address addr = addProductForBuyer(
+                oldProduct.name(),
+                oldProduct.description(),
+                oldProduct.uniqueProductCode(),
+                oldProduct.imageKey(),
+                oldProduct.isActive(),
+                oldProduct.category(),
+                block.timestamp,
+                _newOwner
+            );
+            product = Product_4(addr);
+        } else {
+            product = Product_4(productAddress);
+        }
+
+        Inventory_7 oldInventory = Inventory_7(_inventoryId);
+
+        address uniqueInventoryAddress = checkForInventory(
+            oldInventory.vintage(),
+            productAddress,
+            oldInventory.pricePerUnit(),
+            _newOwner
+        );
+
+        //if no inventory is created before && vintage is invalid   );
+        if (uniqueInventoryAddress == address(0)) {
+            (uint256 status, address inventoryAddr) = addInventoryForBuyer(
+                address(product),
+                _newQuantity,
+                oldInventory.pricePerUnit(),
+                oldInventory.vintage(),
+                InventoryStatus.UNPUBLISHED,
+                block.timestamp,
+                oldInventory.batchSerializationNumber(),
+                _newOwner
+            );
+            inventory = Inventory_7(inventoryAddr);
+        } else {
+            //inventory retreived
+            Inventory_7 inventoryToBeAdded = Inventory_7(
+                uniqueInventoryAddress
+            );
+            int availableQuantity = inventoryToBeAdded.availableQuantity();
+            //quantity updated
+            uint256 status = inventoryToBeAdded.updateQuantityForVintages(
+                availableQuantity + _newQuantity
+            );
+            inventory = inventoryToBeAdded;
+        }
+
+        if (address(product) == address(0) || address(inventory) == address(0)) {
+            return (RestStatus.BAD_REQUEST, address(product), address(inventory) );
+        } 
+
+        return (RestStatus.OK, address(product), address(inventory));
+    }
+
+    function retireCredits(
+        address _inventoryId,
+        string _retiredBy,
+        string _retiredOnBehalfOf,
+        int _quantity,
+        string _purpose
+    ) returns (uint256, address) {
+        Inventory_7 inventory = Inventory_7(_inventoryId);
+        if (_quantity > inventory.availableQuantity()) {
+            return (RestStatus.BAD_REQUEST, address(0));
+        }
+
+        uint256 currentTimestamp = block.timestamp;
+        uint256 currentYear = (currentTimestamp / 31536000) + 1970;
+        if (inventory.vintage() > currentYear) {
+            return (RestStatus.BAD_REQUEST, address(0));
+        }
+
+        return
+            inventory.retireCredits(
+                _inventoryId,
+                _retiredBy,
+                _retiredOnBehalfOf,
+                _quantity,
+                _purpose
+            );
     }
 }

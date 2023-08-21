@@ -134,6 +134,23 @@ const reducer = (state, action) => {
         error: action.error,
         isLoadingStripeStatus: false
       };
+    case actionDescriptors.retireCredits:
+      return {
+        ...state,
+        isRetiringCredits: true
+      };
+    case actionDescriptors.retireCreditsSuccessful:
+      return {
+        ...state,
+        retiredCredits: action.payload,
+        isRetiringCredits: false
+      };
+    case actionDescriptors.retireCreditsFailed:
+      return {
+        ...state,
+        error: action.error,
+        isRetiringCredits: false
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

@@ -240,6 +240,7 @@ const UpdateInventoryModal = ({
                   name="vintage"
                   value={formik.values.vintage}
                   onChange={formik.handleChange}
+                  disabled={true}
                 />
                 {formik.touched.vintage && formik.errors.vintage && (
                   <span className="text-error text-xs">

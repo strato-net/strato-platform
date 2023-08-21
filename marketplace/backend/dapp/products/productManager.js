@@ -115,6 +115,12 @@ function bind(user, _contract, options) {
     updateInventory(user, contract, args, options);
   contract.deleteProduct = async (args) =>
     deleteProduct(user, contract, args, options);
+  contract.sellItems = async (args) =>
+    sellItems(user, contract, args, options);
+  contract.retireCredits = async (args) =>
+    retireCredits(user, contract, args, options);
+  contract.getRetiredItems = async (args, options) =>
+    inventoryJs.getAllRetiredItems(user, args, options);
   contract.updateInventoriesQuantities = async (args) =>
     updateInventoriesQuantities(user, contract, args, options);
   return contract;
@@ -397,6 +403,55 @@ async function getInventories(admin, contract, args = {}, options) {
   }
 }
 
+/**
+ * Sell items
+ */
+async function sellItems(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: 'sellItems',
+    args: util.usc(_args),
+  }
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  }
+
+  const [restStatus, itemAddress] = await rest.call(admin, callArgs, options)
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK) throw new rest.RestError(restStatus, 0, { callArgs })
+
+  return [restStatus, itemAddress];
+}
+
+/**
+ * Retire an item
+ */
+async function retireCredits(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "retireCredits",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, retiredItemAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, retiredItemAddress];
+}
+
 async function updateInventoriesQuantities(admin, contract, _args, baseOptions) {
 
   const callArgs = {
@@ -435,5 +490,7 @@ export default {
   createInventory,
   resellInventory,
   updateInventory,
-  updateInventoriesQuantities
+  updateInventoriesQuantities,
+  sellItems,
+  retireCredits
 };

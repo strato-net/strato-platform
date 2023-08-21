@@ -10,7 +10,6 @@ import {
   PieChartOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
-import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
@@ -119,13 +118,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                     </div>
                     <div
                       className="flex items-center mt-2 cursor-pointer"
-                      onClick={showModalEdit}
-                    >
-                      <PlusOutlined />
-                      <p className="ml-3">Add Event</p>
-                    </div>
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
                       onClick={showEditModal}
                     >
                       <EditOutlined />
@@ -193,24 +185,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               {inventory.vintage === 0 ? "N/A" : inventory.vintage}
             </p>
           </div>
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Serial Numbers</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <div
-              className="flex items-center cursor-pointer ml-3"
-              onClick={() => {
-                navigate(
-                  `${routes.Items.url}?inventoryId=${inventory.address}`,
-                  { state: { productName: inventory.name } }
-                );
-              }}
-            >
-              <EyeOutlined />
-              <p className="text-secondryB text-sm ml-2">View</p>
-            </div>
-          </div>
           <div className="flex mt-2.5">
             <div
               className={classNames(
@@ -242,9 +216,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           inventory={inventory}
           category={category}
         />
-      )}
-      {openEdit && (
-        <AddEventModal open={openEdit} handleCancel={handleCancelEdit} inventoryId={inventory.address} productId={inventory.productId} />
       )}
       {editModalOpen && (
         <UpdateInventoryModal

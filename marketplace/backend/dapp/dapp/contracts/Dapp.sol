@@ -7,7 +7,6 @@ import "/dapp/eventType/contracts/EventType.sol";
 import "/dapp/eventType/contracts/EventTypeManager.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
 import "/dapp/items/contracts/Event.sol";
-import "/dapp/items/contracts/ItemManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
 import "/dapp/orders/contracts/OrderManager.sol";
 /**
@@ -29,7 +28,6 @@ contract Dapp {
     // OrganizationManager organizationManager;
     // MembershipManager membershipManager;
     // UserManager userManager;
-    ItemManager itemManager;
     ProductManager public productManager;
     EventTypeManager_10 eventTypeManager;
     PaymentManager paymentManager;
@@ -49,7 +47,6 @@ contract Dapp {
         bootUserOrganization = userCert["organization"];
         bootUserOrganizationalUnit = userCert["organizationalUnit"];
         orderManager = new OrderManager();
-        itemManager = new ItemManager();
         productManager = new ProductManager();
         eventTypeManager = new EventTypeManager_10();
         paymentManager = new PaymentManager();

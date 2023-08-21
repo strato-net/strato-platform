@@ -24,7 +24,10 @@ const actionDescriptors = {
   onboardSellerToStripeFailed: "onboard_seller_to_stripe_failed",
   sellerStripeStatus: "seller_stripe_status",
   sellerStripeStatusSuccessful: "seller_stripe_status_successful",
-  sellerStripeStatusFailed: "seller_stripe_status_failed"
+  sellerStripeStatusFailed: "seller_stripe_status_failed",
+  retireCredits: "retire_credits",
+  retireCreditsSuccessful: "retire_credits_successful",
+  retireCreditsFailed: "retire_credits_failed"
 };
 
 const actions = {
@@ -318,6 +321,52 @@ const actions = {
         type: actionDescriptors.sellerStripeStatusFailed,
         error: "Error while trying to get Stripe status",
       });
+    }
+  },
+
+  retireCredits: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.retireCredits });
+    try {
+      const response = await fetch(`${apiUrl}/inventory/retire`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.retireCreditsSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Credits retired successfully", true);
+        return true;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.retireCreditsFailed,
+          error: "Error while retiring Credits",
+        });
+        actions.setMessage(dispatch, "Error while retiring Credits");
+        return false;
+      }
+
+      dispatch({
+        type: actionDescriptors.retireCreditsFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.retireCreditsFailed,
+        error: "Error while retiring Credits",
+      });
+      actions.setMessage(dispatch, "Error while retiring Credits");
     }
   },
 

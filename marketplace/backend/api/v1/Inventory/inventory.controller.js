@@ -97,29 +97,20 @@ class InventoryController {
     }
   }
 
-  // static async audit(req, res, next) {
-  //   try {
-  //     const { dapp, params } = req
-  //     const { address, chainId } = params
+  static async retire(req, res, next) {
+    try {
+      const { dapp, body } = req
 
-  //     const result = await dapp.auditInventory({ address, chainId }, options)
-  //     rest.response.status200(res, result)
-  //   } catch (e) {
-  //     return next(e)
-  //   }
-  // }
+      InventoryController.validateRetireCreditsArgs(body)
 
-  // static async transferOwnership(req, res, next) {
-  //   try {
-  //     const { dapp, body } = req
+      const result = await dapp.retireCredits(body)
+      rest.response.status200(res, result)
 
-  //     InventoryController.validateTransferOwnershipArgs(body)
-  //     const result = await dapp.transferOwnershipInventory(body, options)
-  //     rest.response.status200(res, result)
-  //   } catch (e) {
-  //     return next(e)
-  //   }
-  // }
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
 
   // ----------------------- ARG VALIDATION ------------------------
@@ -131,10 +122,9 @@ class InventoryController {
       pricePerUnit: Joi.number().integer().greater(0).required(),
       vintage: Joi.number().integer().min(2020).max(2040).allow(0),
       status: Joi.number().integer().min(1).max(2).required(),
-      batchSerializationNumber: Joi.string().required()
     });
 
-    
+
     const validation = createInventorySchema.validate(args);
 
     if (validation.error) {
@@ -198,6 +188,27 @@ class InventoryController {
       })
     }
   }
+
+  static validateRetireCreditsArgs(args) {
+    const retireCreditsSchema = Joi.object({
+      inventoryId: Joi.string().required(),
+      retiredBy: Joi.string().required(),
+      retiredOnBehalfOf: Joi.string().required(),
+      quantity: Joi.number().integer().min(0).required(),
+      purpose: Joi.string().required()
+    });
+
+    const validation = retireCreditsSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Retire Credits Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
 }
+
+
 
 export default InventoryController

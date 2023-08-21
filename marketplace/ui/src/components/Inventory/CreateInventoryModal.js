@@ -59,7 +59,6 @@ const CreateInventoryModal = ({
     quantity: null,
     pricePerUnit: "",
     vintage: 0,
-    batchSerializationNumber: " ",
     status: true,
   };
 
@@ -98,7 +97,6 @@ const CreateInventoryModal = ({
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-      batchSerializationNumber: " ",
     };
 
     TagManager.dataLayer({

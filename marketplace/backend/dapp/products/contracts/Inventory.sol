@@ -1,9 +1,10 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
+import "./RetiredItem.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory_6 is InventoryStatus {
+contract Inventory_7 is InventoryStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -18,6 +19,7 @@ contract Inventory_6 is InventoryStatus {
     int public availableQuantity;
     InventoryStatus public status;
     uint public createdDate;
+    string public batchSerializationNumber;
     int public retiredQuantity;
 
     constructor(
@@ -27,6 +29,7 @@ contract Inventory_6 is InventoryStatus {
         uint _vintage,
         InventoryStatus _status,
         uint _createdDate,
+        string _batchSerializationNumber,
         address _owner
     ) public {
         owner = _owner;
@@ -40,6 +43,7 @@ contract Inventory_6 is InventoryStatus {
         availableQuantity = _quantity;
         status = _status;
         createdDate = _createdDate;
+        batchSerializationNumber = _batchSerializationNumber;
         retiredQuantity = 0;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -84,13 +88,35 @@ contract Inventory_6 is InventoryStatus {
     function updateRetiredQuantity(int _quantity) returns (uint) {
         availableQuantity = availableQuantity - _quantity;
         retiredQuantity = retiredQuantity + _quantity;
+    }
+
+    function updateQuantityForVintages(int _quantity) returns (uint) {
+        quantity = _quantity;
+        availableQuantity = _quantity;
         return RestStatus.OK;
     }
 
-    function updateQuantityForVintages(int _quantity) returns(uint){
-      quantity = _quantity;
-      availableQuantity = _quantity;
-      return RestStatus.OK;
+    function retireCredits(
+        address _inventoryId,
+        string _retiredBy,
+        string _retiredOnBehalfOf,
+        int _quantity,
+        string _purpose
+    ) public returns (uint256, address) {
+        RetiredItem_2 retiredItem = new RetiredItem_2(
+            _inventoryId,
+            _retiredBy,
+            _retiredOnBehalfOf,
+            _quantity,
+            _purpose,
+            block.timestamp,
+            batchSerializationNumber
+        );
+
+        availableQuantity = availableQuantity - _quantity;
+        retiredQuantity = retiredQuantity + _quantity;
+
+        return (RestStatus.OK, address(retiredItem));
     }
 
     // Get the userOrganization
