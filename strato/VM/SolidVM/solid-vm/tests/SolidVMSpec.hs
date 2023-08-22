@@ -7238,27 +7238,6 @@ contract qq is Parent {
 |] 
     getFields ["x"] `shouldReturn` [BInteger 9]
 
-  it "can use virtual and override" . runTest $ do
-    runBS [r|
-
-contract Parent {
-  uint x = 7;
-  function myVirtualFunc() virtual {
-    x = 8;
-  }
-}
-
-contract qq is Parent {
-  function myVirtualFunc() override {
-    x = 9;
-  }
-  constructor() {
-    myVirtualFunc();
-  }
-}
-|] 
-    getFields ["x"] `shouldReturn` [BInteger 9]
-
   it "can parse variadic arguments" . runTest $ do
     runBS [r|
 contract qq {
