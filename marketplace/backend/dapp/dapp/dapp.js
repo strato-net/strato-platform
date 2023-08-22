@@ -617,7 +617,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ownerOrganization: userOrganization
     }, getOptions);
     console.log('dapp.getProperty - productData', productData)
-    const reviews = await managers.reviewManager.getProduct({
+    const reviews = await managers.reviewManager.getReview({
       productId: property.productId,
       propertyId: property.address,
       ownerOrganization: userOrganization

@@ -47,8 +47,6 @@ const WriteReviewModal = (props) => {
       ]}
     >
       <Form name="basic" form={form} layout="vertical">
-        <Row gutter={24}>
-          <Col span={12}>
             <Form.Item
               label="Name"
               name="name"
@@ -61,20 +59,6 @@ const WriteReviewModal = (props) => {
             >
               <Input onChange={(e) => { handleChange("name", e.target.value) }} />
             </Form.Item>
-          </Col>
-        </Row>
-        <Form.Item
-          label="Title"
-          name="title"
-          rules={[
-            {
-              required: true,
-              message: "Please input a title!",
-            },
-          ]}
-        >
-          <Input onChange={(e) => { handleChange("title", e.target.value) }} />
-        </Form.Item>
         <Form.Item
           label="How would you rate the property?"
           name="rating"
@@ -88,6 +72,18 @@ const WriteReviewModal = (props) => {
           <Rate onChange={(e) => { handleChange("rating", e.target.value) }} />
         </Form.Item>
         <Form.Item
+          label="Title"
+          name="title"
+          rules={[
+            {
+              required: true,
+              message: "Please input a title!",
+            },
+          ]}
+        >
+          <Input onChange={(e) => { handleChange("title", e.target.value) }} />
+        </Form.Item>
+        <Form.Item
           label="What do you think of the property?"
           name="comments"
           rules={[
@@ -97,7 +93,7 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <TextArea rows={4} onChange={(e) => { handleChange("description", encodeURIComponent(e.target.value)) }} />
+          <TextArea rows={4} style={{resize: 'none'}} onChange={(e) => { handleChange("description", encodeURIComponent(e.target.value)) }} />
         </Form.Item>
       </Form>
     </Modal>

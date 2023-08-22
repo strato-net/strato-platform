@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Button, Typography, Space, Avatar, Form, Col, notification } from "antd";
 import { UserOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
-import { actions } from "../../../contexts/propertyContext/actions";
+import { actions } from "../../../../contexts/propertyContext/actions";
 import {
   usePropertiesDispatch,
   usePropertiesState,
-} from "../../../contexts/propertyContext";
-import { useAuthenticateState } from "../../../contexts/authentication";
+} from "../../../../contexts/propertyContext";
+import { useAuthenticateState } from "../../../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import WriteReviewModal from "../review/WriteReviewModal";
 import ReviewCard from "./ReviewCard";
@@ -26,8 +26,8 @@ const ReviewTab = (props) => {
   const { message, success, isReviewAdding } = usePropertiesState();
 
   useEffect(() => {
-    const listOfReviews = reviews.forEach((review) => {
-      review.readmore = false
+    const listOfReviews = reviews?.map((review) => {
+      return { ...review, readmore: false }
     })
     setReviewList(listOfReviews)
   }, [reviews]);

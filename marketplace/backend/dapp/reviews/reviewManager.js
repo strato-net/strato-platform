@@ -107,7 +107,7 @@ function bind(user, _contract, options) {
  * get the reviews
  */
 async function getReview(user, args, options) {
-  return productDocumentJs.get(user, args, options);
+  return reviewJs.get(user, args, options);
 }
 
 // * Add the reviews
