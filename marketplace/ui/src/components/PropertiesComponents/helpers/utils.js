@@ -23,3 +23,38 @@ decodeURIComponent(text.comments).replace(/%0A/g, "\n").split('\n').map((line, i
     <br />
   </React.Fragment>
 ))}
+
+
+//convert unix timestamp to human readable date
+export function unixToDate(unixTimestamp) {
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const date = new Date(unixTimestamp * 1000); // Convert to milliseconds
+  const month = months[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+
+  const daySuffix = getDaySuffix(day);
+
+  return `${month} ${day}${daySuffix}, ${year}`;
+}
+
+function getDaySuffix(day) {
+  if (day >= 11 && day <= 13) {
+    return "th";
+  }
+
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}

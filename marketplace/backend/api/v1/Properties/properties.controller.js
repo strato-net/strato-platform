@@ -94,9 +94,10 @@ class PropertiesController {
   static async createReview(req, res, next) {
     try {
       const { dapp, body } = req
-
+      console.log('createReview body', body)
       PropertiesController.validateCreateReviewArgs(body)
       const result = await dapp.createReview(body)
+      console.log('createReview - result', result)
       rest.response.status200(res, result)
 
       return next()
@@ -235,7 +236,6 @@ class PropertiesController {
 
   static validateCreateReviewArgs(args) {
     const createReviewSchema = Joi.object({
-      reviewArgs: Joi.object({
         productId: Joi.string().required(),
         propertyId: Joi.string().required(),
         reviewerAddress: Joi.string().required(),
@@ -243,7 +243,6 @@ class PropertiesController {
         title: Joi.string().required(),
         description: Joi.string().required(),
         rating: Joi.number().required(),
-      })
     });
 
     const validation = createReviewSchema.validate(args);

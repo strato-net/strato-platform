@@ -1,8 +1,8 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "./Review.sol";
 
-/// @title A representation of ProductManager to manage product and inventory
-contract ReviewManager {
+/// @title A representation of ReviewManager to manage reviews
+contract ReviewManager_0_1 {
     // constructor() public {}
 
     function createReview(
@@ -12,11 +12,11 @@ contract ReviewManager {
         string _reviewerName,
         string _title,
         string _description,
-        string _rating,
+        uint _rating,
         uint _createdDate,
-        int _delDate
+        uint _delDate
     ) returns (uint256, address) {
-        Review review = new Review(
+        Review_0_2 review = new Review_0_2(
             _productId,
             _propertyId,
             _reviewerAddress,
@@ -32,7 +32,7 @@ contract ReviewManager {
     }
 
     function deleteReview(address _reviewAddress) returns (uint256, string) {
-        Review review = Review(_reviewAddress);
+        Review_0_2 review = Review_0_2(_reviewAddress);
         return review.deleteReview();
     }
 }

@@ -11,7 +11,7 @@ import dayjs from "dayjs";
 
 import reviewJs from "./review";
 
-const contractName = "ReviewManager";
+const contractName = "ReviewManager_0_1";
 const contractFilename = `${util.cwd}/dapp/reviews/contracts/ReviewManager.sol`;
 
 /**
@@ -96,6 +96,8 @@ function bind(user, _contract, options) {
   contract.getState = async () => getState(user, contract, options);
   contract.getReview = async (args, _options = defaultOptions) =>
     getReview(user, args, _options);
+    contract.getReviews = async (args, _options = defaultOptions) =>
+    getReviews(user, args, _options);
   contract.createReview = async (args) =>
     createReview(user, contract, args, options);
   contract.deleteReview = async (args) =>
@@ -107,11 +109,17 @@ function bind(user, _contract, options) {
  * get the reviews
  */
 async function getReview(user, args, options) {
+  console.log('review-manager getReview', args)
   return reviewJs.get(user, args, options);
+}
+
+async function getReviews(user, args, options) {
+  return reviewJs.getAll(user, args, options);
 }
 
 // * Add the reviews
 async function createReview(admin, contract, _args, baseOptions) {
+  console.log('review-manager createReview', _args)
   const callArgs = {
     contract,
     method: "createReview",

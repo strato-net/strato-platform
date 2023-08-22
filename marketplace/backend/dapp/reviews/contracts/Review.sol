@@ -3,16 +3,16 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of Review assets
-contract Review {
+contract Review_0_2 {
     address public productId;
     address public propertyId;
     address public reviewerAddress;
     string public reviewerName;
     string public title;
     string public description;
-    string public rating;
+    uint public rating;
     uint public createdDate;
-    int public delDate;
+    uint public delDate;
 
     constructor(
     address _productId,
@@ -21,12 +21,12 @@ contract Review {
     string _reviewerName,
     string _title,
     string _description,
-    string _rating,
+    uint _rating,
     uint _createdDate,
-    int _delDate
+    uint _delDate
     ) public {
         productId = _productId;
-        productId = _propertyId;
+        propertyId = _propertyId;
         reviewerAddress = _reviewerAddress;
         reviewerName = _reviewerName;
         title = _title;

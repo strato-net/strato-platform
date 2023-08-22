@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Review';
+const contractName = 'Review_0_2';
 const contractFilename = `${util.cwd}/dapp/reviews/contracts/Review.sol`;
 /** 
  * Upload a new review 
@@ -153,7 +153,7 @@ async function get(user, args, options) {
     const { productId, propertyId, ...restArgs } = args;
     let review;
 
-    if (address) {
+    if (productId) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'propertyId', value: propertyId });
         review = await searchOne(contractName, searchArgs, options, user);
     } else {
@@ -164,10 +164,14 @@ async function get(user, args, options) {
         return undefined;
     }
 
-
     return marshalOut({
         ...review,
     });
+}
+
+async function getAll(admin, args = {}, options) {
+    const reviews = await searchAllWithQueryArgs(contractName, args, options, admin)
+    return reviews.map((review) => marshalOut(review))
 }
 
 /**
@@ -185,6 +189,7 @@ export default {
     contractFilename,
     bindAddress,
     get,
+    getAll,
     marshalIn,
     marshalOut,
     getHistory

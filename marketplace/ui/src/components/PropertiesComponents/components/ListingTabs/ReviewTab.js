@@ -13,7 +13,7 @@ import ReviewCard from "./ReviewCard";
 
 const ReviewTab = (props) => {
   const { reviews } = props
-
+  console.log(reviews)
   const dispatch = usePropertiesDispatch();
 
   const [open, setOpen] = useState(false);
@@ -22,18 +22,26 @@ const ReviewTab = (props) => {
 
   const [api, contextHolder] = notification.useNotification();
 
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const { message, success, isReviewAdding } = usePropertiesState();
 
   useEffect(() => {
-    const listOfReviews = reviews?.map((review) => {
-      return { ...review, readmore: false }
+    const listOfReviews = []
+    reviews?.forEach((review) => {
+      listOfReviews.push({ ...review, readmore: false })
     })
     setReviewList(listOfReviews)
   }, [reviews]);
 
   const handleSubmit = async () => {
-    actions.createReview(dispatch, form.getFieldsValue());
+    const reviewForm = {
+      ...form.getFieldsValue(),
+      productId: props.productId,
+      propertyId: props.propertyId,
+      reviewerAddress: user.userAddress
+    };
+    console.log(reviewForm)
+    actions.createReview(dispatch, reviewForm);
   };
 
   const handleCancel = () => {
@@ -69,7 +77,7 @@ const ReviewTab = (props) => {
       {contextHolder}
       {message && openToast("bottom")}
       <Col style={{ width: '400px' }}>
-        <Button block onClick={() => {
+        <Button block type="primary" onClick={() => {
           TagManager.dataLayer({
             dataLayer: {
               event: 'PROPERTIES_OPEN_WRITE_REVIEW',
@@ -91,7 +99,7 @@ const ReviewTab = (props) => {
           handleSubmit={handleSubmit}
         />
         <div style={{ margin: "10px" }}>
-          {reviews?.map((review, index) => {
+          {reviewsList?.map((review, index) => {
             return <ReviewCard
               review={review}
               index={index}

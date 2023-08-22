@@ -21,6 +21,7 @@ import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
 import reviewManagerJs from '/dapp/reviews/reviewManager';
+import { prop } from "ramda";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -29,7 +30,7 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
 ];
 
-const contractName = "Dapp";
+const contractName = "Dapp_0_1";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
@@ -617,10 +618,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ownerOrganization: userOrganization
     }, getOptions);
     console.log('dapp.getProperty - productData', productData)
-    const reviews = await managers.reviewManager.getReview({
+    console.log('dapp.getProperty - property.address', property.address)
+    const reviews = await managers.reviewManager.getReviews({
       productId: property.productId,
       propertyId: property.address,
-      ownerOrganization: userOrganization
     }, getOptions);
     console.log('dapp.getProperty - reviews', reviews)
     const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
@@ -783,8 +784,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // Create reviews
   contract.createReview = async function (args, options = defaultOptions) {
+    console.log('dapp.createReview - args', args)
     const createdDate = Math.floor(Date.now() / 1000);
-    return managers.reviewManager.createReview({ ...args, createdDate: createdDate });
+    return managers.reviewManager.createReview({ ...args, createdDate: createdDate, delDate: 0 });
   }
 
   // Delete reviews by the productId/productAddress

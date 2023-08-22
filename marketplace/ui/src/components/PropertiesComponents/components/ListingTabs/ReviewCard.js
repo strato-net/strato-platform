@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Button, Typography, Space, Avatar, Form, Col } from "antd";
 import { UserOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
-import { decodeURIComponentText } from "../../helpers/utils";
+import { decodeURIComponentText, unixToDate } from "../../helpers/utils";
 
 const ReviewCard = (props) => {
-  const { review: { name, title, date, description, readmore }, index } = props
-
+  const { review: { reviewerName, title, createdDate, rating, description, readmore }, index } = props
+  console.log('ReviewCard', props.review)
   return (
     <>
       <Space
@@ -18,7 +18,7 @@ const ReviewCard = (props) => {
           <Typography.Text type="secondary">
             <Avatar size="small" icon={<UserOutlined />} />
             <Typography.Text type="secondary" style={{ padding: "8px" }}>
-              {name}
+              {reviewerName}
             </Typography.Text>
           </Typography.Text>
           {/* edit & delete buttons, that we have to use after login functionality */}
@@ -35,12 +35,12 @@ const ReviewCard = (props) => {
                 />
               </div> */}
         </div>
-        <Typography.Text type="secondary">Reviewed on {date}</Typography.Text>
+        <Typography.Text type="secondary">Reviewed on {unixToDate(createdDate)}</Typography.Text>
         <Typography.Text style={{ position: "relative", top: '10px' }} strong>{title}</Typography.Text>
         <Typography.Text>
           {readmore
             ? decodeURIComponentText(description)
-            : decodeURIComponentText(description).slice(0, 100)}
+            : decodeURIComponentText(description)?.slice(0, 100)}
         </Typography.Text>
         {
           description?.length > 100 ?
