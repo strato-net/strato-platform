@@ -1020,14 +1020,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
         const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
 
-        const [membership] = await managers.membershipManager.createMembership({ 
+        const [ status, address ] = await managers.membershipManager.createMembership({ 
           dappAddress: contract.address,
           membershipArgs: membershipArgs, 
           membershipServiceArgs: membershipServiceArgs, 
           productFileArgs: productFileArgs
         });
 
-        return { membership };
+        return { status, address };
     } catch (error) {
         if (error.response) {
             throw new rest.RestError(error.response.status, error.response.statusText);

@@ -73,7 +73,8 @@ const actions = {
           payload: body.data,
         });
         actions.setMessage(dispatch, "Membership created successfully", true)
-        return true;
+        console.log("Membership created successfully ======= body", body)
+        return body.data
       }
 
       dispatch({ type: actionDescriptors.createMembershipFailed, error: 'Error while creating Membership' });
@@ -86,11 +87,11 @@ const actions = {
     }
   },
 
-  fetchMembershipDetails: async (dispatch, id, chainId) => {
+  fetchMembershipDetails: async (dispatch, id) => {
     dispatch({ type: actionDescriptors.fetchMembershipDetails });
 
     try {
-      const response = await fetch(`${apiUrl}/membership/${id}/${chainId}`, {
+      const response = await fetch(`${apiUrl}/membership/${id}`, {
         method: HTTP_METHODS.GET
       });
 
@@ -102,7 +103,7 @@ const actions = {
           payload: body.data,
         });
 
-        return true;
+        return body.data;
       }
 
       dispatch({ type: actionDescriptors.fetchMembershipDetailsFailed, error: 'Error while fetching Membership' });
