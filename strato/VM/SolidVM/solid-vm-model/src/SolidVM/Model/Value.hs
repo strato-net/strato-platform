@@ -135,6 +135,7 @@ data Value =
   | SBreak
   | SContinue
   | SBytes ByteString
+  | SVariadic [Value]
   deriving (Show)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing

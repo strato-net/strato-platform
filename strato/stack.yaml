@@ -1,6 +1,7 @@
 packages:
 - api/bloc/bloc2
 - api/bloc/bloc2api
+- api/bloc/bloc2client
 - api/core
 - api/ethereum-jsonrpc
 - api/strato-api
@@ -29,6 +30,10 @@ packages:
 - core/vm-runner/
 - core/vm-tools/
 
+- identity-provider/api
+- identity-provider/server
+- identity-provider/client
+
 - indexer/slipstream
 - indexer/strato-index
 
@@ -39,6 +44,7 @@ packages:
 - libs/common-log
 - libs/composable-monads/kafka-monad
 - libs/composable-monads/sql-monad
+- libs/composable-monads/identity-monad
 - libs/composable-monads/vault-monad
 - libs/ethereum-rlp
 - libs/format

@@ -43,7 +43,7 @@ data SourceAnnotation a = SourceAnnotation
   { _sourceAnnotationStart      :: SourcePosition
   , _sourceAnnotationEnd        :: SourcePosition
   , _sourceAnnotationAnnotation :: a
-  } deriving (Eq, Generic, Functor, Data, NFData)
+  } deriving (Eq, Ord, Generic, Functor, Data, NFData)
 
 makeLenses ''SourceAnnotation
 
