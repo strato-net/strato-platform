@@ -10,7 +10,6 @@ services:
     - IDENTITYPROVIDER_DEBUG=${IDENTITYPROVIDER_DEBUG}
     - identityProviderPort=${identityProviderPort}
     - vaultProxyUrl=${vaultProxyUrl}
-    - nodeUrl=${nodeUrl}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}

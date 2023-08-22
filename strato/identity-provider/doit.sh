@@ -26,14 +26,10 @@ function runIdentityServer {
   --minLogLevel="${minLogLevel}" \
   --port="${identityProviderPort}"
   --vaultProxyUrl="${vaultProxyUrl}"
-  --nodeUrl="${nodeUrl}"
   "
   
   if [ -n "${vaultProxyUrl}" ]; then
       vpFlag="--vaultProxyUrl=${vaultProxyUrl}"
-  fi
-  if [ -n "${nodeUrl}" ]; then
-      nuFlag="--nodeUrl=${nodeUrl}"
   fi
   if [ -n "${SENDGRID_APIKEY}" ]; then
       sgFlag="--SENDGRID_APIKEY=${SENDGRID_APIKEY}"
@@ -65,7 +61,7 @@ function runIdentityServer {
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
     --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
-    "${vpFlag}" "${nuFlag}" "${sgFlag}" &>> logs/identity-provider-server
+    "${vpFlag}" "${sgFlag}" &>> logs/identity-provider-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
