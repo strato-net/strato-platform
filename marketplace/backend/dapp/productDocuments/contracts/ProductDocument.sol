@@ -1,7 +1,6 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 
-
 /// @title A representation of Product assets
 contract ProductDocument {
     address public productId;
@@ -39,6 +38,6 @@ contract ProductDocument {
     // Delete the product document
     function deleteProductDocument() public returns (uint256, string) {
         delDate = block.timestamp;
-        return (RestStatus.OK, "ProductDocunent is deleted successfully.");
+        return (RestStatus.OK, "ProductDocument is deleted successfully.");
     }
 }

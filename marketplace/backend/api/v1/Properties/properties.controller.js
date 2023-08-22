@@ -2,7 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3, deleteFileFromS3 } from '../../../helpers/s3'
+import { getSignedUrlFromS3, deleteFileFromS3, uploadFileToS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
@@ -74,30 +74,30 @@ class PropertiesController {
         /* -------upload the documents and images if necessary-------- */
         if (files) {
           files.forEach(async (file) => {
-            // const fileKey = `${moment()
-            //   .utc()
-            //   .valueOf()}_${file.originalname}`;
+            const fileKey = `${moment()
+              .utc()
+              .valueOf()}_${file.originalname}`;
 
-            // const fileHash = crypto
-            //   .createHmac("sha256", file.buffer)
-            //   .digest("hex");
+            const fileHash = crypto
+              .createHmac("sha256", file.buffer)
+              .digest("hex");
 
-            // const fileLocation = await uploadFileToS3(
-            //   `${fileKey}`,
-            //   file.buffer,
-            //   req.app.get(constants.s3ParamName)
-            // );
+            const fileLocation = await uploadFileToS3(
+              `${fileKey}`,
+              file.buffer,
+              req.app.get(constants.s3ParamName)
+            );
 
             const uploadedFile = await uploadFileToS3(
-              file
+              fileKey, file.buffer, "s3 options" // add s3 options
             );
 
             const productDocumentArgs = {
               productId: propertyResult.productContractAddress,
               fileKey: uploadedFile,
-              // fileHash: fileHash,
+              fileHash: fileHash,
               fileName: file.originalname,
-              // fileLocation: fileLocation,
+              fileLocation: fileLocation,
               documentType: file.mimetype,
             }
 
