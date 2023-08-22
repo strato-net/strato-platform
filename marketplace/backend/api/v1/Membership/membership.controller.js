@@ -44,11 +44,11 @@ class MembershipController {
       const { dapp, query } = req
       
       let memberships = await dapp.getMemberships({ ...query })
+      //Get image location associated with each membership/product
       memberships.memberships = memberships.memberships.map((membership) => { 
-        const img  =  getSignedUrlFromS3(membership.productImage[0].fileLocation, req.app.get(constants.s3ParamName));
-        return {...membership, productImage1: img} });
+        const img  =  getSignedUrlFromS3(membership.productImage.fileLocation, req.app.get(constants.s3ParamName));
+        return {...membership, productImageLocation: img} });
       rest.response.status200(res, memberships)
-     
       return next()
     } catch (e) {
       return next(e)

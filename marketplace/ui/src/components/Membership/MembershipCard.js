@@ -68,7 +68,7 @@ const MembershipCard = ({
                 <img
                   className="w-52 object-cover"
                   alt=""
-                  src={membership.productImage1}
+                  src={membership.productImageLocation}
                 />  
                 {membership.product_with_inventory ?  
                   (membership.isInventoryAvailable ?

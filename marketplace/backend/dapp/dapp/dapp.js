@@ -1425,22 +1425,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       if (dictionaryOfMemberships.hasOwnProperty(productAddress)) {
           dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership => ({
               ...existingMembership,
-              product: obj
+              product: obj,
+              productImage : null
           }));
       }
     }
+       
+    //Get Product Image Info
+    const productImageInfo =  await productFileJs.getAll(rawAdmin, { productId: addressOfProducts}, {...options, org: managers.cirrusOrg, app: contractName});
     
-    //Get Product Images
-    var productFiles = undefined;
-    if(addressOfProducts.length > 0){
-        for (const productAddress of addressOfProducts){
-          try { //TODO, make this one cirrus request, instead of many.
-            productFiles =  await productFileJs.getAll(rawAdmin, { productId: productAddress}, {...options, org: managers.cirrusOrg, app: contractName})
-            if(dictionaryOfMemberships.hasOwnProperty(productAddress) ) dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership =>  ({productImage : productFiles, ...existingMembership }  ));
-          } catch(error) { 
-            console.log("Failed to attain productFiles for product: ", productAddress, " with error: ", error);
-            if(dictionaryOfMemberships.hasOwnProperty(productAddress) ) dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership =>  ({productImage : [], ...existingMembership }  ));
-          }
+    //Attach Product Image Info to Corresponding Membership
+    for (const obj of productImageInfo){
+      const productAddress = obj.productId;
+      if (dictionaryOfMemberships.hasOwnProperty(productAddress)) {
+          dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership => ({
+              ...existingMembership,
+              productImage : obj
+          }));
       }
     }
   
