@@ -65,7 +65,7 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
             purpose: purpose
         };
         if (quantity > 0 && quantity <= inventory.availableQuantity && inventory.vintage <= dayjs().year()) {
-            let isDone = await actions.resellInventory(inventoryDispatch, body);
+            let isDone = await actions.retireCredits(inventoryDispatch, body);
             if (isDone) 
             {
                 actions.fetchInventory(inventoryDispatch, 10, 0, "");
