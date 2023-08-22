@@ -108,6 +108,7 @@ const actions = {
           success: true
         });
         actions.setMessage(dispatch, "Property updated successfully", true);
+        actions.fetchPropertyDetails(dispatch, payload.propertyAddress)
         return true;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
@@ -218,13 +219,13 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchPropertyDetailsFailed,
-          error: "Error while fetching property list",
+          error: "Error while fetching property detail",
         });
         return;
       }
       dispatch({
         type: actionDescriptors.fetchPropertyDetailsFailed,
-        error: body.error,
+        error: "Error while fetching property detail",
       });
       return;
     } catch (err) {

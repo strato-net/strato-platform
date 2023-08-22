@@ -195,7 +195,6 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     function addProperty(
         address _productId,
         int _listPrice,
-        string _unparsedAddress,
         int _streetNumber,
         string _streetName,
         string _unitNumber,
@@ -286,7 +285,6 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         Property_0_5 property = new Property_0_5(
             _productId,
             _listPrice,
-            _unparsedAddress,
             _streetNumber,
             _streetName,
             _unitNumber,
@@ -380,7 +378,6 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     function updateProperty(
         address _propertyAddress,
         int _listPrice,
-        string _unparsedAddress,
         int _streetNumber,
         string _streetName,
         string _unitNumber,
@@ -473,7 +470,6 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         return
             property.update(
                 _listPrice,
-                _unparsedAddress,
                 _streetNumber,
                 _streetName,
                 _unitNumber,

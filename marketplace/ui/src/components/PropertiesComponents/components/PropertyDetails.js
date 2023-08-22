@@ -162,6 +162,14 @@ function PropertyDetails() {
 
   const formattedResults = getFormattedResults(getSelectedCategories());
 
+  const dataNotFound = () => {
+    return (
+      <div className="h-96 flex justify-center items-center" id="product-list">
+        No property detail available
+      </div>
+    )
+  }
+
   return (
     <>
       {contextHolder}
@@ -203,125 +211,127 @@ function PropertyDetails() {
           <Spin spinning={isPropertyDetailsLoading} size="large" />
         </div>
       ) : (
-        <Col span={22} style={{ margin: "auto", marginBottom: "100px" }}>
-          <Row>
-            <Col sm={24} lg={14} style={{ backgroundColor: "" }}>
-              <ImageCollage images={images} />
-            </Col>
-            <Col sm={24} lg={10} style={{ backgroundColor: "" }}>
-              <Row justify={"center"} align="top" style={{ marginTop: 20 }}>
-                <Col sm={24} md={20}>
-                  <Space direction="horizontal">
-                    <Title style={{ margin: "0px 10px 0px 0px" }} level={4}>
-                      $ {listPrice?.toLocaleString()}
-                    </Title>
-                    <Text>{bedroomsTotal} Bed</Text>
-                    <Text>{bathroomsTotalInteger} Bath</Text>
-                    <Text>
-                      {livingArea} {livingAreaUnits}
-                    </Text>
-                  </Space>
+        propertyDetails
+          ? <Col span={22} style={{ margin: "auto", marginBottom: "100px" }}>
+            <Row>
+              <Col sm={24} lg={14} style={{ backgroundColor: "" }}>
+                <ImageCollage images={images} />
+              </Col>
+              <Col sm={24} lg={10} style={{ backgroundColor: "" }}>
+                <Row justify={"center"} align="top" style={{ marginTop: 20 }}>
+                  <Col sm={24} md={20}>
+                    <Space direction="horizontal">
+                      <Title style={{ margin: "0px 10px 0px 0px" }} level={4}>
+                        $ {listPrice?.toLocaleString()}
+                      </Title>
+                      <Text>{bedroomsTotal} Bed</Text>
+                      <Text>{bathroomsTotalInteger} Bath</Text>
+                      <Text>
+                        {livingArea} {livingAreaUnits}
+                      </Text>
+                    </Space>
 
-                  <Row>
-                    <Text style={{ margin: "5px 0px 0px 10px" }} level={4}>
-                      {postalCity}, {stateOrProvince},{postalcode}
-                    </Text>
-                  </Row>
-                  <Row>
-                    <span
-                      style={{
-                        width: "10px",
-                        height: "10px",
-                        borderRadius: "50%",
-                        backgroundColor: `${standardStatus === "Active" ? "green" : "red"
-                          }`,
-                        margin: "5px",
-                      }}
-                    ></span>
-                    <Text strong>{standardStatus}</Text>
-                  </Row>
-                  <Row style={{ marginTop: "15px" }}>
-                    <Col style={{ lineHeight: "30px" }}>
-                      <Row>
-                        <Col span={8}>
-                          <Text strong>Property Type</Text>
-                        </Col>
-                        <Col span={16}>{propertyType}</Col>
-                      </Row>
-
-                      <Row>
-                        <Col span={8}>
-                          <Text strong>Lot Size</Text>
-                        </Col>
-                        <Col span={16}>
-                          {lotSizeArea} {lotSizeUnits}
-                        </Col>
-                      </Row>
-
-                      {Object.entries(formattedResults).map(([key, value]) => (
-                        <Row key={key}>
+                    <Row>
+                      <Text style={{ margin: "5px 0px 0px 10px" }} level={4}>
+                        {postalCity}, {stateOrProvince},{postalcode}
+                      </Text>
+                    </Row>
+                    <Row>
+                      <span
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          borderRadius: "50%",
+                          backgroundColor: `${standardStatus === "Active" ? "green" : "red"
+                            }`,
+                          margin: "5px",
+                        }}
+                      ></span>
+                      <Text strong>{standardStatus}</Text>
+                    </Row>
+                    <Row style={{ marginTop: "15px" }}>
+                      <Col style={{ lineHeight: "30px" }}>
+                        <Row>
                           <Col span={8}>
-                            <Text strong>{key}</Text>
+                            <Text strong>Property Type</Text>
                           </Col>
-                          <Col span={16}>{value}</Col>
+                          <Col span={16}>{propertyType}</Col>
                         </Row>
-                      ))}
 
-                      <Row>
-                        <Col span={8}>
-                          <Text strong>Number of Units</Text>
-                        </Col>
-                        <Col span={16}>{numberOfUnitsTotal}</Col>
-                      </Row>
+                        <Row>
+                          <Col span={8}>
+                            <Text strong>Lot Size</Text>
+                          </Col>
+                          <Col span={16}>
+                            {lotSizeArea} {lotSizeUnits}
+                          </Col>
+                        </Row>
 
-                      <Row>
-                        <Col span={8}>
-                          <Text strong>Utilites</Text>
-                        </Col>
-                        <Col span={16}>Water, Sewer, Garbage, gas</Col>
-                      </Row>
+                        {Object.entries(formattedResults).map(([key, value]) => (
+                          <Row key={key}>
+                            <Col span={8}>
+                              <Text strong>{key}</Text>
+                            </Col>
+                            <Col span={16}>{value}</Col>
+                          </Row>
+                        ))}
 
-                      <Row>
-                        <Col span={8}>
-                          <Text strong>Lisitng Provider</Text>
-                        </Col>
-                        <Col span={16}>
-                          Tiffany Rider: 503-380-4875, MLS#23640335 Premiere
-                          Property Group, LLC
-                        </Col>
-                      </Row>
-                    </Col>
-                  </Row>
-                </Col>
-              </Row>
-              <Button
-                type="primary"
-                style={{ marginLeft: "50px", marginTop: "30px" }}
-                disabled
-              >
-                Submit Inquiry
-              </Button>
-            </Col>
-          </Row>
-          <Row>
-            <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
-              <Tabs defaultActiveKey="Overview" items={tabs} />
-            </Col>
-            <Col sm={24} lg={10} style={{ marginTop: "50px" }}>
-              <div
-                style={{
-                  width: "300px",
-                  height: "200px",
-                  background: "grey",
-                  margin: "auto",
-                  textAlign: "center",
-                }}
-              >
-                MAP
-              </div>
-            </Col>
-          </Row>
-        </Col>
+                        <Row>
+                          <Col span={8}>
+                            <Text strong>Number of Units</Text>
+                          </Col>
+                          <Col span={16}>{numberOfUnitsTotal}</Col>
+                        </Row>
+
+                        <Row>
+                          <Col span={8}>
+                            <Text strong>Utilites</Text>
+                          </Col>
+                          <Col span={16}>Water, Sewer, Garbage, gas</Col>
+                        </Row>
+
+                        <Row>
+                          <Col span={8}>
+                            <Text strong>Lisitng Provider</Text>
+                          </Col>
+                          <Col span={16}>
+                            Tiffany Rider: 503-380-4875, MLS#23640335 Premiere
+                            Property Group, LLC
+                          </Col>
+                        </Row>
+                      </Col>
+                    </Row>
+                  </Col>
+                </Row>
+                <Button
+                  type="primary"
+                  style={{ marginLeft: "50px", marginTop: "30px" }}
+                  disabled
+                >
+                  Submit Inquiry
+                </Button>
+              </Col>
+            </Row>
+            <Row>
+              <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
+                <Tabs defaultActiveKey="Overview" items={tabs} />
+              </Col>
+              <Col sm={24} lg={10} style={{ marginTop: "50px" }}>
+                <div
+                  style={{
+                    width: "300px",
+                    height: "200px",
+                    background: "grey",
+                    margin: "auto",
+                    textAlign: "center",
+                  }}
+                >
+                  MAP
+                </div>
+              </Col>
+            </Row>
+          </Col>
+          : dataNotFound()
       )}
 
       {isUploadPhotosModalOpen && (

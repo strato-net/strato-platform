@@ -32,6 +32,7 @@ import {
   usePropertiesDispatch,
   usePropertiesState,
 } from "../../../contexts/propertyContext";
+import { useParams } from "react-router-dom";
 const { LIMIT_PER_PAGE } = propertyConstants;
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -49,8 +50,10 @@ function PropertyCreateModal({
   isCreateModalOpen,
   toggleCreateModal,
   formData,
-  isEdit
 }) {
+
+  let { id } = useParams();
+
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
 
@@ -150,21 +153,24 @@ function PropertyCreateModal({
     const body = propertyData
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
-    if (isEdit) {
-      let updatedData = { ...body, propertyAddress: body.address };
-      delete updatedData["chainId"]
-      delete updatedData["block_hash"]
-      delete updatedData["block_number"]
-      delete updatedData["block_timestamp"]
-      delete updatedData["address"]
-      delete updatedData["record_id"]
-      delete updatedData["transaction_hash"]
-      delete updatedData["transaction_sender"]
+    if (id) {
+      let {
+        chainId,
+        block_hash,
+        block_number,
+        block_timestamp,
+        address,
+        record_id,
+        transaction_hash,
+        transaction_sender,
+        standardStatus,
+        unparsedAddress,
+        latitude,
+        longitude,
+        ...updatedData
+      } = body;
+      updatedData["propertyAddress"] = address;
 
-      delete updatedData["standardStatus"]
-      delete updatedData["unparsedAddress"]
-      delete updatedData["latitude"]
-      delete updatedData["longitude"]
 
       let response = await actions.updateProperty(dispatch, updatedData);
       if (response) {
@@ -377,7 +383,7 @@ function PropertyCreateModal({
             placeholder="Street Name"
             value={streetName}
             defaultValue={streetName}
-            disabled={isEdit}
+            disabled={id}
             onChange={(e) => {
               handleChange("streetName", e.target.value);
             }}
@@ -398,7 +404,7 @@ function PropertyCreateModal({
                 id="streetnumber"
                 type="Number"
                 placeholder="Street Number"
-                disabled={isEdit}
+                disabled={id}
                 controls={false}
                 value={streetNumber}
                 defaultValue={streetNumber}
@@ -424,7 +430,7 @@ function PropertyCreateModal({
                 label="House Number"
                 id="housenumber"
                 placeholder="House Number"
-                disabled={isEdit}
+                disabled={id}
                 controls={false}
                 value={unitNumber}
                 defaultValue={unitNumber}
@@ -467,7 +473,7 @@ function PropertyCreateModal({
                 label="City"
                 id="city"
                 placeholder="City"
-                disabled={isEdit}
+                disabled={id}
                 value={postalCity}
                 defaultValue={postalCity}
                 onChange={(e) => {
@@ -492,7 +498,7 @@ function PropertyCreateModal({
                 placeholder="ZipCode"
                 min={0}
                 max={99999}
-                disabled={isEdit}
+                disabled={id}
                 controls={false}
                 value={postalcode}
                 defaultValue={postalcode}
@@ -564,7 +570,7 @@ function PropertyCreateModal({
             placeholder="Property Type"
             value={propertyType}
             defaultValue={propertyType}
-            disabled={isEdit}
+            disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
             }}
@@ -739,7 +745,7 @@ function PropertyCreateModal({
         title={primaryAction.content}
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
-        okText={modalView ? "Continue" : isEdit ? "Update Property" : "Create Property"}
+        okText={modalView ? "Continue" : id ? "Update Property" : "Create Property"}
         okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
@@ -756,7 +762,7 @@ function PropertyCreateModal({
         toggleCreateConfirmModal={toggleCreateConfirmModal}
         handleSubmitCreateProperty={handleSubmitCreateProperty}
         isCreatePropertySubmitting={isCreatePropertySubmitting || isUpdatePropertySubmitting}
-        isEdit={isEdit}
+        isEdit={id}
       />
     </>
   );

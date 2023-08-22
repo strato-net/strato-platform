@@ -56,7 +56,6 @@ class PropertiesController {
 
       const propertyArgs = {
         ...body,
-        unparsedAddress: `${streetNumber} ${streetName} ${unitNumber}, ${postalCity}, ${stateOrProvince} ${postalcode}`,
         standardStatus: "Active",
         //use google maps api to get lat and long, then convert to string
         latitude: "",
@@ -95,7 +94,6 @@ class PropertiesController {
 
       const propertyArgs = {
         ...body,
-        unparsedAddress: `${streetNumber} ${streetName} ${unitNumber}, ${postalCity}, ${stateOrProvince} ${postalcode}`,
         standardStatus: "Active",
         //use google maps api to get lat and long, then convert to string
         latitude: "",
@@ -122,7 +120,6 @@ class PropertiesController {
       description: Joi.string().required(),
       propertyType: Joi.string().required(),
       listPrice: Joi.number().required(),
-      unparsedAddress: Joi.string().required(),
       streetNumber: Joi.number().required(),
       streetName: Joi.string().required(),
       unitNumber: Joi.string().allow("").required(),
@@ -235,7 +232,6 @@ class PropertiesController {
       description: Joi.string().required(),
       propertyType: Joi.string().required(),
       listPrice: Joi.number().required(),
-      unparsedAddress: Joi.string().required(),
       streetNumber: Joi.number().required(),
       streetName: Joi.string().required(),
       unitNumber: Joi.string().allow("").required(),

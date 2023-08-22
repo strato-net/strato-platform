@@ -4,7 +4,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 contract Property_0_5 {
     address public productId;
     int public listPrice;
-    string public unparsedAddress;
+    // string public unparsedAddress;
     int public streetNumber;
     string public streetName;
     string public unitNumber;
@@ -102,7 +102,6 @@ contract Property_0_5 {
     constructor(
         address _productId,
         int _listPrice,
-        string _unparsedAddress,
         int _streetNumber,
         string _streetName,
         string _unitNumber,
@@ -192,7 +191,6 @@ contract Property_0_5 {
     ) public {
         productId = _productId;
         listPrice = _listPrice;
-        unparsedAddress = _unparsedAddress;
         streetNumber = _streetNumber;
         streetName = _streetName;
         unitNumber = _unitNumber;
@@ -290,7 +288,6 @@ contract Property_0_5 {
     
     function update(
         int _listPrice,
-        string _unparsedAddress,
         int _streetNumber,
         string _streetName,
         string _unitNumber,
@@ -379,7 +376,6 @@ contract Property_0_5 {
         bool _waterFront
     ) public returns (uint256) {
         listPrice = _listPrice;
-        unparsedAddress = _unparsedAddress;
         streetNumber = _streetNumber;
         streetName = _streetName;
         unitNumber = _unitNumber;

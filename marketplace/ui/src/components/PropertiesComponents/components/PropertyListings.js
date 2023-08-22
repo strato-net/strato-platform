@@ -179,7 +179,6 @@ function PropertyListings() {
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
         formData={formData}
-        isEdit={false}
       />
     </>
   );

@@ -663,7 +663,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const propertyArgs = {
         productId: productContract[1],
         listPrice: args.listPrice,
-        unparsedAddress: args.unparsedAddress,
         streetNumber: args.streetNumber,
         streetName: args.streetName,
         unitNumber: args.unitNumber,
@@ -772,9 +771,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const {
       productId,
       description,
+      title,
       ...propertyArgs
     } = args;
-    
+
     // Update productArgs
     const productArgs = {
       productAddress: productId,
@@ -782,6 +782,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         imageKey: "",
         isActive: true,
         description,
+        name: title,
         userUniqueProductCode: `${parseInt(util.iuid())}`
       }
     }
