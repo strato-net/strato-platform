@@ -7,6 +7,8 @@ import getSchema from "./ProductSchema";
 
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import { useCarbonDispatch } from "../../contexts/carbon";
+import { actions as carbonActions } from "../../contexts/carbon/actions";
 import { unitOfMeasures } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 
@@ -24,6 +26,7 @@ const CreateProductModal = ({
   const schema = getSchema();
   const [selectedImage, setSelectedImage] = useState(null);
   const dispatch = useProductDispatch();
+  const carbonDispatch = useCarbonDispatch();
 
   const { isCreateProductSubmitting, isuploadImageSubmitting } =
     useProductState();
@@ -62,6 +65,22 @@ const CreateProductModal = ({
           isActive: values.active,
           category: values.category.name,
         },
+        projectType: "projectType",
+        methodology: "methodology",
+        projectCountry: "projectCountry",
+        projectCategory: "projectCategory",
+        projectDeveloper: "projectDeveloper",
+        dMRV: "dMRV",
+        registry: "registry",
+        creditType: "creditType",
+        sdg: "sdg",
+        validator: "validator",
+        eligibility: "eligibility",
+        permanenceType: "permanenceType",
+        reductionType: "reductionType",
+        unit: "unit",
+        currency: "currency",
+        divisibility: 10
       };
 
       TagManager.dataLayer({
@@ -69,11 +88,18 @@ const CreateProductModal = ({
           event: 'create_product',
         },
       });
-      let isDone = await actions.createProduct(dispatch, body);
+
+      let isDone;
+      if (values.category.name === "Carbon") {
+        isDone = await carbonActions.createCarbon(carbonDispatch, body);
+      } else {
+        isDone = await actions.createProduct(dispatch, body);
+      }
 
       if (isDone) {
         if (page === 1)
           actions.fetchProduct(dispatch, 10, 0, debouncedSearchTerm);
+          carbonActions.fetchCarbons(carbonDispatch, 10, 0, debouncedSearchTerm);
         resetPage(1);
         handleCancel();
       }
@@ -89,11 +115,11 @@ const CreateProductModal = ({
   function beforeUpload(file) {
     const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
     if (!isJpgOrPng) {
-      openToast("bottom","Image must be of jpeg or png format");
+      openToast("bottom", "Image must be of jpeg or png format");
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
-      openToast("bottom","Cannot upload an image of size more than 1mb");
+      openToast("bottom", "Cannot upload an image of size more than 1mb");
     }
     return isJpgOrPng && isLt1M;
   }
@@ -243,24 +269,24 @@ const CreateProductModal = ({
               )}
             </Form.Item>
             <div className="flex justify-between mt-4 items-center">
-            <Form.Item label="Active" name="active">
-              <Radio.Group
-                value={formik.values.active}
-                onChange={formik.handleChange}
-                name="active"
-              >
-                <Radio value={true}>Yes</Radio>
-                <Radio value={false}>No</Radio>
-              </Radio.Group>
+              <Form.Item label="Active" name="active">
+                <Radio.Group
+                  value={formik.values.active}
+                  onChange={formik.handleChange}
+                  name="active"
+                >
+                  <Radio value={true}>Yes</Radio>
+                  <Radio value={false}>No</Radio>
+                </Radio.Group>
 
-              {formik.touched.active && formik.errors.active && (
-                <span className="text-error text-xs">
-                  {formik.errors.active}
-                </span>
-              )}
-            </Form.Item>
+                {formik.touched.active && formik.errors.active && (
+                  <span className="text-error text-xs">
+                    {formik.errors.active}
+                  </span>
+                )}
+              </Form.Item>
             </div>
-           
+
           </div>
         </div>
       </Form>

@@ -7,6 +7,7 @@ import Product from "./components/Product";
 import { ProductsProvider } from "./contexts/product";
 import Inventory from "./components/Inventory";
 import { InventoriesProvider } from "./contexts/inventory";
+import { CarbonProvider } from "./contexts/carbon";
 import Order from "./components/Order";
 import SoldOrderDetails from "./components/Order/SoldOrderDetails";
 import BoughtOrderDetails from "./components/Order/BoughtOrderDetails";
@@ -155,7 +156,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
           <UsersProvider>
             <CategorysProvider>
               <ProductsProvider>
-                <Product user={user} users={users} />
+                <CarbonProvider>
+                  <Product user={user} users={users} />
+                </CarbonProvider>
               </ProductsProvider>
             </CategorysProvider>
           </UsersProvider>
