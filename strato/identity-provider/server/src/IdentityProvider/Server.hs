@@ -32,11 +32,10 @@ import           Network.HTTP.Types.Header               (hContentType, hAuthori
 import           Network.HTTP.Types.Status
 
 import           Data.Aeson
-import           Data.ByteString.Base64
 import qualified Data.ByteString.Lazy                    as BL
-import qualified Data.ByteString.UTF8 as B               (fromString)
-import           Data.List                               (isSuffixOf)
+import           Data.List                               (elemIndex)
 import qualified Data.Map as M
+import           Data.Text                               (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding                      (encodeUtf8, decodeUtf8)
 import           GHC.Generics
@@ -49,7 +48,8 @@ import           Blockchain.Strato.Model.Secp256k1       hiding (HasVault)
 import qualified IdentityProvider.API                    as IDAPI
 import           Strato.Strato23.API
 import           Strato.Strato23.Client
--- import           SQLM
+import           IdentityProvider.OAuth                  hiding (issuer)
+import           IdentityProvider.Email
 
 import           Control.Monad.Change.Modify
 import           Control.Monad.Composable.Vault
@@ -58,93 +58,88 @@ import           Control.Monad.Trans.Except
 import           BlockApps.Logging
 
 data IdentityError
-  = IdentityError T.Text
+  = IdentityError Text
   deriving (Show, Exception)
 
-newtype AccessToken = AccessToken {access_token :: T.Text} deriving (Show, Generic)
-instance FromJSON AccessToken
-instance ToJSON AccessToken
+getAccessTokenForRealm :: ( MonadIO m
+                       , MonadLogger m
+                       , Accessible RealmData m
+                       ) => String -> m (Maybe AccessToken)
+getAccessTokenForRealm realm = do
+    rd <- access (Proxy @RealmData)
+    case M.lookup realm rd of 
+        Nothing -> do 
+            $logErrorS "getAccessTokenForRealm" $ "Recieved PUT /identity request from a realm we don't support: " <> T.pack realm
+            throwIO $ IdentityError "Identity server does not support this realm"
+        Just (RealmDetails endpoints cid csec _) -> getAccessToken cid csec (token_endpoint endpoints)
 
-getAccessToken :: MonadIO m => String -> String -> String -> m (Maybe AccessToken)
-getAccessToken id' sec realm = do
-    manager <- liftIO $ newManager tlsManagerSettings
-    let creds64 = encodeBase64' . B.fromString $ id' <> ":" <> sec
-    templateRequest <- liftIO . parseRequest $ "POST https://keycloak.blockapps.net/auth/realms/" <> realm <> "/protocol/openid-connect/token"
-    let rBody = RequestBodyLBS "grant_type=client_credentials"
-        rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, "Basic " <> creds64)]
-        request = templateRequest{requestHeaders = rHead, requestBody = rBody}
-    response <- liftIO $ httpLbs request manager
-    return $ decode $ responseBody response
+-- oAuthUserToSubject :: OAuthUser -> PublicKey -> Subject
+-- oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
+--     let firstN = T.unpack firstN'
+--         lastN = T.unpack lastN'
+--     in Subject {
+--     subCommonName =  firstN <> " " <> lastN,
+--     subOrg = case attr of
+--         Just (OAuthUserAttributes (Just (org:_))) | not (T.null org) -> T.unpack org
+--         _ -> head firstN : lastN ++ T.unpack (T.take 8 id')
+--     ,
+--     subUnit = Nothing,
+--     subCountry = Nothing,
+--     subPub = pk
+-- }
 
-getMasterAccessToken :: ( MonadIO m
-                        , Accessible MasterClientId m
-                        , Accessible MasterClientSecret m
-                        ) => m (Maybe AccessToken)
-getMasterAccessToken = do
-    MasterClientId mcid <- access Proxy
-    MasterClientSecret msec <- access Proxy
-    getAccessToken mcid msec "master"
+getDefaultEmptyOrg :: String -> String -> String
+getDefaultEmptyOrg name uuid = case elemIndex ' ' name of
+    Nothing -> head name : take 8 uuid
+    Just idx -> let lastNs = drop (idx + 1) name 
+                in head name : lastNs ++ take 8 uuid
 
-getRealmAccessToken :: ( MonadIO m
-                       , Accessible ClientId m
-                       , Accessible ClientSecret m
-                       ) => T.Text -> m (Maybe AccessToken)
-getRealmAccessToken realm = do
-    ClientId cid <- access Proxy
-    ClientSecret csec <- access Proxy
-    getAccessToken cid csec (T.unpack realm)
+getSubject :: ( MonadIO m
+              , MonadLogger m ) 
+               => Text 
+               -> Maybe Text 
+               -> Text 
+               -> String
+               -> PublicKey
+               -> m Subject
+getSubject name mCo uuid _ pk
+    | not $ T.null name = do
+        let name' = T.unpack name
+        return Subject {
+            subCommonName = name',
+            subOrg = case mCo of 
+                Just co | not $ T.null co -> T.unpack co
+                _ -> getDefaultEmptyOrg (T.unpack name) (T.unpack uuid),
+            subUnit = Nothing,
+            subCountry = Nothing,
+            subPub = pk
+        }
+    | otherwise = do
+        $logErrorS "getSubject" "Improper query params! Param 'name' is not defined or is empty. Cannot create a cert with so little info"
+        throwIO $ IdentityError "Param 'name' cannot be empty"
+        -- NOTE TO FUTURE DEVELOPERS: This commented-out code block is from a previous flow where we would call 
+        -- the GET /users endpoint on keycloak to get the user's information. We are trying to be less keycloak
+        -- dependent, so this flow is not being used, but I'll just leave it in here just in case we ever need it
 
-newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [T.Text]} deriving (Show, Generic)
-instance FromJSON OAuthUserAttributes
-instance ToJSON OAuthUserAttributes
-data OAuthUser = OAuthUser {
-    id          :: T.Text, --untested
-    firstName   :: T.Text,
-    lastName    :: T.Text,
-    attributes  :: Maybe OAuthUserAttributes
-} deriving (Show, Generic)
-instance FromJSON OAuthUser
-instance ToJSON OAuthUser
+        -- getAccessTokenForRealm "master" >>= \case 
+        --     Nothing -> do 
+        --         $logErrorS "createAndRegisterCert" "uh oh! We couldn't get an access token for the master realm"
+        --         throwIO $ IdentityError "Something is wrong with the provided access credentials for the master realm. Have a network administrator look into this."
+        --     Just masterToken -> do 
+        --         getUserByUUID masterToken (T.unpack uuid) realm >>= \case
+        --             Left err -> do
+        --                 $logErrorS "createAndRegisterCert" $ "Error occurred while querying OAuth server for information on user with uuid " <> uuid <> ": " <> T.pack err
+        --                 throwIO $ IdentityError "Could not retrieve user's information from OAuth server"
+        --             Right user -> do
+        --                 $logInfoS "createAndRegisterCert" $ "The user's info from the OAuth server is " <> T.pack (show user)
+        --                 return $ oAuthUserToSubject user pk
 
-oAuthUserToSubject :: OAuthUser -> PublicKey -> Subject
-oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
-    let firstN = T.unpack firstN'
-        lastN = T.unpack lastN'
-    in Subject {
-    subCommonName =  firstN <> " " <> lastN,
-    subOrg = case attr of
-        Just (OAuthUserAttributes (Just (org:_))) | not (T.null org) -> T.unpack org
-        _ -> head firstN : lastN ++ T.unpack (T.take 8 id')
-    ,
-    subUnit = Nothing,
-    subCountry = Nothing,
-    subPub = pk
-}
-
-getUserByUUID :: ( MonadIO m
-                 ) => AccessToken -> T.Text -> T.Text -> m (Either String OAuthUser)
-getUserByUUID token uuid realm = do
-    manager <- liftIO $ newManager tlsManagerSettings
-    let url = "https://keycloak.blockapps.net/auth/admin/realms/" <> realm <> "/users/" <> uuid
-    templateRequest <- liftIO $ parseRequest $ T.unpack url
-    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> access_token token)]
-        request = templateRequest{requestHeaders=rHead}
-    response <- liftIO $ httpLbs request manager
-    return $ eitherDecode $ responseBody response
-
-newtype ClientId = ClientId String
-newtype ClientSecret = ClientSecret String
-newtype MasterClientId = MasterClientId String
-newtype MasterClientSecret = MasterClientSecret String
 data IdentityServerData = IdentityServerData
     { issuer             :: Issuer          -- issuer of signing cert
     , issuerCert         :: X509Certificate -- the signing cert
     , issuerPrivKey      :: PrivateKey      -- the signing private key
-    , blocAPIUrl         :: BaseUrl -- strato node where will register cert
-    , clientId           :: ClientId
-    , clientSecret       :: ClientSecret
-    , masterClientId     :: MasterClientId
-    , masterClientSecret :: MasterClientSecret
+    , realmNameToDetails :: RealmData
+    , sendgridAPIKey     :: Maybe SendgridAPIKey
 }
 instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
     access _ = asks issuer
@@ -152,16 +147,10 @@ instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) wh
     access _ = asks issuerCert
 instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
     access _ = asks issuerPrivKey
-instance Monad m => Accessible BaseUrl (ReaderT IdentityServerData m) where
-    access _ = asks blocAPIUrl
-instance Monad m => Accessible ClientId (ReaderT IdentityServerData m) where
-    access _ = asks clientId
-instance Monad m => Accessible ClientSecret (ReaderT IdentityServerData m) where
-    access _ = asks clientSecret
-instance Monad m => Accessible MasterClientId (ReaderT IdentityServerData m) where
-    access _ = asks masterClientId
-instance Monad m => Accessible MasterClientSecret (ReaderT IdentityServerData m) where
-    access _ = asks masterClientSecret
+instance Monad m => Accessible RealmData (ReaderT IdentityServerData m) where
+    access _ = asks realmNameToDetails
+instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
+    access _ = asks sendgridAPIKey
 instance Monad m => Accessible VaultData (VaultM m) where
   access _ = ask
 instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
@@ -177,24 +166,27 @@ putIdentity :: ( MonadIO m
                , Accessible Issuer m
                , Accessible X509Certificate m
                , Accessible PrivateKey m
-               , Accessible BaseUrl m
-               , Accessible ClientId m
-               , Accessible ClientSecret m
-               , Accessible MasterClientId m
-               , Accessible MasterClientSecret m
-               ) => T.Text -> T.Text -> T.Text -> m Address
-putIdentity accessToken uuid idProv = do
-    $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity"
+               , Accessible RealmData m
+               , Accessible (Maybe SendgridAPIKey) m)
+               => Text
+               -> Text
+               -> Text
+               -> Text
+               -> Maybe Text
+               -> Maybe Text
+               -> m Address
+putIdentity accessToken uuid idProv name mEmail mCo = do
+    $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
     -- check if a user exists in vault
-    let realm = last $ T.splitOn "/" (if "/" `T.isSuffixOf` idProv then T.init idProv else idProv)
+    let realm = extractRealmName $ T.unpack idProv
     getVaultKey accessToken >>= \case
         Just (AddressAndKey a k) -> do -- has vault key, confirm also has cert
-            hasCert <- certInCirrus accessToken a
-            unless hasCert $ createAndRegisterCert uuid realm k
+            hasCert <- certInCirrus accessToken realm a (T.unpack name) (T.unpack uuid) (T.unpack <$> mCo)
+            unless hasCert $ createAndRegisterCert name mEmail mCo uuid realm k
             return a
         Nothing -> do -- no vault key, so make key and register cert
             AddressAndKey a k <- postVaultKey accessToken
-            createAndRegisterCert uuid realm k
+            createAndRegisterCert name mEmail mCo uuid realm k
             return a
 
 -- This is just a dummy function
@@ -203,23 +195,20 @@ putIdentity accessToken uuid idProv = do
 -- which is used within the strato node to form a request
 -- which Identity server's nginx transforms the headers
 -- which patterns matches with putIdentity
-putIdentityExternal :: ( MonadIO m
-               , MonadLogger m
-               , HasVault m
-               , Accessible Issuer m
-               , Accessible X509Certificate m
-               , Accessible PrivateKey m
-               , Accessible BaseUrl m
-               , Accessible ClientId m
-               , Accessible ClientSecret m
-               , Accessible MasterClientId m
-               , Accessible MasterClientSecret m
-               ) => T.Text -> m Address
-putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" ""
+putIdentityExternal ::  ( MonadIO m
+                        , MonadLogger m
+                        , HasVault m
+                        , Accessible Issuer m
+                        , Accessible X509Certificate m
+                        , Accessible PrivateKey m
+                        , Accessible RealmData m
+                        , Accessible (Maybe SendgridAPIKey) m
+                        ) => Text -> m Address
+putIdentityExternal bearerToken = putIdentity  (T.replace "Bearer " "" bearerToken) "" "" "" Nothing Nothing
 
 
 blocEndpoint :: String
-blocEndpoint = "bloc/v2.2"
+blocEndpoint = "/bloc/v2.2"
 
 data CertificateInCirrus = CertificateInCirrus{
     -- commonName :: Text,
@@ -229,107 +218,135 @@ data CertificateInCirrus = CertificateInCirrus{
 instance FromJSON CertificateInCirrus
 instance ToJSON CertificateInCirrus
 
-certInCirrus :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => T.Text -> Address -> m Bool
-certInCirrus token a = do
-    url <- access (Proxy @BaseUrl)
-    let cirrusUrl = "cirrus/search/Certificate?userAddress=eq." <> show a
-        url' = T.unpack $ T.replace (T.pack blocEndpoint) (T.pack cirrusUrl) (T.pack $ showBaseUrl url)
-    mgr <- liftIO $ case baseUrlScheme url of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings
-    templateRequest <- liftIO $ parseRequest url'
-    let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
-        request = templateRequest{requestHeaders = rHead}
-    response <- liftIO $ httpLbs request mgr
-    let mCerts:: Maybe [CertificateInCirrus] = decode $ responseBody response
-    case mCerts of
-        Just certs -> do
-            $logInfoS "certInCirrus" $ T.pack $ "Cirrus response was: " <> show certs
-            return . not $ null certs -- maybe can also check if cert is valid and matches user attributes
-        Nothing -> error "Unexpected response from cirrus query. This should never happen"
+certInCirrus :: (MonadIO m, MonadLogger m, Accessible RealmData m) 
+             => Text -> String -> Address -> String -> String -> Maybe String -> m Bool
+certInCirrus token realm a name uuid mCo = do
+    rd <- access (Proxy @RealmData)
+    case M.lookup realm rd of
+        Nothing -> do 
+            $logErrorS "certInCirrus" "Trying to find a cert on a network whose realm we don't support (How?? We should never reach this error)"
+            throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown sooner"
+        Just (RealmDetails _ _ _ nurl) -> do 
+            let cirrusEndpoint = cirrusSearchPath a name uuid mCo
+                url = showBaseUrl nurl{baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
+            mgr <- liftIO $ case baseUrlScheme nurl of
+                Http -> newManager defaultManagerSettings
+                Https -> newManager tlsManagerSettings
+            templateRequest <- liftIO $ parseRequest url
+            let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
+                request = templateRequest{requestHeaders = rHead}
+            response <- liftIO $ httpLbs request mgr
+            let mCerts:: Maybe [CertificateInCirrus] = decode $ responseBody response
+            case mCerts of
+                Just certs -> do
+                    $logInfoS "certInCirrus" $ T.pack $ "Checked for user's cert in Cirrus; response was: " <> show certs
+                    return . not $ null certs -- maybe can also check if cert is valid and matches user attributes
+                Nothing -> do 
+                    $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
+                    throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
+    
+    where 
+        cirrusSearchPath :: Address -> String -> String -> Maybe String -> String 
+        cirrusSearchPath address commonName uuid' mOrg = 
+            let orgParam = case mOrg of 
+                    Nothing -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
+                    Just "" -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
+                    Just org -> ",organization.eq." <> org
+            in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> orgParam <> ")"
 
 createAndRegisterCert :: ( MonadIO m
                          , MonadLogger m
                          , Accessible Issuer m
                          , Accessible X509Certificate m
                          , Accessible PrivateKey m
-                         , Accessible ClientId m
-                         , Accessible ClientSecret m
-                         , Accessible MasterClientId m
-                         , Accessible MasterClientSecret m
-                         , Accessible BaseUrl m
-                         ) => T.Text -> T.Text -> PublicKey -> m ()
-createAndRegisterCert uuid realm k = do
-    getMasterAccessToken >>= \case
+                         , Accessible RealmData m
+                         , Accessible (Maybe SendgridAPIKey) m)
+                         => Text
+                         -> Maybe Text
+                         -> Maybe Text
+                         -> Text
+                         -> String
+                         -> PublicKey
+                         -> m ()
+createAndRegisterCert name mEmail mCo uuid realm k = do
+    sub <- getSubject name mCo uuid realm k
+    createNewCert sub >>= \case
+        Just newCert -> do
+            getAccessTokenForRealm realm >>= \case
+                Nothing -> do
+                    $logErrorS "createAndRegisterCert" "uh oh! We couldn't retrieve an access token for our realm"
+                    throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
+                Just realmToken -> do
+                    registerCert newCert realmToken realm
+                    mEmailK <- access (Proxy @(Maybe SendgridAPIKey))
+                    case (mEmail, mEmailK) of
+                        (Just email, Just emailK) -> sendWelcomeEmail (T.unpack email) (T.unpack name) (T.unpack uuid) emailK
+                        (_, _) -> return ()
         Nothing -> do
-            $logErrorS "createAndRegisterCert" "uh oh! We couldn't get an access token for the master realm"
-            throwIO $ IdentityError "Something is wrong with the provided access credentials for the master realm. Have a network administrator look into this."
-        Just masterToken -> do
-            getUserByUUID masterToken uuid realm >>= \case
-                Left err -> do
-                    $logErrorS "createAndRegisterCert" $ "Error occurred while querying OAuth server for information on user with uuid " <> uuid <> ": " <> T.pack err
-                    throwIO $ IdentityError "Could not retrieve user's information from OAuth server"
-                Right user -> do
-                    $logInfoS "createAndRegisterCert" $ "The user's info from the OAuth server is " <> T.pack (show user)
-                    createNewCert user k >>= \case
-                        Just newCert -> do
-                            getRealmAccessToken realm >>= \case
-                                Nothing -> do
-                                    $logErrorS "createAndRegisterCert" "uh oh! We couldn't an access token for our realm"
-                                    throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
-                                Just realmToken -> registerCert newCert realmToken
-                        Nothing -> do
-                            $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
-                            throwIO $ IdentityError "Unable to sign new cert for user"
+            $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
+            throwIO $ IdentityError "Unable to sign new cert for user"
 
 createNewCert :: ( MonadIO m
                  , Accessible Issuer m
                  , Accessible X509Certificate m
                  , Accessible PrivateKey m
-                 ) => OAuthUser -> PublicKey -> m (Maybe X509Certificate)
-createNewCert user k = do
+                 ) => Subject -> m (Maybe X509Certificate)
+createNewCert sub = do
     i <- access (Proxy @Issuer)
     c <- access (Proxy @X509Certificate)
     iK <- access (Proxy @PrivateKey)
     let signWIssuerPrivKey bs = return $ signMsg iK bs
-    makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i (oAuthUserToSubject user k)
+    makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i sub
 
-registerCert :: (MonadIO m, MonadLogger m, Accessible BaseUrl m) => X509Certificate -> AccessToken -> m ()
-registerCert cert token = do
-    url <- access (Proxy @BaseUrl)
-    mgr <- liftIO $ case baseUrlScheme url of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings
-    let clientEnv = mkClientEnv mgr url
-        txPayload = BlocFunction FunctionPayload{
-            functionpayloadContractAddress = 0x509,
-            functionpayloadMethod = "registerCertificate",
-            functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
-            functionpayloadValue = Nothing,
-            functionpayloadTxParams = Nothing,
-            functionpayloadChainid = Nothing,
-            functionpayloadMetadata = Nothing
-        }
-        txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-    eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest) clientEnv
-    $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse
-    --TODO: how to tell if cert successfully added to blockchain?
 
-getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m (Maybe AddressAndKey)
+registerCert :: (MonadIO m, MonadLogger m, Accessible RealmData m) 
+             => X509Certificate 
+             -> AccessToken 
+             -> String
+             -> m ()
+registerCert cert token realm = do
+    rd <- access (Proxy @RealmData)
+    case M.lookup realm rd of 
+        Nothing -> do
+            $logErrorS "registerCert" "Trying to register cert for realm we don't support. Error should have been thrown MUCH sooner"
+            throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown MUCH sooner"
+        Just (RealmDetails _ _ _ nurl) -> do
+            mgr <- liftIO $ case baseUrlScheme nurl of
+                Http -> newManager defaultManagerSettings
+                Https -> newManager tlsManagerSettings
+            let clientEnv = mkClientEnv mgr nurl{baseUrlPath = baseUrlPath nurl <> blocEndpoint}
+                txPayload = BlocFunction FunctionPayload{
+                    functionpayloadContractAddress = 0x509,
+                    functionpayloadMethod = "registerCertificate",
+                    functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
+                    functionpayloadValue = Nothing,
+                    functionpayloadTxParams = Nothing,
+                    functionpayloadChainid = Nothing,
+                    functionpayloadMetadata = Nothing
+                }
+                txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
+            eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest) clientEnv
+            $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse
+            --TODO: how to tell if cert successfully added to blockchain?
+
+getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do
     VaultData url mgr <- access Proxy
     eAddressNKey <- liftIO $ runClientM (getKey (Just accessToken) Nothing) (mkClientEnv mgr url)
-    $logInfoS "getVaultKey" $ T.pack $ "Vault's response from GET /key is " <> show eAddressNKey
-    case eAddressNKey of 
-        Right a -> return $ Just a
+    case eAddressNKey of
+        Right a -> do
+            $logInfoS "getVaultKey" $ T.pack $ "User already has key in vault: " <> show a
+            return $ Just a
         -- only errors from GET /key are user doesn't exist (400) or incorrect pw (503)
         -- beware if the error behavior for /key changes
-        Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> return Nothing
-        Left err -> do 
+        Left (FailureResponse _ Response{..}) | responseStatusCode == status400 -> do
+            $logInfoS "getVaultKey" "User has no vault key yet. Will create one now"
+            return Nothing
+        Left err -> do
             $logInfoS "getVaultKey" $ T.pack $ "Vault error when trying to get user's key: " <> show err
             throwIO $ IdentityError $ T.pack $ "Vault error when trying to get user's key: " <> show err
 
-postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => T.Text -> m AddressAndKey
+postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m AddressAndKey
 postVaultKey accessToken = do
     VaultData url mgr <- access Proxy
     eAddressNKey <- liftIO $ runClientM (postKey (Just accessToken)) (mkClientEnv mgr url)
@@ -347,25 +364,19 @@ server :: ( MonadIO m
           , Accessible Issuer m
           , Accessible X509Certificate m
           , Accessible PrivateKey m
-          , Accessible BaseUrl m
-          , Accessible ClientId m
-          , Accessible ClientSecret m
-          , Accessible MasterClientId m
-          , Accessible MasterClientSecret m
+          , Accessible RealmData m
+          , Accessible (Maybe SendgridAPIKey) m
           ) => ServerT IDAPI.IdentityProviderAPI m
 server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
 
 hoistCoreServer :: String 
-                -> String 
                 -> Issuer 
                 -> X509Certificate 
                 -> PrivateKey
-                -> String
-                -> String
-                -> String
-                -> String
+                -> RealmData
+                -> Maybe SendgridAPIKey
                 -> Server IDAPI.IdentityProviderAPI
-hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
+hoistCoreServer vaulturl iss cert privk rd mEmailK = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     convertErrors r x = Handler $ do
       eRes <- liftIO . try $ r x
@@ -373,37 +384,26 @@ hoistCoreServer nodeurl vaulturl iss cert privk cid cs mid ms = hoistServer (Pro
         Right a -> return a
         Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM nodeurl iss cert privk cid cs mid ms x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd mEmailK x
     reThrowError :: IdentityError -> ServerError
     reThrowError
       = \case
           IdentityError err -> err400{errBody = BL.fromStrict $ encodeUtf8 err}
 
-runIdentityM :: MonadIO m
-             => String
-             -> Issuer
+runIdentityM :: Issuer
              -> X509Certificate
              -> PrivateKey
-             -> String
-             -> String
-             -> String
-             -> String
+             -> RealmData
+             -> Maybe SendgridAPIKey
              -> ReaderT IdentityServerData m a -> m a
-runIdentityM nodeurl iss cert privk cid cs mid ms x = do
-    url <- liftIO $ parseBaseUrl nodeurl
-    let path' = baseUrlPath url
-    let pathToBlocApi = path' <> (if "/" `isSuffixOf` path' then "" else "/") <> blocEndpoint -- surely there is a better way to do this?
-    runReaderT x $ IdentityServerData iss cert privk url{baseUrlPath=pathToBlocApi} (ClientId cid) (ClientSecret cs) (MasterClientId mid) (MasterClientSecret ms)
+runIdentityM iss cert privk rd mEmailK x = runReaderT x $ IdentityServerData iss cert privk rd mEmailK
 
 
 identityProviderApp :: String
-                    -> String
                     -> Issuer
                     -> X509Certificate
                     -> PrivateKey
-                    -> String
-                    -> String
-                    -> String
-                    -> String
+                    -> RealmData
+                    -> Maybe SendgridAPIKey
                     -> Application
-identityProviderApp nurl vurl iss cert pk cid cs mid ms = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer nurl vurl iss cert pk cid cs mid ms
+identityProviderApp vurl iss cert pk rd mEmailK = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd mEmailK

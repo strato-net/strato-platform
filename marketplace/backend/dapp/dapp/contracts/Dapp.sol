@@ -15,7 +15,7 @@ import "/dapp/orders/contracts/OrderManager.sol";
  *
  */
 
-contract Dapp {
+contract Dapp_2 {
     event OrgAdded(string orgName);
     event OrgUnitAdded(string orgName, string orgUnit);
     event CommonNameAdded(string orgName, string orgUnit, string commonName);

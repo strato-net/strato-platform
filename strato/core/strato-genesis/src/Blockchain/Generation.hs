@@ -50,6 +50,7 @@ import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256              as KECCAK256
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.UserRegistry
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.RLP
 import           Blockchain.Data.ChainInfo
@@ -831,100 +832,18 @@ contract MercataGovernance {
     }
 }|]
 
-userRegistryContract :: Text
-userRegistryContract = [r|
-contract UserRegistry {
-    // The UserRegistry is responsible for creating User contracts for each user.
-    address public owner;
-
-    constructor() {
-        owner = msg.sender;
-    }
-
-    function createUser(string _commonName, string _userAddress, address _certificateAddress) public returns (address) { 
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        User newUser = new User{salt: _commonName}();
-        newUser.initializeUser(_commonName, address(_userAddress), _certificateAddress);
-        return address(newUser);
-    }
-
-    function addCertificateToUser(address _userContractAddress, address _certificateAddress) public {
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        User targetUser = User(_userContractAddress);
-        targetUser.addCertificate(_userContractAddress, _certificateAddress);
-    }
-
-    function toggleUserActiveStatus(address _userContractAddress) public {
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        User targetUser = User(_userContractAddress);
-        targetUser.toggleUserActiveStatus();
-    }
-}
-
-contract User {
-    address public owner;
-
-    mapping(address => address) userCertificates;     // Data structure subject to change
-    string public commonName;
-    bool isActive;
-
-    constructor() {
-        owner = msg.sender;
-    }
-
-    function initializeUser(string _commonName, address _userAddress, address _certificateAddress) {
-        // Only UserRegistry can add new certificates.
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        commonName = _commonName;
-        userCertificates[_userAddress] = _certificateAddress;
-        isActive = true;
-    }
-
-    function addCertificate(address _userAddress, address _certificateAddress) public {
-        // Only UserRegistry can add new certificates.
-        require((msg.sender == owner), "You don't have permission to use this function!");
-        
-        userCertificates[_userAddress] = _certificateAddress;
-    }
-
-    function toggleUserActiveStatus() public {
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        isActive = !isActive;
-    }
-
-    // Checks if the caller is indeed the user the wallet belongs to.
-    function authenticate() public returns (bool) {
-        return userCertificates[msg.sender] != address(0);
-    }
-
-    function callContract(address contractToCall, string functionName, variadic args) public returns (variadic) {
-        // Only the user that this contract is associated with, can use this function.
-        require((authenticate() && isActive), "You don't have permission to use this function!");
-
-        variadic result = address(contractToCall).call(functionName, args);
-        return result;
-    }
-} 
-|]
-
 -- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
 insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertUserRegistryContract certs gi =
     gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
-        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
+        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry userRegistryContract (Just "UserRegistry")]}
     where 
         addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
         initialAccounts = genesisInfoAccountInfo gi
         initialCode     = genesisInfoCodeInfo gi
 
         rlpWrap         = rlpSerialize . rlpEncode
-        contractSrc     = certificateRegistryContract <> "\n\n" <> userRegistryContract
-        encodedRegistry = encodeUtf8 contractSrc
+        encodedRegistry = encodeUtf8 userRegistryContract
 
         rootAddress'    = fromPublicKey rootPubKey
         rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
@@ -952,14 +871,6 @@ insertUserRegistryContract certs gi =
                         (".isActive", rlpWrap $ BBool True),
                         (BC.pack $ ".userCertificates<a:" ++ (show $ certUserAddress cert) ++ ">", addrToCertIdx . show . reverseAddr $ cert)]
             ) certs
-
-        -- testAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing "Jin Huai Xuan" Nothing Nothing) 0
-        --     (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
-        --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
-        --         (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
-        --         (".isActive", rlpWrap $ BBool True),
-        --         (BC.pack $ ".userCertificates<a:a13bf5afbd9e23e92568b546880b55d8ee0d54a5>", addrToCertIdx "a5540deed8550b8846b56825e9239ebdaff53ba1")
-        --     ]
 
         registryAcct = SolidVMContractWithStorage 0x720 720
             (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry)) $
