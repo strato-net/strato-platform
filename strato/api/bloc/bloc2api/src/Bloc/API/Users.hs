@@ -297,6 +297,10 @@ instance ToParam (QueryFlag "resolve") where
   toParam _ =
     DocQueryParam "resolve" ["0","1",""] "flag for resolving a transaction result" Flag
 
+instance ToParam (QueryParam "use_wallet" Bool) where
+  toParam _ =
+    DocQueryParam "use_wallet" [] "flag for overriding default user wallet behavior" Normal
+
 --------------------------------------------------------------------------------
 
 type PostUsersFill = "users"

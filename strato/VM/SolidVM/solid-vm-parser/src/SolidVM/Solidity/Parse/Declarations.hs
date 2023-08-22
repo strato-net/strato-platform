@@ -44,7 +44,7 @@ import qualified SolidVM.Solidity.Xabi              as Xabi
 import           Blockchain.VM.SolidException
 
 data SourceUnitF a = Pragma a Identifier String
-                   | Import a Text.Text
+                   | Import a (SolidVM.FileImportF a)
                    | Alias a String String
                    | NamedXabi Text.Text (XabiF a, [Text.Text])
                    | FLFunc String SolidVM.Func
@@ -174,7 +174,7 @@ solidityDeclaration free =
   modifierDeclaration <|>
   eventDeclaration <|>
   variableDeclaration
-  
+
 {- New types -}
 
 -- | Parses a struct definition
@@ -410,14 +410,23 @@ functionDeclaration free = do
   cName <- getContractName
   let xabi = xabi'{SolidVM._funcContext = a <> SolidVM._funcContext xabi'}
       tipe = if cName == functionName
-                then ConstructorDeclaration 
-                else FuncDeclaration 
+                then ConstructorDeclaration
+                else FuncDeclaration
   return (functionName, tipe xabi)
 
 functionXabi :: Bool -> SolidityParser SolidVM.Func
 functionXabi free = do
   start <- getSourcePosition
   functionArgs <- tupleDeclaration
+
+  let lastParamIsVariadic = maybe False ((==) SVMType.Variadic . fst) (Data.List.uncons . reverse . map snd $ functionArgs)
+      containsOnly1       = length (filter (SVMType.Variadic ==) (map snd functionArgs)) == 1
+  case (lastParamIsVariadic, containsOnly1) of
+    (True, False)  -> unexpected "only one variadic parameter is allowed"
+    (False, True)  -> unexpected "variadic parameter must be the last parameter"
+    (True, True)   -> return ()
+    (False, False) -> return ()
+
   (functionRet, visibility, freevisibility, mutability, virtual, override, funcConstructorCallsOrModifiers) <- functionModifiers
   end <- getSourcePosition
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
@@ -576,10 +585,10 @@ functionModifiers = do
       <|> (reserved "payable"  >> return SolidVM.Payable)
       )
     overrideModifier = reserved "override" >> (fromMaybe [] <$> optionMaybe (parens $ commaSep identifier))
-    constructorCallModifiersOrOtherModifiers = do 
+    constructorCallModifiersOrOtherModifiers = do
       name <- stringToLabel <$> identifier
       exps <- optionMaybe (parens $ commaSep expression)
-      return (name, fromMaybe [] exps) 
+      return (name, fromMaybe [] exps)
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String
@@ -661,7 +670,7 @@ inCommentSingle
   where
     startEnd   = nub (commentEnd solidityLanguage ++ commentStart solidityLanguage)
 
---To make a new reserved word with a specific pragma version please add to the following function list, 
+--To make a new reserved word with a specific pragma version please add to the following function list,
   -- This assumes that only the solidvm pragma name is used. Please change if new pragmaNames are added.
 isReservedWord :: String -> String -> Bool
 isReservedWord version _ = do

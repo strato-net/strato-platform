@@ -94,6 +94,7 @@ valueToSolidityValue = \case
                               ++ intercalate "," (map (formatType . snd) returnTypes)
                               ++ ")"
   ValueArraySentinel{} -> error "TODO(tim): ValueArraySentinel"
+  ValueVariadic values -> SolidityArray $ map valueToSolidityValue values
 
 
 
@@ -164,6 +165,7 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ ofs cnt len =
               -- vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') mOffset mCount len
         TypeEnum _ -> [(offset, 1)]
         TypeContract _ -> [(offset, 1)]
+        TypeVariadic -> error "decodeStorageKey: TypeVariadic"
 
 decodeCacheValues
   :: Contract
@@ -318,6 +320,8 @@ decodeCacheValue' typeDefs'@TypeDefs{..} cache position@Storage.Position{..} val
         let raw_kvs = structSort theStruct $ Map.toList kvs
         in Just . ValueStruct . Map.fromList $ decodeCacheValues' typeDefs' theStruct cache (Storage.alignedByte position) raw_kvs
        v -> error $ "decodeCacheValue': Expected ValueStruct, but got: " ++ show v
+
+  TypeVariadic -> Nothing
 
 structSort :: Struct -> [(Text, Value)] -> [(Text, Value)]
 structSort (Struct om _)  = sortBy omOrder
@@ -500,6 +504,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
 
      Just theStruct -> Just . ValueStruct . Map.fromList $ decodeValues cnt typeDefs' theStruct storage (Storage.alignedByte position)
 
+  TypeVariadic -> Nothing
 
 
 
@@ -623,6 +628,7 @@ encodeValue' typeDefs'@TypeDefs{} position@Storage.Position{..} ty = \case
   ValueStruct _ -> error "Structs not supported yet"
   ValueMapping{} -> error "Mappings unsupported in EVM values"
   ValueArraySentinel{} -> error "ArraySentinel unsupported in EVM values"
+  ValueVariadic _ -> error "Variadic not supported yet"
 
 
 
