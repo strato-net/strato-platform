@@ -141,15 +141,12 @@ const MembershipCard = ({
                  {membership.timePeriodInMonths} Month(s)
                 </p>
               </div>
-              <div
-                className={classNames(
-                  state.isActive
-                    ? "text-success bg-[#EAFFEE]"
-                    : "text-orange bg-[#FFF6EC]",
-                  "text-center py-1 rounded w-24 text-sm mt-2.5"
-                )}
-              >
-                <p>{state.isActive ? "Active" : "Inactive"}</p>
+              <div className={classNames( "text-center py-1 rounded w-24 text-sm mt-2.5")}>
+                {membership.product_with_inventory ?  
+                  (membership.isInventoryAvailable ?
+                      (<Button type="primary" shape="round"  size={1} style={{ background: "green" }}> Active </Button>) 
+                      : (<Button type="primary" shape="round"  size={1} style={{ background: "red" }}> Retained </Button>) )
+                  :(<Button type="primary" shape="round"  size={1} style={{ background: "blue"    }}> Prepared </Button>)}
               </div>
             </div>
           </div>
