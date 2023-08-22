@@ -72,9 +72,9 @@ const MembershipCard = ({
                 />  
                 {membership.product_with_inventory ?  
                   (membership.isInventoryAvailable ?
-                      (<Button type="primary" shape="round"  size={1} style={{ background: "green" }}> Active </Button>) 
-                      : (<Button type="primary" shape="round"  size={1} style={{ background: "red" }}> Retained </Button>) )
-                  :(<Button type="primary" shape="round"  size={1} style={{ background: "blue"    }}> Prepared </Button>)}
+                      (<Button type="primary" shape="round" style={{ background: "green" }}> For Sale </Button>) 
+                      : (<Button type="primary" shape="round"  style={{ background: "red" }}> Retained </Button>) )
+                  :(<Button type="primary" shape="round" style={{ background: "blue" }}> Not for Sale </Button>)}
             </div>
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
