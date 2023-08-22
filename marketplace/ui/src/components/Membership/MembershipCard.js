@@ -84,13 +84,21 @@ const MembershipCard = ({
                   </h3>
                 </div>
                 <div className="flex items-center">
+                {!membership.product_with_inventory ?
+                   <Button type="text"
+                     className="text-primary text-sm cursor-pointer"
+                   >
+                     List for Sale
+                   </Button>
+                :null}
                 <Button type="text"
                   className="text-primary text-sm cursor-pointer"
                   onClick={callDetailPage}
                 >
                   Preview
                 </Button>
-                <Popover
+                
+                {/* <Popover
                   placement="bottomLeft"
                   open={openPop}
                   onOpenChange={handleOpenChange}
@@ -117,7 +125,7 @@ const MembershipCard = ({
                   trigger="click"
                 >
                   <MoreOutlined />
-                </Popover>
+                </Popover> */}
                 </div>
               </div>
               <div className="flex mt-1.5 items-center">
