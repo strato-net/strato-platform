@@ -64,11 +64,18 @@ const MembershipCard = ({
       ) : (
         <Card className="w-full mt-6" id="product">
           <div className="flex">
-            <img
-              className="w-52 object-cover"
-              alt=""
-              src={membership.productImage1}
-            />
+            <div className={classNames( "text-center py-1 rounded w-24 text-sm mt-2.5")}>
+                <img
+                  className="w-52 object-cover"
+                  alt=""
+                  src={membership.productImage1}
+                />  
+                {membership.product_with_inventory ?  
+                  (membership.isInventoryAvailable ?
+                      (<Button type="primary" shape="round"  size={1} style={{ background: "green" }}> Active </Button>) 
+                      : (<Button type="primary" shape="round"  size={1} style={{ background: "red" }}> Retained </Button>) )
+                  :(<Button type="primary" shape="round"  size={1} style={{ background: "blue"    }}> Prepared </Button>)}
+            </div>
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
@@ -141,13 +148,6 @@ const MembershipCard = ({
                 <p className="text-secondryB text-sm ml-3">
                  {membership.timePeriodInMonths} Month(s)
                 </p>
-              </div>
-              <div className={classNames( "text-center py-1 rounded w-24 text-sm mt-2.5")}>
-                {membership.product_with_inventory ?  
-                  (membership.isInventoryAvailable ?
-                      (<Button type="primary" shape="round"  size={1} style={{ background: "green" }}> Active </Button>) 
-                      : (<Button type="primary" shape="round"  size={1} style={{ background: "red" }}> Retained </Button>) )
-                  :(<Button type="primary" shape="round"  size={1} style={{ background: "blue"    }}> Prepared </Button>)}
               </div>
             </div>
           </div>
