@@ -1535,8 +1535,7 @@ contract qq {
 
 contract qq {
   uint x = 7;
-  function myInternalFunc()
-      ternal {
+  function myInternalFunc() internal {
     x = 8;
   }
   constructor() {
@@ -1618,8 +1617,7 @@ contract qq is Parent {
 
 contract Parent {
   uint x = 7;
-  function myInternalFunc()
-      ternal {
+  function myInternalFunc() internal {
     x = 8;
   }
 }
@@ -1701,8 +1699,7 @@ contract qq {
 
 contract Parent {
   uint x = 7;
-  function myInternalFunc()
-      ternal {
+  function myInternalFunc() internal {
     x = 8;
   }
 }
