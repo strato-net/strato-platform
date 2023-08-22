@@ -81,7 +81,7 @@ const serviceDispatch = useMembershipDispatch();
   useEffect(() => {
     let services = [];
     let savings = [];
-    membershipServices.forEach(element => {
+    membershipServices?.forEach(element => {
       services.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceDesc": element.serviceDescription, "memberPrice": element.membershipPrice, "nonMemberPrice": element.servicePrice, "uses": element.maxQuantity},)
       savings.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceCost": element.savings},)
     });
@@ -360,30 +360,30 @@ const serviceDispatch = useMembershipDispatch();
 
           <div className="flex mx-16">
             <div className="w-1/2">
-              <div className="h-96 flex items-center justify-center border border-grayLight">
-                {/* TODO: figure out how to show multiple images */}
-                {/* {allProductFiles && allProductFiles.length > 0 ? (
-                <Carousel>
-                  {allProductFiles.map((file, index) => (
-                      <Image
-                        key={index}
-                        height={"100%"}
-                        width={"100%"}
-                        style={{ objectFit: "contain" }}
-                        src={file.imageUrl}
-                      />
-                  ))}
-                </Carousel>
-                ) : (
+              
+              <div className="items-center justify-center border border-grayLight">
+                {allProductFiles && allProductFiles.length > 0 ? (
+                  <Carousel>
+                    {allProductFiles.map((file, index) => 
+                      <div key={index} className= "h-96">
+                        <Image
+                          height={"100%"}
+                          width={"100%"}
+                          style={{ objectFit: "contain" }}
+                          src={file.imageUrl}
+                        />
+                        
+                    </div>
+                    )}
+                  </Carousel>
+                  ) : (
                   <Image
                         height={"100%"}
                         width={"100%"}
                         style={{ objectFit: "contain" }}
                         src={null}
                       />
-                )} */}
-                
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={allProductFiles !== undefined ? (allProductFiles[0] ? allProductFiles[0].imageUrl : null) : null} />
+                )}
               </div>
               {details?.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
