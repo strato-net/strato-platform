@@ -122,7 +122,7 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchMembership });
 
     try {
-      const response = await fetch(`${apiUrl}/membership?limit=${limit}&offset=${offset}${query}`, {
+      const response = await fetch(`${apiUrl}/membership?${query}`, {
         method: HTTP_METHODS.GET,
       });
 

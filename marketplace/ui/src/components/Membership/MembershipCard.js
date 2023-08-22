@@ -64,7 +64,7 @@ const MembershipCard = ({
       ) : (
         <Card className="w-full mt-6" id="product">
           <div className="flex">
-            <div className={classNames( "text-center py-1 rounded w-24 text-sm mt-2.5")}>
+            <div className="text-center py-1 rounded w-24 text-sm mt-2.5">
                 <img
                   className="w-52 object-cover"
                   alt=""
@@ -72,9 +72,9 @@ const MembershipCard = ({
                 />  
                 {membership.product_with_inventory ?  
                   (membership.isInventoryAvailable ?
-                      (<Button type="primary" shape="round" style={{ background: "green" }}> For Sale </Button>) 
-                      : (<Button type="primary" shape="round"  style={{ background: "red" }}> Retained </Button>) )
-                  :(<Button type="primary" shape="round" style={{ background: "blue" }}> Not for Sale </Button>)}
+                      (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px"  }}> For Sale </Button>) 
+                      : (<Button type="primary" shape="round"  style={{ background: "red", marginTop: "10px"  }}> Retained </Button>) )
+                  :(<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px"  }}> Not for Sale </Button>)}
             </div>
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
