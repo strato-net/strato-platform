@@ -66,7 +66,7 @@ tableNameToText (MappingTableName o a c m ) =
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
       contractAndMapping = c <> "." <> m
-  in "mapping@" <> prefix <> contractAndMapping
+  in prefix <> contractAndMapping
 tableNameToText (HistoryTableName o a c) =
   let prefix
         | T.null o = ""
@@ -80,13 +80,12 @@ tableNameToText (EventTableName o a c e) =
         | otherwise = o <> tableSeparator <> a <> tableSeparator
       contractAndEvent = c <> "." <> e
   in prefix <> contractAndEvent
-tableNameToText (AssetTableRowName o a c) =
+tableNameToText (AbstractTableName o a c) =
   let prefix
         | T.null o = ""
         | T.null a = o <> tableSeparator
         | otherwise = o <> tableSeparator <> a <> tableSeparator
   in prefix <> c
-
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char

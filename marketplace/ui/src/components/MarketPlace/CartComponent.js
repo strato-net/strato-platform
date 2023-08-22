@@ -13,7 +13,8 @@ import { actions } from "../../contexts/marketplace/actions";
 import {
     useMarketplaceDispatch,
   } from "../../contexts/marketplace";
-  import { useAuthenticateState } from "../../contexts/authentication";
+import { useAuthenticateState } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
 
 const CartComponent = ({ columns, data }) => {
@@ -95,6 +96,11 @@ const CartComponent = ({ columns, data }) => {
                                     window.location.href = loginUrl;
                                 } else {
                                 actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                                TagManager.dataLayer({
+                                    dataLayer: {
+                                      event: 'submit_order_from_cart',
+                                    },
+                                  });
                                 navigate("/confirmOrder");
                             }}}
                             disabled={data.length === 0}

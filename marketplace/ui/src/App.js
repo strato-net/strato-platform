@@ -8,14 +8,20 @@ import { BrowserRouter } from "react-router-dom";
 import "./styles/app.css";
 import { Layout } from "antd";
 import HeaderComponent from "./components/Header/Header";
-
+import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 
 const { Content } = Layout;
 
 const App = () => {
 
-  const {user, loginUrl, users } =
+  const tagManagerArgs = {
+    gtmId: 'GTM-NHBZ2BX'
+  };
+
+  TagManager.initialize(tagManagerArgs);
+
+  const {user, loginUrl, users, isAuthenticated } =
     useAuthenticateState();
     
     
@@ -32,7 +38,7 @@ const App = () => {
     <BrowserRouter basename="/marketplace">
       <Layout>
         <UsersProvider>
-          <HeaderComponent user={user} users={users} loginUrl={loginUrl} />
+          <HeaderComponent isOauth={isAuthenticated}  user={user} users={users} loginUrl={loginUrl} />
         </UsersProvider>
         <Content>
           <AuthenticatedRoutes user={user} users={users} />

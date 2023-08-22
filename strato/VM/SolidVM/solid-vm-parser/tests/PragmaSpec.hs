@@ -12,7 +12,6 @@ import           SolidVM.Solidity.Parse.Declarations
 import           SolidVM.Solidity.Parse.File
 import           Data.Source.Annotation as SA 
 import           Data.Source.Position as SP
-import qualified Data.Map as M
 
 dummyAnnotation :: SA.SourceAnnotation ()
 dummyAnnotation =
@@ -34,12 +33,12 @@ dummyAnnotation =
 
 spec :: Spec
 spec = do
-  let pragmaParse = runParser solidityPragma (ParserState "" "" M.empty) ""
+  let pragmaParse = runParser solidityPragma initialParserState ""
   describe "Pragma" $ do
     it "should fail without an identifier" $
       pragmaParse "pragma;" `shouldSatisfy` isLeft
-    it "should fail without contents for version number" $
-      pragmaParse "pragma typecheck;" `shouldSatisfy` isLeft
+    it "should succeed without contents for version number" $
+      pragmaParse "pragma typecheck;" `shouldSatisfy` isRight
     it "shoudl fail without a ;" $
       pragmaParse "pragma solc 0.4.8" `shouldSatisfy` isLeft
 

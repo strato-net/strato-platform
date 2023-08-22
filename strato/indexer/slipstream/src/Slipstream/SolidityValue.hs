@@ -113,6 +113,7 @@ valueToSolidityValue' = \case
   ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue' namedItems
   ValueMapping ms -> Just . SolidityObject $ mapMaybe convertBoth (M.toList ms)
   ValueArraySentinel{} -> Nothing
+  ValueVariadic values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ values
 
  where convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
        convertBoth (sv, v) = (simpleValueToText sv, ) <$> valueToSolidityValue' v

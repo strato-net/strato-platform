@@ -8,6 +8,7 @@ import {
   Badge,
   Avatar,
   Dropdown,
+  Typography,
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
@@ -21,10 +22,12 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
+const { Title } = Typography;
 const { Header } = Layout;
 
-const HeaderComponent = ({ user, loginUrl }) => {
+const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const navigate = useNavigate();
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
@@ -72,6 +75,11 @@ const HeaderComponent = ({ user, loginUrl }) => {
   ];
 
   const logout = () => {
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'logout',
+      },
+    });
     userActions.logout(userDispatch);
   };
 
@@ -153,7 +161,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
         >
           <Image src={Images.logo} width={35} preview={false} />
         </div>
-        {roleIndex === undefined || roleIndex === 1 ? null : <div className="ml-7 w-72">
+        {((roleIndex === undefined || roleIndex === 1) && !isOauth)  ? null : <div className="ml-7 w-72">
           <Input
             size="large"
             placeholder="Search"
@@ -169,7 +177,37 @@ const HeaderComponent = ({ user, loginUrl }) => {
         className="h-16 bg-primary text-tertiaryB m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
-          if (item.key === "4") navigate(navUrls[item.key], { state: { tab: "EventType" } })
+          if (item.key === "0") {    
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_marketplace_page',
+            },
+          });}
+          if (item.key === "1") {  
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_orders_page',
+            },
+          });}
+          if (item.key === "2") {
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_inventory_page',
+            },
+          });}
+          if (item.key === "3") {
+            TagManager.dataLayer({
+            dataLayer: {
+              event: 'view_products_page',
+            },
+          });}
+          if (item.key === "4") {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_events_page',
+              },
+            });
+            navigate(navUrls[item.key], { state: { tab: "EventType" } })}
           else navigate(navUrls[item.key]);
         }}
         items={navItems[roleIndex]?.items}
@@ -178,7 +216,14 @@ const HeaderComponent = ({ user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}
-          onClick={() => navigate("/checkout")}
+          onClick={() => {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_shopping_cart',
+              },
+            });
+            navigate("/checkout");
+          }}
         >
           <Avatar
             style={{
@@ -190,7 +235,16 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white"> Login / Register </a> : null
+            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white" 
+              onClick={() => {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'login_register_click'
+                  }
+                })
+              } } > 
+              Login / Register 
+              </a> : (isOauth  ?  <Title  style={{backgroundColor: 'red', border: 3, padding:10,  color: '#FFFFFF'}} level={3} >Something went wrong, try to refresh page</Title> : null)  
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
