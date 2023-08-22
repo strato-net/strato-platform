@@ -117,7 +117,7 @@ function newnode {
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
-  actualTimeout="${connectionTimeout:-300}"
+  actualTimeout="${connectionTimeout:-30}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
     withCushion=$(( 2 * blockstanbulRoundPeriodS ))
     actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
@@ -138,6 +138,9 @@ function newnode {
   if [ -n "${network}" ]; then
     networkFlag="--network=${network}"
   fi
+  if [ -n "${maxReturnedHeaders}" ]; then
+    maxHeadersFlag="--maxReturnedHeaders=${maxReturnedHeaders}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -145,8 +148,8 @@ function newnode {
      --sqlPeers=true \
      --debugFail=${debugFail:-true}  \
      --maxConn=$maxConn \
-     --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
+     ${maxHeadersFlag} \
      ${txgFlag} \
      ${atbFlag} \
      ${pcamFlag} \
@@ -423,7 +426,6 @@ fi
 setEnv requireCerts true
 setEnv genesisBlock ""
 setEnv bootnode ""
-setEnv maxReturnedHeaders 500
 
 setEnv mineBlocks true
 setEnv verifyBlocks false
