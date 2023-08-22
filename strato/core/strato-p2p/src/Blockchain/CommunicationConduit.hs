@@ -332,7 +332,17 @@ messageToBytes = mapC serializeWithRespectToMaxMessageSize
           bs = theWord `B.cons` rlpSerialize o 
       in  if B.length bs >= maxMessageSize
           then case msg of
-            BlockBodies arr -> serializeWithRespectToMaxMessageSize (BlockBodies $ take (length arr `div` 2) arr)
-            _ -> error $ printf "messageToBytes: message (%s...) too large for TCP send (%d >= %d)"
+            NewBlockHashes arr  -> serializeWithRespectToMaxMessageSize . NewBlockHashes  $ firstHalf arr
+            Transactions arr    -> serializeWithRespectToMaxMessageSize . Transactions    $ firstHalf arr
+            BlockHeaders arr    -> serializeWithRespectToMaxMessageSize . BlockHeaders    $ firstHalf arr
+            GetBlockBodies arr  -> serializeWithRespectToMaxMessageSize . GetBlockBodies  $ firstHalf arr
+            BlockBodies arr     -> serializeWithRespectToMaxMessageSize . BlockBodies     $ firstHalf arr
+            GetChainDetails arr -> serializeWithRespectToMaxMessageSize . GetChainDetails $ firstHalf arr 
+            ChainDetails arr    -> serializeWithRespectToMaxMessageSize . ChainDetails    $ firstHalf arr 
+            GetTransactions arr -> serializeWithRespectToMaxMessageSize . GetTransactions $ firstHalf arr
+            _ -> error $ printf "messageToBytes: message (%s...) too large to be sent via RLPx and can't be truncated (%d >= %d)"
               (take 50 $ show msg) (B.length bs) maxMessageSize
           else bs
+    
+    firstHalf :: [a] -> [a]
+    firstHalf arr = take (length arr `div` 2) arr
