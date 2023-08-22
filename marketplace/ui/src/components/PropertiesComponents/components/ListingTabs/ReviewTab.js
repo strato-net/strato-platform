@@ -34,13 +34,15 @@ const ReviewTab = (props) => {
   }, [reviews]);
 
   const handleSubmit = async () => {
+    const encodedDescription = encodeURIComponent(form.getFieldValue("description"));
+
     const reviewForm = {
       ...form.getFieldsValue(),
       productId: props.productId,
       propertyId: props.propertyId,
-      reviewerAddress: user.userAddress
+      reviewerAddress: user.userAddress,
+      description: encodedDescription,
     };
-    console.log(reviewForm)
     actions.createReview(dispatch, reviewForm);
   };
 

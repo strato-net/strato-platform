@@ -93,7 +93,7 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <TextArea rows={4} style={{resize: 'none'}} onChange={(e) => { handleChange("description", encodeURIComponent(e.target.value)) }} />
+          <TextArea rows={4} style={{resize: 'none'}} onChange={(e) => { handleChange("description", e.target.value) }} />
         </Form.Item>
       </Form>
     </Modal>
