@@ -11,7 +11,6 @@
 {-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeOperators          #-}
-{-# OPTIONS -fno-warn-orphans       #-}
 {-# OPTIONS -fno-warn-redundant-constraints       #-}
 
 module Handlers.IdentityServerCallback (API, server) where
@@ -23,7 +22,7 @@ import           GHC.Stack
 import           Servant
 import           Servant.Client
 import           Control.Monad.Reader              (runReaderT)
-import           Control.Concurrent.Async
+import           Control.Exception                 (try, SomeException)
 import           Control.Monad.IO.Class
 
 
@@ -49,9 +48,14 @@ redirect :: ( MonadIO m, MonadLogger m, HasIdentity m)
     => Text ->  m (Headers '[Header "Location" String] Address)
 redirect accessToken = do
   IdentityData url mgr <- access Proxy
-  -- We do not want to wait for the response from the identity server
-  -- so we fork a thread to run the request
-  _ <- liftIO $ async $ runLoggingT $   (flip runReaderT ( IdentityData url mgr)  $ identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) )
+  --Historical note: we decided to wait for ID serer response, but ignore any bad response
+  --As the fail safe should catch any ID server failure
+  idServerResult <- liftIO $ (try (runLoggingT $ (flip runReaderT ( IdentityData url mgr)  $ identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) )) :: IO (Either SomeException Address) )
+  case idServerResult of 
+    Left e -> do
+      logErrorCS callStack $ "Error calling Identity Server: " <> pack (show e)
+    Right _ -> do
+      logInfoCS callStack "Successfully called Identity Server"
   return $ addHeader "/" (Address 0x0) --At one point we wanted to redirect with an address, but we don't need to do that anymore, maybe we should remove the address from the type signature
 
 identitytWrapper :: (MonadIO m, MonadLogger m, HasIdentity m, HasCallStack) =>
