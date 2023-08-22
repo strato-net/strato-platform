@@ -133,6 +133,9 @@ instance (Account `A.Alters` AddressState) SetupDBM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
+instance (Account `A.Selectable` AddressState) SetupDBM where
+  select _ = getAddressStateMaybe
+
 instance (Keccak256 `A.Alters` DBCode) SetupDBM where
   lookup _ = genericLookupCodeDB $ asks codeDB
   insert _ = genericInsertCodeDB $ asks codeDB

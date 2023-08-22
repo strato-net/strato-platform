@@ -139,10 +139,10 @@ class CodeEditor extends Component {
         throw new Error("Can't compile. Source is undefined")
       }
       const code = getFileAndReplaceWithImport(this.props.codeEditorData.sourceCode, this.props.codeEditorData.tab)
-      const newFileList = getImportStatements(code)
-      if (newFileList.length > 0) {
-        throw new Error("Can't find the imported file.")
-      }
+      // const newFileList = getImportStatements(code)
+      // if (newFileList.length > 0) {
+      //   throw new Error("Can't find the imported file.")
+      // }
       mixpanelWrapper.track("compile_contract_code_click");
       this.props.compileCodeFromEditor(code, codeType);
     } catch (e) {

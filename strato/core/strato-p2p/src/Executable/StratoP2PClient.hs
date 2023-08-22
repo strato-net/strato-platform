@@ -183,7 +183,7 @@ stratoP2PClient runner = runner $ \sSource -> do
                    e' | Just HeadMacIncorrect  <- fromException e' -> do
                     disErr <- storeDisableException thePeer (T.pack "HeadMacIncorrect")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    lengthenPeerDisable thePeer
+                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
                    e' | Just NetworkIDMismatch <- fromException e' -> do
                     udpErr <- disableUDPPeerForSeconds thePeer 86400
                     whenLeft udpErr $ \theUDPErr -> do
@@ -195,7 +195,7 @@ stratoP2PClient runner = runner $ \sSource -> do
                    e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException thePeer (T.pack "PeerDisconnected")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    lengthenPeerDisable thePeer
+                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
                    e' | Just TimeoutException <- fromException e' -> do
                     disErr <- storeDisableException thePeer (T.pack "TimeoutException")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
@@ -215,7 +215,7 @@ stratoP2PClient runner = runner $ \sSource -> do
                           $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
                         disErr <-storeDisableException thePeer (T.pack "ioErrType: NoSuchThing")
                         whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-                        lengthenPeerDisable thePeer
+                        lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
                       _ -> return $ Right ()
                    _  -> return $ Right ()
           whenLeft eErr $ \err -> do

@@ -75,6 +75,7 @@ executables:
       - solid-vm
       - solid-vm-fuzzer
       - strato-conf
+      - strato-model
       - text
       - transformers
       - unliftio

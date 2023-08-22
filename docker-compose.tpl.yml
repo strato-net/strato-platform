@@ -156,6 +156,7 @@ services:
     - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
+    - idServerUrl=${idServerUrl}
     - kafkaHost=kafka
     - kafkaPort=9092
     - lazyBlocks=${lazyBlocks}

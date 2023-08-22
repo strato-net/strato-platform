@@ -16,6 +16,7 @@ import           HFlags
 import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.VMOptions() -- HFlags
+import           Blockchain.Strato.Model.Options()
 import           Executable.EthereumVM
 import           Executable.EVMFlags() -- HFlags
 import           SolidVM.Solidity.SourceTools
