@@ -274,3 +274,11 @@ export function getEnvVariable(name) {
   if (value == '') throw new Error("missing env var for " + name);
   return value
 }
+
+export const  pollingHelper = async ( func, argsToFunc, attemptNumber=0, attemptsAllowed=8, milliseconds=1000  )  => {
+ if (attemptsAllowed  < attemptNumber) return null;
+ let result = await func(...argsToFunc);
+ if (!(result === null || result === undefined)) return result;
+ await new Promise(resolve => setTimeout(resolve, milliseconds));
+ return pollingHelper(func, argsToFunc, attemptNumber+1, attemptsAllowed, milliseconds  );
+}
