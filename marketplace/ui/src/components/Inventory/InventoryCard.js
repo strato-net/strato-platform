@@ -6,13 +6,15 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
-  SyncOutlined
+  SyncOutlined,
+  PieChartOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import { useNavigate } from "react-router-dom";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import RetireModal from "./RetireModal";
+import ResellModal from "./ResellModal";
 import routes from "../../helpers/routes";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
@@ -20,6 +22,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [open, setOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [retireModalOpen, setRetireModalOpen] = useState(false);
+  const [resellModalOpen, setResellModalOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -60,6 +63,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
 
   const handleRetireModalClose = () => {
     setRetireModalOpen(false);
+  };
+
+  const showResellModal = () => {
+    hide();
+    setResellModalOpen(true);
+  };
+
+  const handleResellModalClose = () => {
+    setResellModalOpen(false);
   };
 
   const callDetailPage = () => {
@@ -111,6 +123,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                       <EditOutlined />
                       <p className="ml-3">Edit</p>
                     </div>
+                  {inventory.category === 'Carbon' &&(                    
                     <div
                       className="flex items-center mt-2 cursor-pointer"
                       onClick={showRetireModal}
@@ -118,6 +131,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                       <SyncOutlined />
                       <p className="ml-3">Retire</p>
                     </div>
+                  )}
+                  {inventory.category === 'Carbon' &&(
+                    <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showResellModal}
+                    >
+                      <PieChartOutlined />
+                      <p className="ml-3">Resell</p>
+                    </div>
+                  )}
                   </div>
                 }
                 trigger="click"
@@ -210,6 +233,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           open={retireModalOpen}
           handleCancel={handleRetireModalClose}
           inventory={inventory}
+        />
+      )}
+      {resellModalOpen && (
+        <ResellModal
+          open={resellModalOpen}
+          handleCancel={handleResellModalClose}
+          inventory={inventory}
+          
         />
       )}
     </Card>

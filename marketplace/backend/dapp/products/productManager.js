@@ -109,6 +109,8 @@ function bind(user, _contract, options) {
     createProduct(user, contract, args, options);
   contract.createInventory = async (args) =>
     createInventory(user, contract, args, options);
+  contract.resellInventory = async (args) =>
+    resellInventory(user, contract, args, options);
   contract.updateInventory = async (args) =>
     updateInventory(user, contract, args, options);
   contract.deleteProduct = async (args) =>
@@ -228,6 +230,37 @@ async function createInventory(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
     method: "addInventory",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, inventoryAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (restStatus == 409)
+    throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found" });
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, inventoryAddress];
+}
+
+/**
+ * Resell a portion of existing inventory
+ */
+async function resellInventory(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "resellInventory",
     args: util.usc({
       ..._args,
     }),
@@ -455,6 +488,7 @@ export default {
   updateProduct,
   deleteProduct,
   createInventory,
+  resellInventory,
   updateInventory,
   updateInventoriesQuantities,
   sellItems,

@@ -5,27 +5,23 @@ import { useInventoryDispatch, useInventoryState } from "../../contexts/inventor
 import dayjs from 'dayjs';
 
 
-const RetireModal = ({ open, handleCancel, inventory }) => {
+const ResellModal = ({ open, handleCancel, inventory }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
-    const [retiredOnBehalfOf, setRetiredOnBehalfOf] = useState("");
-    const [purpose, setPurpose] = useState("");
+    const [pricePerUnit, setpricePerUnit] = useState(inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
-    const [canRetire, setCanRetire] = useState(true);
+    const [canResell, setCanResell] = useState(true);
     const {
-        isRetiringCredits
+        isReselling
     } = useInventoryState();
 
     useEffect(() => {
-        if (quantity > inventory.availableQuantity) {
-            setCanRetire(false);
+        if (quantity > inventory.availableQuantity || quantity <=0) {
+            setCanResell(false);
         }
         else {
-            setCanRetire(true);
+            setCanResell(true);
         };
-        if (inventory.vintage > dayjs().year()) {
-            setCanRetire(false);
-        }
     }, [quantity])
     const columns = [
         {
@@ -43,34 +39,26 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
             )
         },
         {
-            title: "Retired on Behalf of",
+            title: "Set Price",
             render: () => (
-                <Input value={retiredOnBehalfOf} onChange={(e) => setRetiredOnBehalfOf(e.target.value)} />
-            )
-        },
-        {
-            title: "Retirement Purpose",
-            render: () => (
-                <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} />
+                <InputNumber value={pricePerUnit} controls={false} min={pricePerUnit} onChange={(value) => setpricePerUnit(value)} />
             )
         }
     ];
 
+
     const handleSubmit = async () => {
         const body = {
             inventoryId: inventory.address,
-            retiredBy: inventory.name,
-            retiredOnBehalfOf: retiredOnBehalfOf,
             quantity: quantity,
-            purpose: purpose
+            price: pricePerUnit
         };
-        if (quantity > 0 && quantity <= inventory.availableQuantity && inventory.vintage <= dayjs().year()) {
-            let isDone = await actions.retireCredits(inventoryDispatch, body);
-            if (isDone) 
-            {
-                actions.fetchInventory(inventoryDispatch, 10, 0, "");
-                handleCancel();
-            }
+        if (quantity > 0 && quantity <= inventory.availableQuantity) {
+            let isDone = await actions.resellInventory(inventoryDispatch, body);
+            if (isDone) {
+                  actions.fetchInventory(inventoryDispatch, 10, 0, "");
+            handleCancel();
+        }
         }
     }
 
@@ -78,11 +66,11 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`Retire - ${decodeURIComponent(inventory.name)}`}
+            title={`Resell - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canRetire} loading={isRetiringCredits}>
-                    Retire
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canResell} loading={isReselling}>
+                    Resell
                 </Button>
             ]}
         >
@@ -96,4 +84,4 @@ const RetireModal = ({ open, handleCancel, inventory }) => {
 }
 
 
-export default RetireModal;
+export default ResellModal;

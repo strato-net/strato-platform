@@ -37,6 +37,7 @@ export const Inventory = {
   getAll: '/',
   create: '/',
   update: '/update',
+  resell: '/resell',
   retire: '/retire'
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership',

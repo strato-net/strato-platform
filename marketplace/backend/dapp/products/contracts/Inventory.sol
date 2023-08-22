@@ -4,7 +4,7 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 import "./RetiredItem.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory_5 is InventoryStatus {
+contract Inventory_7 is InventoryStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -78,6 +78,16 @@ contract Inventory_5 is InventoryStatus {
     function updateQuantity(int _quantity) returns (uint) {
         availableQuantity = _quantity;
         return RestStatus.OK;
+    }
+
+    function updateQuantityForResell(int _quantity) returns (uint256) {
+        availableQuantity = availableQuantity - _quantity;
+        return RestStatus.OK;
+    }
+
+    function updateRetiredQuantity(int _quantity) returns (uint) {
+        availableQuantity = availableQuantity - _quantity;
+        retiredQuantity = retiredQuantity + _quantity;
     }
 
     function updateQuantityForVintages(int _quantity) returns (uint) {

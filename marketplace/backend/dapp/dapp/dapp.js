@@ -253,6 +253,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     ];
 
   };
+
+  contract.resellInventory = async function (args, options = defaultOptions) {
+    const{ inventoryId, quantity, price, ...newArgs } = args;
+    return await managers.productManager.resellInventory({existingInventory:inventoryId, quantity, price});
+  };
+
   contract.updateInventory = async function (args, options = defaultOptions) {
     return await managers.productManager.updateInventory(args);
   };
