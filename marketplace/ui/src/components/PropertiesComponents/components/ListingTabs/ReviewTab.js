@@ -24,7 +24,7 @@ const ReviewTab = (props) => {
 
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const { message, success, isReviewAdding } = usePropertiesState();
-
+  console.log(user)
   useEffect(() => {
     const listOfReviews = []
     reviews?.forEach((review) => {
@@ -40,6 +40,7 @@ const ReviewTab = (props) => {
       ...form.getFieldsValue(),
       productId: props.productId,
       propertyId: props.propertyId,
+      reviewerName: user.commonName,
       reviewerAddress: user.userAddress,
       description: encodedDescription,
     };

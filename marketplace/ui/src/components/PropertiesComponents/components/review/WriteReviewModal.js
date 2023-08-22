@@ -47,30 +47,6 @@ const WriteReviewModal = (props) => {
       ]}
     >
       <Form name="basic" form={form} layout="vertical">
-            <Form.Item
-              label="Name"
-              name="reviewerName"
-              rules={[
-                {
-                  required: true,
-                  message: "Please input your name!",
-                },
-              ]}
-            >
-              <Input onChange={(e) => { handleChange("reviewerName", e.target.value) }} />
-            </Form.Item>
-        <Form.Item
-          label="How would you rate the property?"
-          name="rating"
-          rules={[
-            {
-              required: true,
-              message: "Please provide a rating!",
-            },
-          ]}
-        >
-          <Rate onChange={(e) => { handleChange("rating", e.target.value) }} />
-        </Form.Item>
         <Form.Item
           label="Title"
           name="title"
@@ -82,6 +58,19 @@ const WriteReviewModal = (props) => {
           ]}
         >
           <Input onChange={(e) => { handleChange("title", e.target.value) }} />
+        </Form.Item>
+        <Form.Item
+          label="How would you rate the property?"
+          name="rating"
+          className="my-4"
+          rules={[
+            {
+              required: true,
+              message: "Please provide a rating!",
+            },
+          ]}
+        >
+          <Rate onChange={(e) => { handleChange("rating", e.target.value) }} />
         </Form.Item>
         <Form.Item
           label="What do you think of the property?"
