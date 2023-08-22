@@ -9,7 +9,7 @@ import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 
 const MembershipCard = ({
-  product,
+  membership,
   categorys,
   debouncedSearchTerm,
 }) => {
@@ -46,9 +46,9 @@ const MembershipCard = ({
   };
 
   useEffect(() => {
-    setState(product);
-    // console.log("state", state);
-  }, [product]);
+    setState(membership);
+  }, [membership]);
+
   
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true } });
@@ -64,16 +64,23 @@ const MembershipCard = ({
       ) : (
         <Card className="w-full mt-6" id="product">
           <div className="flex">
-            <img
-              className="w-52 object-cover"
-              alt=""
-              src={state.imageUrl}
-            />
+            <div className="text-center py-1 rounded w-24 text-sm mt-2.5">
+                <img
+                  className="w-52 object-cover"
+                  alt=""
+                  src={membership.productImage1}
+                />  
+                {membership.product_with_inventory ?  
+                  (membership.isInventoryAvailable ?
+                      (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px"  }}> For Sale </Button>) 
+                      : (<Button type="primary" shape="round"  style={{ background: "red", marginTop: "10px"  }}> Retained </Button>) )
+                  :(<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px"  }}> Not for Sale </Button>)}
+            </div>
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
                   <h3 className="font-semibold text-primaryB text-xl">
-                    {decodeURIComponent(state.name)}
+                    {decodeURIComponent(membership.product.name)}
                   </h3>
                 </div>
                 <div className="flex items-center">
@@ -119,7 +126,7 @@ const MembershipCard = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                  {state.subCategory}
+                  {membership.product.subCategory}
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
@@ -128,7 +135,7 @@ const MembershipCard = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                  Equinox Labs
+                  {membership.product.manufacturer}
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
@@ -139,18 +146,8 @@ const MembershipCard = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                 1 Year
+                 {membership.timePeriodInMonths} Month(s)
                 </p>
-              </div>
-              <div
-                className={classNames(
-                  state.isActive
-                    ? "text-success bg-[#EAFFEE]"
-                    : "text-orange bg-[#FFF6EC]",
-                  "text-center py-1 rounded w-24 text-sm mt-2.5"
-                )}
-              >
-                <p>{state.isActive ? "Active" : "Inactive"}</p>
               </div>
             </div>
           </div>
