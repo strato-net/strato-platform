@@ -89,11 +89,11 @@ const actions = {
     }
   },
 
-  fetchProductDetails: async (dispatch, id, chainId) => {
+  fetchProductDetails: async (dispatch, id) => {
     dispatch({ type: actionDescriptors.fetchProductDetails });
 
     try {
-      const response = await fetch(`${apiUrl}/product/${id}/${chainId}`, {
+      const response = await fetch(`${apiUrl}/product/${id}`, {
         method: HTTP_METHODS.GET,
       });
 

@@ -232,9 +232,11 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 <CategorysProvider>
                   <SubCategorysProvider>
                     <InventoriesProvider>
-                      <ItemsProvider>
-                        <MembershipDetails user={user} users={users} />
-                      </ItemsProvider>
+                      <ProductsProvider>
+                        <ItemsProvider>
+                          <MembershipDetails user={user} users={users} />
+                        </ItemsProvider>
+                      </ProductsProvider>
                     </InventoriesProvider>
                   </SubCategorysProvider>
                 </CategorysProvider>

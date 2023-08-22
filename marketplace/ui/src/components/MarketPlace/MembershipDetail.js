@@ -14,10 +14,15 @@ import {
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as productActions } from "../../contexts/product/actions";
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import {
+  useProductDispatch,
+  useProductState,
+} from "../../contexts/product";
 import routes from "../../helpers/routes";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
@@ -37,7 +42,7 @@ import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 
-const MembershipDetails = ({ user, users }) => {
+const MembershipDetails = ({ user, users, inventoryId }) => {
   const { state, pathname } = useLocation();
 
   let isCalledFromMembership = false;
@@ -97,6 +102,8 @@ const serviceDispatch = useMembershipDispatch();
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { inventoryDetails, inventories, isInventoryDetailsLoading } = useInventoryState();
+  const productDispatch = useProductDispatch();
+  const {productDetails} = useProductState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
@@ -118,18 +125,25 @@ const serviceDispatch = useMembershipDispatch();
 
 
   useEffect(() => {
-    if (Id !== undefined && membershipDetails) {
-      // TODO: should Use membershipDetails.productId
-      actions.fetchInventory(dispatch, limit, offset, '90defbb4c55e706c25a5950d5ffe4376c79a456e');
+    if (Id !== undefined && inventoryId) {
+      actions.fetchInventoryDetail(dispatch, inventoryId);
     }
-  }, [Id, dispatch, user, membershipDetails]);
+    else if (Id !== undefined && membershipDetails) {
+      productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
+    }
+  }, [Id, dispatch, productDispatch, user, membershipDetails, inventoryId]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
-  const details = inventories[0];
-  console.log("details: ", details)
+  let details = undefined;
+  if(inventoryId && inventoryDetails){
+    details = inventoryDetails;
+  }
+  else if(!inventoryId && productDetails) {
+    details = productDetails;
+  }
 
   const subtract = () => {
     if (qty !== 1) {
@@ -341,7 +355,7 @@ const serviceDispatch = useMembershipDispatch();
             <div className="w-1/2">
               <div className="h-96 flex items-center justify-center border border-grayLight">
                 {/* TODO: figure out how to show multiple images */}
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={allProductFiles !== undefined ? (allProductFiles[0] ? allProductFiles[0].imgUrl : null) : null} />
+                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={allProductFiles !== undefined ? (allProductFiles[0] ? allProductFiles[0].imageUrl : null) : null} />
               </div>
               {details?.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
@@ -395,7 +409,7 @@ const serviceDispatch = useMembershipDispatch();
                 ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
-                $ {details?.pricePerUnit}
+                {details?.pricePerUnit ? `$ ${details.pricePerUnit}` : "not listed"}
               </Title>
               {details?.availableQuantity !== 0 ?
                 <Space>
