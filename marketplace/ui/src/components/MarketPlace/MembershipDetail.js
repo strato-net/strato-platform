@@ -10,6 +10,7 @@ import {
   Spin,
   notification,
   InputNumber,
+  Carousel,
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -56,6 +57,7 @@ const MembershipDetails = ({ user, users, inventoryId }) => {
 
   const [serviceList, setServiceList] = useState([])
   const [savingsList, setSavingsList] = useState([])
+  const [totalSavings, setTotalSavings] = useState(0)
   const [Id, setId] = useState(undefined);
   const [isServiceSelected, setIsServiceSelected] = useState(false);
   const [membershipDetails, setMembershipDetails] = useState(undefined);
@@ -83,6 +85,11 @@ const serviceDispatch = useMembershipDispatch();
       services.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceDesc": element.serviceDescription, "memberPrice": element.membershipPrice, "nonMemberPrice": element.servicePrice, "uses": element.maxQuantity},)
       savings.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceCost": element.savings},)
     });
+    let total = 0;
+    savings.forEach(element => {
+      total += element.serviceCost;
+    });
+    setTotalSavings(total);
     setServiceList(services);
     setSavingsList(savings);
   }, [membershipServices])
@@ -355,6 +362,27 @@ const serviceDispatch = useMembershipDispatch();
             <div className="w-1/2">
               <div className="h-96 flex items-center justify-center border border-grayLight">
                 {/* TODO: figure out how to show multiple images */}
+                {/* {allProductFiles && allProductFiles.length > 0 ? (
+                <Carousel>
+                  {allProductFiles.map((file, index) => (
+                      <Image
+                        key={index}
+                        height={"100%"}
+                        width={"100%"}
+                        style={{ objectFit: "contain" }}
+                        src={file.imageUrl}
+                      />
+                  ))}
+                </Carousel>
+                ) : (
+                  <Image
+                        height={"100%"}
+                        width={"100%"}
+                        style={{ objectFit: "contain" }}
+                        src={null}
+                      />
+                )} */}
+                
                 <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={allProductFiles !== undefined ? (allProductFiles[0] ? allProductFiles[0].imageUrl : null) : null} />
               </div>
               {details?.availableQuantity !== 0 ?
@@ -410,6 +438,9 @@ const serviceDispatch = useMembershipDispatch();
               </Paragraph>
               <Title level={4} className="!mt-0">
                 {details?.pricePerUnit ? `$ ${details.pricePerUnit}` : "not listed"}
+              </Title>
+              <Title level={4} className="!mt-0">
+                {`Total Savings: $ ${totalSavings}`}
               </Title>
               {details?.availableQuantity !== 0 ?
                 <Space>
