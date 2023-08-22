@@ -10,6 +10,7 @@ import {
   Spin,
   notification,
   InputNumber,
+  Carousel,
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -42,9 +43,10 @@ import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 
-const MembershipDetails = ({ user, users, inventoryId }) => {
+const MembershipDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
-
+  const inventoryId = state?.inventoryId;
+  
   let isCalledFromMembership = false;
 
   if (state !== null && state !== undefined) {
@@ -56,6 +58,7 @@ const MembershipDetails = ({ user, users, inventoryId }) => {
 
   const [serviceList, setServiceList] = useState([])
   const [savingsList, setSavingsList] = useState([])
+  const [totalSavings, setTotalSavings] = useState(0)
   const [Id, setId] = useState(undefined);
   const [isServiceSelected, setIsServiceSelected] = useState(false);
   const [membershipDetails, setMembershipDetails] = useState(undefined);
@@ -79,10 +82,15 @@ const serviceDispatch = useMembershipDispatch();
   useEffect(() => {
     let services = [];
     let savings = [];
-    membershipServices.forEach(element => {
+    membershipServices?.forEach(element => {
       services.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceDesc": element.serviceDescription, "memberPrice": element.membershipPrice, "nonMemberPrice": element.servicePrice, "uses": element.maxQuantity},)
       savings.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceCost": element.savings},)
     });
+    let total = 0;
+    savings.forEach(element => {
+      total += element.serviceCost;
+    });
+    setTotalSavings(total);
     setServiceList(services);
     setSavingsList(savings);
   }, [membershipServices])
@@ -353,9 +361,30 @@ const serviceDispatch = useMembershipDispatch();
 
           <div className="flex mx-16">
             <div className="w-1/2">
-              <div className="h-96 flex items-center justify-center border border-grayLight">
-                {/* TODO: figure out how to show multiple images */}
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={allProductFiles !== undefined ? (allProductFiles[0] ? allProductFiles[0].imageUrl : null) : null} />
+              
+              <div className="items-center justify-center border border-grayLight">
+                {allProductFiles && allProductFiles.length > 0 ? (
+                  <Carousel>
+                    {allProductFiles.map((file, index) => 
+                      <div key={index} className= "h-96">
+                        <Image
+                          height={"100%"}
+                          width={"100%"}
+                          style={{ objectFit: "contain" }}
+                          src={file.imageUrl}
+                        />
+                        
+                    </div>
+                    )}
+                  </Carousel>
+                  ) : (
+                  <Image
+                        height={"100%"}
+                        width={"100%"}
+                        style={{ objectFit: "contain" }}
+                        src={null}
+                      />
+                )}
               </div>
               {details?.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
@@ -410,6 +439,9 @@ const serviceDispatch = useMembershipDispatch();
               </Paragraph>
               <Title level={4} className="!mt-0">
                 {details?.pricePerUnit ? `$ ${details.pricePerUnit}` : "not listed"}
+              </Title>
+              <Title level={4} className="!mt-0">
+                {`Total Savings: $ ${totalSavings}`}
               </Title>
               {details?.availableQuantity !== 0 ?
                 <Space>

@@ -51,7 +51,7 @@ const MembershipCard = ({
 
   
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true } });
+    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
   }
 
 

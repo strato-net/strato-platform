@@ -88,14 +88,14 @@ const Membership = ( user ) => {
         .filter((membership_) => membership_.inventories.length > 0)
         .map((membership_) => { 
             return membership_.inventories.map((inventory) => { 
-                return {...membership_, ...inventory, product_with_inventory: 1  } }) }))
+                return {...membership_, ...inventory, product_with_inventory: 1, inventoryAddress: inventory.address, membershipAddress: membership_.address  } }) }))
         .flat();
     //Then we combine lists of memberships that do not have inventories with the list of inventories/memberhsips
     memberships = [
         ...(memberships
             .filter((membership_) => membership_.inventories.length === 0))
             .map((membership_) => { 
-                return {...membership_, product_with_inventory: 0 } })
+                return {...membership_, product_with_inventory: 0, inventoryAddress: null, membershipAddress: membership_.address } })
         , ...membershipsAsInventories];
         
     useEffect(() => {
@@ -248,6 +248,8 @@ const Membership = ( user ) => {
                             </div>
                             <>
                                 {memberships.length !== 0 ? (
+                                    
+                                    console.log("memberships: ", memberships),
                                     <div className="my-4">
                                         {memberships.map((product, index) => {
                                             return (
