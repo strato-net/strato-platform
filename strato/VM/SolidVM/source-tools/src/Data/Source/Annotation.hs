@@ -81,9 +81,23 @@ instance Semigroup a => Semigroup (SourceAnnotation a) where
   (SourceAnnotation s _ a) <> (SourceAnnotation _ e b) = SourceAnnotation s e (a <> b)
 
 instance Show a => Show (SourceAnnotation a) where
-  show sAT = "(line " ++ (show startPosLine) ++ ", column " ++ (show startPosColumn) ++ ") - " ++ "(line " ++ (show endPosLine) ++ ", column " ++ (show endPosColumn) ++ "): " ++ (show sAA) ++ " "
+  show sAT = concat
+    [ file
+    , " (line "
+    , show startPosLine
+    , ", column "
+    , show startPosColumn
+    , ") - (line "
+    , show endPosLine
+    , ", column "
+    , show endPosColumn
+    , "): "
+    , show sAA
+    , " "
+    ]
     where 
       startPos = (_sourceAnnotationStart sAT)
+      file = startPos ^. sourcePositionName
       endPos = (_sourceAnnotationEnd sAT)
       sAA = (_sourceAnnotationAnnotation sAT)
       startPosLine = (_sourcePositionLine startPos)

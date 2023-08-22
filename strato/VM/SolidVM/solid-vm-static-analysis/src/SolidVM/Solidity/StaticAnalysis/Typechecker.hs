@@ -19,7 +19,7 @@ import           Data.Foldable (traverse_)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (catMaybes, fromJust, fromMaybe)
+import           Data.Maybe      (catMaybes, fromJust, fromMaybe, isJust)
 import qualified Data.Set        as S
 import           Data.Source
 import           Data.String     (IsString, fromString)
@@ -178,7 +178,8 @@ functionType cc x name f =
 
 filterFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> [Visibility] -> Type'
 filterFuncs cc x name f visibilities = case f ^. funcVisibility of
-  Just v | v `elem` visibilities -> bottom $ "cannot access function " <> labelToText name <> " because it is marked as " <> tShowVisibility v <$ x
+  Just v | usesStrictModifiers cc && v `elem` visibilities ->
+    bottom $ "cannot access function " <> labelToText name <> " because it is marked as " <> tShowVisibility v <$ x
   _ -> functionType cc x name $ ("" <$) <$> f
 
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
@@ -786,7 +787,9 @@ checkOverrides cc c funcName f =
   let ctx = f ^. funcContext
       mOs = f ^. funcOverrides
       tFuncName = T.pack funcName
-      parentsWithSameFunc :: [(SolidString, Annotated FuncF)] = catMaybes $ sequence . (_contractName &&& (M.lookup funcName . _functions)) <$> catMaybes (flip M.lookup (cc ^. contracts) <$> c ^. parents)
+      parentsWithSameFunc =
+        catMaybes $ sequence . (_contractName &&& (M.lookup funcName . _functions))
+                <$> catMaybes (flip M.lookup (cc ^. contracts) <$> c ^. parents)
    in case parentsWithSameFunc of
         [] -> case mOs of
                 Nothing -> functionType cc ctx funcName f
@@ -856,69 +859,80 @@ functionHelper :: Annotated CodeCollectionF
                -> String
                -> Annotated FuncF
                -> Type'
-functionHelper cc c funcName f@Func{..} = unlessBottom (checkOverrides cc c funcName f) $ \t' -> case f ^. funcContents of
-  Nothing -> t'
-  Just stmts ->
-    if (funcName == "receive")
-      then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
-        ([], [], Just Payable, Just External) ->
-           let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= _varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (_isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
-               swap = uncurry $ flip (,)
-               args = (\(it,n) -> ( n
+functionHelper cc c funcName f@Func{..} =
+  let check = if usesStrictModifiers cc
+                then checkOverrides cc c funcName f
+                else functionType cc (f ^. funcContext) funcName f
+   in unlessBottom check $ \t' -> case f ^. funcContents of
+        Nothing -> t'
+        Just stmts ->
+          if (funcName == "receive")
+            then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
+              ([], [], Just Payable, Just External) ->
+                 let r = R cc c (Just f) funcName $
+                           map (fmap $ isJust . _varInitialVal)
+                               (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                     swap = uncurry $ flip (,)
+                     args = (\(it,n) -> ( n
+                                        , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                        ))
+                        <$> (catMaybes $ sequence . swap <$> _funcArgs)
+                     vals = (\(it,n) -> ( n
+                                        , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                        ))
+                        <$> (catMaybes $ sequence . swap <$> _funcVals)
+                     argVals = M.fromList $ args ++ vals
+                  in runReader (statementsHelper argVals stmts) r
+              ([fArg], _, _, _) -> bottom  $ (T.concat
+                                [ "Function `receive` must take no arguments, but has been given "
+                                , T.pack $ show fArg
+                                ]) <$ _funcContext
+              (_, [fVal], _, _) -> bottom $ (T.concat
+                                [ "Function `receive` must have no return values, but has been given "
+                                , T.pack $ show fVal
+                                ]) <$ _funcContext
+              _ -> bottom $ "Function `receive` must be External and Payable, but has not been declared so " <$ _funcContext
+          else if (funcName == "fallback")
+                then case (_funcArgs, _funcVals, _funcVisibility) of
+                      ([], [], Just External) ->
+                        let r = R cc c (Just f) funcName $
+                                  map (fmap $ isJust . _varInitialVal)
+                                      (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                            swap = uncurry $ flip (,)
+                            args = (\(it,n) -> ( n
+                                                  , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                                ))
+                                              <$> (catMaybes $ sequence . swap <$> _funcArgs)
+                            vals = (\(it,n) -> ( n
+                                                  , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                                ))
+                                              <$> (catMaybes $ sequence . swap <$> _funcVals)
+                            argVals = M.fromList $ args ++ vals
+                         in runReader (statementsHelper argVals stmts) r
+                      ([fArg], _, _) -> bottom  $ (T.concat
+                                        [ "Function `fallback` must take no arguments, but has been given "
+                                        , T.pack $ show fArg
+                                        ]) <$ _funcContext
+                      (_, [fVal], _) -> bottom $ (T.concat
+                                        [ "Function `fallback` must have no return values, but has been given "
+                                        , T.pack $ show fVal
+                                        ]) <$ _funcContext
+                      _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
+          else
+            let r = R cc c (Just f) funcName $
+                      map (fmap $ isJust . _varInitialVal)
+                          (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                swap = uncurry $ flip (,)
+                args = (\(it,n) -> ( n
                                   , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                                   ))
                   <$> (catMaybes $ sequence . swap <$> _funcArgs)
-               vals = (\(it,n) -> ( n
+                vals = (\(it,n) -> ( n
                                   , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                                   ))
                   <$> (catMaybes $ sequence . swap <$> _funcVals)
-               argVals = M.fromList $ args ++ vals
+                argVals = M.fromList $ args ++ vals
             in runReader (statementsHelper argVals stmts) r
-        ([fArg], _, _, _) -> bottom  $ (T.concat
-                          [ "Function `receive` must take no arguments, but has been given "
-                          , T.pack $ show fArg
-                          ]) <$ _funcContext
-        (_, [fVal], _, _) -> bottom $ (T.concat
-                          [ "Function `receive` must have no return values, but has been given "
-                          , T.pack $ show fVal
-                          ]) <$ _funcContext
-        _ -> bottom $ "Function `receive` must be External and Payable, but has not been declared so " <$ _funcContext
-    else if (funcName == "fallback")
-          then case (_funcArgs, _funcVals, _funcVisibility) of
-                ([], [], Just External) -> let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= _varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (_isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
-                                               swap = uncurry $ flip (,)
-                                               args = (\(it,n) -> ( n
-                                                                     , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                                                   ))
-                                                                 <$> (catMaybes $ sequence . swap <$> _funcArgs)
-                                               vals = (\(it,n) -> ( n
-                                                                     , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                                                   ))
-                                                                 <$> (catMaybes $ sequence . swap <$> _funcVals)
-                                               argVals = M.fromList $ args ++ vals
-                                           in runReader (statementsHelper argVals stmts) r
-                ([fArg], _, _) -> bottom  $ (T.concat
-                                  [ "Function `fallback` must take no arguments, but has been given "
-                                  , T.pack $ show fArg
-                                  ]) <$ _funcContext
-                (_, [fVal], _) -> bottom $ (T.concat
-                                  [ "Function `fallback` must have no return values, but has been given "
-                                  , T.pack $ show fVal
-                                  ]) <$ _funcContext
-                _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
-    else
-      let r = R cc c (Just f) funcName (map (\(nameOfVar, varDecl) -> (nameOfVar, Nothing /= _varInitialVal varDecl) ) (filter (\(_, varDecl) ->  (_isImmutable varDecl ) ) (M.toList $ _storageDefs c)))
-          swap = uncurry $ flip (,)
-          args = (\(it,n) -> ( n
-                            , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                            ))
-            <$> (catMaybes $ sequence . swap <$> _funcArgs)
-          vals = (\(it,n) -> ( n
-                            , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                            ))
-            <$> (catMaybes $ sequence . swap <$> _funcVals)
-          argVals = M.fromList $ args ++ vals
-      in runReader (statementsHelper argVals stmts) r
 
 statementsHelper :: (M.Map SolidString (Annotated VarDefEntryF))
                  -> [Annotated StatementF]

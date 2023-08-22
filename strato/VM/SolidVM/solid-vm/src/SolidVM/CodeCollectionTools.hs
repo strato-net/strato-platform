@@ -12,6 +12,7 @@ module SolidVM.CodeCollectionTools (
   ) where
 
 import Control.Lens
+import Data.Bool (bool)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Source
@@ -109,7 +110,7 @@ addInheritedObjects cc c = do
 
 addInheritedFunctions :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedFunctions cc c = do
-  fu <- toUnionMaker' _functions (M.filter ((/= Just Private) . _funcVisibility) . _functions) cc c
+  fu <- toUnionMaker' _functions (bool id (M.filter ((/= Just Private) . _funcVisibility)) (usesStrictModifiers cc) . _functions) cc c
   pure $ c{
   _functions=fu
   }
