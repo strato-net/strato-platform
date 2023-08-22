@@ -11,6 +11,7 @@ import dayjs from "dayjs";
 
 import productJs from "./product";
 import inventoryJs from "./inventory";
+import carbonJs from "./carbon";
 
 const contractName = "ProductManager";
 const contractFilename = `${util.cwd}/dapp/products/contracts/ProductManager.sol`;
@@ -99,6 +100,10 @@ function bind(user, _contract, options) {
     getProduct(user, args, _options);
   contract.getProducts = async (args, _options = defaultOptions) =>
     getProducts(user, args, _options);
+  contract.getCarbon = async (args, _options = defaultOptions) =>
+    getCarbon(user, args, _options);
+  contract.getCarbons = async (args, _options = defaultOptions) =>
+    getCarbons(user, args, _options);
   contract.getInventory = async (args, _options = defaultOptions) =>
     getInventory(user, contract, args, _options);
   contract.getInventories = async (args, _options = defaultOptions) =>
@@ -107,6 +112,8 @@ function bind(user, _contract, options) {
     updateProduct(user, contract, args, options);
   contract.createProduct = async (args) =>
     createProduct(user, contract, args, options);
+  contract.createCarbon = async (args) =>
+    createCarbon(user, contract, args, options);
   contract.createInventory = async (args) =>
     createInventory(user, contract, args, options);
   contract.resellInventory = async (args) =>
@@ -150,6 +157,32 @@ async function createProduct(admin, contract, _args, baseOptions) {
     throw new rest.RestError(restStatus, 0, { callArgs });
 
   return [restStatus, productAddress];
+}
+
+// * Add the carbon
+async function createCarbon(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "addCarbon",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, carbonAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, carbonAddress];
 }
 
 /**
@@ -354,6 +387,20 @@ async function getProducts(user, args, options) {
 }
 
 /**
+ * get the carbon details
+ */
+async function getCarbon(user, args, options) {
+  return carbonJs.get(user, args, options);
+}
+
+/**
+ * get all the carbon details
+ */
+async function getCarbons(user, args, options) {
+  return carbonJs.getAll(user, args, options);
+}
+
+/**
  * get the inventory with product details
  */
 async function getInventory(user, contract, args, options) {
@@ -485,6 +532,7 @@ export default {
   contractFilename,
   marshalOut,
   createProduct,
+  createCarbon,
   updateProduct,
   deleteProduct,
   createInventory,

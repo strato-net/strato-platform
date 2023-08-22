@@ -239,14 +239,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
 
-    /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    if (quantity === 0) {
-      return [
-        createInventoryStatus,
-        createdInventoryAddress,
-      ]
-    }
-
     return [
       createInventoryStatus,
       createdInventoryAddress,
@@ -255,8 +247,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.resellInventory = async function (args, options = defaultOptions) {
-    const{ inventoryId, quantity, price, ...newArgs } = args;
-    return await managers.productManager.resellInventory({existingInventory:inventoryId, quantity, price});
+    const { inventoryId, quantity, price, ...newArgs } = args;
+    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price });
   };
 
   contract.updateInventory = async function (args, options = defaultOptions) {
@@ -290,6 +282,69 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
+
+  contract.getCarbon = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const carbon = await managers.productManager.getCarbon({ ...args }, getOptions);
+
+    const productData = await managers.productManager.getProduct({
+      address: carbon.productId,
+      ownerOrganization: userOrganization
+    }, getOptions);
+
+    const carbonData = { ...carbon, ...productData }
+    return carbonData;
+  };
+
+  contract.getCarbons = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    const allCarbonsData = await managers.productManager.getCarbons({ ...args }, getOptions);
+    const carbonsWithProducts = [];
+
+    for (const carbon of allCarbonsData) {
+      const productData = await managers.productManager.getProduct({
+        ...args,
+        offset: 0,
+        sort: null,
+        address: carbon.productId,
+        ownerOrganization: userOrganization
+      }, getOptions);
+      carbonsWithProducts.push({ ...carbon, ...productData })
+    }
+    
+    return carbonsWithProducts;
+  };
+
+  contract.createCarbon = async function (args, options = optionsNoChainIds) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const productArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs };
+
+    const [createProductStatus, createdProductAddress] = await managers.productManager.createProduct({ ...productArgs, createdDate: createdDate });
+
+    if (createProductStatus == 200) {
+      const carbonArgs = {
+        productId: createdProductAddress,
+        projectType: args.projectType,
+        methodology: args.methodology,
+        projectCountry: args.projectCountry,
+        projectCategory: args.projectCategory,
+        projectDeveloper: args.projectDeveloper,
+        dMRV: args.dMRV,
+        registry: args.registry,
+        creditType: args.creditType,
+        sdg: args.sdg,
+        validator: args.validator,
+        eligibility: args.eligibility,
+        permanenceType: args.permanenceType,
+        reductionType: args.reductionType,
+        unit: args.unit,
+        currency: args.currency,
+        divisibility: args.divisibility
+      }
+
+      return managers.productManager.createCarbon(carbonArgs);
+    }
+  }
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {

@@ -31,6 +31,13 @@ export const Product = {
   // transferOwnership: '/transferOwnership'
 }
 
+export const Carbon = {
+  prefix: '/carbon',
+  getAll: '/',
+  get: '/:address',
+  create: '/'
+}
+
 export const Inventory = {
   prefix: '/inventory',
   get: '/:address',
