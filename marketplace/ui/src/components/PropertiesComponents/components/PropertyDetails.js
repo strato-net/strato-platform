@@ -134,7 +134,7 @@ function PropertyDetails() {
     {
       key: "Reviews",
       label: `Reviews`,
-      // children: <ReviewTab reviews={reviews} />,
+      children: <ReviewTab reviews={property.reviews} />,
     },
   ];
 

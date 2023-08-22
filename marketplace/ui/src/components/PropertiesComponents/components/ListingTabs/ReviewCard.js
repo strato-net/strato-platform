@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Button, Typography, Space, Avatar, Form, Col } from "antd";
 import { UserOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
-
+import { decodeURIComponentText } from "../../helpers/utils";
 
 const ReviewCard = (props) => {
-  const { review: { name, title, date, comments, readmore }, index } = props
+  const { review: { name, title, date, description, readmore }, index } = props
 
   return (
     <>
@@ -39,11 +39,11 @@ const ReviewCard = (props) => {
         <Typography.Text style={{ position: "relative", top: '10px' }} strong>{title}</Typography.Text>
         <Typography.Text>
           {readmore
-            ? comments
-            : comments.slice(0, 100)}
+            ? decodeURIComponentText(description)
+            : decodeURIComponentText(description).slice(0, 100)}
         </Typography.Text>
         {
-          comments?.length > 100 ?
+          description?.length > 100 ?
             readmore
               ? <Button block className="read-btn" onClick={() => { props.handleRead() }}><UpOutlined /> Hide full review</Button>
               : <Button block className="read-btn" onClick={() => { props.handleRead() }}> <DownOutlined /> See full review</Button>

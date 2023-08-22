@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Button, Modal, Col, Row, Input, Form } from "antd";
+import { Button, Modal, Col, Row, Input, Form, Rate } from "antd";
+import TagManager from "react-gtm-module";
+
 const { TextArea } = Input;
 
 const WriteReviewModal = (props) => {
@@ -31,7 +33,14 @@ const WriteReviewModal = (props) => {
           htmlType="submit"
           loading={isReviewSubmitting}
           disabled={isReviewSubmitting}
-          onClick={() => handleSubmit()}
+          onClick={() => {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'PROPERTIES_REVIEW_SUBMITTED',
+              },
+            })
+            handleSubmit()
+          }}
         >
           Submit
         </Button>,
@@ -41,48 +50,42 @@ const WriteReviewModal = (props) => {
         <Row gutter={24}>
           <Col span={12}>
             <Form.Item
-              label="First Name"
-              name="firstName"
+              label="Name"
+              name="name"
               rules={[
                 {
                   required: true,
-                  message: "Please input your First Name!",
+                  message: "Please input your name!",
                 },
               ]}
             >
-              <Input onChange={(e) => { handleChange("firstName", e.target.value) }} />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              label="Last Name"
-              name="lastName"
-              rules={[
-                {
-                  required: true,
-                  message: "Please input your Last Name!",
-                },
-              ]}
-            >
-              <Input onChange={(e) => { handleChange("lastName", e.target.value) }} />
+              <Input onChange={(e) => { handleChange("name", e.target.value) }} />
             </Form.Item>
           </Col>
         </Row>
         <Form.Item
-          label="Email"
-          name="email"
+          label="Title"
+          name="title"
           rules={[
             {
               required: true,
-              message: "Please input your email!",
-            },
-            {
-              type: "email",
-              message: "Please enter a valid email address!",
+              message: "Please input a title!",
             },
           ]}
         >
-          <Input onChange={(e) => { handleChange("email", e.target.value) }} />
+          <Input onChange={(e) => { handleChange("title", e.target.value) }} />
+        </Form.Item>
+        <Form.Item
+          label="How would you rate the property?"
+          name="rating"
+          rules={[
+            {
+              required: true,
+              message: "Please provide a rating!",
+            },
+          ]}
+        >
+          <Rate onChange={(e) => { handleChange("rating", e.target.value) }} />
         </Form.Item>
         <Form.Item
           label="What do you think of the property?"
@@ -94,7 +97,7 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <TextArea rows={4} onChange={(e) => { handleChange("comments", e.target.value) }} />
+          <TextArea rows={4} onChange={(e) => { handleChange("description", encodeURIComponent(e.target.value)) }} />
         </Form.Item>
       </Form>
     </Modal>
