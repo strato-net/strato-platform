@@ -19,7 +19,7 @@ const actionDescriptors = {
   resellInventoryFailed: "resell_inventory_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
-  onboardSellerToStripe: "onboard_selactioler_to_stripe",
+  onboardSellerToStripe: "onboard_seller_to_stripe",
   onboardSellerToStripeSuccessful: "onboard_seller_to_stripe_successful",
   onboardSellerToStripeFailed: "onboard_seller_to_stripe_failed",
   sellerStripeStatus: "seller_stripe_status",
