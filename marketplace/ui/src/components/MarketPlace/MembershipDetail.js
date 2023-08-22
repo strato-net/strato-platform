@@ -43,9 +43,10 @@ import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 
-const MembershipDetails = ({ user, users, inventoryId }) => {
+const MembershipDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
-
+  const inventoryId = state?.inventoryId;
+  
   let isCalledFromMembership = false;
 
   if (state !== null && state !== undefined) {
