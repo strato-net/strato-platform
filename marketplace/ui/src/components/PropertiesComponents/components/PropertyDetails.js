@@ -38,6 +38,11 @@ function PropertyDetails() {
   useEffect(() => {
     actions.fetchPropertyDetails(dispatch, id);
   }, []);
+
+  useEffect(() => {
+    document.title = `Mercata Properties | ${propertyDetails?.title} `;
+  }, [propertyDetails]);
+
   const { Text, Title } = Typography;
 
   const [api, contextHolder] = notification.useNotification();
@@ -180,7 +185,7 @@ function PropertyDetails() {
             }}
             disabled
           >
-            Upload Images
+            Edit Property
           </Button>
         </Col>
       </Row>
