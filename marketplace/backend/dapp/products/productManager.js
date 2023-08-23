@@ -163,14 +163,16 @@ async function updateProduct(admin, contract, _args, baseOptions) {
   const scheme = Object.keys(_args).reduce((agg, key) => {
     const base = 1;
     switch (key) {
-      case "description":
+      case "name":
         return agg | (base << 0);
-      case "imageKey":
+      case "description":
         return agg | (base << 1);
-      case "isActive":
+      case "imageKey":
         return agg | (base << 2);
-      case "userUniqueProductCode":
+      case "isActive":
         return agg | (base << 3);
+      case "userUniqueProductCode":
+        return agg | (base << 4);
       default:
         return agg;
     }

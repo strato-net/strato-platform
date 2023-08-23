@@ -49,6 +49,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     }
 
     function updateProduct(
+        string _name,
         address _productAddress,
         string _description,
         string _imageKey,
@@ -59,6 +60,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         Product_3 product = Product_3(_productAddress);
         return
             product.update(
+                _name,
                 _description,
                 _imageKey,
                 _isActive,
