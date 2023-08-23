@@ -4,7 +4,7 @@ const factory = {
     getInventoryArgs(uid, userAddress) {
         const args = {
             category: 'Carbon',
-            quantity: 3,
+            availableQuantity: 3,
             pricePerUnit: uid,
             vintage: 2000,
             status: 2,

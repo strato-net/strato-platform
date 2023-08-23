@@ -13,7 +13,6 @@ contract Inventory_7 is InventoryStatus {
     address public productId;
     string public category;
     int public purchasedQuantity;
-    int public quantity;
     int public pricePerUnit;
     uint public vintage;
     int public availableQuantity;
@@ -37,7 +36,6 @@ contract Inventory_7 is InventoryStatus {
         productId = msg.sender;
         category = _category;
         purchasedQuantity = 0;
-        quantity = _quantity;
         pricePerUnit = _pricePerUnit;
         vintage = _vintage;
         availableQuantity = _quantity;
@@ -88,12 +86,6 @@ contract Inventory_7 is InventoryStatus {
     function updateRetiredQuantity(int _quantity) returns (uint) {
         availableQuantity = availableQuantity - _quantity;
         retiredQuantity = retiredQuantity + _quantity;
-    }
-
-    function updateQuantityForVintages(int _quantity) returns (uint) {
-        quantity = _quantity;
-        availableQuantity = _quantity;
-        return RestStatus.OK;
     }
 
     function retireCredits(

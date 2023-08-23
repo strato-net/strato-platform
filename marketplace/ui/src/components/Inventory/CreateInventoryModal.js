@@ -56,7 +56,7 @@ const CreateInventoryModal = ({
       name: null,
       address: "",
     },
-    quantity: null,
+    availableQuantity: null,
     pricePerUnit: "",
     vintage: 0,
     status: true,
@@ -67,7 +67,7 @@ const CreateInventoryModal = ({
     validationSchema: schema,
     onSubmit: function (values) {
       // if (
-      //   (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) ||
+      //   (values.serialNumber.serialNumArr.length === parseInt(values.availableQuantity)) ||
       //   // Serial numbers are optional, we can submit the form if there are none. 
       //   (values.serialNumber.serialNumArr.length === 0)
       // ) {
@@ -93,7 +93,7 @@ const CreateInventoryModal = ({
   const handleCreateFormSubmit = async (values) => {
     const body = {
       productAddress: values.productName.address,
-      quantity: parseInt(values.quantity),
+      availableQuantity: parseInt(values.availableQuantity),
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
@@ -283,18 +283,18 @@ const CreateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-              <Form.Item label="Quantity" name="quantity" className="w-72">
+              <Form.Item label="Quantity" name="availableQuantity" className="w-72">
                 <Input
                   label="quantity"
                   placeholder="Enter Quantity"
-                  name="quantity"
+                  name="availableQuantity"
                   disabled={false}
-                  value={formik.values.quantity}
+                  value={formik.values.availableQuantity}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.quantity && formik.errors.quantity && (
+                {formik.touched.availableQuantity && formik.errors.availableQuantity && (
                   <span className="text-error text-xs">
-                    {formik.errors.quantity}
+                    {formik.errors.availableQuantity}
                   </span>
                 )}
               </Form.Item>

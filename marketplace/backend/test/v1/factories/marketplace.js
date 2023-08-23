@@ -23,9 +23,9 @@ export const productArgs = (uid, category) => {
 }
 
 export const inventoryArgs = (address, uid) => {
-    const quantity = 2
+    const availableQuantity = 2
     const args = {
-        quantity,
+        availableQuantity,
         productAddress: address,
         pricePerUnit: uid,
         vintage: 2000,

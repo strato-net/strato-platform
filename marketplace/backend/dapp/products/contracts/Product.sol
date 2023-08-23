@@ -97,7 +97,7 @@ contract Product_4 is InventoryStatus {
 
     // Add the inventory for the product
     function addInventory(
-        int _quantity,
+        int _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -114,7 +114,7 @@ contract Product_4 is InventoryStatus {
         }
         Inventory_7 inventory = new Inventory_7(
             category,
-            _quantity,
+            _availableQuantity,
             _pricePerUnit,
             _vintage,
             _status,

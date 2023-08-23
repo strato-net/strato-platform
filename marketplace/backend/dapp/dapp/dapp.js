@@ -236,7 +236,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createdDate = Math.floor(Date.now() / 1000);
     const { ...restArgs } = args;
     const newArgs = { ...restArgs, batchSerializationNumber: util.uid() }
-    const quantity = args.quantity;
     const serialNumbers = []
 
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
@@ -626,7 +625,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
         const orderItem = orderList.find(item => item.inventoryId === inventory.address);
         if (orderItem) {
-          inventory.quantity = orderItem.quantity;
+          inventory.availableQuantity = orderItem.quantity;
         }
 
       });
@@ -641,7 +640,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const inventoriesData = Object.values(groupedData);
       const total = inventoriesData.reduce((acc, obj) => {
-        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.quantity, 0);
+        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.availableQuantity, 0);
         return acc + result;
       }, 0);
 
@@ -651,7 +650,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       let orders = [];
       for (const inventory of inventoriesData) {
-        const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.quantity), 0);
+        const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.availableQuantity), 0);
         const shippingCharge = inventoryTotal * CHARGES.SHIPPING;
         const tax = inventoryTotal * CHARGES.TAX;
 
@@ -676,14 +675,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         // add orderLine for inventories
         for (const inventoryObject of inventory.data) {
-          const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
+          const tax = (inventoryObject.pricePerUnit * inventoryObject.availableQuantity) * CHARGES.SHIPPING;
 
           await managers.orderManager.addOrderLine({
             orderAddress,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
             batchSerializationNumber: inventoryObject.batchSerializationNumber,
-            quantity: inventoryObject.quantity,
+            quantity: inventoryObject.availableQuantity,
             pricePerUnit: inventoryObject.pricePerUnit,
             tax,
             createdDate

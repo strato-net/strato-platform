@@ -129,7 +129,7 @@ contract ProductManager is InventoryStatus, RestStatus {
 
     function addInventory(
         address _productAddress,
-        int _quantity,
+        int _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -147,13 +147,13 @@ contract ProductManager is InventoryStatus, RestStatus {
             );
             if (isUnique != address(0)) {
                 Inventory_7 inventory = Inventory_7(isUnique);
-                inventory.updateQuantityForVintages(
-                    inventory.availableQuantity() + _quantity
+                inventory.updateQuantity(
+                    inventory.availableQuantity() + _availableQuantity
                 );
                 return (RestStatus.OK, isUnique);
             }
             (uint256 status, address inventoryAddress) = product.addInventory(
-                _quantity,
+                _availableQuantity,
                 _pricePerUnit,
                 _vintage,
                 _status,
@@ -173,7 +173,7 @@ contract ProductManager is InventoryStatus, RestStatus {
 
     function addInventoryForBuyer(
         address _productAddress,
-        int _quantity,
+        int _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -186,7 +186,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         Product_4 product = Product_4(_productAddress);
 
         (uint256 status, address inventoryAddress) = product.addInventory(
-            _quantity,
+            _availableQuantity,
             _pricePerUnit,
             _vintage,
             _status,
@@ -264,10 +264,6 @@ contract ProductManager is InventoryStatus, RestStatus {
             } else {
                 int quantityToAdd = inventory.availableQuantity() +
                     _quantities[i];
-
-                if (quantityToAdd > inventory.quantity()) {
-                    return RestStatus.BAD_REQUEST;
-                }
                 inventory.updateQuantity(quantityToAdd);
             }
         }
@@ -377,7 +373,7 @@ contract ProductManager is InventoryStatus, RestStatus {
             );
             int availableQuantity = inventoryToBeAdded.availableQuantity();
             //quantity updated
-            uint256 status = inventoryToBeAdded.updateQuantityForVintages(
+            uint256 status = inventoryToBeAdded.updateQuantity(
                 availableQuantity + _newQuantity
             );
             inventory = inventoryToBeAdded;
