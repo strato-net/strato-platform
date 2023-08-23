@@ -316,7 +316,8 @@ handleEvents peer = awaitForever $ \case
         newCount <- lift $ setTitleAndProduceBlocks blocks'
         yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
         rHeaders <- lift getRemainingBHeaders
-        let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
+        let unmatchedHeaders = drop (length bodies) headers
+            (neededHeaders, remainingHeaders) = splitNeededHeaders (unmatchedHeaders ++ rHeaders)
         lift $ putBlockHeaders neededHeaders
         lift $ putRemainingBHeaders remainingHeaders
         if null neededHeaders
