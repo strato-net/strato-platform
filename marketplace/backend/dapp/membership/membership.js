@@ -172,7 +172,7 @@ async function get(user, args, options) {
 async function getAll(admin, args = {}, options) {
     const memberships = await searchAllWithQueryArgs(contractName, args, options, admin)
 
-    return { memberships: memberships.map((membership) => marshalOut(membership))}
+    return  memberships.map((membership) => marshalOut(membership))
 }
 
 /**
