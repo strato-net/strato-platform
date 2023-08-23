@@ -46,6 +46,7 @@ library:
   - resourcet
   - servant-client
   - servant-server
+  - split
   - strato-model
   - text
   - transformers
@@ -66,11 +67,13 @@ executables:
     - blockapps-identity-provider-api
     - blockapps-identity-provider-server
     - bytestring
+    - containers
     - hflags
     - http-client
     - transformers
     - warp
     - x509-certs
+    - yaml
 
 tests:
   identity-provider-test:
