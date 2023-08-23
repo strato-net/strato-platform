@@ -79,7 +79,8 @@ const Membership = ( user ) => {
     };
 
     let { memberships, ismembershipsLoading, message, success } = useMembershipState();
-    
+   
+    console.log("memberships", memberships);
     //We want to show all inventories associated to a membership, but also
     //All memberships that do not have inventories
     //So we create a new list of memberships objects, creating a new object for each inventory
@@ -241,7 +242,7 @@ const Membership = ( user ) => {
                                         style={{ backgroundColor: '#6e7ddd', color: 'white', margin: '10px', fontWeight: 'bold' }}
                                         className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40">
                                         <span style={{ fontWeight: 'normal' }}> Setup  </span>
-                                        <span style={{ fontWeight: '900', margin: '1px' }}>  Stripe  </span>
+                                        <span style={{ fontWeight: '900', margin: '0 5px' }}>  Stripe  </span>
                                         <span style={{ fontWeight: 'normal' }}> Account</span>
                                     </Button>
                                 </div>

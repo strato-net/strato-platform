@@ -1395,71 +1395,44 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   
     // Get all memberships
     const memberships = await membershipJs.getAll(rawAdmin, {  ...args}, newOptions)
-  
-    // Create an empty dictionary to store the result and proccess data quickly
-    const dictionaryOfMemberships = {}; //Where key == productId and value == list of memberships with that productId
-    let   addressOfProducts       = []; // This list is used for the call for Products
-    // Iterate through list of memberships to create the dictionary, note we filter out memberships with null productIds
-    for (const obj of memberships.memberships) {
-        const productID = obj.productId;
-        // Check if the productID is not null
-        if (!(productID === null || productID === undefined)) {
-            // Check if the productID is already a key in the dictionary
-            // If not, create a new list as the value for that key
-            if (!dictionaryOfMemberships.hasOwnProperty(productID) ) dictionaryOfMemberships[productID] = [];
-  
-            // Push the current object into the list corresponding to the productID key
-            dictionaryOfMemberships[productID].push({...obj , inventories: [] });
-  
-            //If not null create list of productIds/address for get request to attain Products
-             addressOfProducts.push(productID);
-        }
-    }
+
+    //filter out memberships with null productIds
+    memberships.memberships  = memberships.memberships.filter(m => m.productId !== null && m.productId !== undefined)
+    
+    //Get the list of productIds for API calls
+    const addressOfProducts = memberships.memberships.map(membership => membership.productId);
   
     //Get Products
     const products    = await managers.productManager.getProducts({ address: addressOfProducts }, newOptions);
-  
+
     //Attach product to membership
-    for (const obj of products){
-      const productAddress = obj.address;
-      if (dictionaryOfMemberships.hasOwnProperty(productAddress)) {
-          dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership => ({
-              ...existingMembership,
-              product: obj,
-              productImage : null
-          }));
-      }
-    }
+    products.forEach(product => {
+      memberships.memberships = memberships.memberships.map(membership => {
+        return (membership.productId === product.address)  ?
+          { ...membership, product: product, productImage: null, inventories: [] } : membership;} )
+    })  
        
     //Get Product Image Info
     const productImageInfo =  await productFileJs.getAll(rawAdmin, { productId: addressOfProducts}, {...options, org: managers.cirrusOrg, app: contractName});
     
     //Attach Product Image Info to Corresponding Membership
-    for (const obj of productImageInfo){
-      const productAddress = obj.productId;
-      if (dictionaryOfMemberships.hasOwnProperty(productAddress)) {
-          dictionaryOfMemberships[productAddress] = dictionaryOfMemberships[productAddress].map(existingMembership => ({
-              ...existingMembership,
-              productImage : obj
-          }));
-      }
-    }
+    productImageInfo.forEach(productImage => {
+      memberships.memberships = memberships.memberships.map(membership => {
+        return (membership.productId === productImage.productId)  ? 
+            {...membership, productImage : productImage} : membership;} )
+    })
   
     //Get inventories using the corresponding ProductIds
     const inventories = await managers.productManager.getInventories({ productId: addressOfProducts}, newOptions );
     
     //iterate through the list of inventories and attach the inventory status to the membership object
-    for (const obj of inventories) {
-        const productID = obj.productId;
-        // Check if the productID is already a key in the dictionary, then append the inventory status to the membership object list
-        if (dictionaryOfMemberships.hasOwnProperty(productID) ) {
-              dictionaryOfMemberships[productID] = dictionaryOfMemberships[productID].map(existingMembership => ({
-                ...existingMembership,
-                inventories: [...existingMembership.inventories, obj]
-              }));
-      }
-    }
-    return {memberships : Object.values(dictionaryOfMemberships).flat()}
+    inventories.forEach(inventory => {
+      memberships.memberships = memberships.memberships.map(membership => {
+        return (membership.productId === inventory.productId)  ?
+          { ...membership, inventories: [...membership.inventories, inventory] } : membership;} )
+    })
+
+    return memberships;
   }
 
   contract.transferOwnershipMembership = async function (args, options = defaultOptions) {
