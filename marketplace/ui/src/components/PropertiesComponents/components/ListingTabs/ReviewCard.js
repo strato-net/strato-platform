@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Button, Typography, Space, Avatar, Form, Col } from "antd";
-import { UserOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
+import { Button, Typography, Space, Avatar, Form, Row, Image } from "antd";
+import { UserOutlined, DownOutlined, UpOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { decodeURIComponentText, unixToDate } from "../../helpers/utils";
+import star from "../../assets/icons/star.svg";
 
 const ReviewCard = (props) => {
   const {
@@ -25,17 +26,23 @@ const ReviewCard = (props) => {
           </Typography.Text>
           {/* edit & delete buttons, that we have to use after login functionality */}
           {/* <div style={{ justifyContent: "flex-end" }}>
-                <Button
-                  type="primary"
-                  style={{ marginRight: "10px" }}
-                  icon={<EditOutlined />}
-                />
-                <Button
-                  danger
-                  type="primary"
-                  icon={<DeleteOutlined />}
-                />
-              </div> */}
+            <Button
+              type="primary"
+              style={{ marginRight: "10px" }}
+              icon={<EditOutlined />}
+            />
+            <Button
+              danger
+              type="primary"
+              icon={<DeleteOutlined />}
+            />
+          </div> */}
+          <Row>
+            <Typography.Text strong type="primary" style={{ marginRight: 6 }}>
+              {rating}
+            </Typography.Text>
+            <Image src={star} width={20} height={20} />
+          </Row>
         </div>
         <Typography.Text type="secondary">
           Reviewed on {unixToDate(createdDate)}
@@ -43,7 +50,7 @@ const ReviewCard = (props) => {
         <Typography.Text style={{ position: "relative", top: "10px" }} strong>
           {title}
         </Typography.Text>
-        <Typography.Text>
+        <Typography.Text style={{ position: "relative", top: "6px" }}>
           {decodeURIComponentText(description, readmore)}
         </Typography.Text>
         {description?.length > 100 ? (
