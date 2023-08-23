@@ -16,7 +16,7 @@ import { isOauthEnabled } from '../../../../lib/checkMode';
 
 export function postMethodCall(payload) {
   const isModeOauth = isOauthEnabled();
-  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainId } } :
+  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainId, use_wallet: payload.useWallet } } :
     {
       params: {
         username: payload.username,

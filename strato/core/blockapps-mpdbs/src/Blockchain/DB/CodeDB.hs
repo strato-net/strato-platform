@@ -1,6 +1,8 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
@@ -11,6 +13,9 @@ module Blockchain.DB.CodeDB (
   CodeKind(..),
   HasCodeDB,
   DBCode,
+  MemCodeDB(..),
+  runMemCodeDB,
+  runNewMemCodeDB,
   shaToKey,
   dbCodeToValue,
   genericLookupCodeDB,
@@ -27,14 +32,17 @@ module Blockchain.DB.CodeDB (
 
 
 import           Control.DeepSeq
-import           Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Alter         as A
 import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.State.Strict
 import           Data.Bifunctor                     (first)
 import           Data.Binary
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Lazy               as BL
 import           Data.Default
+import qualified Data.Map.Strict                    as M
 import qualified Database.LevelDB                   as DB
 import           Prelude                            hiding (lookup)
 
@@ -47,9 +55,26 @@ newtype CodeDB = CodeDB { unCodeDB :: DB.DB }
 instance NFData CodeDB where
   rnf (CodeDB a) = a `seq` ()
 
-type HasCodeDB m = (Keccak256 `Alters` DBCode) m
+type HasCodeDB m = (Keccak256 `A.Alters` DBCode) m
 
 type DBCode = (CodeKind, B.ByteString)
+
+newtype MemCodeDB m a = MemCodeDB { unMemCodeDB :: StateT (M.Map Keccak256 DBCode) m a }
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+instance MonadTrans MemCodeDB where
+  lift = MemCodeDB . lift
+
+instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCodeDB m) where
+  lookup _   = MemCodeDB . gets . M.lookup
+  insert _ k = MemCodeDB . modify' . M.insert k
+  delete _   = MemCodeDB . modify' . M.delete
+
+runMemCodeDB :: Monad m => MemCodeDB m a -> M.Map Keccak256 DBCode -> m a
+runMemCodeDB f m = evalStateT (unMemCodeDB f) m
+
+runNewMemCodeDB :: Monad m => MemCodeDB m a -> m a
+runNewMemCodeDB f = runMemCodeDB f M.empty
 
 shaToKey :: Keccak256 -> B.ByteString
 shaToKey = BL.toStrict . encode . sha2StateRoot
@@ -76,7 +101,7 @@ genericDeleteCodeDB f codeHash = do
   db <- unCodeDB <$> f
   DB.delete db def (shaToKey codeHash)
 
-instance MonadIO m => (Keccak256 `Alters` DBCode) (ReaderT CodeDB m) where
+instance MonadIO m => (Keccak256 `A.Alters` DBCode) (ReaderT CodeDB m) where
   lookup _ = genericLookupCodeDB ask
   insert _ = genericInsertCodeDB ask
   delete _ = genericDeleteCodeDB ask
@@ -102,8 +127,8 @@ getCodeKind hsh = maybe (error $ "no codekind found for " ++ show hsh) fst <$> g
 codeDBPut :: HasCodeDB m => CodeKind -> B.ByteString -> m Keccak256
 codeDBPut kind code = do
   let hsh = hash code
-  insert Proxy hsh (kind,code)
+  A.insert A.Proxy hsh (kind,code)
   return hsh
 
 codeDBGet :: HasCodeDB m => Keccak256 -> m (Maybe DBCode)
-codeDBGet = lookup Proxy
+codeDBGet = A.lookup A.Proxy

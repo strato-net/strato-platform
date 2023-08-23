@@ -16,7 +16,7 @@ class UsersController {
       console.log('me USER ', user)
       if (user === null || user === undefined) { 
           console.log('user not found in first attempt')
-          await new Promise(resolve => setTimeout(resolve, 6000));
+          await new Promise(resolve => setTimeout(resolve, 3000));
           user = await dapp.getCertificate({ userAddress })
           console.log('user content from second attempt', user)
       }
