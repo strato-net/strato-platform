@@ -157,6 +157,17 @@ const MembershipCard = ({
                  {membership.timePeriodInMonths} Month(s)
                 </p>
               </div>
+              <div className="flex mt-1.5 items-center">
+                <p className="text-primaryC text-sm w-40">
+                  Savings
+                </p>
+                <p text-secondryB text-sm>
+                  :
+                </p>
+                <p className="text-primaryA font-bold text-sm ml-3">
+                 $ {membership.savings}
+                </p>
+              </div>
             </div>
           </div>
           {/* {open && (
