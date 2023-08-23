@@ -1396,8 +1396,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     // Get all memberships
     const memberships = await membershipJs.getAll(rawAdmin, {  ...args}, newOptions)
 
-    //filter out memberships with null productIds
-    memberships.memberships  = memberships.memberships.filter(m => m.productId !== null && m.productId !== undefined)
+    //filter out memberships with null productIds and memberships that don't belong to the user's organization
+    memberships.memberships  = memberships.memberships
+    .filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization)
     
     //Get the list of productIds for API calls
     const addressOfProducts = memberships.memberships.map(membership => membership.productId);

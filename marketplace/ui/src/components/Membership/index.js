@@ -80,7 +80,6 @@ const Membership = ( user ) => {
 
     let { memberships, ismembershipsLoading, message, success } = useMembershipState();
    
-    console.log("memberships", memberships);
     //We want to show all inventories associated to a membership, but also
     //All memberships that do not have inventories
     //So we create a new list of memberships objects, creating a new object for each inventory
