@@ -36,17 +36,18 @@ const { Search } = Input;
 const { Title, Text } = Typography;
 
 const Membership = ( user ) => {
-    const { state } = useLocation();
-    let isCalledFromHeader = false;
-    console.log("here1")
-    if (state !== null && state !== undefined && user.user !== null && user.user !== undefined) {
-        console.log("here2")
-        console.log("state", state)
-        console.log("user", user)
-        isCalledFromHeader = state.isCalledFromHeader
-    }
+    let { state } = useLocation();
+    const [open, setOpen] = useState((state && user.user) ? state.isCalledFromHeader : false);
+    useEffect(() => {
+        if (state && user.user){
+            setOpen(state.isCalledFromHeader);
+        }
+        else{
+            setOpen(false);
+        }
+        state = null
+    }, [state]);
     
-    const [open, setOpen] = useState(isCalledFromHeader);
     const dispatch = useMembershipDispatch();
     const [api, contextHolder] = notification.useNotification();
     const [queryValue, setQueryValue] = useState("");
@@ -259,8 +260,6 @@ const Membership = ( user ) => {
                             </div>
                             <>
                                 {memberships.length !== 0 ? (
-                                    
-                                    console.log("memberships: ", memberships),
                                     <div className="my-4">
                                         {memberships.map((product, index) => {
                                             return (
