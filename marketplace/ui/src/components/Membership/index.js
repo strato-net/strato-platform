@@ -30,13 +30,24 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { useLocation } from "react-router-dom";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
 
 const Membership = ( user ) => {
-    const [open, setOpen] = useState(false);
-      const dispatch = useMembershipDispatch();
+    const { state } = useLocation();
+    let isCalledFromHeader = false;
+    console.log("here1")
+    if (state !== null && state !== undefined && user.user !== null && user.user !== undefined) {
+        console.log("here2")
+        console.log("state", state)
+        console.log("user", user)
+        isCalledFromHeader = state.isCalledFromHeader
+    }
+    
+    const [open, setOpen] = useState(isCalledFromHeader);
+    const dispatch = useMembershipDispatch();
     const [api, contextHolder] = notification.useNotification();
     const [queryValue, setQueryValue] = useState("");
     const limit = 10;

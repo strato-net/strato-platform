@@ -9,7 +9,7 @@ import {
   Avatar,
   Dropdown,
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -175,6 +175,20 @@ const HeaderComponent = ({ user, loginUrl }) => {
         items={navItems[roleIndex]?.items}
       />
       <Space size="large">
+        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
+          className="cursor-pointer"
+          onClick={() => {
+            navigate("/memberships", { state: { isCalledFromHeader: true} });
+          }}
+        >
+          <Avatar
+            style={{
+              backgroundColor: "#181EAC",
+            }}
+            icon={<PlusCircleOutlined />}
+          />
+        </Badge>
+        }
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}

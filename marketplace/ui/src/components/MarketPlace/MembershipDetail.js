@@ -289,7 +289,7 @@ const serviceDispatch = useMembershipDispatch();
         <Space>
           <DescTitle text="Seller" />
           <DescTitle text="                                :" />
-          <Text className="text-[13px]">{details?.ownerCommonName}</Text>
+          <Text className="text-[13px]">{details?.ownerOrganization}</Text>
         </Space>
 
         <Space>
