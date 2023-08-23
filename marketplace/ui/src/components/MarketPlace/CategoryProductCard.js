@@ -38,7 +38,7 @@ const CategoryProductCard = ({ product, category }) => {
   const [api, contextHolder] = notification.useNotification();
 
   const navigate = useNavigate();
-  const naviroute = routes.MarketplaceProductDetail.url;
+  const naviroute = routes.MembershipDetail.url;
   const [qty, setQty] = useState(1);
 
   const subtract = () => {
@@ -125,7 +125,7 @@ const CategoryProductCard = ({ product, category }) => {
               height={180}
               preview={false}
               onClick={() =>
-                navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+                navigate(`${naviroute.replace(":id", product.address)}`, { state: { isCalledFromInventory: false } })
               }
             />
           </div>
@@ -136,7 +136,7 @@ const CategoryProductCard = ({ product, category }) => {
                 className="text-xl text-primaryB hover:text-primary hover:underline"
                 id="prod-name"
                 onClick={() =>
-                  navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+                  navigate(`${naviroute.replace(":id", product.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: product.address } })
                 }
               >
                 {decodeURIComponent(product.name)}&nbsp;
@@ -156,7 +156,10 @@ const CategoryProductCard = ({ product, category }) => {
                 ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
-              $ {product.pricePerUnit}
+              ${product.pricePerUnit}
+            </Title>
+            <Title level={4} className="!mt-0" id="prod-savings" style={{ color: "green" }}>
+              Total Savings: ${product.totalSavings}
             </Title>
             {product.availableQuantity !== 0 ?
               (

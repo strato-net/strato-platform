@@ -149,6 +149,7 @@ async function getAll(admin, args = {}, options) {
                 ...product,
                 ...inventory,
                 totalSavings: totalSavings,
+                membershipAddress: membership.address,
             });
         });
     });
