@@ -137,4 +137,6 @@ export const Properties = {
   get: '/:address',
   create: '/',
   update: '/update',
+  createReview: '/review',
+  deleteReview: '/review/delete',
 }

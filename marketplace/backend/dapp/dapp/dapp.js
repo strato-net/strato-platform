@@ -20,6 +20,8 @@ import userAddressJs from "/dapp/addresses/userAddress.js";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
+import reviewManagerJs from '/dapp/reviews/reviewManager';
+import { prop } from "ramda";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -28,7 +30,7 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
 ];
 
-const contractName = "Dapp";
+const contractName = "Dapp_0_1";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
@@ -114,13 +116,14 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const state = await rest.getState(admin, contract, options);
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
+  const reviewManager = await reviewManagerJs.bindAddress(admin, state["reviewManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, reviewManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -609,12 +612,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //Get the product contract
     console.log('dapp.getProperty - property', property)
     console.log('dapp.getProperty - productId', property.productId)
-    const productData = await managers.productManager.getProduct({ 
+    const productData = await managers.productManager.getProduct({
       address: property.productId,
       uniqueProductID: property.productId,
-      ownerOrganization: userOrganization }, getOptions);
-      console.log('dapp.getProperty - productData', productData)
-    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
+      ownerOrganization: userOrganization
+    }, getOptions);
+    console.log('dapp.getProperty - productData', productData)
+    console.log('dapp.getProperty - property.address', property.address)
+    const reviews = await managers.reviewManager.getReviews({
+      productId: property.productId,
+      propertyId: property.address,
+    }, getOptions);
+    console.log('dapp.getProperty - reviews', reviews)
+    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
     return propertyData
   };
 
@@ -624,13 +634,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const propertiesWProducts = []
 
     for (const property of allPropertiesData) {
-      const productData = await managers.productManager.getProduct({ 
+      const productData = await managers.productManager.getProduct({
         ...args,
         offset: 0,
         sort: null,
         address: property.productId,
         uniqueProductID: property.productId,
-        ownerOrganization: userOrganization }, 
+        ownerOrganization: userOrganization
+      },
         getOptions
       );
       propertiesWProducts.push({ ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory })
@@ -768,6 +779,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
+
+  // ------------------------------ REVIEW MANAGER STARTS--------------------------------
+
+  // Create reviews
+  contract.createReview = async function (args, options = defaultOptions) {
+    console.log('dapp.createReview - args', args)
+    const createdDate = Math.floor(Date.now() / 1000);
+    return managers.reviewManager.createReview({ ...args, createdDate: createdDate, delDate: 0 });
+  }
+
+  // Delete reviews by the productId/productAddress
+  contract.deleteReview = async function (args, options = defaultOptions) {
+    return managers.reviewManager.deleteReview(args);
+  };
+
+
+  // ------------------------------ REVIEW MANAGER ENDS--------------------------------
+
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
