@@ -170,18 +170,24 @@ function PropertyCreateModal({
       livingArea,
       livingAreaUnits,
       numberOfUnitsTotal,
+      fileUpload:fileList,
 
       ...selectedOptions,
     };
 
     for (const key in body) {
-      if (body.hasOwnProperty(key)) {
+      if(key==="fileUpload"){
+        fileList.forEach((file, index) => {
+          formData.append(key, file.originFileObj , file.name)
+        });
+      }
+      else if (body.hasOwnProperty(key)) {
         formData.append(key, body[key]);
       }
     }
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
-    let response = await actions.createProperty(dispatch, body);
+    let response = await actions.createProperty(dispatch, formData);
     if (response) {
       toggleCreateModal(false)
       toggleCreateConfirmModal(false)
@@ -189,16 +195,16 @@ function PropertyCreateModal({
       actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
     }
 
-    if (projectImages) {
-      const formData = new FormData()
-      formData.append('projectAddress', projectAddress)
-      formData.append('section', uploadSections.IMAGES)
-      projectImages.forEach((file) => {
-        formData.append('projectImageFiles', file.originFileObj);
-      });
-      await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
-    }
-    Modal.destroyAll();
+    // if (projectImages) {
+    //   const formData = new FormData()
+    //   formData.append('projectAddress', projectAddress)
+    //   formData.append('section', uploadSections.IMAGES)
+    //   projectImages.forEach((file) => {
+    //     formData.append('projectImageFiles', file.originFileObj);
+    //   });
+    //   await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
+    // }
+    // Modal.destroyAll();
   };
 
   const handleFileChange = ({ fileList: newFileList }) => setFileList(newFileList);
@@ -500,7 +506,7 @@ function PropertyCreateModal({
         </Row>
         <Form.Item>
           <Upload
-            action="https://multinode203.ci.blockapps.net/api/v1/image"
+            // action="https://multinode203.ci.blockapps.net/api/v1/image"
             listType="picture-card"
             fileList={fileList}
             onPreview={handlePreview}
@@ -715,7 +721,7 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        okButtonProps={{ disabled: primaryAction.disabled }}
+        // okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);

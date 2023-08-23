@@ -4,6 +4,8 @@ import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import { getSignedUrlFromS3, deleteFileFromS3, uploadFileToS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
+import moment from 'moment/moment'
+import crypto from "crypto";
 
 const options = { config, cacheNonce: true }
 
@@ -54,9 +56,7 @@ class PropertiesController {
 
   static async create(req, res, next) {
     try {
-      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalcode } } = req
-
-
+      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalcode }, files } = req
       const propertyArgs = {
         ...body,
         unparsedAddress: `${streetNumber} ${streetName} ${unitNumber}, ${postalCity}, ${stateOrProvince} ${postalcode}`,
@@ -89,8 +89,9 @@ class PropertiesController {
             );
 
             const uploadedFile = await uploadFileToS3(
-              fileKey, file.buffer, "s3 options" // add s3 options
+              process.env.EXT_STORAGE_S3_BUCKET, fileKey, file.buffer // add s3 options
             );
+
 
             const productDocumentArgs = {
               productId: propertyResult.productContractAddress,
