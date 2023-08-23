@@ -12,9 +12,7 @@ contract ProductDocumentManager {
         string _fileName,
         string _fileLocation,
         int _uploadDate,
-        string _documentType,
-        string _uploadedByUser,
-        int _delDate
+        string _documentType
     ) returns (uint256, address) {
         ProductDocument productDocument = new ProductDocument(
          _productId,
@@ -23,9 +21,7 @@ contract ProductDocumentManager {
          _fileName,
          _fileLocation,
          _uploadDate,
-         _documentType,
-         _uploadedByUser,
-         _delDate
+         _documentType
         );
 
         return (RestStatus.OK, address(productDocument));

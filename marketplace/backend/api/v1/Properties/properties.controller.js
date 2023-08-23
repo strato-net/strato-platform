@@ -2,9 +2,9 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3, deleteFileFromS3 } from '../../../helpers/s3'
+import { getSignedUrlFromS3, deleteFileFromS3, uploadFileToS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
-import moment from 'moment/moment'
+import moment from 'moment'
 import crypto from "crypto";
 
 const options = { config, cacheNonce: true }
@@ -74,31 +74,27 @@ class PropertiesController {
         /* -------upload the documents and images if necessary-------- */
         if (files) {
           files.forEach(async (file) => {
-            // const fileKey = `${moment()
-            //   .utc()
-            //   .valueOf()}_${file.originalname}`;
+            const fileKey = `${moment()
+              .utc()
+              .valueOf()}_${file.originalname}`;
 
-            // const fileHash = crypto
-            //   .createHmac("sha256", file.buffer)
-            //   .digest("hex");
+            const fileHash = crypto
+              .createHmac("sha256", file.buffer)
+              .digest("hex");
 
-            // const fileLocation = await uploadFileToS3(
-            //   `${fileKey}`,
-            //   file.buffer,
-            //   req.app.get(constants.s3ParamName)
-            // );
 
-            const uploadedFile = await uploadFileToS3(
-              process.env.EXT_STORAGE_S3_BUCKET, fileKey, file.buffer // add s3 options
+            const uploadResult = await uploadFileToS3(
+              `${fileKey}`,
+              file.buffer,
+              req.app.get(constants.s3ParamName)
             );
-
 
             const productDocumentArgs = {
               productId: propertyResult.productContractAddress,
-              fileKey: uploadedFile,
-              // fileHash: fileHash,
+              fileKey,
+              fileHash,
               fileName: file.originalname,
-              // fileLocation: fileLocation,
+              fileLocation: uploadResult.Location,
               documentType: file.mimetype,
             }
 
@@ -118,7 +114,6 @@ class PropertiesController {
         }
         const inventoryResult = await dapp.createInventory(inventoryBody)
         if (inventoryResult) {
-          console.log('propertyResult', propertyResult)
           rest.response.status200(res, propertyResult)
         }
       }
@@ -237,22 +232,19 @@ class PropertiesController {
     const validation = createPropertySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error',
+        `Missing args or bad format: ${validation.error.message}`)
     }
   }
 
   static validateCreateProductDocumentArgs(args) {
     const createProductDocumentSchema = Joi.object({
-      productDocumentArgs: Joi.object({
-        productId: Joi.string().required(),
-        fileKey: Joi.string().required(),
-        fileHash: Joi.string().required(),
-        fileName: Joi.string().required(),
-        fileLocation: Joi.string().required(),
-        documentType: Joi.string().required(),
-      })
+      productId: Joi.string().required(),
+      fileKey: Joi.string().required(),
+      fileHash: Joi.string().required(),
+      fileName: Joi.string().required(),
+      fileLocation: Joi.string().required(),
+      documentType: Joi.string().required(),
     });
 
     const validation = createProductDocumentSchema.validate(args);

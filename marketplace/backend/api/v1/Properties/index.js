@@ -3,8 +3,11 @@ import PropertiesController from "./properties.controller";
 import { Properties } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
+import multer from "multer";
+import constants from "../../../helpers/constants";
 
 const router = express.Router();
+const fileUploader = multer({ storage: multer.memoryStorage() });
 
 router.get(
   Properties.get,
@@ -23,6 +26,7 @@ router.get(
 router.post(
   Properties.create,
   authHandler.authorizeRequest(),
+  fileUploader.array(constants.fileUploadFieldName),
   loadDapp,
   PropertiesController.create
 );

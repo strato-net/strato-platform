@@ -58,7 +58,6 @@ function marshalIn(_args) {
         fileLocation: '',
         uploadDate: 0,
         documentType: '',
-        uploadedByUser: '',
         delDate: 0,
     };
 

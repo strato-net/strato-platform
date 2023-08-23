@@ -11,7 +11,6 @@ contract ProductDocument {
     string public fileLocation;
     int public uploadDate;
     string public documentType;
-    string public uploadedByUser;
     uint public delDate;
 
     constructor(
@@ -21,9 +20,7 @@ contract ProductDocument {
         string _fileName,
         string _fileLocation,
         int _uploadDate,
-        string _documentType,
-        string _uploadedByUser,
-        int _delDate
+        string _documentType
     ) public {
         productId = _productId;
         fileKey = _fileKey;
@@ -32,7 +29,6 @@ contract ProductDocument {
         fileLocation = _fileLocation;
         uploadDate = _uploadDate;
         documentType = _documentType;
-        uploadedByUser = _uploadedByUser;
         delDate = 0;
     }
 

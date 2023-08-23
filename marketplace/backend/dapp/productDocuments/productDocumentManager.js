@@ -94,8 +94,8 @@ function bind(user, _contract, options) {
     ...options,
   };
   contract.getState = async () => getState(user, contract, options);
-  contract.getProducDocument = async (args, _options = defaultOptions) =>
-    getProducDocument(user, args, _options);
+  contract.getProductDocument = async (args, _options = defaultOptions) =>
+    getProductDocument(user, args, _options);
   contract.createProductDocument = async (args) =>
     createProductDocument(user, contract, args, options);
   contract.deleteProductDocument = async (args) =>
@@ -106,7 +106,7 @@ function bind(user, _contract, options) {
 /**
  * get the productDocuments
  */
-async function getProducDocument(user, args, options) {
+async function getProductDocument(user, args, options) {
   return productDocumentJs.get(user, args, options);
 }
 

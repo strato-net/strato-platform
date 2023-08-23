@@ -616,7 +616,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       uniqueProductID: property.productId,
       ownerOrganization: userOrganization
     }, getOptions);
-    const propertyImages = await managers.productDocumentManager.getProductDocuments({ ...args, productId: property.productId }, getOptions);
+    const propertyImages = await managers.productDocumentManager.getProducDocument({ ...args, productId: property.productId }, getOptions);
     const propertyData = {
       ...property,
       title: productData.name,
@@ -790,7 +790,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // Create productDocuments
   contract.createProductDocument = async function (args, options = defaultOptions) {
     const uploadDate = Math.floor(Date.now() / 1000);
-    return managers.productDocumentManager.createProductDocument({ ...args, uploadDate: uploadDate });
+    return managers.productDocumentManager.createProductDocument({ ...args, uploadDate });
   }
 
   // Delete productDocuments by the productId/productAddress

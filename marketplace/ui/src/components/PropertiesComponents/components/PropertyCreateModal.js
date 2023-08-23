@@ -151,7 +151,8 @@ function PropertyCreateModal({
 
   //creates the listing for property
   const handleSubmitCreateProperty = async () => {
-
+     const formData = new FormData();
+     
     const body = {
       title,
       description,
