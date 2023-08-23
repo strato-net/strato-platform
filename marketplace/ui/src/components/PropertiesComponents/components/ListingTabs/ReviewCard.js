@@ -4,14 +4,16 @@ import { UserOutlined, DownOutlined, UpOutlined } from "@ant-design/icons";
 import { decodeURIComponentText, unixToDate } from "../../helpers/utils";
 
 const ReviewCard = (props) => {
-  const { review: { reviewerName, title, createdDate, rating, description, readmore }, index } = props
-  console.log('ReviewCard', props.review)
+  const {
+    review: { reviewerName, title, createdDate, rating, description, readmore },
+    index,
+  } = props;
   return (
     <>
       <Space
         direction="vertical"
         size="small"
-        style={{ marginTop: "30px", width: '400px' }}
+        style={{ marginTop: "30px", width: "400px" }}
         key={index}
       >
         <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -35,23 +37,44 @@ const ReviewCard = (props) => {
                 />
               </div> */}
         </div>
-        <Typography.Text type="secondary">Reviewed on {unixToDate(createdDate)}</Typography.Text>
-        <Typography.Text style={{ position: "relative", top: '10px' }} strong>{title}</Typography.Text>
-        <Typography.Text>
-          {readmore
-            ? decodeURIComponentText(description)
-            : decodeURIComponentText(description)?.slice(0, 100)}
+        <Typography.Text type="secondary">
+          Reviewed on {unixToDate(createdDate)}
         </Typography.Text>
-        {
-          description?.length > 100 ?
-            readmore
-              ? <Button block className="read-btn" onClick={() => { props.handleRead() }}><UpOutlined /> Hide full review</Button>
-              : <Button block className="read-btn" onClick={() => { props.handleRead() }}> <DownOutlined /> See full review</Button>
-            : ''}
+        <Typography.Text style={{ position: "relative", top: "10px" }} strong>
+          {title}
+        </Typography.Text>
+        <Typography.Text>
+          {decodeURIComponentText(description, readmore)}
+        </Typography.Text>
+        {description?.length > 100 ? (
+          readmore ? (
+            <Button
+              block
+              className="read-btn"
+              onClick={() => {
+                props.handleRead();
+              }}
+            >
+              <UpOutlined /> Hide full review
+            </Button>
+          ) : (
+            <Button
+              block
+              className="read-btn"
+              onClick={() => {
+                props.handleRead();
+              }}
+            >
+              {" "}
+              <DownOutlined /> See full review
+            </Button>
+          )
+        ) : (
+          ""
+        )}
       </Space>
-
     </>
-  )
-}
+  );
+};
 
-export default ReviewCard
+export default ReviewCard;
