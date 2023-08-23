@@ -46,10 +46,9 @@ const actions = {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: "application/json"
         },
-        body: JSON.stringify(payload),
+        body: payload,
       });
 
       const body = await response.json();

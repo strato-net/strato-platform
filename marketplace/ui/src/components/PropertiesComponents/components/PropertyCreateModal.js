@@ -170,12 +170,24 @@ function PropertyCreateModal({
       livingArea,
       livingAreaUnits,
       numberOfUnitsTotal,
+      fileUpload: fileList,
 
       ...selectedOptions,
     };
 
+    for (const key in body) {
+      if (key === "fileUpload") {
+        fileList.forEach((file, index) => {
+          formData.append(key, file.originFileObj, file.name)
+        });
+      }
+      else if (body.hasOwnProperty(key)) {
+        formData.append(key, body[key]);
+      }
+    }
+
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
-    let response = await actions.createProperty(dispatch, body);
+    let response = await actions.createProperty(dispatch, formData);
     if (response) {
       toggleCreateModal(false)
       toggleCreateConfirmModal(false)
@@ -183,17 +195,16 @@ function PropertyCreateModal({
       actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
     }
 
-    //TODO:- Can uncomment when use image upload ***
-    //   if (projectImages) {
-    //     const formData = new FormData()
-    //     formData.append('projectAddress', projectAddress)
-    //     formData.append('section', uploadSections.IMAGES)
-    //     projectImages.forEach((file) => {
-    //       formData.append('projectImageFiles', file.originFileObj);
-    //     });
-    //     await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
-    //   }
-    //   Modal.destroyAll();
+    // if (projectImages) {
+    //   const formData = new FormData()
+    //   formData.append('projectAddress', projectAddress)
+    //   formData.append('section', uploadSections.IMAGES)
+    //   projectImages.forEach((file) => {
+    //     formData.append('projectImageFiles', file.originFileObj);
+    //   });
+    //   await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
+    // }
+    // Modal.destroyAll();
   };
 
   const handleFileChange = ({ fileList: newFileList }) => setFileList(newFileList);
@@ -494,34 +505,34 @@ function PropertyCreateModal({
           </Col>
         </Row>
         <Form.Item>
-        <Upload
-        action="https://multinode203.ci.blockapps.net/api/v1/image"
-        listType="picture-card"
-        fileList={fileList}
-        onPreview={handlePreview}
-        onChange={handleFileChange}
-      >
-        {fileList.length >= 8 ? null : 
-            <div>
-            <PlusOutlined />
-            <div
+          <Upload
+            // action="https://multinode203.ci.blockapps.net/api/v1/image"
+            listType="picture-card"
+            fileList={fileList}
+            onPreview={handlePreview}
+            onChange={handleFileChange}
+          >
+            {fileList.length >= 8 ? null :
+              <div>
+                <PlusOutlined />
+                <div
+                  style={{
+                    marginTop: 8,
+                  }}
+                >
+                  Upload
+                </div>
+              </div>}
+          </Upload>
+          <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancel}>
+            <img
+              alt="example"
               style={{
-                marginTop: 8,
+                width: '100%',
               }}
-            >
-              Upload
-            </div>
-          </div>}
-      </Upload>
-      <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancel}>
-        <img
-          alt="example"
-          style={{
-            width: '100%',
-          }}
-          src={previewImage}
-        />
-      </Modal>
+              src={previewImage}
+            />
+          </Modal>
         </Form.Item>
       </Form>
     )
@@ -710,7 +721,7 @@ function PropertyCreateModal({
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
         okText={modalView ? "Continue" : "Next"}
-        okButtonProps={{ disabled: primaryAction.disabled }}
+        // okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
           setModalView(true);
