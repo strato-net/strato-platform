@@ -10,7 +10,9 @@ module Bloc.API
   , blocApi
   , module Bloc.API.Git
   , module Bloc.API.Users
+  , module Bloc.API.X509
   , module Bloc.API.Contracts
+  , module Bloc.API.Chain
   , module Bloc.API.Transaction
   , module Bloc.API.Utils
   ) where
@@ -65,6 +67,7 @@ type BlocAPI =
   :<|> PostBlocTransactionBody
   :<|> PostBlocTransactionUnsigned
   :<|> PostBlocTransaction
+  :<|> PostBlocTransactionExternal
 
 --Unsure what this will break if anything but remove later
 instance ToSample Text where

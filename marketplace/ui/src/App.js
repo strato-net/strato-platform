@@ -21,7 +21,7 @@ const App = () => {
 
   TagManager.initialize(tagManagerArgs);
 
-  const {user, loginUrl, users } =
+  const {user, loginUrl, users, isAuthenticated } =
     useAuthenticateState();
     
     
@@ -38,7 +38,7 @@ const App = () => {
     <BrowserRouter basename="/marketplace">
       <Layout>
         <UsersProvider>
-          <HeaderComponent user={user} users={users} loginUrl={loginUrl} />
+          <HeaderComponent isOauth={isAuthenticated}  user={user} users={users} loginUrl={loginUrl} />
         </UsersProvider>
         <Content>
           <AuthenticatedRoutes user={user} users={users} />

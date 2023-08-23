@@ -34,7 +34,9 @@ data Type
   | Enum { bytes::Maybe Int32, typedef::Text, names::Maybe [Text]}
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::Text}
-  | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic,NFData, Read)
+  | Mapping {dynamic::Maybe Bool, key::Type, value::Type} 
+  | Variadic
+  deriving (Eq, Show, Generic,NFData, Read)
 
 instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}

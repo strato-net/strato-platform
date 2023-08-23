@@ -85,7 +85,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                 e' | Just HeadMacIncorrect  <- fromException e' -> do
                   disErr <- storeDisableException p (T.pack "HeadMacIncorrect")
                   whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                  lengthenPeerDisable p
+                  lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                 e' | Just NetworkIDMismatch <- fromException e' -> do
                  udpErr <- disableUDPPeerForSeconds p 86400
                  whenLeft udpErr $ \theUDPErr -> do
@@ -97,7 +97,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                 e' | Just PeerDisconnected <- fromException e' -> do
                   disErr <- storeDisableException p (T.pack "PeerDisconnected")
                   whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                  lengthenPeerDisable p
+                  lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                 e' | Just TimeoutException <- fromException e' -> do
                   disErr <- storeDisableException p (T.pack "TimeoutException")
                   whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
@@ -117,7 +117,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                       $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                      disErr <- storeDisableException p (T.pack "TimeoutException")
                      whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                     lengthenPeerDisable p
+                     lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                    _ -> return $ Right ()
                 _  -> return $ Right ()
               throwIO err

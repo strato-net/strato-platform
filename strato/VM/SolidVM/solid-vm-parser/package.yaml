@@ -30,6 +30,7 @@ library:
   - semver-range
   - solid-vm-model
   - source-tools
+  - strato-model
   - swagger2
   - text
   - deepseq

@@ -29,6 +29,7 @@ import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Verification
 import           Blockchain.VMOptions
+import           Blockchain.Strato.Model.Options
 
 {-
 nextGasLimit::Integer->Integer->Integer

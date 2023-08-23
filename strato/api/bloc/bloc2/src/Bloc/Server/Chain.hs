@@ -40,6 +40,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.TransactionResultStatus
+import           Blockchain.DB.CodeDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.TypeLits
 import           Blockchain.Strato.Model.Account
@@ -81,6 +82,7 @@ governanceAddress = Address 0x100
 --           _ -> m
 
 createChainInfo :: ( A.Selectable Account AddressState m
+                   , HasCodeDB m
                    , (Keccak256 `A.Selectable` SourceMap) m
                    , MonadLogger m
                    , HasVault m
@@ -156,6 +158,7 @@ getLastBlockHash = do
 
 
 postChainInfo :: ( A.Selectable Account AddressState m
+                 , HasCodeDB m
                  , (Keccak256 `A.Selectable` SourceMap) m
                  , MonadLogger m
                  , HasBlocEnv m
@@ -184,6 +187,7 @@ postChainInfo mJwtToken chainInput = case mJwtToken of
         pure chainId
 
 postChainInfos :: ( A.Selectable Account AddressState m
+                  , HasCodeDB m
                   , (Keccak256 `A.Selectable` SourceMap) m
                   , MonadLogger m
                   , HasSQL m

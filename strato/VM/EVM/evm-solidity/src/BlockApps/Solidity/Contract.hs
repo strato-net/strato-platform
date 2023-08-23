@@ -68,6 +68,7 @@ getPositionAndSize typeDefs' p (TypeArrayFixed size ty) =
 getPositionAndSize _ p TypeMapping{}  = (getNextAvailablePosition p 32, 32)
 getPositionAndSize _ p TypeFunction{} = (p,32)
 getPositionAndSize _ p TypeContract{} = nextAvail p 20
+getPositionAndSize _ p TypeVariadic{} = (getNextAvailablePosition p 32, 32)
 
 nextAvail::Storage.Position->Word256->(Storage.Position, Word256)
 nextAvail p x = (getNextAvailablePosition p $ toInteger x, x)
