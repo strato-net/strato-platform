@@ -1355,7 +1355,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     
     
     // Get all membershipServices
-    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }))?.membershipServices ?? [];
+    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }));
 
     // Get all services
     const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
@@ -1400,7 +1400,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const dictionaryOfMemberships = {}; //Where key == productId and value == list of memberships with that productId
     let   addressOfProducts       = []; // This list is used for the call for Products
     // Iterate through list of memberships to create the dictionary, note we filter out memberships with null productIds
-    for (const obj of memberships.memberships) {
+    for (const obj of memberships) {
         const productID = obj.productId;
         // Check if the productID is not null
         if (!(productID === null || productID === undefined)) {
