@@ -115,12 +115,12 @@ async function getAll(admin, args = {}, options) {
         return (servicePrice - membershipPrice) * maxQuantity;
     }
 
-    function calculateTotalDiscount(services) {
+    function calculateTotalSavings(services) {
         return services.reduce((total, service) => total + service.serviceDiscount, 0);
     }
 
     // Process inventory results and create the return object
-    inventoryResults.forEach((inventoryBatch, batchIndex) => {
+    inventoryResults.forEach((inventoryBatch, batchIx) => {
         inventoryBatch.forEach(inventory => {
             const product = productMap.get(inventory.productId);
             const membership = membershipMap.get(product.address);
@@ -141,14 +141,14 @@ async function getAll(admin, args = {}, options) {
                 }),
             };
 
-            const totalDiscount = calculateTotalDiscount(membershipData.services);
+            const totalSavings = calculateTotalSavings(membershipData.services);
 
-            membershipData.totalDiscount = totalDiscount;
+            membershipData.totalSavings = totalSavings;
 
             returnObject.push({
                 ...product,
                 ...inventory,
-                membership: membershipData
+                totalSavings: totalSavings,
             });
         });
     });
