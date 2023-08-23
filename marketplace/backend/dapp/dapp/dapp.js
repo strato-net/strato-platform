@@ -643,7 +643,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
         getOptions
       );
-      const propertyImages = await managers.productDocumentManager.getProductDocuments({ ...args, productId: property.productId }, getOptions);
+      const propertyImages = await managers.productDocumentManager.getProductDocument({ ...args, productId: property.productId }, getOptions);
       propertiesWProducts.push({ ...property, 
         title: productData.name,
         description: productData.description, 
