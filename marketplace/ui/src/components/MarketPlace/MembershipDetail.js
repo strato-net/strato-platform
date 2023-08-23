@@ -239,7 +239,7 @@ const serviceDispatch = useMembershipDispatch();
       render: (text) => <p>{decodeURIComponent(text)}</p>
     },
     {
-      title: <Text className="text-primaryC text-[13px]">EFFECTIVE COST SAVING FROM MEMBERMSHIP </Text>,
+      title: <Text className="text-primaryC text-[13px]">EFFECTIVE COST SAVINGS FROM MEMBERSHIP </Text>,
       dataIndex: "serviceCost",
       key: "serviceCost",
       render: (text) => <p style={{ textAlign: 'center'}}>${decodeURIComponent(text)}</p>,
@@ -289,7 +289,7 @@ const serviceDispatch = useMembershipDispatch();
         <Space>
           <DescTitle text="Seller" />
           <DescTitle text="                                :" />
-          <Text className="text-[13px]">{details?.ownerCommonName}</Text>
+          <Text className="text-[13px]">{details?.ownerOrganization}</Text>
         </Space>
 
         <Space>
@@ -438,9 +438,9 @@ const serviceDispatch = useMembershipDispatch();
                 ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
-                {details?.pricePerUnit ? `$ ${details.pricePerUnit}` : "not listed"}
+                {details?.pricePerUnit ? `$ ${details.pricePerUnit}` : "Not Listed"}
               </Title>
-              <Title level={4} className="!mt-0">
+              <Title level={4} className="!mt-0" style={{ color: 'green' }}>
                 {`Total Savings: $ ${totalSavings}`}
               </Title>
               {details?.availableQuantity !== 0 ?
