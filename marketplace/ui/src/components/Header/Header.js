@@ -43,7 +43,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
 
-  const showStorage = user && user.organization && user.organization == "BlockApps" ? true : false 
+  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false 
 
   const navItems = [
     {
@@ -208,6 +208,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
               },
             });
             navigate(navUrls[item.key], { state: { tab: "EventType" } })}
+          else navigate(navUrls[item.key]);
           if (item.key === "5") {
             TagManager.dataLayer({
               dataLayer: {
@@ -215,7 +216,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
               }
             });
           }
-          else navigate(navUrls[item.key]);
         }}
         items={navItems[roleIndex]?.items}
       />
