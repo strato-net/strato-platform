@@ -6,18 +6,12 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-import { filterlabel, propertyCheckBox, propertyConstants } from '../helpers/constants'
+import { createPropertyFormInitialData, filterlabel, propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
 
   const [filterOption, setFilterOption] = useState({});
-  const [formData, setFormData] = useState({
-    lotSizeUnits: "sqft",
-    livingAreaUnits: "sqft",
-    numberOfUnitsTotal: 1,
-    ...propertyCheckBox
-  })
   const [appliedFilter, setAppliedFilter] = useState({})
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(LIMIT_PER_PAGE)
@@ -178,7 +172,7 @@ console.log(properties)
       <PropertyCreateModal
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
-        formData={formData}
+        formData={createPropertyFormInitialData}
       />
     </>
   );

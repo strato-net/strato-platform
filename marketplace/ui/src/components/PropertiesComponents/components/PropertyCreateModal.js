@@ -23,8 +23,8 @@ import {
   categoriesObj,
   stateData,
   homeTypeData,
-  propertyCheckBox,
   propertyConstants,
+  createPropertyFormInitialData,
 } from "../helpers/constants";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
@@ -177,16 +177,17 @@ function PropertyCreateModal({
       if (response) {
         toggleCreateModal(false)
         toggleCreateConfirmModal(false)
-        setModalView(!modalView);
-        // actions.fetchPropertyDetails(dispatch, id)
+        setModalView(true);
+
       }
     } else {
       let response = await actions.createProperty(dispatch, body);
       if (response) {
         toggleCreateModal(false)
         toggleCreateConfirmModal(false)
-        setModalView(!modalView);
+        setModalView(true);
         actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+        setPropertyData(createPropertyFormInitialData)
       }
     }
 

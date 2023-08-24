@@ -31,7 +31,20 @@ router.put(
   Properties.update,
   authHandler.authorizeRequest(),
   loadDapp,
-  PropertiesController.update
+  PropertiesController.update);
+  
+router.post(
+  Properties.createReview,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.createReview
+);
+
+router.post(
+  Properties.deleteReview,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.deleteReview
 );
 
 router.post(
