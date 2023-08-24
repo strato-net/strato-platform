@@ -164,7 +164,7 @@ const MembershipCard = ({
                 <p text-secondryB text-sm>
                   :
                 </p>
-                <p className="text-primaryA font-bold text-sm ml-3">
+                <p style={{ color: "green"}} className="text-primaryB font-bold text-sm ml-3">
                  $ {membership.savings}
                 </p>
               </div>
