@@ -1383,7 +1383,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       }),
       productFiles: productFiles
     };
-    console.log("Dapp-getMembership combinedData: ", combinedData);
     return combinedData
   }
 
@@ -1434,7 +1433,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           { ...membership, inventories: [...membership.inventories, inventory] } : membership;} )
     })
 
-    console.log("Dapp-getMemberships memberships: ", memberships)
     return memberships;
   }
 

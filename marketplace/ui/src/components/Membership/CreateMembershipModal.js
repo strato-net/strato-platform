@@ -40,7 +40,7 @@ import { INVENTORY_STATUS } from "../../helpers/constants";
 
 const { Dragger } = Upload;
 
-const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
+const CreateMembershipModal = ({ open, handleCancel, user }) => {
   // const schema = getSchema();
   const prodDispatch = useProductDispatch();
   const limit = 10;
@@ -221,7 +221,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   };
 
   const handleCreateFormSubmit = async (values) => {
-    console.log("values", values);
     const updatedValues = checkDiscountType(memberDiscount);
     // console.log("updated Values", updatedValues);
     // console.log("values", values);
@@ -316,14 +315,13 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                 type: 2,
               })),
             };
-
             switch (visible) {
               // If the List Now form is open we will create the membership and inventory otherwise we will just create the membership
               case false:
                 const isDone = await actions.createMembership(dispatch, body);
                 if (isDone) {
                   formik.resetForm();
-                  handleCancel();
+                  handleCancel("success");
                 }
                 break;
               case true:
@@ -352,7 +350,7 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
                   );
                   if (isDone3) {
                     formik.resetForm();
-                    handleCancel();
+                    handleCancel("success");
                   }
                 }
                 break;
@@ -372,14 +370,12 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
   const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
 
   const closeModal = () => {
-    handleCancel();
+    handleCancel(false);
   };
 
   function beforeUpload() {
     return false;
   }
-
-  const [api, contextHolder] = notification.useNotification();
 
   const closeListNowModal = () => {
     setVisible(false);
@@ -387,15 +383,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
 
   const openListNowModal = () => {
     setVisible(true);
-  };
-
-  const openToast = (placement, message) => {
-    api.error({
-      message: message,
-      onClose: actions.resetMessage(dispatch),
-      placement,
-      key: 2,
-    });
   };
 
   return (
@@ -442,7 +429,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
           </div>,
         ]}
       >
-        {contextHolder}
         <h1
           id="modal-title"
           className="text-center font-semibold text-lg text-primaryB"
@@ -792,7 +778,6 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
           isCreateMembershipSubmitting={isCreateMembershipSubmitting}
         />
       )}
-      {/* {message && openToast("bottom")} */}
     </>
   );
 };
