@@ -97,7 +97,7 @@ contract Product_4 is InventoryStatus {
 
     // Add the inventory for the product
     function addInventory(
-        int _availableQuantity,
+        uint _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -144,7 +144,7 @@ contract Product_4 is InventoryStatus {
     // Update the inventory quantity
     function updateInventoryQuantity(
         address _inventory,
-        int _quantity
+        uint _quantity
     ) public returns (uint256) {
         Inventory_7 inventory = Inventory_7(_inventory);
         inventory.updateQuantity(_quantity);

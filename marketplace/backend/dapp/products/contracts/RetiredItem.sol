@@ -9,7 +9,7 @@ contract RetiredItem_2 {
     address public inventoryId;
     string public retiredBy;
     string public retiredOnBehalfOf;
-    int public quantity;
+    uint public quantity;
     string public purpose;
     uint public retirementDate;
     string public batchSerializationNumber;
@@ -18,7 +18,7 @@ contract RetiredItem_2 {
         address _inventoryId,
         string _retiredBy,
         string _retiredOnBehalfOf,
-        int _quantity,
+        uint _quantity,
         string _purpose,
         uint _retirementDate,
         string _batchSerializationNumber

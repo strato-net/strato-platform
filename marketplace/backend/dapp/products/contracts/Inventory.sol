@@ -12,18 +12,18 @@ contract Inventory_7 is InventoryStatus {
 
     address public productId;
     string public category;
-    int public purchasedQuantity;
+    uint public purchasedQuantity;
     int public pricePerUnit;
     uint public vintage;
-    int public availableQuantity;
+    uint public availableQuantity;
     InventoryStatus public status;
     uint public createdDate;
     string public batchSerializationNumber;
-    int public retiredQuantity;
+    uint public retiredQuantity;
 
     constructor(
         string _category,
-        int _quantity,
+        uint _quantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -73,17 +73,17 @@ contract Inventory_7 is InventoryStatus {
         return RestStatus.OK;
     }
 
-    function updateQuantity(int _quantity) returns (uint) {
+    function updateQuantity(uint _quantity) returns (uint) {
         availableQuantity = _quantity;
         return RestStatus.OK;
     }
 
-    function updateQuantityForResell(int _quantity) returns (uint256) {
+    function updateQuantityForResell(uint _quantity) returns (uint256) {
         availableQuantity = availableQuantity - _quantity;
         return RestStatus.OK;
     }
 
-    function updateRetiredQuantity(int _quantity) returns (uint) {
+    function updateRetiredQuantity(uint _quantity) returns (uint) {
         availableQuantity = availableQuantity - _quantity;
         retiredQuantity = retiredQuantity + _quantity;
     }
@@ -92,7 +92,7 @@ contract Inventory_7 is InventoryStatus {
         address _inventoryId,
         string _retiredBy,
         string _retiredOnBehalfOf,
-        int _quantity,
+        uint _quantity,
         string _purpose
     ) public returns (uint256, address) {
         RetiredItem_2 retiredItem = new RetiredItem_2(

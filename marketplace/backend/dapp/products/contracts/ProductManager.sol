@@ -129,7 +129,7 @@ contract ProductManager is InventoryStatus, RestStatus {
 
     function addInventory(
         address _productAddress,
-        int _availableQuantity,
+        uint _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -171,9 +171,31 @@ contract ProductManager is InventoryStatus, RestStatus {
         return (RestStatus.FORBIDDEN, address(0));
     }
 
+    function addVintage(
+        address _inventoryId,
+        uint _vintage,
+        uint _retiredQuantity,
+        uint _bufferAmount,
+        uint _estimatedReductionAmount,
+        uint _actualReductionAmount,
+        string _verifier
+    ) returns (uint256, address) {
+        Vintage vintage = new Vintage(
+            _inventoryId,
+            _vintage,
+            _retiredQuantity,
+            _bufferAmount,
+            _estimatedReductionAmount,
+            _actualReductionAmount,
+            _verifier
+        );
+
+        return (RestStatus.OK, address(vintage));
+    }
+
     function addInventoryForBuyer(
         address _productAddress,
-        int _availableQuantity,
+        uint _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -204,7 +226,7 @@ contract ProductManager is InventoryStatus, RestStatus {
 
     function resellInventory(
         address _existingInventory,
-        int _quantity,
+        uint _quantity,
         int _price
     ) returns (uint256, address) {
         Inventory_7 existingInventory = Inventory_7(_existingInventory);
@@ -248,7 +270,7 @@ contract ProductManager is InventoryStatus, RestStatus {
 
     function updateInventoriesQuantities(
         address[] _inventories,
-        int[] _quantities,
+        uint[] _quantities,
         bool _isReduce
     ) returns (uint256) {
         for (uint i = 0; i < _inventories.length; i++) {
@@ -258,11 +280,11 @@ contract ProductManager is InventoryStatus, RestStatus {
                 if (_quantities[i] > inventory.availableQuantity()) {
                     return RestStatus.BAD_REQUEST;
                 }
-                int quantityToDeduct = inventory.availableQuantity() -
+                uint quantityToDeduct = inventory.availableQuantity() -
                     _quantities[i];
                 inventory.updateQuantity(quantityToDeduct);
             } else {
-                int quantityToAdd = inventory.availableQuantity() +
+                uint quantityToAdd = inventory.availableQuantity() +
                     _quantities[i];
                 inventory.updateQuantity(quantityToAdd);
             }
@@ -317,7 +339,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         address _productId,
         address _inventoryId,
         address _newOwner,
-        int _newQuantity
+        uint _newQuantity
     ) public returns (uint, address, address) {
         Product_4 product;
         Inventory_7 inventory;
@@ -371,7 +393,7 @@ contract ProductManager is InventoryStatus, RestStatus {
             Inventory_7 inventoryToBeAdded = Inventory_7(
                 uniqueInventoryAddress
             );
-            int availableQuantity = inventoryToBeAdded.availableQuantity();
+            uint availableQuantity = inventoryToBeAdded.availableQuantity();
             //quantity updated
             uint256 status = inventoryToBeAdded.updateQuantity(
                 availableQuantity + _newQuantity
@@ -396,7 +418,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         address _inventoryId,
         string _retiredBy,
         string _retiredOnBehalfOf,
-        int _quantity,
+        uint _quantity,
         string _purpose
     ) returns (uint256, address) {
         Inventory_7 inventory = Inventory_7(_inventoryId);
