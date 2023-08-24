@@ -57,7 +57,6 @@ class PaymentServiceController {
           // const sessionStatus = object.status;
           // const paymentIntentId = object.payment_intent;
           // const paymentContract = await dapp.getPayment({ paymentSessionId })
-
           // await dapp.updatePayment({ payment: paymentContract.address, paymentStatus, paymentIntentId, sessionStatus })
           break;
         case 'checkout.session.expired':

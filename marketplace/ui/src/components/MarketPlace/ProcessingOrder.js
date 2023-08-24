@@ -75,6 +75,11 @@ const ProcessingOrder = () => {
             let object = { paymentSessionId: sessionId, ...cart };
             handleOrderConfirm(object);
           }
+          else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+            const cart = JSON.parse(body.data.metadata.cart);
+            let object = { paymentSessionId: sessionId, ...cart };
+            handleOrderConfirm(object);
+          }
         }
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         seterror("Cannot find session ID");

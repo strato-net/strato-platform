@@ -190,7 +190,7 @@ pipeline {
                 usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
               dir ('strato-worktree') {
-                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, devops/**"
+                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
                 sh '''#!/bin/bash -le
                   set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
