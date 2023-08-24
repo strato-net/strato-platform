@@ -40,7 +40,6 @@ const CategoryProductCard = ({ product, category }) => {
 
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
-  const naviroute = routes.MembershipDetail.url;
   const [qty, setQty] = useState(1);
 
   const subtract = () => {
