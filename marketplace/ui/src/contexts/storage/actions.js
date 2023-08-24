@@ -4,9 +4,12 @@ import { cirrusUrl, HTTP_METHODS } from "../../helpers/constants";
 const actionDescriptors = {
   resetMessage: "reset_message",
   setMessage: "set_message",
-  fetchStorage: "fetch_storage",
-  fetchStorageSuccessful: "fetch_storage_successful",
-  fetchStorageFailed: "fetch_storage_failed"
+  fetchAssets: "fetch_assets",
+  fetchAssetsSuccessful: "fetch_assets_successful",
+  fetchAssetsFailed: "fetch_assets_failed",
+  fetchSales: "fetch_sales",
+  fetchSalesSuccessful: "fetch_sales_successful",
+  fetchSalesFailed: "fetch_sales_failed",
 };
 
 const actions = {
@@ -18,10 +21,10 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchStorage: async (dispatch, limit, offset, queryValue) => {
+  fetchAssets: async (dispatch, limit, offset, queryValue) => {
     const query = queryValue ? `&contractName=${queryValue}` : "";
 
-    dispatch({ type: actionDescriptors.fetchStorage });
+    dispatch({ type: actionDescriptors.fetchAssets });
 
     try {
       const response = await fetch(
@@ -35,24 +38,63 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchStorageSuccessful,
+          type: actionDescriptors.fetchAssetsSuccessful,
           payload: body.data,
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
-          type: actionDescriptors.fetchStorageFailed,
-          error: "Error while fetching Storage",
+          type: actionDescriptors.fetchAssetsFailed,
+          error: "Error while fetching from the Asset table",
         });
       }
       dispatch({
-        type: actionDescriptors.fetchStorageFailed,
+        type: actionDescriptors.fetchAssetsFailed,
         error: body.error,
       });
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchStorageFailed,
-        error: "Error while fetching Storage",
+        type: actionDescriptors.fetchAssetsFailed,
+        error: "Error while fetching from the Asset table",
+      });
+    }
+  },
+
+  fetchSales: async (dispatch, limit, offset, queryValue) => {
+    const query = queryValue ? `&contractName=${queryValue}` : "";
+
+    dispatch({ type: actionDescriptors.fetchSales });
+
+    try {
+      const response = await fetch(
+        `${cirrusUrl}/Sale?limit=${limit}&offset=${offset}${query}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchSalesSuccessful,
+          payload: body.data,
+        });
+        return;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchSalesFailed,
+          error: "Error while fetching from the Sale table",
+        });
+      }
+      dispatch({
+        type: actionDescriptors.fetchSalesFailed,
+        error: body.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchSalesFailed,
+        error: "Error while fetching from the Sale table",
       });
     }
   },

@@ -1,6 +1,7 @@
 import { actionDescriptors } from "./actions";
+import { initialState } from ".";
 
-const reducer = (state, action) => {
+const reducer = (state = initialState, action) => {
   switch (action.type) {
     case actionDescriptors.resetMessage:
       return {
@@ -14,22 +15,39 @@ const reducer = (state, action) => {
         success: action.success,
         message: action.message
       };
-    case actionDescriptors.fetchStorage:
+    case actionDescriptors.fetchAssets:
       return {
         ...state,
-        isStorageLoading: true
+        isAssetsLoading: true
       };
-    case actionDescriptors.fetchStorageSuccessful:
+    case actionDescriptors.fetchAssetsSuccessful:
       return {
         ...state,
-        data: action.payload,
-        isStorageLoading: false
+        assets: action.payload,
+        isAssetsLoading: false
       };
-    case actionDescriptors.fetchStorageFailed:
+    case actionDescriptors.fetchAssetsFailed:
       return {
         ...state,
         error: action.error,
-        isStorageLoading: false
+        isAssetsLoading: false
+      };
+    case actionDescriptors.fetchSales:
+      return {
+        ...state,
+        isSalesLoading: true
+      };
+    case actionDescriptors.fetchSalesSuccessful:
+      return {
+        ...state,
+        sales: action.payload,
+        isSalesLoading: false
+      };
+    case actionDescriptors.fetchSalesFailed:
+      return {
+        ...state,
+        error: action.error,
+        isSalesLoading: false
       };
     default:
       throw new Error (`Unhandled action: '${action.type}'`);
