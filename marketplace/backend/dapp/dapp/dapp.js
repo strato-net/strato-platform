@@ -624,7 +624,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       propertyId: property.address,
     }, getOptions);
     console.log('dapp.getProperty - reviews', reviews)
-    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
+    const propertyData = { ...property, title: productData.name,organization:productData.ownerOrganization, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
     return propertyData
   };
 

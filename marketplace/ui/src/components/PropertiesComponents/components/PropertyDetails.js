@@ -24,6 +24,7 @@ import {
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
+import { useAuthenticateState } from "../../../contexts/authentication";
 
 function PropertyDetails() {
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
@@ -36,6 +37,9 @@ function PropertyDetails() {
     message,
     success,
   } = usePropertiesState();
+  const { user } = useAuthenticateState();
+  const organization = user?.organization
+
   let { id } = useParams();
 
   useEffect(() => {
@@ -175,41 +179,52 @@ function PropertyDetails() {
     )
   }
 
-  return (
-    <>
-      {contextHolder}
-      {message && openToast("bottom")}
+  const editBox = () => {
+    return (
       <Row
         wrap
         gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }}
         className="mt-5 justify-between"
       >
-        <Typography.Title
-          level={4}
-          style={{ padding: "0px 16px" }}
-        ></Typography.Title>
-        <Col style={{ marginRight: "50px" }}>
-          <Button
-            type="primary"
-            onClick={() => {
-              setUploadPhotosModal(true);
-            }}
-            disabled
-          >
-            Edit Property
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => {
-              toggleCreateModal(true);
-            }}
-            style={{ marginLeft: "5px" }}
-          >
-            <EditOutlined />
-            Edit
-          </Button>
-        </Col>
+        <>
+          <Typography.Title
+            level={4}
+            style={{ padding: "0px 16px" }}
+          ></Typography.Title>
+          <Col style={{ marginRight: "50px" }}>
+            <Button
+              type="primary"
+              onClick={() => {
+                setUploadPhotosModal(true);
+              }}
+              disabled
+            >
+              Edit Property
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                toggleCreateModal(true);
+              }}
+              style={{ marginLeft: "5px" }}
+            >
+              <EditOutlined />
+              Edit
+            </Button>
+          </Col>
+        </>
       </Row>
+    )
+  }
+
+  return (
+    <>
+      {contextHolder}
+      {message && openToast("bottom")}
+      {!isPropertyDetailsLoading
+        && propertyDetails?.organization == organization
+        && editBox()
+      }
       {isPropertyDetailsLoading ? (
         <div className="h-96 flex justify-center items-center">
           <Spin spinning={isPropertyDetailsLoading} size="large" />

@@ -4,7 +4,6 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 contract Property_0_5 {
     address public productId;
     int public listPrice;
-    // string public unparsedAddress;
     int public streetNumber;
     string public streetName;
     string public unitNumber;
