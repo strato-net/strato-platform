@@ -46,6 +46,7 @@ library:
     - generic-arbitrary
     - generic-deriving
     - hashable
+    - hflags
     - http-api-data
     - integer-gmp
     - labeled-error
@@ -56,6 +57,7 @@ library:
     - path-pieces
     - persistent
     - primitive
+    - raw-strings-qq
     - relapse           # remove this
     - secp256k1-haskell
     - servant

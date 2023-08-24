@@ -22,3 +22,9 @@ defineFlag "evmCompatible" (False :: Bool) "Whether to turn off STRATO enhanceme
 defineFlag "txSizeLimit" (150000 :: Int) "The maximum length of a valid RLP encoded transaction bytestring"
 defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions an account can make"
 defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
+defineFlag "identityServerUrl" ("https://identity.blockapps.net" :: String) "The URL of the identity server" -- This could be used during the strato-getting started or default use with network flag
+defineFlag "vaultProxyPort" ("8013" :: String) "URL to Vault"
+defineFlag "userRegistryAddress" ("4be508b4b59039cbacf5f18ccd9b67ab48e86e6d" :: String) "Address of the User Registry contract" -- TODO: Change back to 720 once we start deploying networks with UserRegistry in the genesis block
+defineFlag "userRegistryCodeHash" ("02946aa18081cd1c540f931e600d58e1c1e21a447620fb318ddf57b29126720b" :: String) "Code hash of UserRegistry contract code collection"
+defineFlag "useBuiltinUserRegistry" (True :: Bool) "Whether to use the code hash for the standard UserRegistry contracts"
+defineFlag "useWalletsByDefault" (False :: Bool) "Whether to redirect transactions to user wallet contracts by default"

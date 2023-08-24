@@ -97,7 +97,7 @@ valueToSolidityValue = \case
   ValueArrayDynamic ivs -> Just . SolidityArray <$> mapMaybeM valueToSolidityValue (unsparse ivs)
   ValueArrayFixed{} -> Left "internal error: SolidVM generate state for static arrays"
   ValueFunction{} -> Left "internal error: SolidVM generating state for functions"
-
+  ValueVariadic{} -> Left "internal error: SolidVM generating state for variadic"
 
   where fromShowable :: (Show a) => a -> Either String (Maybe SolidityValue)
         fromShowable = Right . Just . SolidityValueAsString . T.pack . show

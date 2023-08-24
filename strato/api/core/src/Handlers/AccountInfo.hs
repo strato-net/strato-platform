@@ -27,7 +27,7 @@ import           Servant
 import           Servant.Client
 --import           Servant.Swagger.Tags
 
-
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
@@ -241,9 +241,19 @@ codeServer cHash = select (Proxy @SourceMap) cHash >>= \case
   Just srcMap -> pure srcMap
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
-getCodeFromPostgres cHash =
-  let getSourceMap = deserializeSourceMap . codeRefCode . E.entityVal
-   in fmap (listToMaybe . map getSourceMap) . sqlQuery . E.select $
+getCodeFromPostgres = fmap (fmap deserializeSourceMap) . getCodeTextFromPostgres
+
+getCodeTextFromPostgres :: HasSQL m => Keccak256 -> m (Maybe Text)
+getCodeTextFromPostgres cHash =
+  let getText = codeRefCode . E.entityVal
+   in fmap (listToMaybe . map getText) . sqlQuery . E.select $
         E.from $ \(codeRef) -> do
         E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)
         return codeRef
+
+getX509CertForAccount :: HasCirrus m => Address -> m (Maybe Certificate)
+getX509CertForAccount addr = do
+  fmap (listToMaybe . map E.entityVal) . cirrusQuery . E.select $
+    E.from $ \(certificate) -> do
+      E.where_ (certificate E.^. CertificateUserAddress E.==. E.val addr)
+      return $ certificate

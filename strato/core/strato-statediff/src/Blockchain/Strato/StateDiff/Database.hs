@@ -82,7 +82,7 @@ createAccount blockNumber accountDiffs =
     tryCreates = do
       codeIDs <- fmap catMaybes $ (map (Just . SQL.entityKey) <$> traverse (`SQL.upsert` []) (uncurry codeRef <$> accountDiffs)) `catch` (\(e :: SomeException) -> do
         $logWarnS "commitSqlDiffs/createAccount" . T.pack $ "Error inserting code: " ++ show e
-        pure Nothing)
+        pure [])
       let newAccounts = map (uncurry $ uncurry addrRef) $ zip accountDiffs codeIDs
       $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Creating accounts: " ++ (unlines $ map show newAccounts)
       addrIDs <- map SQL.entityKey <$> traverse (`SQL.upsert` []) newAccounts

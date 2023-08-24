@@ -24,6 +24,7 @@ executables:
       - hflags
       - lifted-async
       - ordered-containers
+      - strato-model
       - strato-p2p
       - wai-middleware-prometheus
       - warp
@@ -93,7 +94,6 @@ library:
     - transformers
     - unliftio-core
     - unliftio
-    - vm-tools
     - warp
     - x509-certs
 

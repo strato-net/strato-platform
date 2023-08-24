@@ -60,6 +60,7 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
+import           Blockchain.Strato.Model.Options       (computeNetworkID)
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -320,13 +321,28 @@ bytesToMessages = forever $ do
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
 maxMessageSize :: Int
-maxMessageSize = 1 `shiftL` 25
+maxMessageSize = 1 `shiftL` 24
 
 messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
-messageToBytes = mapC $ \msg ->
-  let (theWord, o) = wireMessage2Obj msg
-      bs = theWord `B.cons` rlpSerialize o
-  in if B.length bs >= maxMessageSize
-        then error $ printf "messageToBytes: message (%s...) too large for TCP send (%d >= %d)"
-                            (take 50 $ show msg) (B.length bs) maxMessageSize
-        else bs
+messageToBytes = mapC serializeWithRespectToMaxMessageSize
+  where 
+    serializeWithRespectToMaxMessageSize :: Message -> B.ByteString
+    serializeWithRespectToMaxMessageSize msg = 
+      let (theWord, o) = wireMessage2Obj msg 
+          bs = theWord `B.cons` rlpSerialize o 
+      in  if B.length bs >= maxMessageSize
+          then case msg of
+            NewBlockHashes arr  -> serializeWithRespectToMaxMessageSize . NewBlockHashes  $ firstHalf arr
+            Transactions arr    -> serializeWithRespectToMaxMessageSize . Transactions    $ firstHalf arr
+            BlockHeaders arr    -> serializeWithRespectToMaxMessageSize . BlockHeaders    $ firstHalf arr
+            GetBlockBodies arr  -> serializeWithRespectToMaxMessageSize . GetBlockBodies  $ firstHalf arr
+            BlockBodies arr     -> serializeWithRespectToMaxMessageSize . BlockBodies     $ firstHalf arr
+            GetChainDetails arr -> serializeWithRespectToMaxMessageSize . GetChainDetails $ firstHalf arr 
+            ChainDetails arr    -> serializeWithRespectToMaxMessageSize . ChainDetails    $ firstHalf arr 
+            GetTransactions arr -> serializeWithRespectToMaxMessageSize . GetTransactions $ firstHalf arr
+            _ -> error $ printf "messageToBytes: message (%s...) too large to be sent via RLPx and can't be truncated (%d >= %d)"
+              (take 50 $ show msg) (B.length bs) maxMessageSize
+          else bs
+    
+    firstHalf :: [a] -> [a]
+    firstHalf arr = take (length arr `div` 2) arr

@@ -14,6 +14,7 @@ module Blockchain.Generation (
   insertContractsJSONHashMaps,
   insertContracts,
   insertCertRegistryContract,
+  insertUserRegistryContract,
   insertMercataGovernanceContract,
   readCertsFromGenesisInfo,
   readValidatorsFromGenesisInfo,
@@ -49,6 +50,7 @@ import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256              as KECCAK256
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.UserRegistry
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.Data.RLP
 import           Blockchain.Data.ChainInfo
@@ -829,3 +831,47 @@ contract MercataGovernance {
         }
     }
 }|]
+
+-- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
+insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
+insertUserRegistryContract certs gi =
+    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
+        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry userRegistryContract (Just "UserRegistry")]}
+    where 
+        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+        initialAccounts = genesisInfoAccountInfo gi
+        initialCode     = genesisInfoCodeInfo gi
+
+        rlpWrap         = rlpSerialize . rlpEncode
+        encodedRegistry = encodeUtf8 userRegistryContract
+
+        rootAddress'    = fromPublicKey rootPubKey
+        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
+        rootSub         = fromJust $ getCertSubject rootCert
+        rootAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing Nothing) 123
+            (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
+                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+                (".isActive", rlpWrap $ BBool True),
+                (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
+            ]
+
+        userAccts = map (\cert -> do
+                let certSub' crt =
+                        case getCertSubject crt of
+                            Just s -> s
+                            Nothing -> error "Certificate requires a subject"
+                    certUserAddress = fromPublicKey . subPub . certSub'
+                    certSub = certSub' cert
+                    reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
+                SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing Nothing) 0 
+                    (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+                        (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
+                        (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
+                        (".isActive", rlpWrap $ BBool True),
+                        (BC.pack $ ".userCertificates<a:" ++ (show $ certUserAddress cert) ++ ">", addrToCertIdx . show . reverseAddr $ cert)]
+            ) certs
+
+        registryAcct = SolidVMContractWithStorage 0x720 720
+            (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry)) $
+            [(".owner", rootAddress)]

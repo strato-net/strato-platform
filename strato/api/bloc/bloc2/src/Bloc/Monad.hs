@@ -39,7 +39,9 @@ import           UnliftIO                           hiding (Handler(..))
 import           Bloc.API.Transaction
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 
 import           Control.Monad.Change.Modify        hiding (modify)
@@ -54,14 +56,17 @@ data CacheNonce = CacheNonce
 type HasBlocEnv m = Accessible BlocEnv m
 
 data BlocEnv = BlocEnv
-  { stateFetchLimit    :: Integer
-  , gasOn              :: Bool
-  , evmCompatible      :: Bool
-  , txSizeLimit        :: Int
-  , accountNonceLimit  :: Integer
-  , gasLimit           :: Integer
-  , globalNonceCounter :: Cache Account Nonce
-  , txTBQueue          :: TBQueue (Maybe Text, Maybe ChainId, Bool, PostBlocTransactionRequest)
+  { stateFetchLimit     :: Integer
+  , gasOn               :: Bool
+  , evmCompatible       :: Bool
+  , txSizeLimit         :: Int
+  , accountNonceLimit   :: Integer
+  , gasLimit            :: Integer
+  , globalNonceCounter  :: Cache Account Nonce
+  , txTBQueue           :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest)
+  , userRegistryAddress :: Address
+  , userRegistryCodeHash :: Maybe Keccak256
+  , useWalletsByDefault :: Bool
   }
 
 --------------------------------------------------------------------------------

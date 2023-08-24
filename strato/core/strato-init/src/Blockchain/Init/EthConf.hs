@@ -31,6 +31,17 @@ defaultSqlConfig =
       poolsize = 10
     }
 
+defaultCirrusConfig :: SqlConf
+defaultCirrusConfig = 
+    SqlConf {
+      user = "postgres",
+      password = "api",
+      host = "postgres",
+      port = 5432,
+      database = "strato",
+      poolsize = 10
+    }
+
 defaultKafkaConfig :: KafkaConf
 defaultKafkaConfig = KafkaConf {
   kafkaHost = "kafka",
@@ -89,6 +100,7 @@ defaultConfig =
     EthConf {
       ethUniqueId        = defaultEthUniqueId,
       sqlConfig          = defaultSqlConfig,
+      cirrusConfig       = defaultCirrusConfig,
       redisBlockDBConfig = defaultRedisBlockDBConfig,
       levelDBConfig      = defaultLevelDBConfig,
       kafkaConfig        = defaultKafkaConfig,

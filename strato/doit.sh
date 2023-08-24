@@ -9,6 +9,8 @@ Yellow='\033[0;33m'
 BYellow='\033[1;33m'
 NC='\033[0m'
 
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-"8013"}
+
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
@@ -115,7 +117,7 @@ function newnode {
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
-  actualTimeout="${connectionTimeout:-300}"
+  actualTimeout="${connectionTimeout:-30}"
   if [ -n "${blockstanbulRoundPeriodS}" ]; then
     withCushion=$(( 2 * blockstanbulRoundPeriodS ))
     actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
@@ -136,6 +138,9 @@ function newnode {
   if [ -n "${network}" ]; then
     networkFlag="--network=${network}"
   fi
+  if [ -n "${maxReturnedHeaders}" ]; then
+    maxHeadersFlag="--maxReturnedHeaders=${maxReturnedHeaders}"
+  fi
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -143,8 +148,8 @@ function newnode {
      --sqlPeers=true \
      --debugFail=${debugFail:-true}  \
      --maxConn=$maxConn \
-     --maxReturnedHeaders=$maxReturnedHeaders \
      --networkID=$networkID \
+     ${maxHeadersFlag} \
      ${txgFlag} \
      ${atbFlag} \
      ${pcamFlag} \
@@ -224,6 +229,22 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
+  if [ -n "${idServerUrl}" ]; then
+      idServer="--identityServerUrl=${idServerUrl}"
+  fi
+  if [ -n "${userRegistryAddress}" ]; then
+      urFlag="--userRegistryAddress=${userRegistryAddress}"
+  fi
+  if [ -n "${userRegistryCodeHash}" ]; then
+      ucFlag="--userRegistryCodeHash=${userRegistryCodeHash}"
+  fi
+  if [ -n "${useBuiltinUserRegistry}" ]; then
+      ubFlag="--useBuiltinUserRegistry=${useBuiltinUserRegistry}"
+  fi
+  if [ -n "${useWalletsByDefault}" ]; then
+      udFlag="--useWalletsByDefault=${useWalletsByDefault}"
+  fi
+
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
@@ -236,7 +257,7 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}" +RTS -N1 >> logs/strato-api 2>&1
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}" "${idServer}" "${urFlag}" "${ucFlag}" "${ubFlag}" "${udFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
@@ -416,7 +437,6 @@ fi
 setEnv requireCerts true
 setEnv genesisBlock ""
 setEnv bootnode ""
-setEnv maxReturnedHeaders 500
 
 setEnv mineBlocks true
 setEnv verifyBlocks false
