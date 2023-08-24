@@ -167,6 +167,7 @@ function PropertyCreateModal({
         unparsedAddress,
         latitude,
         longitude,
+        reviews,
         ...updatedData
       } = body;
       updatedData["propertyAddress"] = address;

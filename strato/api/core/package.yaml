@@ -12,6 +12,7 @@ library:
   dependencies:
   - aeson
   - aeson-casing
+  - async
   - base64-bytestring
   - binary
   - blockapps-data
@@ -35,7 +36,9 @@ library:
   - mtl
   - process
   - QuickCheck
+  - resourcet
   - seqevents
+  - servant
   - servant-client
   - servant-multipart
   - servant-multipart-client  
@@ -52,6 +55,9 @@ library:
   - unordered-containers
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
+  - blockapps-identity-provider-client
   - vault-monad
+  - identity-monad
   - blockapps-vault-wrapper-server
   - strato-redis-blockdb
+  - evm-solidity

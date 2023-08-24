@@ -41,6 +41,11 @@ function PropertyDetails() {
   useEffect(() => {
     actions.fetchPropertyDetails(dispatch, id);
   }, []);
+
+  useEffect(() => {
+    document.title = `Mercata Properties | ${propertyDetails?.title} `;
+  }, [propertyDetails]);
+
   const { Text, Title } = Typography;
 
   const [api, contextHolder] = notification.useNotification();
@@ -137,7 +142,7 @@ function PropertyDetails() {
     {
       key: "Reviews",
       label: `Reviews`,
-      // children: <ReviewTab reviews={reviews} />,
+      children: <ReviewTab reviews={propertyDetails?.reviews} propertyId={propertyDetails?.address} productId={propertyDetails?.productId} />,
     },
   ];
 
@@ -191,8 +196,7 @@ function PropertyDetails() {
             }}
             disabled
           >
-            <UploadOutlined />
-            Upload Images
+            Edit Property
           </Button>
           <Button
             type="primary"

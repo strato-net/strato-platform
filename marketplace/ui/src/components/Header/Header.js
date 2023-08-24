@@ -228,7 +228,16 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white"> Login / Register </a> : null
+            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white" 
+              onClick={() => {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'login_register_click'
+                  }
+                })
+              } } > 
+              Login / Register 
+              </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">

@@ -22,6 +22,7 @@ import           Bloc.Server.Utils
 import           BlockApps.Logging
 import           BlockApps.Solidity.Contract()
 import           Blockchain.Data.AddressStateDB
+import           Blockchain.DB.CodeDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
@@ -33,6 +34,7 @@ import           SQLM
 
 
 postUsersFill :: ( A.Selectable Account AddressState m
+                 , HasCodeDB m
                  , (Keccak256 `A.Selectable` SourceMap) m
                  , MonadLogger m
                  , HasSQL m

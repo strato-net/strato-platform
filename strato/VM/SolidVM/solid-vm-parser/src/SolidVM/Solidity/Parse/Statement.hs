@@ -11,7 +11,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Text.Parsec
 import           Text.Parsec.Expr
+import           Text.Read (readMaybe)
 
+import           Blockchain.Strato.Model.Account
 import           SolidVM.Model.CodeCollection.Statement
 import           SolidVM.Model.SolidString
 import           SolidVM.Model.Type
@@ -50,7 +52,7 @@ statement =
   <|> throwStatement
   <|> try (do
               ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
-              pure $ SimpleStatement e a 
+              pure $ SimpleStatement e a
           )
   <|> (Continue <$> (position (reserved "continue") <* semi))
   <|> (Break <$> (position (reserved "break") <* semi))
@@ -82,7 +84,7 @@ solidityTryCatchStatement = do
       mIdent <- optionMaybe identifier
       mtps <- optionMaybe tupleDeclaration'
       ss <- statements
-      (i,tps) <- case (mIdent, mtps) of 
+      (i,tps) <- case (mIdent, mtps) of
         (Just "Error" , Just [(a,b)] ) -> if (case b of (SVMType.String _) -> True; _ -> False;) then pure ("Error", Just (a,b) ) else fail "'Error' catch statement parameter type must be string"
         (Just "Error" , Just xs ) -> if Prelude.length xs < 2 then pure ("Error", Nothing) else fail "'Error' catch statement must only have one or zero parameters"
         (Just "Error" , Nothing ) -> pure ("Error", Nothing)
@@ -199,13 +201,13 @@ revertStatement = try $ do
       ]
     pure (i, e)
   _ <- semi
-  pure $ RevertStatement i e a  
+  pure $ RevertStatement i e a
 
 
 location :: SolidityParser (Maybe Location)
 location = optionMaybe $ asum [ reserved "memory" >> return Memory
                               , reserved "storage" >> return Storage
-                              , reserved "calldata" >> return Calldata 
+                              , reserved "calldata" >> return Calldata
                               ]
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
@@ -292,7 +294,8 @@ postfix p = Postfix . chainl1 p $ return (flip (.))
 
 memberName :: SolidityParser SolidString
 memberName = do
-  (reserved "length" >> return (stringToLabel "length"))
+  (reserved "call" >> return (stringToLabel "call"))
+  <|> (reserved "length" >> return (stringToLabel "length"))
   <|> fmap stringToLabel identifier
 
 tuple :: SolidityParser Expression -- includes the case of a 1-tuple, ie- parens...  but just returns as a simple expression
@@ -347,7 +350,7 @@ primaryExpression :: SolidityParser Expression
 primaryExpression = do
   let res' a b = withPosition $ b <$ reserved a
       res  a   = res' a a
-      
+
   myHexParser
     <|> (uncurry Variable . fmap stringToLabel <$> res "msg")
     <|> (uncurry Variable . fmap stringToLabel <$> res "address")
@@ -366,13 +369,14 @@ primaryExpression = do
     <|> (uncurry BoolLiteral <$> res' "true" True)
     <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
     <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
-    <|> (do 
+    <|> (do
             ~(a, (val, nu)) <- withPosition $ do
               val <- scientificInteger
               nu <- optionMaybe numberUnit
               pure (val, nu)
             pure $ NumberLiteral a val nu)
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
+    <|> (uncurry AccountLiteral <$> withPosition accountLiteral)
 
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do
@@ -384,9 +388,9 @@ myHexParser = try $ do
   return $ HexaLiteral a val
 
 scientific :: SolidityParser Integer
-scientific = do 
+scientific = do
     leftVal <- integer
-    _ <- symbol "e" 
+    _ <- symbol "e"
     rightVal <- integer
     pure $ leftVal * (10 ^ rightVal)
 
@@ -404,13 +408,27 @@ numberUnit = do
 parseArgs :: SolidityParser [Expression]
 parseArgs = parens $ commaSep literal
 
-parseDelegateCallArgs :: SolidityParser (SolidString, [SVMType.Type])
-parseDelegateCallArgs = do
+parseExternalCallArgs :: SolidityParser (SolidString, [SVMType.Type])
+parseExternalCallArgs = do
   ~(fname, args) <-  do
       name <- fromMaybe "fallback" <$> optionMaybe identifier
-      args <-  parens $ commaSep  simpleType
+      args <-  parens $ commaSep simpleType
       return (name, args)
   return (fname, args)
+
+accountLiteral :: SolidityParser NamedAccount
+accountLiteral = do
+  void $ char '<'
+  addr <- many1 hexDigit
+  cId <- optionMaybe $ do
+    void $ char ':'
+    (reserved "main" >> pure "main") <|> many1 hexDigit
+  let acctStr = addr ++ maybe "" (':':) cId
+  acct <- case readMaybe acctStr of
+    Nothing -> fail $ "accountLiteral: Could not parse account from " ++ acctStr
+    Just acct -> pure acct
+  void $ char '>'
+  pure acct
 
 literal :: SolidityParser Expression
 literal = asum
@@ -418,6 +436,7 @@ literal = asum
             ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
             pure $ NumberLiteral a n u
         , uncurry StringLiteral <$> withPosition stringLiteral
+        , uncurry AccountLiteral <$> withPosition accountLiteral
         , uncurry BoolLiteral <$> withPosition (False <$ reserved "false")
         , uncurry BoolLiteral <$> withPosition (True <$ reserved "true")
         , uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal)

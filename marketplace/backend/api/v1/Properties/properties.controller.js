@@ -104,6 +104,21 @@ class PropertiesController {
 
       const updatedProperty = await dapp.updateProperty(propertyArgs)
       rest.response.status200(res, updatedProperty)
+    
+    return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async createReview(req, res, next) {
+    try {
+      const { dapp, body } = req
+      console.log('createReview body', body)
+      PropertiesController.validateCreateReviewArgs(body)
+      const result = await dapp.createReview(body)
+      console.log('createReview - result', result)
+      rest.response.status200(res, result)
 
       return next()
     } catch (e) {
@@ -111,6 +126,20 @@ class PropertiesController {
     }
   }
 
+  static async deleteReview(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      PropertiesController.validateDeleteReviewArgs(body)
+
+      const result = await dapp.deleteReview(body, options)
+
+      rest.response.status200(res, result)
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -333,6 +362,41 @@ class PropertiesController {
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Update Property Argument Validation Error`,
         `Missing args or bad format: ${validation.error.message}`,
       )
+    }
+  }
+  
+  static validateCreateReviewArgs(args) {
+    const createReviewSchema = Joi.object({
+        productId: Joi.string().required(),
+        propertyId: Joi.string().required(),
+        reviewerAddress: Joi.string().required(),
+        reviewerName: Joi.string().required(),
+        title: Joi.string().required(),
+        description: Joi.string().required(),
+        rating: Joi.number().required(),
+    });
+
+    const validation = createReviewSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Review Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+  
+
+  static validateDeleteReviewArgs(args) {
+    const deleteReviewSchema = Joi.object({
+      productAddress: Joi.string().required()
+    });
+
+    const validation = deleteReviewSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Delete Review Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
     }
   }
 

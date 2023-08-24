@@ -37,6 +37,7 @@ data Type
   | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text
+  | TypeVariadic
   deriving (Eq, Show, Generic, NFData, Binary, Ord)
 
 data SimpleType
@@ -61,6 +62,7 @@ getTypeByteLength = \case
   TypeStruct{}          -> Nothing
   TypeEnum{}            -> Nothing
   TypeContract{}        -> getSimpleTypeByteLength TypeAccount
+  TypeVariadic{}        -> Nothing
 
 getSimpleTypeByteLength :: SimpleType -> Maybe Int
 getSimpleTypeByteLength = \case
@@ -94,3 +96,4 @@ formatType (TypeFunction _ paramTypes returnTypes) =
 formatType (TypeEnum name) = Text.unpack name
 formatType (TypeContract name) = Text.unpack name
 formatType (TypeStruct name) = Text.unpack name
+formatType (TypeVariadic) = "variadic"

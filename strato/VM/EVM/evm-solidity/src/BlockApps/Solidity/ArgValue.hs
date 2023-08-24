@@ -135,6 +135,18 @@ argValueToValue defs theType argVal = case theType of
           Left "argValueToValue: Could not parse object into a Struct"
         Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- BF.first DAK.toText <$> KM.toList mp]
       a ->  Left $ Text.pack $ "argValueToValue: Expected TypeStruct to be a object, but got a" ++ show a
+  TypeVariadic -> do
+    case argVal of
+      ArgArray xs -> do
+        listOfVals <- mapM (\v -> do
+            let inferredType = argValueToType v
+                value = argValueToValue defs inferredType v
+            case value of
+              Right v' -> return v'
+              _ -> Left $ "argValueToValue: Could not parse array into a Variadic"
+          ) $ V.toList xs
+        Right $ ValueVariadic listOfVals
+      o -> Left . Text.pack $ "argValueToValue: Expected TypeVariadic to be an array, but got: " ++ show o
 
 argValueToSimpleValue :: SimpleType -> ArgValue -> Either Text SimpleValue
 argValueToSimpleValue theType argVal = case theType of

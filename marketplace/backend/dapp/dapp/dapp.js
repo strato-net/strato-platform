@@ -20,6 +20,8 @@ import userAddressJs from "/dapp/addresses/userAddress.js";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
+import reviewManagerJs from '/dapp/reviews/reviewManager';
+import { prop } from "ramda";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -28,7 +30,7 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
 ];
 
-const contractName = "Dapp";
+const contractName = "Dapp_0_1";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
@@ -114,13 +116,14 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const state = await rest.getState(admin, contract, options);
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
+  const reviewManager = await reviewManagerJs.bindAddress(admin, state["reviewManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, reviewManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -133,8 +136,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     console.log('dapp - userCertificate', userCertificate)
     if (userCertificate === null || userCertificate === undefined) {
       // delay for 6 seconds and check again if cert got created successfully
-      console.log('user not found in first attempt, this may be a brand new registration, recheck in 9 secs')
-      await new Promise(resolve => setTimeout(resolve, 9000));
+      console.log('user not found in first attempt, this may be a brand new registration, recheck in 3 secs')
+      await new Promise(resolve => setTimeout(resolve, 3000));
       userCertificate = await certificateJs.getCertificateMe(rawAdmin);
       console.log('user content from second attempt', userCertificate)
     }
@@ -614,7 +617,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       uniqueProductID: property.productId,
       ownerOrganization: userOrganization
     }, getOptions);
-    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory }
+    console.log('dapp.getProperty - productData', productData)
+    console.log('dapp.getProperty - property.address', property.address)
+    const reviews = await managers.reviewManager.getReviews({
+      productId: property.productId,
+      propertyId: property.address,
+    }, getOptions);
+    console.log('dapp.getProperty - reviews', reviews)
+    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
     return propertyData
   };
 
@@ -795,6 +805,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
+
+  // ------------------------------ REVIEW MANAGER STARTS--------------------------------
+
+  // Create reviews
+  contract.createReview = async function (args, options = defaultOptions) {
+    console.log('dapp.createReview - args', args)
+    const createdDate = Math.floor(Date.now() / 1000);
+    return managers.reviewManager.createReview({ ...args, createdDate: createdDate, delDate: 0 });
+  }
+
+  // Delete reviews by the productId/productAddress
+  contract.deleteReview = async function (args, options = defaultOptions) {
+    return managers.reviewManager.deleteReview(args);
+  };
+
+
+  // ------------------------------ REVIEW MANAGER ENDS--------------------------------
+
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };

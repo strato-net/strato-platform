@@ -53,7 +53,7 @@ import           UnliftIO
 import           Text.Parsec                          (runParser)
 import           SolidVM.Solidity.Parse.Statement
 
-import           SolidVM.Solidity.Parse.ParserTypes   (ParserState(..))
+import           SolidVM.Solidity.Parse.ParserTypes   (initialParserState)
 
 
 import           Bloc.API.Users
@@ -73,10 +73,10 @@ import           BlockApps.SolidityVarReader
 import           BlockApps.XAbiConverter
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.DataDefs
+import           Blockchain.DB.CodeDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.CodePtr   (CodeKind(..))
 import           Blockchain.Strato.Model.Keccak256
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import           Bloc.API.TypeWrappers
@@ -107,6 +107,7 @@ emptyBatchState = BatchState Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' :: ( (Keccak256 `A.Selectable` SourceMap) m
+                             , HasCodeDB m
                              , A.Selectable Account AddressState m
                              , MonadLogger m
                              , HasSQL m
@@ -127,6 +128,7 @@ getBlocTransactionResult' hashes@(txh:_) resolve =
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult :: ( (Keccak256 `A.Selectable` SourceMap) m
+                            , HasCodeDB m
                             , A.Selectable Account AddressState m
                             , MonadLogger m
                             , HasSQL m
@@ -136,6 +138,7 @@ getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults
 
 
 getBatchBlocTransactionResult' :: ( (Keccak256 `A.Selectable` SourceMap) m
+                                  , HasCodeDB m
                                   , A.Selectable Account AddressState m
                                   , MonadLogger m
                                   , HasSQL m
@@ -147,6 +150,7 @@ getBatchBlocTransactionResult' hashes resolve =
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults :: ( (Keccak256 `A.Selectable` SourceMap) m
+                              , HasCodeDB m
                               , A.Selectable Account AddressState m
                               , MonadLogger m
                               , HasSQL m
@@ -214,6 +218,7 @@ rawTx2PostTx RawTransaction{..} = Deprecated.PostTransaction
   }
 
 evalAndReturn :: ( (Keccak256 `A.Selectable` SourceMap) m
+                 , HasCodeDB m
                  , A.Selectable Account AddressState m
                  , MonadLogger m
                  , HasSQL m
@@ -267,6 +272,7 @@ contractResult i txHash txResult@TransactionResult{..} mmd = do
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
 
 functionResult :: ( A.Selectable Account AddressState m
+                  , HasCodeDB m
                   , (Keccak256 `A.Selectable` SourceMap) m
                   , MonadLogger m
                   , HasSQL m
@@ -337,7 +343,7 @@ convertResultResToVals byteResp responseTypes =
 convertSvmResultResToVals :: MonadLogger m => String ->  m (Maybe [SolidityValue])
 convertSvmResultResToVals resp = do
   $logDebugS "convertSvmResultResToVals" . Text.pack $ "response: " ++ resp
-  let args = runParser parseArgs (ParserState "" "" Map.empty) "" resp
+  let args = runParser parseArgs initialParserState "" resp
   $logDebugS "convertSvmResultResToVals" . Text.pack $ "args: " ++ show args
   case args of
     Left _ -> pure Nothing
@@ -408,13 +414,15 @@ getArgValues argsMap argNamesTypes = do
                   Xabi.Array{}           -> Left "Arrays of arrays are not allowed as function arguments"
                   Xabi.Contract name     -> Right $ TypeContract name
                   Xabi.Mapping{}         -> Left "Arrays of mappings are not allowed as function arguments"
-                  Xabi.UnknownLabel{}           -> Right $ SimpleType typeUInt
+                  Xabi.UnknownLabel{}    -> Right $ SimpleType typeUInt
+                  Xabi.Variadic          -> Left "Arrays of variadics are not allowed as function arguments"
               in case len of
                    Just l                -> TypeArrayFixed l <$> ettyty
                    Nothing               -> TypeArrayDynamic <$> ettyty
             Xabi.Contract name           -> Right $ TypeContract name
             Xabi.Mapping _ _ _           -> Left "Mappings are not allowed as function arguments"
-            Xabi.UnknownLabel _                 -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
+            Xabi.UnknownLabel _          -> Right $ SimpleType typeUInt -- since Enums are converted to Ints
+            Xabi.Variadic                -> Right $ TypeVariadic 
         in do
           ty <- either (blocError . UserError) return typeM
           either (blocError . UserError) (return . (ix,)) (argValueToValue Nothing ty argVal)

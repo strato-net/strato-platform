@@ -55,6 +55,7 @@ xabiToContract contractName' parents' userDefinedTypes xabi = do
     Xabi.LibraryKind  -> LibraryType
     Xabi.AbstractKind  -> AbstractType
     Xabi.InterfaceKind -> InterfaceType,
+  _importedFrom = Nothing,
   _contractContext = Xabi._xabiContext xabi
   }
 

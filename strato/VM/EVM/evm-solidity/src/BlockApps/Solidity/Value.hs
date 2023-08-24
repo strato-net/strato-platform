@@ -60,6 +60,7 @@ data Value
   | ValueMapping (Map.Map SimpleValue Value)
   | ValueStruct (Map.Map Text Value)
   | ValueArraySentinel Int
+  | ValueVariadic [Value]
   deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord)
 
 data SimpleValue
@@ -93,6 +94,7 @@ zeroOf = \case
   ValueArrayFixed{} -> error "default value of sized array"
   ValueFunction{} -> error "default value of function"
   ValueEnum{} -> error "default value of enum"
+  ValueVariadic{} -> error "default value of variadic"
 
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
@@ -140,7 +142,8 @@ bytesToValue b = \case
   TypeMapping{}  -> Nothing -- TODO: Fixme
   TypeFunction{} -> Nothing -- TODO: Fixme
   TypeEnum{}     -> Nothing -- TODO: Fixme
-  TypeStruct{}   -> Nothing  -- TODO: Fixme
+  TypeStruct{}   -> Nothing -- TODO: Fixme
+  TypeVariadic{} -> Nothing -- TODO
   where
     splitBytes b' ty
       | ByteString.null b' = []
@@ -246,8 +249,9 @@ valueToText = \case
   ValueFunction{}    -> error "ValueFunction to text"
   ValueStruct m      -> 
     "{" <> Text.intercalate "," (map (\(k, v) -> Text.concat [k, ":", valueToText v]) $ Map.toList m) <> "}"
-
   ValueArraySentinel{} -> error "ValueArraySentinel to text"
+  ValueVariadic vals -> 
+    "[" <> Text.intercalate "," (map valueToText vals) <> "]"
 
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
@@ -281,7 +285,8 @@ textToValue defs str = \case
          in case Bimap.lookupR str' eSet of
               Nothing -> Left $ "Missing value '" <> str <> "' in enum definition for " <> name
               Just i -> Right $ ValueEnum name str' $ fromIntegral i
-  TypeStruct{}   -> Left "textToValue TODO: TypeStruct not yet implemented"
+  TypeStruct{} -> Left "textToValue TODO: TypeStruct not yet implemented"
+  TypeVariadic{} -> Left "textToValue TODO: TypeVariadic not yet implemented"
 
 textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue
 textToSimpleValue str = \case

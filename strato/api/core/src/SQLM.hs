@@ -39,6 +39,7 @@ data ApiError
   | StratoError ClientError
   | CirrusError SERVANT.ServerError
   | VaultWrapperError ClientError
+  | IdentitytWrapperError ClientError
   | DBError Text
   | UserError Text
   | TxSizeError Text
@@ -107,6 +108,13 @@ apiErrorToServantErr = \case
                      "This probably is a configuration error, but can also mean the Strato peer is down.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the strato-api logs.)"
+                   ]}
+  IdentitytWrapperError _ ->
+            err500{errBody = JSON.encode $ unlines
+                   [
+                     "Identity Server Error!",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the identity server logs.)"
                    ]}
   VaultWrapperError _ ->
             err500{errBody = JSON.encode $ unlines
