@@ -338,6 +338,7 @@ main = do
           globalNonceCounter = nonceCache,
           txTBQueue = tbqueue,
           userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
+          userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
           useWalletsByDefault = flags_useWalletsByDefault
           }
   run 3000 $ app env theDoc
