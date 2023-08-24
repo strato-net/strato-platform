@@ -201,6 +201,10 @@ services:
     - svmDev=${svmDev}
     - txSizeLimit=${txSizeLimit}
     - useSyncMode=${useSyncMode}
+    - userRegistryAddress=${userRegistryAddress}
+    - userRegistryCodeHash=${userRegistryCodeHash}
+    - useBuiltinUserRegistry=${useBuiltinUserRegistry}
+    - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}
