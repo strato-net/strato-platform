@@ -47,18 +47,4 @@ router.post(
   PropertiesController.deleteReview
 );
 
-router.post(
-  Properties.createReview,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  PropertiesController.createReview
-);
-
-router.post(
-  Properties.deleteReview,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  PropertiesController.deleteReview
-);
-
 export default router;

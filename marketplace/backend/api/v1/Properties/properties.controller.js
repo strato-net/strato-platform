@@ -1,58 +1,67 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
-const options = { config, cacheNonce: true }
+import { rest } from "blockapps-rest";
+import Joi from "@hapi/joi";
+import RestStatus from "http-status-codes";
+import config from "../../../load.config";
+const options = { config, cacheNonce: true };
 
 class PropertiesController {
-
   static async get(req, res, next) {
     try {
-      const { dapp, params } = req
-      const { address } = params
+      const { dapp, params } = req;
+      const { address } = params;
 
-      let args
-      let chainOptions = options
+      let args;
+      let chainOptions = options;
 
       if (address) {
-        args = { address }
-        chainOptions = { ...options }
+        args = { address };
+        chainOptions = { ...options };
       }
 
-      const property = await dapp.getProperty(args, chainOptions)
+      const property = await dapp.getProperty(args, chainOptions);
       // const productImageUrl = getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
       // const result = { ...product, imageUrl: productImageUrl }
-      rest.response.status200(res, property)
+      rest.response.status200(res, property);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const properties = await dapp.getProperties({ ...query })
+      const properties = await dapp.getProperties({ ...query });
       // const productsWithImageUrl = products.map(product => ({
       //   ...product,
       //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
       //   )
       // }))
 
-      rest.response.status200(res, properties)
+      rest.response.status200(res, properties);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async create(req, res, next) {
     try {
-      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalcode } } = req
-
+      const {
+        dapp,
+        body,
+        body: {
+          streetNumber,
+          streetName,
+          unitNumber,
+          postalCity,
+          stateOrProvince,
+          postalcode,
+        },
+      } = req;
 
       const propertyArgs = {
         ...body,
@@ -60,37 +69,47 @@ class PropertiesController {
         //use google maps api to get lat and long, then convert to string
         latitude: "",
         longitude: "",
-      }
+      };
 
-      PropertiesController.validateCreatePropertyArgs(propertyArgs)
+      PropertiesController.validateCreatePropertyArgs(propertyArgs);
 
-      const propertyResult = await dapp.createProperty(propertyArgs)
+      const propertyResult = await dapp.createProperty(propertyArgs);
       if (propertyResult) {
         const inventoryBody = {
           productAddress: propertyResult.productContractAddress,
           quantity: 1,
           pricePerUnit: propertyArgs.listPrice,
-          batchId: '1',
+          batchId: "1",
           status: 1,
           serialNumber: [],
-        }
-        const inventoryResult = await dapp.createInventory(inventoryBody)
+        };
+        const inventoryResult = await dapp.createInventory(inventoryBody);
         if (inventoryResult) {
-          console.log('propertyResult', propertyResult)
-          rest.response.status200(res, propertyResult)
+          console.log("propertyResult", propertyResult);
+          rest.response.status200(res, propertyResult);
         }
       }
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async update(req, res, next) {
     try {
-      const { dapp, body, body: { streetNumber, streetName, unitNumber, postalCity, stateOrProvince, postalcode } } = req
-
+      const {
+        dapp,
+        body,
+        body: {
+          streetNumber,
+          streetName,
+          unitNumber,
+          postalCity,
+          stateOrProvince,
+          postalcode,
+        },
+      } = req;
 
       const propertyArgs = {
         ...body,
@@ -98,45 +117,45 @@ class PropertiesController {
         //use google maps api to get lat and long, then convert to string
         latitude: "",
         longitude: "",
-      }
+      };
 
-      PropertiesController.validateUpdatePropertyArgs(propertyArgs)
+      PropertiesController.validateUpdatePropertyArgs(propertyArgs);
 
-      const updatedProperty = await dapp.updateProperty(propertyArgs)
-      rest.response.status200(res, updatedProperty)
-      return next()
+      const updatedProperty = await dapp.updateProperty(propertyArgs);
+      rest.response.status200(res, updatedProperty);
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async createReview(req, res, next) {
     try {
-      const { dapp, body } = req
-      console.log('createReview body', body)
-      PropertiesController.validateCreateReviewArgs(body)
-      const result = await dapp.createReview(body)
-      console.log('createReview - result', result)
-      rest.response.status200(res, result)
+      const { dapp, body } = req;
+      console.log("createReview body", body);
+      PropertiesController.validateCreateReviewArgs(body);
+      const result = await dapp.createReview(body);
+      console.log("createReview - result", result);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async deleteReview(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      PropertiesController.validateDeleteReviewArgs(body)
+      PropertiesController.validateDeleteReviewArgs(body);
 
-      const result = await dapp.deleteReview(body, options)
+      const result = await dapp.deleteReview(body, options);
 
-      rest.response.status200(res, result)
-      return next()
+      rest.response.status200(res, result);
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
@@ -246,9 +265,13 @@ class PropertiesController {
     const validation = createPropertySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        "Create Property Argument Validation Error",
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 
@@ -358,79 +381,55 @@ class PropertiesController {
     const validation = updatePropertySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Update Property Argument Validation Error`,
-        `Missing args or bad format: ${validation.error.message}`,
-      )}
-    }
-  static validateCreateReviewArgs(args) {
-    const createReviewSchema = Joi.object({
-        productId: Joi.string().required(),
-        propertyId: Joi.string().required(),
-        reviewerAddress: Joi.string().required(),
-        reviewerName: Joi.string().required(),
-        title: Joi.string().required(),
-        description: Joi.string().required(),
-        rating: Joi.number().required(),
-    });
-
-    const validation = createReviewSchema.validate(args);
-
-    if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Review Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
-    }
-  }
-
-  static validateDeleteReviewArgs(args) {
-    const deleteReviewSchema = Joi.object({
-      productAddress: Joi.string().required()
-    });
-
-    const validation = deleteReviewSchema.validate(args);
-
-    if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Delete Review Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
-    }
-  }
-
-  static validateCreateReviewArgs(args) {
-    const createReviewSchema = Joi.object({
-        productId: Joi.string().required(),
-        propertyId: Joi.string().required(),
-        reviewerAddress: Joi.string().required(),
-        reviewerName: Joi.string().required(),
-        title: Joi.string().required(),
-        description: Joi.string().required(),
-        rating: Joi.number().required(),
-    });
-
-    const validation = createReviewSchema.validate(args);
-
-    if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Review Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Update Property Argument Validation Error`,
+        `Missing args or bad format: ${validation.error.message}`
+      );
     }
   }
   
+  static validateCreateReviewArgs(args) {
+    const createReviewSchema = Joi.object({
+      productId: Joi.string().required(),
+      propertyId: Joi.string().required(),
+      reviewerAddress: Joi.string().required(),
+      reviewerName: Joi.string().required(),
+      title: Joi.string().required(),
+      description: Joi.string().required(),
+      rating: Joi.number().required(),
+    });
+
+    const validation = createReviewSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        "Create Review Argument Validation Error",
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
+    }
+  }
 
   static validateDeleteReviewArgs(args) {
     const deleteReviewSchema = Joi.object({
-      productAddress: Joi.string().required()
+      productAddress: Joi.string().required(),
     });
 
     const validation = deleteReviewSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Delete Review Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        "Delete Review Argument Validation Error",
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
-
 }
 
-export default PropertiesController
+export default PropertiesController;
