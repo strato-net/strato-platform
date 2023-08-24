@@ -40,6 +40,7 @@ const CategoryProductCard = ({ product, category }) => {
 
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
+  const naviroute = routes.MembershipDetail.url;
   const [qty, setQty] = useState(1);
 
   const subtract = () => {
@@ -158,7 +159,10 @@ const CategoryProductCard = ({ product, category }) => {
               ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
-              $ {product.pricePerUnit}
+              ${product.pricePerUnit}
+            </Title>
+            <Title level={4} className="!mt-0" id="prod-savings" style={{ color: "green" }}>
+              Total Savings: ${product.totalSavings}
             </Title>
             {product.availableQuantity !== 0 ?
               (
