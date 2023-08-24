@@ -18,12 +18,12 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
-      const productsWithImageUrl = inventories
-        .map(product => ({
-          ...product,
-          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
-        }))
-      rest.response.status200(res, productsWithImageUrl)
+      // const productsWithImageUrl = inventories
+      //   .map(product => ({
+      //     ...product,
+      //     imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+      //   }))
+      rest.response.status200(res, inventories)
 
       return next()
     } catch (e) {
@@ -41,12 +41,12 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
-      const productsWithImageUrl = inventories
-        .map(product => ({
-          ...product,
-          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
-        }))
-      rest.response.status200(res, productsWithImageUrl)
+      // const productsWithImageUrl = inventories
+      //   .map(product => ({
+      //     ...product,
+      //     imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+      //   }))
+      rest.response.status200(res, inventories)
 
       return next()
     } catch (e) {
@@ -58,12 +58,12 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProducts({ ...query })
-      const productsWithImageUrl = inventories.map(product => ({
-        ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
-      rest.response.status200(res, productsWithImageUrl)
+      // const productsWithImageUrl = inventories.map(product => ({
+      //   ...product,
+      //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+      //   )
+      // }))
+      rest.response.status200(res, inventories)
 
       return next()
     } catch (e) {
@@ -75,12 +75,12 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
-      const productsWithImageUrl = inventories.map(product => ({
-        ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
-      rest.response.status200(res, productsWithImageUrl)
+      // const productsWithImageUrl = inventories.map(product => ({
+      //   ...product,
+      //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+      //   )
+      // }))
+      rest.response.status200(res, inventories)
 
       return next()
     } catch (e) {

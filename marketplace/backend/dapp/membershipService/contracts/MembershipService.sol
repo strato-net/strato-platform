@@ -38,7 +38,7 @@ contract MembershipService {
         ,   int _createdDate
         ,   bool _isActive
     ) public {
-        owner = msg.sender;
+        owner = tx.origin;
 
         membershipId = _membershipId;
         serviceId = _serviceId;
@@ -48,7 +48,7 @@ contract MembershipService {
         createdDate = _createdDate;
         isActive = _isActive;
 
-        mapping(string => string) ownerCert = getUserCert(msg.sender);
+        mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];

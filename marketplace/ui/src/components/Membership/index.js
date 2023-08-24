@@ -30,13 +30,25 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { useLocation } from "react-router-dom";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
 
 const Membership = ( user ) => {
-    const [open, setOpen] = useState(false);
-      const dispatch = useMembershipDispatch();
+    let { state } = useLocation();
+    const [open, setOpen] = useState((state && user.user) ? state.isCalledFromHeader : false);
+    useEffect(() => {
+        if (state && user.user){
+            setOpen(state.isCalledFromHeader);
+        }
+        else{
+            setOpen(false);
+        }
+        window.history.replaceState({}, "/memberships")
+    }, [state]);
+    
+    const dispatch = useMembershipDispatch();
     const [api, contextHolder] = notification.useNotification();
     const [queryValue, setQueryValue] = useState("");
     const limit = 10;
@@ -79,7 +91,7 @@ const Membership = ( user ) => {
     };
 
     let { memberships, ismembershipsLoading, message, success } = useMembershipState();
-    
+   
     //We want to show all inventories associated to a membership, but also
     //All memberships that do not have inventories
     //So we create a new list of memberships objects, creating a new object for each inventory
@@ -196,21 +208,13 @@ const Membership = ( user ) => {
                                         Memberships
                                     </Typography.Text>
                                     <div>
-                                        <Typography.Text style={{ fontSize: '7px' }}>
+                                        <Typography.Text style={{ fontSize: '10px' }}>
                                             {memberships.length}  Memberships found
                                         </Typography.Text>
                                     </div>
                                 </Col>
-                                <Col>
-                                    <Button
-                                        id="add-product-button"
-                                        type="primary"
-                                        style={{ backgroundColor: '#6e7ddd', color: 'white', margin: '10px', fontWeight: 'bold' }}
-                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40"
-                                    >
-                                        <span style={{ fontWeight: 'normal' }}>Connect with </span>
-                                        <span style={{ fontWeight: '900', margin: '1px' }}>  Stripe</span>
-                                    </Button>
+                                {/* <Col>
+
                                     <Dropdown.Button
                                         style={{ margin: '10px' }}
                                         icon={<DownOutlined />}
@@ -218,20 +222,8 @@ const Membership = ( user ) => {
                                     >
                                         All
                                     </Dropdown.Button>
-                                </Col>
+                                </Col> */}
                                 <div className="flex">
-                                    <Button
-                                        id="add-product-button"
-                                        type="primary"
-                                        style={{ backgroundColor: 'red', color: 'white', margin: '10px' }}
-                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                                    >Create Services</Button>
-                                    <Button
-                                        id="add-product-button"
-                                        type="primary"
-                                        style={{ backgroundColor: 'green', color: 'white', margin: '10px' }}
-                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                                    >Sell Existing Membership </Button>
                                     <Button id="add-product-button" type="primary" className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
                                         style={{ backgroundColor: 'blue', color: 'white', margin: '10px' }}
                                         onClick={() => {
@@ -240,16 +232,34 @@ const Membership = ( user ) => {
                                             } else {
                                                 showModal()
                                             }
-                                        }}
-                                    >
+                                        }}>
                                         Create New Membership
+                                    </Button>
+                                    <Button
+                                        id="add-product-button"
+                                        type="primary"
+                                        style={{ backgroundColor: 'green', color: 'white', margin: '10px' }}
+                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                                        >Sell Existing Membership </Button>
+                                    <Button
+                                        id="add-product-button"
+                                        type="primary"
+                                        style={{ backgroundColor: 'red', color: 'white', margin: '10px' }}
+                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                                        >Manage Services</Button>
+                                    <Button
+                                        id="add-product-button"
+                                        type="primary"
+                                        style={{ backgroundColor: '#6e7ddd', color: 'white', margin: '10px', fontWeight: 'bold' }}
+                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40">
+                                        <span style={{ fontWeight: 'normal' }}> Setup  </span>
+                                        <span style={{ fontWeight: '900', margin: '0 5px' }}>  Stripe  </span>
+                                        <span style={{ fontWeight: 'normal' }}> Account</span>
                                     </Button>
                                 </div>
                             </div>
                             <>
                                 {memberships.length !== 0 ? (
-                                    
-                                    console.log("memberships: ", memberships),
                                     <div className="my-4">
                                         {memberships.map((product, index) => {
                                             return (

@@ -32,14 +32,14 @@ contract Membership_2 {
         ,   string _additionalInfo
         ,   uint _createdDate
     ) public {
-        owner = msg.sender;
+        owner = tx.origin;
         
         productId = _productId;
         timePeriodInMonths = _timePeriodInMonths;
         additionalInfo = _additionalInfo;
         createdDate = _createdDate;
 
-        mapping(string => string) ownerCert = getUserCert(msg.sender);
+        mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];

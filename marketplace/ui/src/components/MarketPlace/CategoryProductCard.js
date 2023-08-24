@@ -17,6 +17,7 @@ import {
   useMarketplaceState,
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -38,7 +39,7 @@ const CategoryProductCard = ({ product, category }) => {
   const [api, contextHolder] = notification.useNotification();
 
   const navigate = useNavigate();
-  const naviroute = routes.MarketplaceProductDetail.url;
+  const naviroute = routes.MembershipDetail.url;
   const [qty, setQty] = useState(1);
 
   const subtract = () => {
@@ -108,6 +109,7 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
+  console.log("product", product)
   return (
     <div>
       {contextHolder}
@@ -125,7 +127,7 @@ const CategoryProductCard = ({ product, category }) => {
               height={180}
               preview={false}
               onClick={() =>
-                navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+                navigate(`${naviroute.replace(":id", product.membershipId)}`, { state: { isCalledFromMembership: true, inventoryId: product.address} })
               }
             />
           </div>
@@ -136,7 +138,7 @@ const CategoryProductCard = ({ product, category }) => {
                 className="text-xl text-primaryB hover:text-primary hover:underline"
                 id="prod-name"
                 onClick={() =>
-                  navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+                  navigate(`${naviroute.replace(":id", product.membershipId)}`, { state: { isCalledFromMembership: true, inventoryId: product.address} })
                 }
               >
                 {decodeURIComponent(product.name)}&nbsp;
@@ -149,11 +151,11 @@ const CategoryProductCard = ({ product, category }) => {
               id="prod-desc"
             >
               {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    <br />
-                  </React.Fragment>
-                ))}
+                <React.Fragment key={index}>
+                  {line}
+                  <br />
+                </React.Fragment>
+              ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
               $ {product.pricePerUnit}
@@ -195,6 +197,14 @@ const CategoryProductCard = ({ product, category }) => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
                       } else {
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'add_to_cart_from_marketplace',
+                            product_name: product.name,
+                            category: product.category,
+                            productId: product.productId
+                          },
+                        });
                         addItemToCart();
                       }
                     }}>
@@ -208,6 +218,14 @@ const CategoryProductCard = ({ product, category }) => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
                       } else {
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'buy_now_from_marketplace',
+                            product_name: product.name,
+                            category: product.category,
+                            productId: product.productId
+                          },
+                        });
                         addItemToCart();
                         navigate("/checkout");
                       }
@@ -222,10 +240,20 @@ const CategoryProductCard = ({ product, category }) => {
                 <Button
                   type="primary"
                   className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-                  href={`mailto:sales@blockapps.net`}>
+                  href={`mailto:sales@blockapps.net`}
+                  onClick={() => {
+                    TagManager.dataLayer({
+                      dataLayer: {
+                        event: 'contact_sales_from_category_card',
+                        product_name: product.name,
+                        category: product.category,
+                        productId: product.productId
+                      },
+                    });
+                  }}>
                   Contact to Buy
                 </Button>
-                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
+                <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">
                   If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
                 </Paragraph>
               </div>

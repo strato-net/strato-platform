@@ -148,6 +148,7 @@ async function getAll(admin, args = {}, options) {
             returnObject.push({
                 ...product,
                 ...inventory,
+                membershipId: membership.address,
                 totalSavings: totalSavings,
             });
         });

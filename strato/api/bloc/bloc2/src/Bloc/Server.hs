@@ -24,18 +24,21 @@ import           Bloc.Server.TransactionResult
 import           Bloc.Server.Users
 import           Bloc.Server.X509
 
-import Control.Monad.Change.Alter
-import Control.Monad.Logger
+import           Control.Monad.Change.Alter
+import           Control.Monad.Logger
 
-import Bloc.Monad
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Data.AddressStateDB
+import           Bloc.Monad
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.CirrusDefs
+import           Blockchain.DB.CodeDB
 
-import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault
+import           Control.Monad.Composable.SQL
+import           Control.Monad.Composable.Vault
 
-import SolidVM.Model.CodeCollection.Contract
+import           SolidVM.Model.CodeCollection.Contract
 
 bloc :: ( MonadLogger m
         , HasBlocEnv m
@@ -43,6 +46,8 @@ bloc :: ( MonadLogger m
         , HasSQL m
         , Selectable Account Contract m
         , Selectable Account AddressState m
+        , Selectable Address Certificate m
+        , HasCodeDB m
         , (Keccak256 `Selectable` SourceMap) m
         )
      => ServerT BlocAPI m
