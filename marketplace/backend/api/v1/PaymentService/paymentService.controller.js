@@ -48,17 +48,21 @@ class PaymentServiceController {
           break;
         case 'checkout.session.async_payment_succeeded':
           const checkoutSessionAsyncPaymentSucceeded = object;
+          const finalPaymentStatus = object.payment_status;
+          const finalSessionStatus = object.status;
+          const finalPaymentIntentId = object.payment_intent;
+          const finalPaymentContract = await dapp.getPayment({ paymentSessionId })
+          await dapp.updatePayment({ payment: finalPaymentContract.address, finalPaymentStatus, finalPaymentIntentId, finalSessionStatus })
           // Then define and call a function to handle the event checkout.session.async_payment_succeeded
           break;
         case 'checkout.session.completed':
           // Then define and call a function to handle the event checkout.session.completed
           // const paymentSessionId = object.id;
-          // const paymentStatus = object.payment_status;
-          // const sessionStatus = object.status;
-          // const paymentIntentId = object.payment_intent;
-          // const paymentContract = await dapp.getPayment({ paymentSessionId })
-
-          // await dapp.updatePayment({ payment: paymentContract.address, paymentStatus, paymentIntentId, sessionStatus })
+          const paymentStatus = object.payment_status;
+          const sessionStatus = object.status;
+          const paymentIntentId = object.payment_intent;
+          const paymentContract = await dapp.getPayment({ paymentSessionId })
+          await dapp.updatePayment({ payment: paymentContract.address, paymentStatus, paymentIntentId, sessionStatus })
           break;
         case 'checkout.session.expired':
           const checkoutSessionExpired = object;
