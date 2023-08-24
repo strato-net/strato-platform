@@ -1449,8 +1449,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
               { ...membership, 
                 //Note we might have multiple service per membership
                 savings: (membership.hasOwnProperty('savings') ?
-                  membership.savings : 0 ) + (service.price - membershipService.membershipPrice), 
-                membershipServices } 
+                  membership.savings : 0 ) + (service.price - membershipService.membershipPrice)} 
               : membership;} )
         }
       })
