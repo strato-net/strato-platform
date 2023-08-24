@@ -10,7 +10,7 @@ import {
   Dropdown,
   Typography,
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined } from "@ant-design/icons";
+import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined, DollarOutlined} from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -213,6 +213,17 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         items={navItems[roleIndex]?.items}
       />
       <Space size="large">
+        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
+          className="cursor-pointer"
+        >
+          <Avatar
+            style={{
+              backgroundColor: "#181EAC",
+            }}
+            icon={<DollarOutlined />}
+          />
+        </Badge>
+        }
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           onClick={() => {
