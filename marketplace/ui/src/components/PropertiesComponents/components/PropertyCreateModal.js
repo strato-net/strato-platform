@@ -303,7 +303,7 @@ function PropertyCreateModal({
           <Input.TextArea
             label="Project Description"
             value={description}
-            maxLength={500}
+            maxLength={5000}
             showCount
             placeholder="Project Description"
             onChange={(e) => {
