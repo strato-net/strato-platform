@@ -22,7 +22,7 @@ import {
   usePropertiesState,
 } from "../../../contexts/propertyContext";
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
-import { categoriesObj } from "../helpers/constants";
+import { categoriesObj, homeTypeData } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
 import { useAuthenticateState } from "../../../contexts/authentication";
 
@@ -274,7 +274,7 @@ function PropertyDetails() {
                           <Col span={8}>
                             <Text strong>Property Type</Text>
                           </Col>
-                          <Col span={16}>{propertyType}</Col>
+                          <Col span={16}>{homeTypeData[propertyType]}</Col>
                         </Row>
 
                         <Row>

@@ -223,7 +223,7 @@ function PropertyCreateModal({
 
   const primaryAction = {
     content: modalView ? (
-      "Create a Property Listing"
+      id ?"Update Property":"Create a Property Listing"
     ) : (
       <>
         <Button type="link" onClick={handleModalToggle}>
