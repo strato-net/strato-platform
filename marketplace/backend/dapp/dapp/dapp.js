@@ -1446,7 +1446,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         if (service.address === membershipService.serviceId) {
            memberships.memberships =  memberships.memberships.map(membership => {
           return ((membership.address === membershipService.membershipId) )  ?
-            { ...membership, savings:(service.price - membershipService.membershipPrice), membershipServices } : membership;} )
+              { ...membership, 
+                //Note we might have multiple service per membership
+                savings: (membership.hasOwnProperty('savings') ?
+                  membership.savings : 0 ) + (service.price - membershipService.membershipPrice), 
+                membershipServices } 
+              : membership;} )
         }
       })
     }) 
