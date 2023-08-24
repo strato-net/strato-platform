@@ -45,7 +45,7 @@ const Membership = ( user ) => {
         else{
             setOpen(false);
         }
-        state = null
+        window.history.replaceState({}, "/memberships")
     }, [state]);
     
     const dispatch = useMembershipDispatch();
