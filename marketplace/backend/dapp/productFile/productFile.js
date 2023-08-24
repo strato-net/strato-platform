@@ -180,6 +180,7 @@ function bindAddress(user, address, options) {
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
  * @param args Lookup with an address or uniqueProductFileID.
  * @returns Contract state in cirrus
+ * 
  */
 
 async function get(user, args, options) {
