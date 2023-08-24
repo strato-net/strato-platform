@@ -59,7 +59,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchMembershipSuccessful:
       return {
         ...state,
-        memberships: action.payload.memberships,
+        memberships: action.payload,
         totalMemberships: action.payload.total,
         isMembershipsLoading: false
       };

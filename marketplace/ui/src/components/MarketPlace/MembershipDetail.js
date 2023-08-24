@@ -69,6 +69,7 @@ const MembershipDetails = ({ user, users }) => {
   useMembershipState();
 const serviceDispatch = useMembershipDispatch();
 
+console.log("membershipServices", membershipServices)
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   
   useEffect(() => {
