@@ -44,7 +44,11 @@ const ReviewTab = (props) => {
       reviewerAddress: user.userAddress,
       description: encodedDescription,
     };
-    actions.createReview(dispatch, reviewForm);
+    const response = await actions.createReview(dispatch, reviewForm);
+    if (response) {
+      setOpen(false)
+      actions.fetchPropertyDetails(dispatch, props.propertyId);
+    }
   };
 
   const handleCancel = () => {
