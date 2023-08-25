@@ -629,7 +629,7 @@ createMappingTableQuery (o, a, n, m) =
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
                "block_number text", "transaction_hash text", "transaction_sender text", "contract_name text", "mapname text","key text", "value text"]
-        , ",\n  PRIMARY KEY (record_id));"
+        , ",\n  PRIMARY KEY (record_id, key));"
         ]
 
 createAbstractTableQuery ::  Contract -> (Text, Text, Text) -> Text
@@ -754,7 +754,7 @@ insertMappingTableQuery ms = concat $
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (address, key) DO UPDATE SET
+  ON CONFLICT (record_id, key) DO UPDATE SET
     record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",

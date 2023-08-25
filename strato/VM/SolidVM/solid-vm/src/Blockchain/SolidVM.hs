@@ -568,6 +568,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                               (SInteger _, SVMType.Int _ _) -> True
                               (SString _, SVMType.String _) -> True
                               (SString _, SVMType.Bytes _ _) -> True
+                              (SString _, SVMType.Address _) -> True
+                              (SString _, SVMType.Account _) -> True
                               (SBool _, SVMType.Bool) -> True
                               (SAccount _ _, SVMType.Address _) -> True
                               (SAccount _ _, SVMType.Account _) -> True
@@ -828,13 +830,13 @@ argsToValsModifiers ctract md args =
 argsToVals :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
 argsToVals ctract fn args = case args of
   CC.OrderedArgs xs -> do
-    when (length xs /= length orderedTypes && not (validVariadicSignature orderedTypes)) $
-      invalidArguments "arity mismatch" (xs, orderedTypes)
     valList <- zipWithM eval32 orderedTypes xs
     let maybeVariadic = Data.List.uncons valList
         unpackedList = case maybeVariadic of
           Just (SVariadic x, _) -> init valList ++ x
           _ -> valList
+    when (length unpackedList /= length orderedTypes && not (validVariadicSignature orderedTypes)) $
+      invalidArguments "arity mismatch" (unpackedList, orderedTypes)
     pure $ OrderedVals unpackedList
 
   CC.NamedArgs xs -> NamedVals . M.toList <$> do
@@ -1926,6 +1928,15 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' args
+  onTraced $ do
+    liftIO $ putStrLn $ concat [
+      C.cyan ">> Created salted contract:",
+      "\n   code hash      " ++ C.yellow (show hsh),
+      "\n   salt           " ++ C.yellow (show salt),
+      "\n   creator        " ++ C.yellow (show creator),
+      "\n   arguments      " ++ C.yellow (show args'),
+      "\n   salted address " ++ C.yellow (show newAddress)
+      ]
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
@@ -1961,6 +1972,30 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
             (CC.OrderedArgs a) -> getVar <=< expToVar $ head a
             (CC.NamedArgs _) -> pure $ SNULL
           case (val1, name) of
+            (SAccount (NamedAccount addr _) _, "derive") -> do
+              (_, hsh, _) <- getCodeAndCollection (Account addr Nothing)
+              args' <- case args of
+                (CC.OrderedArgs []) -> typeError "derive needs at least one argument, none were given " args
+                (CC.OrderedArgs (_ : as)) -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                (CC.NamedArgs _) -> typeError "Cannot provide named args to derive" args
+              let salt = case convertedFirstArg of
+                        SString s -> s
+                        _ -> typeError "first arugment must be a string " args
+                  newAddress = getNewAddressWithSalt_unsafe
+                                addr
+                                salt
+                                (keccak256ToByteString hsh)
+                                (show args')
+              onTraced $ do
+                liftIO $ putStrLn $ concat [
+                  C.cyan ">> Deriving salted contract:",
+                  "\n   code hash      " ++ C.yellow (show hsh),
+                  "\n   salt           " ++ C.yellow (show convertedFirstArg),
+                  "\n   input address  " ++ C.yellow (show addr),
+                  "\n   arguments      " ++ C.yellow (show args'),
+                  "\n   salted address " ++ C.yellow (show newAddress)
+                  ]
+              return . Constant $ SAccount (NamedAccount newAddress UnspecifiedChain) False
             (SAccount addr _, "delegatecall") -> do
               let  (funcName, args') = (case args of
                     (CC.OrderedArgs []) -> typeError "delegate call needs atleast one arguement, none were given " args
@@ -2076,6 +2111,8 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       (SInteger _, SVMType.Int _ _) -> pure True
                       (SString _, SVMType.String _) -> pure True
                       (SString _, SVMType.Bytes _ _) -> pure True
+                      (SString _, SVMType.Address _) -> pure True
+                      (SString _, SVMType.Account _) -> pure True
                       (SBool _, SVMType.Bool) -> pure True
                       (SAccount _ _, SVMType.Address _) -> pure True
                       (SAccount _ _, SVMType.Account _) -> pure True
