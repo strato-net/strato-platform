@@ -1,37 +1,37 @@
 import React, { useEffect, useState } from "react";
 import { useStorageDispatch, useStorageState } from "../../contexts/storage";
 import { actions } from "../../contexts/storage/actions";
-import useDebounce from "../UseDebounce";
 import DataTableComponent from "../DataTableComponent";
 import { Pagination } from "antd";
 
-const AssetsTable = ({ user }) => {
+const AssetsTable = ({ user, searchQuery }) => {
   const dispatch = useStorageDispatch();
-  const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
 
-  const { assets, isAssetsLoading } = useStorageState();
+  const { data, isStorageLoading } = useStorageState();
 
   useEffect(() => {
-    actions.fetchAssets(
+    actions.fetchStorage(
       dispatch,
       limit,
       offset,
-      debouncedSearchTerm
+      "Asset",
+      searchQuery
     );
-  }, [dispatch, limit, offset, debouncedSearchTerm]);
+  }, [dispatch, limit, offset, searchQuery]);
 
-  const [data, setData ] = useState([]);
+  const [assets, setAssets] = useState([]);
+
   useEffect(() => {
     let items = [];
-    assets && assets.forEach((asset) => {
+    data && data.forEach((asset) => {
       items.push(asset);
     });
-    setData(items);
-  }, [assets]);
+    setAssets(items);
+  }, [data]);
 
   const column = [
     {
@@ -50,19 +50,19 @@ const AssetsTable = ({ user }) => {
   }
 
   useEffect(() => {
-    let len = data.length;
+    let len = assets.length;
     let total;
     if (len === limit) total = page * 10 + limit;
     else total = (page - 1) * 10 + limit;
     setTotal(total);
-  }, [data]);
+  }, [assets]);
 
   return (
     <div>
       <DataTableComponent
         columns = {column}
-        data={data}
-        isLoading={isAssetsLoading}
+        data={assets}
+        isLoading={isStorageLoading}
         pagination={false}
         scrollX="100%"
       />

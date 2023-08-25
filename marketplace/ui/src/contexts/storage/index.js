@@ -5,8 +5,7 @@ const StorageStateContext = createContext();
 const StorageDispatchContext = createContext();
 
 const initialState = {
-  assets: [],
-  sales: [],
+  data: [],
   error: undefined,
   isAssetsLoading: false,
   isSalesLoading: false,
@@ -36,7 +35,7 @@ const useStorageState = () => {
   return context;
 };
 
-const useStorageDispatch =() => {
+const useStorageDispatch = () => {
   const context = useContext(StorageDispatchContext);
   if (context === undefined) {
     throw new Error(

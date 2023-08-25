@@ -15,39 +15,22 @@ const reducer = (state = initialState, action) => {
         success: action.success,
         message: action.message
       };
-    case actionDescriptors.fetchAssets:
+    case actionDescriptors.fetchStorage:
       return {
         ...state,
-        isAssetsLoading: true
+        isStorageLoading: true
       };
-    case actionDescriptors.fetchAssetsSuccessful:
+    case actionDescriptors.fetchStorageSuccessful:
       return {
         ...state,
-        assets: action.payload,
-        isAssetsLoading: false
+        data: action.payload,
+        isStorageLoading: false
       };
-    case actionDescriptors.fetchAssetsFailed:
+    case actionDescriptors.fetchStorageFailed:
       return {
         ...state,
         error: action.error,
-        isAssetsLoading: false
-      };
-    case actionDescriptors.fetchSales:
-      return {
-        ...state,
-        isSalesLoading: true
-      };
-    case actionDescriptors.fetchSalesSuccessful:
-      return {
-        ...state,
-        sales: action.payload,
-        isSalesLoading: false
-      };
-    case actionDescriptors.fetchSalesFailed:
-      return {
-        ...state,
-        error: action.error,
-        isSalesLoading: false
+        isStorageLoading: false
       };
     default:
       throw new Error (`Unhandled action: '${action.type}'`);
