@@ -624,7 +624,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       propertyId: property.address,
     }, getOptions);
     console.log('dapp.getProperty - reviews', reviews)
-    const propertyData = { ...property, title: productData.name, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
+    const propertyData = { ...property, title: productData.name,organization:productData.ownerOrganization, description: productData.description, propertyType: productData.subCategory, reviews: reviews }
     return propertyData
   };
 
@@ -673,7 +673,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const propertyArgs = {
         productId: productContract[1],
         listPrice: args.listPrice,
-        unparsedAddress: args.unparsedAddress,
         streetNumber: args.streetNumber,
         streetName: args.streetName,
         unitNumber: args.unitNumber,
@@ -775,6 +774,33 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         propertyContractRest: propertyContract[0],
         propertyContractAddress: propertyContract[1],
       }
+    }
+  }
+
+  contract.updateProperty = async function (args) {
+    const {
+      productId,
+      description,
+      title,
+      ...propertyArgs
+    } = args;
+
+    // Update productArgs
+    const productArgs = {
+      productAddress: productId,
+      updates: {
+        imageKey: "",
+        isActive: true,
+        description,
+        name: title,
+        userUniqueProductCode: `${parseInt(util.iuid())}`
+      }
+    }
+
+    const [productRestStatus] = await managers.productManager.updateProduct(productArgs);
+
+    if (productRestStatus === '200') {
+      return await managers.productManager.updateProperty(propertyArgs);
     }
   }
 

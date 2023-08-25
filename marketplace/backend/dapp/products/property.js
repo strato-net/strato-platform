@@ -54,7 +54,6 @@ function marshalIn(_args) {
         productId: '',
         propertType: '',
         listPrice: 0,
-        unparsedAddress: '',
         streetNumber: 0,
         streetName: '',
         unitNumber: '',
@@ -240,7 +239,7 @@ function bindAddress(user, address, options) {
 async function get(user, args, options) {
     const { uniqueProductID, address, ...restArgs } = args;
     let product;
-    console.log('productJS',uniqueProductID, address)
+    console.log('productJS', uniqueProductID, address)
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
         product = await searchOne(contractName, searchArgs, options, user);

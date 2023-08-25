@@ -23,8 +23,8 @@ import {
   categoriesObj,
   stateData,
   homeTypeData,
-  propertyCheckBox,
   propertyConstants,
+  createPropertyFormInitialData,
 } from "../helpers/constants";
 import PropertyCreateConfirmModal from "./PropertyCreateConfirmModal";
 import { actions } from "../../../contexts/propertyContext/actions";
@@ -32,6 +32,7 @@ import {
   usePropertiesDispatch,
   usePropertiesState,
 } from "../../../contexts/propertyContext";
+import { useParams } from "react-router-dom";
 const { LIMIT_PER_PAGE } = propertyConstants;
 const { Panel } = Collapse;
 const { Option } = Select;
@@ -48,22 +49,19 @@ const { Text } = Typography;
 function PropertyCreateModal({
   isCreateModalOpen,
   toggleCreateModal,
+  formData,
 }) {
+
+  let { id } = useParams();
+
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
 
   const [api, contextHolder] = notification.useNotification();
   const dispatch = usePropertiesDispatch();
 
-  const { message, success, isCreatePropertySubmitting } = usePropertiesState();
-  const [propertyData, setPropertyData] = useState({
-    lotSizeUnits: "sqft",
-    livingAreaUnits: "sqft",
-    numberOfUnitsTotal: 1,
-  });
-
-  const [selectedOptions, setSelectedOptions] = useState(propertyCheckBox);
-
+  const { message, success, isCreatePropertySubmitting, isUpdatePropertySubmitting } = usePropertiesState();
+  const [propertyData, setPropertyData] = useState(formData);
   //TODO:- Can uncomment when use image upload ***
   // const [selectedImage, setSelectedImage] = useState(null);
   // const [previewOpen, setPreviewOpen] = useState(false);
@@ -152,35 +150,46 @@ function PropertyCreateModal({
   //creates the listing for property
   const handleSubmitCreateProperty = async () => {
 
-    const body = {
-      title,
-      description,
-      propertyType,
-      listPrice,
-      streetNumber,
-      streetName,
-      unitNumber,
-      postalCity,
-      stateOrProvince,
-      postalcode,
-      bathroomsTotalInteger,
-      bedroomsTotal,
-      lotSizeArea,
-      lotSizeUnits,
-      livingArea,
-      livingAreaUnits,
-      numberOfUnitsTotal,
-
-      ...selectedOptions,
-    };
+    const body = propertyData
 
     // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
-    let response = await actions.createProperty(dispatch, body);
-    if (response) {
-      toggleCreateModal(false)
-      toggleCreateConfirmModal(false)
-      setModalView(!modalView);
-      actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+    if (id) {
+      let {
+        chainId,
+        block_hash,
+        block_number,
+        block_timestamp,
+        address,
+        record_id,
+        transaction_hash,
+        transaction_sender,
+        standardStatus,
+        unparsedAddress,
+        latitude,
+        longitude,
+        reviews,
+        organization,
+        ...updatedData
+      } = body;
+      updatedData["propertyAddress"] = address;
+
+
+      let response = await actions.updateProperty(dispatch, updatedData);
+      if (response) {
+        toggleCreateModal(false)
+        toggleCreateConfirmModal(false)
+        setModalView(true);
+
+      }
+    } else {
+      let response = await actions.createProperty(dispatch, body);
+      if (response) {
+        toggleCreateModal(false)
+        toggleCreateConfirmModal(false)
+        setModalView(true);
+        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+        setPropertyData(createPropertyFormInitialData)
+      }
     }
 
     //TODO:- Can uncomment when use image upload ***
@@ -214,7 +223,7 @@ function PropertyCreateModal({
 
   const primaryAction = {
     content: modalView ? (
-      "Create a Property Listing"
+      id ?"Update Property":"Create a Property Listing"
     ) : (
       <>
         <Button type="link" onClick={handleModalToggle}>
@@ -246,11 +255,6 @@ function PropertyCreateModal({
     }
   };
 
-  const handleCheckbox = (value, check) => {
-    let data = { ...selectedOptions };
-    data[value] = check;
-    setSelectedOptions(data);
-  };
 
   function convertCategories() {
     const convertedData = [];
@@ -281,7 +285,8 @@ function PropertyCreateModal({
         >
           <Input
             label="title"
-            // value={title}
+            value={title}
+            defaultValue={title}
             maxLength={100}
             placeholder="Listing Title"
             showCount
@@ -303,7 +308,8 @@ function PropertyCreateModal({
           <Input.TextArea
             label="Project Description"
             value={description}
-            maxLength={5000}
+            defaultValue={description}
+            maxLength={500}
             showCount
             placeholder="Project Description"
             onChange={(e) => {
@@ -329,6 +335,7 @@ function PropertyCreateModal({
                 placeholder="Total Units"
                 controls={false}
                 value={numberOfUnitsTotal}
+                defaultValue={numberOfUnitsTotal}
                 onChange={(value) => {
                   handleChange("numberOfUnitsTotal", value);
                 }}
@@ -356,6 +363,7 @@ function PropertyCreateModal({
                 controls={false}
                 addonBefore="$"
                 value={listPrice}
+                defaultValue={listPrice}
                 onChange={(e) => {
                   handleChange("listPrice", e);
                 }}
@@ -377,6 +385,8 @@ function PropertyCreateModal({
             id="streetname"
             placeholder="Street Name"
             value={streetName}
+            defaultValue={streetName}
+            disabled={id}
             onChange={(e) => {
               handleChange("streetName", e.target.value);
             }}
@@ -397,8 +407,10 @@ function PropertyCreateModal({
                 id="streetnumber"
                 type="Number"
                 placeholder="Street Number"
+                disabled={id}
                 controls={false}
                 value={streetNumber}
+                defaultValue={streetNumber}
                 onChange={(value) => {
                   handleChange("streetNumber", value);
                 }}
@@ -421,8 +433,10 @@ function PropertyCreateModal({
                 label="House Number"
                 id="housenumber"
                 placeholder="House Number"
+                disabled={id}
                 controls={false}
                 value={unitNumber}
+                defaultValue={unitNumber}
                 onChange={(e) => {
                   handleChange("unitNumber", e.target.value);
                 }}
@@ -442,6 +456,7 @@ function PropertyCreateModal({
           <Select
             label="State"
             value={stateOrProvince}
+            defaultValue={stateOrProvince}
             placeholder="Select State"
             onSelect={(e) => {
               handleChange("stateOrProvince", e);
@@ -461,7 +476,9 @@ function PropertyCreateModal({
                 label="City"
                 id="city"
                 placeholder="City"
+                disabled={id}
                 value={postalCity}
+                defaultValue={postalCity}
                 onChange={(e) => {
                   handleChange("postalCity", e.target.value);
                 }}
@@ -484,8 +501,10 @@ function PropertyCreateModal({
                 placeholder="ZipCode"
                 min={0}
                 max={99999}
+                disabled={id}
                 controls={false}
                 value={postalcode}
+                defaultValue={postalcode}
                 onChange={(value) => {
                   handleChange("postalcode", value);
                 }}
@@ -553,6 +572,8 @@ function PropertyCreateModal({
             label="homeType"
             placeholder="Property Type"
             value={propertyType}
+            defaultValue={propertyType}
+            disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
             }}
@@ -581,6 +602,7 @@ function PropertyCreateModal({
                 controls={false}
                 min={0}
                 value={bedroomsTotal}
+                defaultValue={bedroomsTotal}
                 onChange={(value) => {
                   handleChange("bedroomsTotal", value);
                 }}
@@ -610,6 +632,7 @@ function PropertyCreateModal({
                 controls={false}
                 min={0}
                 value={bathroomsTotalInteger}
+                defaultValue={bathroomsTotalInteger}
                 onChange={(value) => {
                   handleChange("bathroomsTotalInteger", value);
                 }}
@@ -638,6 +661,7 @@ function PropertyCreateModal({
                 addonAfter={LivingAreaUnitElement}
                 min={0}
                 value={livingArea}
+                defaultValue={livingArea}
                 onChange={(value) => {
                   handleChange("livingArea", value);
                 }}
@@ -668,6 +692,7 @@ function PropertyCreateModal({
                 addonAfter={LotSizeAreaUnitElement}
                 min={0}
                 value={lotSizeArea}
+                defaultValue={lotSizeArea}
                 onChange={(value) => {
                   handleChange("lotSizeArea", value);
                 }}
@@ -696,8 +721,10 @@ function PropertyCreateModal({
                     <Checkbox
                       key={key}
                       name={opt.label}
+                      checked={propertyData[opt.value]}
+                      defaultChecked={propertyData[opt.value]}
                       onChange={(e) => {
-                        handleCheckbox(opt.value, e.target.checked);
+                        handleChange(opt.value, e.target.checked);
                       }}
                     >
                       {opt.label}
@@ -721,7 +748,7 @@ function PropertyCreateModal({
         title={primaryAction.content}
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
-        okText={modalView ? "Continue" : "Next"}
+        okText={modalView ? "Continue" : id ? "Update Property" : "Create Property"}
         okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
@@ -737,7 +764,8 @@ function PropertyCreateModal({
         isCreateConfirmModalOpen={isCreateConfirmModalOpen}
         toggleCreateConfirmModal={toggleCreateConfirmModal}
         handleSubmitCreateProperty={handleSubmitCreateProperty}
-        isCreatePropertySubmitting={isCreatePropertySubmitting}
+        isCreatePropertySubmitting={isCreatePropertySubmitting || isUpdatePropertySubmitting}
+        isEdit={id}
       />
     </>
   );
