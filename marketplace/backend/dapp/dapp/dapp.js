@@ -815,6 +815,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return managers.reviewManager.createReview({ ...args, createdDate: createdDate, delDate: 0 });
   }
 
+  // Edit Reviews
+  contract.editReview = async function (args, options = defaultOptions) {
+    return managers.reviewManager.updateReview(args);
+  }
+
   // Delete reviews by the productId/productAddress
   contract.deleteReview = async function (args, options = defaultOptions) {
     return managers.reviewManager.deleteReview(args);

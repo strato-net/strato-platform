@@ -440,6 +440,7 @@ class PropertiesController {
       title: Joi.string().required(),
       description: Joi.string().required(),
       rating: Joi.number().required(),
+      address: Joi.string().required(),
     });
 
     const validation = updateReviewSchema.validate(args);

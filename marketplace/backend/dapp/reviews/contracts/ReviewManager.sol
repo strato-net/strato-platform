@@ -31,6 +31,20 @@ contract ReviewManager_0_1 {
         return (RestStatus.OK, address(review));
     }
 
+    function updateReview(
+        string _title,
+        address _description,
+        uint _rating,
+        string _address
+    ) returns (uint256) {
+        Review_0_2 review = Review_0_2(_address);
+        return review.update(
+                _title,
+                _description,
+                _rating
+            );
+    }
+
     function deleteReview(address _reviewAddress) returns (uint256, string) {
         Review_0_2 review = Review_0_2(_reviewAddress);
         return review.deleteReview();

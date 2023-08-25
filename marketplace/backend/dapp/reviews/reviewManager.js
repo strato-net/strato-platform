@@ -96,10 +96,12 @@ function bind(user, _contract, options) {
   contract.getState = async () => getState(user, contract, options);
   contract.getReview = async (args, _options = defaultOptions) =>
     getReview(user, args, _options);
-    contract.getReviews = async (args, _options = defaultOptions) =>
+  contract.getReviews = async (args, _options = defaultOptions) =>
     getReviews(user, args, _options);
   contract.createReview = async (args) =>
     createReview(user, contract, args, options);
+  contract.updateReview = async (args) =>
+    updateReview(user, contract, args, options);
   contract.deleteReview = async (args) =>
     deleteReview(user, contract, args, options);
   return contract;
@@ -144,6 +146,31 @@ async function createReview(admin, contract, _args, baseOptions) {
   return [restStatus, reviewAddress];
 }
 
+async function updateReview(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "updateReview",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+  const [restStatus] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus];
+}
+
 /**
  * Delete review
  */
@@ -185,5 +212,6 @@ export default {
   contractFilename,
   marshalOut,
   createReview,
+  updateReview,
   deleteReview,
 };

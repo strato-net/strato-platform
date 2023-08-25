@@ -36,6 +36,18 @@ contract Review_0_2 {
         delDate = 0;
     }
 
+    function update(
+        string _title
+    ,   string _description
+    ,   uint _rating
+    ) returns (uint) {
+        title = _title;
+        description = _description;
+        rating = _rating;
+        
+      return RestStatus.OK;
+    }
+
     // Delete the review
     function deleteReview() public returns (uint256, string) {
         delDate = block.timestamp;
