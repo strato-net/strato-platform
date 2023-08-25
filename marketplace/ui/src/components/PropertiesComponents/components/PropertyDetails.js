@@ -368,7 +368,7 @@ function PropertyDetails() {
             </Row>
             <Row>
               <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
-                <div style={{ display: "flex",zIndex:"1" ,background:"white", justifyContent: "space-between", position:"sticky", top:"0px" }}>
+                <div style={{ display: "flex", zIndex: "1", background: "white", justifyContent: "space-between", position: "sticky", top: "0px" }}>
                   {tabs.map((tab) => (
                     <Col
                       sm={6}
@@ -380,8 +380,8 @@ function PropertyDetails() {
                         style={{
                           padding: "5px",
                           backgroundColor: activeTab === tab.key && "#EDEDED",
-                          fontSize:"18px",
-                          textAlign:"center"
+                          fontSize: "18px",
+                          textAlign: "center"
                         }}
                       >
                         <a
@@ -399,7 +399,12 @@ function PropertyDetails() {
                   <>
                     <div id={tab.key}>
                       <div style={{ paddingTop: "20px" }}>
-                        <Typography.Title level={5}>
+                        <Typography.Title level={5} style={{
+                          backgroundColor: activeTab === tab.key && "#EDEDED",
+                          display: "inline-block",
+                          padding: "10px",
+                          borderRadius: "5px"
+                        }}>
                           <a style={{ color: "black" }} href={`#${tab.key}`}>{tab.label}</a>
                         </Typography.Title>
                       </div>

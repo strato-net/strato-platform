@@ -64,10 +64,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
   ];
 
   const menu = [
-    { name: "arts", icon: carbon, label: "arts", url:"" },
-    { name: "property", icon: property, label: "property", url:"/properties" },
-    { name: "carbon", icon: carbon, label: "carbon", url:"" },
-    { name: "loyalty", icon: property, label: "loyalty", url:"" }
+    { name: "arts", icon: carbon, label: "arts", url: "" },
+    { name: "property", icon: property, label: "property", url: "/properties" },
+    { name: "carbon", icon: carbon, label: "carbon", url: "" },
+    { name: "loyalty", icon: property, label: "loyalty", url: "" }
   ]
 
   const navUrls = [
@@ -104,7 +104,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
     } else if (pathName.includes("/properties") || pathName === "/properties") {
       setSelectedTab("5");
     }
-    else{
+    else {
       setSelectedTab("0");
     }
   }, [window.location.pathname]);
@@ -229,45 +229,52 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }}
         items={navItems[roleIndex]?.items}
       />
-      
+
       <Space size="large">
-      <Button style={{ border: "none", marginTop:"20px" }} onClick={() => setOpen(true)}>
-        {sell}
-        {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
-      </Button>
-        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
-          className="cursor-pointer"
-          count={cartList.length}
-          onClick={() => {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_shopping_cart',
-              },
-            });
-            navigate("/checkout");
-          }}
-        >
-          <Avatar
-            style={{
-              backgroundColor: "#181EAC",
+        {roleIndex === undefined || roleIndex === 1
+          ? null
+          : <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
+            {sell}
+            {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
+          </Button>}
+        {roleIndex === undefined || roleIndex === 1
+          ? null
+          : <Badge
+            className="cursor-pointer"
+            count={cartList.length}
+            onClick={() => {
+              TagManager.dataLayer({
+                dataLayer: {
+                  event: 'view_shopping_cart',
+                },
+              });
+              navigate("/checkout");
             }}
-            icon={<ShoppingCartOutlined />}
-          />
-        </Badge>
+          >
+            <Avatar
+              style={{
+                backgroundColor: "#181EAC",
+              }}
+              icon={<ShoppingCartOutlined />}
+            />
+          </Badge>
         }
         {
-          roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white"
-              onClick={() => {
-                TagManager.dataLayer({
-                  dataLayer: {
-                    event: 'login_register_click'
-                  }
-                })
-              }} >
-              Login / Register
-            </a> : null
-          ) :
+          roleIndex === undefined || roleIndex === 1
+            ? (
+              loginUrl
+                ? <a href={loginUrl} id="Login" className="text-base text-white"
+                  onClick={() => {
+                    TagManager.dataLayer({
+                      dataLayer: {
+                        event: 'login_register_click'
+                      }
+                    })
+                  }} >
+                  Login / Register
+                </a>
+                : null
+            ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
                 {initials}
@@ -287,10 +294,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
       >
         <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
           {menu.map((item, index) => {
-            return <Col className="menu-card" onClick={()=>{redirect(item.url)}} span={8} offset={2} key={index} style={{ display: "flex", padding:"5px" }}>
+            return <Col className="menu-card" onClick={() => { redirect(item.url) }} span={8} offset={2} key={index} style={{ display: "flex", padding: "5px" }}>
               <div style={{ margin: "auto" }}>
                 <div>{item.icon}</div>
-                <p style={{textAlign:"center"}}>{item.label}</p>
+                <p style={{ textAlign: "center" }}>{item.label}</p>
               </div>
             </Col>
           })}
