@@ -28,6 +28,7 @@ import PropertyCreateModal from "./PropertyCreateModal";
 import { useAuthenticateState } from "../../../contexts/authentication";
 const AnyReactComponent = ({ text }) => <div>{text}</div>;
 function PropertyDetails() {
+  const [activeTab, setActiveTab] = useState("Overview");
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const dispatch = usePropertiesDispatch();
@@ -140,22 +141,22 @@ function PropertyDetails() {
     {
       key: "Overview",
       label: `Overview`,
-      children: <OverviewTab description={description} />,
+      children: <OverviewTab id="#Overview" description={description} />,
     },
     {
       key: "Features",
       label: `Features`,
-      children: <FeaturesTab property={property?.fields} />,
+      children: <FeaturesTab id="#Features" property={property?.fields} />,
     },
     {
       key: "Price",
       label: `Price and Tax History`,
-      children: <PriceHistoryTab property={property?.fields} />,
+      children: <PriceHistoryTab id="#Price" property={property?.fields} />,
     },
     {
       key: "Reviews",
       label: `Reviews`,
-      children: <ReviewTab reviews={propertyDetails?.reviews} propertyId={propertyDetails?.address} productId={propertyDetails?.productId} />,
+      children: <ReviewTab id="#Reviews" reviews={propertyDetails?.reviews} propertyId={propertyDetails?.address} productId={propertyDetails?.productId} />,
     },
   ];
 
@@ -278,7 +279,7 @@ function PropertyDetails() {
                       <Text strong>{standardStatus}</Text>
                     </Row>
                     <Row style={{ marginTop: "15px" }}>
-                      <Col style={{ lineHeight: "30px" }}>
+                      <Col span={24} style={{ lineHeight: "30px" }}>
                         <Row>
                           <Col span={8}>
                             <Text strong>Property Type</Text>
@@ -345,7 +346,7 @@ function PropertyDetails() {
                 <div
                   style={{
                     width: "100%",
-                    height: "200px",
+                    height: "300px",
                     background: "grey",
                     margin: "auto",
                     textAlign: "center",
@@ -367,7 +368,46 @@ function PropertyDetails() {
             </Row>
             <Row>
               <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
-                <Tabs defaultActiveKey="Overview" items={tabs} />
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  {tabs.map((tab) => (
+                    <Col
+                      sm={6}
+                      key={tab.key}
+                      id={tab.key}
+                      style={{ margin: "auto", padding: "10px" }}
+                    >
+                      <div
+                        style={{
+                          padding: "5px",
+                          backgroundColor: activeTab === tab.key && "#EDEDED",
+                          fontSize:"18px",
+                          textAlign:"center"
+                        }}
+                      >
+                        <a
+                          href={`#${tab.key}`}
+                          onClick={() => setActiveTab(tab.key)}
+                        >
+                          {tab.label}
+                        </a>
+                      </div>
+                    </Col>
+                  ))}
+                </div>
+
+                {tabs.map((tab, index) => (
+                  <>
+                    <div id={tab.key}>
+                      <div style={{ paddingTop: "20px" }}>
+                        <Typography.Title level={5}>
+                          <a style={{ color: "black" }} href={`#${tab.key}`}>{tab.label}</a>
+                        </Typography.Title>
+                      </div>
+                      {tab.children}
+                    </div>
+                    <div style={{ width: "100%", margin: "50px auto" }}></div>
+                  </>
+                ))}
               </Col>
             </Row>
           </Col>
