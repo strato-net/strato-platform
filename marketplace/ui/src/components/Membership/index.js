@@ -94,7 +94,7 @@ const Membership = ( user ) => {
    
     
     useEffect(() => {
-        actions.sellerStripeStatus(dispatch, user?.organization);
+        actions.sellerStripeStatus(dispatch, user?.user?.organization);
     }, [dispatch, user]);
     
     const navigate = useNavigate();
@@ -171,7 +171,7 @@ const Membership = ( user ) => {
     return (
         <>
             {contextHolder}
-            {ismembershipsLoading || iscategorysLoading || issubCategorysLoading || isLoadingStripeStatus || stripeStatus == null ? (
+            {stripeStatus === null || ismembershipsLoading || iscategorysLoading || issubCategorysLoading || isLoadingStripeStatus ? (
                 <div className="h-screen flex justify-center items-center">
                     <Spin spinning={ismembershipsLoading} size="large" />
                 </div>
@@ -277,7 +277,7 @@ const Membership = ( user ) => {
                                     <Button
                                         id="add-product-button"
                                         type="primary"
-                                        style={{ backgroundColor: '#6e7ddd', color: 'white', margin: '10px', fontWeight: 'bold' }}
+                                        style={{ color: 'white', margin: '10px', fontWeight: 'bold' }}
                                         className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40"
                                         disabled={stripeStatus.detailsSubmitted}
                                         onClick={() => {

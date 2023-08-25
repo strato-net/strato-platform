@@ -52,5 +52,5 @@ export default {
   EventSerialNumberList: { label: "Event Serial Numbers", url: "/events/serialNumbers" },
   ProcessingOrder: { label: "Processing Order", url: "/order/status" },
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
-  OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/inventories/stripe/onboarding" },
+  OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/memberships/stripe/onboarding" },
 };

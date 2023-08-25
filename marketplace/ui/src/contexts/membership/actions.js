@@ -32,6 +32,9 @@ const actionDescriptors = {
   fetchMembershipFromDetails: "fetch_membership_of_inventory",
   fetchMembershipFromDetailsSuccessful: "fetch_membership_of_inventory_successful",
   fetchMembershipFromDetailsFailed: "fetch_membership_of_inventory_failed",
+  onboardSellerToStripe: "onboard_seller_to_stripe",
+  onboardSellerToStripeSuccessful: "onboard_seller_to_stripe_successful",
+  onboardSellerToStripeFailed: "onboard_seller_to_stripe_failed",
   sellerStripeStatus: "seller_stripe_status",
   sellerStripeStatusSuccessful: "seller_stripe_status_successful",
   sellerStripeStatusFailed: "seller_stripe_status_failed"
@@ -298,6 +301,45 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
+    }
+  },
+  onboardSellerToStripe: async (dispatch) => {
+    dispatch({ type: actionDescriptors.onboardSellerToStripe });
+
+    try {
+      const response = await fetch(`${apiUrl}/payment/stripe/account`, {
+        // const response = await fetch(`${apiUrl}/inventory`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.onboardSellerToStripeSuccessful,
+          payload: body.data,
+        });
+        return body.data;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryFailed,
+          error: "Error while trying to onboard to Stripe",
+        });
+        actions.setMessage(dispatch, "Error while trying to onboard to Stripe");
+        return null;
+      }
+
+      dispatch({
+        type: actionDescriptors.onboardSellerToStripeFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.onboardSellerToStripeFailed,
+        error: "Error while trying to onboard to Stripe",
+      });
     }
   },
   sellerStripeStatus: async (dispatch, org) => {

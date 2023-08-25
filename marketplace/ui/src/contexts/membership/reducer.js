@@ -177,6 +177,23 @@ const reducer = (state, action) => {
         ...state,
         isImportAssetsModalOpen: false
       }
+    case actionDescriptors.onboardSellerToStripe:
+      return {
+        ...state,
+        isOnboardingSellerToStripe: true
+      };
+    case actionDescriptors.onboardSellerToStripeSuccessful:
+      return {
+        ...state,
+        onboardedSeller: action.payload,
+        isOnboardingSellerToStripe: false
+      };
+    case actionDescriptors.onboardSellerToStripeFailed:
+      return {
+        ...state,
+        error: action.error,
+        isOnboardingSellerToStripe: false
+      };
     case actionDescriptors.sellerStripeStatus:
       return {
         ...state,
