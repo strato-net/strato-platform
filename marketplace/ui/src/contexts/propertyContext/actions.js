@@ -285,7 +285,7 @@ const actions = {
   updateReview: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateReview, payload })
     try {
-      const response = await fetch(`${apiUrl}/updatereview`, {
+      const response = await fetch(`${apiUrl}properties/review/update`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
@@ -330,7 +330,7 @@ const actions = {
   deleteReview: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.deleteReview, payload })
     try {
-      const response = await fetch(`${apiUrl}/properties/deletereview`, {
+      const response = await fetch(`${apiUrl}/properties/review/delete`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {

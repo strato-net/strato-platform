@@ -195,15 +195,6 @@ function PropertyDetails() {
             <Button
               type="primary"
               onClick={() => {
-                setUploadPhotosModal(true);
-              }}
-              disabled
-            >
-              Edit Property
-            </Button>
-            <Button
-              type="primary"
-              onClick={() => {
                 toggleCreateModal(true);
               }}
               style={{ marginLeft: "5px" }}

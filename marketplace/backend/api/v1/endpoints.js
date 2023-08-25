@@ -138,5 +138,6 @@ export const Properties = {
   create: '/',
   update: '/update',
   createReview: '/review',
+  updateReview: '/review/update',
   deleteReview: '/review/delete',
 }

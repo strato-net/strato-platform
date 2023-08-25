@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Button, Typography, Space, Avatar, Form, Row, Image } from "antd";
 import { UserOutlined, DownOutlined, UpOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { useAuthenticateState } from "../../../../contexts/authentication";
 import { decodeURIComponentText, unixToDate } from "../../helpers/utils";
 import star from "../../assets/icons/star.svg";
 
@@ -9,6 +10,9 @@ const ReviewCard = (props) => {
     review: { reviewerName, title, createdDate, rating, description, readmore },
     index,
   } = props;
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+
   return (
     <>
       <Space
@@ -25,10 +29,15 @@ const ReviewCard = (props) => {
             </Typography.Text>
           </Typography.Text>
           {/* edit & delete buttons, that we have to use after login functionality */}
-          {/* <div style={{ justifyContent: "flex-end" }}>
+          <Row>
+            <Typography.Text strong type="primary" style={{ marginRight: "6px" }}>
+              {rating}
+            </Typography.Text>
+            <Image src={star} width={20} height={20} style={{ marginRight: "6px" }} />
+            <div style={{ justifyContent: "flex-end" }}>
             <Button
               type="primary"
-              style={{ marginRight: "10px" }}
+              style={{ marginRight: "6px" }}
               icon={<EditOutlined />}
             />
             <Button
@@ -36,12 +45,7 @@ const ReviewCard = (props) => {
               type="primary"
               icon={<DeleteOutlined />}
             />
-          </div> */}
-          <Row>
-            <Typography.Text strong type="primary" style={{ marginRight: 6 }}>
-              {rating}
-            </Typography.Text>
-            <Image src={star} width={20} height={20} />
+          </div>
           </Row>
         </div>
         <Typography.Text type="secondary">
@@ -59,7 +63,11 @@ const ReviewCard = (props) => {
               block
               className="read-btn"
               onClick={() => {
-                props.handleRead();
+                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  window.location.href = loginUrl;
+                } else {
+                  props.handleRead();
+                }
               }}
             >
               <UpOutlined /> Hide full review
@@ -69,7 +77,11 @@ const ReviewCard = (props) => {
               block
               className="read-btn"
               onClick={() => {
-                props.handleRead();
+                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  window.location.href = loginUrl;
+                } else {
+                  props.handleRead();
+                }
               }}
             >
               {" "}

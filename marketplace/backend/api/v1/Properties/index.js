@@ -33,6 +33,7 @@ router.put(
   loadDapp,
   PropertiesController.update);
   
+//Review specific routes
 router.post(
   Properties.createReview,
   authHandler.authorizeRequest(),
@@ -45,6 +46,13 @@ router.post(
   authHandler.authorizeRequest(),
   loadDapp,
   PropertiesController.deleteReview
+);
+
+router.updateReview(
+  Properties.updateReview,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.updateReview
 );
 
 export default router;
