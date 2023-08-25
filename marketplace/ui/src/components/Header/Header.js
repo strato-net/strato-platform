@@ -8,6 +8,10 @@ import {
   Badge,
   Avatar,
   Dropdown,
+  Button,
+  Modal,
+  Row,
+  Col,
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
@@ -22,12 +26,13 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-
-
+import { icons } from "../PropertiesComponents/assets/icons/icons";
+const { carbon, arts, loyalty, property, sell } = icons;
 const { Header } = Layout;
 
 const HeaderComponent = ({ user, loginUrl }) => {
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
   const { cartList } = useMarketplaceState();
@@ -57,6 +62,13 @@ const HeaderComponent = ({ user, loginUrl }) => {
       ]
     }
   ];
+
+  const menu = [
+    { name: "arts", icon: carbon, label: "arts" },
+    { name: "property", icon: property, label: "property" },
+    { name: "carbon", icon: carbon, label: "carbon" },
+    { name: "loyalty", icon: property, label: "loyalty" }
+  ]
 
   const navUrls = [
     routes.Marketplace.url,
@@ -170,42 +182,52 @@ const HeaderComponent = ({ user, loginUrl }) => {
         className="h-16 bg-primary text-tertiaryB m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
-          if (item.key === "0") {    
+          if (item.key === "0") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_marketplace_page',
-            },
-          });}
-          if (item.key === "1") {  
+              dataLayer: {
+                event: 'view_marketplace_page',
+              },
+            });
+          }
+          if (item.key === "1") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_orders_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_orders_page',
+              },
+            });
+          }
           if (item.key === "2") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_inventory_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_inventory_page',
+              },
+            });
+          }
           if (item.key === "3") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_products_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_products_page',
+              },
+            });
+          }
           if (item.key === "4") {
             TagManager.dataLayer({
               dataLayer: {
                 event: 'view_events_page',
               },
             });
-            navigate(navUrls[item.key], { state: { tab: "EventType" } })}
+            navigate(navUrls[item.key], { state: { tab: "EventType" } })
+          }
           else navigate(navUrls[item.key]);
         }}
         items={navItems[roleIndex]?.items}
       />
+      
       <Space size="large">
+      <Button style={{ border: "none", marginTop:"20px" }} onClick={() => setOpen(true)}>
+        {sell}
+        {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
+      </Button>
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}
@@ -228,16 +250,16 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white" 
+            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white"
               onClick={() => {
                 TagManager.dataLayer({
                   dataLayer: {
                     event: 'login_register_click'
                   }
                 })
-              } } > 
-              Login / Register 
-              </a> : null
+              }} >
+              Login / Register
+            </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
@@ -246,6 +268,27 @@ const HeaderComponent = ({ user, loginUrl }) => {
             </Dropdown>
         }
       </Space>
+      <Modal
+        title="What kind of asset we are selling ?"
+        centered
+        open={open}
+        onOk={() => setOpen(false)}
+        onCancel={() => setOpen(false)}
+        width={'400px'}
+        height={'90%'}
+        footer={false}
+      >
+        <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
+          {menu.map((item, index) => {
+            return <Col span={12} key={index} style={{ display: "flex" }}>
+              <div style={{ margin: "auto" }}>
+                <div>{item.icon}</div>
+                <p style={{textAlign:"center"}}>{item.label}</p>
+              </div>
+            </Col>
+          })}
+        </Row>
+      </Modal>
     </Header>
   );
 };
