@@ -28,6 +28,7 @@ so that they could be properly moved to their respective version's subsection.
 - Derived contracts are inserted as rows in abstract tables
 - Support for imports from addresses in SolidVM
 - More lenient P2P disable times to prevent non-validators from being "locked out"
+- `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract

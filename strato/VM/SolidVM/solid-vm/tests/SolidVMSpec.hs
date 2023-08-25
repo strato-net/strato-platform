@@ -5800,8 +5800,29 @@ contract qq {
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
 
 
-  -- todo: 'fit' to 'it'
-  fit "can deterministically derive salted contract addresses with multiple args" . runTest $ do
+  it "can deterministically derive salted contract addresses with no args" . runTest $ do
+    let src = [r|
+contract VerySimpleStorage {
+  uint x;
+  constructor() {
+    x = 1337;
+  }
+}
+
+contract qq {
+  VerySimpleStorage public x;
+  address y;
+  constructor() public {
+    x = new VerySimpleStorage{salt: "kosher"}();
+    y = address(this).derive("kosher");
+
+    require(address(x) == y, "These salted addresses are not the same");
+  }
+}|]
+    runBS src `shouldReturn` ()
+
+
+  it "can deterministically derive salted contract addresses with multiple args" . runTest $ do
     let src = [r|
 contract User {
   string commonName;
@@ -5816,8 +5837,9 @@ contract qq {
   User public x;
   address y;
   constructor() public {
-    x = new User{salt: "salt"}("David Moncayo", "MyVeryCoolCert");
-    y = address(x).derive("salt", "David Moncayo", "MyVeryCoolCert");
+    x = new User{salt: "himalayan"}("David Moncayo", "Bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk");
+    y = address(this).derive("himalayan", "David Moncayo", "Bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk");
+    require(address(x) == y, "These salted addresses are not the same");
   }
 }|]
     runBS src `shouldReturn` ()

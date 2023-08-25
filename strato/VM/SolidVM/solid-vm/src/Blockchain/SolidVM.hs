@@ -1917,6 +1917,15 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' args
+  onTraced $ do
+    liftIO $ putStrLn $ concat [
+      C.cyan ">> Created salted contract:",
+      "\n   code hash      " ++ C.yellow (show hsh),
+      "\n   salt           " ++ C.yellow (show salt),
+      "\n   creator        " ++ C.yellow (show creator),
+      "\n   arguments      " ++ C.yellow (show args'),
+      "\n   salted address " ++ C.yellow (show newAddress)
+      ]
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
@@ -1952,27 +1961,30 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
             (CC.OrderedArgs a) -> getVar <=< expToVar $ head a
             (CC.NamedArgs _) -> pure $ SNULL
           case (val1, name) of
-            (SAccount addr _, "derive") -> do
-              (hsh, _) <- getCurrentCodeCollection
-              salt <- saltTextToValue $ show convertedFirstArg
-              Account addr'' _ <- getNewAddressWithSalt (Account (_namedAccountAddress addr) Nothing) salt hsh (show args)
-              return . Constant $ SAccount (NamedAccount addr'' UnspecifiedChain) False
-              where
-                saltTextToValue :: MonadSM m => String -> m Value
-                saltTextToValue saltText = do
-                  let stringParser = do
-                        ~(a, str) <- withPosition $ do
-                          s <- stringLiteral
-                          return s
-                        return $ CC.StringLiteral a str
-                  let saltExpression = runParser (stringParser <|> expression) (ParserState "" "" M.empty) "" (saltText)
-                  saltValue <- do
-                    case saltExpression of
-                      Left pe -> invalidArguments "big bad sad" pe
-                      Right e' -> do
-                        s <- getVar =<< expToVar e'
-                        return s
-                  return saltValue
+            (SAccount (NamedAccount addr _) _, "derive") -> do
+              (_, hsh, _) <- getCodeAndCollection (Account addr Nothing)
+              args' <- case args of
+                (CC.OrderedArgs []) -> typeError "derive needs at least one argument, none were given " args
+                (CC.OrderedArgs (_ : as)) -> OrderedVals <$> mapM (getVar <=< expToVar) as
+                (CC.NamedArgs _) -> typeError "Cannot provide named args to derive" args
+              let salt = case convertedFirstArg of
+                        SString s -> s
+                        _ -> typeError "first arugment must be a string " args
+                  newAddress = getNewAddressWithSalt_unsafe
+                                addr
+                                salt
+                                (keccak256ToByteString hsh)
+                                (show args')
+              onTraced $ do
+                liftIO $ putStrLn $ concat [
+                  C.cyan ">> Deriving salted contract:",
+                  "\n   code hash      " ++ C.yellow (show hsh),
+                  "\n   salt           " ++ C.yellow (show convertedFirstArg),
+                  "\n   input address  " ++ C.yellow (show addr),
+                  "\n   arguments      " ++ C.yellow (show args'),
+                  "\n   salted address " ++ C.yellow (show newAddress)
+                  ]
+              return . Constant $ SAccount (NamedAccount newAddress UnspecifiedChain) False
             (SAccount addr _, "delegatecall") -> do
               let  (funcName, args') = (case args of
                     (CC.OrderedArgs []) -> typeError "delegate call needs atleast one arguement, none were given " args
