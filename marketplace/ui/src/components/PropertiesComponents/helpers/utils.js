@@ -15,14 +15,28 @@ export function cleanPhoneNumber(phoneNumber) {
   return phoneNumber.replace(/\D/g, '');
 }
 
-// decode uri component and replace %0A with new line
-export const decodeURIComponentText = (text) => {
-decodeURIComponent(text.comments).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-  <React.Fragment key={index}>
-    {line}
-    <br />
-  </React.Fragment>
-))}
+// decode uri component and replace %0A with new line4
+// export const decodeURIComponentText = (encodedURI) => decodeURIComponent(encodedURI.replace(/%0A/g, '\n'));
+
+export const decodeURIComponentText = (encodedText, readmore) => {
+  const decodedText = decodeURIComponent(encodedText.replace(/%0A/g, '\n'));
+
+  if (readmore) {
+    return decodedText.split('\n').map((line, index) => (
+      <React.Fragment key={index}>
+        {line}
+        <br />
+      </React.Fragment>
+    ));
+  } else {
+    return decodedText.slice(0, 100).split('\n').map((line, index) => (
+      <React.Fragment key={index}>
+        {line}
+        <br />
+      </React.Fragment>
+    ));
+  }
+};
 
 
 //convert unix timestamp to human readable date

@@ -6,7 +6,7 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-import { filterlabel, propertyConstants } from '../helpers/constants'
+import { createPropertyFormInitialData, filterlabel, propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
@@ -172,6 +172,7 @@ console.log(properties)
       <PropertyCreateModal
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
+        formData={createPropertyFormInitialData}
       />
     </>
   );

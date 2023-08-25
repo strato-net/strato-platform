@@ -1,8 +1,9 @@
+import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
+
 /// @title A representation of Property assets
 contract Property_0_5 {
     address public productId;
     int public listPrice;
-    string public unparsedAddress;
     int public streetNumber;
     string public streetName;
     string public unitNumber;
@@ -100,7 +101,6 @@ contract Property_0_5 {
     constructor(
         address _productId,
         int _listPrice,
-        string _unparsedAddress,
         int _streetNumber,
         string _streetName,
         string _unitNumber,
@@ -190,7 +190,6 @@ contract Property_0_5 {
     ) public {
         productId = _productId;
         listPrice = _listPrice;
-        unparsedAddress = _unparsedAddress;
         streetNumber = _streetNumber;
         streetName = _streetName;
         unitNumber = _unitNumber;
@@ -226,7 +225,7 @@ contract Property_0_5 {
         refrigeration = _refrigeration;
         solar = _solar;
         wallUnit = _wallUnit;
-        
+
         // Heating
         baseboard = _baseboard;
         forceAir = _forceAir;
@@ -284,6 +283,192 @@ contract Property_0_5 {
         sauna = _sauna;
         sprinklerSystem = _sprinklerSystem;
         waterFront = _waterFront;
-        
+    }
+    
+    function update(
+        int _listPrice,
+        int _streetNumber,
+        string _streetName,
+        string _unitNumber,
+        string _postalCity,
+        string _stateOrProvince,
+        int _postalcode,
+        int _bathroomsTotalInteger,
+        int _bedroomsTotal,
+        string _standardStatus,
+        int _lotSizeArea,
+        string _lotSizeUnits,
+        int _livingArea,
+        string _livingAreaUnits,
+        string _latitude,
+        string _longitude,
+        int _numberOfUnitsTotal,
+        // Appliances
+        bool _dishwasher,
+        bool _dryer,
+        bool _freezer,
+        bool _garbageDisposal,
+        bool _microwave,
+        bool _ovenOrRange,
+        bool _refrigerator,
+        bool _washer,
+        bool _waterHeater,
+        // Cooling
+        bool _centralAir,
+        bool _evaporative,
+        bool _geoThermal,
+        bool _refrigeration,
+        bool _solar,
+        bool _wallUnit,
+        // Heating
+        bool _baseboard,
+        bool _forceAir,
+        bool _geoThermalHeat,
+        bool _heatPump,
+        bool _hotWater,
+        bool _radiant,
+        bool _solarHeat,
+        bool _steam,
+        // Flooring
+        bool _carpet,
+        bool _concrete,
+        bool _hardwood,
+        bool _laminate,
+        bool _linoleumVinyl,
+        bool _slate,
+        bool _softwood,
+        bool _tile,
+        // Parking
+        bool _carport,
+        bool _garage,
+        bool _offStreet,
+        bool _onStreet,
+        // Interior Features
+        bool _attic,
+        bool _cableReady,
+        bool _ceilingFan,
+        bool _doublePaneWindows,
+        bool _elevator,
+        bool _fireplace,
+        bool _flooring,
+        bool _furnished,
+        bool _jettedTub,
+        bool _securitySystem,
+        bool _vaultedCeiling,
+        bool _skylight,
+        bool _wetBar,
+        // Exterior Features
+        bool _barbecueArea,
+        bool _deck,
+        bool _dock,
+        bool _fence,
+        bool _garden,
+        bool _hotTubOrSpa,
+        bool _lawn,
+        bool _patio,
+        bool _pond,
+        bool _pool,
+        bool _porch,
+        bool _rvParking,
+        bool _sauna,
+        bool _sprinklerSystem,
+        bool _waterFront
+    ) public returns (uint256) {
+        listPrice = _listPrice;
+        streetNumber = _streetNumber;
+        streetName = _streetName;
+        unitNumber = _unitNumber;
+        postalCity = _postalCity;
+        stateOrProvince = _stateOrProvince;
+        postalcode = _postalcode;
+        bathroomsTotalInteger = _bathroomsTotalInteger;
+        bedroomsTotal = _bedroomsTotal;
+        standardStatus = _standardStatus;
+        lotSizeArea = _lotSizeArea;
+        lotSizeUnits = _lotSizeUnits;
+        livingArea = _livingArea;
+        livingAreaUnits = _livingAreaUnits;
+        latitude = _latitude;
+        longitude = _longitude;
+        numberOfUnitsTotal = _numberOfUnitsTotal;
+
+        // Appliances
+        dishwasher = _dishwasher;
+        dryer = _dryer;
+        freezer = _freezer;
+        garbageDisposal = _garbageDisposal;
+        microwave = _microwave;
+        ovenOrRange = _ovenOrRange;
+        refrigerator = _refrigerator;
+        washer = _washer;
+        waterHeater = _waterHeater;
+
+        // Cooling
+        centralAir = _centralAir;
+        evaporative = _evaporative;
+        geoThermal = _geoThermal;
+        refrigeration = _refrigeration;
+        solar = _solar;
+        wallUnit = _wallUnit;
+
+        // Heating
+        baseboard = _baseboard;
+        forceAir = _forceAir;
+        geoThermalHeat = _geoThermalHeat;
+        heatPump = _heatPump;
+        hotWater = _hotWater;
+        radiant = _radiant;
+        solarHeat = _solarHeat;
+        steam = _steam;
+
+        // Flooring
+        carpet = _carpet;
+        concrete = _concrete;
+        hardwood = _hardwood;
+        laminate = _laminate;
+        linoleumVinyl = _linoleumVinyl;
+        slate = _slate;
+        softwood = _softwood;
+        tile = _tile;
+
+        // Parking
+        carport = _carport;
+        garage = _garage;
+        offStreet = _offStreet;
+        onStreet = _onStreet;
+
+        // Interior Features
+        attic = _attic;
+        cableReady = _cableReady;
+        ceilingFan = _ceilingFan;
+        doublePaneWindows = _doublePaneWindows;
+        elevator = _elevator;
+        fireplace = _fireplace;
+        flooring = _flooring;
+        furnished = _furnished;
+        jettedTub = _jettedTub;
+        securitySystem = _securitySystem;
+        vaultedCeiling = _vaultedCeiling;
+        skylight = _skylight;
+        wetBar = _wetBar;
+
+        // Exterior Features
+        barbecueArea = _barbecueArea;
+        deck = _deck;
+        dock = _dock;
+        fence = _fence;
+        garden = _garden;
+        hotTubOrSpa = _hotTubOrSpa;
+        lawn = _lawn;
+        patio = _patio;
+        pond = _pond;
+        pool = _pool;
+        porch = _porch;
+        rvParking = _rvParking;
+        sauna = _sauna;
+        sprinklerSystem = _sprinklerSystem;
+        waterFront = _waterFront;
+
+        return RestStatus.OK;
     }
 }
