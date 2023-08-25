@@ -5732,8 +5732,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"] `shouldReturn`
-      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) Nothing
-      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just $ BC.pack src) Nothing
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) Nothing
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just . hash $ BC.pack src) Nothing
       ]
 
   it "can deterministically create multiple salted contract with args" . runTest $ do
@@ -5767,8 +5767,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"] `shouldReturn`
-      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]")
-      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SInteger 100]")
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]")
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SInteger 100]")
       ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -5794,7 +5794,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
     [BContract "User" x] <- getFields["x"]
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"

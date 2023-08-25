@@ -199,7 +199,7 @@ instance MonadSM m => Mod.Accessible [SourcePosition] m where
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do -- TODO: allow write access once we figure out how to discard changes
-  let eExpr = runParser expression (ParserState "" "" M.empty) "" (T.unpack exprText)
+  let eExpr = runParser expression initialParserState "" (T.unpack exprText)
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
@@ -275,7 +275,7 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
 
     let maybeArgString = M.lookup "args" =<< metadata
         argString = maybe "()" T.unpack maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
+        maybeArgs = runParser parseArgs initialParserState "" argString
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource True initCode
@@ -428,7 +428,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeArgString = M.lookup "args" =<< metadata
         !argString = T.unpack $ fromMaybe (missingField "TX is missing metadata parameter called 'args'" $ show metadata) maybeArgString
-        maybeArgs = runParser parseArgs (ParserState "" "" M.empty) "" argString
+        maybeArgs = runParser parseArgs initialParserState "" argString
         !args = either (parseError "call arguments") CC.OrderedArgs maybeArgs
 
     ((orgName, appName), returnVal) <- traverse (fmap Just . maybe (return "()") encodeForReturn)
@@ -530,7 +530,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
         case fnCalltype of
           CC.DefaultCall -> functionName
           -- Handles RawCall and DelegateCall function signature parsing
-          _ -> (case runParser parseExternalCallArgs (ParserState "" "" M.empty) "" functionName of
+          _ -> (case runParser parseExternalCallArgs initialParserState "" functionName of
             Right (funcTocall, _) -> funcTocall
             _ -> functionName)
 
@@ -565,6 +565,8 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                               (SInteger _, SVMType.Int _ _) -> True
                               (SString _, SVMType.String _) -> True
                               (SString _, SVMType.Bytes _ _) -> True
+                              (SString _, SVMType.Address _) -> True
+                              (SString _, SVMType.Account _) -> True
                               (SBool _, SVMType.Bool) -> True
                               (SAccount _ _, SVMType.Address _) -> True
                               (SAccount _ _, SVMType.Account _) -> True
@@ -806,7 +808,7 @@ argsToValsModifiers ctract md args =
                 return $ SMap valueType $ M.fromList m
                 where
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
+                                let !maybeExp = runParser literal initialParserState "" (labelToString k)
                                 case maybeExp of
                                   Right ex -> do
                                     k' <- eval32 keyType ex
@@ -819,13 +821,13 @@ argsToValsModifiers ctract md args =
 argsToVals :: MonadSM m => CC.Contract -> CC.Func -> CC.ArgList -> m ValList
 argsToVals ctract fn args = case args of
   CC.OrderedArgs xs -> do
-    when (length xs /= length orderedTypes && not (validVariadicSignature orderedTypes)) $
-      invalidArguments "arity mismatch" (xs, orderedTypes)
     valList <- zipWithM eval32 orderedTypes xs
     let maybeVariadic = Data.List.uncons valList
         unpackedList = case maybeVariadic of
           Just (SVariadic x, _) -> init valList ++ x
           _ -> valList
+    when (length unpackedList /= length orderedTypes && not (validVariadicSignature orderedTypes)) $
+      invalidArguments "arity mismatch" (unpackedList, orderedTypes)
     pure $ OrderedVals unpackedList
 
   CC.NamedArgs xs -> NamedVals . M.toList <$> do
@@ -873,7 +875,7 @@ argsToVals ctract fn args = case args of
                 return $ SMap valueType $ M.fromList m
                 where --go :: (SolidString, CC.Expression) -> (SolidString, (Value, Variable))
                       go (k, v) = do
-                                let !maybeExp = runParser literal (ParserState "" "" M.empty) "" (labelToString k)
+                                let !maybeExp = runParser literal initialParserState "" (labelToString k)
                                 case maybeExp of
                                   Right ex -> do
                                     k' <- eval32 keyType ex
@@ -1936,7 +1938,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
               s <- stringLiteral
               return s
             return $ CC.StringLiteral a str
-      let saltExpression = runParser (stringParser <|> expression) (ParserState "" "" M.empty) "" (saltText)
+      let saltExpression = runParser (stringParser <|> expression) initialParserState "" (saltText)
       saltValue <- do
         case saltExpression of
           Left pe -> invalidArguments "big bad sad" pe
@@ -2100,6 +2102,8 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       (SInteger _, SVMType.Int _ _) -> pure True
                       (SString _, SVMType.String _) -> pure True
                       (SString _, SVMType.Bytes _ _) -> pure True
+                      (SString _, SVMType.Address _) -> pure True
+                      (SString _, SVMType.Account _) -> pure True
                       (SBool _, SVMType.Bool) -> pure True
                       (SAccount _ _, SVMType.Address _) -> pure True
                       (SAccount _ _, SVMType.Account _) -> pure True

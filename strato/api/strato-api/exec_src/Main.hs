@@ -292,7 +292,7 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         runCirrusM .
         flip runReaderT blocEnv .
         runVaultM ("http://localhost:8013/strato/v2.3" ) . 
-        runIdentitytM getIdServerUrl $ f
+        runIdentitytM flags_identityServerUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -302,12 +302,12 @@ main = do
   _ <- $initHFlags "Core API"
 
   -- check if id server connection is valid; only run if using https (unless using localhost)
-  identityUrl <- parseBaseUrl getIdServerUrl
+  identityUrl <- parseBaseUrl flags_identityServerUrl
   let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
   let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
   if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
     then 
-      error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdServerUrl
+      error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> flags_identityServerUrl
     else putStrLn "Identity server url is valid to connect to"
 
   let theDoc = toSwagger (Proxy :: Proxy FullAPI)
@@ -337,7 +337,9 @@ main = do
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
           txTBQueue = tbqueue,
-          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress
+          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
+          userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
+          useWalletsByDefault = flags_useWalletsByDefault
           }
   run 3000 $ app env theDoc
 

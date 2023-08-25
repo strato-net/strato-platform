@@ -13,6 +13,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Resource
+import Control.Monad.Trans.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.String
@@ -58,6 +59,8 @@ createBlocEnv = liftIO $ do
                  , globalNonceCounter=error("globalNonceCounter shouldn't be needed in slipstream, it is undefined")
                  , txTBQueue=error("txTBQueue shouldn't be needed in slipstream, it is undefined")
                  , userRegistryAddress=0x0
+                 , userRegistryCodeHash = Nothing
+                 , useWalletsByDefault = error "useWalletsByDefault shouldn't be needed in slipstream"
     }
 
 
@@ -72,7 +75,6 @@ main = do
   runLoggingT
     . runResourceT
     . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
-    . runSQLM
     . withPostgresqlConn workerConnStr $ \workerConn -> do
 
     $logInfoS "main" "Welcome to Slipstream!!!!"
@@ -94,10 +96,6 @@ main = do
 
     handle <- runSqlConn initStorage workerConn
     gref <- newGlobals handle (CirrusHandle conn S.empty)
-
-    --Create Mercata Abstract tables
-    -- generateAssetTable conn gref
-    -- generateSaleTable conn gref
-    -- generateUserTable conn gref
     
-    getAndProcessMessages env conn gref
+    flip runReaderT gref . runSQLM $
+      getAndProcessMessages env conn

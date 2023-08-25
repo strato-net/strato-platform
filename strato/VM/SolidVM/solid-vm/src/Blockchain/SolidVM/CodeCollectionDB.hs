@@ -122,7 +122,7 @@ withAnnotations f = fmap (first unwind) . f
         unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either CompilationError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile (ParserState "" "" M.empty) (T.unpack fileName) (T.unpack src)
+parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile initialParserState (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations fileName = runIdentity . withAnnotations (Identity . parseSource fileName)

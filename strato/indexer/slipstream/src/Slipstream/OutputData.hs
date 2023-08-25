@@ -20,15 +20,10 @@ module Slipstream.OutputData (
   insertMappingTable,
   insertAbstractTable,
   insertAbstractTableQuery,
-  -- insertContractInAbstractTableQuery,
   createIndexTable,
   createMappingTable,
   createHistoryTable,
   createAbstractTable,
-  createAbstractTableRow,
-  createAssetTable,
-  createSaleTable,
-  createUserTable,
   insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
@@ -41,6 +36,7 @@ module Slipstream.OutputData (
 
 import           BlockApps.Solidity.Value
 import           Conduit
+import           Control.Arrow                   ((***))
 import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
@@ -229,7 +225,7 @@ baseMappingColumns = [ "record_id"
               , "block_number"
               , "transaction_hash"
               , "transaction_sender"
-              , "contractname"
+              , "contract_name"
               , "mapname"
               ]
 
@@ -242,7 +238,7 @@ baseAbstractColumns = [ "record_id"
               , "block_number"
               , "transaction_hash"
               , "transaction_sender"
-              , "contractname"
+              , "contract_name"
               ]
 
 baseTableColumns :: TableColumns
@@ -250,10 +246,6 @@ baseTableColumns = baseColumns
 
 baseMappingTableColumns :: TableColumns
 baseMappingTableColumns = baseMappingColumns
-
-baseAbstractTableColumns :: TableColumns
-baseAbstractTableColumns = baseAbstractColumns
-
 
 -- discard app if org is null
 constructTableNameParameters :: Text -> Text -> Text -> (Text, Text, Text)
@@ -264,20 +256,8 @@ constructTableNameParameters org app contract =
          then (org, "", contract)
          else (org, app, contract)
 
-constructMappingOrAbstractTableNameParameters :: Text -> Text -> Text -> Text -> (Text, Text, Text, Text)
-constructMappingOrAbstractTableNameParameters org app contract m_or_a=
-  if T.null org
-    then ("", "", contract, m_or_a)
-    else if app == contract
-         then (org, "", contract, m_or_a)
-         else (org, app, contract, m_or_a)
-
-
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
-
-uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
-uncurry4 f (v, x, y, z) = f v x y z
 
 historyTableName :: Text -> Text -> Text -> TableName
 historyTableName o a n = uncurry3 HistoryTableName $ constructTableNameParameters o a n
@@ -288,11 +268,10 @@ indexTableName o a n = uncurry3 IndexTableName $ constructTableNameParameters o 
 abstractTableName :: Text -> Text -> Text -> TableName
 abstractTableName o a n = uncurry3 AbstractTableName $ constructTableNameParameters o a n
 
-abstractTableRowName :: Text -> Text -> Text -> Text -> TableName
-abstractTableRowName o a n ab = uncurry4 AbstractTableRowName $ constructMappingOrAbstractTableNameParameters o a n ab
-
 mappingTableName :: Text -> Text -> Text -> Text -> TableName
-mappingTableName o a n m = uncurry4 MappingTableName $ constructMappingOrAbstractTableNameParameters o a n m
+mappingTableName o a n m =
+  let (o', a', n') = constructTableNameParameters o a n
+   in MappingTableName o' a' n' m
 
 createExpandIndexTable
   :: OutputM m
@@ -371,36 +350,6 @@ createIndexTable globalsIORef contract (o, a, n) = do
     setTableCreated globalsIORef tableName list
     return $ getDeferredForeignKeys tableName contract o a
 
-createAssetTableQuery :: Text
-createAssetTableQuery =
-  let tableName = indexTableName "" "" "Asset"
-   in T.concat
-        [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"]
-        , ",\n  PRIMARY KEY (contractname));"
-        ]
-
-createSaleTableQuery :: Text
-createSaleTableQuery =
-  let tableName = indexTableName "" "" "Sale"
-   in T.concat
-        [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"]
-        , ",\n  PRIMARY KEY (contractname));"
-        ]
-
-createUserTableQuery :: Text
-createUserTableQuery =
-  let tableName = indexTableName "" "" "User"
-   in T.concat
-        [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
-        , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"]
-        , ",\n  PRIMARY KEY (contractname));"
-        ]
-
 createAbstractTable :: OutputM m
                  => IORef Globals
                  -> Contract
@@ -413,53 +362,6 @@ createAbstractTable globalsIORef contract (o, a, n) = do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     yield $ createAbstractTableQuery contract (o,a,n)
     setTableCreated globalsIORef tableName (list++ ["\"data\" jsonb"])
-
-createAbstractTableRow :: OutputM m
-                 => IORef Globals
-                 -> Contract
-                 -> (Text, Text, Text)
-                 -> Text
-                 -> ConduitM () Text m ()
-createAbstractTableRow globalsIORef contract (o, a, n) ab = do
-  let tableName = abstractTableRowName o a n ab
-  tableExists <- isTableCreated globalsIORef tableName
-  when (not tableExists) $ do
-    let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
-    setTableCreated globalsIORef tableName list
-
-createAssetTable :: OutputM m
-                 => IORef Globals
-                 -> ConduitM () Text m ()
-createAssetTable globalsIORef = do
-  let tableName = indexTableName "" "" "Asset"
-  tableExists <- isTableCreated globalsIORef tableName
-  when (not tableExists) $ do
-    yield $ createAssetTableQuery
-    let list = ["data"]
-    setTableCreated globalsIORef tableName list
-
-createSaleTable :: OutputM m
-                 => IORef Globals
-                 -> ConduitM () Text m ()
-createSaleTable globalsIORef = do
-  let tableName = indexTableName "" "" "Sale"
-  tableExists <- isTableCreated globalsIORef tableName
-  when (not tableExists) $ do
-    yield $ createSaleTableQuery
-    let list = ["data"]
-    setTableCreated globalsIORef tableName list
-
-createUserTable :: OutputM m
-                 => IORef Globals
-                 -> ConduitM () Text m ()
-createUserTable globalsIORef = do
-  let tableName = indexTableName "" "" "User"
-  tableExists <- isTableCreated globalsIORef tableName
-  when (not tableExists) $ do
-    yield $ createUserTableQuery
-    let list = ["data"]
-    setTableCreated globalsIORef tableName list
-
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable :: OutputM m
@@ -700,17 +602,13 @@ insertHistoryTable contracts@(E.ProcessedContract { organization = org, applicat
   yieldMany $ insertHistoryTableQuery contracts
 
 insertAbstractTable :: OutputM m
-                 => [Maybe (E.ProcessedContract, T.Text, TableColumns)]
+                 => [(E.ProcessedContract, T.Text, TableColumns)]
                  -> ConduitM () Text m ()
-insertAbstractTable [] = return () -- no data, do nothing
-insertAbstractTable contracts = do
-    let validContracts = catMaybes contracts
-    case validContracts of
-        [] -> return () -- no valid contracts, do nothing
-        ((E.ProcessedContract { organization = org, application = app, contractName = cName },_,_) : _) -> do
-            let tableName = indexTableName org app cName
-            $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show tableName
-            yieldMany $ insertAbstractTableQuery validContracts
+insertAbstractTable [] = pure ()
+insertAbstractTable cs@((E.ProcessedContract { organization = org, application = app, contractName = cName }, _, _):_) = do
+  let tableName = indexTableName org app cName
+  $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show tableName ++ " (and potentially others)"
+  yieldMany $ insertAbstractTableQuery cs
 
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -730,8 +628,8 @@ createMappingTableQuery (o, a, n, m) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "mapname text","key text", "value text"]
-        , ",\n  PRIMARY KEY (address, key));"
+               "block_number text", "transaction_hash text", "transaction_sender text", "contract_name text", "mapname text","key text", "value text"]
+        , ",\n  PRIMARY KEY (record_id, key));"
         ]
 
 createAbstractTableQuery ::  Contract -> (Text, Text, Text) -> Text
@@ -741,8 +639,8 @@ createAbstractTableQuery contract (o, a, n) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "contractname text", "data jsonb"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list)
-        , ",\n  PRIMARY KEY (contractname));"
+               "block_number text", "transaction_hash text", "transaction_sender text", "contract_name text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list) ++ ["data jsonb"]
+        , ",\n  PRIMARY KEY (record_id));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -856,7 +754,7 @@ insertMappingTableQuery ms = concat $
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (address, key) DO UPDATE SET
+  ON CONFLICT (record_id, key) DO UPDATE SET
     record_id = excluded.record_id,
     address = excluded.address,
     "chainId" = excluded."chainId",
@@ -865,43 +763,24 @@ insertMappingTableQuery ms = concat $
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    contractname = excluded.contractname,
+    contract_name = excluded.contract_name,
     mapname = excluded.mapname,
     value = excluded.value|]
                 , ";"
                 ]
 
--- insertContractInAbstractTableQuery :: OutputM m => IORef Globals -> (Text, Text) -> Text -> ConduitM () Text m ()
--- insertContractInAbstractTableQuery globalsIORef (o,a) ab = do
---   let abstractTableName = abstractTableRowName o a ab
---       contractTableName = indexTableName o a 
---   tableExists <- isTableCreated globalsIORef abstractTableName
---   $logInfoLS "insertContractInAbstractTableQuery/abstractTableRowExists" (abstractTableName, tableExists)
-
---   when (not tableExists) $ do
---     incNumAbstractRowTables
---     yield $ T.concat [ "INSERT INTO ",tableNameToDoubleQuoteText abstractTableName," (contractname) VALUES ('", tableNameToDoubleQuoteText contractTableName, "');" ]
---     let list = ["data"]
---     setTableCreated globalsIORef abstractTableName list
-
 insertAbstractTableQuery :: [(E.ProcessedContract, T.Text, TableColumns)] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs = concat $
   let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab, abColumns) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns))) <$> cs
-   in flip map (map snd $ partitionWith (length . snd . fst) cs') $ \case
+   in flip map (map snd $ partitionWith ((length . snd) *** fst) cs') $ \case
         [] -> []
-        contracts@(((x, _), (ab, abColumns)):_) ->
+        contracts@(((x, _), (abTableName, abColumns)):_) ->
           let contractTableName = indexTableName
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)  
-              abTableName = case ab of
-                "Asset" -> abstractTableName "" "" "Asset"
-                "Sale"  -> abstractTableName "" "" "Sale"
-                "User"  -> abstractTableName "" "" "User"
-                _ -> abstractTableName (E.organization x) (E.contractName x) (ab)
-              abTableName' = tableNameToDoubleQuoteText abTableName 
-              keySt  = wrapAndEscapeDouble . map escapeQuotes $ (baseAbstractTableColumns ++ abColumns)
+              keySt  = wrapAndEscapeDouble $ escapeQuotes <$> (baseAbstractColumns ++ filter (`notElem` baseAbstractColumns) abColumns)
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -916,14 +795,13 @@ insertAbstractTableQuery cs = concat $
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
-                , abTableName'
+                , abTableName
                 , " "
                 , keySt
                 , "\n  VALUES "
                 , inserts
                 , [r|
-  ON CONFLICT (contractname) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (record_id) DO UPDATE SET
     address = excluded.address,
     "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
@@ -931,6 +809,7 @@ insertAbstractTableQuery cs = concat $
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
+    contract_name = excluded.contract_name,
     data = excluded.data|]
                 , ";"
                 ]

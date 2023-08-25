@@ -37,10 +37,11 @@ import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Data
 import           Data.Hashable
-import           Data.Maybe                           (fromJust, fromMaybe)
+import           Data.Maybe                           (fromMaybe)
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
+import           Data.Text.Encoding                   (encodeUtf8)
 import           Database.Persist.Sql                 hiding (get)
 import           GHC.Generics
 import           Numeric
@@ -57,9 +58,10 @@ import           Web.PathPieces
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256, keccak256ToByteString)
+import qualified Blockchain.Strato.Model.Keccak256    as SHA (Keccak256, hash, keccak256ToWord256, keccak256ToByteString)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
+import           Blockchain.Strato.Model.UserRegistry
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2
 import qualified LabeledError
@@ -250,13 +252,13 @@ getNewAddressWithSalt_unsafe creator salt codeHash args =
   in decode $ BL.drop 12 $ encode theHash
 
 -- Default values are for the UserRegistry/User contract. Salt should be the userAddress.
-deriveAddressWithSalt :: Maybe Address -> String -> Maybe BC.ByteString -> Maybe String -> Address
-deriveAddressWithSalt sender salt src args = do
-  let theAddress = fromMaybe (fromJust $ stringAddress "0000000000000000000000000000000000000720") sender -- UserRegistry address
+deriveAddressWithSalt :: Maybe Address -> String -> Maybe SHA.Keccak256 -> Maybe String -> Address
+deriveAddressWithSalt sender salt srcHash args = do
+  let theAddress = fromMaybe (Address 0x720) sender -- UserRegistry address
       theHash = SHA.hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
                                                    , rlpEncode theAddress
                                                    , rlpEncode salt
-                                                   , rlpEncode $ maybe ("2_\156\246X\192\246\237<\n\142FF\244\SI\132\&6Q^=\DC1z#\159O?n\DEL\"\nF*" :: BC.ByteString) (SHA.keccak256ToByteString . SHA.hash) src 
+                                                   , rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash $ encodeUtf8 userRegistryContract) srcHash 
                                                    , rlpEncode $ fromMaybe "OrderedVals []" args
                                                    ]
   -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)

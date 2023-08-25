@@ -430,6 +430,7 @@ getVariableOfName name = do
                                                 ,  CC._modifiers = M.empty
                                                 ,  CC._usings = M.empty
                                                 ,  CC._contractType = currentContract x^.CC.contractType
+                                                ,  CC._importedFrom = Nothing
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
                                                 }
                               }

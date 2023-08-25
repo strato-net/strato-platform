@@ -21,7 +21,6 @@ module Blockchain.Data.AddressStateDB (
   blankAddressState,
   resolveCodePtr,
   unsafeResolveCodePtr,
-  unsafeResolveCodePtrSelect,
   resolveCodePtrParent,
   codePtrToSHA,
   resolvedCodePtrToSHA,
@@ -164,16 +163,6 @@ unsafeResolveCodePtr (CodeAtAccount acct name) = select Proxy acct >>= \case
     Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
     _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
-
--- TODO: Remove this when Selectable is a superclass of Alters
-unsafeResolveCodePtrSelect :: Selectable Account AddressState m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtrSelect (CodeAtAccount acct name) = select Proxy acct >>= \case
-  Nothing -> pure Nothing
-  Just AddressState{..} -> unsafeResolveCodePtrSelect addressStateCodeHash >>= \case
-    Just e@(EVMCode _) -> pure $ Just e
-    Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
-    _ -> pure Nothing
-unsafeResolveCodePtrSelect codePtr = pure $ Just codePtr
 
 resolveCodePtrParent :: ( Selectable Word256 ParentChainIds m
                         , Selectable Account AddressState m
