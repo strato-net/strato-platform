@@ -288,8 +288,9 @@ const Membership = ( user ) => {
                                             }
                                             }}
                                         >
-                                        <span style={{ fontWeight: 'normal' }}> Connect to  </span>
+                                        <span style={{ fontWeight: 'normal' }}> Setup  </span>
                                         <span style={{ fontWeight: '900', margin: '0 5px' }}>  Stripe  </span>
+                                        <span style={{ fontWeight: 'normal' }}> Account</span>
                                     </Button>
                                 </div>
                             </div>
