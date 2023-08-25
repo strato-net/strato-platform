@@ -1434,18 +1434,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           { ...membership, inventories: [...membership.inventories, inventory]} : membership;} )
     })
 
-    const membershipAddressList = memberships.memberships.map(membership => membership.address);    
+    const membershipAddressList = memberships.map(membership => membership.address);    
     //Get Services for price savings
     const membershipServices = await membershipServiceJs.getAll(rawAdmin, { membershipId: membershipAddressList},  {...options, org: managers.cirrusOrg, app: contractName} );
 
-    const serviceAddresses = membershipServices.membershipServices.map(membershipService => membershipService.serviceId);
+    const serviceAddresses = membershipServices.map(membershipService => membershipService.serviceId);
 
     // const servicesAll = await managers.serviceManager.getAll({ownerOrganization: userOrganization  }, { ...options, org: managers.cirrusOrg, app: contractName, });
     const servicesAll = await managers.serviceManager.getAll({address: serviceAddresses  }, { ...options, org: managers.cirrusOrg, app: contractName, });
-    membershipServices.membershipServices.forEach(membershipService => {
+    membershipServices.forEach(membershipService => {
       servicesAll.forEach(service => {
         if (service.address === membershipService.serviceId) {
-           memberships.memberships =  memberships.memberships.map(membership => {
+          memberships =  memberships.map(membership => {
           return ((membership.address === membershipService.membershipId) )  ?
               { ...membership, 
                 //Note we might have multiple service per membership
