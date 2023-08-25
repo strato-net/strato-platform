@@ -32,6 +32,9 @@ const actionDescriptors = {
   fetchMembershipFromDetails: "fetch_membership_of_inventory",
   fetchMembershipFromDetailsSuccessful: "fetch_membership_of_inventory_successful",
   fetchMembershipFromDetailsFailed: "fetch_membership_of_inventory_failed",
+  sellerStripeStatus: "seller_stripe_status",
+  sellerStripeStatusSuccessful: "seller_stripe_status_successful",
+  sellerStripeStatusFailed: "seller_stripe_status_failed"
 };
 
 const actions = {
@@ -295,6 +298,36 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
+    }
+  },
+  sellerStripeStatus: async (dispatch, org) => {
+    dispatch({ type: actionDescriptors.sellerStripeStatus });
+
+    try {
+      const response = await fetch(`${apiUrl}/payment/stripe/account/status/${org}`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.sellerStripeStatusSuccessful,
+          payload: body.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.sellerStripeStatusFailed,
+        error: "Error while trying to get Stripe status",
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.sellerStripeStatusFailed,
+        error: "Error while trying to get Stripe status",
+      });
     }
   },
 };
