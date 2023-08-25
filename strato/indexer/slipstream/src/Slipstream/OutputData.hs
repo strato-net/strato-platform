@@ -1036,6 +1036,3 @@ valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueArrayFixed _ _) = Nothing
 valueToSQLText (ValueArrayDynamic _) = Nothing
 --valueToSQLText (ValueStruct namedItems) = Nothing
-
-
-valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
