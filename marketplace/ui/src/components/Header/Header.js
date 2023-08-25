@@ -64,10 +64,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
   ];
 
   const menu = [
-    { name: "arts", icon: carbon, label: "arts" },
-    { name: "property", icon: property, label: "property" },
-    { name: "carbon", icon: carbon, label: "carbon" },
-    { name: "loyalty", icon: property, label: "loyalty" }
+    { name: "arts", icon: carbon, label: "arts", url:"" },
+    { name: "property", icon: property, label: "property", url:"/properties" },
+    { name: "carbon", icon: carbon, label: "carbon", url:"" },
+    { name: "loyalty", icon: property, label: "loyalty", url:"" }
   ]
 
   const navUrls = [
@@ -156,6 +156,13 @@ const HeaderComponent = ({ user, loginUrl }) => {
     if (user) setRoleIndex(0)
     else setRoleIndex(1)
   }, [user])
+
+  const redirect = () => {
+    setOpen(false)
+    navigate("/properties")
+    // setTimeout(()=>{
+    // }, 1000)
+  }
 
   return (
     <Header className="!bg-primary flex">
@@ -280,7 +287,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
       >
         <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
           {menu.map((item, index) => {
-            return <Col span={12} key={index} style={{ display: "flex" }}>
+            return <Col className="menu-card" onClick={()=>{redirect(item.url)}} span={8} offset={2} key={index} style={{ display: "flex", padding:"5px" }}>
               <div style={{ margin: "auto" }}>
                 <div>{item.icon}</div>
                 <p style={{textAlign:"center"}}>{item.label}</p>

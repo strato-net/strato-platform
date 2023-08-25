@@ -368,7 +368,7 @@ function PropertyDetails() {
             </Row>
             <Row>
               <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div style={{ display: "flex",zIndex:"1" ,background:"white", justifyContent: "space-between", position:"sticky", top:"0px" }}>
                   {tabs.map((tab) => (
                     <Col
                       sm={6}
