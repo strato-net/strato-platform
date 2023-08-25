@@ -4,12 +4,16 @@
     , OverloadedStrings
     , FlexibleContexts
     , TemplateHaskell
+    , TypeApplications
 #-}
 
 module Slipstream.MessageConsumer (
   getAndProcessMessages
   ) where
 
+import Prelude hiding (lookup)
+import Control.Monad.Change.Alter
+import Control.Monad.Change.Modify
 import Control.Monad.IO.Unlift
 import Data.IORef
 import Data.String
@@ -19,8 +23,13 @@ import qualified Network.Kafka.Protocol as K hiding (Message)
 
 import Bloc.Monad (BlocEnv)
 import BlockApps.Logging
+import Blockchain.Data.AddressStateDB
+import Blockchain.Data.ChainInfo
+import Blockchain.DB.CodeDB
 import Blockchain.MilenaTools
 import Blockchain.Stream.VMEvent
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.ExtendedWord
 
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
@@ -28,6 +37,7 @@ import Control.Monad.Composable.SQL
 import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.Processor
+import SolidVM.Model.CodeCollection
 
 lookupTopic :: K.TopicName
 lookupTopic = fromString "statediff"
@@ -64,22 +74,39 @@ putStatediffOffset off = do
         error $ show err
       Right () -> return ()
 
-getAndProcessMessages :: (MonadLogger m, HasKafka m, HasSQL m) =>
-                         BlocEnv -> PGConnection -> IORef Globals -> m ()
-getAndProcessMessages env conn cache = do
+getAndProcessMessages :: ( MonadLogger m
+                         , HasKafka m
+                         , HasSQL m
+                         , Accessible (IORef Globals) m
+                         , Selectable Account AddressState m
+                         , Selectable Account CodeCollection m
+                         , Selectable Word256 ParentChainIds m
+                         , HasCodeDB m
+                         )
+                      => BlocEnv -> PGConnection -> m ()
+getAndProcessMessages env conn = do
   let errorCount = 0
   offset <- getStatediffOffset
-  getAndProcessMessages' env conn cache offset errorCount
+  getAndProcessMessages' env conn offset errorCount
 
-getAndProcessMessages' :: (MonadLogger m, HasKafka m, HasSQL m) =>
-                          BlocEnv -> PGConnection -> IORef Globals -> K.Offset -> Int -> m ()
-getAndProcessMessages' env conn cache offset errorCounter = do
+getAndProcessMessages' :: ( MonadLogger m
+                          , HasKafka m
+                          , HasSQL m
+                          , Accessible (IORef Globals) m
+                          , Selectable Account AddressState m
+                          , Selectable Account CodeCollection m
+                          , Selectable Word256 ParentChainIds m
+                          , HasCodeDB m
+                          )
+                       => BlocEnv -> PGConnection -> K.Offset -> Int -> m ()
+getAndProcessMessages' env conn offset errorCounter = do
   $logInfoS "getAndProcessMessages'" $ T.pack $ "#### fetching VMEvents: Offset=" ++ show offset
   recordOffset offset
   messages <- execKafka $ fetchVMEvents offset
   recordKafkaMessages messages
+  cache <- access (Proxy @(IORef Globals))
   forceGlobalEval cache
-  processTheMessages env conn cache messages
+  processTheMessages env conn messages
   let newOffset = offset + fromIntegral (length messages)
   currentOffset <- getStatediffOffset
   offset' <- if currentOffset /= offset
@@ -91,4 +118,4 @@ getAndProcessMessages' env conn cache offset errorCounter = do
                putStatediffOffset newOffset
                return newOffset
 
-  getAndProcessMessages' env conn cache offset' errorCounter
+  getAndProcessMessages' env conn offset' errorCounter

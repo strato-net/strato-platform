@@ -82,6 +82,7 @@ xabiTypeToType Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
   return $ TypeMapping (xabiTypeToSimpleType k) value
 xabiTypeToType Xabi.Enum { Xabi.typedef=enumName } = return $ TypeEnum enumName
 xabiTypeToType Xabi.Struct { Xabi.typedef=name } = return $ TypeStruct name
+xabiTypeToType Xabi.Variadic{} = return $ TypeVariadic
 xabiTypeToType v = return $ SimpleType $ xabiTypeToSimpleType v
 
 
@@ -265,6 +266,7 @@ typeToXabiType typeDefs (TypeEnum enumName) =
    Just x -> Xabi.Enum (Just 1) enumName $ Just $ map snd $ sortOn fst $ Bimap.toList x
 typeToXabiType _ (TypeContract contractName) = Xabi.Contract contractName
 typeToXabiType _ TypeFunction{} = error "typeToXabiType was called with function type, which isn't allowed"
+typeToXabiType _ TypeVariadic{} = Xabi.Variadic
 
 
 simpleTypeToXabiType::SimpleType->Xabi.Type

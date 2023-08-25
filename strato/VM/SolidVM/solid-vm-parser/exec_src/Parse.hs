@@ -7,5 +7,5 @@ import qualified Data.Map as M
 main :: IO ()
 main = do
   contents <- getContents
-  let maybeFile = runParser solidityFile (ParserState "qq" "" M.empty) "qq" contents
+  let maybeFile = runParser solidityFile (ParserState "qq" "" M.empty M.empty) "qq" contents
   putStrLn $ show maybeFile

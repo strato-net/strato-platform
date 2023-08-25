@@ -40,7 +40,7 @@ import qualified SolidVM.Solidity.Parse.UnParser           as SolidUnparse
 
 parseSolidXabi :: SourceName -> SourceCode ->  Either String (EVMParseT.SolcVersion,  [(T.Text, EVMXabi.Xabi)] )
 parseSolidXabi sName sCode = do
-  fi@(File parsedFile) <-  showError $ runParser solidityFile (ParserState "" "" M.empty) sName sCode
+  fi@(File parsedFile) <-  showError $ runParser solidityFile initialParserState sName sCode
   let nameXabi = [(name, transFormXabi xabi) |  NamedXabi name (xabi, _) <- parsedFile]
   let associatedEVMVersion = case decideVersion fi of
             SolidParseT.ZeroPointFour -> EVMParseT.ZeroPointFour
@@ -162,4 +162,4 @@ tFormTypeToType = \case
   (SolidType.Account _)                   ->  (XabiType.Account)
   (SolidType.Fixed _ _)                   ->  (XabiType.Bool) --Questionable at best
   (SolidType.Error _ ss)                  ->  (XabiType.UnknownLabel ss)          --Questionable at best
-
+  SolidType.Variadic                      ->  error "type (variadic) is not an indexable type"

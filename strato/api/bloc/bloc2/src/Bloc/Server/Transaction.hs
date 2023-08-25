@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 
 module Bloc.Server.Transaction (
   postBlocTransaction,
@@ -31,6 +32,7 @@ import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Lazy
 import qualified Crypto.Secp256k1                  as S
+import           Data.Bool
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Short             as BSS
@@ -44,6 +46,7 @@ import           Data.Int                          (Int32)
 import           Data.List                         (partition, sortOn)
 import qualified Data.Vector                       as V
 
+import qualified Data.Map                          as M
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
@@ -82,10 +85,12 @@ import           BlockApps.Solidity.XabiContract
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AlternateTransaction
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json             hiding (Contract)
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Data.Transaction      (rawTX2TX, transactionHash)
+import           Blockchain.DB.CodeDB
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address  hiding (unAddress)
 import           Blockchain.Strato.Model.ChainId
@@ -123,6 +128,8 @@ mergeTxParams inner outer = inner <|> outer
 txWorker :: ( MonadLogger m
             , A.Selectable Account Contract m
             , A.Selectable Account AddressState m
+            , A.Selectable Address Certificate m
+            , HasCodeDB m
             , (Keccak256 `A.Selectable` SourceMap) m
             , HasBlocEnv m
             , HasVault m
@@ -135,8 +142,8 @@ txWorker = forever $ do
   case e of
     Left (ex :: SomeException) -> $logErrorS "txWorker/error" . Text.pack $ show ex
     Right () -> error "txWorker returned a Right (). This should never happen. Please contact Simon Peyton Jones."
-  where processTxs = awaitForever $ \(a,b,r,c) ->
-          lift . void $ postBlocTransaction' (Do CacheNonce) a b r c
+  where processTxs = awaitForever $ \(a,b,w,r,c) ->
+          lift . void $ postBlocTransaction' (Do CacheNonce) a b w r c
 
 
 
@@ -225,6 +232,8 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest{..} = do
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody :: ( MonadLogger m
                            , A.Selectable Account Contract m
+                           , A.Selectable Account AddressState m
+                           , HasCodeDB m
                            , HasBlocEnv m
                            , HasSQL m
                            , HasVault m
@@ -348,6 +357,8 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
 -- | postBlocTransactionUnsigned
 postBlocTransactionUnsigned :: ( MonadLogger m
                                , A.Selectable Account Contract m
+                               , A.Selectable Account AddressState m
+                               , HasCodeDB m
                                , HasBlocEnv m
                                , HasSQL m
                                , HasVault m
@@ -471,6 +482,8 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
 postBlocTransactionParallel :: ( MonadLogger m
                                , A.Selectable Account Contract m
                                , A.Selectable Account AddressState m
+                               , A.Selectable Address Certificate m
+                               , HasCodeDB m
                                , (Keccak256 `A.Selectable` SourceMap) m
                                , HasBlocEnv m
                                , HasVault m
@@ -478,23 +491,26 @@ postBlocTransactionParallel :: ( MonadLogger m
                                )
                             => Maybe Text
                             -> Maybe ChainId
+                            -> Maybe Bool -- use_wallet
                             -> Bool -- resolve
                             -> Bool -- queue
                             -> PostBlocTransactionRequest
                             -> m [BlocChainOrTransactionResult]
-postBlocTransactionParallel jwtToken b resolve queue c =
+postBlocTransactionParallel jwtToken b mUseWallet resolve queue c =
   if queue && not resolve
     then do
       checkIsSynced
       tbqueue <- fmap txTBQueue getBlocEnv
-      atomically $ writeTBQueue tbqueue (jwtToken,b,resolve,c)
+      atomically $ writeTBQueue tbqueue (jwtToken,b,mUseWallet,resolve,c)
       pure []
-    else postBlocTransaction' (Do CacheNonce) jwtToken b resolve c
+    else postBlocTransaction' (Do CacheNonce) jwtToken b mUseWallet resolve c
 
 
 postBlocTransaction :: ( MonadLogger m
                        , A.Selectable Account Contract m
                        , A.Selectable Account AddressState m
+                       , A.Selectable Address Certificate m
+                       , HasCodeDB m
                        , (Keccak256 `A.Selectable` SourceMap) m
                        , HasBlocEnv m
                        , HasVault m
@@ -502,6 +518,7 @@ postBlocTransaction :: ( MonadLogger m
                        )
                     => Maybe Text
                     -> Maybe ChainId
+                    -> Maybe Bool -- use_wallet
                     -> Bool
                     -> PostBlocTransactionRequest
                     -> m [BlocChainOrTransactionResult]
@@ -510,6 +527,8 @@ postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 postBlocTransactionExternal :: ( MonadLogger m
                               , A.Selectable Account Contract m
                               , A.Selectable Account AddressState m
+                              , A.Selectable Address Certificate m
+                              , HasCodeDB m
                               , (Keccak256 `A.Selectable` SourceMap) m
                               , HasBlocEnv m
                               , HasVault m
@@ -517,6 +536,7 @@ postBlocTransactionExternal :: ( MonadLogger m
                               )
                             => Maybe Text
                             -> Maybe ChainId
+                            -> Maybe Bool -- use_wallet
                             -> Bool
                             -> PostBlocTransactionRequest
                             -> m [BlocChainOrTransactionResult]
@@ -526,6 +546,8 @@ postBlocTransactionExternal bearerToken = postBlocTransaction' (Don't CacheNonce
 postBlocTransaction' :: ( MonadLogger m
                         , A.Selectable Account Contract m
                         , A.Selectable Account AddressState m
+                        , A.Selectable Address Certificate m
+                        , HasCodeDB m
                         , (Keccak256 `A.Selectable` SourceMap) m
                         , HasBlocEnv m
                         , HasVault m
@@ -534,18 +556,28 @@ postBlocTransaction' :: ( MonadLogger m
                      => Should CacheNonce
                      -> Maybe Text
                      -> Maybe ChainId
+                     -> Maybe Bool -- use_wallet
                      -> Bool
                      -> PostBlocTransactionRequest
                      -> m [BlocChainOrTransactionResult]
-postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
+postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
   accountNonceLimit <- fmap accountNonceLimit getBlocEnv
+  userRegistry <- fmap userRegistryAddress getBlocEnv
+  userRegistryHash <- fmap userRegistryCodeHash getBlocEnv
   case mJwtToken of
     Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
     Just jwtToken -> do
       addr <- case mAddr of
-        Nothing -> fmap unAddress . blocVaultWrapper $  getKey (Just jwtToken) Nothing
+        Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwtToken) Nothing
         Just addr' -> return addr'
+      let err = CouldNotFind $ Text.concat
+                [ "postBlocTransaction': Couldn't find common name for user address "
+                , Text.pack $ formatAddressWithoutColor addr
+                ]
+      userCert <- maybe (throwIO err) pure =<<
+        A.select (A.Proxy @Certificate) addr
+      let userContractAddr = deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash Nothing
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0
@@ -638,16 +670,44 @@ postBlocTransaction' cacheNonce mJwtToken chainId resolve (PostBlocTransactionRe
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
-            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp jwtToken
+            let bfpWallet = FunctionParameters
+                        addr
+                        userContractAddr
+                        "callContract"
+                        (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
+                        (functionpayloadValue p)
+                        (mergeTxParams (functionpayloadTxParams p) txParams)
+                        (functionpayloadMetadata p)
+                        (functionpayloadChainid p <|> chainId)
+                        resolve
+            walletFlag <- useWalletsByDefault <$> getBlocEnv
+            let bfp' = bool bfp bfpWallet $ fromMaybe walletFlag mUseWallet
+            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp' jwtToken
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
                         (map (\(FunctionPayload a m r v x c md) ->
-                                MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                          MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
                         chainId
                         resolve
-            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp jwtToken
+            let bflpWallet = FunctionListParameters
+                        addr
+                        (map (\(FunctionPayload a m r v x c md) ->
+                                MethodCall 
+                                  userContractAddr 
+                                  "callContract"  
+                                  (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
+                                  (fromMaybe (Strung 0) v) 
+                                  (mergeTxParams x txParams) 
+                                  c 
+                                  md
+                              ) p)
+                        chainId
+                        resolve
+            walletFlag <- useWalletsByDefault <$> getBlocEnv
+            let bflp' = bool bflp bflpWallet $ fromMaybe walletFlag mUseWallet
+            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp' jwtToken
         GENESIS -> case txs of
           [] -> return []
           xs -> do
@@ -707,6 +767,7 @@ data TransactionHeader = TransactionHeader
 
 postUsersSend' :: ( A.Selectable Account AddressState m
                   , (Keccak256 `A.Selectable` SourceMap) m
+                  , HasCodeDB m
                   , MonadLogger m
                   , HasBlocEnv m
                   , HasVault m
@@ -730,6 +791,7 @@ postUsersSend' cacheNonce TransferParameters{..} jwtToken = do
 postUsersContractSolidVM' :: ( MonadLogger m
                              , A.Selectable Account AddressState m
                              , (Keccak256 `A.Selectable` SourceMap) m
+                             , HasCodeDB m
                              , HasBlocEnv m
                              , HasVault m
                              , HasSQL m
@@ -767,6 +829,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters{..} jwtToken = do
 postUsersUploadListSolidVM' :: ( MonadLogger m
                                , A.Selectable Account AddressState m
                                , (Keccak256 `A.Selectable` SourceMap) m
+                               , HasCodeDB m
                                , HasBlocEnv m
                                , HasVault m
                                , HasSQL m
@@ -805,6 +868,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters{..} jwtToken = do
 
 postUsersSendList' :: ( MonadLogger m
                       , A.Selectable Account AddressState m
+                      , HasCodeDB m
                       , (Keccak256 `A.Selectable` SourceMap) m
                       , HasBlocEnv m
                       , HasVault m
@@ -832,6 +896,7 @@ postUsersSendList' cacheNonce TransferListParameters{..} jwtToken = do
 postUsersContractMethodList' :: ( MonadLogger m
                                 , A.Selectable Account Contract m
                                 , A.Selectable Account AddressState m
+                                , HasCodeDB m
                                 , (Keccak256 `A.Selectable` SourceMap) m
                                 , HasBlocEnv m
                                 , HasVault m
@@ -883,6 +948,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} jwtToken = do
 postUsersContractMethod' :: ( MonadLogger m
                             , A.Selectable Account Contract m
                             , A.Selectable Account AddressState m
+                            , HasCodeDB m
                             , (Keccak256 `A.Selectable` SourceMap) m
                             , HasBlocEnv m
                             , HasVault m
@@ -1199,11 +1265,11 @@ getSolidityType _  Xabi.Account            = Right . SimpleType $ TypeAccount
 getSolidityType _ (Xabi.Struct _ name)     = Right $ TypeStruct name
 getSolidityType _ (Xabi.Enum _ name _)     = Right $ TypeEnum name
 getSolidityType _ (Xabi.Contract name)     = Right $ TypeContract name
-getSolidityType (ArgInt _) (Xabi.UnknownLabel _)  = Right $ SimpleType typeUInt -- since Enums are converted to Ints
+getSolidityType (ArgInt _) (Xabi.UnknownLabel _)     = Right $ SimpleType typeUInt -- since Enums are converted to Ints
 getSolidityType (ArgString _) (Xabi.UnknownLabel s)  = Right $ TypeEnum $ Text.pack s
 getSolidityType (ArgObject _) (Xabi.UnknownLabel s)  = Right $ TypeStruct $ Text.pack s --interpret an object strictly as a struct
 getSolidityType av (Xabi.UnknownLabel _)             = Left $ Text.pack $ "Expected a string, int, or object, but recieved: " ++ show av
-getSolidityType (ArgArray v) (Xabi.Array typ len)     =
+getSolidityType (ArgArray v) (Xabi.Array typ len)    =
   let arrType = case len of
         Just l -> TypeArrayFixed l
         Nothing -> TypeArrayDynamic
@@ -1214,9 +1280,11 @@ getSolidityType (ArgArray v) (Xabi.Array typ len)     =
 getSolidityType av (Xabi.Array _ _)          = Left $ Text.pack $ "Expected Array but got " ++ show av
 getSolidityType (ArgObject _) Xabi.Mapping{} = Right $ TypeStruct "s"
 getSolidityType av Xabi.Mapping{}            = Left $ Text.pack $ "Expected Object for Mapping type, but got " ++ show av
+getSolidityType _ Xabi.Variadic              = Right $ TypeVariadic
 
 
 getResultAndRespond :: ( A.Selectable Account AddressState m
+                       , HasCodeDB m
                        , (Keccak256 `A.Selectable` SourceMap) m
                        , MonadLogger m
                        , HasSQL m

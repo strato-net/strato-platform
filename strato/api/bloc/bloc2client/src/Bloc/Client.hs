@@ -153,6 +153,7 @@ getChainInfo = client (Proxy @GetChainInfo)
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel :: Maybe Text
                             -> Maybe ChainId 
+                            -> Maybe Bool 
                             -> Bool 
                             -> Bool 
                             -> PostBlocTransactionRequest
@@ -181,6 +182,7 @@ postBlocTransactionUnsigned = client (Proxy @PostBlocTransactionUnsigned)
 
 postBlocTransaction :: Maybe Text 
                     -> Maybe ChainId 
+                    -> Maybe Bool 
                     -> Bool 
                     -> PostBlocTransactionRequest
                     -> ClientM [BlocChainOrTransactionResult]
@@ -188,6 +190,7 @@ postBlocTransaction = client (Proxy @PostBlocTransaction)
 
 postBlocTransactionExternal :: Maybe Text 
                             -> Maybe ChainId 
+                            -> Maybe Bool 
                             -> Bool 
                             -> PostBlocTransactionRequest
                             -> ClientM [BlocChainOrTransactionResult]

@@ -26,38 +26,14 @@ function runIdentityServer {
   --minLogLevel="${minLogLevel}" \
   --port="${identityProviderPort}"
   --vaultProxyUrl="${vaultProxyUrl}"
-  --nodeUrl="${nodeUrl}"
-  --OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET}"
-  --OAUTH_MASTER_CLIENT_ID="${OAUTH_MASTER_CLIENT_ID}"
-  --OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID}"
-  --OAUTH_MASTER_CLIENT_SECRET="${OAUTH_MASTER_CLIENT_SECRET}"
   "
   
   if [ -n "${vaultProxyUrl}" ]; then
       vpFlag="--vaultProxyUrl=${vaultProxyUrl}"
   fi
-  if [ -n "${issuerPrivKeyPath}" ]; then
-      ipFlag="--issuerPrivKeyPath=${issuerPrivKeyPath}"
-  fi
-  if [ -n "${OAUTH_PROVIDER_URL}" ]; then
-      opFlag="--OAUTH_PROVIDER_URL=${OAUTH_PROVIDER_URL}"
-  fi
-  if [ -n "${OAUTH_TOKEN_ENDPOINT}" ]; then
-      otFlag="--OAUTH_TOKEN_ENDPOINT=${OAUTH_TOKEN_ENDPOINT}"
-  fi
-  if [ -n "${OAUTH_USER_ENDPOINT}" ]; then
-      ouFlag="--OAUTH_USER_ENDPOINT=${OAUTH_USER_ENDPOINT}"
-  fi
-  if [ -n "${OAUTH_MASTER_CLIENT_ID}" ]; then
-      mciFlag="--OAUTH_MASTER_CLIENT_ID=${OAUTH_MASTER_CLIENT_ID}"
-  fi
-  if [ -n "${OAUTH_MASTER_CLIENT_SECRET}" ]; then
-      mcpFlag="--OAUTH_MASTER_CLIENT_SECRET=${OAUTH_MASTER_CLIENT_SECRET}"
-  fi
-  if [ -n "${nodeUrl}" ]; then
-      nuFlag="--nodeUrl=${nodeUrl}"
-  fi
-  
+  if [ -n "${SENDGRID_APIKEY}" ]; then
+      sgFlag="--SENDGRID_APIKEY=${SENDGRID_APIKEY}"
+  fi  
   RED='\033[0;31m'
   NC='\033[0m' # No Color
   
@@ -84,11 +60,8 @@ function runIdentityServer {
   
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
-    --minLogLevel=${minLogLevel} \
-    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} --port="${identityProviderPort}" \
-    "${vpFlag}" "${ipFlag}" \
-    "${opFlag}" "${otFlag}" "${ouFlag}" "${mciFlag}" "${mcpFlag}" \
-    "${nuFlag}" &>> logs/identity-provider-server
+    --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
+    "${vpFlag}" "${sgFlag}" &>> logs/identity-provider-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
