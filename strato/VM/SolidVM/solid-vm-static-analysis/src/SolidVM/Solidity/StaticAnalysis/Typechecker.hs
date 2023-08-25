@@ -1454,6 +1454,7 @@ tcExpr (FunctionCall x (MemberAccess _ var "delegatecall" ) args) = do
     (OrderedArgs [], _)    -> pure $ bottom $ ".delegatecall() requires at least one argument" <$ x
     (OrderedArgs (a:_), _) -> (stringType' x)  ~> tcExpr a !> (pure $ topType' x)
     _                      -> pure $ bottom $ ".delegatecall() does not take named arguements" <$ x
+
 tcExpr (FunctionCall x (MemberAccess _ var "call") args) = do
   res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
   case (args, res) of
@@ -1461,6 +1462,15 @@ tcExpr (FunctionCall x (MemberAccess _ var "call") args) = do
     (OrderedArgs [], _)    -> pure $ bottom $ ".call() requires at least one argument" <$ x
     (OrderedArgs (a:_), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
     _                      -> pure $ bottom $ ".call() does not take named arguments" <$ x
+
+tcExpr (FunctionCall x (MemberAccess _ var "derive") args) = do
+  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
+  case (args, res) of
+    (_, Bottom _)          -> pure $ bottom $ "Can only use derive() as a method on an account or address" <$ x
+    (OrderedArgs [], _)    -> pure $ bottom $ "derive() requires at least one argument" <$ x
+    (OrderedArgs (a:_), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
+    _                      -> pure $ bottom $ "derive() does not take named arguments" <$ x
+
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of

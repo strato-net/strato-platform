@@ -1952,6 +1952,27 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
             (CC.OrderedArgs a) -> getVar <=< expToVar $ head a
             (CC.NamedArgs _) -> pure $ SNULL
           case (val1, name) of
+            (SAccount addr _, "derive") -> do
+              (hsh, _) <- getCurrentCodeCollection
+              salt <- saltTextToValue $ show convertedFirstArg
+              Account addr'' _ <- getNewAddressWithSalt (Account (_namedAccountAddress addr) Nothing) salt hsh (show args)
+              return . Constant $ SAccount (NamedAccount addr'' UnspecifiedChain) False
+              where
+                saltTextToValue :: MonadSM m => String -> m Value
+                saltTextToValue saltText = do
+                  let stringParser = do
+                        ~(a, str) <- withPosition $ do
+                          s <- stringLiteral
+                          return s
+                        return $ CC.StringLiteral a str
+                  let saltExpression = runParser (stringParser <|> expression) (ParserState "" "" M.empty) "" (saltText)
+                  saltValue <- do
+                    case saltExpression of
+                      Left pe -> invalidArguments "big bad sad" pe
+                      Right e' -> do
+                        s <- getVar =<< expToVar e'
+                        return s
+                  return saltValue
             (SAccount addr _, "delegatecall") -> do
               let  (funcName, args') = (case args of
                     (CC.OrderedArgs []) -> typeError "delegate call needs atleast one arguement, none were given " args

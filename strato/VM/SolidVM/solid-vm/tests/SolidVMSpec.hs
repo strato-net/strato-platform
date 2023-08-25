@@ -5731,7 +5731,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn` 
+    getFields ["x", "y"] `shouldReturn`
       [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) Nothing
       , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just $ BC.pack src) Nothing
       ]
@@ -5766,7 +5766,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn` 
+    getFields ["x", "y"] `shouldReturn`
       [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]")
       , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SInteger 100]")
       ]
@@ -5798,6 +5798,30 @@ contract qq {
     [BContract "User" x] <- getFields["x"]
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
+
+
+  -- todo: 'fit' to 'it'
+  fit "can deterministically derive salted contract addresses with multiple args" . runTest $ do
+    let src = [r|
+contract User {
+  string commonName;
+  string cert;
+  constructor(string _commonName, string _cert) {
+    commonName = _commonName;
+    cert = _cert;
+  }
+}
+
+contract qq {
+  User public x;
+  address y;
+  constructor() public {
+    x = new User{salt: "salt"}("David Moncayo", "MyVeryCoolCert");
+    y = address(x).derive("salt", "David Moncayo", "MyVeryCoolCert");
+  }
+}|]
+    runBS src `shouldReturn` ()
+
 
   it "should fail when trying to create salted contract to the same address" $ runTest (do
     runBS [r|
