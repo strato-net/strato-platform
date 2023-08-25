@@ -5,6 +5,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeApplications  #-}
 {-# LANGUAGE TypeOperators     #-}
 
 
@@ -13,6 +15,7 @@
 
 module Main where
 
+import           Prelude                         hiding (lookup)
 import           Control.Lens.Operators
 import           Control.Monad.Change.Modify  (Accessible)
 import           Control.Monad.Change.Alter
@@ -25,7 +28,7 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString.Lazy.Char8      as BLC
 import qualified Data.Cache                      as Cache
 import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Maybe                      (listToMaybe, maybeToList, isJust)
+import           Data.Maybe                      (listToMaybe, maybeToList, isJust, fromJust)
 import           Data.Source.Map
 import           Data.Swagger                    hiding (delete, Http)
 import           HFlags
@@ -53,12 +56,15 @@ import           Bloc.Server.Utils          (toMaybe)
 import           BlockApps.Init
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.AddressStateRef
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.CirrusDefs
 import           Blockchain.Data.Json
+import           Blockchain.DB.CodeDB
 
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Composable.Identity
@@ -104,6 +110,9 @@ instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
+instance Selectable Account Contract m => Selectable Account Contract (CirrusM m) where
+  select p = lift . select p
+
 instance Selectable Account Contract m => Selectable Account Contract (ReaderT BlocEnv m) where
   select p = lift . select p
 
@@ -117,15 +126,42 @@ instance Selectable Account Contract m => Selectable Account Contract (IdentityM
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
+instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+  lookup _ k   = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
+  delete _ _   = error "API: Keccak256 `Alters` DBCode delete"
+
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
   select p = lift . select p
 
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (IdentityM m) where
   select p = lift . select p
 
+instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (CirrusM m) where
+  select p = lift . select p
 
 instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (ReaderT BlocEnv m) where
   select p = lift . select p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (VaultM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (IdentityM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT BlocEnv m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (CirrusM m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
 
 instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do
@@ -142,6 +178,24 @@ instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
       (addressStateRefContractRoot r)
       codePtr
       (toMaybe 0 $ addressStateRefChainId r)
+
+instance MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
+  select _ = Account.getX509CertForAccount
+
+instance Selectable Address Certificate m => Selectable Address Certificate (VaultM m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT BlocEnv m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (IdentityM m) where
+  select p = lift . select p
+
+instance Selectable Address Certificate m => Selectable Address Certificate (SQLM m) where
+  select p = lift . select p
+
+instance Selectable Account AddressState m => Selectable Account AddressState (CirrusM m) where
+  select p = lift . select p
 
 instance Selectable Account AddressState m => Selectable Account AddressState (VaultM m) where
   select p = lift . select p
@@ -214,6 +268,8 @@ fullServer :: ( MonadLogger m
               , HasVault m
               , Selectable Account Contract m
               , Selectable Account AddressState m
+              , Selectable Address Certificate m
+              , HasCodeDB m
               , Selectable Keccak256 SourceMap m
               )
            => ServerT FullAPI m
@@ -233,9 +289,10 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
     runM f =
       runLoggingT .
         runSQLM .
+        runCirrusM .
         flip runReaderT blocEnv .
         runVaultM ("http://localhost:8013/strato/v2.3" ) . 
-        runIdentitytM getIdServerUrl $ f
+        runIdentitytM flags_identityServerUrl $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -245,12 +302,12 @@ main = do
   _ <- $initHFlags "Core API"
 
   -- check if id server connection is valid; only run if using https (unless using localhost)
-  identityUrl <- parseBaseUrl getIdServerUrl
+  identityUrl <- parseBaseUrl flags_identityServerUrl
   let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
   let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
   if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
     then 
-      error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdServerUrl
+      error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> flags_identityServerUrl
     else putStrLn "Identity server url is valid to connect to"
 
   let theDoc = toSwagger (Proxy :: Proxy FullAPI)
@@ -279,7 +336,9 @@ main = do
           gasLimit = flags_gasLimit,
           stateFetchLimit = stateFetchLimit',
           globalNonceCounter = nonceCache,
-          txTBQueue = tbqueue
+          txTBQueue = tbqueue,
+          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
+          useWalletsByDefault = flags_useWalletsByDefault
           }
   run 3000 $ app env theDoc
 

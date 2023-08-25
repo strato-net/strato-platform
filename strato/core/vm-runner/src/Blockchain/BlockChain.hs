@@ -746,6 +746,7 @@ completeDiff :: ( MonadLogger m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
+                , A.Selectable Account AddressState m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m

@@ -41,6 +41,7 @@ library:
     - core-api2
     - cross-monitoring
     - deepseq
+    - ethereum-rlp
     - extra
     - format
     - lens
@@ -74,6 +75,7 @@ executables:
       - base
       - bloc2
       - blockapps-init
+      - blockapps-mpdbs
       - cache
       - clock
       - hflags
@@ -81,6 +83,7 @@ executables:
       - persistent-postgresql
       - postgresql-typed
       - slipstream
+      - transformers
       - wai-middleware-prometheus
       - warp
 

@@ -19,6 +19,7 @@ import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
 const { Title, Text } = Typography;
 
@@ -175,6 +176,14 @@ const TopSellingProductCard = () => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                               window.location.href = loginUrl;
                             } else {
+                              TagManager.dataLayer({
+                                dataLayer: {
+                                  event: 'buy_now_from_top_selling_product',
+                                  product_name: topSellingProduct.name,
+                                  category: topSellingProduct.category,
+                                  productId: topSellingProduct.productId
+                                },
+                              });
                               addItemToCart(topSellingProduct);
                               navigate("/checkout");
                             }
@@ -187,8 +196,15 @@ const TopSellingProductCard = () => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                               window.location.href = loginUrl;
                             } else {
+                              TagManager.dataLayer({
+                                dataLayer: {
+                                  event: 'add_to_cart_from_top_selling_product',
+                                  product_name: topSellingProduct.name,
+                                  category: topSellingProduct.category,
+                                  productId: topSellingProduct.productId
+                                },
+                              });
                               addItemToCart(topSellingProduct);
-                              // navigate("/checkout"); Should not navigate to checkout page
                             }
                           }}
                           className="w-11 h-10 border border-primary rounded-md flex justify-center items-center cursor-pointer"

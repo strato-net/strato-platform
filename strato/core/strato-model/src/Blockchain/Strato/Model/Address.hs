@@ -16,6 +16,7 @@ module Blockchain.Strato.Model.Address
       stringAddress,
       getNewAddress_unsafe,
       getNewAddressWithSalt_unsafe,
+      deriveAddressWithSalt,
       addressAsNibbleString, addressFromNibbleString,
       addressToHex, addressFromHex,
       unAddress,
@@ -36,9 +37,11 @@ import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Data
 import           Data.Hashable
+import           Data.Maybe                           (fromJust, fromMaybe)
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
+import           Data.Text.Encoding                   (encodeUtf8)
 import           Database.Persist.Sql                 hiding (get)
 import           GHC.Generics
 import           Numeric
@@ -55,9 +58,10 @@ import           Web.PathPieces
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256)
+import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256, keccak256ToByteString)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
+import           Blockchain.Strato.Model.UserRegistry
 import qualified Data.NibbleString                    as N
 import qualified Data.RLP                             as RLP2
 import qualified LabeledError
@@ -246,6 +250,19 @@ getNewAddressWithSalt_unsafe :: Address -> String -> B.ByteString -> String -> A
 getNewAddressWithSalt_unsafe creator salt codeHash args =
   let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (0xFF :: Integer), rlpEncode creator, rlpEncode salt, rlpEncode codeHash, rlpEncode args]
   in decode $ BL.drop 12 $ encode theHash
+
+-- Default values are for the UserRegistry/User contract. Salt should be the userAddress.
+deriveAddressWithSalt :: Maybe Address -> String -> Maybe BC.ByteString -> Maybe String -> Address
+deriveAddressWithSalt sender salt src args = do
+  let theAddress = fromMaybe (fromJust $ stringAddress "0000000000000000000000000000000000000720") sender -- UserRegistry address
+      theHash = SHA.hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
+                                                   , rlpEncode theAddress
+                                                   , rlpEncode salt
+                                                   , rlpEncode $ SHA.keccak256ToByteString $ maybe (SHA.hash $ encodeUtf8 userRegistryContract) (SHA.hash) src 
+                                                   , rlpEncode $ fromMaybe "OrderedVals []" args
+                                                   ]
+  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
+  (decode $ BL.drop 12 $ encode theHash)
 
 addressAsNibbleString::Address->N.NibbleString
 addressAsNibbleString (Address s) =

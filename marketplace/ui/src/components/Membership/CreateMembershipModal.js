@@ -242,6 +242,27 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
       return prodActions.uploadImage(prodDispatch, formData);
     });
 
+    const calculateMemberPrice = (membershipName, memberDiscount) => {
+      const servicePrice = services.find(
+        (service) => service.name === membershipName
+      ).price;
+
+      const memberPrice = servicePrice * (1 - memberDiscount / 100);
+
+      return memberPrice;
+    };
+
+    const calculateMemberDiscount = (membershipName, memberPrice) => {
+      const servicePrice = services.find( 
+        (service) => service.name === membershipName
+      ).price;
+
+      const memberDiscount = (1 - memberPrice / servicePrice) * 100;
+
+      return memberDiscount;
+    };
+
+
     Promise.all(uploadFilePromises)
       .then(async (results0) => {
         arrayOfFiles.push(...results0);
@@ -277,8 +298,8 @@ const CreateMembershipModal = ({ open, handleCancel, categorys, user }) => {
               },
               membershipServiceArgs: updatedValues.services.map((service) => ({
                 serviceId: service.serviceId,
-                membershipPrice: service.memberPrice ? service.memberPrice : 0,
-                discountPrice: service.percentDiscount ? service.percentDiscount : 0,
+                membershipPrice: service.memberPrice ? service.memberPrice : calculateMemberPrice(service.serviceName, service.percentDiscount),
+                discountPrice: service.percentDiscount ? service.percentDiscount : calculateMemberDiscount(service.serviceName, service.memberPrice),
                 maxQuantity: service.numberOfUses,
                 createdDate: new Date().getTime(),
                 // If visible is true the List Now form is open and the membership is active

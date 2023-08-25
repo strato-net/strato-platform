@@ -2,6 +2,8 @@ import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
 import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
+import { pollingHelper } from "/helpers/utils";
+
 import StripeService from "/payment-service/stripe.service";
 import dayjs from 'dayjs';
 import RestStatus from 'http-status-codes';
@@ -44,6 +46,7 @@ const contractName = "Dapp";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
+let   userCert = null;
 
 // interface Member {
 //   access?:boolean,
@@ -143,19 +146,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   let userOrganization
   
   if (!serviceUser) {
-    let userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-    console.log('dapp - userCertificate', userCertificate)
-    if (userCertificate === null || userCertificate === undefined) { 
-      // delay for 6 seconds and check again if cert got created successfully
-      console.log('user not found in first attempt, this may be a brand new registration, recheck in 3 secs')
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      userCertificate = await certificateJs.getCertificateMe(rawAdmin);
-      console.log('user content from second attempt', userCertificate)
-    }
-    contract.userOrganization = userCertificate.organization
-    userOrganization = userCertificate.organization
+    
+    let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
 
-    console.log('dapp - userCertificate.organization', userCertificate.organization)
+    //We are not guaranteed the user will have a certificate
+    //99% chance they do, but if this this their first login
+    //the node might not have a certificate in time
+    if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
+      contract.userOrganization = userCertificate.organization
+      userOrganization = userCertificate.organization
+      userCert    = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
+      console.log('dapp - userCertificate.organization', userCertificate.organization)
+    }
   }
   
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
@@ -229,7 +231,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   contract.getCertificate = async function (args) {
     return certificateJs.getCertificate(admin, args);
   };
-  contract.getCertificateMe = async function () {
+  contract.getCertificateMe = (!(userCert === null || userCert === undefined)) ? userCert : async function () {
     return certificateJs.getCertificateMe(admin);
   };
   contract.getCertificates = async function (args) {
@@ -1355,7 +1357,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     
     
     // Get all membershipServices
-    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }))?.membershipServices ?? [];
+    const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }));
 
     // Get all services
     const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
@@ -1394,21 +1396,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
   
     // Get all memberships
-    const memberships = await membershipJs.getAll(rawAdmin, {  ...args}, newOptions)
+    let memberships = await membershipJs.getAll(rawAdmin, {  ...args}, newOptions)
 
     //filter out memberships with null productIds and memberships that don't belong to the user's organization
-    memberships.memberships  = memberships.memberships
-    .filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization)
+    memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization)
     
     //Get the list of productIds for API calls
-    const addressOfProducts = memberships.memberships.map(membership => membership.productId);
+    const addressOfProducts = memberships.map(membership => membership.productId);
   
     //Get Products
     const products    = await managers.productManager.getProducts({ address: addressOfProducts }, newOptions);
 
     //Attach product to membership
     products.forEach(product => {
-      memberships.memberships = memberships.memberships.map(membership => {
+      memberships = memberships.map(membership => {
         return (membership.productId === product.address)  ?
           { ...membership, product: product, productImage: null, inventories: []} : membership;} )
     })  
@@ -1418,7 +1419,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     
     //Attach Product Image Info to Corresponding Membership
     productImageInfo.forEach(productImage => {
-      memberships.memberships = memberships.memberships.map(membership => {
+      memberships = memberships.map(membership => {
         return (membership.productId === productImage.productId)  ? 
             {...membership, productImage : productImage} : membership;} )
     })
@@ -1428,7 +1429,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     
     //iterate through the list of inventories and attach the inventory status to the membership object
     inventories.forEach(inventory => {
-      memberships.memberships = memberships.memberships.map(membership => {
+      memberships = memberships.map(membership => {
         return (membership.productId === inventory.productId)  ?
           { ...membership, inventories: [...membership.inventories, inventory]} : membership;} )
     })
@@ -1455,6 +1456,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       })
     }) 
 
+    console.log("Dapp-getMemberships memberships: ", memberships)
     return memberships;
   }
 
