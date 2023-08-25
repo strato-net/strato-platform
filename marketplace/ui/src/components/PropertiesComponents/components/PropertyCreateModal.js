@@ -576,6 +576,9 @@ function PropertyCreateModal({
             disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
+              if(value === "apartment" || value === "condo"){
+                handleChange("lotSizeArea", 0);
+              }
             }}
             options={homeTypeData}
             showSearch
@@ -699,6 +702,7 @@ function PropertyCreateModal({
                 onWheel={(e) => {
                   e.target.blur();
                 }}
+                disabled={propertyData.propertyType === "apartment" || propertyData.propertyType === "condo"  ? true : false}
               />
             </Form.Item>
           </Col>

@@ -8,7 +8,7 @@ import {
 } from "../../../../contexts/propertyContext";
 import { useAuthenticateState } from "../../../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import WriteReviewModal from "../review/WriteReviewModal";
+import WriteReviewModal from "./WriteReviewModal";
 import ReviewCard from "./ReviewCard";
 
 const ReviewTab = (props) => {
@@ -44,7 +44,11 @@ const ReviewTab = (props) => {
       reviewerAddress: user.userAddress,
       description: encodedDescription,
     };
-    actions.createReview(dispatch, reviewForm);
+    const response = await actions.createReview(dispatch, reviewForm);
+    if (response) {
+      setOpen(false)
+      actions.fetchPropertyDetails(dispatch, props.propertyId);
+    }
   };
 
   const handleCancel = () => {
