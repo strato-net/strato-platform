@@ -1,13 +1,12 @@
 module ChainHash where
 
-import qualified Data.ByteString as B
-import Data.Aeson
-import System.Exit
-import Text.Printf
-
 import Blockchain.Data.ChainInfo
 import Blockchain.Strato.Model.Keccak256
+import Data.Aeson
+import qualified Data.ByteString as B
+import System.Exit
 import Text.Format
+import Text.Printf
 
 chainHash :: IO ()
 chainHash = do

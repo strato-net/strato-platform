@@ -1,18 +1,16 @@
 module Blockchain.Sequencer.CablePackage where
 
+import Blockchain.Blockstanbul (Checkpoint)
+import Blockchain.Sequencer.Event
 import ClassyPrelude
 import Numeric.Natural
 
-import Blockchain.Blockstanbul (Checkpoint)
-import Blockchain.Sequencer.Event
-
-
 data CablePackage = CablePackage
-                  { unseqEvents :: TBQueue IngestEvent
-                  , unseqCheckpoints :: TQueue Checkpoint
-                  , seqP2PEvents :: TQueue P2pEvent
-                  , seqVMEvents :: TQueue VmEvent
-                  }
+  { unseqEvents :: TBQueue IngestEvent,
+    unseqCheckpoints :: TQueue Checkpoint,
+    seqP2PEvents :: TQueue P2pEvent,
+    seqVMEvents :: TQueue VmEvent
+  }
 
 queueDepth :: Natural
 queueDepth = 4096

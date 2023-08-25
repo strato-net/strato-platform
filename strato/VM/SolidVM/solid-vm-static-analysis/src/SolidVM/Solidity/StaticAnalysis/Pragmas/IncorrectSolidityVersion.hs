@@ -1,14 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion
-  ( detector
-  ) where
 
-import           Data.Source
-import           Data.Text                           (Text)
-import qualified Data.Text                           as T
-import           SolidVM.Solidity.StaticAnalysis.Types
-import           SolidVM.Solidity.Parse.Declarations (SourceUnitF(..), SourceUnit)
+module SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion
+  ( detector,
+  )
+where
+
+import Data.Source
+import Data.Text (Text)
+import qualified Data.Text as T
+import SolidVM.Solidity.Parse.Declarations (SourceUnit, SourceUnitF (..))
+import SolidVM.Solidity.StaticAnalysis.Types
 
 -- type ParserDetector = [SourceUnit] -> [SourceAnnotation T.Text]
 detector :: ParserDetector

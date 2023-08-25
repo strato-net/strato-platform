@@ -1,36 +1,34 @@
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeOperators #-}
 
-module Blockchain.Verification (
-  transactionsVerificationValue,
-  ommersVerificationValue,
-  receiptsVerificationValue
-  ) where
+module Blockchain.Verification
+  ( transactionsVerificationValue,
+    ommersVerificationValue,
+    receiptsVerificationValue,
+  )
+where
 
-import           Prelude.Unicode
-
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.RLP
-import           Blockchain.Data.Transaction
+import Blockchain.Data.DataDefs
+import Blockchain.Data.RLP
+import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
-import           Blockchain.Strato.Model.Keccak256
-
-import           Data.Functor.Identity
+import Blockchain.Strato.Model.Keccak256
+import Data.Functor.Identity
+import Prelude.Unicode
 
 {-
 transactionsVerificationValue::[Transaction]->MP.StateRoot
 transactionsVerificationValue = MP.sha2StateRoot . listToRLPVerificationValue
 -}
 
-
 transactionsVerificationValue :: [Transaction] -> MP.StateRoot
-transactionsVerificationValue theList = runIdentity . MP.runMP . MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer)..] theList
+transactionsVerificationValue theList = runIdentity . MP.runMP . MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer) ..] theList
 
-ommersVerificationValue::[BlockData]->Keccak256
+ommersVerificationValue :: [BlockData] -> Keccak256
 ommersVerificationValue = listToRLPVerificationValue
 
-receiptsVerificationValue::()->MP.StateRoot
+receiptsVerificationValue :: () -> MP.StateRoot
 receiptsVerificationValue _ = MP.emptyTriePtr
 
 listToRLPVerificationValue :: (RLPSerializable a) => [a] -> Keccak256

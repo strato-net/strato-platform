@@ -1,4 +1,7 @@
-{-# LANGUAGE BangPatterns, Rank2Types, ScopedTypeVariables, TypeOperators #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- |
 -- Module: Data.BloomFilter
@@ -23,10 +26,8 @@
 --
 -- This module provides low-level control.  For an easier to use
 -- interface, see the "Data.BloomFilter.Easy" module.
-
 module Data.BloomFilter
-    (
-    -- * Overview
+  ( -- * Overview
     -- $overview
 
     -- ** Ease of use
@@ -36,72 +37,80 @@ module Data.BloomFilter
     -- $performance
 
     -- * Types
-      Hash
-    , Bloom
-    , MBloom
+    Hash,
+    Bloom,
+    MBloom,
 
     -- * Immutable Bloom filters
 
     -- ** Conversion
-    , freeze
-    , thaw
-    , unsafeFreeze
+    freeze,
+    thaw,
+    unsafeFreeze,
 
     -- ** Creation
-    , unfold
-
-    , fromList
-    , empty
-    , singleton
+    unfold,
+    fromList,
+    empty,
+    singleton,
 
     -- ** Accessors
-    , length
-    , elem
-    , notElem
+    length,
+    elem,
+    notElem,
 
     -- ** Modification
-    , insert
-    , insertList
+    insert,
+    insertList,
 
     -- * The underlying representation
+
     -- | If you serialize the raw bit arrays below to disk, do not
     -- expect them to be portable to systems with different
     -- conventions for endianness or word size.
 
     -- | The raw bit array used by the immutable 'Bloom' type.
-    , bitArray
-    ) where
+    bitArray,
+  )
+where
 
-import Control.Monad (liftM, forM_)
+import Control.DeepSeq (NFData (..))
+import Control.Monad (forM_, liftM)
 import Control.Monad.ST (ST, runST)
-import Control.DeepSeq (NFData(..))
 import Data.Array.Base (unsafeAt)
 import qualified Data.Array.Base as ST
 import Data.Array.Unboxed (UArray)
-import Data.Bits ((.&.), unsafeShiftL, unsafeShiftR)
-import Data.BloomFilter.Util ((:*)(..))
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.))
 import qualified Data.BloomFilter.Mutable as MB
-import qualified Data.BloomFilter.Mutable.Internal as MB
 import Data.BloomFilter.Mutable.Internal (Hash, MBloom)
+import qualified Data.BloomFilter.Mutable.Internal as MB
+import Data.BloomFilter.Util ((:*) (..))
 import Data.Word (Word32)
-
-import Prelude hiding (elem, length, notElem,
-                       (/), (*), div, divMod, mod, rem)
-
+import Prelude hiding
+  ( div,
+    divMod,
+    elem,
+    length,
+    mod,
+    notElem,
+    rem,
+    (*),
+    (/),
+  )
 
 -- | An immutable Bloom filter, suitable for querying from pure code.
-data Bloom a = B {
-      hashes :: !(a -> [Hash])
-    , shift :: {-# UNPACK #-} !Int
-    , mask :: {-# UNPACK #-} !Int
-    , bitArray :: {-# UNPACK #-} !(UArray Int Hash)
-    }
+data Bloom a = B
+  { hashes :: !(a -> [Hash]),
+    shift :: {-# UNPACK #-} !Int,
+    mask :: {-# UNPACK #-} !Int,
+    bitArray :: {-# UNPACK #-} !(UArray Int Hash)
+  }
 
 instance Show (Bloom a) where
-    show ub = "Bloom { " ++ show ((1::Int) `unsafeShiftL` shift ub) ++ " bits } "
+  show ub = "Bloom { " ++ show ((1 :: Int) `unsafeShiftL` shift ub) ++ " bits } "
 
 instance NFData (Bloom a) where
-    rnf !_ = ()
+  rnf !_ = ()
 
 logBitsInHash :: Int
 logBitsInHash = 5 -- logPower2 bitsInHash
@@ -112,18 +121,22 @@ logBitsInHash = 5 -- logPower2 bitsInHash
 -- Example:
 --
 -- @
---import "Data.BloomFilter.Hash" (cheapHashes)
+-- import "Data.BloomFilter.Hash" (cheapHashes)
 --
---filter = create (cheapHashes 3) 1024 $ \mf -> do
+-- filter = create (cheapHashes 3) 1024 $ \mf -> do
 --           insertMB mf \"foo\"
 --           insertMB mf \"bar\"
 -- @
 --
 -- Note that the result of the setup function is not used.
-create :: (a -> [Hash])        -- ^ family of hash functions to use
-        -> Int                  -- ^ number of bits in filter
-        -> (forall s. (MBloom s a -> ST s ()))  -- ^ setup function
-        -> Bloom a
+create ::
+  -- | family of hash functions to use
+  (a -> [Hash]) ->
+  -- | number of bits in filter
+  Int ->
+  -- | setup function
+  (forall s. (MBloom s a -> ST s ())) ->
+  Bloom a
 {-# INLINE create #-}
 create hash numBits body = runST $ do
   mb <- MB.new hash numBits
@@ -133,15 +146,17 @@ create hash numBits body = runST $ do
 -- | Create an immutable Bloom filter from a mutable one.  The mutable
 -- filter may be modified afterwards.
 freeze :: MBloom s a -> ST s (Bloom a)
-freeze mb = B (MB.hashes mb) (MB.shift mb) (MB.mask mb) `liftM`
-            ST.freeze (MB.bitArray mb)
+freeze mb =
+  B (MB.hashes mb) (MB.shift mb) (MB.mask mb)
+    `liftM` ST.freeze (MB.bitArray mb)
 
 -- | Create an immutable Bloom filter from a mutable one.  The mutable
 -- filter /must not/ be modified afterwards, or a runtime crash may
 -- occur.  For a safer creation interface, use 'freeze' or 'create'.
 unsafeFreeze :: MBloom s a -> ST s (Bloom a)
-unsafeFreeze mb = B (MB.hashes mb) (MB.shift mb) (MB.mask mb) `liftM`
-                    ST.unsafeFreeze (MB.bitArray mb)
+unsafeFreeze mb =
+  B (MB.hashes mb) (MB.shift mb) (MB.mask mb)
+    `liftM` ST.unsafeFreeze (MB.bitArray mb)
 
 -- | Copy an immutable Bloom filter to create a mutable one.  There is
 -- no non-copying equivalent.
@@ -152,9 +167,12 @@ thaw ub = MB.MB (hashes ub) (shift ub) (mask ub) `liftM` ST.thaw (bitArray ub)
 --
 -- This function is subject to fusion with 'insert'
 -- and 'insertList'.
-empty :: (a -> [Hash])         -- ^ family of hash functions to use
-       -> Int                   -- ^ number of bits in filter
-       -> Bloom a
+empty ::
+  -- | family of hash functions to use
+  (a -> [Hash]) ->
+  -- | number of bits in filter
+  Int ->
+  Bloom a
 {-# INLINE [1] empty #-}
 empty hash numBits = create hash numBits (\_ -> return ())
 
@@ -162,10 +180,14 @@ empty hash numBits = create hash numBits (\_ -> return ())
 --
 -- This function is subject to fusion with 'insert'
 -- and 'insertList'.
-singleton :: (a -> [Hash])     -- ^ family of hash functions to use
-           -> Int               -- ^ number of bits in filter
-           -> a                 -- ^ element to insert
-           -> Bloom a
+singleton ::
+  -- | family of hash functions to use
+  (a -> [Hash]) ->
+  -- | number of bits in filter
+  Int ->
+  -- | element to insert
+  a ->
+  Bloom a
 {-# INLINE [1] singleton #-}
 singleton hash numBits elt = create hash numBits (\mb -> MB.insert mb elt)
 
@@ -173,8 +195,9 @@ singleton hash numBits elt = create hash numBits (\mb -> MB.insert mb elt)
 -- a word array and a bit offset within that word.
 hashIdx :: Int -> Word32 -> (Int :* Int)
 hashIdx theMask x = (y `unsafeShiftR` logBitsInHash) :* (y .&. hashMask)
-  where hashMask = 31 -- bitsInHash - 1
-        y = fromIntegral x .&. theMask
+  where
+    hashMask = 31 -- bitsInHash - 1
+    y = fromIntegral x .&. theMask
 
 -- -- | Hash the given value, returning a list of (word offset, bit
 -- -- offset) pairs, one per hash value.
@@ -191,11 +214,14 @@ hashesU ub elt = hashIdx (mask ub) `map` hashes ub elt
 -- /still/ some possibility that @True@ will be returned.
 elem :: a -> Bloom a -> Bool
 elem elt ub = all test (hashesU ub elt)
-  where test (off :* bit) = (bitArray ub `unsafeAt` off) .&. (1 `unsafeShiftL` bit) /= 0
-          
-modify :: (forall s. (MBloom s a -> ST s z))  -- ^ mutation function (result is discarded)
-        -> Bloom a
-        -> Bloom a
+  where
+    test (off :* bit) = (bitArray ub `unsafeAt` off) .&. (1 `unsafeShiftL` bit) /= 0
+
+modify ::
+  -- | mutation function (result is discarded)
+  (forall s. (MBloom s a -> ST s z)) ->
+  Bloom a ->
+  Bloom a
 {-# INLINE modify #-}
 modify body ub = runST $ do
   mb <- thaw ub
@@ -226,28 +252,40 @@ insertList :: [a] -> Bloom a -> Bloom a
 {-# NOINLINE insertList #-}
 insertList elts = modify $ \mb -> mapM_ (MB.insert mb) elts
 
-{-# RULES "Bloom insert . insert" forall a b u.
-    insert b (insert a u) = insertList [a,b] u
+{-# RULES
+"Bloom insert . insert" forall a b u.
+  insert b (insert a u) =
+    insertList [a, b] u
   #-}
 
-{-# RULES "Bloom insertList . insert" forall x xs u.
-    insertList xs (insert x u) = insertList (x:xs) u
+{-# RULES
+"Bloom insertList . insert" forall x xs u.
+  insertList xs (insert x u) =
+    insertList (x : xs) u
   #-}
 
-{-# RULES "Bloom insert . insertList" forall x xs u.
-    insert x (insertList xs u) = insertList (x:xs) u
+{-# RULES
+"Bloom insert . insertList" forall x xs u.
+  insert x (insertList xs u) =
+    insertList (x : xs) u
   #-}
 
-{-# RULES "Bloom insertList . insertList" forall xs ys u.
-    insertList xs (insertList ys u) = insertList (xs++ys) u
+{-# RULES
+"Bloom insertList . insertList" forall xs ys u.
+  insertList xs (insertList ys u) =
+    insertList (xs ++ ys) u
   #-}
 
-{-# RULES "Bloom insertList . empty" forall h n xs.
-    insertList xs (empty h n) = fromList h n xs
+{-# RULES
+"Bloom insertList . empty" forall h n xs.
+  insertList xs (empty h n) =
+    fromList h n xs
   #-}
 
-{-# RULES "Bloom insertList . singleton" forall h n x xs.
-    insertList xs (singleton h n x) = fromList h n (x:xs)
+{-# RULES
+"Bloom insertList . singleton" forall h n x xs.
+  insertList xs (singleton h n x) =
+    fromList h n (x : xs)
   #-}
 
 -- | Query an immutable Bloom filter for non-membership.  If the value
@@ -255,7 +293,8 @@ insertList elts = modify $ \mb -> mapM_ (MB.insert mb) elts
 -- is /still/ some possibility that @True@ will be returned.
 notElem :: a -> Bloom a -> Bool
 notElem elt ub = any test (hashesU ub elt)
-  where test (off :* bit) = (bitArray ub `unsafeAt` off) .&. (1 `unsafeShiftL` bit) == 0
+  where
+    test (off :* bit) = (bitArray ub `unsafeAt` off) .&. (1 `unsafeShiftL` bit) == 0
 
 -- | Return the size of an immutable Bloom filter, in bits.
 length :: Bloom a -> Int
@@ -269,17 +308,24 @@ length = unsafeShiftL 1 . shift
 --
 --   * If it returns @'Just' (a,b)@, @a@ is added to the filter and
 --     @b@ is used as a new seed.
-unfold :: forall a b. (a -> [Hash]) -- ^ family of hash functions to use
-        -> Int                       -- ^ number of bits in filter
-        -> (b -> Maybe (a, b))       -- ^ seeding function
-        -> b                         -- ^ initial seed
-        -> Bloom a
+unfold ::
+  forall a b.
+  -- | family of hash functions to use
+  (a -> [Hash]) ->
+  -- | number of bits in filter
+  Int ->
+  -- | seeding function
+  (b -> Maybe (a, b)) ->
+  -- | initial seed
+  b ->
+  Bloom a
 {-# INLINE unfold #-}
 unfold theHashes numBits f k = create theHashes numBits (loop k)
-  where loop :: forall s. b -> MBloom s a -> ST s ()
-        loop j mb = case f j of
-                      Just (a, j') -> MB.insert mb a >> loop j' mb
-                      _ -> return ()
+  where
+    loop :: forall s. b -> MBloom s a -> ST s ()
+    loop j mb = case f j of
+      Just (a, j') -> MB.insert mb a >> loop j' mb
+      _ -> return ()
 
 -- | Create an immutable Bloom filter, populating it from a list of
 -- values.
@@ -289,19 +335,25 @@ unfold theHashes numBits f k = create theHashes numBits (loop k)
 -- returns three hashes.
 --
 -- @
---import "Data.BloomFilter.Hash" (cheapHashes)
+-- import "Data.BloomFilter.Hash" (cheapHashes)
 --
---filt = fromList (cheapHashes 3) 1024 [\"foo\", \"bar\", \"quux\"]
+-- filt = fromList (cheapHashes 3) 1024 [\"foo\", \"bar\", \"quux\"]
 -- @
-fromList :: (a -> [Hash])      -- ^ family of hash functions to use
-          -> Int                -- ^ number of bits in filter
-          -> [a]                -- ^ values to populate with
-          -> Bloom a
+fromList ::
+  -- | family of hash functions to use
+  (a -> [Hash]) ->
+  -- | number of bits in filter
+  Int ->
+  -- | values to populate with
+  [a] ->
+  Bloom a
 {-# INLINE [1] fromList #-}
 fromList theHashes numBits list = create theHashes numBits $ forM_ list . MB.insert
 
-{-# RULES "Bloom insertList . fromList" forall h n xs ys.
-    insertList xs (fromList h n ys) = fromList h n (xs ++ ys)
+{-# RULES
+"Bloom insertList . fromList" forall h n xs ys.
+  insertList xs (fromList h n ys) =
+    fromList h n (xs ++ ys)
   #-}
 
 {-

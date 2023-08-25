@@ -2,46 +2,40 @@
 
 module Main where
 
-import Prelude
-
-
 -- base
-import Data.Either (isRight, isLeft)
-import qualified Data.List.NonEmpty as NE
 
 -- Hackage
 import Control.Lens
 import Control.Monad.Except (catchError, throwError)
 import Control.Monad.Trans (liftIO)
-import Test.Tasty
-import Test.Tasty.Hspec
-import Test.Tasty.QuickCheck
-import Test.Hspec
-
-
 import qualified Data.ByteString.Char8 as B
-
+import Data.Either (isLeft, isRight)
+import qualified Data.List.NonEmpty as NE
 -- local
 import Network.Kafka
 import Network.Kafka.Consumer
 import Network.Kafka.Producer
-import Network.Kafka.Protocol (ProduceResponse(..),
-                               KafkaError(..),
-                               CompressionCodec(..),
-                               CreateTopicsResponse(..),
-                               DeleteTopicsResponse(..),
-                               Offset(..),
-                               OffsetCommitResponse(..),
-                               OffsetFetchResponse(..),
-                               ConsumerGroup(..),
-                               Partition(..),
-                               KafkaString(..),
-                               Metadata(..),
-                               TopicName(..),
-                               HeartbeatResponse(..),
-                              )
-
-
+import Network.Kafka.Protocol
+  ( CompressionCodec (..),
+    ConsumerGroup (..),
+    CreateTopicsResponse (..),
+    DeleteTopicsResponse (..),
+    HeartbeatResponse (..),
+    KafkaError (..),
+    KafkaString (..),
+    Metadata (..),
+    Offset (..),
+    OffsetCommitResponse (..),
+    OffsetFetchResponse (..),
+    Partition (..),
+    ProduceResponse (..),
+    TopicName (..),
+  )
+import Test.Hspec
+import Test.Tasty
+import Test.Tasty.Hspec
+import Test.Tasty.QuickCheck
+import Prelude
 
 main :: IO ()
 main = testSpec "the specs" specs >>= defaultMain
@@ -58,10 +52,10 @@ specs = do
 
   let cleanup :: TopicName -> IO ()
       cleanup topicName = do
-          _ <- run $ do
-                   stateAddresses %= NE.cons ("localhost", 9092)
-                   deleteTopic (deleteTopicsRequest topicName)
-          pure ()
+        _ <- run $ do
+          stateAddresses %= NE.cons ("localhost", 9092)
+          deleteTopic (deleteTopicsRequest topicName)
+        pure ()
 
   describe "can talk to local Kafka server" $ do
     prop "can produce messages" $ \ms -> do
@@ -76,7 +70,7 @@ specs = do
       result <- run $ do
         r1 <- produceMessages $ byteMessages ms
         r2 <- produceMessages $ byteMessages ms'
-        r3 <- produceCompressedMessages Gzip $  byteMessages ms''
+        r3 <- produceCompressedMessages Gzip $ byteMessages ms''
         return $ r1 ++ r2 ++ r3
       result `shouldSatisfy` isRight
 
@@ -93,14 +87,13 @@ specs = do
         info <- brokerPartitionInfo topic
 
         case getPartitionByKey (B.pack key) info of
-          Just PartitionAndLeader { _palLeader = leader, _palPartition = partition } -> do
+          Just PartitionAndLeader {_palLeader = leader, _palPartition = partition} -> do
             let payload = [(TopicAndPartition topic partition, groupMessagesToSet NoCompression messages)]
                 s = stateBrokers . at leader
             [(_topicName, [(_, NoError, offset)])] <- _produceResponseFields <$> send leader payload
             broker <- findMetadataOrElse [topic] s (KafkaInvalidBroker leader)
             resp <- withBrokerHandle broker (\handle -> fetch' handle =<< fetchRequest offset partition topic)
             return $ fmap tamPayload . fetchMessages $ resp
-
           Nothing -> fail "Could not deduce partition"
 
       result `shouldBe` Right (tamPayload <$> messages)
@@ -115,7 +108,6 @@ specs = do
           [[(_topicName, [(partition, NoError, offset)])]] -> do
             resp <- fetch offset partition topic
             return $ fmap tamPayload . fetchMessages $ resp
-
           _ -> fail "Unexpected produce response"
 
       result `shouldBe` Right (tamPayload <$> messages)
@@ -131,7 +123,6 @@ specs = do
           [[(_topicName, [(partition, NoError, offset)])]] -> do
             resp <- fetch offset partition topic
             return $ fmap tamPayload . fetchMessages $ resp
-
           _ -> fail "Unexpected produce response"
 
       result `shouldBe` Right (tamPayload <$> messages)
@@ -144,11 +135,12 @@ specs = do
     it "discards monadic effects when exceptions are thrown" $ do
       result <- run $ do
         stateName .= "expected"
-        _ <- flip catchError (return . Left) $ withAddressHandle ("localhost", 9092) $ \_ -> do
-          stateName .= "changed"
-          _ <- throwError KafkaFailedToFetchMetadata
-          n <- use stateName
-          return (Right n)
+        _ <- flip catchError (return . Left) $
+          withAddressHandle ("localhost", 9092) $ \_ -> do
+            stateName .= "changed"
+            _ <- throwError KafkaFailedToFetchMetadata
+            n <- use stateName
+            return (Right n)
         use stateName
       result `shouldBe` Right "expected"
 
@@ -159,7 +151,6 @@ specs = do
         updateMetadatas []
         use stateAddresses
       result `shouldBe` fmap NE.nub result
-
 
   let newTopicName = "milena-test-13-partitions"
   describe "create topics" $ do
@@ -202,38 +193,38 @@ specs = do
 
       it "commit offset 5 to partition 0 for consumer group \"group1\"" $ do
         commitOff <- run $ do
-            stateAddresses %= NE.cons ("localhost", 9092)
-            commitOffset (commitOffsetRequest (ConsumerGroup "group1") t 0 (Offset 5))
-        commitOff `shouldBe` Right (OffsetCommitResp [(t,[(Partition 0,NoError)])])
+          stateAddresses %= NE.cons ("localhost", 9092)
+          commitOffset (commitOffsetRequest (ConsumerGroup "group1") t 0 (Offset 5))
+        commitOff `shouldBe` Right (OffsetCommitResp [(t, [(Partition 0, NoError)])])
 
       it "commit offset 15 to partition 1 for consumer group \"group1\"" $ do
         commitOff <- run $ do
-            stateAddresses %= NE.cons ("localhost", 9092)
-            commitOffset (commitOffsetRequest (ConsumerGroup "group1") t 1 (Offset 15))
-        commitOff `shouldBe` Right (OffsetCommitResp [(t,[(Partition 1,NoError)])])
+          stateAddresses %= NE.cons ("localhost", 9092)
+          commitOffset (commitOffsetRequest (ConsumerGroup "group1") t 1 (Offset 15))
+        commitOff `shouldBe` Right (OffsetCommitResp [(t, [(Partition 1, NoError)])])
 
       it "commit offset 10 to partition 2 for consumer group \"group2\"" $ do
         commitOff <- run $ do
-            stateAddresses %= NE.cons ("localhost", 9092)
-            commitOffset (commitOffsetRequest (ConsumerGroup "group2") t 2 10)
+          stateAddresses %= NE.cons ("localhost", 9092)
+          commitOffset (commitOffsetRequest (ConsumerGroup "group2") t 2 10)
         commitOff `shouldSatisfy` isRight
 
       it "fetch offset from partition 0 for \"group1\"" $ do
         fetchOff <- run $ do
-            stateAddresses %= NE.cons ("localhost", 9092)
-            fetchOffset (fetchOffsetRequest (ConsumerGroup "group1") t 0)
-        fetchOff `shouldBe` Right (OffsetFetchResp [(t,[(Partition 0, Offset 5,Metadata (KString {_kString = ""}),NoError)])])
+          stateAddresses %= NE.cons ("localhost", 9092)
+          fetchOffset (fetchOffsetRequest (ConsumerGroup "group1") t 0)
+        fetchOff `shouldBe` Right (OffsetFetchResp [(t, [(Partition 0, Offset 5, Metadata (KString {_kString = ""}), NoError)])])
 
       it "fetch offset from partition 0 for \"group2\"" $ do
         fetchOff <- run $ do
-            stateAddresses %= NE.cons ("localhost", 9092)
-            fetchOffset (fetchOffsetRequest (ConsumerGroup "group2") t 0)
-        fetchOff `shouldBe` Right (OffsetFetchResp [(t,[(Partition 0, Offset (-1),Metadata (KString {_kString = ""}),UnknownTopicOrPartition)])])
+          stateAddresses %= NE.cons ("localhost", 9092)
+          fetchOffset (fetchOffsetRequest (ConsumerGroup "group2") t 0)
+        fetchOff `shouldBe` Right (OffsetFetchResp [(t, [(Partition 0, Offset (-1), Metadata (KString {_kString = ""}), UnknownTopicOrPartition)])])
 
       it "note that getLastOffset is unchanged" $ do
         getLastOff <- run $ do
-            stateAddresses %= NE.cons ("localhost", 9092)
-            getLastOffset EarliestTime 0 t
+          stateAddresses %= NE.cons ("localhost", 9092)
+          getLastOffset EarliestTime 0 t
         getLastOff `shouldSatisfy` isRight
         getLastOff `shouldBe` (Right $ Offset 0)
 

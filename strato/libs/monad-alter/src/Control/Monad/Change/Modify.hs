@@ -1,29 +1,30 @@
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE Rank2Types            #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Control.Monad.Change.Modify
-  ( Modifiable(..)
-  , Has(..)
-  , Accessible(..)
-  , accesses
-  , Inputs(..)
-  , inputs
-  , Outputs(..)
-  , genericOutputsStringIO
-  , Awaits(..)
-  , Yields(..)
-  , module Data.Proxy
-  ) where
+  ( Modifiable (..),
+    Has (..),
+    Accessible (..),
+    accesses,
+    Inputs (..),
+    inputs,
+    Outputs (..),
+    genericOutputsStringIO,
+    Awaits (..),
+    Yields (..),
+    module Data.Proxy,
+  )
+where
 
-import           Control.Lens
-import           Control.Monad                    (void)
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.State        (execStateT, StateT)
-import           Data.Proxy
+import Control.Lens
+import Control.Monad (void)
+import Control.Monad.IO.Class
+import Control.Monad.Trans.State (StateT, execStateT)
+import Data.Proxy
 
 {- The Modifiable Typeclass
   `Modifiable a f` is a typeclass used to generalize Control.Monad.State-like functions to any monad f.
@@ -125,8 +126,6 @@ class Monad f => Modifiable a f where
   modifyStatefully_ :: Proxy a -> StateT a f () -> f ()
   modifyStatefully_ p = void . modifyStatefully p
 
-
-
 class Has b a where
   this :: Proxy a -> Lens' b a
 
@@ -135,8 +134,6 @@ instance a `Has` a where
 
 instance (Identity a) `Has` a where
   this _ = lens runIdentity (const Identity)
-
-
 
 {- The Accessible Typeclass
   `Accessible a f` is a typeclass used to generalize the Control.Monad.State function
@@ -176,9 +173,10 @@ class Awaits f a where
   {-# MINIMAL await #-}
 
   awaitForever :: Monad f => (a -> f ()) -> f ()
-  awaitForever f = await >>= \case
-    Nothing -> return ()
-    Just a -> f a >> awaitForever f
+  awaitForever f =
+    await >>= \case
+      Nothing -> return ()
+      Just a -> f a >> awaitForever f
 
 {- The Yields Typeclass
   (f `Yields` a) is a typeclass used to generalize the `yield` function from streaming

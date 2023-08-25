@@ -1,72 +1,84 @@
-{-# LANGUAGE DeriveGeneric        #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE RecordWildCards      #-}
-{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Strato.Model.Event(
-  Event(..)
-  ) where
+module Blockchain.Strato.Model.Event
+  ( Event (..),
+  )
+where
 
-import           Control.DeepSeq
-import           GHC.Generics
-import           Data.Aeson
-import           Test.QuickCheck
-import           Test.QuickCheck.Arbitrary.Generic
-import           Test.QuickCheck.Instances()
+import Blockchain.MiscJSON ()
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import Data.Aeson
+import GHC.Generics
+import Test.QuickCheck
+import Test.QuickCheck.Arbitrary.Generic
+import Test.QuickCheck.Instances ()
+import Text.Format
 
-import           Blockchain.MiscJSON()
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Keccak256
-import           Text.Format
-
-data Event =
-  Event {
-    evBlockHash            :: Keccak256,
+data Event = Event
+  { evBlockHash :: Keccak256,
     evContractOrganization :: String,
-    evContractApplication  :: String,
-    evContractName    :: String,
+    evContractApplication :: String,
+    evContractName :: String,
     evContractAccount :: Account,
-    evName            :: String,
-    evArgs            :: [(String, String)] -- TODO: probably should use Solidity values here?
-    } deriving (Eq, Read, Show, Generic)
+    evName :: String,
+    evArgs :: [(String, String)] -- TODO: probably should use Solidity values here?
+  }
+  deriving (Eq, Read, Show, Generic)
 
 instance Format Event where
-  format Event{..} =
-    "evBlockHash: " ++ format evBlockHash ++ "\n" ++
-    "evContractOrganization: " ++ evContractOrganization ++ "\n" ++
-    "evContractApplication: " ++ evContractApplication ++ "\n" ++
-    "evContractName: " ++ evContractName ++ "\n" ++
-    "evContractAccount: " ++ format evContractAccount ++ "\n" ++
-    "evName: " ++ evName ++ "\n" ++
-    "evArgs: " ++ show evArgs ++ "\n"
-    
+  format Event {..} =
+    "evBlockHash: " ++ format evBlockHash ++ "\n"
+      ++ "evContractOrganization: "
+      ++ evContractOrganization
+      ++ "\n"
+      ++ "evContractApplication: "
+      ++ evContractApplication
+      ++ "\n"
+      ++ "evContractName: "
+      ++ evContractName
+      ++ "\n"
+      ++ "evContractAccount: "
+      ++ format evContractAccount
+      ++ "\n"
+      ++ "evName: "
+      ++ evName
+      ++ "\n"
+      ++ "evArgs: "
+      ++ show evArgs
+      ++ "\n"
 
 instance ToJSON Event where
-  toJSON Event{..} = object
-    [ "eventBlockHash" .= evBlockHash
-    , "eventContractOrganization" .= evContractOrganization
-    , "eventContractApplication" .= evContractApplication
-    , "eventContractName" .= evContractName
-    , "eventContractAccount" .= evContractAccount
-    , "eventName"         .= evName
-    , "eventArgs"         .= evArgs
-    ]
+  toJSON Event {..} =
+    object
+      [ "eventBlockHash" .= evBlockHash,
+        "eventContractOrganization" .= evContractOrganization,
+        "eventContractApplication" .= evContractApplication,
+        "eventContractName" .= evContractName,
+        "eventContractAccount" .= evContractAccount,
+        "eventName" .= evName,
+        "eventArgs" .= evArgs
+      ]
 
 instance FromJSON Event where
-  parseJSON (Object o) = Event
-    <$> (o .: "eventBlockHash")
-    <*> (o .: "eventContractOrganization")
-    <*> (o .: "eventContractApplication")
-    <*> (o .: "eventContractName")
-    <*> (o .: "eventContractAccount")
-    <*> (o .: "eventName")
-    <*> (o .: "eventArgs")
+  parseJSON (Object o) =
+    Event
+      <$> (o .: "eventBlockHash")
+      <*> (o .: "eventContractOrganization")
+      <*> (o .: "eventContractApplication")
+      <*> (o .: "eventContractName")
+      <*> (o .: "eventContractAccount")
+      <*> (o .: "eventName")
+      <*> (o .: "eventArgs")
   parseJSON o = error $ "parseJSON Event: Expected object, got:" ++ show o
 
 instance NFData Event
 
 instance Arbitrary Event where
   arbitrary = genericArbitrary
-  

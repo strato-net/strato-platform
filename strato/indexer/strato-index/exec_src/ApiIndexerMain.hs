@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-import           BlockApps.Init
-import           BlockApps.Logging
-import           Blockchain.Strato.Indexer.ApiIndexer
-import           HFlags
+import BlockApps.Init
+import BlockApps.Logging
+import Blockchain.Strato.Indexer.ApiIndexer
+import HFlags
 
 main :: IO ()
 main = do

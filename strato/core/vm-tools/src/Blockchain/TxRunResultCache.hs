@@ -1,21 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Blockchain.TxRunResultCache (
-  Cache,
-  new,
-  insert,
-  lookup
-  ) where
 
+module Blockchain.TxRunResultCache
+  ( Cache,
+    new,
+    insert,
+    lookup,
+  )
+where
+
+import Blockchain.Bagger.Transactions
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.StateRoot
 import Control.DeepSeq
 import qualified Data.Cache.LRU as LRU
 import Data.IORef
 import qualified Data.Text as T
 import Prometheus
 import Prelude hiding (lookup)
-
-import Blockchain.Bagger.Transactions
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.StateRoot
 
 type CacheValue = (StateRoot, Integer, [TxRunResult])
 
@@ -28,17 +29,19 @@ instance NFData Cache where
 
 {-# NOINLINE resultsCacheSize #-}
 resultsCacheSize :: Vector T.Text Gauge
-resultsCacheSize = unsafeRegister
-                 . vector "kind"
-                 . gauge
-                 $ Info "vm_results_cache_size" "Sizes of the results cache"
+resultsCacheSize =
+  unsafeRegister
+    . vector "kind"
+    . gauge
+    $ Info "vm_results_cache_size" "Sizes of the results cache"
 
 {-# NOINLINE resultsCacheStats #-}
 resultsCacheStats :: Vector T.Text Counter
-resultsCacheStats = unsafeRegister
-                  . vector "event"
-                  . counter
-                  $ Info "vm_results_cache_stats" "Statistics about cache access"
+resultsCacheStats =
+  unsafeRegister
+    . vector "event"
+    . counter
+    $ Info "vm_results_cache_stats" "Statistics about cache access"
 
 recomputeCacheSize :: Cache -> IO ()
 recomputeCacheSize (Cache ioref) = do
@@ -68,5 +71,5 @@ lookup (Cache ioref) hsh = do
   res <- snd . LRU.lookup hsh <$> readIORef ioref
   case res of
     Nothing -> withLabel resultsCacheStats "misses" incCounter
-    Just{} -> withLabel resultsCacheStats "hits" incCounter
+    Just {} -> withLabel resultsCacheStats "hits" incCounter
   return res
