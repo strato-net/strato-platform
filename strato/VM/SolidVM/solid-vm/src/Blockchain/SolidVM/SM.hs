@@ -40,7 +40,7 @@ module Blockchain.SolidVM.SM (
   getCurrentFunctionName,
   getCurrentCodeCollection,
   addFunctionToCurrentContractInCurrentCallInfo,
-  removeFunctionFromCurrentContractInCurrentCallInfo, 
+  removeFunctionFromCurrentContractInCurrentCallInfo,
   getEnv,
   getGasInfo,
   getVariableOfName,
@@ -348,7 +348,7 @@ runSM maybeCode env gi chainId' f = do
         callStack = [],
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
-        _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit 
+        _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit
         }
   startingStateRef <- newIORef startingState
   eVal <- try $ runReaderT f startingStateRef
@@ -432,7 +432,7 @@ getVariableOfName name = do
                                                 ,  CC._contractType = currentContract x^.CC.contractType
                                                 ,  CC._importedFrom = Nothing
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
-                                                } 
+                                                }
                               }
                     else x
       vars = localVariables currentCallInfo
@@ -451,7 +451,7 @@ getVariableOfName name = do
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
                                                   , "string", "keccak256", "ripemd160", "payable"
-                                                  , "require", "revert", "assert", "sha3"  , "delegatecall"
+                                                  , "require", "revert", "assert", "sha3", "delegatecall", "call", "derive"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
                                                   , "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $
@@ -596,7 +596,7 @@ pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   (curFrame:rest) -> do
     let localVariables' = localVariables curFrame
         variableStack'  = variableStack curFrame
-    {-- We save the local variables available in this scope to the 'stack', 
+    {-- We save the local variables available in this scope to the 'stack',
     which is simply a list of mappings from name to type/values
     --}
     pure $ curFrame{variableStack = (localVariables':variableStack')} : rest
@@ -609,7 +609,7 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     let (varFrame, st) = case variableStack curFrame of
           (varFrame': st') -> (varFrame', st')
           [] -> (M.empty, [])
-    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars), 
+    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars),
     we simply reassign the local variables to the top frame of the stack
     and the new stack's value is the rest of the frames
     --}
@@ -693,7 +693,7 @@ addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
         (currentCallInfo:_) -> do
             let contract = currentContract currentCallInfo
             -- _functions :: Map SolidString (FuncF a),
-                newContract = contract{CC._functions = M.insert funcName funcObject $ CC._functions contract} 
+                newContract = contract{CC._functions = M.insert funcName funcObject $ CC._functions contract}
             Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
                 [] -> internalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack" ()
                 (ci:rest) -> pure $ ci{currentContract=newContract} : rest
@@ -706,7 +706,7 @@ removeFunctionFromCurrentContractInCurrentCallInfo funcName = do
         (currentCallInfo:_) -> do
             let contract = currentContract currentCallInfo
             -- _functions :: Map SolidString (FuncF a),
-                newContract = contract{CC._functions = M.delete funcName $ CC._functions contract} 
+                newContract = contract{CC._functions = M.delete funcName $ CC._functions contract}
             Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
                 [] -> internalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack" ()
                 (ci:rest) -> pure $ ci{currentContract=newContract} : rest

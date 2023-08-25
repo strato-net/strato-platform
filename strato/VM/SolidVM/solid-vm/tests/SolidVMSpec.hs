@@ -5731,7 +5731,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn` 
+    getFields ["x", "y"] `shouldReturn`
       [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) Nothing
       , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just . hash $ BC.pack src) Nothing
       ]
@@ -5766,7 +5766,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn` 
+    getFields ["x", "y"] `shouldReturn`
       [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]")
       , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SInteger 100]")
       ]
@@ -5798,6 +5798,52 @@ contract qq {
     [BContract "User" x] <- getFields["x"]
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
+
+
+  it "can deterministically derive salted contract addresses with no args" . runTest $ do
+    let src = [r|
+contract VerySimpleStorage {
+  uint x;
+  constructor() {
+    x = 1337;
+  }
+}
+
+contract qq {
+  VerySimpleStorage public x;
+  address y;
+  constructor() public {
+    x = new VerySimpleStorage{salt: "kosher"}();
+    y = address(this).derive("kosher");
+
+    require(address(x) == y, "These salted addresses are not the same");
+  }
+}|]
+    runBS src `shouldReturn` ()
+
+
+  it "can deterministically derive salted contract addresses with multiple args" . runTest $ do
+    let src = [r|
+contract User {
+  string commonName;
+  string cert;
+  constructor(string _commonName, string _cert) {
+    commonName = _commonName;
+    cert = _cert;
+  }
+}
+
+contract qq {
+  User public x;
+  address y;
+  constructor() public {
+    x = new User{salt: "himalayan"}("David Moncayo", "Bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk");
+    y = address(this).derive("himalayan", "David Moncayo", "Bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk");
+    require(address(x) == y, "These salted addresses are not the same");
+  }
+}|]
+    runBS src `shouldReturn` ()
+
 
   it "should fail when trying to create salted contract to the same address" $ runTest (do
     runBS [r|
