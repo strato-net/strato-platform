@@ -508,7 +508,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
           Nothing -> M.insert "<constructor>" emptyFunction $ contract^.CC.functions
           Just c -> M.insert "<constructor>" c $ contract^.CC.functions
         where
-          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing M.empty [] dummyAnnotation False []
+          emptyFunction = CC.Func [] [] Nothing (Just []) Nothing False Nothing M.empty [] dummyAnnotation False []
           dummyAnnotation :: SourceAnnotation ()
           dummyAnnotation =
             SourceAnnotation
@@ -541,6 +541,9 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
           (Just theFunction, CC.DefaultCall) -> do
                 args' <- argsToVals contract' theFunction argExps
                 mCallInfo <- getCurrentCallInfoIfExists
+                let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
+                when ((from /= to) && isForbidden) $
+                  unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
                 let ro = case mCallInfo of
                           Nothing -> False
                           Just ci -> if fromChain == toChain then readOnly ci else True
@@ -580,6 +583,9 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                       case finalFuncFind of
                         [a] -> Just a
                         _   -> Nothing
+                let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
+                when ((from /= to) && isForbidden) $
+                  unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
                 case mtheFunction' of
                       Just theFunction' -> do
                         args' <- argsToVals contract' theFunction' $ case valList' of [] -> CC.OrderedArgs []; _ -> argExps
@@ -602,8 +608,11 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
           -- Maybe the function is actually a getter
           _ -> do
             case M.lookup functionName $ contract^.CC.storageDefs of
-              Just _ -> do
+              Just CC.VariableDecl{..} -> do
                   $logDebugS "call'/getter" . T.pack $ labelToString functionName
+                  let isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
+                  when ((from /= to) && isForbidden) $
+                    unknownFunction "logFunctionCall" (functionName, contract^.CC.contractName)
                   addCallInfo to contract functionName hsh cc M.empty True False
                   -- TODO: this should only exist if the storage variable is declared "public",
                   -- right now I just ignore this and allow anything to be called as a getter

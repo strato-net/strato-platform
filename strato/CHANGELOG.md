@@ -29,6 +29,8 @@ so that they could be properly moved to their respective version's subsection.
 - Derived contracts are inserted as rows in abstract tables
 - Support for imports from addresses in SolidVM
 - More lenient P2P disable times to prevent non-validators from being "locked out"
+- Proper behavior of virtual, override, and visibility modifiers
+- Introduction of `es6` and `strict` pragmas, which enable braced and qualified import syntax, and proper visibility modifier behavior, respectively.
 - `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
 
 ### Changed
