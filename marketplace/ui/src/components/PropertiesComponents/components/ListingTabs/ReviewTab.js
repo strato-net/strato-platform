@@ -112,7 +112,8 @@ const ReviewTab = (props) => {
               index={index}
               setOpen={setOpen}
               open={open}
-              handleRead={() => { handleRead(index) }} />
+              handleRead={() => { handleRead(index) }} 
+              id={props.propertyId} />
           })}
         </div>
       </Col>

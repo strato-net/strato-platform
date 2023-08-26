@@ -10,11 +10,12 @@ import {
   usePropertiesState,
 } from "../../../../contexts/propertyContext";
 import { actions } from "../../../../contexts/propertyContext/actions";
+import DeleteReviewModal from "./DeleteReviewModal";
 
 const ReviewCard = (props) => {
   const {
     review: { reviewerName, title, createdDate, rating, description, address, readmore },
-    index
+    index, id
   } = props;
   const decodedDescription = decodeURIComponentText(description, readmore)
 
@@ -22,11 +23,12 @@ const ReviewCard = (props) => {
   const [api, contextHolder] = notification.useNotification();
 
   const [open, setOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [reviewData, setReviewData] = useState({})
 
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { message, success, isReviewUpdating } = usePropertiesState();
+  const { message, success, isReviewUpdating, isReviewDeleting } = usePropertiesState();
   const dispatch = usePropertiesDispatch();
 
   const handleCancel = () => {
@@ -41,8 +43,20 @@ const ReviewCard = (props) => {
       address: address,
     }
     console.log('form', formBody)
-    await actions.updateReview(dispatch, formBody);
-  }
+    const result = await actions.updateReview(dispatch, formBody);
+    if(result) {
+      setOpen(!open)
+      actions.fetchPropertyDetails(dispatch, id);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    const result = await actions.deleteReview(dispatch, address);
+    if(result) {
+      setOpen(!open)
+      actions.fetchPropertyDetails(dispatch, id);
+    }
+  };
 
   const openToast = (placement) => {
 
@@ -107,6 +121,9 @@ const ReviewCard = (props) => {
                 danger
                 type="primary"
                 icon={<DeleteOutlined />}
+                onClick={() => {
+                  setDeleteModalOpen(!deleteModalOpen)
+                }}
               />
             </div>
           </Row>
@@ -166,6 +183,12 @@ const ReviewCard = (props) => {
         setReviewData={setReviewData}
         handleCancel={handleCancel}
         handleSubmitUpdate={handleSubmitUpdate}
+      />
+      <DeleteReviewModal
+        open={deleteModalOpen}
+        handleDeleteReview={handleDeleteReview}
+        isReviewDeleting={isReviewDeleting}
+        handleCancel={() => setDeleteModalOpen(false)}
       />
     </>
   );
