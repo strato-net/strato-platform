@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Typography, Space, Avatar, Form, Row, Image } from "antd";
+import { Button, Typography, Space, Avatar, Form, Row, Image, notification } from "antd";
 import { UserOutlined, DownOutlined, UpOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useAuthenticateState } from "../../../../contexts/authentication";
 import { decodeURIComponentText, unixToDate } from "../../helpers/utils";
@@ -19,6 +19,7 @@ const ReviewCard = (props) => {
   const decodedDescription = decodeURIComponentText(description, readmore)
 
   const [form] = Form.useForm();
+  const [api, contextHolder] = notification.useNotification();
 
   const [open, setOpen] = useState(false);
   const [reviewData, setReviewData] = useState({})
@@ -43,6 +44,25 @@ const ReviewCard = (props) => {
     await actions.updateReview(dispatch, formBody);
   }
 
+  const openToast = (placement) => {
+
+    if (success) {
+      api.success({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
   useEffect(() => {
     form.setFieldsValue({
       title: title,
@@ -53,6 +73,8 @@ const ReviewCard = (props) => {
 
   return (
     <>
+      {message && openToast("bottom")}
+      {contextHolder}
       <Space
         direction="vertical"
         size="small"
