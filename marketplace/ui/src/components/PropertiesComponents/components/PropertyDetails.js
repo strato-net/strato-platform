@@ -8,6 +8,7 @@ import {
   notification,
   Button,
   Space,
+  Modal,
 } from "antd";
 import ImageCollage from "../../Carousel/ImageCollage";
 import OverviewTab from "./ListingTabs/OverviewTab";
@@ -25,10 +26,12 @@ import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj, homeTypeData } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
 import { useAuthenticateState } from "../../../contexts/authentication";
+import TalkToSalesModal from "./TalkToSalesModal";
 
 function PropertyDetails() {
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
+  const [isTalkToSalesModalOpen, setTalkToSalesModal] = useState(false);
   const dispatch = usePropertiesDispatch();
   const {
     property,
@@ -41,6 +44,10 @@ function PropertyDetails() {
   const organization = user?.organization
 
   let { id } = useParams();
+
+  const handleCancel = () => {
+    setTalkToSalesModal(!isTalkToSalesModalOpen);
+  };
 
   useEffect(() => {
     actions.fetchPropertyDetails(dispatch, id);
@@ -316,9 +323,11 @@ function PropertyDetails() {
                 <Button
                   type="primary"
                   style={{ marginLeft: "50px", marginTop: "30px" }}
-                  disabled
+                  onClick={() => {
+                    setTalkToSalesModal(!isTalkToSalesModalOpen);
+                  }}
                 >
-                  Submit Inquiry
+                  Talk to Sales
                 </Button>
               </Col>
             </Row>
@@ -356,6 +365,9 @@ function PropertyDetails() {
         formData={propertyDetails}
         isEdit={true}
       />}
+      <Modal open={isTalkToSalesModalOpen} footer={[]} onCancel={() => handleCancel()}>
+      <TalkToSalesModal />
+      </Modal>
     </>
   );
 }

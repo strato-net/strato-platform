@@ -33,9 +33,9 @@ contract ReviewManager_0_2 {
 
     function updateReview(
         string _title,
-        address _description,
+        string _description,
         uint _rating,
-        string _address
+        address _address
     ) returns (uint256) {
         Review_0_3 review = Review_0_3(_address);
         return review.update(

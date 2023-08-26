@@ -452,7 +452,7 @@ class PropertiesController {
 
   static validateDeleteReviewArgs(args) {
     const deleteReviewSchema = Joi.object({
-      productAddress: Joi.string().required(),
+      address: Joi.string().required(),
     });
 
     const validation = deleteReviewSchema.validate(args);
