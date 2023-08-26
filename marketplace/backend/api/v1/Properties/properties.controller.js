@@ -149,14 +149,10 @@ class PropertiesController {
       const {
         dapp,
         body,
-        // body: {
-        //   title,
-        //   description,
-        //   rating,
-        // },
       } = req;
+      console.log("updateReview body", body);
 
-      PropertiesController.validateUpdatePropertyArgs(body);
+      PropertiesController.validateUpdateReviewArgs(body);
 
       const updatedReview = await dapp.updateReview(body);
       rest.response.status200(res, updatedReview);

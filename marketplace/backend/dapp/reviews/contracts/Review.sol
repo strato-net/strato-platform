@@ -3,7 +3,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of Review assets
-contract Review_0_2 {
+contract Review_0_3 {
     address public productId;
     address public propertyId;
     address public reviewerAddress;

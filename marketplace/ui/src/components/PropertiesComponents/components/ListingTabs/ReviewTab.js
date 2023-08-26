@@ -24,7 +24,7 @@ const ReviewTab = (props) => {
 
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const { message, success, isReviewAdding } = usePropertiesState();
-  console.log(user)
+
   useEffect(() => {
     const listOfReviews = []
     reviews?.forEach((review) => {
@@ -110,6 +110,8 @@ const ReviewTab = (props) => {
             return <ReviewCard
               review={review}
               index={index}
+              setOpen={setOpen}
+              open={open}
               handleRead={() => { handleRead(index) }} />
           })}
         </div>

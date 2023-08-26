@@ -22,6 +22,7 @@ function PropertyListings() {
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
+    document.title = "Welcome to Mercata Properties"
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
 

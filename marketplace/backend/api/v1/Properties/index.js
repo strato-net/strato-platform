@@ -48,7 +48,7 @@ router.post(
   PropertiesController.deleteReview
 );
 
-router.updateReview(
+router.put(
   Properties.updateReview,
   authHandler.authorizeRequest(),
   loadDapp,

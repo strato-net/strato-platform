@@ -1,35 +1,33 @@
-import React, { useState } from "react";
-import { Button, Modal, Col, Row, Input, Form, Rate } from "antd";
+import React from "react";
+import { Button, Modal, Form, Input, Rate } from "antd";
 import TagManager from "react-gtm-module";
 
 const { TextArea } = Input;
 
-const WriteReviewModal = (props) => {
-  const [reviewData, setReviewData] = useState({})
-  const { open, handleCancel, isReviewSubmitting, handleSubmit, form } = props;
-
-  const { title, rating, description } = reviewData
+const EditReviewModal = (props) => {
+  const { open, title, rating, description, handleCancel, isReviewUpdating, reviewData, setReviewData, handleSubmitUpdate, form } = props;
   const disabledSubmitReview =
-    !form.getFieldValue("title") ||
-    !form.getFieldValue("rating") ||
-    !form.getFieldValue("description");
+  !form.getFieldValue("title") ||
+  !form.getFieldValue("rating") ||
+  !form.getFieldValue("description");
 
   const handleChange = (key, value) => {
     let data = { ...reviewData }
     data[key] = value;
     setReviewData(data)
+    console.log('data', data)
   }
 
   return (
     <Modal
       open={open}
-      title="Write a Review"
+      title="Edit your review"
       onCancel={() => handleCancel()}
       footer={[
         <Button
           key="back"
           onClick={() => handleCancel()}
-          disabled={isReviewSubmitting}
+          disabled={isReviewUpdating}
         >
           Cancel
         </Button>,
@@ -37,7 +35,7 @@ const WriteReviewModal = (props) => {
           key="submit"
           type="primary"
           htmlType="submit"
-          loading={isReviewSubmitting}
+          loading={isReviewUpdating}
           disabled={disabledSubmitReview}
           onClick={() => {
             TagManager.dataLayer({
@@ -45,7 +43,7 @@ const WriteReviewModal = (props) => {
                 event: 'PROPERTIES_REVIEW_SUBMITTED',
               },
             })
-            handleSubmit()
+            handleSubmitUpdate()
           }}
         >
           Submit
@@ -93,12 +91,13 @@ const WriteReviewModal = (props) => {
           ]}
         >
           <TextArea rows={4} style={{ resize: 'none' }} onChange={(e) => { handleChange("description", e.target.value) }}
-            value={description}
-            defaultValue={description} />
+            value={decodeURIComponent(description.replace(/%0A/g, '\n'))} 
+            defaultValue={decodeURIComponent(description.replace(/%0A/g, '\n'))}
+            />
         </Form.Item>
       </Form>
     </Modal>
   );
 };
 
-export default WriteReviewModal;
+export default EditReviewModal;

@@ -816,7 +816,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   // Edit Reviews
-  contract.editReview = async function (args, options = defaultOptions) {
+  contract.updateReview = async function (args, options = defaultOptions) {
     return managers.reviewManager.updateReview(args);
   }
 

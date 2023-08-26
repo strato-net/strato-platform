@@ -11,7 +11,7 @@ import dayjs from "dayjs";
 
 import reviewJs from "./review";
 
-const contractName = "ReviewManager_0_1";
+const contractName = "ReviewManager_0_2";
 const contractFilename = `${util.cwd}/dapp/reviews/contracts/ReviewManager.sol`;
 
 /**
