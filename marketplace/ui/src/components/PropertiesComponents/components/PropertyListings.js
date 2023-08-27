@@ -117,7 +117,6 @@ function PropertyListings() {
     : (properties.length === LIMIT_PER_PAGE
       ? (currentPage * LIMIT_PER_PAGE) + 1
       : currentPage * LIMIT_PER_PAGE)
-console.log(properties)
   return (
     <>
       {message && openToast("bottom")}

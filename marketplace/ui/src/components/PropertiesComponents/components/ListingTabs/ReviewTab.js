@@ -13,7 +13,6 @@ import ReviewCard from "./ReviewCard";
 
 const ReviewTab = (props) => {
   const { reviews } = props
-  console.log(reviews)
   const dispatch = usePropertiesDispatch();
 
   const [open, setOpen] = useState(false);
@@ -113,6 +112,7 @@ const ReviewTab = (props) => {
               setOpen={setOpen}
               open={open}
               handleRead={() => { handleRead(index) }} 
+              userAddress={user.userAddress}
               id={props.propertyId} />
           })}
         </div>

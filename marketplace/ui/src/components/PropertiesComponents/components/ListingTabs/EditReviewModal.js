@@ -16,7 +16,6 @@ const EditReviewModal = (props) => {
     let data = { ...reviewData }
     data[key] = value;
     setReviewData(data)
-    console.log('data', data)
   }
 
   return (

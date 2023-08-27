@@ -14,8 +14,8 @@ import DeleteReviewModal from "./DeleteReviewModal";
 
 const ReviewCard = (props) => {
   const {
-    review: { reviewerName, title, createdDate, rating, description, address, readmore },
-    index, id
+    review: { reviewerName, title, createdDate, rating, description, address, reviewerAddress, readmore },
+    index, id, userAddress
   } = props;
   const decodedDescription = decodeURIComponentText(description, readmore)
 
@@ -42,17 +42,17 @@ const ReviewCard = (props) => {
       description: encodedDescription,
       address: address,
     }
-    console.log('form', formBody)
+
     const result = await actions.updateReview(dispatch, formBody);
-    if(result) {
+    if (result) {
       setOpen(!open)
       actions.fetchPropertyDetails(dispatch, id);
     }
   };
 
   const handleDeleteReview = async () => {
-    const result = await actions.deleteReview(dispatch, {address: address});
-    if(result) {
+    const result = await actions.deleteReview(dispatch, { address: address });
+    if (result) {
       setOpen(!open)
       actions.fetchPropertyDetails(dispatch, id);
     }
@@ -102,30 +102,32 @@ const ReviewCard = (props) => {
               {reviewerName}
             </Typography.Text>
           </Typography.Text>
-          <Row>
+          <Row style={{display: 'flex', alignItems:'center'}}>
+            { userAddress === reviewerAddress &&
+              <div style={{ justifyContent: "flex-end" }}>
+                <Button
+                  type="primary"
+                  style={{ marginRight: "6px" }}
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setOpen(!open)
+                  }}
+                />
+                <Button
+                  danger
+                  type="primary"
+                  style={{ marginRight: "6px" }}
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    setDeleteModalOpen(!deleteModalOpen)
+                  }}
+                />
+              </div>
+            }
             <Typography.Text strong type="primary" style={{ marginRight: "6px" }}>
               {rating}
             </Typography.Text>
-            <Image src={star} width={20} height={20} preview={false} style={{ marginRight: "6px" }} />
-            {/* edit & delete buttons, that we have to use after login functionality */}
-            <div style={{ justifyContent: "flex-end" }}>
-              <Button
-                type="primary"
-                style={{ marginRight: "6px" }}
-                icon={<EditOutlined />}
-                onClick={() => {
-                  setOpen(!open)
-                }}
-              />
-              <Button
-                danger
-                type="primary"
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  setDeleteModalOpen(!deleteModalOpen)
-                }}
-              />
-            </div>
+            <Image src={star} width={20} height={20} preview={false} />
           </Row>
         </div>
         <Typography.Text type="secondary">
