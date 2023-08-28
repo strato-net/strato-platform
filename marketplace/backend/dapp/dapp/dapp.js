@@ -1392,7 +1392,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   //Note that memberships should be surjective to Products (some data has ProductId as null)
   //Also note that there maybe multiple inventories that map to a single product that correspond to a single membership
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
- 
+    const oldOptions =  { ...options,  app: contractName }
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
   
     // Get all memberships
@@ -1411,7 +1411,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     products.forEach(product => {
       memberships = memberships.map(membership => {
         return (membership.productId === product.address)  ?
-          { ...membership, product: product, productImage: null, inventories: [] } : membership;} )
+          { ...membership, product: product, productImage: null, inventories: []} : membership;} )
     })  
        
     //Get Product Image Info
@@ -1431,8 +1431,30 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     inventories.forEach(inventory => {
       memberships = memberships.map(membership => {
         return (membership.productId === inventory.productId)  ?
-          { ...membership, inventories: [...membership.inventories, inventory] } : membership;} )
+          { ...membership, inventories: [...membership.inventories, inventory]} : membership;} )
     })
+
+    const membershipAddressList = memberships.map(membership => membership.address);    
+    //Get Services for price savings
+    const membershipServices = await membershipServiceJs.getAll(rawAdmin, { membershipId: membershipAddressList},  {...options, org: managers.cirrusOrg, app: contractName} );
+
+    const serviceAddresses = membershipServices.map(membershipService => membershipService.serviceId);
+
+    // const servicesAll = await managers.serviceManager.getAll({ownerOrganization: userOrganization  }, { ...options, org: managers.cirrusOrg, app: contractName, });
+    const servicesAll = await managers.serviceManager.getAll({address: serviceAddresses  }, { ...options, org: managers.cirrusOrg, app: contractName, });
+    membershipServices.forEach(membershipService => {
+      servicesAll.forEach(service => {
+        if (service.address === membershipService.serviceId) {
+          memberships =  memberships.map(membership => {
+          return ((membership.address === membershipService.membershipId) )  ?
+              { ...membership, 
+                //Note we might have multiple service per membership
+                savings: (membership.hasOwnProperty('savings') ?
+                  membership.savings : 0 ) + (service.price - membershipService.membershipPrice)} 
+              : membership;} )
+        }
+      })
+    }) 
 
     console.log("Dapp-getMemberships memberships: ", memberships)
     return memberships;
