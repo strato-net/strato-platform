@@ -53,20 +53,20 @@ const HeaderComponent = ({ user, loginUrl }) => {
     // {
     //   role: 0,
     //   items: [
-        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
-        { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">Inventory</div>, key: '2' },
-        { label: <div id="Products">Products</div>, key: '3' },
-        { label: <div id="Events">Events</div>, key: '4' },
+    { label: <div id="Marketplace">Marketplace</div>, key: '0' },
+    { label: <div id="Orders">Orders</div>, key: '1' },
+    { label: <div id="Inventory">Inventory</div>, key: '2' },
+    { label: <div id="Products">Products</div>, key: '3' },
+    { label: <div id="Events">Events</div>, key: '4' },
     //   ]
     // }
   ];
 
   const menu = [
-    { name: "arts", icon: arts, label: "arts", url: "" },
-    { name: "property", icon: property, label: "property", url: "/properties" },
-    { name: "carbon", icon: carbon, label: "carbon", url: "" },
-    { name: "loyalty", icon: loyalty, label: "loyalty", url: "" }
+    { name: "arts", icon: arts, label: "Arts", url: "" },
+    { name: "property", icon: property, label: "Property", url: "/properties" },
+    { name: "carbon", icon: carbon, label: "Carbon", url: "" },
+    { name: "loyalty", icon: loyalty, label: "Loyalty", url: "" }
   ]
 
   const navUrls = [
@@ -99,7 +99,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
-    } else{
+    } else {
       setSelectedTab("0");
     }
   }, [window.location.pathname]);
@@ -155,8 +155,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
   const redirect = () => {
     setOpen(false)
     navigate("/properties")
-    // setTimeout(()=>{
-    // }, 1000)
   }
 
   const isLogin = () => {
@@ -281,24 +279,25 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
       </Space>
       <Modal
+        closeIcon={true}
         title="What kind of asset we are selling ?"
         centered
         open={open}
         onOk={() => setOpen(false)}
         onCancel={() => setOpen(false)}
-        width={'400px'}
+        width={'350px'}
         height={'90%'}
         footer={false}
       >
         <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
           {menu.map((item, index) => {
-            const {icon, label, url } = item
-            return <Col className="menu-card" onClick={() => { redirect(url) }} 
-            span={6} offset={3}
-             key={index} style={{ display: "flex", padding: "8px" }}>
+            const { icon, label, url } = item
+            return <Col className="menu-card" onClick={() => { redirect(url) }}
+              span={6} offset={4}
+              key={index} style={{ display: "flex", padding: "5px" }}>
               <div style={{ margin: "auto" }}>
-                <div style={{margin:"auto"}}>{icon}</div>
-                <p style={{ textAlign: "center" }}>{label}</p>
+                <div style={{ margin: "auto" }}>{icon}</div>
+                <p style={{ textAlign: "center",marginTop:"2px" }}>{label}</p>
               </div>
             </Col>
           })}

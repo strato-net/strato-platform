@@ -26,5 +26,7 @@
   border-radius: 12px;
   cursor: pointer;
   /* color: blue; */
-  fill: blue !important;
+}
+.ant-modal-title{
+  text-align: center;
 }
