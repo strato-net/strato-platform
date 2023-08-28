@@ -63,10 +63,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
   ];
 
   const menu = [
-    { name: "arts", icon: carbon, label: "arts", url: "" },
+    { name: "arts", icon: arts, label: "arts", url: "" },
     { name: "property", icon: property, label: "property", url: "/properties" },
     { name: "carbon", icon: carbon, label: "carbon", url: "" },
-    { name: "loyalty", icon: property, label: "loyalty", url: "" }
+    { name: "loyalty", icon: loyalty, label: "loyalty", url: "" }
   ]
 
   const navUrls = [
@@ -292,10 +292,13 @@ const HeaderComponent = ({ user, loginUrl }) => {
       >
         <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
           {menu.map((item, index) => {
-            return <Col className="menu-card" onClick={() => { redirect(item.url) }} span={6} offset={3} key={index} style={{ display: "flex", padding: "5px" }}>
+            const {icon, label, url } = item
+            return <Col className="menu-card" onClick={() => { redirect(url) }} 
+            span={6} offset={3}
+             key={index} style={{ display: "flex", padding: "8px" }}>
               <div style={{ margin: "auto" }}>
-                <div style={{margin:"auto"}}>{item.icon}</div>
-                <p style={{ textAlign: "center" }}>{item.label}</p>
+                <div style={{margin:"auto"}}>{icon}</div>
+                <p style={{ textAlign: "center" }}>{label}</p>
               </div>
             </Col>
           })}
