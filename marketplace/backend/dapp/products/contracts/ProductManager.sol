@@ -2,6 +2,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "./Product.sol";
 import "./Inventory.sol";
 import "./Carbon.sol";
+import "./Vintage.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of ProductManager to manage product and inventory

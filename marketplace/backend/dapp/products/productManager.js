@@ -12,6 +12,7 @@ import dayjs from "dayjs";
 import productJs from "./product";
 import inventoryJs from "./inventory";
 import carbonJs from "./carbon";
+import vintageJs from "./vintage"
 
 const contractName = "ProductManager";
 const contractFilename = `${util.cwd}/dapp/products/contracts/ProductManager.sol`;
@@ -108,6 +109,10 @@ function bind(user, _contract, options) {
     getInventory(user, contract, args, _options);
   contract.getInventories = async (args, _options = defaultOptions) =>
     getInventories(user, contract, args, _options);
+  contract.getVintage = async (args, _options = defaultOptions) =>
+    getVintage(user, args, _options);
+  contract.getVintages = async (args, _options = defaultOptions) =>
+    getVintages(user, args, _options);
   contract.updateProduct = async (args) =>
     updateProduct(user, contract, args, options);
   contract.createProduct = async (args) =>
@@ -287,6 +292,32 @@ async function createInventory(admin, contract, _args, baseOptions) {
   return [restStatus, inventoryAddress];
 }
 
+// * Add the vintage
+async function createVintage(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "addVintage",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, vintageAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, vintageAddress];
+}
+
 /**
  * Resell a portion of existing inventory
  */
@@ -398,6 +429,20 @@ async function getCarbon(user, args, options) {
  */
 async function getCarbons(user, args, options) {
   return carbonJs.getAll(user, args, options);
+}
+
+/**
+ * get the vintage details
+ */
+async function getVintage(user, args, options) {
+  return vintageJs.get(user, args, options);
+}
+
+/**
+ * get all the carbon details
+ */
+async function getVintages(user, args, options) {
+  return vintageJs.getAll(user, args, options);
 }
 
 /**

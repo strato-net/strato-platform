@@ -8,6 +8,7 @@ import { ProductsProvider } from "./contexts/product";
 import Inventory from "./components/Inventory";
 import { InventoriesProvider } from "./contexts/inventory";
 import { CarbonProvider } from "./contexts/carbon";
+import { VintageProvider } from "./contexts/vintage";
 import Order from "./components/Order";
 import SoldOrderDetails from "./components/Order/SoldOrderDetails";
 import BoughtOrderDetails from "./components/Order/BoughtOrderDetails";
@@ -174,9 +175,11 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 <EventTypesProvider>
                   <EventsProvider>
                     <ProductsProvider>
-                      <InventoriesProvider>
-                        <Inventory user={user} users={users} />
-                      </InventoriesProvider>
+                      <VintageProvider>
+                        <InventoriesProvider>
+                          <Inventory user={user} users={users} />
+                        </InventoriesProvider>
+                      </VintageProvider>
                     </ProductsProvider>
                   </EventsProvider>
                 </EventTypesProvider>

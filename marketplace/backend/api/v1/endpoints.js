@@ -50,6 +50,13 @@ export const Inventory = {
   // transferOwnership: '/transferOwnership',
 }
 
+export const Vintage = {
+  prefix: '/vintage',
+  getAll: '/',
+  get: '/:address',
+  create: '/'
+}
+
 export const Order = {
   prefix: '/order',
   get: '/:address',

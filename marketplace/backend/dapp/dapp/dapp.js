@@ -30,7 +30,7 @@ const contractName = "Dapp";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
-let   userCert = null;
+let userCert = null;
 
 // interface Member {
 //   access?:boolean,
@@ -127,7 +127,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   let userOrganization
 
   if (!serviceUser) {
-    
+
     let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
 
     //We are not guaranteed the user will have a certificate
@@ -136,7 +136,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
-      userCert    = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
+      userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
       console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
   }
@@ -312,7 +312,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }, getOptions);
       carbonsWithProducts.push({ ...carbon, ...productData })
     }
-    
+
     return carbonsWithProducts;
   };
 
@@ -344,6 +344,66 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       return managers.productManager.createCarbon(carbonArgs);
+    }
+  }
+
+  contract.getVintage = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const vintage = await managers.productManager.getVintage({ ...args }, getOptions);
+
+    const inventoryData = await managers.productManager.getInventory({
+      address: vintage.inventoryId,
+      ownerOrganization: userOrganization
+    }, getOptions);
+
+    const vintageData = { ...vintage, ...inventoryData }
+    return vintageData;
+  };
+
+  contract.getVintages = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    const allVintagesData = await managers.productManager.getVintages({ ...args }, getOptions);
+    const vintagesWithInventory = [];
+
+    for (const vintage of allVintagesData) {
+      const inventoryData = await managers.productManager.getInventory({
+        ...args,
+        offset: 0,
+        sort: null,
+        address: vintage.inventoryId,
+        ownerOrganization: userOrganization
+      }, getOptions);
+      vintagesWithInventory.push({ ...vintage, ...inventoryData })
+    }
+
+    return vintagesWithInventory;
+  };
+
+  contract.createVintage = async function (args, options = optionsNoChainIds) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const inventoryArgs = {
+      productAddress: args.productAddress,
+      availableQuantity: args.availableQuantity,
+      pricePerUnit: args.pricePerUnit,
+      vintage: args.vintage,
+      status: args.status,
+      batchSerializationNumber: util.uid()
+    };
+
+    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...inventoryArgs, createdDate: createdDate });
+
+    if (createInventoryStatus == 200) {
+      const vintageArgs = {
+        inventoryId: createdInventoryAddress,
+        vintage: args.vintage,
+        retiredQuantity: args.retiredQuantity,
+        bufferAmount: args.bufferAmount,
+        estimatedReductionAmount: args.estimatedReductionAmount,
+        actualReductionAmount: args.actualReductionAmount,
+        verifier: args.verifier
+      }
+
+      return managers.productManager.createVintage(vintageArgs);
     }
   }
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------

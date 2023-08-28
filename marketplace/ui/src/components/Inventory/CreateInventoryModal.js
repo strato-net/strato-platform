@@ -20,6 +20,10 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import {
+  useVintageDispatch,
+  useVintageState,
+} from "../../contexts/vintage";
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { usePapaParse } from "react-papaparse";
@@ -39,6 +43,7 @@ const CreateInventoryModal = ({
 }) => {
   const schema = getSchema();
   const dispatch = useInventoryDispatch();
+  const vintageDispatch = useVintageDispatch();
   const productDispatch = useProductDispatch();
   const { readString } = usePapaParse();
   const [api, contextHolder] = notification.useNotification();
@@ -46,6 +51,7 @@ const CreateInventoryModal = ({
 
   const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
   const { isCreateInventorySubmitting } = useInventoryState();
+  const { isCreateVintageSubmitting } = useVintageState();
 
   const initialValues = {
     category: {
@@ -97,6 +103,11 @@ const CreateInventoryModal = ({
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
+      retiredQuantity: 0,
+      bufferAmount: 0,
+      estimatedReductionAmount: 0,
+      actualReductionAmount: 0,
+      verifier: "verifier"
     };
 
     TagManager.dataLayer({
@@ -104,7 +115,14 @@ const CreateInventoryModal = ({
         event: 'create_inventory',
       },
     });
-    let isDone = await actions.createInventory(dispatch, body);
+
+    let isDone;
+    if (values.category.name === "Carbon") {
+      isDone = await vintageActions.createVintage(vintageDispatch, body);
+    }
+    else {
+      isDone = await actions.createInventory(dispatch, body);
+    }
 
     if (isDone) {
       if (page === 1)
@@ -234,9 +252,9 @@ const CreateInventoryModal = ({
               key="submit"
               type="primary"
               onClick={formik.handleSubmit}
-              disabled={isCreateInventorySubmitting}
+              loading={isCreateInventorySubmitting || isCreateVintageSubmitting}
             >
-              {isCreateInventorySubmitting ? <Spin /> : "Create Inventory"}
+              Create Inventory
             </Button>
           </div>,
         ]}
@@ -365,7 +383,7 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
             </div>
-            { formik.values.category.name === "Carbon"  && 
+            {formik.values.category.name === "Carbon" &&
               <div className="flex justify-between mt-4 ">
                 <Form.Item
                   label="Vintage"

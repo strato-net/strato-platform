@@ -7,7 +7,7 @@ import getSchema from "./ProductSchema";
 
 import { actions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
-import { useCarbonDispatch } from "../../contexts/carbon";
+import { useCarbonDispatch, useCarbonState } from "../../contexts/carbon";
 import { actions as carbonActions } from "../../contexts/carbon/actions";
 import { unitOfMeasures } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
@@ -28,8 +28,9 @@ const CreateProductModal = ({
   const dispatch = useProductDispatch();
   const carbonDispatch = useCarbonDispatch();
 
-  const { isCreateProductSubmitting, isuploadImageSubmitting } =
-    useProductState();
+  const { isCreateProductSubmitting, isuploadImageSubmitting } = useProductState();
+  const { isCreateCarbonSubmitting } = useCarbonState();
+
 
   const initialValues = {
     image: null,
@@ -106,7 +107,7 @@ const CreateProductModal = ({
     }
   };
 
-  const disabled = isCreateProductSubmitting || isuploadImageSubmitting;
+  const disabled = isCreateProductSubmitting || isuploadImageSubmitting || isCreateCarbonSubmitting;
 
   const closeModal = () => {
     handleCancel();
