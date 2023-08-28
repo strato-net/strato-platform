@@ -11,34 +11,46 @@ const SalesTable = ({ user, searchQuery }) => {
   const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
 
-  const { data, isStorageLoading } = useStorageState();
+  const { sales, isSalesLoading } = useStorageState();
 
   useEffect(() => {
-    actions.fetchStorage(
+    actions.fetchSales(
       dispatch,
       limit,
       offset,
-      "Sale",
       searchQuery
     );
   }, [dispatch, limit, offset, searchQuery]);
 
-  const [sales, setSales] = useState([]);
+  const [data, setData] = useState([]);
+
   useEffect(() => {
     let items = [];
-    data && data.forEach((sale) => {
-      items.push(sale);
+    sales.forEach((sale) => {
+      const { ["record_id"]: omittedKey, ...rest } = sale;
+      items.push({
+        recordId: sale.record_id,
+        recordData: rest,
+      });
     });
-    setSales(items);
-  }, [data]);
+    setData(items);
+  }, [sales]);
 
   const column = [
     {
-      title: "Something".toUpperCase(),
-      dataIndex: "something",
-      key: "something",
-      render: (something) => (
-        <p>something</p>
+      title: "Record ID".toUpperCase(),
+      dataIndex: "recordId",
+      key: "recordId",
+      render: (recordId) => (
+        <p>{recordId}</p>
+      )
+    },
+    {
+      title: "Record Data".toUpperCase(),
+      dataIndex: "recordData",
+      key: "recordData",
+      render: (recordData) => (
+        <p><pre>{JSON.stringify(recordData, null, 2)}</pre></p>
       )
     }
   ]
@@ -49,19 +61,19 @@ const SalesTable = ({ user, searchQuery }) => {
   }
 
   useEffect(() => {
-    let len = sales.length;
+    let len = data.length;
     let total;
     if (len === limit) total = page * 10 + limit;
     else total = (page - 1) * 10 + limit;
     setTotal(total);
-  }, [sales]);
+  }, [data]);
 
   return (
     <div>
       <DataTableComponent
         columns = {column}
-        data={sales}
-        isLoading={isStorageLoading}
+        data={data}
+        isLoading={isSalesLoading}
         pagination={false}
         scrollX="100%"
       />

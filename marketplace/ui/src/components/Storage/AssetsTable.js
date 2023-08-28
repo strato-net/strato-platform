@@ -11,35 +11,46 @@ const AssetsTable = ({ user, searchQuery }) => {
   const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
 
-  const { data, isStorageLoading } = useStorageState();
+  const { assets, isAssetsLoading } = useStorageState();
 
   useEffect(() => {
-    actions.fetchStorage(
+    actions.fetchAssets(
       dispatch,
       limit,
       offset,
-      "Asset",
       searchQuery
     );
   }, [dispatch, limit, offset, searchQuery]);
 
-  const [assets, setAssets] = useState([]);
+  const [data, setData] = useState([]);
 
   useEffect(() => {
     let items = [];
-    data && data.forEach((asset) => {
-      items.push(asset);
+    assets.forEach((asset) => {
+      const { ["record_id"]: omittedKey, ...rest } = asset;
+      items.push({
+        recordId: asset.record_id,
+        recordData: rest,
+      });
     });
-    setAssets(items);
-  }, [data]);
+    setData(items);
+  }, [assets]);
 
   const column = [
     {
-      title: "Something".toUpperCase(),
-      dataIndex: "something",
-      key: "something",
-      render: (something) => (
-        <p>something</p>
+      title: "Record ID".toUpperCase(),
+      dataIndex: "recordId",
+      key: "recordId",
+      render: (recordId) => (
+        <p>{recordId}</p>
+      )
+    },
+    {
+      title: "Record Data".toUpperCase(),
+      dataIndex: "recordData",
+      key: "recordData",
+      render: (recordData) => (
+        <p><pre>{JSON.stringify(recordData, null, 2)}</pre></p>
       )
     }
   ]
@@ -50,19 +61,19 @@ const AssetsTable = ({ user, searchQuery }) => {
   }
 
   useEffect(() => {
-    let len = assets.length;
+    let len = data.length;
     let total;
     if (len === limit) total = page * 10 + limit;
     else total = (page - 1) * 10 + limit;
     setTotal(total);
-  }, [assets]);
+  }, [data]);
 
   return (
     <div>
       <DataTableComponent
         columns = {column}
-        data={assets}
-        isLoading={isStorageLoading}
+        data={data}
+        isLoading={isAssetsLoading}
         pagination={false}
         scrollX="100%"
       />

@@ -4,16 +4,17 @@ import reducer from "./reducer";
 const StorageStateContext = createContext();
 const StorageDispatchContext = createContext();
 
-const initialState = {
-  data: [],
-  error: undefined,
-  isAssetsLoading: false,
-  isSalesLoading: false,
-  success: false,
-  message: null,
-};
-
 const StorageProvider = ({ children }) => {
+  const initialState = {
+    error: undefined,
+    assets: [],
+    sales: [],
+    isAssetsLoading: false,
+    isSalesLoading: false,
+    success: false,
+    message: null,
+  };
+
   const [state, dispatch] = useReducer(reducer, initialState);
 
   return (
@@ -54,5 +55,4 @@ export {
   useStorageState,
   useStorageUnit,
   StorageProvider,
-  initialState
 };
