@@ -6,11 +6,13 @@
 
 module SolidVM.CodeCollectionTools (
   xabiToContract,
-  applyInheritance,
+  applyInheritanceNoFunctions,
+  applyInheritanceFunctions,
   resolveLabels
   ) where
 
 import Control.Lens
+import Data.Bool (bool)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Source
@@ -73,16 +75,22 @@ validateXabi Xabi{xabiModifiers=mx, xabiContext=ctx} =
                   )
 -}
 
-applyInheritance :: CodeCollection -> SolidEither CodeCollection
-applyInheritance cc = do
+applyInheritanceNoFunctions :: CodeCollection -> SolidEither CodeCollection
+applyInheritanceNoFunctions cc = do
   ccs <- traverse (addInheritedObjects cc) $ cc^.contracts
+  pure $ cc{
+    _contracts = ccs
+  }
+
+applyInheritanceFunctions :: CodeCollection -> SolidEither CodeCollection
+applyInheritanceFunctions cc = do
+  ccs <- traverse (addInheritedFunctions cc) $ cc^.contracts
   pure $ cc{
     _contracts = ccs
   }
 
 addInheritedObjects :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedObjects cc c = do
-  fu <- toUnionMaker _functions cc c
   sd <- toUnionMaker _storageDefs cc c
   ud <- toUnionMaker _userDefined cc c
   en <- toUnionMaker _enums cc c
@@ -91,7 +99,6 @@ addInheritedObjects cc c = do
   co <- toUnionMaker _constants cc c
   mo <- toUnionMaker _modifiers cc c
   pure $ c{
-  _functions=fu,
   _storageDefs=sd,
   _userDefined =ud,
   _enums=en,
@@ -101,11 +108,21 @@ addInheritedObjects cc c = do
   _modifiers=mo
   }
 
+addInheritedFunctions :: CodeCollection -> Contract -> SolidEither Contract
+addInheritedFunctions cc c = do
+  fu <- toUnionMaker' _functions (bool id (M.filter ((/= Just Private) . _funcVisibility)) (usesStrictModifiers cc) . _functions) cc c
+  pure $ c{
+  _functions=fu
+  }
+
 toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
-toUnionMaker f cc c = do
+toUnionMaker f = toUnionMaker' f f
+
+toUnionMaker' :: (Ord a) => (Contract -> M.Map a b) -> (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
+toUnionMaker' fSelf fAncestors cc c = do
   parents' <- getParents cc c
-  parentMaps <- traverse (toUnionMaker f cc) parents'
-  pure . M.unions $ f c : parentMaps
+  parentMaps <- traverse (toUnionMaker' fAncestors fAncestors cc) parents' -- this allows us to perform fSelf only once
+  pure . M.unions $ fSelf c : parentMaps
 
 
 
