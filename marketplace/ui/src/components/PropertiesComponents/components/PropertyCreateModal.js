@@ -457,6 +457,7 @@ function PropertyCreateModal({
             label="State"
             value={stateOrProvince}
             defaultValue={stateOrProvince}
+            disabled={id}
             placeholder="Select State"
             onSelect={(e) => {
               handleChange("stateOrProvince", e);

@@ -159,6 +159,22 @@ const HeaderComponent = ({ user, loginUrl }) => {
     // }, 1000)
   }
 
+  const isLogin = () => {
+
+    if (loginUrl) {
+      return <a href={loginUrl} id="Login" className="text-base text-white"
+        onClick={() => {
+          TagManager.dataLayer({
+            dataLayer: {
+              event: 'login_register_click'
+            }
+          })
+        }} >
+        Login / Register
+      </a>
+    }
+  }
+
   return (
     <Header className="!bg-primary flex">
       <Space>
@@ -256,21 +272,8 @@ const HeaderComponent = ({ user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1
-            ? (
-              loginUrl
-                ? <a href={loginUrl} id="Login" className="text-base text-white"
-                  onClick={() => {
-                    TagManager.dataLayer({
-                      dataLayer: {
-                        event: 'login_register_click'
-                      }
-                    })
-                  }} >
-                  Login / Register
-                </a>
-                : null
-            ) :
-            <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
+            ? isLogin()
+            : <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
                 {initials}
               </a>
@@ -289,9 +292,9 @@ const HeaderComponent = ({ user, loginUrl }) => {
       >
         <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
           {menu.map((item, index) => {
-            return <Col className="menu-card" onClick={() => { redirect(item.url) }} span={8} offset={2} key={index} style={{ display: "flex", padding: "5px" }}>
+            return <Col className="menu-card" onClick={() => { redirect(item.url) }} span={6} offset={3} key={index} style={{ display: "flex", padding: "5px" }}>
               <div style={{ margin: "auto" }}>
-                <div>{item.icon}</div>
+                <div style={{margin:"auto"}}>{item.icon}</div>
                 <p style={{ textAlign: "center" }}>{item.label}</p>
               </div>
             </Col>

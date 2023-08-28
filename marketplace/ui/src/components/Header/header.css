@@ -24,4 +24,7 @@
 .menu-card:hover{
   background-color: #E3E4FF;
   border-radius: 12px;
+  cursor: pointer;
+  color: blue;
+  fill: blue;
 }
