@@ -2,7 +2,7 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "./Membership.sol";
 import "/dapp/membershipService/contracts/MembershipService.sol";
-import "/dapp/ProductFile/contracts/ProductFile.sol";
+import "/dapp/productFile/contracts/ProductFile.sol";
 import "/dapp/products/contracts/ProductManager.sol";
 import "/dapp/Dapp/contracts/Dapp.sol";
 
@@ -65,7 +65,7 @@ contract MembershipManager is RestStatus{
     }
 
     function addMembership(address _dappAddress, MembershipArgs _membershipArgs, MembershipServiceArgs[] _membershipServiceArgs, ProductFileArgs[] _productFileArgs) 
-        returns (uint256, address) {
+        returns (uint256, address, address) {
 
 
         dapp = Dapp(account(_dappAddress, "parent"));
@@ -124,7 +124,7 @@ contract MembershipManager is RestStatus{
         memberships.push(address(membership));
 
 
-        return (RestStatus.OK, address(membership));
+        return (RestStatus.OK, address(membership), address(product));
     }
 
 //    function updateMembership (address _membershipAddress, string _description, string _imageKey, bool _isActive, string _userUniqueMembershipCode, uint _scheme) 

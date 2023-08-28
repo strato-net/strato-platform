@@ -37,6 +37,7 @@ import {
 import { useInventoryDispatch } from "../../contexts/inventory";
 import ListNowModal from "./ListNowModal";
 import { INVENTORY_STATUS } from "../../helpers/constants";
+import { create } from "yup/lib/Reference";
 
 const { Dragger } = Upload;
 
@@ -325,14 +326,9 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 }
                 break;
               case true:
-                const isDone2 = await actions.createMembership(dispatch, body);
-                if (isDone2) {
-                  const getMembership = await actions.fetchMembershipDetails(
-                    dispatch,
-                    isDone2.address
-                  );
-
-                  const productId = getMembership.membership.productId;
+                const createMembership = await actions.createMembership(dispatch, body);
+                console.log("createMembership", createMembership);
+                  const productId = createMembership.productAddress;
                   const inventoryBody = {
                     productAddress: productId,
                     quantity: updatedValues.quantity,
@@ -344,15 +340,14 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                     serialNumber: [],
                   };
 
-                  const isDone3 = await inventoryActions.createInventory(
+                  const createInventory = await inventoryActions.createInventory(
                     inventoryDispatch,
                     inventoryBody
                   );
-                  if (isDone3) {
+                  if (createInventory) {
                     formik.resetForm();
                     handleCancel("success");
                   }
-                }
                 break;
               default:
                 break;
