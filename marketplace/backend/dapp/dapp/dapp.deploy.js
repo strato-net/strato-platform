@@ -92,7 +92,7 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     assert.equal(deployment.dapp.contract.address, dapp.address)
   })
   
-   it.only('Should populate services', async () => {
+   it('Should populate services', async () => {
     // let _dapp = await dappJs.uploadDappContract(adminUser, options)
     const deploy = fsUtil.getYaml(`${config.configDirPath}/${config.deployFilename}`)
     const options = { config }
