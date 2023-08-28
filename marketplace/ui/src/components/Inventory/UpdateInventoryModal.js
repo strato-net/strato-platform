@@ -174,7 +174,6 @@ const UpdateInventoryModal = ({
                   label="quantity"
                   placeholder="Enter Quantity"
                   name="quantity"
-                  disabled={true}
                   value={formik.values.quantity}
                   onChange={formik.handleChange}
                 />
