@@ -8,6 +8,7 @@ const PropertyProvider = ({ children }) => {
   const initialState = {
     property: null,
     isCreatePropertySubmitting: false,
+    isUpdatePropertySubmitting: false,
     properties: [],
     filter: null,
     isPropertiesLoading: false,

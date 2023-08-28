@@ -50,17 +50,16 @@ const HeaderComponent = ({ user, loginUrl }) => {
 
 
   const navItems = [
-    {
-      role: 0,
-      items: [
+    // {
+    //   role: 0,
+    //   items: [
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
         { label: <div id="Inventory">Inventory</div>, key: '2' },
         { label: <div id="Products">Products</div>, key: '3' },
         { label: <div id="Events">Events</div>, key: '4' },
-        { label: <div id="Property">Property</div>, key: '5' },
-      ]
-    }
+    //   ]
+    // }
   ];
 
   const menu = [
@@ -76,7 +75,6 @@ const HeaderComponent = ({ user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
-    routes.Properties.url
   ];
 
   const logout = () => {
@@ -101,10 +99,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
-    } else if (pathName.includes("/properties") || pathName === "/properties") {
-      setSelectedTab("5");
-    }
-    else {
+    } else{
       setSelectedTab("0");
     }
   }, [window.location.pathname]);
@@ -227,7 +222,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
           }
           else navigate(navUrls[item.key]);
         }}
-        items={navItems[roleIndex]?.items}
+        items={navItems}
       />
 
       <Space size="large">

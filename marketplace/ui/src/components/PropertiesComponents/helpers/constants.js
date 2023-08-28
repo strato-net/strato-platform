@@ -258,3 +258,10 @@ export const QueryKeys = {
   minlotSizeArea: "-lotSizeArea",
   maxlotSizeArea: "+lotSizeArea",
 }
+
+export const createPropertyFormInitialData = {
+  lotSizeUnits: "sqft",
+  livingAreaUnits: "sqft",
+  numberOfUnitsTotal: 1,
+  ...propertyCheckBox
+}

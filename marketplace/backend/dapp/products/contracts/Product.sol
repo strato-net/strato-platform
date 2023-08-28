@@ -70,7 +70,8 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
     }
 
     function update(
-        string _description
+        string _name
+    ,   string _description
     ,   string _imageKey
     ,   bool _isActive
     ,   string _userUniqueProductCode
@@ -85,16 +86,19 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       }
 
       if ((_scheme & (1 << 0)) == (1 << 0)) {
-        description = _description;
+          name = _name;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
-        imageKey = _imageKey;
+          description = _description;
       }
       if ((_scheme & (1 << 2)) == (1 << 2)) {
-        isActive = _isActive;
+          imageKey = _imageKey;
       }
       if ((_scheme & (1 << 3)) == (1 << 3)) {
-        userUniqueProductCode = _userUniqueProductCode;
+          isActive = _isActive;
+      }
+      if ((_scheme & (1 << 4)) == (1 << 4)) {
+          userUniqueProductCode = _userUniqueProductCode;
       }
 
       return RestStatus.OK;

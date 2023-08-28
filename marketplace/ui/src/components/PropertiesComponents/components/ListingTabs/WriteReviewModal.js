@@ -8,6 +8,13 @@ const WriteReviewModal = (props) => {
   const [reviewData, setReviewData] = useState({})
   const { open, handleCancel, isReviewSubmitting, handleSubmit, form } = props;
 
+  const { title, rating, description } = reviewData
+
+  const disabledSubmitReview =
+    !title ||
+    !rating ||
+    !description;
+
   const handleChange = (key, value) => {
     let data = { ...reviewData }
     data[key] = value;
@@ -33,6 +40,7 @@ const WriteReviewModal = (props) => {
           htmlType="submit"
           loading={isReviewSubmitting}
           disabled={isReviewSubmitting}
+          okButtonProps={{ disabled: disabledSubmitReview}}
           onClick={() => {
             TagManager.dataLayer({
               dataLayer: {
