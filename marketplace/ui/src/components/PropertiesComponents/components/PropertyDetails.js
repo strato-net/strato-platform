@@ -150,7 +150,7 @@ function PropertyDetails() {
     },
     {
       key: "Price",
-      label: `Price and Tax History`,
+      label: `History`,
       children: <PriceHistoryTab id="#Price" property={property?.fields} />,
     },
     {
