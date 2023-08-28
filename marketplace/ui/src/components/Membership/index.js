@@ -197,7 +197,7 @@ const Membership = ( user ) => {
                                     }}
                                     disabled={stripeStatus.detailsSubmitted}
                                     >
-                                    {"Connect Stripe"}
+                                    {"Setup Stripe Account"}
                                 </Button>
                                 <Button
                                     id="add-product-button"
