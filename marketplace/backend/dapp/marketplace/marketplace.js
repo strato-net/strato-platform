@@ -62,73 +62,122 @@ function marshalOut(_args) {
   return args;
 }
 
+function calculateServiceDiscount(servicePrice, membershipPrice, maxQuantity) {
+    return (servicePrice - membershipPrice) * maxQuantity;
+}
+
+function calculateTotalSavings(services) {
+    return services.reduce((total, service) => total + service.serviceDiscount, 0);
+}
+
 async function getAll(admin, args = {}, options) {
-    const { range = [], ...restArgs } = args;
+    const { quantity, pricePerUnit, range = [], ...restArgs } = args;
 
-    // Fetch all products, memberships, membership services, and services in parallel
-    const [products, memberships, membershipServices, services] = await Promise.all([
-        productJs.getAll(admin, {
-            isActive: true,
-            isDeleted: false,
-            isInventoryAvailable: true,
-            ...restArgs
-        }, options),
-        membershipJs.getAll(admin, { productId: null }, options),
-        membershipServiceJs.getAll(admin, { membershipId: null }, options),
-        serviceJs.getAll(admin, { address: null }, options)
-    ]);
+    // First we fetch all the products. 
+    const products = await productJs.getAll(admin, {
+        isActive: true,
+        isDeleted: false,
+        isInventoryAvailable: true,
+        ...restArgs
+    }, options);
 
-    const productMap = new Map(products.map(product => [product.address, product]));
+    // We will make a map of products with memberships and products without memberships
+    const productsWithMembershipsMap = new Map(
+        products.filter(product => product.category === "Membership").map(product => [product.address, product])
+    );
 
-    const membershipMap = new Map(memberships.map(membership => [membership.productId, membership]));
-
-    const membershipServiceMap = membershipServices.reduce((acc, service) => {
-        if (!acc[service.membershipId]) {
-            acc[service.membershipId] = [];
-        }
-        acc[service.membershipId].push(service);
-        return acc;
-    }, {});
-
-    const serviceMap = new Map(services.map(service => [service.address, service]));
+    const productsWithoutMembershipsMap = new Map(
+        products.filter(product => product.category !== "Membership").map(product => [product.address, product])
+    );
 
     // Fetch inventory for each product in parallel
-    const inventoryPromises = products.map(product => {
-        return inventoryJs.getAll(admin, {
-            appChainId: args.appChainId,
-            status: inventoryStatus.PUBLISHED,
-            productId: product.address,
-            range,
-            gteField: 'availableQuantity',
-            gteValue: 1,
-            sort: '-createdDate',
-            offset: args.offset,
-            limit: constants.TOP_SELLING_GET_LIMIT
-        }, options);
+    // This needs to be done in batches of 200 so we don't exceed the max query size
+    const inventoryWithMembershipPromises = [];
+    const inventoryWithoutMembershipPromises = [];
+    const batchSize = 200;
+
+    // Inventory for membership
+    for (let i = 0; i < productsWithMembershipsMap.size; i += batchSize) {
+        const batch = Array.from(productsWithMembershipsMap.keys()).slice(i, i + batchSize);
+        inventoryWithMembershipPromises.push(
+            inventoryJs.getAll(admin, {
+                appChainId: args.appChainId,
+                status: inventoryStatus.PUBLISHED,
+                productId: batch,
+                range,
+                gteField: 'availableQuantity',
+                gteValue: 0,
+                sort: '-createdDate',
+                offset: args.offset,
+            }, options)
+        );
+    }
+
+    // Inventory for non membership
+    for (let i = 0; i < productsWithoutMembershipsMap.size; i += batchSize) {
+        const batch = Array.from(productsWithoutMembershipsMap.keys()).slice(i, i + batchSize);
+        inventoryWithoutMembershipPromises.push(
+            inventoryJs.getAll(admin, {
+                appChainId: args.appChainId,
+                status: inventoryStatus.PUBLISHED,
+                productId: batch,
+                range,
+                gteField: 'availableQuantity',
+                gteValue: 0,
+                sort: '-createdDate',
+                offset: args.offset,
+            }, options)
+        );
+    }
+
+    const inventoryWithMembershipResults = await Promise.all(inventoryWithMembershipPromises);
+    const inventoryWithoutMembershipResults = await Promise.all(inventoryWithoutMembershipPromises);
+
+    // Combine inventory and products for non membership products
+    const productWithoutMembership = [];
+    inventoryWithoutMembershipResults.forEach((inventoryBatch, batchIx) => {
+        inventoryBatch.forEach(inventory => {
+            const product = productsWithoutMembershipsMap.get(inventory.productId);
+            productWithoutMembership.push({
+                ...product,
+                ...inventory,
+            });
+        });
     });
 
-    const inventoryResults = await Promise.all(inventoryPromises);
+    // Inventory with Memberships need membershipServices and Services data
+    // Fetch membershipServices and Services in parallel
 
-    const returnObject = [];
+    // Fetch all memberships using the product address
+    const productIds = Array.from(productsWithMembershipsMap.keys());
+    const memberships = await membershipJs.getAll(admin, { productId: productIds }, options);
 
-    function calculateServiceDiscount(servicePrice, membershipPrice, maxQuantity) {
-        return (servicePrice - membershipPrice) * maxQuantity;
-    }
+    // map the membership address to the membership object
+    const membershipMap = new Map(memberships.map(membership => [membership.productId, membership]));
 
-    function calculateTotalSavings(services) {
-        return services.reduce((total, service) => total + service.serviceDiscount, 0);
-    }
+    // Fetch all membershipServices using the membership address
+    const membershipIds = memberships.map(membership => membership.address);
+    const allMembershipServices = await membershipServiceJs.getAll(admin, { membershipId: membershipIds }, options);
 
-    // Process inventory results and create the return object
-    inventoryResults.forEach((inventoryBatch, batchIx) => {
+    // fetch all services
+    const services = await serviceJs.getAll(admin, {}, options);
+    // map the service address to the service object
+    const serviceMap = new Map(services.map(service => [service.address, service]));
+
+    const productWithMembership = [];
+    inventoryWithMembershipResults.forEach((inventoryBatch, batchIx) => {
         inventoryBatch.forEach(inventory => {
-            const product = productMap.get(inventory.productId);
+            // Find the product for this inventory
+            const product = productsWithMembershipsMap.get(inventory.productId);
+            
+            // Find the membership for this product
             const membership = membershipMap.get(product.address);
 
-            const membershipServices = membershipServiceMap[membership.address] || [];
+            // Get all the membership services for this membership
+            const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
 
+            // Build the service data for each membership service
             const membershipData = {
-                ...membership,
                 services: membershipServices.map(service => {
                     const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
                     const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
@@ -139,13 +188,13 @@ async function getAll(admin, args = {}, options) {
                         serviceDiscount
                     };
                 }),
-            };
+            }
 
+            // Calculate the total savings for this membership
             const totalSavings = calculateTotalSavings(membershipData.services);
 
-            membershipData.totalSavings = totalSavings;
-
-            returnObject.push({
+            // Add the membership data to the product
+            productWithMembership.push({
                 ...product,
                 ...inventory,
                 membershipId: membership.address,
@@ -153,14 +202,15 @@ async function getAll(admin, args = {}, options) {
             });
         });
     });
-
-    return returnObject.map(inventory => marshalOut(inventory));
+    
+    return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
 }
 
 
 async function getTopSellingProducts(admin, args = {}, options) {
     const { quantity, pricePerUnit, range = [], ...restArgs } = args;
 
+    // First we fetch all the products. 
     const products = await productJs.getAll(admin, {
         isActive: true,
         isDeleted: false,
@@ -168,53 +218,129 @@ async function getTopSellingProducts(admin, args = {}, options) {
         ...restArgs
     }, options);
 
-    const productDictionary = products.reduce((acc, product) => {
-        acc[product.address] = product;
-        return acc;
-    }, {});
+    // We will make a map of products with memberships and products without memberships
+    const productsWithMembershipsMap = new Map(
+        products.filter(product => product.category === "Membership").map(product => [product.address, product])
+    );
 
-    const productIds = products.map(product => product.address);
+    const productsWithoutMembershipsMap = new Map(
+        products.filter(product => product.category !== "Membership").map(product => [product.address, product])
+    );
+
+    // Fetch inventory for each product in parallel
+    // This needs to be done in batches of 200 so we don't exceed the max query size
+    const inventoryWithMembershipPromises = [];
+    const inventoryWithoutMembershipPromises = [];
     const batchSize = 200;
-    const inventoryPromises = [];
-    const membershipPromise = membershipJs.getAll(admin, { productId: productIds }, options);
 
-    for (let i = 0; i < productIds.length; i += batchSize) {
-        const batchProductIds = productIds.slice(i, i + batchSize);
-
-        const inventoryPromise = inventoryJs.getAll(admin, {
-            appChainId: args.appChainId,
-            status: inventoryStatus.PUBLISHED,
-            productId: batchProductIds,
-            range,
-            gteField: 'availableQuantity',
-            gteValue: 1,
-            sort: '-createdDate',
-            offset: args.offset,
-            limit: constants.TOP_SELLING_GET_LIMIT
-        }, options);
-
-        inventoryPromises.push(inventoryPromise);
+    // Inventory for membership
+    for (let i = 0; i < productsWithMembershipsMap.size; i += batchSize) {
+        const batch = Array.from(productsWithMembershipsMap.keys()).slice(i, i + batchSize);
+        inventoryWithMembershipPromises.push(
+            inventoryJs.getAll(admin, {
+                appChainId: args.appChainId,
+                status: inventoryStatus.PUBLISHED,
+                productId: batch,
+                range,
+                gteField: 'availableQuantity',
+                gteValue: 0,
+                sort: '-createdDate',
+                offset: args.offset,
+            }, options)
+        );
     }
 
-    const [inventoryResults, memberships] = await Promise.all([Promise.all(inventoryPromises), membershipPromise]);
+    // Inventory for non membership
+    for (let i = 0; i < productsWithoutMembershipsMap.size; i += batchSize) {
+        const batch = Array.from(productsWithoutMembershipsMap.keys()).slice(i, i + batchSize);
+        inventoryWithoutMembershipPromises.push(
+            inventoryJs.getAll(admin, {
+                appChainId: args.appChainId,
+                status: inventoryStatus.PUBLISHED,
+                productId: batch,
+                range,
+                gteField: 'availableQuantity',
+                gteValue: 0,
+                sort: '-createdDate',
+                offset: args.offset,
+            }, options)
+        );
+    }
 
-    const membershipMap = memberships.reduce((acc, membership) => {
-        acc[membership.productId] = membership;
-        return acc;
-    }, {});
+    const inventoryWithMembershipResults = await Promise.all(inventoryWithMembershipPromises);
+    const inventoryWithoutMembershipResults = await Promise.all(inventoryWithoutMembershipPromises);
 
-    const returnObject = inventoryResults[0].map(inventory => {
-        const product = productDictionary[inventory.productId];
-        const membership = membershipMap[product.address];
-
-        return {
-            ...product,
-            ...inventory,
-            membership: membership
-        };
+    // Combine inventory and products for non membership products
+    const productWithoutMembership = [];
+    inventoryWithoutMembershipResults.forEach((inventoryBatch, batchIx) => {
+        inventoryBatch.forEach(inventory => {
+            const product = productsWithoutMembershipsMap.get(inventory.productId);
+            productWithoutMembership.push({
+                ...product,
+                ...inventory,
+            });
+        });
     });
 
-    return returnObject.map(inventory => marshalOut(inventory));
+    // Inventory with Memberships need membershipServices and Services data
+    // Fetch membershipServices and Services in parallel
+
+    // Fetch all memberships using the product address
+    const productIds = Array.from(productsWithMembershipsMap.keys());
+    const memberships = await membershipJs.getAll(admin, { productId: productIds }, options);
+
+    // map the membership address to the membership object
+    const membershipMap = new Map(memberships.map(membership => [membership.productId, membership]));
+
+    // Fetch all membershipServices using the membership address
+    const membershipIds = memberships.map(membership => membership.address);
+    const allMembershipServices = await membershipServiceJs.getAll(admin, { membershipId: membershipIds }, options);
+
+    // fetch all services
+    const services = await serviceJs.getAll(admin, {}, options);
+    // map the service address to the service object
+    const serviceMap = new Map(services.map(service => [service.address, service]));
+
+    const productWithMembership = [];
+    inventoryWithMembershipResults.forEach((inventoryBatch, batchIx) => {
+        inventoryBatch.forEach(inventory => {
+            // Find the product for this inventory
+            const product = productsWithMembershipsMap.get(inventory.productId);
+            
+            // Find the membership for this product
+            const membership = membershipMap.get(product.address);
+
+            // Get all the membership services for this membership
+            const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
+
+            // Build the service data for each membership service
+            const membershipData = {
+                services: membershipServices.map(service => {
+                    const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
+                    const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
+
+                    return {
+                        ...service,
+                        servicePrice,
+                        serviceDiscount
+                    };
+                }),
+            }
+
+            // Calculate the total savings for this membership
+            const totalSavings = calculateTotalSavings(membershipData.services);
+
+            // Add the membership data to the product
+            productWithMembership.push({
+                ...product,
+                ...inventory,
+                membershipId: membership.address,
+                totalSavings: totalSavings,
+            });
+        });
+    });
+    
+    return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
 }
 
 

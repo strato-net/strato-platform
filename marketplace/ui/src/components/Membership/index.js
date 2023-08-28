@@ -76,14 +76,14 @@ const Membership = ( user ) => {
         if (success) {
             api.success({
                 message: message,
-                // onClose: actions.resetMessage(dispatch), //Do not have disptach yet, once we have it, we can use this
+                onClose: actions.resetMessage(dispatch), 
                 placement,
                 key: 1,
             });
         } else {
             api.error({
                 message: message,
-                // onClose: actions.resetMessage(dispatch), //Do not have disptach yet, once we have it, we can use this
+                onClose: actions.resetMessage(dispatch), 
                 placement,
                 key: 2,
             });
@@ -91,7 +91,7 @@ const Membership = ( user ) => {
     };
 
     let { memberships, ismembershipsLoading, message, success } = useMembershipState();
-   
+
     //We want to show all inventories associated to a membership, but also
     //All memberships that do not have inventories
     //So we create a new list of memberships objects, creating a new object for each inventory
@@ -132,8 +132,13 @@ const Membership = ( user ) => {
         hasChecked && !isAuthenticated && loginUrl !== undefined ? window.location.href = loginUrl : setOpen(true)
     };
 
-    const handleCancel = () => {
-        setOpen(false);
+    const handleCancel = (message) => {
+        if (message === "success") {
+            setOpen(false);
+            actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
+        } else {
+            setOpen(false);
+        }
     };
 
     const queryHandle = (e) => {
@@ -293,10 +298,10 @@ const Membership = ( user ) => {
           open={open}
           user={user}
           handleCancel={handleCancel}
-          categorys={categorys}
-          resetPage={onPageChange}
-          page={page}
-          debouncedSearchTerm={debouncedSearchTerm}
+        //   categorys={categorys}
+        //   resetPage={onPageChange}
+        //   page={page}
+        //   debouncedSearchTerm={debouncedSearchTerm}
         />
       )}
        {message && openToast("bottom")}

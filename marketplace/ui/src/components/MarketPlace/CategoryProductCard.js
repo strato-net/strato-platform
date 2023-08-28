@@ -39,7 +39,9 @@ const CategoryProductCard = ({ product, category }) => {
   const [api, contextHolder] = notification.useNotification();
 
   const navigate = useNavigate();
-  const naviroute = routes.MembershipDetail.url;
+  const naviroute = routes.MarketplaceProductDetail.url;
+  const naviroute2 = routes.MembershipDetail.url;
+  
   const [qty, setQty] = useState(1);
 
   const subtract = () => {
@@ -127,8 +129,11 @@ const CategoryProductCard = ({ product, category }) => {
               height={180}
               preview={false}
               onClick={() =>
-                navigate(`${naviroute.replace(":id", product.membershipId)}`, { state: { isCalledFromMembership: true, inventoryId: product.address} })
-              }
+                product.membershipId ? 
+                navigate(naviroute2.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address} })
+                :
+                navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+            }
             />
           </div>
           <div>
@@ -138,7 +143,10 @@ const CategoryProductCard = ({ product, category }) => {
                 className="text-xl text-primaryB hover:text-primary hover:underline"
                 id="prod-name"
                 onClick={() =>
-                  navigate(`${naviroute.replace(":id", product.membershipId)}`, { state: { isCalledFromMembership: true, inventoryId: product.address} })
+                  product.membershipId ? 
+                  navigate(naviroute2.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address} })
+                  :
+                  navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
                 }
               >
                 {decodeURIComponent(product.name)}&nbsp;
