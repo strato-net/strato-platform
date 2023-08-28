@@ -144,6 +144,24 @@ class PropertiesController {
     }
   }
 
+  static async updateReview(req, res, next) {
+    try {
+      const {
+        dapp,
+        body,
+      } = req;
+      console.log("updateReview body", body);
+
+      PropertiesController.validateUpdateReviewArgs(body);
+
+      const updatedReview = await dapp.updateReview(body);
+      rest.response.status200(res, updatedReview);
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async deleteReview(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -413,9 +431,28 @@ class PropertiesController {
     }
   }
 
+  static validateUpdateReviewArgs(args) {
+    const updateReviewSchema = Joi.object({
+      title: Joi.string().required(),
+      description: Joi.string().required(),
+      rating: Joi.number().required(),
+      address: Joi.string().required(),
+    });
+
+    const validation = updateReviewSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Update Review Argument Validation Error`,
+        `Missing args or bad format: ${validation.error.message}`
+      );
+    }
+  }
+
   static validateDeleteReviewArgs(args) {
     const deleteReviewSchema = Joi.object({
-      productAddress: Joi.string().required(),
+      address: Joi.string().required(),
     });
 
     const validation = deleteReviewSchema.validate(args);

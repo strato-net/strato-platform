@@ -36,7 +36,7 @@ contract Dapp_0_1 {
     EventTypeManager_10 eventTypeManager;
     PaymentManager paymentManager;
     OrderManager orderManager;
-    ReviewManager_0_1 reviewManager;
+    ReviewManager_0_2 reviewManager;
     
     account public bootUserAccount;
     string public bootUserCommonName;
@@ -56,7 +56,7 @@ contract Dapp_0_1 {
         productManager = new ProductManager();
         eventTypeManager = new EventTypeManager_10();
         paymentManager = new PaymentManager();
-        reviewManager = new ReviewManager_0_1();
+        reviewManager = new ReviewManager_0_2();
     }
 
     function getProductManager() public returns (ProductManager) {

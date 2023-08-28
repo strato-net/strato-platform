@@ -22,6 +22,7 @@ function PropertyListings() {
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
+    document.title = "Welcome to Mercata Properties"
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
 
@@ -116,7 +117,6 @@ function PropertyListings() {
     : (properties.length === LIMIT_PER_PAGE
       ? (currentPage * LIMIT_PER_PAGE) + 1
       : currentPage * LIMIT_PER_PAGE)
-console.log(properties)
   return (
     <>
       {message && openToast("bottom")}
