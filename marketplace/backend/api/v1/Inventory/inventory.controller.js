@@ -23,8 +23,8 @@ class InventoryController {
       }
 
       const inventory = await dapp.getInventory(args, chainOptions)
-      const inventoryImageUrl = getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
-      const result = { ...inventory, imageUrl: inventoryImageUrl }
+      // const inventoryImageUrl = getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
+      const result = { ...inventory }
       rest.response.status200(res, result)
 
       return next()
@@ -38,12 +38,12 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories.map(inventory => ({
-        ...inventory,
-        imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
-      rest.response.status200(res, inventoriesWithImageUrl)
+      // const inventoriesWithImageUrl = inventories.map(inventory => ({
+      //   ...inventory,
+      //   imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
+      //   )
+      // }))
+      rest.response.status200(res, inventories)
 
       return next()
     } catch (e) {
