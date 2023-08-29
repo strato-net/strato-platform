@@ -233,7 +233,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&buyerOrganization=${organization}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&order=createdDate.desc&buyerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -261,7 +261,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&sellerOrganization=${organization}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=createdDate.desc${query}&sellerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
