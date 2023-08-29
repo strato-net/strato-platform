@@ -26,7 +26,7 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
 ];
 
-const contractName = "Dapp";
+const contractName = "Dapp_2";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
@@ -127,7 +127,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   let userOrganization
 
   if (!serviceUser) {
-
     let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
 
     //We are not guaranteed the user will have a certificate

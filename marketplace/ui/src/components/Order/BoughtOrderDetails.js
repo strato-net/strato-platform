@@ -36,6 +36,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
+  const [achStatus,setAchStatus] = useState(false);
   const [paid, setPaid] = useState(false)
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false);
 
@@ -111,6 +112,9 @@ const BoughtOrderDetails = ({ user, users }) => {
 
           if (body.data["payment_status"] === "paid") {
             setPaid(true);
+          }
+          if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+            setAchStatus(true);
           }
 
         }
@@ -310,7 +314,9 @@ const BoughtOrderDetails = ({ user, users }) => {
             <div className="flex">
               <Text className="font-semibold text-primaryB">Order Details</Text>
               {
-                !paid ? <div /> : <div className={classNames("text-success  bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                !paid ?  (achStatus && <div className={classNames("text-warning  bg-[#FFC300]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                <p>Processing</p>
+              </div>) : <div className={classNames("text-success  bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
                   <p>Paid</p>
                 </div>
               }
