@@ -310,6 +310,7 @@ const Membership = ( user ) => {
                                                     categorys={categorys}
                                                     subCategorys={subCategorys}
                                                     key={index}
+                                                    user={user}
                                                     debouncedSearchTerm={debouncedSearchTerm}
                                                 />
                                             );

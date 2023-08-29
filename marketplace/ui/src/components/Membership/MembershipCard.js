@@ -2,22 +2,20 @@ import React, { useEffect, useState } from "react";
 import classNames from "classnames";
 import { Card, Popover, Spin, Button } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import ListForSaleModal from "./ListForSaleModal";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 
-const MembershipCard = ({
-  membership,
-  categorys,
-  debouncedSearchTerm,
-}) => {
+const MembershipCard = ({ membership, user, categorys, debouncedSearchTerm }) => {
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
+  const [saleModalOpen, setSaleModalOpen] = useState(false);
 
   const showModal = () => {
     hide();
@@ -45,14 +43,28 @@ const MembershipCard = ({
     setEditModalOpen(false);
   };
 
+  console.log("membership", state);
+
   useEffect(() => {
     setState(membership);
   }, [membership]);
 
-  
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
-  }
+    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, {
+      state: {
+        isCalledFromMembership: true,
+        inventoryId:
+          state.inventoryAddress !== undefined ||
+          state.inventoryAddress !== null
+            ? state.inventoryAddress
+            : null,
+      },
+    });
+  };
+
+  const openSaleModal = () => {
+    setSaleModalOpen(true);
+  };
 
 
   return (
@@ -65,16 +77,41 @@ const MembershipCard = ({
         <Card className="w-full mt-6" id="product">
           <div className="flex">
             <div className="text-center py-1 rounded w-24 text-sm mt-2.5">
-                <img
-                  className="w-52 object-cover"
-                  alt=""
-                  src={membership.productImageLocation}
-                />  
-                {membership.product_with_inventory ?  
-                  (membership.isInventoryAvailable ?
-                      (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px"  }}> For Sale </Button>) 
-                      : (<Button type="primary" shape="round"  style={{ background: "red", marginTop: "10px"  }}> Retained </Button>) )
-                  :(<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px"  }}> Not for Sale </Button>)}
+              <img
+                className="w-52 object-cover"
+                alt=""
+                src={membership.productImageLocation}
+              />
+              {membership.product_with_inventory ? (
+                membership.isInventoryAvailable ? (
+                  <Button
+                    type="primary"
+                    shape="round"
+                    style={{ background: "green", marginTop: "10px" }}
+                  >
+                    {" "}
+                    For Sale{" "}
+                  </Button>
+                ) : (
+                  <Button
+                    type="primary"
+                    shape="round"
+                    style={{ background: "red", marginTop: "10px" }}
+                  >
+                    {" "}
+                    Retained{" "}
+                  </Button>
+                )
+              ) : (
+                <Button
+                  type="primary"
+                  shape="round"
+                  style={{ background: "blue", marginTop: "10px" }}
+                >
+                  {" "}
+                  Not for Sale{" "}
+                </Button>
+              )}
             </div>
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
@@ -84,21 +121,24 @@ const MembershipCard = ({
                   </h3>
                 </div>
                 <div className="flex items-center">
-                {!membership.product_with_inventory ?
-                   <Button type="text"
-                     className="text-primary text-sm cursor-pointer"
-                   >
-                     List for Sale
-                   </Button>
-                :null}
-                <Button type="text"
-                  className="text-primary text-sm cursor-pointer"
-                  onClick={callDetailPage}
-                >
-                  Preview
-                </Button>
-                
-                {/* <Popover
+                  {!membership.product_with_inventory ? (
+                    <Button
+                      type="text"
+                      className="text-primary text-sm cursor-pointer"
+                      onClick={openSaleModal}
+                    >
+                      List for Sale
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="text"
+                    className="text-primary text-sm cursor-pointer"
+                    onClick={callDetailPage}
+                  >
+                    Preview
+                  </Button>
+
+                  {/* <Popover
                   placement="bottomLeft"
                   open={openPop}
                   onOpenChange={handleOpenChange}
@@ -147,29 +187,36 @@ const MembershipCard = ({
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">
-                  Duration
-                </p>
+                <p className="text-primaryC text-sm w-40">Duration</p>
                 <p text-secondryB text-sm>
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                 {membership.timePeriodInMonths} Month(s)
+                  {membership.timePeriodInMonths} Month(s)
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">
-                  Savings
-                </p>
+                <p className="text-primaryC text-sm w-40">Savings</p>
                 <p text-secondryB text-sm>
                   :
                 </p>
-                <p style={{ color: "green"}} className="text-primaryB font-bold text-sm ml-3">
-                 $ {membership.savings}
+                <p
+                  style={{ color: "green" }}
+                  className="text-primaryB font-bold text-sm ml-3"
+                >
+                  $ {membership.savings}
                 </p>
               </div>
             </div>
           </div>
+          {saleModalOpen && (
+            <ListForSaleModal
+              open={saleModalOpen}
+              setOpen={setSaleModalOpen}
+              user={user}
+              product={state}
+            />
+          )}
           {/* {open && (
             <DeleteProductModal
               open={open}
