@@ -118,7 +118,7 @@ pipeline {
                   MP_DAPP_ADDRESS='c93f9a422a4508a6501a63537291128122f7bcf2' \\
                   CLIENT_URL="https://membership.mercata-testnet2.blockapps.net" \\
                   ssl="true" \\
-                  ./strato --single
+                  ./strato
               """
             }
 
