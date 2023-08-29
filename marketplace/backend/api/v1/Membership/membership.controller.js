@@ -103,6 +103,7 @@ class MembershipController {
             createdDate: Joi.number().required(),
             timePeriodInMonths: Joi.number().required(),
             additionalInfo: Joi.string().required(),
+            taxPercentage: Joi.number().required(),
         }).required(),
         membershipServiceArgs: Joi.array().items(Joi.object({
             serviceId: Joi.string().required(),

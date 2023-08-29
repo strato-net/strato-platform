@@ -926,6 +926,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
       }
 
+      const memberships_ = await  membershipJs.getAll(rawAdmin, {productId: inventories.map(inventory => inventory.productId)}, {...options, org: managers.cirrusOrg, app: contractName})
+
       const quantitiesToReduce = orderList.map(order => order.quantity);
 
       // reducing quantity inside inventories to place order and checking the buyerOrganization should not be equal to inventory organization
@@ -942,7 +944,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       const groupedData = inventories.reduce((acc, inventory) => {
         if (!acc[inventory.ownerOrganization]) {
-          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, data: [] };
+          const membership = memberships_.find(membership => membership.productId === inventory.productId)
+          console.log("----------------------->",membership, "membership")
+          if (membership) {
+            inventory.tax = membership.taxPercentage/100;
+          } else {inventory.tax = 0;}
+
+          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, tax: inventory.tax,  data: [] };
         }
         acc[inventory.ownerOrganization].data.push(inventory);
         return acc;
@@ -950,7 +958,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       const inventoriesData = Object.values(groupedData);
       const total = inventoriesData.reduce((acc, obj) => {
-        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.quantity, 0);
+        const result = obj.data.reduce((total, curr) => curr.tax ? (Math.ceil(((total + curr.pricePerUnit * curr.quantity) * (1 + (obj.tax/100)) ) * 100) / 100).toFixed(2)   : (total + curr.pricePerUnit * curr.quantity) , 0);
         return acc + result;
       }, 0);
 

@@ -4,6 +4,7 @@ export const membershipArgs = (uid) => {
     timePeriodInMonths: uid,
     additionalInfo: `additionalInfo_${uid}`,
     createdDate: uid,
+    taxPercentage:0,
   };
 
   return args;

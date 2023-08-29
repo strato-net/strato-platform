@@ -199,6 +199,7 @@ async function getAll(admin, args = {}, options) {
                 ...inventory,
                 membershipId: membership.address,
                 totalSavings: totalSavings,
+                taxes:  membership.taxPercentage/10000 
             });
         });
     });

@@ -42,6 +42,7 @@ contract MembershipManager is RestStatus{
         uint createdDate;
         int timePeriodInMonths;
         string additionalInfo;
+        uint taxPercentage;
     }
 
 
@@ -87,7 +88,7 @@ contract MembershipManager is RestStatus{
                                                  _membershipArgs.imageKey, _membershipArgs.isActive, _membershipArgs.category,
                                                  _membershipArgs.subCategory, _membershipArgs.createdDate);
         
-        Membership_2 membership = new Membership_2(address(product), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
+        Membership_3 membership = new Membership_3(address(product), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate, _membershipArgs.taxPercentage);
 
         //iterate throught MembershipServiceArgs array and create MembershipServices 
 

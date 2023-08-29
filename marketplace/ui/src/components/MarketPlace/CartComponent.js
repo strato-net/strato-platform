@@ -32,16 +32,19 @@ const CartComponent = ({ columns, data }) => {
         let s = 0;
         let tot = 0;
         data.forEach(element => {
-            t += element.tax;
-            s += element.shippingCharges;
-            tot += element.amount;
+            t += ((parseFloat(element.tax) ));
+            s += (parseFloat(element.shippingCharges));
+            tot += parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2));
         });
         setTax(t);
         setShipping(s);
         setTotal(tot)
+        console.log(tot);
     }, [data])
+    let totalNew = 0;
+    data.forEach(element => { totalNew += element.amount; });
 
-
+    const finalTotal = ( total +tax +shipping ).toFixed(2);  
     return (
         <Card className="my-4">
             <div>
@@ -79,9 +82,9 @@ const CartComponent = ({ columns, data }) => {
                             <Divider />
                             <Row className="justify-end">
                                 <p className="text-lg font-semibold w-36 mr-2">Total</p>
-                                <p className="text-lg font-semibold">-</p>
+                                <p className="text-lg font-semibold">:</p>
                                 <p className="text-lg font-semibold ml-2 w-20 text-right">
-                                    ${total + tax + shipping}
+                                    ${finalTotal}
                                 </p>
                             </Row>
                         </Col>
