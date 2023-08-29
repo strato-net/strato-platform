@@ -10,7 +10,7 @@ RUN apt-get update && \
   rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 HEALTHCHECK --interval=3s --timeout=2s --start-period=300s \
-  CMD lsof -i :3000 || \
+  CMD lsof -i :3003 || \
   exit 1
 
 RUN mkdir -p /usr/src/ui
