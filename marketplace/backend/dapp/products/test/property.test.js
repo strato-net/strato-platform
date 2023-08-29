@@ -26,6 +26,7 @@ describe('Property', function () {
     let dapp;
     let newOptions;
     let adminOrganization;
+    let args;
 
     const factoryArgs = () => ({ ...(factory.getPropertyArgs(util.uid())) });
 
@@ -76,20 +77,36 @@ describe('Property', function () {
             org: adminOrganization,
             ...options
         }
+
+        args = factoryArgs(globalAdmin)
     });
 
     it('Create Property - 201', async () => {
-        // Create Property via upload
-        const args = factoryArgs(globalAdmin)
-        console.log("args", args)
         contract = await propertyJs.uploadContract(globalAdmin, args, newOptions);
-        console.log("contract", contract)
         const state = await contract.getState();
-        console.log("state", state)
 
         assert.deepInclude(
-            // Convert the Property data into strings as the args are in strings
             R.map(v => '' + v, state),
+            R.map(v => '' + v, { ...args }));
+    });
+
+    it('Get All Properties - 201', async () => {
+        const properties = await propertyJs.getAll(globalAdmin, {}, newOptions);
+        assert(Array.isArray(properties), 'should be array');
+        assert.isAtLeast(properties.length, 1, 'Properties has length of 1');
+    });
+
+    it('Get Property - 201', async () => {
+        const payload = {
+            uniqueProductID: `${util.uid() + 2}`.padStart(40, '0'),
+            address: contract.address
+        };
+
+        const property = await propertyJs.get(globalAdmin, payload, newOptions);
+        assert.isObject(property, 'property is an object');
+        assert.deepInclude(
+            // Convert the Property data into strings as the args are in strings
+            R.map(v => '' + v, property),
             R.map(v => '' + v, { ...args }));
     });
 

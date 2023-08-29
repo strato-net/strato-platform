@@ -50,18 +50,7 @@ class PropertiesController {
 
   static async create(req, res, next) {
     try {
-      const {
-        dapp,
-        body,
-        body: {
-          streetNumber,
-          streetName,
-          unitNumber,
-          postalCity,
-          stateOrProvince,
-          postalcode,
-        },
-      } = req;
+      const { dapp, body } = req;
 
       const propertyArgs = {
         ...body,
@@ -98,18 +87,7 @@ class PropertiesController {
 
   static async update(req, res, next) {
     try {
-      const {
-        dapp,
-        body,
-        body: {
-          streetNumber,
-          streetName,
-          unitNumber,
-          postalCity,
-          stateOrProvince,
-          postalcode,
-        },
-      } = req;
+      const { dapp, body } = req;
 
       const propertyArgs = {
         ...body,

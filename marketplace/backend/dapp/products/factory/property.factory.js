@@ -4,7 +4,6 @@ const factory = {
     getPropertyArgs(uid) {
         const args = {
                 productId: `${uid + 2}`.padStart(40, '0'),
-                propertyType: `propertyType_${uid}`,
                 listPrice: 1000000,
                 streetNumber: 54,
                 streetName: `streetName_${uid}`,
