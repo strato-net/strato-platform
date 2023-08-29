@@ -108,7 +108,11 @@ const ReviewTab = (props) => {
             return <ReviewCard
               review={review}
               index={index}
-              handleRead={() => { handleRead(index) }} />
+              setOpen={setOpen}
+              open={open}
+              handleRead={() => { handleRead(index) }} 
+              userAddress={user.userAddress}
+              id={props.propertyId} />
           })}
         </div>
       </Col>

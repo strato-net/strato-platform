@@ -9,6 +9,7 @@ import {
   notification,
   Button,
   Space,
+  Modal,
 } from "antd";
 import ImageCollage from "../../Carousel/ImageCollage";
 import OverviewTab from "./ListingTabs/OverviewTab";
@@ -22,15 +23,18 @@ import {
   usePropertiesDispatch,
   usePropertiesState,
 } from "../../../contexts/propertyContext";
+import TalkToSalesModal from "./TalkToSalesModal";
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
 import { useAuthenticateState } from "../../../contexts/authentication";
 const AnyReactComponent = ({ text }) => <div>{text}</div>;
+
 function PropertyDetails() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
+  const [isTalkToSalesModalOpen, setTalkToSalesModal] = useState(false);
   const dispatch = usePropertiesDispatch();
   const {
     property,
@@ -43,6 +47,10 @@ function PropertyDetails() {
   const organization = user?.organization
 
   let { id } = useParams();
+
+  const handleCancel = () => {
+    setTalkToSalesModal(!isTalkToSalesModalOpen);
+  };
 
   useEffect(() => {
     actions.fetchPropertyDetails(dispatch, id);
@@ -205,15 +213,6 @@ function PropertyDetails() {
             <Button
               type="primary"
               onClick={() => {
-                setUploadPhotosModal(true);
-              }}
-              disabled
-            >
-              Edit Property
-            </Button>
-            <Button
-              type="primary"
-              onClick={() => {
                 toggleCreateModal(true);
               }}
               style={{ marginLeft: "5px" }}
@@ -335,9 +334,11 @@ function PropertyDetails() {
                 <Button
                   type="primary"
                   style={{ marginLeft: "50px", marginTop: "30px" }}
-                  disabled
+                  onClick={() => {
+                    setTalkToSalesModal(!isTalkToSalesModalOpen);
+                  }}
                 >
-                  Submit Inquiry
+                  Talk to Sales
                 </Button>
               </Col>
             </Row>
@@ -431,6 +432,9 @@ function PropertyDetails() {
         formData={propertyDetails}
         isEdit={true}
       />}
+      <Modal open={isTalkToSalesModalOpen} footer={[]} onCancel={() => handleCancel()}>
+      <TalkToSalesModal />
+      </Modal>
     </>
   );
 }

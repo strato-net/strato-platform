@@ -9,11 +9,10 @@ const WriteReviewModal = (props) => {
   const { open, handleCancel, isReviewSubmitting, handleSubmit, form } = props;
 
   const { title, rating, description } = reviewData
-
   const disabledSubmitReview =
-    !title ||
-    !rating ||
-    !description;
+    !form.getFieldValue("title") ||
+    !form.getFieldValue("rating") ||
+    !form.getFieldValue("description");
 
   const handleChange = (key, value) => {
     let data = { ...reviewData }
@@ -39,8 +38,7 @@ const WriteReviewModal = (props) => {
           type="primary"
           htmlType="submit"
           loading={isReviewSubmitting}
-          disabled={isReviewSubmitting}
-          okButtonProps={{ disabled: disabledSubmitReview}}
+          disabled={disabledSubmitReview}
           onClick={() => {
             TagManager.dataLayer({
               dataLayer: {
@@ -65,7 +63,9 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <Input onChange={(e) => { handleChange("title", e.target.value) }} />
+          <Input onChange={(e) => { handleChange("title", e.target.value) }}
+            value={title}
+            defaultValue={title} />
         </Form.Item>
         <Form.Item
           label="How would you rate the property?"
@@ -78,7 +78,9 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <Rate onChange={(e) => { handleChange("rating", e.target.value) }} />
+          <Rate onChange={(e) => { handleChange("rating", e.target.value) }}
+            value={rating}
+            defaultValue={rating} />
         </Form.Item>
         <Form.Item
           label="What do you think of the property?"
@@ -90,7 +92,9 @@ const WriteReviewModal = (props) => {
             },
           ]}
         >
-          <TextArea rows={4} style={{resize: 'none'}} onChange={(e) => { handleChange("description", e.target.value) }} />
+          <TextArea rows={4} style={{ resize: 'none' }} onChange={(e) => { handleChange("description", e.target.value) }}
+            value={description}
+            defaultValue={description} />
         </Form.Item>
       </Form>
     </Modal>
