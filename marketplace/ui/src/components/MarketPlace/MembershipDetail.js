@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useFormik, getIn } from "formik";
 import {
   Row,
   Breadcrumb,
@@ -41,11 +42,14 @@ import useDebounce from "../UseDebounce";
 import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
+import ListNowModal from "../Membership/ListNowModal";
+import * as yup from "yup";
+import { INVENTORY_STATUS } from "../../helpers/constants";
 
 
 const MembershipDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
-  const inventoryId = state?.inventoryId;
+  const [inventoryId, setInventoryId] = useState(state?.inventoryId);
   
   let isCalledFromMembership = false;
 
@@ -55,21 +59,26 @@ const MembershipDetails = ({ user, users }) => {
   else if (pathname.includes("memberships")) {
     isCalledFromMembership = true
   }
-
+  const initialValues = {
+    name: "",
+    price: "",
+    quantity: ""
+  };
   const [serviceList, setServiceList] = useState([])
   const [savingsList, setSavingsList] = useState([])
   const [totalSavings, setTotalSavings] = useState(0)
+  const [ownerSameAsUser, setOwnerSameAsUser] = useState(true)
   const [Id, setId] = useState(undefined);
   const [isServiceSelected, setIsServiceSelected] = useState(false);
   const [membershipDetails, setMembershipDetails] = useState(undefined);
   const [allProductFiles, setAllProductFiles] = useState(undefined);
+  const [visible, setVisible] = useState(false);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { membershipServices, membership, isMembershipLoading, productFiles} =
+  const { membershipServices, membership, isMembershipLoading, productFiles, isCreateMembershipSubmitting} =
   useMembershipState();
-const serviceDispatch = useMembershipDispatch();
+  const serviceDispatch = useMembershipDispatch();
 
-console.log("membershipServices", membershipServices)
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   
   useEffect(() => {
@@ -104,13 +113,37 @@ console.log("membershipServices", membershipServices)
     setAllProductFiles(productFiles)
   }, [productFiles])
   
+  const getSchema = (isListNowModalOpen) => {
+    return yup.object().shape({
+      name: yup.string().required("Membership name is required"),
+      price: yup.number().when("isListNowModalOpen", {
+          is: () => isListNowModalOpen, // Use a function to evaluate the condition
+          then: yup.number().required("Price is required"),
+        }),
+      quantity: yup.number().when("isListNowModalOpen", {
+        is: () => isListNowModalOpen, // Use a function to evaluate the condition
+        then: yup.number().required("Quantity is required"),
+      }),
+    });
+  };
   
+  const formik = useFormik({
+    initialValues: initialValues,
+    validationSchema: getSchema(visible),
+    setFieldValue: (field, value) => {
+      formik.setFieldValue(field, value);
+    },
+    onSubmit: function (values) {
+      handleCreateFormSubmit(values);
+    },
+    enableReinitialize: true,
+  });
 
   const { Text, Paragraph, Title } = Typography;
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { inventoryDetails, inventories, isInventoryDetailsLoading } = useInventoryState();
+  const { inventoryDetails, inventories, isInventoryDetailsLoading, inventory } = useInventoryState();
   const productDispatch = useProductDispatch();
   const {productDetails} = useProductState();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -132,6 +165,12 @@ console.log("membershipServices", membershipServices)
     else setId(routeMatch?.params?.address);
   }, [routeMatch, routeMatch1]);
 
+    
+  useEffect(() => {
+    if (inventory !== null && inventory !== undefined) {
+      setInventoryId(inventory[1]);
+    }
+  }, [inventory])
 
   useEffect(() => {
     if (Id !== undefined && inventoryId) {
@@ -186,14 +225,15 @@ console.log("membershipServices", membershipServices)
     }
   };
 
-  const ownerSameAsUser = () => {
-
-    if (user && user.organization !== inventories?.ownerOrganization) {
-      return true;
+  
+  useEffect(() => {
+    if (user && user.organization && (inventoryDetails === null || inventoryDetails === undefined)) {
+      setOwnerSameAsUser(false);
     }
-
-    return false;
-  }
+    else{
+      setOwnerSameAsUser(true);
+    }
+  }, [inventoryDetails, details])
 
   const addItemToCart = () => {
     let found = false;
@@ -320,6 +360,44 @@ console.log("membershipServices", membershipServices)
       if (isServiceSelected) setIsServiceSelected(false)
     }
   }
+  
+  const closeListNowModal = () => {
+    setVisible(false);
+  };
+
+  const openListNowModal = () => {
+    setVisible(true);
+  };
+  
+  const handleCreateFormSubmit = async (values) => {
+    if (user) {
+      if (Id !== undefined) {
+        if (formik.values.price !== "" && formik.values.quantity !== "") {
+          const inventoryBody = {
+            productAddress: membershipDetails.productId,
+            quantity: formik.values.quantity,
+            pricePerUnit: formik.values.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
+            status: INVENTORY_STATUS.PUBLISHED,
+            serialNumber: [],
+          };
+
+          const createInventory = await actions.createInventory(
+            dispatch,
+            inventoryBody
+          );
+          
+          if (createInventory) {
+            formik.resetForm();
+          }
+          setVisible(false);
+          
+        }
+      }
+    }
+  };
 
   return (
     <>
@@ -396,11 +474,11 @@ console.log("membershipServices", membershipServices)
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
                       } else {
-                        addItemToCart();
-                        navigate("/checkout");
+                        formik.setFieldValue("name", details?.name);
+                        openListNowModal();
                       }
                     }}
-                    disabled={ownerSameAsUser()}
+                    disabled={ownerSameAsUser}
                     id="buyNow"
                   >
                     Sell
@@ -520,6 +598,17 @@ console.log("membershipServices", membershipServices)
             </div>
           </div>
         </div>
+      )}
+      {visible && (
+        <ListNowModal
+          open={visible}
+          user={{user}}
+          handleCancel={closeListNowModal}
+          onClick={openListNowModal}
+          formik={formik}
+          getIn={getIn}
+          isCreateMembershipSubmitting={isCreateMembershipSubmitting}
+        />
       )}
     </>
   );
