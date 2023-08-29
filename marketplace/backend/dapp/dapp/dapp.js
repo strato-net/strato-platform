@@ -945,12 +945,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       const groupedData = inventories.reduce((acc, inventory) => {
         if (!acc[inventory.ownerOrganization]) {
           const membership = memberships_.find(membership => membership.productId === inventory.productId)
-          console.log("----------------------->",membership, "membership")
-          if (membership) {
-            inventory.tax = membership.taxPercentage/100;
-          } else {inventory.tax = 0;}
-
-          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, tax: inventory.tax,  data: [] };
+          const taxRate = membership ? membership.taxPercentage/100 : inventory.tax = 0;
+          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate,  data: [] };
         }
         acc[inventory.ownerOrganization].data.push(inventory);
         return acc;
