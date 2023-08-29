@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { Input, Tabs } from "antd";
 import AssetsTable from "./AssetsTable";
+import routes from "../../helpers/routes";
 import SalesTable from "./SalesTable";
 
 const { Search } = Input; 
 
 const Storage = ({ user }) => {
   const [searchValue, setSearchValue] = useState("");
+  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
 
   const onChange = (key) => {
 
@@ -17,7 +19,9 @@ const Storage = ({ user }) => {
   }
 
   return (
-    <div>
+    <>
+    {showStorage ?
+    (<div>
       <Tabs 
         className="mx-16 mt-14"
         defaultActiveKey={"Asset"}
@@ -36,7 +40,9 @@ const Storage = ({ user }) => {
           }
         ]}
       />
-    </div>
+    </div>) : <p>It appears that you do not have access to this page. Click <a className="font-bold text-blue" href={routes.Marketplace.url}>here</a> to go back to the homepage.</p>
+    }
+    </>
   );
 };
 
