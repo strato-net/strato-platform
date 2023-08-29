@@ -65,13 +65,15 @@ class VintageController {
 
     static validateCreateVintageArgs(args) {
         const createVintageSchema = Joi.object({
-            inventoryId: Joi.string().required(),
+            productAddress: Joi.string().required(),
             vintage: Joi.number().integer().min(2020).max(2040).allow(0),
-            retiredQuantity: Joi.number().integer().min(0).required(),
             bufferAmount: Joi.number().integer().required(),
             estimatedReductionAmount: Joi.number().integer().required(),
             actualReductionAmount: Joi.number().integer().required(),
-            verifier: Joi.string().required()
+            verifier: Joi.string().required(),
+            availableQuantity: Joi.number().integer().min(0).required(),
+            pricePerUnit: Joi.number().integer().greater(0).required(),
+            status: Joi.number().integer().min(1).max(2).required(),
         });
 
         const validation = createVintageSchema.validate(args);

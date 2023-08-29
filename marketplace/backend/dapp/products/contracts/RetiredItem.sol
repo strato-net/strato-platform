@@ -1,6 +1,6 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 
-contract RetiredItem_2 {
+contract RetiredItem_3 {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;

@@ -2,26 +2,29 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 import "./RetiredItem.sol";
+import "./Vintage.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory_7 is InventoryStatus {
+contract Inventory_11 is InventoryStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
     address public productId;
+    address public vintageId;
     string public category;
     uint public purchasedQuantity;
+    uint public retiredQuantity;
     int public pricePerUnit;
     uint public vintage;
     uint public availableQuantity;
     InventoryStatus public status;
     uint public createdDate;
     string public batchSerializationNumber;
-    uint public retiredQuantity;
 
     constructor(
+        address _vintageId,
         string _category,
         uint _quantity,
         int _pricePerUnit,
@@ -34,15 +37,16 @@ contract Inventory_7 is InventoryStatus {
         owner = _owner;
 
         productId = msg.sender;
+        vintageId = _vintageId;
         category = _category;
         purchasedQuantity = 0;
+        retiredQuantity = 0;
         pricePerUnit = _pricePerUnit;
         vintage = _vintage;
         availableQuantity = _quantity;
         status = _status;
         createdDate = _createdDate;
         batchSerializationNumber = _batchSerializationNumber;
-        retiredQuantity = 0;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -83,11 +87,6 @@ contract Inventory_7 is InventoryStatus {
         return RestStatus.OK;
     }
 
-    function updateRetiredQuantity(uint _quantity) returns (uint) {
-        availableQuantity = availableQuantity - _quantity;
-        retiredQuantity = retiredQuantity + _quantity;
-    }
-
     function retireCredits(
         address _inventoryId,
         string _retiredBy,
@@ -95,7 +94,7 @@ contract Inventory_7 is InventoryStatus {
         uint _quantity,
         string _purpose
     ) public returns (uint256, address) {
-        RetiredItem_2 retiredItem = new RetiredItem_2(
+        RetiredItem_3 retiredItem = new RetiredItem_3(
             _inventoryId,
             _retiredBy,
             _retiredOnBehalfOf,

@@ -130,6 +130,7 @@ contract ProductManager is InventoryStatus, RestStatus {
 
     function addInventory(
         address _productAddress,
+        address _vintageId,
         uint _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
@@ -147,13 +148,14 @@ contract ProductManager is InventoryStatus, RestStatus {
                 tx.origin
             );
             if (isUnique != address(0)) {
-                Inventory_7 inventory = Inventory_7(isUnique);
+                Inventory_11 inventory = Inventory_11(isUnique);
                 inventory.updateQuantity(
                     inventory.availableQuantity() + _availableQuantity
                 );
                 return (RestStatus.OK, isUnique);
             }
             (uint256 status, address inventoryAddress) = product.addInventory(
+                _vintageId,
                 _availableQuantity,
                 _pricePerUnit,
                 _vintage,
@@ -173,18 +175,14 @@ contract ProductManager is InventoryStatus, RestStatus {
     }
 
     function addVintage(
-        address _inventoryId,
         uint _vintage,
-        uint _retiredQuantity,
         uint _bufferAmount,
         uint _estimatedReductionAmount,
         uint _actualReductionAmount,
         string _verifier
     ) returns (uint256, address) {
-        Vintage vintage = new Vintage(
-            _inventoryId,
+        Vintage_5 vintage = new Vintage_5(
             _vintage,
-            _retiredQuantity,
             _bufferAmount,
             _estimatedReductionAmount,
             _actualReductionAmount,
@@ -196,6 +194,7 @@ contract ProductManager is InventoryStatus, RestStatus {
 
     function addInventoryForBuyer(
         address _productAddress,
+        address _vintageId,
         uint _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
@@ -209,6 +208,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         Product_4 product = Product_4(_productAddress);
 
         (uint256 status, address inventoryAddress) = product.addInventory(
+            _vintageId,
             _availableQuantity,
             _pricePerUnit,
             _vintage,
@@ -230,7 +230,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint _quantity,
         int _price
     ) returns (uint256, address) {
-        Inventory_7 existingInventory = Inventory_7(_existingInventory);
+        Inventory_11 existingInventory = Inventory_11(_existingInventory);
         if (
             _quantity > existingInventory.availableQuantity() || _quantity <= 0
         ) {
@@ -240,16 +240,38 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint256 isUpdated = existingInventory.updateQuantityForResell(
             _quantity
         );
-        (uint256 status, address inventoryAddress) = product.addInventory(
-            _quantity,
-            _price,
-            existingInventory.vintage(),
-            InventoryStatus.PUBLISHED,
-            block.timestamp,
-            existingInventory.batchSerializationNumber(),
-            tx.origin
-        );
-        return (status, inventoryAddress);
+        if (existingInventory.category() == "Carbon") {
+            (uint256 status, address inventoryAddress) = product.addInventory(
+                existingInventory.vintageId(),
+                _quantity,
+                _price,
+                existingInventory.vintage(),
+                InventoryStatus.PUBLISHED,
+                block.timestamp,
+                existingInventory.batchSerializationNumber(),
+                tx.origin
+            );
+            
+            Vintage_5 existingVintage = Vintage_5(existingInventory.vintageId());
+            existingVintage.addInventoryId(inventoryAddress);
+
+            return (status, inventoryAddress);
+        }
+        else {
+            (uint256 status, address inventoryAddress) = product.addInventory(
+                address(0),
+                _quantity,
+                _price,
+                existingInventory.vintage(),
+                InventoryStatus.PUBLISHED,
+                block.timestamp,
+                existingInventory.batchSerializationNumber(),
+                tx.origin
+            );
+            return (status, inventoryAddress);
+        }
+
+        return (RestStatus.BAD_REQUEST, address(0));
     }
 
     function updateInventory(
@@ -275,7 +297,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         bool _isReduce
     ) returns (uint256) {
         for (uint i = 0; i < _inventories.length; i++) {
-            Inventory_7 inventory = Inventory_7(_inventories[i]);
+            Inventory_11 inventory = Inventory_11(_inventories[i]);
 
             if (_isReduce) {
                 if (_quantities[i] > inventory.availableQuantity()) {
@@ -343,7 +365,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint _newQuantity
     ) public returns (uint, address, address) {
         Product_4 product;
-        Inventory_7 inventory;
+        Inventory_11 inventory;
 
         Product_4 oldProduct = Product_4(_productId);
         address productAddress = checkForProduct(
@@ -367,7 +389,7 @@ contract ProductManager is InventoryStatus, RestStatus {
             product = Product_4(productAddress);
         }
 
-        Inventory_7 oldInventory = Inventory_7(_inventoryId);
+        Inventory_11 oldInventory = Inventory_11(_inventoryId);
 
         address uniqueInventoryAddress = checkForInventory(
             oldInventory.vintage(),
@@ -378,20 +400,37 @@ contract ProductManager is InventoryStatus, RestStatus {
 
         //if no inventory is created before && vintage is invalid   );
         if (uniqueInventoryAddress == address(0)) {
-            (uint256 status, address inventoryAddr) = addInventoryForBuyer(
-                address(product),
-                _newQuantity,
-                oldInventory.pricePerUnit(),
-                oldInventory.vintage(),
-                InventoryStatus.UNPUBLISHED,
-                block.timestamp,
-                oldInventory.batchSerializationNumber(),
-                _newOwner
-            );
-            inventory = Inventory_7(inventoryAddr);
+            if (oldInventory.category() == "Carbon") {
+                (uint256 status, address inventoryAddr) = addInventoryForBuyer(
+                    address(product),
+                    oldInventory.vintageId(),
+                    _newQuantity,
+                    oldInventory.pricePerUnit(),
+                    oldInventory.vintage(),
+                    InventoryStatus.UNPUBLISHED,
+                    block.timestamp,
+                    oldInventory.batchSerializationNumber(),
+                    _newOwner
+                );
+                inventory = Inventory_11(inventoryAddr);
+            }
+            else {
+                (uint256 status, address inventoryAddr) = addInventoryForBuyer(
+                    address(product),
+                    address(0),
+                    _newQuantity,
+                    oldInventory.pricePerUnit(),
+                    oldInventory.vintage(),
+                    InventoryStatus.UNPUBLISHED,
+                    block.timestamp,
+                    oldInventory.batchSerializationNumber(),
+                    _newOwner
+                );
+                inventory = Inventory_11(inventoryAddr);
+            }
         } else {
             //inventory retreived
-            Inventory_7 inventoryToBeAdded = Inventory_7(
+            Inventory_11 inventoryToBeAdded = Inventory_11(
                 uniqueInventoryAddress
             );
             uint availableQuantity = inventoryToBeAdded.availableQuantity();
@@ -422,7 +461,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint _quantity,
         string _purpose
     ) returns (uint256, address) {
-        Inventory_7 inventory = Inventory_7(_inventoryId);
+        Inventory_11 inventory = Inventory_11(_inventoryId);
         if (_quantity > inventory.availableQuantity()) {
             return (RestStatus.BAD_REQUEST, address(0));
         }

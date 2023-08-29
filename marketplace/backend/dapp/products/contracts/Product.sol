@@ -97,6 +97,7 @@ contract Product_4 is InventoryStatus {
 
     // Add the inventory for the product
     function addInventory(
+        address _vintageId,
         uint _availableQuantity,
         int _pricePerUnit,
         uint _vintage,
@@ -112,7 +113,8 @@ contract Product_4 is InventoryStatus {
         if (!isInventoryAvailable) {
             isInventoryAvailable = true;
         }
-        Inventory_7 inventory = new Inventory_7(
+        Inventory_11 inventory = new Inventory_11(
+            _vintageId,
             category,
             _availableQuantity,
             _pricePerUnit,
@@ -136,7 +138,7 @@ contract Product_4 is InventoryStatus {
             return RestStatus.FORBIDDEN;
         }
 
-        Inventory_7 inventory = Inventory_7(_inventory);
+        Inventory_11 inventory = Inventory_11(_inventory);
         inventory.update(_pricePerUnit, _status, _scheme);
         return (RestStatus.OK);
     }
@@ -146,7 +148,7 @@ contract Product_4 is InventoryStatus {
         address _inventory,
         uint _quantity
     ) public returns (uint256) {
-        Inventory_7 inventory = Inventory_7(_inventory);
+        Inventory_11 inventory = Inventory_11(_inventory);
         inventory.updateQuantity(_quantity);
         return (RestStatus.OK);
     }

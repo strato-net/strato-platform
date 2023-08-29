@@ -1,23 +1,20 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 
-contract Vintage {
+contract Vintage_5 {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
-    address public inventoryId;
+    address[] public inventoryIds;
     uint public vintage;
-    uint public retiredQuantity;
     uint public bufferAmount;
     uint public estimatedReductionAmount;
     uint public actualReductionAmount;
     string public verifier;
 
     constructor(
-        address _inventoryId,
         uint _vintage,
-        uint _retiredQuantity,
         uint _bufferAmount,
         uint _estimatedReductionAmount,
         uint _actualReductionAmount,
@@ -25,9 +22,8 @@ contract Vintage {
     ) {
         owner = tx.origin;
 
-        inventoryId = _inventoryId;
+        inventoryIds = [];
         vintage = _vintage;
-        retiredQuantity = _retiredQuantity;
         bufferAmount = _bufferAmount;
         estimatedReductionAmount = _estimatedReductionAmount;
         actualReductionAmount = _actualReductionAmount;
@@ -37,5 +33,10 @@ contract Vintage {
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
+    }
+
+    function addInventoryId(address _inventoryId) public returns (uint256) {
+        inventoryIds.push(_inventoryId);
+        return (RestStatus.OK);
     }
 }

@@ -100,7 +100,7 @@ const CreateProductModal = ({
       if (isDone) {
         if (page === 1)
           actions.fetchProduct(dispatch, 10, 0, debouncedSearchTerm);
-          carbonActions.fetchCarbons(carbonDispatch, 10, 0, debouncedSearchTerm);
+        carbonActions.fetchCarbons(carbonDispatch, 10, 0, debouncedSearchTerm);
         resetPage(1);
         handleCancel();
       }
@@ -150,9 +150,10 @@ const CreateProductModal = ({
             key="submit"
             type="primary"
             onClick={formik.handleSubmit}
-            disabled={disabled}
+            disabled={isuploadImageSubmitting}
+            loading={isCreateProductSubmitting || isCreateCarbonSubmitting}
           >
-            {disabled ? <Spin /> : "Create Product"}
+            Create Product
           </Button>
         </div>,
       ]}

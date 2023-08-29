@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Inventory_7';
+const contractName = 'Inventory_11';
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 
 /** 
@@ -168,7 +168,7 @@ async function getAll(admin, args = {}, options) {
 }
 
 async function getAllRetiredItems(admin, args = {}, options) {
-    const retiredItems = await searchAllWithQueryArgs("RetiredItem_2", args, options, admin)
+    const retiredItems = await searchAllWithQueryArgs("RetiredItem_3", args, options, admin)
     return retiredItems.map((retiredItem) => marshalOut(retiredItem))
 }
 

@@ -121,6 +121,8 @@ function bind(user, _contract, options) {
     createCarbon(user, contract, args, options);
   contract.createInventory = async (args) =>
     createInventory(user, contract, args, options);
+  contract.createVintage = async (args) =>
+    createVintage(user, contract, args, options);
   contract.resellInventory = async (args) =>
     resellInventory(user, contract, args, options);
   contract.updateInventory = async (args) =>

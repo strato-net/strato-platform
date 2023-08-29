@@ -235,7 +235,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createInventory = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const { ...restArgs } = args;
-    const newArgs = { ...restArgs, batchSerializationNumber: util.uid() }
+    const newArgs = { ...restArgs, batchSerializationNumber: util.uid(), vintageId: address(0) }
     const serialNumbers = []
 
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
@@ -248,7 +248,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.resellInventory = async function (args, options = defaultOptions) {
-    const { inventoryId, quantity, price, ...newArgs } = args;
+    const { inventoryId, quantity, price } = args;
     return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price });
   };
 
@@ -310,7 +310,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         address: carbon.productId,
         ownerOrganization: userOrganization
       }, getOptions);
-      carbonsWithProducts.push({ ...carbon, ...productData })
+      carbonsWithProducts.push({ ...carbon, ...productData, address: carbon.address })
     }
 
     return carbonsWithProducts;
@@ -349,61 +349,39 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getVintage = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const vintage = await managers.productManager.getVintage({ ...args }, getOptions);
-
-    const inventoryData = await managers.productManager.getInventory({
-      address: vintage.inventoryId,
-      ownerOrganization: userOrganization
-    }, getOptions);
-
-    const vintageData = { ...vintage, ...inventoryData }
-    return vintageData;
+    return await managers.productManager.getVintage({ ...args }, getOptions);
   };
 
   contract.getVintages = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    const allVintagesData = await managers.productManager.getVintages({ ...args }, getOptions);
-    const vintagesWithInventory = [];
-
-    for (const vintage of allVintagesData) {
-      const inventoryData = await managers.productManager.getInventory({
-        ...args,
-        offset: 0,
-        sort: null,
-        address: vintage.inventoryId,
-        ownerOrganization: userOrganization
-      }, getOptions);
-      vintagesWithInventory.push({ ...vintage, ...inventoryData })
-    }
-
-    return vintagesWithInventory;
+    return await managers.productManager.getVintages({ ...args }, getOptions);
   };
 
   contract.createVintage = async function (args, options = optionsNoChainIds) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const inventoryArgs = {
-      productAddress: args.productAddress,
-      availableQuantity: args.availableQuantity,
-      pricePerUnit: args.pricePerUnit,
+    const serialNumbers = [];
+    const vintageArgs = {
       vintage: args.vintage,
-      status: args.status,
-      batchSerializationNumber: util.uid()
-    };
+      bufferAmount: args.bufferAmount,
+      estimatedReductionAmount: args.estimatedReductionAmount,
+      actualReductionAmount: args.actualReductionAmount,
+      verifier: args.verifier
+    }
 
-    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...inventoryArgs, createdDate: createdDate });
+    const [createVintageStatus, createdVintageAddress] = await managers.productManager.createVintage(vintageArgs);
 
-    if (createInventoryStatus == 200) {
-      const vintageArgs = {
-        inventoryId: createdInventoryAddress,
+    if (createVintageStatus == 200) {
+      const inventoryArgs = {
+        productAddress: args.productAddress,
+        vintageId: createdVintageAddress,
+        availableQuantity: args.availableQuantity,
+        pricePerUnit: args.pricePerUnit,
         vintage: args.vintage,
-        retiredQuantity: args.retiredQuantity,
-        bufferAmount: args.bufferAmount,
-        estimatedReductionAmount: args.estimatedReductionAmount,
-        actualReductionAmount: args.actualReductionAmount,
-        verifier: args.verifier
-      }
+        status: args.status,
+        batchSerializationNumber: util.uid()
+      };
 
-      return managers.productManager.createVintage(vintageArgs);
+      return await managers.productManager.createInventory({ ...inventoryArgs, createdDate, serialNumbers });
     }
   }
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------

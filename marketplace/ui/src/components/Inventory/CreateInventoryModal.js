@@ -16,6 +16,7 @@ import { Link } from "react-router-dom";
 import TextArea from "antd/es/input/TextArea";
 import getSchema from "./InventorySchema";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as vintageActions } from "../../contexts/vintage/actions";
 import {
   useInventoryDispatch,
   useInventoryState,
@@ -88,6 +89,7 @@ const CreateInventoryModal = ({
   });
 
   useEffect(() => {
+    vintageActions.fetchVintages(vintageDispatch, 10, 0, debouncedSearchTerm);
     if (formik.values.category.name) {
       productActions.fetchCategoryBasedProduct(
         productDispatch,
@@ -103,7 +105,6 @@ const CreateInventoryModal = ({
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-      retiredQuantity: 0,
       bufferAmount: 0,
       estimatedReductionAmount: 0,
       actualReductionAmount: 0,
@@ -127,6 +128,7 @@ const CreateInventoryModal = ({
     if (isDone) {
       if (page === 1)
         actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
+      vintageActions.fetchVintages(vintageDispatch, 10, 0, debouncedSearchTerm);
       resetPage(1);
       handleCancel();
     }
