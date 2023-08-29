@@ -28,7 +28,11 @@ const MembershipsProvider = ({ children }) => {
     assetsUploaded: 0,
     assetsUploadedErrors: [],
     isImportAssetsModalOpen: false,
-    totalMemberships: 0
+    totalMemberships: 0,
+    isOnboardingSellerToStripe: false,
+    onboardedSeller: null,
+    stripeStatus: null,
+    isLoadingStripeStatus: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);
