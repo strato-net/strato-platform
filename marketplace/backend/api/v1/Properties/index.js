@@ -31,4 +31,32 @@ router.post(
   PropertiesController.create
 );
 
+router.put(
+  Properties.update,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.update);
+  
+//Review specific routes
+router.post(
+  Properties.createReview,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.createReview
+);
+
+router.post(
+  Properties.deleteReview,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.deleteReview
+);
+
+router.put(
+  Properties.updateReview,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  PropertiesController.updateReview
+);
+
 export default router;

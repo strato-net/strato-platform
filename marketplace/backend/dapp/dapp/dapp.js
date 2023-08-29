@@ -21,6 +21,7 @@ import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
 import productDocumentManagerJs from '/dapp/productDocuments/productDocumentManager';
+import reviewManagerJs from '/dapp/reviews/reviewManager';
 
 const allAssetNames = [
   orderJs.contractName,
@@ -29,7 +30,7 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
 ];
 
-const contractName = "Dapp";
+const contractName = "Dapp_0_1";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
@@ -116,6 +117,7 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
   const productDocumentManager = await productDocumentManagerJs.bindAddress(admin, state["productDocumentManager"], options);
+  const reviewManager = await reviewManagerJs.bindAddress(admin, state["reviewManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
@@ -123,6 +125,7 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
   return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager, productDocumentManager };
+  return { cirrusOrg, productManager, reviewManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -617,11 +620,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ownerOrganization: userOrganization
     }, getOptions);
     const propertyImages = await managers.productDocumentManager.getProducDocument({ ...args, productId: property.productId }, getOptions);
-    const propertyData = {
-      ...property,
+    console.log('dapp.getProperty - productData', productData)
+    console.log('dapp.getProperty - property.address', property.address)
+    const reviews = await managers.reviewManager.getReviews({
+      productId: property.productId,
+      propertyId: property.address,
+    }, getOptions);
+    console.log('dapp.getProperty - reviews', reviews)
+    const propertyData = { ...property, 
       title: productData.name,
-      description: productData.description,
-      propertyType: productData.subCategory,
+      organization:productData.ownerOrganization, 
+      description: productData.description, 
+      propertyType: productData.subCategory, 
+      reviews: reviews,
       images: propertyImages
     }
     return propertyData
@@ -660,11 +671,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const productArgs = {
       name: args.title,
       description: args.description,
-      manufacturer: "",
+      manufacturer: "N/A",
       unitOfMeasurement: 1,
-      userUniqueProductCode: "",
+      userUniqueProductCode: "N/A",
       leastSellableUnit: 1,
-      imageKey: "",
+      imageKey: "N/A",
       isActive: true,
       category: "Real Estate",
       subCategory: args.propertyType,
@@ -678,7 +689,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const propertyArgs = {
         productId: productContract[1],
         listPrice: args.listPrice,
-        unparsedAddress: args.unparsedAddress,
         streetNumber: args.streetNumber,
         streetName: args.streetName,
         unitNumber: args.unitNumber,
@@ -783,6 +793,33 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   }
 
+  contract.updateProperty = async function (args) {
+    const {
+      productId,
+      description,
+      title,
+      ...propertyArgs
+    } = args;
+
+    // Update productArgs
+    const productArgs = {
+      productAddress: productId,
+      updates: {
+        imageKey: "",
+        isActive: true,
+        description,
+        name: title,
+        userUniqueProductCode: `${parseInt(util.iuid())}`
+      }
+    }
+
+    const [productRestStatus] = await managers.productManager.updateProduct(productArgs);
+
+    if (productRestStatus === '200') {
+      return await managers.productManager.updateProperty(propertyArgs);
+    }
+  }
+  
   /* ------------------------------ PRODUCT MANAGER ENDS------------------------------ */
 
   /* ------------------------------PRODUCTDOCUMENT MANAGER---------------------------- */
@@ -799,6 +836,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   /* ----------------------------PRODUCTDOCUMENT MANAGER ENDS-------------------------- */
+
+  // ------------------------------ REVIEW MANAGER STARTS--------------------------------
+
+  // Create reviews
+  contract.createReview = async function (args, options = defaultOptions) {
+    console.log('dapp.createReview - args', args)
+    const createdDate = Math.floor(Date.now() / 1000);
+    return managers.reviewManager.createReview({ ...args, createdDate: createdDate, delDate: 0 });
+  }
+
+  // Edit Reviews
+  contract.updateReview = async function (args, options = defaultOptions) {
+    return managers.reviewManager.updateReview(args);
+  }
+
+  // Delete reviews by the productId/productAddress
+  contract.deleteReview = async function (args, options = defaultOptions) {
+    return managers.reviewManager.deleteReview(args);
+  };
+
+
+  // ------------------------------ REVIEW MANAGER ENDS--------------------------------
+
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };

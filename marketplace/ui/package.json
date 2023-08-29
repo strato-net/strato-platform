@@ -51,6 +51,7 @@
     "immer": "^9.0.17",
     "prop-types": "^15.8.1",
     "react": "^18.2.0",
+    "react-calendly": "^4.1.1",
     "react-dom": "^18.2.0",
     "react-gtm-module": "^2.0.11",
     "react-papaparse": "^4.1.0",

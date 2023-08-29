@@ -22,7 +22,7 @@ const reducer = (state, action) => {
     case actionDescriptors.createPropertySuccessful:
       return {
         ...state,
-        product: action.payload,
+        property: action.payload,
         isCreatePropertySubmitting: false,
       };
     case actionDescriptors.createPropertyFailed:
@@ -64,21 +64,38 @@ const reducer = (state, action) => {
       return {
         ...state,
         isPropertyDetailsLoading: false,
-        propertyDetails: action.payload
+        message: action.error
+      };
+    case actionDescriptors.updateProperty:
+      return {
+        ...state,
+        isUpdatePropertySubmitting: true,
+      };
+    case actionDescriptors.updatePropertySuccessful:
+      return {
+        ...state,
+        propertyDetails: action.payload,
+        isUpdatePropertySubmitting: false,
+      };
+    case actionDescriptors.updatePropertyFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUpdatePropertySubmitting: false,
       };
     // review cases:-
-    case actionDescriptors.addReview:
+    case actionDescriptors.createReview:
       return {
         ...state,
         isReviewAdding: true,
       };
-    case actionDescriptors.addReviewSuccessful:
+    case actionDescriptors.createReviewSuccessful:
       return {
         ...state,
         review: action.payload,
         isReviewAdding: false,
       };
-    case actionDescriptors.addReviewFailed:
+    case actionDescriptors.createReviewFailed:
       return {
         ...state,
         error: action.error,

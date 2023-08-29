@@ -12,13 +12,14 @@ import "/dapp/items/contracts/ItemManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
 import "/dapp/orders/contracts/OrderManager.sol";
 import "/dapp/productDocuments/contracts/ProductDocumentManager.sol";
+import "/dapp/reviews/contracts/ReviewManager.sol";
 /**
  * Single entry point to all the project's contracts
  * Deployed by the deploy script
  *
  */
 
-contract Dapp {
+contract Dapp_0_1 {
     event OrgAdded(string orgName);
     event OrgUnitAdded(string orgName, string orgUnit);
     event CommonNameAdded(string orgName, string orgUnit, string commonName);
@@ -37,6 +38,7 @@ contract Dapp {
     PaymentManager paymentManager;
     OrderManager orderManager;
     ProductDocumentManager productDocumentManager;
+    ReviewManager_0_2 reviewManager;
     
     account public bootUserAccount;
     string public bootUserCommonName;
@@ -57,6 +59,7 @@ contract Dapp {
         eventTypeManager = new EventTypeManager_10();
         paymentManager = new PaymentManager();
         productDocumentManager = new ProductDocumentManager();
+        reviewManager = new ReviewManager_0_2();
     }
 
     function getProductManager() public returns (ProductManager) {

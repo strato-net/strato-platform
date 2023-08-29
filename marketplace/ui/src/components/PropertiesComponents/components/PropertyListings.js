@@ -6,7 +6,7 @@ import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
-import { filterlabel, propertyConstants } from '../helpers/constants'
+import { createPropertyFormInitialData, filterlabel, propertyConstants } from '../helpers/constants'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
@@ -22,6 +22,7 @@ function PropertyListings() {
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
+    document.title = "Welcome to Mercata Properties"
     actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
   }, [dispatch, currentPage, limit])
 
@@ -116,7 +117,6 @@ function PropertyListings() {
     : (properties.length === LIMIT_PER_PAGE
       ? (currentPage * LIMIT_PER_PAGE) + 1
       : currentPage * LIMIT_PER_PAGE)
-
   return (
     <>
       {message && openToast("bottom")}
@@ -172,6 +172,7 @@ function PropertyListings() {
       <PropertyCreateModal
         isCreateModalOpen={isCreateModalOpen}
         toggleCreateModal={toggleCreateModal}
+        formData={createPropertyFormInitialData}
       />
     </>
   );

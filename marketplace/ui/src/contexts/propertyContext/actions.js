@@ -16,9 +16,9 @@ const actionDescriptors = {
   fetchPropertyDetailsSuccessful: "fetch_property_details_successful",
   fetchPropertyDetailsFailed: "fetch_property_details_failed",
 
-  addReview: "add_review",
-  addReviewSuccessful: "add_review_successful",
-  addReviewFailed: "add_review_failed",
+  createReview: "create_review",
+  createReviewSuccessful: "create_review_successful",
+  createReviewFailed: "create_review_failed",
   updateReview: "update_review",
   updateReviewSuccessful: "update_review_successful",
   updateReviewfailed: "update_review_failed",
@@ -88,8 +88,8 @@ const actions = {
   updateProperty: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateProperty });
     try {
-      const response = await fetch(`${apiUrl}/updateproperties`, {
-        method: HTTP_METHODS.POST,
+      const response = await fetch(`${apiUrl}/properties/update`, {
+        method: HTTP_METHODS.PUT,
         credentials: "same-origin",
         headers: {
           Accept: "application/json",
@@ -104,8 +104,10 @@ const actions = {
         dispatch({
           type: actionDescriptors.updatePropertySuccessful,
           payload: body.data,
+          success: true
         });
         actions.setMessage(dispatch, "Property updated successfully", true);
+        actions.fetchPropertyDetails(dispatch, payload.propertyAddress)
         return true;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
@@ -216,13 +218,13 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.fetchPropertyDetailsFailed,
-          error: "Error while fetching property list",
+          error: "Error while fetching property detail",
         });
         return;
       }
       dispatch({
         type: actionDescriptors.fetchPropertyDetailsFailed,
-        error: body.error,
+        error: "Error while fetching property detail",
       });
       return;
     } catch (err) {
@@ -234,10 +236,10 @@ const actions = {
     }
   },
 
-  addReview: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.addReview, payload })
+  createReview: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.createReview, payload })
     try {
-      const response = await fetch(`${apiUrl}/addreview`, {
+      const response = await fetch(`${apiUrl}/properties/review`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
@@ -251,14 +253,14 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.addReviewSuccessful,
+          type: actionDescriptors.createReviewSuccessful,
           payload: body.data,
         });
         actions.setMessage(dispatch, "Review added successfully", true);
         return true;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
-          type: actionDescriptors.addReviewFailed,
+          type: actionDescriptors.createReviewFailed,
           error: "Error while adding review",
         });
         actions.setMessage(dispatch, "Error while adding review");
@@ -266,14 +268,14 @@ const actions = {
       }
 
       dispatch({
-        type: actionDescriptors.addReviewFailed,
+        type: actionDescriptors.createReviewFailed,
         error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.addReviewFailed,
+        type: actionDescriptors.createReviewFailed,
         error: "Error while adding review",
       });
       actions.setMessage(dispatch, "Error while adding review");
@@ -282,8 +284,8 @@ const actions = {
   updateReview: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.updateReview, payload })
     try {
-      const response = await fetch(`${apiUrl}/updatereview`, {
-        method: HTTP_METHODS.POST,
+      const response = await fetch(`${apiUrl}/properties/review/update`, {
+        method: HTTP_METHODS.PUT,
         credentials: "same-origin",
         headers: {
           Accept: "application/json",
@@ -327,7 +329,7 @@ const actions = {
   deleteReview: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.deleteReview, payload })
     try {
-      const response = await fetch(`${apiUrl}/deletereview`, {
+      const response = await fetch(`${apiUrl}/properties/review/delete`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {

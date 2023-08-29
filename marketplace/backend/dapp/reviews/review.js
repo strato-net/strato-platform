@@ -4,12 +4,12 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Property_0_5';
-const contractFilename = `${util.cwd}/dapp/products/contracts/Property.sol`;
+const contractName = 'Review_0_5';
+const contractFilename = `${util.cwd}/dapp/reviews/contracts/Review.sol`;
 /** 
- * Upload a new Product 
+ * Upload a new review 
  * @param user User token (typically an admin)
- * @param _constructorArgs Arguments of Product's constructor
+ * @param _constructorArgs Arguments of review's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
  * @returns Contract object
  * */
@@ -42,7 +42,7 @@ async function uploadContract(user, _constructorArgs, options) {
  * Augment contract arguments before they are used to post a contract.
  * Its counterpart is {@link marshalOut `marshalOut`}.
  * 
- * As our arguments come into the product contract they first pass through `marshalIn` and 
+ * As our arguments come into the review contract they first pass through `marshalIn` and 
  * when we retrieve contract state they pass through {@link marshalOut `marshalOut`}.
  * 
  * (A mathematical analogy: `marshalIn` and {@link marshalOut `marshalOut`} form something like a 
@@ -52,101 +52,14 @@ async function uploadContract(user, _constructorArgs, options) {
 function marshalIn(_args) {
     const defaultArgs = {
         productId: '',
-        propertType: '',
-        listPrice: 0,
-        streetNumber: 0,
-        streetName: '',
-        unitNumber: '',
-        postalCity: '',
-        stateOrProvince: '',
-        postalcode: 0,
-        bathroomsTotalInteger: 0,
-        bedroomsTotal: 0,
-        standardStatus: '',
-        lotSizeArea: 0,
-        lotSizeUnits: '',
-        livingArea: 0,
-        livingAreaUnits: '',
-        latitude: '',
-        longitude: '',
-        numberOfUnitsTotal: 0,
-        // Appliances
-        dishwasher: false,
-        dryer: false,
-        freezer: false,
-        garbageDisposal: false,
-        microwave: false,
-        ovenOrRange: false,
-        refrigerator: false,
-        washer: false,
-        waterHeater: false,
-
-        // Cooling
-        centralAir: false,
-        evaporative: false,
-        geoThermal: false,
-        refrigeration: false,
-        solar: false,
-        wallUnit: false,
-
-        // Heating
-        baseboard: false,
-        forceAir: false,
-        geoThermalHeat: false,
-        heatPump: false,
-        hotWater: false,
-        radiant: false,
-        solarHeat: false,
-        steam: false,
-
-        // Flooring
-        carpet: false,
-        concrete: false,
-        hardwood: false,
-        laminate: false,
-        linoleumVinyl: false,
-        slate: false,
-        softwood: false,
-        tile: false,
-
-        // Parking
-        carport: false,
-        garage: false,
-        offStreet: false,
-        onStreet: false,
-
-        // Interior Features
-        attic: false,
-        cableReady: false,
-        ceilingFan: false,
-        doublePaneWindows: false,
-        elevator: false,
-        fireplace: false,
-        flooring: false,
-        furnished: false,
-        jettedTub: false,
-        securitySystem: false,
-        vaultedCeiling: false,
-        skylight: false,
-        wetBar: false,
-
-        // Exterior Features
-        barbecueArea: false,
-        deck: false,
-        dock: false,
-        fence: false,
-        garden: false,
-        hotTubOrSpa: false,
-        lawn: false,
-        patio: false,
-        pond: false,
-        pool: false,
-        porch: false,
-        rvParking: false,
-        sauna: false,
-        sprinklerSystem: false,
-        waterFront: false,
-
+        propertyId: '',
+        reviewerAddress: '',
+        reviewerName: '',
+        title: '',
+        description: '',
+        rating: 0,
+        createdDate: 0,
+        delDate: 0,
     };
 
     const args = {
@@ -177,7 +90,7 @@ async function getHistory(user, chainId, address, options) {
  * Augment returned contract state before it is returned.
  * Its counterpart is {@link marshalIn `marshalIn`}.
  * 
- * As our arguments come into the product contract they first pass through {@link marshalIn `marshalIn`} 
+ * As our arguments come into the review contract they first pass through {@link marshalIn `marshalIn`} 
  * and when we retrieve contract state they pass through `marshalOut`.
  * 
  * (A mathematical analogy: {@link marshalIn `marshalIn`} and `marshalOut` form something like a 
@@ -192,10 +105,10 @@ function marshalOut(_args) {
 }
 
 /**
- * Bind functions relevant for product to the _contract object. 
+ * Bind functions relevant for review to the _contract object. 
  * @param user User token
  * @param _contract Contract object from `rest.createContract()` etc.
- * @param options Product deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
+ * @param options review deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 
 
@@ -211,14 +124,14 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing Product contract to a new user token. Useful for having multiple users test
+ * Bind an existing review contract to a new user token. Useful for having multiple users test
  * the same contract.
- * @example <caption>Create an admin and user bound to the same new product contract.</caption>
+ * @example <caption>Create an admin and user bound to the same new review contract.</caption>
  * const adminBoundContract = uploadContract(adminToken, args, options);
  * const userBoundContract = bindAddress(userToken, adminBoundContract.address, options);
  * @param user User token
- * @param address Address of the Product contract
- * @param options Product deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
+ * @param address Address of the review contract
+ * @param options review deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 function bindAddress(user, address, options) {
     const contract = {
@@ -237,29 +150,28 @@ function bindAddress(user, address, options) {
 
 
 async function get(user, args, options) {
-    const { uniqueProductID, address, ...restArgs } = args;
-    let product;
-    console.log('productJS', uniqueProductID, address)
-    if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        product = await searchOne(contractName, searchArgs, options, user);
+    const { productId, propertyId, ...restArgs } = args;
+    let review;
+
+    if (productId) {
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'propertyId', value: propertyId });
+        review = await searchOne(contractName, searchArgs, options, user);
     } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueProductID', value: uniqueProductID });
-        product = await searchOne(contractName, searchArgs, options, user);
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'productId', value: productId });
+        review = await searchOne(contractName, searchArgs, options, user);
     }
-    if (!product) {
+    if (!review) {
         return undefined;
     }
 
-
     return marshalOut({
-        ...product,
+        ...review,
     });
 }
 
 async function getAll(admin, args = {}, options) {
-    const products = await searchAllWithQueryArgs(contractName, args, options, admin)
-    return products.map((product) => marshalOut(product))
+    const reviews = await searchAllWithQueryArgs(contractName, args, options, admin)
+    return reviews.map((review) => marshalOut(review))
 }
 
 /**
