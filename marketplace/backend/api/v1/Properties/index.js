@@ -26,7 +26,7 @@ router.get(
 router.post(
   Properties.create,
   authHandler.authorizeRequest(),
-  fileUploader.array(constants.fileUploadFieldName),
+  fileUploader.any(),
   loadDapp,
   PropertiesController.create
 );

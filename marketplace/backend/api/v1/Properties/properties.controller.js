@@ -55,19 +55,10 @@ class PropertiesController {
 
   static async create(req, res, next) {
     try {
-      const {
-        dapp,
-        body,
-        files,
-        body: {
-          streetNumber,
-          streetName,
-          unitNumber,
-          postalCity,
-          stateOrProvince,
-          postalcode,
-        },
-      } = req;
+      const { dapp, body, files } = req;
+
+      console.log("propertyController -- body", body)
+      console.log("propertyController -- files", files)
 
       const propertyArgs = {
         ...body,
@@ -76,59 +67,60 @@ class PropertiesController {
         latitude: "",
         longitude: "",
       };
+      console.log("propertyController -- propertyArgs", propertyArgs)
 
-      PropertiesController.validateCreatePropertyArgs(propertyArgs);
+      // PropertiesController.validateCreatePropertyArgs(propertyArgs);
 
-      const propertyResult = await dapp.createProperty(propertyArgs);
-      if (propertyResult) {
+      // const propertyResult = await dapp.createProperty(propertyArgs);
+      // if (propertyResult) {
 
-        /* -------upload the documents and images if necessary-------- */
-        if (files) {
-          files.forEach(async (file) => {
-            const fileKey = `${moment()
-              .utc()
-              .valueOf()}_${file.originalname}`;
+      /* -------upload the documents and images if necessary-------- */
+      if (files) {
+        files.forEach(async (file) => {
+          const fileKey = `${moment()
+            .utc()
+            .valueOf()}_${file.originalname}`;
 
-            const fileHash = crypto
-              .createHmac("sha256", file.buffer)
-              .digest("hex");
+          const fileHash = crypto
+            .createHmac("sha256", file.buffer)
+            .digest("hex");
 
 
-            const uploadResult = await uploadFileToS3(
-              `${fileKey}`,
-              file.buffer,
-              req.app.get(constants.s3ParamName)
-            );
+          const uploadResult = await uploadFileToS3(
+            `${fileKey}`,
+            file.buffer,
+            req.app.get(constants.s3ParamName)
+          );
 
-            const productDocumentArgs = {
-              productId: propertyResult.productContractAddress,
-              fileKey,
-              fileHash,
-              fileName: file.originalname,
-              fileLocation: uploadResult.Location,
-              documentType: file.mimetype,
-            }
+          const productDocumentArgs = {
+            productId: propertyResult.productContractAddress,
+            fileKey,
+            fileHash,
+            fileName: file.originalname,
+            fileLocation: uploadResult.Location,
+            documentType: file.mimetype,
+          }
 
-            PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
+          PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
 
-            await dapp.createProductDocument(productDocumentArgs)
-          })
-        }
-
-        const inventoryBody = {
-          productAddress: propertyResult.productContractAddress,
-          quantity: 1,
-          pricePerUnit: propertyArgs.listPrice,
-          batchId: "1",
-          status: 1,
-          serialNumber: [],
-        };
-        const inventoryResult = await dapp.createInventory(inventoryBody);
-        if (inventoryResult) {
-          console.log("propertyResult", propertyResult);
-          rest.response.status200(res, propertyResult);
-        }
+          await dapp.createProductDocument(productDocumentArgs)
+        })
       }
+
+      // const inventoryBody = {
+      //   productAddress: propertyResult.productContractAddress,
+      //   quantity: 1,
+      //   pricePerUnit: propertyArgs.listPrice,
+      //   batchId: "1",
+      //   status: 1,
+      //   serialNumber: [],
+      // };
+      // const inventoryResult = await dapp.createInventory(inventoryBody);
+      // if (inventoryResult) {
+      //   console.log("propertyResult", propertyResult);
+      //   rest.response.status200(res, propertyResult);
+      // }
+      // }
 
       return next();
     } catch (e) {
@@ -467,7 +459,7 @@ class PropertiesController {
       );
     }
   }
-  
+
   static validateCreateReviewArgs(args) {
     const createReviewSchema = Joi.object({
       productId: Joi.string().required(),
