@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -28,14 +29,14 @@ mergeSourcesByForce :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, Mona
                     -> mo (ConduitM () a mi ())
 mergeSourcesByForce sx bound = do
   return $ do
-    (chkey, c) <- allocate (atomically $ newTBMChan bound) (atomically . closeTBMChan)
-    st <- lift $ askUnliftIO
-    regs <- forM sx $ \s -> do
+    (!chkey,!c) <- allocate (atomically $ newTBMChan bound) (atomically . closeTBMChan)
+    !st         <- lift $ askUnliftIO
+    regs        <- forM sx $ \s -> do
       register . killThread =<< do
         (liftIO $ forkIOWithUnmask $ \unmask ->
           (unmask $ unliftIO st $
             runConduit $ s .| sinkTBMChan c)
           `finally` atomically (closeTBMChan c))
-    sourceTBMChan c
-    release chkey
+    !_ <- sourceTBMChan c
+    !_ <- release chkey
     traverse_ release regs

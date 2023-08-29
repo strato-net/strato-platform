@@ -139,7 +139,7 @@ runEthServerConduit p pSource pSink seqSrc peerStr = do
     Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do     
       !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
-      !eventSink <- mkEthP2PEventConduit peerStr outCtx
+      !eventSink   <- mkEthP2PEventConduit peerStr outCtx
       fmap (either Just (const Nothing)) . try . runConduit $ eventSource
                       .| handleMsgServerConduit myPubkey p
                       .| eventSink
