@@ -59,6 +59,8 @@ function PropertyCreateModal({
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
 
+  const [disableLotSize, setDisableLotSize] = useState(false);
+
   const [api, contextHolder] = notification.useNotification();
   const dispatch = usePropertiesDispatch();
 
@@ -230,7 +232,7 @@ function PropertyCreateModal({
         <Text>Property Listing - House Facts</Text>
       </>
     ),
-    disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
+    // disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
     onConfirm: showConfirmationModal
   };
@@ -566,8 +568,11 @@ function PropertyCreateModal({
             disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
-              if(value === "apartment" || value === "condo"){
+              if((value === "apartment" || value === "condo")) {
+                setDisableLotSize(true)
                 handleChange("lotSizeArea", 0);
+              } else {
+                setDisableLotSize(false)
               }
             }}
             options={homeTypeData}
@@ -692,7 +697,7 @@ function PropertyCreateModal({
                 onWheel={(e) => {
                   e.target.blur();
                 }}
-                disabled={propertyData.propertyType === "apartment" || propertyData.propertyType === "condo"  ? true : false}
+                disabled={disableLotSize}
               />
             </Form.Item>
           </Col>
