@@ -1,4 +1,4 @@
-abstract contract NonFungible is Asset{
+abstract contract NonFungible is SellableAsset{
     string private assetID;
     string private name;
     string private symbol;
@@ -22,7 +22,7 @@ abstract contract NonFungible is Asset{
     // Event emitted when an approval is set or removed
     event Approval(address indexed owner, address indexed spender, uint256 tokenId, bool approved);
 
-    constructor(string memory assetID, string memory _name, string memory _symbol, uint256 _totalSupply) {
+    constructor(string memory _assetID, string memory _name, string memory _symbol, uint256 _totalSupply) SellableAsset(){
         assetID = _assetID;
         name = _name;
         symbol = _symbol;

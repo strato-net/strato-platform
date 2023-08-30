@@ -1,11 +1,11 @@
-abstract contract Fungible is Asset{
+abstract contract Fungible is SellableAsset{
     uint public totalSupply;
     mapping(address => uint) record public balanceOf;
     string public name;
 
     event Transfer(address indexed from, address indexed to, uint amount);
 
-    constructor(string memory _assetID, uint _totalSupply, string _name) Asset(_assetID) {
+    constructor(string memory _assetID, uint _totalSupply, string _name) SellableAsset() {
         totalSupply = _totalSupply;
         name = _name;
         balanceOf[msg.sender] = _totalSupply;

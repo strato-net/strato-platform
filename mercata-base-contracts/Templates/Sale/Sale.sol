@@ -4,7 +4,7 @@ abstract contract Sale{
     string sellersCommonName;
     string purchasersOrganization;
     string purchasersCommonName;
-    Asset assetToBeSold;
+    SellableAsset assetToBeSold;
     string price;
 
     constructor(
@@ -13,7 +13,7 @@ abstract contract Sale{
         address _assetToBeSold,
         string _price
     ) {
-        assetToBeSold = Asset(_assetToBeSold);
+        assetToBeSold = SellableAsset(_assetToBeSold);
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
         sellersOrganization = Certificate(account(address(c), "main")).organization();
