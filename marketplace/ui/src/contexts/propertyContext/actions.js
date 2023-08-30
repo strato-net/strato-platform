@@ -330,7 +330,7 @@ const actions = {
     dispatch({ type: actionDescriptors.deleteReview, payload })
     try {
       const response = await fetch(`${apiUrl}/properties/review/delete`, {
-        method: HTTP_METHODS.POST,
+        method: HTTP_METHODS.PUT,
         credentials: "same-origin",
         headers: {
           Accept: "application/json",
