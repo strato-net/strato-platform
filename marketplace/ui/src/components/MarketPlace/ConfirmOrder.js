@@ -38,10 +38,7 @@ import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
 
-
 const { TextArea } = Input;
-
-
 
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
@@ -77,8 +74,6 @@ const ShippingDetailsSchema = () => {
     }),
   });
 };
-
-
 
 const ConfirmOrder = () => {
   const { Text } = Typography;
@@ -245,8 +240,6 @@ const ConfirmOrder = () => {
     }
   };
 
-
-
   const columns = [
     {
       title: <Text className="text-primaryC text-[13px]"></Text>,
@@ -319,12 +312,94 @@ const ConfirmOrder = () => {
     },
   ];
 
-  
-
   const navigate = useNavigate();
 
+  function sendEmail(emailObj) {
+    const serviceId = process.env.REACT_APP_SERVICE_ID;
+    const templateId = process.env.REACT_APP_TEMPLATE_ID;
+    const userId = process.env.REACT_APP_USER_ID;
+      const data = {
+          service_id: serviceId,
+          template_id: templateId,
+          user_id: userId,
+          template_params: emailObj
+      };
+      fetch('https://api.emailjs.com/api/v1.0/email/send', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+      })
+      .then(response => {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.indexOf("application/json") !== -1) {
+              return response.json();
+          } else {
+              return response.text();
+          }
+      })
+      .then(result => {
+          console.log(result);
+      })
+      .catch(error => {
+          console.error('Error:', error);
+      });
+  }
 
   const handleOrderConfirm = async () => {
+    let concatenatedOrderString = "";
+    for (let i = 0; i < confirmOrderList.length; i++) {
+      let orderItem = confirmOrderList[i];
+      let itemName = orderItem.item.name;
+      let itemPrice = orderItem.unitPrice;
+      let itemQty = orderItem.qty;
+      concatenatedOrderString += `\u2022 ${itemName}: ${itemPrice} x ${itemQty} <br>`;
+      if (i === (confirmOrderList.length - 1)) {
+          concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71;"> <br>`;
+          concatenatedOrderString += `Sales Tax: $${tax}.00 <br>`;
+          concatenatedOrderString += `Shipping Fee: <i>free</i> <br><br>`;
+          concatenatedOrderString += `Order Total: $${total}.00 <br>`;
+      }
+    }
+
+    let selectedShippingAddr = userAddresses[selectedAddress];
+    let shippingName = selectedShippingAddr.shippingName.replace(/%20/g, ' ');
+    let shippingAddrLine1 = selectedShippingAddr.shippingAddressLine1.replace(/%20/g, ' ');
+    let shippingAddrLine2 = selectedShippingAddr.shippingAddressLine2.replace(/%20/g, ' ');
+    let shippingCity = selectedShippingAddr.shippingCity.replace(/%20/g, ' ');
+    let shippingState = selectedShippingAddr.shippingState.replace(/%20/g, ' ');
+    let shippingZipcode = selectedShippingAddr.shippingZipcode.replace(/%20/g, ' ');
+    let shippingAddr = `<strong>Ship to:</strong> <br> ${shippingName} <br> ${shippingAddrLine1} <br> ${shippingAddrLine2} <br> ${shippingCity}, ${shippingState} ${shippingZipcode} <br>`;
+    let customerFirstName = user.commonName.split(' ')[0];
+    
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; margin-top: 20px; padding: 20px; background-color: #ffffff; border-radius: 10px; border: 1px solid #0A1B71;">
+          <h2>Hello, <strong>${customerFirstName}</strong></h2>
+          <p>You just successfully placed an order on the BlockApps Marketplace for:</p>
+          <ul style="list-style-type: none;">
+              ${concatenatedOrderString}
+          </ul>
+          <p>Thank you for shopping with us...</p>
+          <p style="text-align: left;">${shippingAddr}</p>
+          <p>We'll send a confirmation when your item ships...</p>
+          <p style="text-align: left;">Yours,</p>
+          <div style="display: flex; align-items: center;">
+              <img src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" style="margin-right: 10px; width: 25%;" />
+              <h3 style="color: #000; font-weight: 100; text-align: left;"><strong>Hamrah Aesthetics</strong> <i>powered by the BlockApps Marketplace</i></h3>
+          </div>
+          <p style="font-size: 10px; margin-top: 20px;">This email was sent from a notification only address that cannot accept incoming email. Please do not reply to this message.</p>
+      </div>
+    `;
+
+    const emailObj = {
+      user_email: user.preferred_username,
+      message_html: htmlContent,
+      subject: 'New Membership Order',
+    };
+
+    sendEmail(emailObj);
+
     handleCancel();
     let orderList = [];
     let orderItemAddress = [];
@@ -403,14 +478,14 @@ const ConfirmOrder = () => {
       ) : (
         <div className="pb-20">
           <Breadcrumb>
+            {/* eslint-disable-next-line no-script-url */}
             <Breadcrumb.Item href="javascript:;">
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
-            <Breadcrumb.Item
-              href="javascript:;"
-            >
+            {/* eslint-disable-next-line no-script-url */}
+            <Breadcrumb.Item href="javascript:;">
               <ClickableCell href={routes.Checkout.url}>
                 Checkout
               </ClickableCell>
@@ -761,7 +836,5 @@ const ConfirmOrder = () => {
     </div>
   );
 };
-
-
 
 export default ConfirmOrder;
