@@ -159,7 +159,7 @@ class InventoryController {
       productAddress: Joi.string().required(),
       inventory: Joi.string(),
       updates: Joi.object({
-        pricePerUnit: Joi.number().integer().greater(0).required(),
+        availableQuantity: Joi.number().integer().greater(0).required(),
         status: Joi.number().integer().min(1).max(2)
       }).required()
     });

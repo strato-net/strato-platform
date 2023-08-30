@@ -93,7 +93,7 @@ const UpdateInventoryModal = ({
       productAddress: values.productName.address,
       inventory: inventoryToUpdate.inventory.address,
       updates: {
-        pricePerUnit: values.pricePerUnit,
+        availableQuantity: values.availableQuantity,
         status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
       },
     };

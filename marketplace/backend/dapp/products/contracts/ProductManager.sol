@@ -273,18 +273,15 @@ contract ProductManager is InventoryStatus, RestStatus {
     function updateInventory(
         address _productAddress,
         address _inventory,
-        int _pricePerUnit,
+        uint _availableQuantity,
         InventoryStatus _status,
         uint _scheme
     ) returns (uint256) {
-        Product_4 product = Product_4(_productAddress);
-        return
-            product.updateInventory(
-                _inventory,
-                _pricePerUnit,
-                _status,
-                _scheme
-            );
+        Inventory_11 inventory = Inventory_11(_inventory);
+        inventory.updateQuantity(
+            _availableQuantity
+        );
+        return RestStatus.OK;
     }
 
     function updateInventoriesQuantities(
