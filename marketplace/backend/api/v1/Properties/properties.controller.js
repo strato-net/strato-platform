@@ -72,6 +72,8 @@ class PropertiesController {
         longitude: "",
       };
 
+      console.log('files - controller', files)
+
       PropertiesController.validateCreatePropertyArgs(propertyArgs);
 
       const propertyResult = await dapp.createProperty(propertyArgs);
@@ -88,10 +90,10 @@ class PropertiesController {
         const inventoryResult = await dapp.createInventory(inventoryBody);
 
         /* -------upload the documents and images if necessary-------- */
-        if (inventoryResult && files) {
+        if (files) {
           //Access token for the image upload
           // const accessToken = await getServiceToken();
-          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiIwZTQ3N2Y5MS1hMGY3LTRjZGQtYjUwNC00NGNlZTRkNzExNDkiLCJleHAiOjE2OTM0MTE0OTAsIm5iZiI6MCwiaWF0IjoxNjkzNDA3ODkwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiMWNmMmQ2MjgtOGY1OC00MzQ0LWI5YjMtOTFjZmY5NzJmNzU4IiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.L60O2lFihHHO5qs7aPC_O-UQv8LVqmTK85YJAzqQsu05sY_QuWgQh5dsDQdsJdk6iIvn4nOysFSjV5C_PszlkEqD_s09M8V9wpTUXaVe1_zIeHZDyKfc7FoNePtdMC1GlFLqJWmMDKJ11zYoyqc1ovUp3e6I5Vmjj6kBohbYuVsLwMMtFbqhlaUPslj1eNmRblBbVjbNT5EuiMOIS7APlxAc3sI2B0o_NBEK5B7CJxyYArMQcMx1d-xnrKFsJ4KKOt-Xo3a5--_09an70da2n2N-HIcZ8Qnoc3_K9YWw9WvzhUNsAFwtr4M00M-HHYMX4gcNKuf5uj3-fCW_UTpJnQ'
+          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiIxNTRkNGY2Mi00OWY1LTQ0MzctYmFkMi0xYTM2MjY3M2Y3NDkiLCJleHAiOjE2OTM0MTYxODAsIm5iZiI6MCwiaWF0IjoxNjkzNDEyNTgwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiNjcwMjAwYWMtODk5ZC00YmRiLWFlMWYtMzhhYTc4NDBiM2E4IiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.CoGtLCBO2su93lHng23cpkMSX03lDOYsjwGmK3U8He0ud_ssr-Z4jGyKdP0lGY79Hjdyo_GFqZ92GLNfII9X2C24ibP5FQ1s-qjArbrEQ5cCAkgcwycK8_FNPtTY7WX19ErgMM4C4MFuGMfFrZU8CUISXRtSypayesNi1Fk5C-6ic7STVb6C8uqlXrYCdFIa2epxO0egBm8xtWNiN_ANCw2E4ggYv3WZxM-ebB2fvCywcRjq9Ljdb4daHepOJVQM7y7-wN4Actmk9Sav9ueQUOxT-JlOBIgYq9y1yEWFRj1zHeVrcioU2MK4Ak8GeHQ3-guY-EcQdAdcGmg9AZAn_A'
           files.forEach(async (file) => {
             const uploadResult = await uploadFileToS3(
               process.env.EXTERNAL_STORAGE_URL,
@@ -110,13 +112,11 @@ class PropertiesController {
             console.log("productDocumentArgs", productDocumentArgs);
             PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
 
-            const result = await dapp.createProductDocument(productDocumentArgs)
-            console.log('controller -result', result)
-            rest.response.status200(res, result);
+            await dapp.createProductDocument(productDocumentArgs)
           })
         }
 
-        if (inventoryResult) {
+        if (propertyResult && inventoryResult) {
           console.log("propertyResult", propertyResult);
           rest.response.status200(res, propertyResult);
         }

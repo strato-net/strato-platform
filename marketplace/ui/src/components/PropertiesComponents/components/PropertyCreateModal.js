@@ -193,26 +193,15 @@ function PropertyCreateModal({
         }); 
 
       let response = await actions.createProperty(dispatch, formData);
-      // if (response) {
-      //   toggleCreateModal(false)
-      //   toggleCreateConfirmModal(false)
-      //   setModalView(true);
-      //   actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
-      //   setPropertyData(createPropertyFormInitialData)
-      // }
+      if (response) {
+        toggleCreateModal(false)
+        toggleCreateConfirmModal(false)
+        setModalView(true);
+        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+        setPropertyData(createPropertyFormInitialData)
+            Modal.destroyAll();
+      }
     }
-
-    //TODO:- Can uncomment when use image upload ***
-    //   if (projectImages) {
-    //     const formData = new FormData()
-    //     formData.append('projectAddress', projectAddress)
-    //     formData.append('section', uploadSections.IMAGES)
-    //     projectImages.forEach((file) => {
-    //       formData.append('projectImageFiles', file.originFileObj);
-    //     });
-    //     await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
-    //   }
-    //   Modal.destroyAll();
   };
 
   const handleCancel = () => setPreviewOpen(false);
