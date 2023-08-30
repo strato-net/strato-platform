@@ -20,6 +20,7 @@ module SolidVM.Model.CodeCollection (
   flErrors,
   pragmas,  
   imports,
+  usesStrictModifiers,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -36,8 +37,10 @@ import           Control.Lens
 import           Control.DeepSeq
 import           Data.Aeson as A
 import           Data.Default
+import           Data.List (find)
 import           Data.Map (Map)
 import qualified Data.Map as M
+import           Data.Maybe (isJust)
 import           Data.Source
 import           Data.Traversable (for)
 import           GHC.Generics
@@ -112,8 +115,9 @@ getParents cc c =
                               , x
                               ))
                         Right
-  in for (c ^. parents) $ \p ->
-       toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
+  in fmap concat . for (c ^. parents) $ \p -> do
+       p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
+       (p':) <$> getParents cc p'
 
 
 instance Arbitrary CodeCollection where
@@ -128,3 +132,6 @@ instance Arbitrary CodeCollection where
     , _flErrors    = M.empty
     , _pragmas     = []
     , _imports     = []}]
+
+usesStrictModifiers :: CodeCollectionF a -> Bool
+usesStrictModifiers = isJust . find ((== "strict") . fst) . _pragmas

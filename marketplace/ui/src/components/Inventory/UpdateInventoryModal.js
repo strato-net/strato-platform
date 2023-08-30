@@ -47,7 +47,7 @@ const UpdateInventoryModal = ({
       name: null,
       address: "",
     },
-    quantity: null,
+    availableQuantity: null,
     pricePerUnit: "",
     vintage: null,
     serialNumber: null,
@@ -77,7 +77,7 @@ const UpdateInventoryModal = ({
           name: inventoryToUpdate.inventory.name,
           address: inventoryToUpdate.inventory.productId,
         },
-        quantity: inventoryToUpdate.inventory.quantity,
+        availableQuantity: inventoryToUpdate.inventory.availableQuantity,
         pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
         vintage: inventoryToUpdate.inventory.vintage,
         serialNumber: null,
@@ -169,17 +169,17 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-              <Form.Item label="Quantity" name="quantity" className="w-72">
+              <Form.Item label="Quantity" name="availableQuantity" className="w-72">
                 <Input
                   label="quantity"
                   placeholder="Enter Quantity"
-                  name="quantity"
-                  value={formik.values.quantity}
+                  name="availableQuantity"
+                  value={formik.values.availableQuantity}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.quantity && formik.errors.quantity && (
+                {formik.touched.availableQuantity && formik.errors.availableQuantity && (
                   <span className="text-error text-xs">
-                    {formik.errors.quantity}
+                    {formik.errors.availableQuantity}
                   </span>
                 )}
               </Form.Item>

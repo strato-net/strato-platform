@@ -31,6 +31,13 @@ export const Product = {
   // transferOwnership: '/transferOwnership'
 }
 
+export const Carbon = {
+  prefix: '/carbon',
+  getAll: '/',
+  get: '/:address',
+  create: '/'
+}
+
 export const Inventory = {
   prefix: '/inventory',
   get: '/:address',
@@ -41,6 +48,13 @@ export const Inventory = {
   retire: '/retire'
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership',
+}
+
+export const Vintage = {
+  prefix: '/vintage',
+  getAll: '/',
+  get: '/:address',
+  create: '/'
 }
 
 export const Order = {

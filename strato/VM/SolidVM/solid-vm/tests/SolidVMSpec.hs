@@ -2167,13 +2167,13 @@ contract qq is Validator {
   it "can resolve super" . runTest $ do
     let ctract = [r|
 contract BaseContainer {
-  function contains(uint x) internal returns (bool) {
+  function contains(uint x) internal virtual returns (bool) {
     return x == 4;
   }
 }
 
 contract qq is BaseContainer {
-  function contains(uint x) external returns (bool) {
+  function contains(uint x) external override returns (bool) {
     return super.contains(x);
   }
 }|]
@@ -2186,17 +2186,17 @@ contract qq is BaseContainer {
   it "selects the correct super with multiple parents" . runTest $ do
     runCall' "value" "()" [r|
 contract A {
-    function value() public returns (uint) {
+    function value() public virtual returns (uint) {
         return 0xa;
     }
 }
 contract B {
-    function value() public returns (uint) {
+    function value() public virtual returns (uint) {
         return 0xb;
     }
 }
 contract qq is A, B {
-    function value() public returns (uint) {
+    function value() public override(B) returns (uint) {
         return super.value();
     }
 }|] `shouldReturn` Just ("("++show (MA.parseHex "b")++")")
@@ -2204,13 +2204,13 @@ contract qq is A, B {
   it "selects the correct super when parents are missing methods" . runTest $ do
     runCall' "value" "()" [r|
 contract A {
-  function value() public returns (uint) {
+  function value() public virtual returns (uint) {
     return 0xa;
   }
 }
 contract B {}
 contract qq is A, B {
-  function value() public returns (uint) {
+  function value() public override returns (uint) {
     return super.value();
   }
 }|] `shouldReturn` Just ("("++show (MA.parseHex "a")++")")
@@ -2332,7 +2332,7 @@ contract qq {
   constructor(){
     test = it_getsTrueAndThisDotV();
   }
-  function it_getsTrueAndThisDotV() external returns (bool) { // fails
+  function it_getsTrueAndThisDotV() private returns (bool) { // fails
     string_test y = new string_test();
     (bool b, string v) = y.getTrueAndThisDotV();
     return b && v == "test string" && (false == (v != "test string"));
@@ -3619,7 +3619,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function myTransfer() internal payable
+  function myTransfer() external payable
     returns (uint){
       aPay.transfer(13);
       bal = aPay.balance;
@@ -3645,7 +3645,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3671,7 +3671,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3697,7 +3697,7 @@ contract qq{
     a = account(this);
     aPay = payable(a);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, bool){
       success = aPay.send(13);
       bal = aPay.balance;
@@ -3721,7 +3721,7 @@ contract qq{
   constructor() public {
     a = account(this);
   }
-  function mySend() internal pure
+  function mySend() external pure
     returns (uint, bool){
       success = a.send(13);
       bal = a.balance;
@@ -3744,7 +3744,7 @@ contract qq{
   constructor() public {
     a = account(this);
   }
-  function myTransfer() internal pure
+  function myTransfer() external pure
     returns (uint, bool){
       success = a.transfer(13);
       bal = a.balance;
@@ -3782,7 +3782,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function myTransfer() internal payable
+  function myTransfer() external payable
     returns (uint, uint, uint){
       bPay.transfer(13);
       bala = aPay.balance;
@@ -3829,7 +3829,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function mySend() internal
+  function mySend() external
     returns (bool, uint, uint, uint){
       success = bPay.send(13);
       bala = aPay.balance;
@@ -3872,7 +3872,7 @@ contract qq{
     c = account(t);
     cPay = account(c);
   }
-  function myTransfer() internal payable
+  function myTransfer() external payable
     returns (uint, uint, uint){
       bPay.transfer(1300);
       bala = aPay.balance;
@@ -3915,7 +3915,7 @@ contract qq{
     c = account(t);
     cPay = payable(c);
   }
-  function mySend() internal
+  function mySend() external
     returns (uint, uint, uint){
       success = bPay.send(1300);
       bala = aPay.balance;
@@ -5607,7 +5607,7 @@ contract qq {
     ownerPay = payable(owner);
   }
 
-  function selfDestructThis() internal {
+  function selfDestructThis() external {
     selfdestruct(ownerPay);
   }
 }|]
@@ -5731,9 +5731,9 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn` 
-      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) Nothing
-      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just $ BC.pack src) Nothing
+    getFields ["x", "y"] `shouldReturn`
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) Nothing
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just . hash $ BC.pack src) Nothing
       ]
 
   it "can deterministically create multiple salted contract with args" . runTest $ do
@@ -5766,9 +5766,9 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x", "y"] `shouldReturn` 
-      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]")
-      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SInteger 100]")
+    getFields ["x", "y"] `shouldReturn`
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]")
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SInteger 100]")
       ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -5794,10 +5794,56 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
     [BContract "User" x] <- getFields["x"]
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
+
+
+  it "can deterministically derive salted contract addresses with no args" . runTest $ do
+    let src = [r|
+contract VerySimpleStorage {
+  uint x;
+  constructor() {
+    x = 1337;
+  }
+}
+
+contract qq {
+  VerySimpleStorage public x;
+  address y;
+  constructor() public {
+    x = new VerySimpleStorage{salt: "kosher"}();
+    y = address(this).derive("kosher");
+
+    require(address(x) == y, "These salted addresses are not the same");
+  }
+}|]
+    runBS src `shouldReturn` ()
+
+
+  it "can deterministically derive salted contract addresses with multiple args" . runTest $ do
+    let src = [r|
+contract User {
+  string commonName;
+  string cert;
+  constructor(string _commonName, string _cert) {
+    commonName = _commonName;
+    cert = _cert;
+  }
+}
+
+contract qq {
+  User public x;
+  address y;
+  constructor() public {
+    x = new User{salt: "himalayan"}("David Moncayo", "Bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk");
+    y = address(this).derive("himalayan", "David Moncayo", "Bababadalgharaghtakamminarronnkonnbronntonnerronntuonnthunntrovarrhounawnskawntoohoohoordenenthurnuk");
+    require(address(x) == y, "These salted addresses are not the same");
+  }
+}|]
+    runBS src `shouldReturn` ()
+
 
   it "should fail when trying to create salted contract to the same address" $ runTest (do
     runBS [r|
@@ -5862,16 +5908,14 @@ contract qq {
   uint myNum = 5;
   uint otherNum = 7;
   uint errorCount = 0;
-  constructor() public returns (uint,bool) {
+  constructor() {
     Divisor d =  new Divisor();
     try d.doTheDivide() returns (uint v) {
-          return (v, true);
-        } catch Error(string memory amsg) {
+        } catch Error(string memory amsg) { 
             // This is executed in case
             // revert was called inside getData
             // and a reason string was provided.
             errorCount++;
-            return (0, false);
         } catch Panic(uint errCode) {
             // This is executed in case of a panic,
             // i.e. a serious error like division by zero
@@ -5880,11 +5924,9 @@ contract qq {
             errorCount++;
             myNum = 3;
             otherNum = errCode;
-            return (0, false);
         } catch (bytes bigTest) {
             // This is executed in case revert() was used.
             errorCount++;
-            return (0, false);
         }
   }
 }|]
@@ -7221,6 +7263,26 @@ contract qq is SafeMath {
 |]
     getFields ["x"] `shouldReturn` [BInteger 4]
 
+  it "can use virtual and override" . runTest $ do
+    runBS [r|
+
+contract Parent {
+  uint x = 7;
+  function myVirtualFunc() virtual {
+    x = 8;
+  }
+}
+
+contract qq is Parent {
+  function myVirtualFunc() override {
+    x = 9;
+  }
+  constructor() {
+    myVirtualFunc();
+  }
+}
+|] 
+    getFields ["x"] `shouldReturn` [BInteger 9]
 
   it "can parse variadic arguments" . runTest $ do
     runBS [r|

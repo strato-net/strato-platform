@@ -21,7 +21,6 @@ import constants, { inventoryStatus } from '/helpers/constants'
  */
 function marshalIn(_args) {
     const defaultArgs = {
-        quantity: 0,
         pricePerUnit: 0,
         vintage: 2000,
         availableQuantity: 0,

@@ -171,11 +171,13 @@ compileSource :: ( HasCodeDB m
                  )
               => Bool -> Map T.Text T.Text-> m (Either CompilationError CodeCollection)
 compileSource typeCheck mTT = do
-  let applyInheritanceE = first SVMEx . applyInheritance
+  let applyInheritanceE = first SVMEx . applyInheritanceNoFunctions
   eCC <- compileSourceNoInheritance typeCheck mTT
   pure $ case applyInheritanceE =<< eCC of
-    Right cc | typeCheck -> O.detector <$> typeCheckDetector cc
-             | otherwise                 -> Right cc
+    Right cc -> first SVMEx . applyInheritanceFunctions . O.detector =<<
+      if typeCheck
+        then typeCheckDetector cc
+        else Right cc
     Left x -> Left x
     where
       typeCheckDetector ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of

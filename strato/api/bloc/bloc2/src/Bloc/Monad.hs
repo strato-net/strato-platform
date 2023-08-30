@@ -41,6 +41,7 @@ import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Nonce
 
 import           Control.Monad.Change.Modify        hiding (modify)
@@ -64,6 +65,7 @@ data BlocEnv = BlocEnv
   , globalNonceCounter  :: Cache Account Nonce
   , txTBQueue           :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest)
   , userRegistryAddress :: Address
+  , userRegistryCodeHash :: Maybe Keccak256
   , useWalletsByDefault :: Bool
   }
 
