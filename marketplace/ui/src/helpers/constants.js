@@ -1,3 +1,5 @@
+import { env } from "../env";
+
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
   : "/api/v1";
@@ -5,6 +7,14 @@ export const apiUrl = process.env.REACT_APP_URL
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
   : "/cirrus/search"
+
+export const assetTableName = env.REACT_APP_ASSET_TABLE_NAME
+  ? env.REACT_APP_ASSET_TABLE_NAME
+  : "Asset"
+
+export const saleTableName = env.REACT_APP_SALE_TABLE_NAME
+  ? env.REACT_APP_SALE_TABLE_NAME
+  : "Sale"
 
 export const HTTP_METHODS = {
   GET: "GET",

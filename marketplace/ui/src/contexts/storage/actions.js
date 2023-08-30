@@ -1,5 +1,5 @@
 import RestStatus from "http-status-codes";
-import { cirrusUrl, HTTP_METHODS } from "../../helpers/constants";
+import { cirrusUrl, assetTableName, saleTableName, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
   resetMessage: "reset_message",
@@ -28,7 +28,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${cirrusUrl}/Asset?limit=${limit}&offset=${offset}${query}`,
+        `${cirrusUrl}/${assetTableName}?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -67,7 +67,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${cirrusUrl}/Sale?limit=${limit}&offset=${offset}${query}`,
+        `${cirrusUrl}/${saleTableName}?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }

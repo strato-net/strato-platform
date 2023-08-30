@@ -21,6 +21,7 @@ WORKDIR /usr/src/ui/
 
 RUN yarn install && \
   yarn global add serve@13.0.2 && \
+  yarn global add react-inject-env@2.1.0 && \
   REACT_APP_IN_DOCKER=true REACT_APP_UI_VERSION=$(node -e "console.log(require('./package.json').version);") yarn build && \
   rm -rf node_modules
 
