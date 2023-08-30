@@ -181,7 +181,7 @@ contract ProductManager is InventoryStatus, RestStatus {
         uint _actualReductionAmount,
         string _verifier
     ) returns (uint256, address) {
-        Vintage_5 vintage = new Vintage_5(
+        Vintage_6 vintage = new Vintage_6(
             _vintage,
             _bufferAmount,
             _estimatedReductionAmount,
@@ -251,10 +251,6 @@ contract ProductManager is InventoryStatus, RestStatus {
                 existingInventory.batchSerializationNumber(),
                 tx.origin
             );
-            
-            Vintage_5 existingVintage = Vintage_5(existingInventory.vintageId());
-            existingVintage.addInventoryId(inventoryAddress);
-
             return (status, inventoryAddress);
         }
         else {

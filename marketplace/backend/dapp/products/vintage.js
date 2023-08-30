@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Vintage_5';
+const contractName = 'Vintage_6';
 const contractFilename = `${util.cwd}/dapp/products/contracts/Vintage.sol`;
 /** 
  * Upload a new Vintage 

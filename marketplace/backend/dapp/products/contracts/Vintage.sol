@@ -1,12 +1,11 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 
-contract Vintage_5 {
+contract Vintage_6 {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
-    address[] public inventoryIds;
     uint public vintage;
     uint public bufferAmount;
     uint public estimatedReductionAmount;
@@ -22,7 +21,6 @@ contract Vintage_5 {
     ) {
         owner = tx.origin;
 
-        inventoryIds = [];
         vintage = _vintage;
         bufferAmount = _bufferAmount;
         estimatedReductionAmount = _estimatedReductionAmount;
@@ -33,10 +31,5 @@ contract Vintage_5 {
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
-    }
-
-    function addInventoryId(address _inventoryId) public returns (uint256) {
-        inventoryIds.push(_inventoryId);
-        return (RestStatus.OK);
     }
 }
