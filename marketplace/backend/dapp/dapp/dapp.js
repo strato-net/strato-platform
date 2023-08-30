@@ -30,7 +30,7 @@ const contractName = "Dapp_2";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
-let   userCert = null;
+let userCert = null;
 
 // interface Member {
 //   access?:boolean,
@@ -127,7 +127,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   let userOrganization
 
   if (!serviceUser) {
-    
     let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
 
     //We are not guaranteed the user will have a certificate
@@ -136,7 +135,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
-      userCert    = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
+      userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
       console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
   }
@@ -235,19 +234,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createInventory = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const { ...restArgs } = args;
-    const newArgs = { ...restArgs, batchSerializationNumber: util.uid() }
-    const quantity = args.quantity;
+    const newArgs = { ...restArgs, batchSerializationNumber: util.uid(), vintageId: address(0) }
     const serialNumbers = []
 
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
-
-    /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    if (quantity === 0) {
-      return [
-        createInventoryStatus,
-        createdInventoryAddress,
-      ]
-    }
 
     return [
       createInventoryStatus,
@@ -257,8 +247,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.resellInventory = async function (args, options = defaultOptions) {
-    const{ inventoryId, quantity, price, ...newArgs } = args;
-    return await managers.productManager.resellInventory({existingInventory:inventoryId, quantity, price});
+    const { inventoryId, quantity, price } = args;
+    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price });
   };
 
   contract.updateInventory = async function (args, options = defaultOptions) {
@@ -292,6 +282,107 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
+
+  contract.getCarbon = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const carbon = await managers.productManager.getCarbon({ ...args }, getOptions);
+
+    const productData = await managers.productManager.getProduct({
+      address: carbon.productId,
+      ownerOrganization: userOrganization
+    }, getOptions);
+
+    const carbonData = { ...carbon, ...productData }
+    return carbonData;
+  };
+
+  contract.getCarbons = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    const allCarbonsData = await managers.productManager.getCarbons({ ...args }, getOptions);
+    const carbonsWithProducts = [];
+
+    for (const carbon of allCarbonsData) {
+      const productData = await managers.productManager.getProduct({
+        ...args,
+        offset: 0,
+        sort: null,
+        address: carbon.productId,
+        ownerOrganization: userOrganization
+      }, getOptions);
+      carbonsWithProducts.push({ ...carbon, ...productData, address: carbon.address })
+    }
+
+    return carbonsWithProducts;
+  };
+
+  contract.createCarbon = async function (args, options = optionsNoChainIds) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const productArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs };
+
+    const [createProductStatus, createdProductAddress] = await managers.productManager.createProduct({ ...productArgs, createdDate: createdDate });
+
+    if (createProductStatus == 200) {
+      const carbonArgs = {
+        productId: createdProductAddress,
+        projectType: args.projectType,
+        methodology: args.methodology,
+        projectCountry: args.projectCountry,
+        projectCategory: args.projectCategory,
+        projectDeveloper: args.projectDeveloper,
+        dMRV: args.dMRV,
+        registry: args.registry,
+        creditType: args.creditType,
+        sdg: args.sdg,
+        validator: args.validator,
+        eligibility: args.eligibility,
+        permanenceType: args.permanenceType,
+        reductionType: args.reductionType,
+        unit: args.unit,
+        currency: args.currency,
+        divisibility: args.divisibility
+      }
+
+      return managers.productManager.createCarbon(carbonArgs);
+    }
+  }
+
+  contract.getVintage = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return await managers.productManager.getVintage({ ...args }, getOptions);
+  };
+
+  contract.getVintages = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    return await managers.productManager.getVintages({ ...args }, getOptions);
+  };
+
+  contract.createVintage = async function (args, options = optionsNoChainIds) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const serialNumbers = [];
+    const vintageArgs = {
+      vintage: args.vintage,
+      bufferAmount: args.bufferAmount,
+      estimatedReductionAmount: args.estimatedReductionAmount,
+      actualReductionAmount: args.actualReductionAmount,
+      verifier: args.verifier
+    }
+
+    const [createVintageStatus, createdVintageAddress] = await managers.productManager.createVintage(vintageArgs);
+
+    if (createVintageStatus == 200) {
+      const inventoryArgs = {
+        productAddress: args.productAddress,
+        vintageId: createdVintageAddress,
+        availableQuantity: args.availableQuantity,
+        pricePerUnit: args.pricePerUnit,
+        vintage: args.vintage,
+        status: args.status,
+        batchSerializationNumber: util.uid()
+      };
+
+      return await managers.productManager.createInventory({ ...inventoryArgs, createdDate, serialNumbers });
+    }
+  }
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
@@ -571,7 +662,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
         const orderItem = orderList.find(item => item.inventoryId === inventory.address);
         if (orderItem) {
-          inventory.quantity = orderItem.quantity;
+          inventory.availableQuantity = orderItem.quantity;
         }
 
       });
@@ -586,7 +677,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const inventoriesData = Object.values(groupedData);
       const total = inventoriesData.reduce((acc, obj) => {
-        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.quantity, 0);
+        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.availableQuantity, 0);
         return acc + result;
       }, 0);
 
@@ -596,7 +687,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       let orders = [];
       for (const inventory of inventoriesData) {
-        const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.quantity), 0);
+        const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.availableQuantity), 0);
         const shippingCharge = inventoryTotal * CHARGES.SHIPPING;
         const tax = inventoryTotal * CHARGES.TAX;
 
@@ -621,14 +712,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         // add orderLine for inventories
         for (const inventoryObject of inventory.data) {
-          const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
+          const tax = (inventoryObject.pricePerUnit * inventoryObject.availableQuantity) * CHARGES.SHIPPING;
 
           await managers.orderManager.addOrderLine({
             orderAddress,
             productId: inventoryObject.productId,
             inventoryId: inventoryObject.address,
             batchSerializationNumber: inventoryObject.batchSerializationNumber,
-            quantity: inventoryObject.quantity,
+            quantity: inventoryObject.availableQuantity,
             pricePerUnit: inventoryObject.pricePerUnit,
             tax,
             createdDate

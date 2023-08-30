@@ -232,6 +232,18 @@ function newnode {
   if [ -n "${idServerUrl}" ]; then
       idServer="--identityServerUrl=${idServerUrl}"
   fi
+  if [ -n "${userRegistryAddress}" ]; then
+      urFlag="--userRegistryAddress=${userRegistryAddress}"
+  fi
+  if [ -n "${userRegistryCodeHash}" ]; then
+      ucFlag="--userRegistryCodeHash=${userRegistryCodeHash}"
+  fi
+  if [ -n "${useBuiltinUserRegistry}" ]; then
+      ubFlag="--useBuiltinUserRegistry=${useBuiltinUserRegistry}"
+  fi
+  if [ -n "${useWalletsByDefault}" ]; then
+      udFlag="--useWalletsByDefault=${useWalletsByDefault}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
@@ -245,7 +257,7 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}" "${idServer}" +RTS -N1 >> logs/strato-api 2>&1
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}" "${idServer}" "${urFlag}" "${ucFlag}" "${ubFlag}" "${udFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."

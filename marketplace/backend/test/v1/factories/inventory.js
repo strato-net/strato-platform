@@ -1,7 +1,7 @@
 export const inventoryArgs = (address, uid) => {
-  const quantity = 5
+  const availableQuantity = 5
   const args = {
-    quantity,
+    availableQuantity,
     productAddress: address,
     pricePerUnit: 20,
     vintage: 2000,
@@ -73,9 +73,9 @@ export const inventoryArgs = (address, uid) => {
 }
 
 export const inventoryArgsWithNoSN = (address, uid) => {
-  const quantity = 5
+  const availableQuantity = 5
   const args = {
-    quantity,
+    availableQuantity,
     productAddress: address,
     pricePerUnit: 20,
     vintage: 2000,
@@ -86,9 +86,9 @@ export const inventoryArgsWithNoSN = (address, uid) => {
 }
 
 export const newInventoryArgs = (address, uid) => {
-  const quantity = 2
+  const availableQuantity = 2
   const args = {
-    quantity,
+    availableQuantity,
     productAddress: address,
     pricePerUnit: uid,
     vintage: 2000,

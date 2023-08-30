@@ -2,29 +2,31 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 import "./RetiredItem.sol";
+import "./Vintage.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory_7 is InventoryStatus {
+contract Inventory_11 is InventoryStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
     address public productId;
+    address public vintageId;
     string public category;
-    int public purchasedQuantity;
-    int public quantity;
+    uint public purchasedQuantity;
+    uint public retiredQuantity;
     int public pricePerUnit;
     uint public vintage;
-    int public availableQuantity;
+    uint public availableQuantity;
     InventoryStatus public status;
     uint public createdDate;
     string public batchSerializationNumber;
-    int public retiredQuantity;
 
     constructor(
+        address _vintageId,
         string _category,
-        int _quantity,
+        uint _quantity,
         int _pricePerUnit,
         uint _vintage,
         InventoryStatus _status,
@@ -35,16 +37,16 @@ contract Inventory_7 is InventoryStatus {
         owner = _owner;
 
         productId = msg.sender;
+        vintageId = _vintageId;
         category = _category;
         purchasedQuantity = 0;
-        quantity = _quantity;
+        retiredQuantity = 0;
         pricePerUnit = _pricePerUnit;
         vintage = _vintage;
         availableQuantity = _quantity;
         status = _status;
         createdDate = _createdDate;
         batchSerializationNumber = _batchSerializationNumber;
-        retiredQuantity = 0;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -75,24 +77,13 @@ contract Inventory_7 is InventoryStatus {
         return RestStatus.OK;
     }
 
-    function updateQuantity(int _quantity) returns (uint) {
+    function updateQuantity(uint _quantity) returns (uint) {
         availableQuantity = _quantity;
         return RestStatus.OK;
     }
 
-    function updateQuantityForResell(int _quantity) returns (uint256) {
+    function updateQuantityForResell(uint _quantity) returns (uint256) {
         availableQuantity = availableQuantity - _quantity;
-        return RestStatus.OK;
-    }
-
-    function updateRetiredQuantity(int _quantity) returns (uint) {
-        availableQuantity = availableQuantity - _quantity;
-        retiredQuantity = retiredQuantity + _quantity;
-    }
-
-    function updateQuantityForVintages(int _quantity) returns (uint) {
-        quantity = _quantity;
-        availableQuantity = _quantity;
         return RestStatus.OK;
     }
 
@@ -100,10 +91,10 @@ contract Inventory_7 is InventoryStatus {
         address _inventoryId,
         string _retiredBy,
         string _retiredOnBehalfOf,
-        int _quantity,
+        uint _quantity,
         string _purpose
     ) public returns (uint256, address) {
-        RetiredItem_2 retiredItem = new RetiredItem_2(
+        RetiredItem_3 retiredItem = new RetiredItem_3(
             _inventoryId,
             _retiredBy,
             _retiredOnBehalfOf,

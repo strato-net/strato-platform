@@ -557,22 +557,27 @@ sendOutEvent (OutAction act) =
         case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
               join $ fmap (M.lookup "name") $ a^.Action.metadata,
               M.toList $ a^.Action.actionData) of
-          (Just c, Just n, first:_) -> Just $ CodeCollectionAdded {
-              ccString = c,
-              codePtr =
-                  case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
+          (Just c, Just n, actionDatas) ->
+            let cp = case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
                     Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
                     Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
                     Just v -> error $ "Unknown VM: " ++ show v
-                    Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
-              organization = first^._2.Action.actionDataOrganization,
-              application = n,
-              historyList=
-                  case join $ fmap (M.lookup "history") (a^.Action.metadata) of
-                    Nothing -> []
-                    Just v -> T.splitOn "," v,
-              recordMappings = []
-            }
+                    Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
+                org = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_,Action.ActionData{..}) ->
+                  if _actionDataCodeHash == cp
+                    then Just _actionDataOrganization
+                    else Nothing
+             in Just $ CodeCollectionAdded {
+                  ccString = c,
+                  codePtr = cp,
+                  organization = org,
+                  application = n,
+                  historyList=
+                      case join $ fmap (M.lookup "history") (a^.Action.metadata) of
+                        Nothing -> []
+                        Just v -> T.splitOn "," v,
+                  recordMappings = []
+                }
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
       actionEvents = [NewAction act]

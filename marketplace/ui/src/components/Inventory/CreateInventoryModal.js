@@ -16,10 +16,15 @@ import { Link } from "react-router-dom";
 import TextArea from "antd/es/input/TextArea";
 import getSchema from "./InventorySchema";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as vintageActions } from "../../contexts/vintage/actions";
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import {
+  useVintageDispatch,
+  useVintageState,
+} from "../../contexts/vintage";
 import { actions as productActions } from "../../contexts/product/actions";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import { usePapaParse } from "react-papaparse";
@@ -39,6 +44,7 @@ const CreateInventoryModal = ({
 }) => {
   const schema = getSchema();
   const dispatch = useInventoryDispatch();
+  const vintageDispatch = useVintageDispatch();
   const productDispatch = useProductDispatch();
   const { readString } = usePapaParse();
   const [api, contextHolder] = notification.useNotification();
@@ -46,6 +52,7 @@ const CreateInventoryModal = ({
 
   const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
   const { isCreateInventorySubmitting } = useInventoryState();
+  const { isCreateVintageSubmitting } = useVintageState();
 
   const initialValues = {
     category: {
@@ -56,7 +63,7 @@ const CreateInventoryModal = ({
       name: null,
       address: "",
     },
-    quantity: null,
+    availableQuantity: null,
     pricePerUnit: "",
     vintage: 0,
     status: true,
@@ -67,7 +74,7 @@ const CreateInventoryModal = ({
     validationSchema: schema,
     onSubmit: function (values) {
       // if (
-      //   (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) ||
+      //   (values.serialNumber.serialNumArr.length === parseInt(values.availableQuantity)) ||
       //   // Serial numbers are optional, we can submit the form if there are none. 
       //   (values.serialNumber.serialNumArr.length === 0)
       // ) {
@@ -82,6 +89,7 @@ const CreateInventoryModal = ({
   });
 
   useEffect(() => {
+    vintageActions.fetchVintages(vintageDispatch, 10, 0, debouncedSearchTerm);
     if (formik.values.category.name) {
       productActions.fetchCategoryBasedProduct(
         productDispatch,
@@ -93,10 +101,14 @@ const CreateInventoryModal = ({
   const handleCreateFormSubmit = async (values) => {
     const body = {
       productAddress: values.productName.address,
-      quantity: parseInt(values.quantity),
+      availableQuantity: parseInt(values.availableQuantity),
       pricePerUnit: values.pricePerUnit,
       vintage: parseInt(values.vintage),
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
+      bufferAmount: 0,
+      estimatedReductionAmount: 0,
+      actualReductionAmount: 0,
+      verifier: "verifier"
     };
 
     TagManager.dataLayer({
@@ -104,11 +116,19 @@ const CreateInventoryModal = ({
         event: 'create_inventory',
       },
     });
-    let isDone = await actions.createInventory(dispatch, body);
+
+    let isDone;
+    if (values.category.name === "Carbon") {
+      isDone = await vintageActions.createVintage(vintageDispatch, body);
+    }
+    else {
+      isDone = await actions.createInventory(dispatch, body);
+    }
 
     if (isDone) {
       if (page === 1)
         actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
+      vintageActions.fetchVintages(vintageDispatch, 10, 0, debouncedSearchTerm);
       resetPage(1);
       handleCancel();
     }
@@ -234,9 +254,9 @@ const CreateInventoryModal = ({
               key="submit"
               type="primary"
               onClick={formik.handleSubmit}
-              disabled={isCreateInventorySubmitting}
+              loading={isCreateInventorySubmitting || isCreateVintageSubmitting}
             >
-              {isCreateInventorySubmitting ? <Spin /> : "Create Inventory"}
+              Create Inventory
             </Button>
           </div>,
         ]}
@@ -283,18 +303,18 @@ const CreateInventoryModal = ({
                     </span>
                   )}
               </Form.Item>
-              <Form.Item label="Quantity" name="quantity" className="w-72">
+              <Form.Item label="Quantity" name="availableQuantity" className="w-72">
                 <Input
                   label="quantity"
                   placeholder="Enter Quantity"
-                  name="quantity"
+                  name="availableQuantity"
                   disabled={false}
-                  value={formik.values.quantity}
+                  value={formik.values.availableQuantity}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.quantity && formik.errors.quantity && (
+                {formik.touched.availableQuantity && formik.errors.availableQuantity && (
                   <span className="text-error text-xs">
-                    {formik.errors.quantity}
+                    {formik.errors.availableQuantity}
                   </span>
                 )}
               </Form.Item>
@@ -365,7 +385,7 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
             </div>
-            { formik.values.category.name === "Carbon"  && 
+            {formik.values.category.name === "Carbon" &&
               <div className="flex justify-between mt-4 ">
                 <Form.Item
                   label="Vintage"

@@ -127,8 +127,6 @@ definitions:
         properties:
           productId:
             type: string
-          quantity:
-            type: number
           pricePerUnit:
             type: number
           vintage:
@@ -151,8 +149,6 @@ definitions:
         properties:
           productId:
             type: string
-          quantity:
-            type: number
           pricePerUnit:
             type: number
           vintage:
