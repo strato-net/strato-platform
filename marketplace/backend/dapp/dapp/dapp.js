@@ -124,8 +124,7 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager, productDocumentManager };
-  return { cirrusOrg, productManager, reviewManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager, reviewManager, productDocumentManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -635,6 +634,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       reviews: reviews,
       images: propertyImages
     }
+    console.log('dapp.getProperty - propertyData', propertyData)
     return propertyData
   };
 
@@ -827,7 +827,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // Create productDocuments
   contract.createProductDocument = async function (args, options = defaultOptions) {
     const uploadDate = Math.floor(Date.now() / 1000);
-    const result = await managers.productDocumentManager.createProductDocument({ ...args, uploadDate });
+    const result = await managers.productDocumentManager.createProductDocument({ ...args, uploadDate: uploadDate, delDate: 0 });
     console.log('createProductDocument - result', result)
     return result
   }

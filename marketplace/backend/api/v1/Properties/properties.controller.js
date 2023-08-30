@@ -25,15 +25,16 @@ class PropertiesController {
       }
 
       const property = await dapp.getProperty(args, chainOptions);
-
+      console.log('controller -getproperty', property)
       const imageUrls = [];
       await property.images.forEach(image => {
-        const url = getSignedUrlFromS3(image.imageKey, req.app.get(constants.s3ParamName))
+        const url = getSignedUrlFromS3(image.fileKey, req.app.get(constants.s3ParamName))
         imageUrls.push(url)
       })
         
 
       const result = { ...property, images: imageUrls }
+      console.log('controller -result', result)
       rest.response.status200(res, result);
 
       return next();
@@ -63,8 +64,6 @@ class PropertiesController {
     try {
       const { dapp, body, files } = req;
 
-      console.log('createProperty controller - files', files)
-
       const propertyArgs = {
         ...body,
         standardStatus: "Active",
@@ -78,12 +77,21 @@ class PropertiesController {
       const propertyResult = await dapp.createProperty(propertyArgs);
       if (propertyResult) {
 
+        const inventoryBody = {
+          productAddress: propertyResult.productContractAddress,
+          quantity: 1,
+          pricePerUnit: propertyArgs.listPrice,
+          batchId: "1",
+          status: 1,
+          serialNumber: [],
+        };
+        const inventoryResult = await dapp.createInventory(inventoryBody);
+
         /* -------upload the documents and images if necessary-------- */
-        if (files) {
+        if (inventoryResult && files) {
           //Access token for the image upload
           // const accessToken = await getServiceToken();
-          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiIxYjFlYzM5Ni1hYzc0LTQxMzYtODY4Yi1lMDgwNTk4ZmU0N2EiLCJleHAiOjE2OTMzNjY0OTIsIm5iZiI6MCwiaWF0IjoxNjkzMzY1ODkyLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiMTI4NWMzMjctZWJjOS00M2FlLWEwY2QtZTVjNDc2YThkN2JiIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.Lk2OhRaPlovowzeSagKrBvzu952qZrTs-2KLksRuc2xE7bjWTDdRX39Zcpe083lZrWhas7zWZOLCS3fZIT27dsWKC_oL7SdgB7Tp-rkjIcIqQEK0Uib7FL8HzyDG2vWkQipyuhBOqFyGmN03Mv3rXCehEdDLMD7U5w_Cko6RjjTA_0TTPr-062icZhNYMV0bwFCbi0zfNmecompB87Rr0mdj6WpeFioKGN5OI-NcHQIBRdxR-1Jixzh4AHgD5UhO85y-0ZOgJm50-ZaqyOc2_9Df9t4E-bjcq7tEH0sWH2AkSTMcKx_XGHt0RDAXYgw5_Ez1B0cLj9qmaFKP0CzFyg'
-          console.log('eternal storage url', process.env.EXTERNAL_STORAGE_URL)
+          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiIwZTQ3N2Y5MS1hMGY3LTRjZGQtYjUwNC00NGNlZTRkNzExNDkiLCJleHAiOjE2OTM0MTE0OTAsIm5iZiI6MCwiaWF0IjoxNjkzNDA3ODkwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiMWNmMmQ2MjgtOGY1OC00MzQ0LWI5YjMtOTFjZmY5NzJmNzU4IiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.L60O2lFihHHO5qs7aPC_O-UQv8LVqmTK85YJAzqQsu05sY_QuWgQh5dsDQdsJdk6iIvn4nOysFSjV5C_PszlkEqD_s09M8V9wpTUXaVe1_zIeHZDyKfc7FoNePtdMC1GlFLqJWmMDKJ11zYoyqc1ovUp3e6I5Vmjj6kBohbYuVsLwMMtFbqhlaUPslj1eNmRblBbVjbNT5EuiMOIS7APlxAc3sI2B0o_NBEK5B7CJxyYArMQcMx1d-xnrKFsJ4KKOt-Xo3a5--_09an70da2n2N-HIcZ8Qnoc3_K9YWw9WvzhUNsAFwtr4M00M-HHYMX4gcNKuf5uj3-fCW_UTpJnQ'
           files.forEach(async (file) => {
             const uploadResult = await uploadFileToS3(
               process.env.EXTERNAL_STORAGE_URL,
@@ -102,19 +110,12 @@ class PropertiesController {
             console.log("productDocumentArgs", productDocumentArgs);
             PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
 
-            await dapp.createProductDocument(productDocumentArgs)
+            const result = await dapp.createProductDocument(productDocumentArgs)
+            console.log('controller -result', result)
+            rest.response.status200(res, result);
           })
         }
 
-        const inventoryBody = {
-          productAddress: propertyResult.productContractAddress,
-          quantity: 1,
-          pricePerUnit: propertyArgs.listPrice,
-          batchId: "1",
-          status: 1,
-          serialNumber: [],
-        };
-        const inventoryResult = await dapp.createInventory(inventoryBody);
         if (inventoryResult) {
           console.log("propertyResult", propertyResult);
           rest.response.status200(res, propertyResult);

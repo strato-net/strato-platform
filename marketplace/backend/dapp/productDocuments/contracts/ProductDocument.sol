@@ -3,7 +3,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of Product assets
-contract ProductDocument {
+contract ProductDocument_1 {
     address public productId;
     string public fileKey;
     string public fileName;
@@ -16,7 +16,8 @@ contract ProductDocument {
         string _fileKey,
         string _fileName,
         string _documentType,
-        int _uploadDate
+        int _uploadDate,
+        uint _delDate
     ) public {
         productId = _productId;
         fileKey = _fileKey;
