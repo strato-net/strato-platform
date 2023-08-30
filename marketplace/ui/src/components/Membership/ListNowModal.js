@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Table } from "antd";
+import { Form, Modal, InputNumber, Button, Spin,  Select, Table } from "antd";
+
+const { Option } = Select;
 
 const ListNowModal = ({
   open,
@@ -33,6 +35,18 @@ const ListNowModal = ({
     const parsedValue = parseFloat(numericValue).toFixed(2);
     return isNaN(parsedValue) ? '' : parsedValue;
   };
+
+  const selectAfter = (
+  <Select 
+    defaultValue="percentage"
+    onChange={(value) => {formik.setFieldValue("isTaxPercentage", value == "percentage" );}}
+    style={{ width: 60 }}>
+      <Option value="dollar">$</Option>
+      <Option value="percentage">%</Option>
+      {/* <Option value="GBP">£</Option>
+      <Option value="CNY">¥</Option> */}
+  </Select>
+);
 
   const columns = [
     {
@@ -91,11 +105,13 @@ const ListNowModal = ({
             id="percentage"
             name="percentage"
             min={0}
+            addonAfter={selectAfter}
             formatter={handleFormatter}
             parser={handleParser}
             value={formik.values.taxPercentage}
             onChange={(value) => {
               formik.setFieldValue("taxPercentage", value);
+              console.log(formik.values);
             }}
           />
           {getIn(formik.touched, `taxPercentage`) && getIn(formik.errors, `percentage`) && (

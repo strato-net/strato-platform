@@ -46,7 +46,11 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return item.product.taxes ? (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)   : 0;
+    return item.product.taxes ? 
+    (item.product.isTaxPercentage ? 
+          (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)  
+          :  item.product.taxes) 
+    : 0;
   };
 
   const calculateShipping = (item) => {
@@ -86,6 +90,7 @@ const Checkout = ({ user }) => {
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.pricePerUnit,
           quantity: item.product.address,
+          isTaxPercentage: item.product.isTaxPercentage,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:

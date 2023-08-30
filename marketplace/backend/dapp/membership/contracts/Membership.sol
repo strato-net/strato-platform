@@ -4,7 +4,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of Membership assets
-contract Membership_3 {
+contract Membership_4 {
 
     address public owner;
     string public ownerOrganization;
@@ -16,6 +16,7 @@ contract Membership_3 {
     string public additionalInfo;
     uint public createdDate;
     uint public taxPercentage;
+    bool public isTaxPercentage;
 
     /// @dev Events to add and remove members to this shard.
     event OrgAdded(string orgName);
@@ -33,6 +34,7 @@ contract Membership_3 {
         ,   string _additionalInfo
         ,   uint _createdDate
         ,   uint _taxPercentage
+        ,   bool _isTaxPercentage
     ) public {
         owner = tx.origin;
         
@@ -41,6 +43,7 @@ contract Membership_3 {
         additionalInfo = _additionalInfo;
         createdDate = _createdDate;
         taxPercentage = _taxPercentage;
+        isTaxPercentage = _isTaxPercentage;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

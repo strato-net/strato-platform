@@ -88,6 +88,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     description: "",
     price: "",
     quantity: "",
+    isTaxPercentage: true,
     taxPercentage: 0,
     services: [
       {
@@ -297,6 +298,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 // If visible is true the List Now form is open and the membership is active
                 isActive: visible ? true : false,
                 taxPercentage: Math.ceil(updatedValues.taxPercentage * 100),
+                isTaxPercentage: updatedValues.isTaxPercentage,
               },
               membershipServiceArgs: updatedValues.services.map((service) => ({
                 serviceId: service.serviceId,

@@ -34,7 +34,7 @@ const CartComponent = ({ columns, data }) => {
         data.forEach(element => {
             t += ((parseFloat(element.tax) ));
             s += (parseFloat(element.shippingCharges));
-            tot += parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2));
+            tot += element.isTaxPercentage ? parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2)) : parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2));
         });
         setTax(t);
         setShipping(s);
