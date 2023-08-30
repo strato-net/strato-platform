@@ -827,7 +827,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // Create productDocuments
   contract.createProductDocument = async function (args, options = defaultOptions) {
     const uploadDate = Math.floor(Date.now() / 1000);
-    const result = managers.productDocumentManager.createProductDocument({ ...args, uploadDate });
+    const result = await managers.productDocumentManager.createProductDocument({ ...args, uploadDate });
     console.log('createProductDocument - result', result)
     return result
   }
