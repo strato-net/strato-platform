@@ -154,7 +154,6 @@ function PropertyCreateModal({
 
     const body = propertyData
 
-    // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
     if (id) {
       let {
         chainId,
@@ -185,14 +184,13 @@ function PropertyCreateModal({
       }
     } else {
 
-      console.log('createBody', body)
         const formData = new FormData()
-        formData.append('body', JSON.stringify(body))
+        for (const key in body) {
+          formData.append(key, body[key])
+        }
         fileList.forEach((file) => {
           formData.append('images', file.originFileObj);
         }); 
-
-        console.log(formData.get(body))
 
       let response = await actions.createProperty(dispatch, formData);
       // if (response) {
@@ -529,11 +527,11 @@ function PropertyCreateModal({
 
         <Form.Item>
         <Upload
-        action="https://multinode203.ci.blockapps.net/api/v1/image"
         listType="picture-card"
         fileList={fileList}
         onPreview={handlePreview}
         onChange={handleFileChange}
+        accept="image/*"
       >
         {fileList.length >= 8 ? null : 
             <div>

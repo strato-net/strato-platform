@@ -96,6 +96,8 @@ function bind(user, _contract, options) {
   contract.getState = async () => getState(user, contract, options);
   contract.getProductDocument = async (args, _options = defaultOptions) =>
     getProductDocument(user, args, _options);
+  contract.getProductDocuments = async (args, _options = defaultOptions) =>
+    getProductDocuments(user, args, _options);
   contract.createProductDocument = async (args) =>
     createProductDocument(user, contract, args, options);
   contract.deleteProductDocument = async (args) =>
@@ -110,8 +112,13 @@ async function getProductDocument(user, args, options) {
   return productDocumentJs.get(user, args, options);
 }
 
+async function getProductDocuments(user, args, options) {
+  return productDocumentJs.getAll(user, args, options);
+}
+
 // * Add the productDocuments
 async function createProductDocument(admin, contract, _args, baseOptions) {
+  console.log('document-manager document', _args)
   const callArgs = {
     contract,
     method: "createProductDocument",
@@ -124,7 +131,7 @@ async function createProductDocument(admin, contract, _args, baseOptions) {
     history: [contractName],
   };
 
-  const [restStatus, productAddress] = await rest.call(
+  const [restStatus, productDocumentAddress] = await rest.call(
     admin,
     callArgs,
     options
@@ -132,8 +139,8 @@ async function createProductDocument(admin, contract, _args, baseOptions) {
 
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, productAddress];
+console.log("productDocumentAddress++++", productDocumentAddress)
+  return [restStatus, productDocumentAddress];
 }
 
 /**

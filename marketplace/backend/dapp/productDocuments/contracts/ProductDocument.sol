@@ -6,29 +6,23 @@ import "/dapp/dapp/contracts/Dapp.sol";
 contract ProductDocument {
     address public productId;
     string public fileKey;
-    string public fileHash;
     string public fileName;
-    string public fileLocation;
-    int public uploadDate;
     string public documentType;
+    int public uploadDate;
     uint public delDate;
 
     constructor(
         address _productId,
         string _fileKey,
-        string _fileHash,
         string _fileName,
-        string _fileLocation,
-        int _uploadDate,
-        string _documentType
+        string _documentType,
+        int _uploadDate
     ) public {
         productId = _productId;
         fileKey = _fileKey;
-        fileHash = _fileHash;
         fileName = _fileName;
-        fileLocation = _fileLocation;
-        uploadDate = _uploadDate;
         documentType = _documentType;
+        uploadDate = _uploadDate;
         delDate = 0;
     }
 

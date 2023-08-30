@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Event_1';
+const contractName = 'Event';
 const contractFilename = `${util.cwd}/dapp/items/contracts/Event.sol`;
 
 /** 

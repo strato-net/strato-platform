@@ -30,7 +30,7 @@ const allAssetNames = [
   eventTypeManagerJs.contractName,
 ];
 
-const contractName = "Dapp_0_1";
+const contractName = "Dapp_0_2";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
@@ -608,25 +608,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* -------------------------PROPERTIES DAPP------------------------- */
   contract.getProperty = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    console.log('getOptions', getOptions)
     //Get the property contract
     const property = await managers.productManager.getProperty({ ...args }, getOptions);
     //Get the product contract
-    console.log('dapp.getProperty - property', property)
-    console.log('dapp.getProperty - productId', property.productId)
     const productData = await managers.productManager.getProduct({
       address: property.productId,
       uniqueProductID: property.productId,
       ownerOrganization: userOrganization
     }, getOptions);
-    const propertyImages = await managers.productDocumentManager.getProducDocument({ ...args, productId: property.productId }, getOptions);
+    //Get the property images
+    const propertyImages = await managers.productDocumentManager.getProductDocuments({ 
+      productId: property.productId 
+    }, getOptions);
     console.log('dapp.getProperty - productData', productData)
     console.log('dapp.getProperty - property.address', property.address)
+    //Get the property reviews
     const reviews = await managers.reviewManager.getReviews({
       productId: property.productId,
       propertyId: property.address,
     }, getOptions);
-    console.log('dapp.getProperty - reviews', reviews)
     const propertyData = { ...property, 
       title: productData.name,
       organization:productData.ownerOrganization, 
@@ -654,7 +654,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
         getOptions
       );
-      const propertyImages = await managers.productDocumentManager.getProductDocument({ ...args, productId: property.productId }, getOptions);
+      const propertyImages = await managers.productDocumentManager.getProductDocuments({ ...args, productId: property.productId }, getOptions);
       propertiesWProducts.push({ ...property, 
         title: productData.name,
         description: productData.description, 
@@ -827,7 +827,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // Create productDocuments
   contract.createProductDocument = async function (args, options = defaultOptions) {
     const uploadDate = Math.floor(Date.now() / 1000);
-    return managers.productDocumentManager.createProductDocument({ ...args, uploadDate });
+    const result = managers.productDocumentManager.createProductDocument({ ...args, uploadDate });
+    console.log('createProductDocument - result', result)
+    return result
   }
 
   // Delete productDocuments by the productId/productAddress
@@ -1462,7 +1464,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       };
       // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
       // See orderLine.sol 
-      // Item_3 item = Item_3(account(address(_items[i]),"parent"));
+      // Item item = Item(account(address(_items[i]),"parent"));
 
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");

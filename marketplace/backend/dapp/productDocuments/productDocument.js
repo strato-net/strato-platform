@@ -53,11 +53,9 @@ function marshalIn(_args) {
     const defaultArgs = {
         productId: '',
         fileKey: '',
-        fileHash: '',
         fileName: '',
-        fileLocation: '',
-        uploadDate: 0,
         documentType: '',
+        uploadDate: 0,
         delDate: 0,
     };
 
@@ -169,6 +167,11 @@ async function get(user, args, options) {
     });
 }
 
+async function getAll(admin, args = {}, options) {
+    const documents = await searchAllWithQueryArgs(contractName, args, options, admin)
+    return documents.map((document) => marshalOut(document))
+}
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -184,6 +187,7 @@ export default {
     contractFilename,
     bindAddress,
     get,
+    getAll,
     marshalIn,
     marshalOut,
     getHistory

@@ -19,7 +19,7 @@ import "/dapp/reviews/contracts/ReviewManager.sol";
  *
  */
 
-contract Dapp_0_1 {
+contract Dapp_0_2 {
     event OrgAdded(string orgName);
     event OrgUnitAdded(string orgName, string orgUnit);
     event CommonNameAdded(string orgName, string orgUnit, string commonName);
@@ -34,11 +34,11 @@ contract Dapp_0_1 {
     // UserManager userManager;
     ItemManager itemManager;
     ProductManager public productManager;
-    EventTypeManager_10 eventTypeManager;
+    EventTypeManager eventTypeManager;
     PaymentManager paymentManager;
     OrderManager orderManager;
     ProductDocumentManager productDocumentManager;
-    ReviewManager_0_2 reviewManager;
+    ReviewManager reviewManager;
     
     account public bootUserAccount;
     string public bootUserCommonName;
@@ -56,10 +56,10 @@ contract Dapp_0_1 {
         orderManager = new OrderManager();
         itemManager = new ItemManager();
         productManager = new ProductManager();
-        eventTypeManager = new EventTypeManager_10();
+        eventTypeManager = new EventTypeManager();
         paymentManager = new PaymentManager();
         productDocumentManager = new ProductDocumentManager();
-        reviewManager = new ReviewManager_0_2();
+        reviewManager = new ReviewManager();
     }
 
     function getProductManager() public returns (ProductManager) {

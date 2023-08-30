@@ -4,6 +4,7 @@ import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import { getSignedUrlFromS3, deleteFileFromS3, uploadFileToS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
+import { getServiceToken } from '../../../helpers/oauthHelper'
 import moment from 'moment'
 import crypto from "crypto";
 
@@ -24,9 +25,16 @@ class PropertiesController {
       }
 
       const property = await dapp.getProperty(args, chainOptions);
-      // const productImageUrl = getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
-      // const result = { ...product, imageUrl: productImageUrl }
-      rest.response.status200(res, property);
+
+      const imageUrls = [];
+      await property.images.forEach(image => {
+        const url = getSignedUrlFromS3(image.imageKey, req.app.get(constants.s3ParamName))
+        imageUrls.push(url)
+      })
+        
+
+      const result = { ...property, images: imageUrls }
+      rest.response.status200(res, result);
 
       return next();
     } catch (e) {
@@ -39,10 +47,8 @@ class PropertiesController {
       const { dapp, query } = req;
 
       const properties = await dapp.getProperties({ ...query });
-      // const productsWithImageUrl = products.map(product => ({
-      //   ...product,
-      //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-      //   )
+      
+      // const result = properties.map(property => ({
       // }))
 
       rest.response.status200(res, properties);
@@ -57,8 +63,7 @@ class PropertiesController {
     try {
       const { dapp, body, files } = req;
 
-      console.log("propertyController -- body", body)
-      console.log("propertyController -- files", files)
+      console.log('createProperty controller - files', files)
 
       const propertyArgs = {
         ...body,
@@ -67,60 +72,54 @@ class PropertiesController {
         latitude: "",
         longitude: "",
       };
-      console.log("propertyController -- propertyArgs", propertyArgs)
 
-      // PropertiesController.validateCreatePropertyArgs(propertyArgs);
+      PropertiesController.validateCreatePropertyArgs(propertyArgs);
 
-      // const propertyResult = await dapp.createProperty(propertyArgs);
-      // if (propertyResult) {
+      const propertyResult = await dapp.createProperty(propertyArgs);
+      if (propertyResult) {
 
-      /* -------upload the documents and images if necessary-------- */
-      if (files) {
-        files.forEach(async (file) => {
-          const fileKey = `${moment()
-            .utc()
-            .valueOf()}_${file.originalname}`;
+        /* -------upload the documents and images if necessary-------- */
+        if (files) {
+          //Access token for the image upload
+          // const accessToken = await getServiceToken();
+          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiIyODY1ZDY2MC1kOTg5LTRjZWMtODUyNy1mMGY1MWJlOThiZGYiLCJleHAiOjE2OTMzNjM4NDgsIm5iZiI6MCwiaWF0IjoxNjkzMzYzMjQ4LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiYTgzMjYxZTctNzVhMS00MzA3LTljN2EtMzMyNTA2ZmY4OTUzIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.PEUBeYvEl3lVSTwHKgPW9Dv1fg9pP48u8NN-Gd5VoCjbCzWDkEt26wZeBmHjSl55u3cZkQD7JB-ZUO5XMOBk2qNxAcw8qV6g3T1COKkXe2-1lBwht5Lka8DYoi2R2Dfx3dxmN9lS0pkTIyp3k_lUiqsA1HxAqLwQrDIAftjn5c9vQ88SXIOsJD-Apj_PJFO1b8bNMkTkVR3DPM_G-obxNQ2n_UO96bZRSsIZ5gh-FQPKfPOE_3ZgdCXofRJZo2REecSqH2Tt7ALY3OXqsQbfnFU1i_6utnzcux4GnEX9JJRvJ9BCw7nXkeRtntj9DXgZAYnLeAGXvDhgU6P_tyEvFg'
+          console.log('eternal storage url', process.env.EXTERNAL_STORAGE_URL)
+          files.forEach(async (file) => {
+            const uploadResult = await uploadFileToS3(
+              process.env.EXTERNAL_STORAGE_URL,
+              file,
+              accessToken
+            );
 
-          const fileHash = crypto
-            .createHmac("sha256", file.buffer)
-            .digest("hex");
+            console.log("uploadResult", uploadResult);
 
+            const productDocumentArgs = {
+              productId: propertyResult.productContractAddress,
+              fileKey: uploadResult.data.imageKey,
+              fileName: file.originalname,
+              documentType: file.mimetype,
+            }
+            console.log("productDocumentArgs", productDocumentArgs);
+            PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
 
-          const uploadResult = await uploadFileToS3(
-            `${fileKey}`,
-            file.buffer,
-            req.app.get(constants.s3ParamName)
-          );
+            await dapp.createProductDocument(productDocumentArgs)
+          })
+        }
 
-          const productDocumentArgs = {
-            productId: propertyResult.productContractAddress,
-            fileKey,
-            fileHash,
-            fileName: file.originalname,
-            fileLocation: uploadResult.Location,
-            documentType: file.mimetype,
-          }
-
-          PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
-
-          await dapp.createProductDocument(productDocumentArgs)
-        })
+        const inventoryBody = {
+          productAddress: propertyResult.productContractAddress,
+          quantity: 1,
+          pricePerUnit: propertyArgs.listPrice,
+          batchId: "1",
+          status: 1,
+          serialNumber: [],
+        };
+        const inventoryResult = await dapp.createInventory(inventoryBody);
+        if (inventoryResult) {
+          console.log("propertyResult", propertyResult);
+          rest.response.status200(res, propertyResult);
+        }
       }
-
-      // const inventoryBody = {
-      //   productAddress: propertyResult.productContractAddress,
-      //   quantity: 1,
-      //   pricePerUnit: propertyArgs.listPrice,
-      //   batchId: "1",
-      //   status: 1,
-      //   serialNumber: [],
-      // };
-      // const inventoryResult = await dapp.createInventory(inventoryBody);
-      // if (inventoryResult) {
-      //   console.log("propertyResult", propertyResult);
-      //   rest.response.status200(res, propertyResult);
-      // }
-      // }
 
       return next();
     } catch (e) {
@@ -324,9 +323,7 @@ class PropertiesController {
     const createProductDocumentSchema = Joi.object({
       productId: Joi.string().required(),
       fileKey: Joi.string().required(),
-      fileHash: Joi.string().required(),
       fileName: Joi.string().required(),
-      fileLocation: Joi.string().required(),
       documentType: Joi.string().required(),
     });
 
@@ -336,13 +333,6 @@ class PropertiesController {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create ProductDocument Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
-      throw new rest.RestError(
-        RestStatus.BAD_REQUEST,
-        "Create Property Argument Validation Error",
-        {
-          message: `Missing args or bad format: ${validation.error.message}`,
-        }
-      );
     }
   }
 

@@ -8,20 +8,16 @@ contract ProductDocumentManager {
     function createProductDocument(
         address _productId,
         string _fileKey,
-        string _fileHash,
         string _fileName,
-        string _fileLocation,
-        int _uploadDate,
-        string _documentType
+        string _documentType,
+        int _uploadDate
     ) returns (uint256, address) {
         ProductDocument productDocument = new ProductDocument(
          _productId,
          _fileKey,
-         _fileHash,
          _fileName,
-         _fileLocation,
-         _uploadDate,
-         _documentType
+         _documentType,
+         _uploadDate
         );
 
         return (RestStatus.OK, address(productDocument));

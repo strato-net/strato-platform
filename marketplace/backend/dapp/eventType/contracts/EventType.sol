@@ -2,7 +2,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 
 /// @title A representation of EventType assets
-contract EventType_10 is RestStatus {
+contract EventType is RestStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
