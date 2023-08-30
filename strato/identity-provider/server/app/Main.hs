@@ -43,7 +43,7 @@ main = do
 
     -- read and parse idconf.yaml
     yamlContents <- B.readFile "/identity-provider/idconf.yaml"
-    let idconf :: [RealmMinInfo] = either (error . show) id (decodeEither' yamlContents)
+    let idconf :: [ProvidedRealmInfo] = either (error . show) id (decodeEither' yamlContents)
     realmData <- getRealmData idconf
     if Map.null realmData
         then error "Oh no! We have no realm data. How can we operate on this little info?"
