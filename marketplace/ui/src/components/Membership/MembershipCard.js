@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useFormik, getIn } from "formik";
 import classNames from "classnames";
 import { Card, Popover, Spin, Button } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
@@ -7,8 +8,18 @@ import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
+import { useAuthenticateState } from "../../contexts/authentication";
+import ListNowModal from "../Membership/ListNowModal";
+import * as yup from "yup";
+import { INVENTORY_STATUS } from "../../helpers/constants";
+import {
+  useInventoryDispatch,
+  useInventoryState,
+} from "../../contexts/inventory";
+import { actions } from "../../contexts/inventory/actions";
 
 const MembershipCard = ({
+  user,
   membership,
   categorys,
   debouncedSearchTerm,
@@ -18,6 +29,12 @@ const MembershipCard = ({
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
+  const [visible, setVisible] = useState(false);
+  
+  
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const {isCreateInventorySubmitting } = useInventoryState();
+  const dispatch = useInventoryDispatch();
 
   const showModal = () => {
     hide();
@@ -53,6 +70,74 @@ const MembershipCard = ({
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
   }
+  
+  const closeListNowModal = () => {
+    setVisible(false);
+  };
+
+  const openListNowModal = () => {
+    setVisible(true);
+  };
+  
+  const getSchema = (isListNowModalOpen) => {
+    return yup.object().shape({
+      name: yup.string().required("Membership name is required"),
+      price: yup.number().when("isListNowModalOpen", {
+          is: () => isListNowModalOpen, // Use a function to evaluate the condition
+          then: yup.number().required("Price is required"),
+        }),
+      quantity: yup.number().when("isListNowModalOpen", {
+        is: () => isListNowModalOpen, // Use a function to evaluate the condition
+        then: yup.number().required("Quantity is required"),
+      }),
+    });
+  };
+  
+  const initialValues = {
+    name: "",
+    price: "",
+    quantity: ""
+  };
+  
+  const formik = useFormik({
+    initialValues: initialValues,
+    validationSchema: getSchema(visible),
+    setFieldValue: (field, value) => {
+      formik.setFieldValue(field, value);
+    },
+    onSubmit: function (values) {
+      handleCreateFormSubmit(values);
+    },
+    enableReinitialize: true,
+  });
+  
+  const handleCreateFormSubmit = async (values) => {
+    if (user) {
+        if (formik.values.price !== "" && formik.values.quantity !== "") {
+          const inventoryBody = {
+            productAddress: membership.productId,
+            quantity: formik.values.quantity,
+            pricePerUnit: formik.values.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
+            status: INVENTORY_STATUS.PUBLISHED,
+            serialNumber: [],
+          };
+          const createInventory = await actions.createInventory(
+            dispatch,
+            inventoryBody
+          );
+          
+          if (createInventory) {
+            // membership.product_with_inventory = 1;
+            formik.resetForm();
+          }
+          setVisible(false);
+          
+        }
+    }
+  };
 
 
   return (
@@ -87,6 +172,14 @@ const MembershipCard = ({
                 {!membership.product_with_inventory ?
                    <Button type="text"
                      className="text-primary text-sm cursor-pointer"
+                     onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        formik.setFieldValue("name", membership.product.name);
+                        openListNowModal();
+                      }
+                     }}
                    >
                      List for Sale
                    </Button>
@@ -188,6 +281,17 @@ const MembershipCard = ({
             />
           )} */}
         </Card>
+      )}
+      {visible && (
+        <ListNowModal
+          open={visible}
+          user={user}
+          handleCancel={closeListNowModal}
+          onClick={openListNowModal}
+          formik={formik}
+          getIn={getIn}
+          isCreateMembershipSubmitting={isCreateInventorySubmitting}
+        />
       )}
     </>
   );

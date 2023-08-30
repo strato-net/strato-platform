@@ -75,7 +75,7 @@ const MembershipDetails = ({ user, users }) => {
   const [visible, setVisible] = useState(false);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { membershipServices, membership, isMembershipLoading, productFiles, isCreateMembershipSubmitting} =
+  const { membershipServices, membership, isMembershipLoading, productFiles} =
   useMembershipState();
   const serviceDispatch = useMembershipDispatch();
 
@@ -143,7 +143,7 @@ const MembershipDetails = ({ user, users }) => {
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { inventoryDetails, inventories, isInventoryDetailsLoading, inventory } = useInventoryState();
+  const { inventoryDetails, inventories, isInventoryDetailsLoading, inventory, isCreateInventorySubmitting } = useInventoryState();
   const productDispatch = useProductDispatch();
   const {productDetails} = useProductState();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -607,7 +607,7 @@ const MembershipDetails = ({ user, users }) => {
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
-          isCreateMembershipSubmitting={isCreateMembershipSubmitting}
+          isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
     </>
