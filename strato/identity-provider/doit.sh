@@ -36,7 +36,15 @@ function runIdentityServer {
   fi  
   RED='\033[0;31m'
   NC='\033[0m' # No Color
-  
+  OAUTH_DISCOVERY_URL=$(yq '.[0].discoveryUrl // "" ' /identity-provider/idconf.yaml )
+  OAUTH_CLIENT_ID=$(yq '.[0].clientId // "" ' /identity-provider/idconf.yaml )
+  OAUTH_CLIENT_SECRET=$(yq '.[0].clientSecret // "" ' /identity-provider/idconf.yaml )
+
+  if [[ -z ${OAUTH_DISCOVERY_URL} || -z ${OAUTH_CLIENT_ID} || -z ${OAUTH_CLIENT_SECRET} ]]; then
+    echo "FATAL ERROR: You MUST provide details for at least one OAuth realm in idconf.yaml, including the discoveryUrl, clientId, and clientSecret"
+    exit 1
+  fi
+
   runBackgroundProcess blockapps-vault-proxy-server \
     --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
     --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
