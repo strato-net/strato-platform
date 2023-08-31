@@ -176,8 +176,20 @@ const MembershipDetails = ({ user, users }) => {
     if (Id !== undefined && inventoryId) {
       actions.fetchInventoryDetail(dispatch, inventoryId);
     }
-    else if (Id !== undefined && membershipDetails) {
-      productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
+    else if (Id !== undefined && membershipDetails){
+      
+      const inventoryResult = Promise.resolve(actions.fetchInventory(dispatch, 10, 0, membershipDetails?.productId));
+
+      inventoryResult.then((value) => {
+        if (inventories.length > 0) {
+          setInventoryId(inventories[0].address);
+        }
+        else{
+          productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
+        }
+      }).catch(err => {
+        productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
+      });
     }
   }, [Id, dispatch, productDispatch, user, membershipDetails, inventoryId]);
 
