@@ -306,6 +306,7 @@ const Membership = ( user ) => {
                                         {memberships.map((product, index) => {
                                             return (
                                                 <MembershipCard
+                                                    user={user}
                                                     membership={product}
                                                     categorys={categorys}
                                                     subCategorys={subCategorys}
