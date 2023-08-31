@@ -11,6 +11,7 @@ import {
     Image,
     Typography,
     Pagination,
+    Tabs
 } from "antd";
 import { DownOutlined } from '@ant-design/icons';
 import MembershipCard from "./MembershipCard";
@@ -161,6 +162,22 @@ const Membership = ( user ) => {
             key: '2',
         },
     ];
+    const onChange = (key) => {
+        console.log(key);
+      };
+      
+    const items = [
+    {
+        key: '1',
+        label: 'Purchased',
+        children: 'Content of Tab Pane 1',
+    },
+    {
+        key: '2',
+        label: 'Issued',
+        children: 'Content of Tab Pane 2',
+    }
+    ];
 
     return (
         <>
@@ -212,10 +229,11 @@ const Membership = ( user ) => {
                                     <Typography.Text className="text-2xl">
                                         Memberships
                                     </Typography.Text>
-                                    <div>
-                                        <Typography.Text style={{ fontSize: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <Typography.Text style={{ fontSize: '10px', marginRight: '80px' }}>
                                             {memberships.length}  Memberships found
                                         </Typography.Text>
+                                        <Tabs defaultActiveKey="1" items={items} onChange={onChange} />
                                     </div>
                                 </Col>
                                 {/* <Col>
