@@ -943,25 +943,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       });
 
       const groupedData = inventories.reduce((acc, inventory) => {
-        if (!acc[inventory.ownerOrganization]) {
-          const membership = memberships_.find(membership => membership.productId === inventory.productId)
+        if (!acc[inventory.productId]) {
+          const membership = memberships_.find(membership => membership.productId === inventory.productId) 
           const taxRate    = membership ? ( membership.isTaxPercentage ? membership.taxPercentage/100 :  membership.taxPercentage): 0;
-          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: membership.isTaxPercentage, data: [] };
+          acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: membership.isTaxPercentage, data: [] };
         }
-        acc[inventory.ownerOrganization].data.push(inventory);
+        acc[inventory.productId].data.push(inventory);
         return acc;
       }, {});
 
       const inventoriesData = Object.values(groupedData);
       const total = inventoriesData.reduce((acc, obj) => {
-      const result = obj.data.reduce((total, curr) => obj.tax !==0 ?
+        const result = obj.data.reduce((total, curr) => obj.tax !==0 ?
           (obj.isTaxPercentage ?
           (Math.ceil(((total + ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax/100))) ) * 100) / 100)).toFixed(2)
-          : (total + curr.pricePerUnit * curr.quantity) + obj.tax
+          : total + (curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity) 
          )   : (total + curr.pricePerUnit * curr.quantity) , 0);
-        return acc + result;
-      }, 0);
-
+        return Number(acc) + Number(result);
+      }, 0).toFixed(2);
+      
       if (total != recievedOrderTotal) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
       }

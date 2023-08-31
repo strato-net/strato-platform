@@ -19,7 +19,7 @@ import TagManager from "react-gtm-module";
 
 const CartComponent = ({ columns, data }) => {
     const navigate = useNavigate();
-    const [tax, setTax] = useState(0);
+    let [tax, setTax] = useState(0);
     const [shipping, setShipping] = useState(0);
     const [total, setTotal] = useState(0);
     const marketplaceDispatch = useMarketplaceDispatch();
@@ -39,7 +39,6 @@ const CartComponent = ({ columns, data }) => {
         setTax(t);
         setShipping(s);
         setTotal(tot)
-        console.log(tot);
     }, [data])
     let totalNew = 0;
     data.forEach(element => { totalNew += element.amount; });
