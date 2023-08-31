@@ -58,6 +58,7 @@ const Membership = ( user ) => {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(10);
     const debouncedSearchTerm = useDebounce(queryValue, 1000);
+    let [typeDisplay, setTypeDisplay] = useState("purchase");
 
     //Categories
     const categoryDispatch = useCategoryDispatch();
@@ -163,17 +164,22 @@ const Membership = ( user ) => {
         },
     ];
     const onChange = (key) => {
-        console.log(key);
+        setTypeDisplay(key);
+        typeDisplay = key;
       };
+
+    useEffect(() => {
+        setTypeDisplay(typeDisplay);
+    })
       
     const items = [
     {
-        key: '1',
+        key: 'purchase',
         label: 'Purchased',
         children: 'Content of Tab Pane 1',
     },
     {
-        key: '2',
+        key: 'issued',
         label: 'Issued',
         children: 'Content of Tab Pane 2',
     }
@@ -283,20 +289,36 @@ const Membership = ( user ) => {
                             </div>
                             <>
                                 {memberships.length !== 0 ? (
-                                    <div className="my-4">
-                                        {memberships.map((product, index) => {
-                                            return (
-                                                <MembershipCard
-                                                    user={user}
-                                                    membership={product}
-                                                    categorys={categorys}
-                                                    subCategorys={subCategorys}
-                                                    key={index}
-                                                    debouncedSearchTerm={debouncedSearchTerm}
-                                                />
-                                            );
-                                        })}
-                                    </div>
+                                    (typeDisplay === "purchase") ?
+                                        (<div className="my-4">
+                                            {/* Yo AMoney, you go here 
+                                            {memberships.map((product, index) => {
+                                                return (
+                                                    <MembershipCard
+                                                        user={user}
+                                                        membership={product}
+                                                        categorys={categorys}
+                                                        subCategorys={subCategorys}
+                                                        key={index}
+                                                        debouncedSearchTerm={debouncedSearchTerm}
+                                                    />
+                                                );
+                                            })} */}
+                                        </div>) :
+                                        (<div className="my-4">
+                                            {memberships.map((product, index) => {
+                                                return (
+                                                    <MembershipCard
+                                                        user={user}
+                                                        membership={product}
+                                                        categorys={categorys}
+                                                        subCategorys={subCategorys}
+                                                        key={index}
+                                                        debouncedSearchTerm={debouncedSearchTerm}
+                                                    />
+                                                );
+                                            })}
+                                        </div>)
                                 ) : (
                                     <p className="flex justify-center my-10"> No data found</p>
                                 )}
