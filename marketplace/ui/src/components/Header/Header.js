@@ -182,7 +182,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
         >
           <Image src={Images.logo} width={35} preview={false} />
         </div>
-        {roleIndex === undefined || roleIndex === 1 ? null : <div className="ml-7 w-72">
+        {!(roleIndex === undefined || roleIndex === 1) && <div className="ml-7 w-72">
           <Input
             size="large"
             placeholder="Search"
@@ -240,15 +240,11 @@ const HeaderComponent = ({ user, loginUrl }) => {
       />
 
       <Space size="large">
-        {roleIndex === undefined || roleIndex === 1
-          ? null
-          : <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
+        {!(roleIndex === undefined || roleIndex === 1) && <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
             {sell}
             {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
           </Button>}
-        {roleIndex === undefined || roleIndex === 1
-          ? null
-          : <Badge
+        {!(roleIndex === undefined || roleIndex === 1) &&  <Badge
             className="cursor-pointer"
             count={cartList.length}
             onClick={() => {
