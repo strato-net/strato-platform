@@ -121,7 +121,6 @@ async function getReviews(user, args, options) {
 
 // * Add the reviews
 async function createReview(admin, contract, _args, baseOptions) {
-  console.log('review-manager createReview', _args)
   const callArgs = {
     contract,
     method: "createReview",

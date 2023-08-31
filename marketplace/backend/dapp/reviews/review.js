@@ -171,7 +171,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
     const reviews = await searchAllWithQueryArgs(contractName, args, options, admin)
-    return reviews.map((review) => marshalOut(review))
+    const activeReviews = reviews.filter((item)=>{if(item.delDate===0)return item})
+    return activeReviews.map((review) => marshalOut(review))
 }
 
 /**

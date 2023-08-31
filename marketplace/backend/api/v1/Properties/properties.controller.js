@@ -110,10 +110,8 @@ class PropertiesController {
   static async createReview(req, res, next) {
     try {
       const { dapp, body } = req;
-      console.log("createReview body", body);
       PropertiesController.validateCreateReviewArgs(body);
       const result = await dapp.createReview(body);
-      console.log("createReview - result", result);
       rest.response.status200(res, result);
 
       return next();
@@ -438,7 +436,7 @@ class PropertiesController {
     if (validation.error) {
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
-        "Delete Review Argument Validation Error",
+        `Delete Review Argument Validation Error ${validation.error.message}`,
         {
           message: `Missing args or bad format: ${validation.error.message}`,
         }

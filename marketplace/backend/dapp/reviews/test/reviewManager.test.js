@@ -29,8 +29,8 @@ describe('ReviewManager', function () {
   let args;
 
   const factoryArgs = () => ({ ...(factory.getReviewArgs(util.uid())) });
-  const updateReviewArgs = () => ({ ...(factory.updateReviewArgs(util.uid())) }); 
-  const deleteReviewArgs = () => ({ ...(factory.deleteReviewArgs(util.uid())) }); 
+  const updateReviewArg = () => ({ ...(factory.updateReviewArgs(util.uid())) }); 
+  const deleteReviewArg = () => ({ ...(factory.deleteReviewArgs(util.uid())) }); 
 
   before(async () => {
     assert.isDefined(
@@ -94,8 +94,9 @@ describe('ReviewManager', function () {
 
 
   // it('Update Review - 201', async () => {
-  //   args = updateReviewArgs(globalAdmin)
-  //   let udpdate = await reviewManager.updateReview(globalAdmin,contract, args, newOptions);
+  //   args = updateReviewArg()
+  //   let update = await reviewManager.updateReview(globalAdmin, contract, args, newOptions);
+  //   console.log("update--------------->>>>>>>>>>", update);
   //   //  assert.hasAnyKeys(contract, ["address"], "update Review contract has address")
   //   //  assert.equal(restStatus, RestStatus.OK, 'should succeed')
   //  });
@@ -108,7 +109,7 @@ describe('ReviewManager', function () {
 
   // testing......... 
   // it('Delete Review - 201', async () => {
-  //   args = deleteReviewArgs(globalAdmin)
+  //   args = deleteReviewArg(globalAdmin)
   //   const reviews = await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
   //   console.log("delete----reviews-------------------------------------------------------------------", reviews);
   //   // assert(Array.isArray(reviews), 'should be array');
