@@ -45,8 +45,8 @@ contract ReviewManager_0_2 {
             );
     }
 
-    function deleteReview(address _reviewAddress) returns (uint256, string) {
-        Review_0_5 review = Review_0_5(_reviewAddress);
+    function deleteReview(address _address) returns (uint256, string) {
+        Review_0_5 review = Review_0_5(_address);
         return review.deleteReview();
     }
 }

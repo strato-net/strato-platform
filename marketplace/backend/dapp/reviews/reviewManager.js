@@ -214,4 +214,5 @@ export default {
   createReview,
   updateReview,
   deleteReview,
+  getReviews
 };

@@ -30,6 +30,7 @@ describe('ReviewManager', function () {
 
   const factoryArgs = () => ({ ...(factory.getReviewArgs(util.uid())) });
   const updateReviewArgs = () => ({ ...(factory.updateReviewArgs(util.uid())) }); 
+  const deleteReviewArgs = () => ({ ...(factory.deleteReviewArgs(util.uid())) }); 
 
   before(async () => {
     assert.isDefined(
@@ -92,18 +93,27 @@ describe('ReviewManager', function () {
   });
 
 
-  it('Update Review - 201', async () => {
-    args = updateReviewArgs(globalAdmin)
-    console.log("args----------------------------------------------------------------------", args);
-    // let [restStatus, reviewAddress] = await reviewManager.updateReview(globalAdmin,contract, args, newOptions);
-    //  assert.hasAnyKeys(contract, ["address"], "update Review contract has address")
-    //  console.log("CreateReview---------------->>",restStatus, reviewAddress);
-    //  assert.equal(restStatus, RestStatus.OK, 'should succeed')
-   });
-  // it('Get All Reviews - 201', async () => {
-  //   const reviews = await review.getAll(globalAdmin, {}, newOptions);
-  //   assert(Array.isArray(reviews), 'should be array');
-  //   assert.isAtLeast(reviews.length, 1, 'reviews has length of 1');
+  // it('Update Review - 201', async () => {
+  //   args = updateReviewArgs(globalAdmin)
+  //   let udpdate = await reviewManager.updateReview(globalAdmin,contract, args, newOptions);
+  //   //  assert.hasAnyKeys(contract, ["address"], "update Review contract has address")
+  //   //  assert.equal(restStatus, RestStatus.OK, 'should succeed')
+  //  });
+
+  it('Get All Reviews - 201', async () => {
+    const reviews = await reviewManager.getReviews(globalAdmin,{}, newOptions);
+    assert(Array.isArray(reviews), 'should be array');
+    assert.isAtLeast(reviews.length, 1, 'reviews has length of 1');
+  });
+
+  // testing......... 
+  // it('Delete Review - 201', async () => {
+  //   args = deleteReviewArgs(globalAdmin)
+  //   const reviews = await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
+  //   console.log("delete----reviews-------------------------------------------------------------------", reviews);
+  //   // assert(Array.isArray(reviews), 'should be array');
+  //   // assert.isAtLeast(reviews.length, 1, 'reviews has length of 1');
   // });
+
 
 });
