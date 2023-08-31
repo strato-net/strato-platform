@@ -3,10 +3,9 @@ import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import { getSignedUrlFromS3, deleteFileFromS3, uploadFileToS3 } from '../../../helpers/s3'
+import { geocodeAddress } from '../../../helpers/geocoding'
 import constants from '../../../helpers/constants'
 import { getServiceToken } from '../../../helpers/oauthHelper'
-import moment from 'moment'
-import crypto from "crypto";
 
 const options = { config, cacheNonce: true }
 
@@ -31,7 +30,7 @@ class PropertiesController {
         const url = getSignedUrlFromS3(image.fileKey, req.app.get(constants.s3ParamName))
         imageUrls.push(url)
       })
-        
+
 
       const result = { ...property, images: imageUrls }
       console.log('controller -result', result)
@@ -48,7 +47,7 @@ class PropertiesController {
       const { dapp, query } = req;
 
       const properties = await dapp.getProperties({ ...query });
-      
+
       // const result = properties.map(property => ({
       // }))
 
@@ -68,11 +67,23 @@ class PropertiesController {
         ...body,
         standardStatus: "Active",
         //use google maps api to get lat and long, then convert to string
-        latitude: "",
-        longitude: "",
+        latitude: '',
+        longitude: '',
       };
 
-      console.log('files - controller', files)
+      //Get coordinates for the address
+      await geocodeAddress(`${body.streetNumber} ${body.streetName}, ${body.postalCity} ${body.stateOrProvince} ${body.postalcode}`)
+        .then(coordinates => {
+          if (coordinates) {
+            propertyArgs.longitude = coordinates[0]
+            propertyArgs.latitude = coordinates[1]
+          } else {
+            rest.response.status400('Geocoding failed for the provided address.');
+          }
+        })
+        .catch(err => {
+          rest.response.status400(err);
+        });
 
       PropertiesController.validateCreatePropertyArgs(propertyArgs);
 
