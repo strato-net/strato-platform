@@ -314,41 +314,41 @@ const ConfirmOrder = () => {
 
   const navigate = useNavigate();
 
-  function sendEmail(emailObj) {
-    const serviceId = process.env.REACT_APP_SERVICE_ID;
-    const templateId = process.env.REACT_APP_TEMPLATE_ID;
-    const userId = process.env.REACT_APP_USER_ID;
-      const data = {
-          service_id: serviceId,
-          template_id: templateId,
-          user_id: userId,
-          template_params: emailObj
-      };
-      fetch('https://api.emailjs.com/api/v1.0/email/send', {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-      })
-      .then(response => {
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.indexOf("application/json") !== -1) {
-              return response.json();
-          } else {
-              return response.text();
-          }
-      })
-      .then(result => {
-          console.log(result);
-      })
-      .catch(error => {
-          console.error('Error:', error);
-      });
+  async function sendGridSendEmail(to, subject, htmlContent) {
+    const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
+    const SENDGRID_API_KEY = process.env.REACT_APP_SENDGRID_API_KEY;
+    const emailData = {
+        personalizations: [{
+            to: [{ email: to }],
+            subject: subject
+        }],
+        from: { email: "srinjoy_chakravarty@blockapps.net", name: "Blockapps.net" },
+        content: [{
+            type: 'text/html',
+            value: htmlContent
+        }]
+    };
+    try {
+        const response = await fetch(SENDGRID_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SENDGRID_API_KEY}`
+            },
+            body: JSON.stringify(emailData)
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error('Error sending email: ' + text);
+        }
+        console.log('Email sent successfully!');
+    } catch (error) {
+        console.error('Error sending email:', error);
+        throw error;
+    }
   }
 
   const handleOrderConfirm = async () => {
-    console.log(`srin dotted line left align iteration3`);
     let concatenatedOrderString = "";
     for (let i = 0; i < confirmOrderList.length; i++) {
       let orderItem = confirmOrderList[i];
@@ -389,14 +389,12 @@ const ConfirmOrder = () => {
       </div>
     `
 
-    const emailObj = {
-      user_email: user.preferred_username,
-      message_html: htmlContent,
-      subject: 'New Membership Order',
-    };
-
-    sendEmail(emailObj);
-
+    try {
+      await sendGridSendEmail(user.preferred_username, "New Membership Order", htmlContent);
+    } catch (error) {
+      console.error('Failed to send email:', error);
+    }
+  
     handleCancel();
     let orderList = [];
     let orderItemAddress = [];
