@@ -11,6 +11,7 @@ import {
   Space,
   Modal,
 } from "antd";
+import "../helpers/property.css"
 import ImageCollage from "../../Carousel/ImageCollage";
 import OverviewTab from "./ListingTabs/OverviewTab";
 import FeaturesTab from "./ListingTabs/FeaturesTab";
@@ -242,10 +243,10 @@ function PropertyDetails() {
         propertyDetails
           ? <Col span={22} style={{ margin: "auto", marginBottom: "100px" }}>
             <Row>
-              <Col sm={24} lg={14} style={{ backgroundColor: "" }}>
+              <Col sm={24} lg={14} >
                 <ImageCollage images={images} />
               </Col>
-              <Col sm={24} lg={10} style={{ backgroundColor: "" }}>
+              <Col sm={24} lg={10} >
                 <Row justify={"center"} align="top" style={{ marginTop: 20 }}>
                   <Col sm={24} md={20}>
                     <Space direction="horizontal">
@@ -369,7 +370,7 @@ function PropertyDetails() {
             </Row>
             <Row>
               <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
-                <div style={{ display: "flex", zIndex: "1", background: "white", justifyContent: "space-between", position: "sticky", top: "0px" }}>
+                <div className="tab-card">
                   {tabs.map((tab) => (
                     <Col
                       sm={6}

@@ -328,7 +328,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className='w-100'
                 label="Total Units"
                 id="numberOfUnitsTotal"
                 type="Number"
@@ -354,7 +354,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className='w-100'
                 precision={0}
                 label="Asking Price"
                 type="Number"
@@ -402,7 +402,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className='w-100'
                 label="Street Number"
                 id="streetnumber"
                 type="Number"
@@ -429,7 +429,7 @@ function PropertyCreateModal({
               ]}
             >
               <Input
-                style={{ width: "100%" }}
+                className='w-100'
                 label="House Number"
                 id="housenumber"
                 placeholder="House Number"
@@ -496,7 +496,7 @@ function PropertyCreateModal({
             >
               <InputNumber
                 precision={0}
-                style={{ width: "100%" }}
+                className='w-100'
                 label="Zip Code"
                 type="Number"
                 placeholder="ZipCode"
@@ -524,7 +524,7 @@ function PropertyCreateModal({
                     <img
                       alt="Product"
                       src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
+                      className="w-100 h-100"
                     />
                     <br />
                   </div>
@@ -598,7 +598,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className='w-100'
                 precision={0}
                 label="bedrooms"
                 placeholder="Bedrooms"
@@ -628,7 +628,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className='w-100'
                 precision={0}
                 label="bathrooms"
                 placeholder="Bathrooms"
@@ -687,7 +687,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className='w-100'
                 precision={0}
                 label="lotSize"
                 placeholder="Lot Size Area"

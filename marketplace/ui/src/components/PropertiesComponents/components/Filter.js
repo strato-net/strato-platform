@@ -69,7 +69,7 @@ const Filter = (props) => {
         <Typography.Title level={5}>Sort By</Typography.Title>
         <Select
           value={sort_By}
-          style={{ width: "100%" }}
+          className='w-100'
           placeholder="Sort By"
           onChange={(value) => {
             handleChange("sort_By", value);
@@ -96,7 +96,7 @@ const Filter = (props) => {
               min={0}
               max={max_Price}
               type="number"
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Min Price"
               value={min_Price}
               controls={false}
@@ -107,7 +107,7 @@ const Filter = (props) => {
             />
             <Typography.Title
               level={5}
-              style={{ marginTop: 5 }}
+              className='mt-5'
               ellipsis={{ tooltip: true }}
             >
               Max Price
@@ -115,7 +115,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Max Price"
               value={max_Price}
               controls={false}
@@ -138,7 +138,7 @@ const Filter = (props) => {
               max={99999}
               type="number"
               value={zip_code}
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Enter Zipcode"
               controls={false}
               onChange={(value) => {
@@ -148,13 +148,13 @@ const Filter = (props) => {
             />
             <Typography.Title
               level={5}
-              style={{ marginTop: 5 }}
+              className='mt-5'
               ellipsis={{ tooltip: true }}
             >
               State
             </Typography.Title>
             <Select
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="State"
               value={state}
               onChange={(value) => {
@@ -191,7 +191,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Min Bedrooms"
               value={min_Bedrooms}
               controls={false}
@@ -222,7 +222,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Min Bathrooms"
               value={min_Bathrooms}
               controls={false}
@@ -255,7 +255,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Min Sq Ft."
               value={lot_Size_Area}
               controls={false}
@@ -272,13 +272,13 @@ const Filter = (props) => {
           >
             <Typography.Title
               level={5}
-              style={{ marginTop: 5 }}
+              className='mt-5'
               ellipsis={{ tooltip: true }}
             >
               Parking
             </Typography.Title>
             <Select
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Parking Type"
               value={parking_Type}
               onChange={(value) => {
@@ -289,13 +289,13 @@ const Filter = (props) => {
 
             <Typography.Title
               level={5}
-              style={{ marginTop: 5 }}
+              className='mt-5'
               ellipsis={{ tooltip: true }}
             >
               Property
             </Typography.Title>
             <Select
-              style={{ width: "100%" }}
+              className='w-100'
               placeholder="Property Type"
               value={property_Type}
               onChange={(value) => {
