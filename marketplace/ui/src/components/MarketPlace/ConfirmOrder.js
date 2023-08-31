@@ -348,6 +348,7 @@ const ConfirmOrder = () => {
   }
 
   const handleOrderConfirm = async () => {
+    console.log(`srin dotted line left align iteration3`);
     let concatenatedOrderString = "";
     for (let i = 0; i < confirmOrderList.length; i++) {
       let orderItem = confirmOrderList[i];
@@ -356,10 +357,10 @@ const ConfirmOrder = () => {
       let itemQty = orderItem.qty;
       concatenatedOrderString += `\u2022 ${itemName}: ${itemPrice} x ${itemQty} <br>`;
       if (i === (confirmOrderList.length - 1)) {
-          concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71;"> <br>`;
-          concatenatedOrderString += `Sales Tax: $${tax}.00 <br>`;
-          concatenatedOrderString += `Shipping Fee: <i>free</i> <br><br>`;
-          concatenatedOrderString += `Order Total: $${total}.00 <br>`;
+        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
+        concatenatedOrderString += `\u2022 Sales Tax: $${tax}.00 <br>`;
+        concatenatedOrderString += `\u2022 Shipping Fee: <i><strong>Free</strong></i><br><br>`;
+        concatenatedOrderString += `Order Total: $${total}.00 <br>`;
       }
     }
 
@@ -372,25 +373,21 @@ const ConfirmOrder = () => {
     let shippingZipcode = selectedShippingAddr.shippingZipcode.replace(/%20/g, ' ');
     let shippingAddr = `<strong>Ship to:</strong> <br> ${shippingName} <br> ${shippingAddrLine1} <br> ${shippingAddrLine2} <br> ${shippingCity}, ${shippingState} ${shippingZipcode} <br>`;
     let customerFirstName = user.commonName.split(' ')[0];
-    
+
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; margin-top: 20px; padding: 20px; background-color: #ffffff; border-radius: 10px; border: 1px solid #0A1B71;">
-          <h2>Hello, <strong>${customerFirstName}</strong></h2>
-          <p>You just successfully placed an order on the BlockApps Marketplace for:</p>
-          <ul style="list-style-type: none;">
-              ${concatenatedOrderString}
-          </ul>
-          <p>Thank you for shopping with us...</p>
-          <p style="text-align: left;">${shippingAddr}</p>
-          <p>We'll send a confirmation when your item ships...</p>
-          <p style="text-align: left;">Yours,</p>
-          <div style="display: flex; align-items: center;">
-              <img src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" style="margin-right: 10px; width: 25%;" />
-              <h3 style="color: #000; font-weight: 100; text-align: left;"><strong>Hamrah Aesthetics</strong> <i>powered by the BlockApps Marketplace</i></h3>
-          </div>
-          <p style="font-size: 10px; margin-top: 20px;">This email was sent from a notification only address that cannot accept incoming email. Please do not reply to this message.</p>
+      <div style="font-family: Arial, sans-serif; margin-top: 20px; padding: 20px; background-color: #ffffff; border-radius: 10px; border: 1px solid #0A1B71; max-width: 600px; margin-left: 20px; margin-right: 0;">
+        <h2>Hi, <strong>${customerFirstName}</strong></h2>
+        <p>You just successfully placed an order on the BlockApps Marketplace for:</p>
+        <ul style="list-style-type: none; max-width: 90%; margin: auto;">${concatenatedOrderString}</ul>
+        <p>Thank you for shopping with us...</p>
+        <p style="text-align: left;">${shippingAddr}</p>
+        <p style="text-align: left;">Yours,</p>
+        <div style="display: flex; align-items: center;"><img style="margin-right: 10px; width: 60px; height: 60px;" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
+          <h3 style="color: #000; font-weight: 100; text-align: left;"><strong>Hamrah Aesthetics</strong> <em><span style="text-decoration: underline;">powered by</span> the BlockApps Marketplace on </em><strong>Mercata&#8482;</strong><em><br /></em></h3>
+        </div>
+        <p style="font-size: 10px; margin-top: 20px;">This email was sent from a notification only address that cannot accept incoming email. Please do not reply to this message.</p>
       </div>
-    `;
+    `
 
     const emailObj = {
       user_email: user.preferred_username,
