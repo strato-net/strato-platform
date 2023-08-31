@@ -65,7 +65,7 @@ const ListNowModal = ({
       key: "quantity",
     },
     {
-      title: "Tax Percentage",
+      title: "Tax Percentage/Amount",
       dataIndex: "percentage",
       key: "precentage",
     },
