@@ -15,7 +15,7 @@ const { Search } = Input;
 
 const EventList = () => {
   const [data, setdata] = useState([])
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
   const dispatch = useEventDispatch();
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
@@ -34,10 +34,10 @@ const EventList = () => {
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined ){
-      actions.fetchEventOfInventory(dispatch,limit,offset,debouncedSearchTerm,Id);
+    if (id !== undefined ){
+      actions.fetchEventOfInventory(dispatch,limit,offset,debouncedSearchTerm,id);
     }
-  }, [limit,offset,Id,debouncedSearchTerm,dispatch])
+  }, [limit,offset,id,debouncedSearchTerm,dispatch])
   
 
   useEffect(() => {
@@ -55,7 +55,7 @@ const EventList = () => {
       dataIndex: "name",
       key: "name",
       render: (text) => (
-        <div className="cursor-pointer" onClick={()=> navigate(routes.InventoryEventDetail.url.replace(":inventoryId",Id).replace(":eventTypeId",text.eventTypeId))}>
+        <div className="cursor-pointer" onClick={()=> navigate(routes.InventoryEventDetail.url.replace(":inventoryId",id).replace(":eventTypeId",text.eventTypeId))}>
           <p className="text-primary underline">{decodeURIComponent(text.eventTypeName)}</p>
         </div>
       ),

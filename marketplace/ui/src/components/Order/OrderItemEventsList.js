@@ -16,7 +16,7 @@ import ClickableCell from "../ClickableCell";
 
 
 const OrderItemEventsList = () => {
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
   const [data, setData] = useState([]);
   const { Text } = Typography;
   const dispatch = useEventDispatch();
@@ -36,10 +36,10 @@ const OrderItemEventsList = () => {
 
 
   useEffect(() => {
-    if (Id !== undefined) {
-      actions.fetchEventOfItem(dispatch, limit, offset, debouncedSearchTerm, Id)
+    if (id !== undefined) {
+      actions.fetchEventOfItem(dispatch, limit, offset, debouncedSearchTerm, id)
     }
-  }, [dispatch, limit, offset, debouncedSearchTerm, Id])
+  }, [dispatch, limit, offset, debouncedSearchTerm, id])
 
   useEffect(() => {
     setId(routeMatch?.params?.itemId);

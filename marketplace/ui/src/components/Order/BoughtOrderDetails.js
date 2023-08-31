@@ -30,7 +30,7 @@ import TagManager from "react-gtm-module";
 
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
   const { Text } = Typography;
@@ -83,13 +83,13 @@ const BoughtOrderDetails = ({ user, users }) => {
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined) {
+    if (id !== undefined) {
       getData();
     }
-  }, [Id, dispatch]);
+  }, [id, dispatch]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id);
+    const data = await actions.fetchOrderDetails(dispatch, id);
     if (data != null) {
       getPaymentStatus(data.paymentSessionId);
     }
@@ -163,7 +163,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     });
   }
 
-  if (Id !== undefined && !isorderDetailsLoading && details !== null) {
+  if (id !== undefined && !isorderDetailsLoading && details !== null) {
     if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";
     }
@@ -229,7 +229,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 `${routes.BoughtOrderItemDetail.url
                   .replace(":id", text.address)}`,
                   // .replace(":chainId", text.chainId)}`,
-                { state: { orderId: details.orderId, address: Id } }
+                { state: { orderId: details.orderId, address: id } }
               );
             }}
             className="hover:text-primaryHover cursor-pointer"
@@ -287,7 +287,7 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const handleCancelOrder = async () => {
     const body = {
-      address: Id,
+      address: id,
       updates: {
         buyerComments: encodeURIComponent(comment),
         status: 4,
