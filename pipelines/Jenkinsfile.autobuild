@@ -207,14 +207,16 @@ pipeline {
             withCredentials([
                 usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
-                def version = sh(script: 'cat VERSION', returnStdout: true).trim()
-                def gitCommit = env.GIT_COMMIT.take(9)
-                def targetDir = "${version}-${gitCommit}"
-                
-                sh """
-                    set -x
-                    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws s3 cp --recursive --exclude "*" --include "docker-compose*" . s3://blockapps-build-artifacts/${targetDir}
-                """
+                script {
+                  def version = sh(script: 'cat VERSION', returnStdout: true).trim()
+                  def gitCommit = env.GIT_COMMIT.take(9)
+                  def targetDir = "${version}-${gitCommit}"
+                  
+                  sh """
+                      set -x
+                      AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws s3 cp --recursive --exclude "*" --include "docker-compose*" . s3://blockapps-build-artifacts/${targetDir}
+                  """
+              }
             }
           },
 
