@@ -7,6 +7,7 @@ import { actions } from '../../../contexts/propertyContext/actions'
 import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/propertyContext'
 import PropertyCreateModal from './PropertyCreateModal'
 import { createPropertyFormInitialData, filterlabel, propertyConstants } from '../helpers/constants'
+import TagManager from "react-gtm-module";
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
@@ -79,8 +80,13 @@ function PropertyListings() {
               const { listPrice, address } = property
               return listPrice && (
                 <Col key={index} style={{ padding: '10px' }}>
-                  <Link to={`/properties/${address}`}>
-                    <PropertyCard property={property} />
+                  <Link to={`/properties/${address}`} onClick={() => {
+                    TagManager.dataLayer({
+                      dataLayer: {
+                        event: `PROPERTIES_VIEW_${address}`,
+                      },
+                    });
+                  }}>                    <PropertyCard property={property} />
                   </Link>
                 </Col>
               )

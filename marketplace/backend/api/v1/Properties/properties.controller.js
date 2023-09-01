@@ -104,12 +104,12 @@ class PropertiesController {
         if (files) {
           //Access token for the image upload
           // const accessToken = await getServiceToken();
-          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiIxNTRkNGY2Mi00OWY1LTQ0MzctYmFkMi0xYTM2MjY3M2Y3NDkiLCJleHAiOjE2OTM0MTYxODAsIm5iZiI6MCwiaWF0IjoxNjkzNDEyNTgwLCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiNjcwMjAwYWMtODk5ZC00YmRiLWFlMWYtMzhhYTc4NDBiM2E4IiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.CoGtLCBO2su93lHng23cpkMSX03lDOYsjwGmK3U8He0ud_ssr-Z4jGyKdP0lGY79Hjdyo_GFqZ92GLNfII9X2C24ibP5FQ1s-qjArbrEQ5cCAkgcwycK8_FNPtTY7WX19ErgMM4C4MFuGMfFrZU8CUISXRtSypayesNi1Fk5C-6ic7STVb6C8uqlXrYCdFIa2epxO0egBm8xtWNiN_ANCw2E4ggYv3WZxM-ebB2fvCywcRjq9Ljdb4daHepOJVQM7y7-wN4Actmk9Sav9ueQUOxT-JlOBIgYq9y1yEWFRj1zHeVrcioU2MK4Ak8GeHQ3-guY-EcQdAdcGmg9AZAn_A'
-          files.forEach(async (file) => {
-            console.log("contorller-files", file.originalname);
+          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiI4ODYyNWYxMS1kZmU2LTQ0NjEtOTY2Ny1iMGIzYWExNDFiNTgiLCJleHAiOjE2OTM1MTAzODYsIm5iZiI6MCwiaWF0IjoxNjkzNTA2Nzg2LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiZDU4ODRlMjEtZWRkOC00MWEzLWJjYmUtYzZjMGY1MWRiZjBjIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.IcROrKZb8Q5OcSkmjfXp0IH8kp62JgJ_dEIEHwage3PAi4RUbkz7GCZFo8NhBiJGoZW52X4_5BDMTUM2gc_Uo41QQceDAgMBOuJrusU8ZHsH6wS6YXq2vx_pzKlbvsdNH5vupN1mEswiw4odUqp-D413xIzAG0dkUjDCN501XCMrfydgZK9YIiVPoFZv2T-IQp2Ihog2W9G7qbfS28jJeY1j_fC4e5hZlRv-hkSZfbtEcR3bZTsjz4aJ98ri0OHVwwfF8JqpxqrUifQQgGMLw9NqMIsbXlDzYHaSvAuicrunkdUtd4AvDUi_8TurdZ7us9nDFV3U4A2156g-gvBOKQ'
+            for (let i = 0; i < files.length; i++) {
+            console.log("contorller-files", files[i].originalname);
             const uploadResult = await uploadFileToS3(
               process.env.EXTERNAL_STORAGE_URL,
-              file,
+              files[i],
               accessToken
             );
 
@@ -118,14 +118,15 @@ class PropertiesController {
             const productDocumentArgs = {
               productId: propertyResult.productContractAddress,
               fileKey: uploadResult.data.imageKey,
-              fileName: file.originalname,
-              documentType: file.mimetype,
+              fileName: files[i].originalname,
+              documentType: files[i].mimetype,
             }
             console.log("productDocumentArgs", productDocumentArgs);
             PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
 
-            await dapp.createProductDocument(productDocumentArgs)
-          })
+            const uploaded = await dapp.createProductDocument(productDocumentArgs)
+            console.log("uploadedFILE", uploaded);
+          }
         }
 
         if (propertyResult && inventoryResult) {
