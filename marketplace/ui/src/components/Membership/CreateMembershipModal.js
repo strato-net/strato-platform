@@ -89,6 +89,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     price: "",
     quantity: "",
     isTaxPercentage: true,
+    taxDollarAmount: 0,
+    taxPercentageAmount: 0,
     taxPercentage: 0,
     services: [
       {
@@ -297,8 +299,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 additionalInfo: updatedValues.additionalInformation,
                 // If visible is true the List Now form is open and the membership is active
                 isActive: visible ? true : false,
-                taxPercentage: Math.ceil(updatedValues.taxPercentage * 100),
-                isTaxPercentage: updatedValues.isTaxPercentage,
               },
               membershipServiceArgs: updatedValues.services.map((service) => ({
                 serviceId: service.serviceId,
@@ -342,6 +342,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                     // Status should always be published if we use List Now
                     status: INVENTORY_STATUS.PUBLISHED,
                     serialNumber: [],
+                    taxPercentageAmount: Math.floor(updatedValues.taxPercentageAmount*100),
+                    taxDollarAmount:     Math.floor(updatedValues.taxDollarAmount*100),
                   };
 
                   const createInventory = await inventoryActions.createInventory(

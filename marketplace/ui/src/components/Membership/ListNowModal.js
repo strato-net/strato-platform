@@ -38,13 +38,11 @@ const ListNowModal = ({
 
   const selectAfter = (
   <Select 
-    defaultValue="percentage"
-    onChange={(value) => {formik.setFieldValue("isTaxPercentage", value == "percentage" );}}
+    defaultValue="1"
+    onChange={(value) => {formik.setFieldValue("isTaxPercentage", value === "1" )}}
     style={{ width: 60 }}>
-      <Option value="dollar">$</Option>
-      <Option value="percentage">%</Option>
-      {/* <Option value="GBP">£</Option>
-      <Option value="CNY">¥</Option> */}
+      <Option value="0">$</Option>
+      <Option value="1">%</Option>
   </Select>
 );
 
@@ -111,6 +109,12 @@ const ListNowModal = ({
             value={formik.values.taxPercentage}
             onChange={(value) => {
               formik.setFieldValue("taxPercentage", value);
+              formik.values.isTaxPercentage  ? 
+                  (formik.setFieldValue("taxPercentageAmount", value))
+                  :  (formik.setFieldValue("taxDollarAmount", value))
+              !formik.values.isTaxPercentage ? 
+                  (formik.setFieldValue("taxPercentageAmount", 0))
+                  :  (formik.setFieldValue("taxDollarAmount", 0))
               console.log(formik.values);
             }}
           />

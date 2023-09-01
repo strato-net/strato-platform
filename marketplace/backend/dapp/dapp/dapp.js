@@ -926,8 +926,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
       }
 
-      const memberships_ = await  membershipJs.getAll(rawAdmin, {productId: inventories.map(inventory => inventory.productId)}, {...options, org: managers.cirrusOrg, app: contractName})
-
       const quantitiesToReduce = orderList.map(order => order.quantity);
 
       // reducing quantity inside inventories to place order and checking the buyerOrganization should not be equal to inventory organization
@@ -944,9 +942,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       const groupedData = inventories.reduce((acc, inventory) => {
         if (!acc[inventory.productId]) {
-          const membership = memberships_.find(membership => membership.productId === inventory.productId) 
-          const taxRate    = membership ? ( membership.isTaxPercentage ? membership.taxPercentage/100 :  membership.taxPercentage): 0;
-          acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: membership.isTaxPercentage, data: [] };
+          const taxRate    = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount :  inventory.taxDollarAmount)/100;
+          acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: inventory.taxDollarAmount === 0, data: [] };
         }
         acc[inventory.productId].data.push(inventory);
         return acc;
@@ -956,7 +953,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       const total = inventoriesData.reduce((acc, obj) => {
         const result = obj.data.reduce((total, curr) => obj.tax !==0 ?
           (obj.isTaxPercentage ?
-          (Math.ceil(((total + ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax/100))) ) * 100) / 100)).toFixed(2)
+          ((total + ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax/100))) ) * 100) / 100
           : total + (curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity) 
          )   : (total + curr.pricePerUnit * curr.quantity) , 0);
         return Number(acc) + Number(result);

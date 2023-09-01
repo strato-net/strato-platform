@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 
-const contractName = 'Membership_4';
+const contractName = 'Membership_2';
 const contractFilename = `${util.cwd}/dapp/membership/contracts/Membership.sol`;
 
 /** 
@@ -58,8 +58,6 @@ function marshalIn(_args) {
         timePeriodInMonths: 0,
         additionalInfo: '',
         createdDate: 0,
-        taxPercentage:0,
-        isTaxPercentage: true,
     };
     
     const args = {
