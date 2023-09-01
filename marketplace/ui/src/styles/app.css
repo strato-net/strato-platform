@@ -146,3 +146,7 @@ display: none !important;
 :where(.css-dev-only-do-not-override-9ntgx0).ant-form-item .ant-form-item-explain-error{
   margin-bottom: 10px;
 }
+
+.border-btm {
+  border-bottom: 1px solid black;
+}

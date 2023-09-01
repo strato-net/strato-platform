@@ -69,7 +69,7 @@ const Filter = (props) => {
         <Typography.Title level={5}>Sort By</Typography.Title>
         <Select
           value={sort_By}
-          className='w-100'
+          className='w-full'
           placeholder="Sort By"
           onChange={(value) => {
             handleChange("sort_By", value);
@@ -77,14 +77,14 @@ const Filter = (props) => {
           options={sortBy}
         />
 
-        <Typography.Title level={5} style={{ marginTop: "15px" }}>
+        <Typography.Title level={5} className="mt-3.5">
           Filter By
         </Typography.Title>
         <Collapse
           expandIconPosition={"end"}
           defaultActiveKey={["1", "2"]}
         >
-          <Panel className="fw-7" header="Price Range" key="1">
+          <Panel className="font-bold" header="Price Range" key="1">
             <Typography.Title
               level={5}
               className="mt-0"
@@ -96,7 +96,7 @@ const Filter = (props) => {
               min={0}
               max={max_Price}
               type="number"
-              className='w-100'
+              className='w-full'
               placeholder="Min Price"
               value={min_Price}
               controls={false}
@@ -107,7 +107,7 @@ const Filter = (props) => {
             />
             <Typography.Title
               level={5}
-              className='mt-5'
+              className='mt-1'
               ellipsis={{ tooltip: true }}
             >
               Max Price
@@ -115,7 +115,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              className='w-100'
+              className='w-full'
               placeholder="Max Price"
               value={max_Price}
               controls={false}
@@ -125,7 +125,7 @@ const Filter = (props) => {
               onWheel={(e) => e.target.blur()}
             />
           </Panel>
-          <Panel className="fw-7" header="Location" key="2">
+          <Panel className="font-bold" header="Location" key="2">
             <Typography.Title
               level={5}
               className="mt-0"
@@ -138,7 +138,7 @@ const Filter = (props) => {
               max={99999}
               type="number"
               value={zip_code}
-              className='w-100'
+              className='w-full'
               placeholder="Enter Zipcode"
               controls={false}
               onChange={(value) => {
@@ -148,13 +148,13 @@ const Filter = (props) => {
             />
             <Typography.Title
               level={5}
-              className='mt-5'
+              className='mt-1'
               ellipsis={{ tooltip: true }}
             >
               State
             </Typography.Title>
             <Select
-              className='w-100'
+              className='w-full'
               placeholder="State"
               value={state}
               onChange={(value) => {
@@ -165,7 +165,7 @@ const Filter = (props) => {
           </Panel>
 
           <Panel
-            className="fw-7"
+            className="font-bold"
             header="Bedrooms & Bathrooms"
             key="3"
           >
@@ -191,7 +191,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              className='w-100'
+              className='w-full'
               placeholder="Min Bedrooms"
               value={min_Bedrooms}
               controls={false}
@@ -222,7 +222,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              className='w-100'
+              className='w-full'
               placeholder="Min Bathrooms"
               value={min_Bathrooms}
               controls={false}
@@ -233,9 +233,9 @@ const Filter = (props) => {
             />
           </Panel>
 
-          <Panel className="fw-7" header="Amenities" key="4">
+          <Panel className="font-bold" header="Amenities" key="4">
             <Checkbox.Group
-              style={{ display: "grid", lineHeight: "30px" }}
+              className="grid leading-7"
               options={amenities}
               value={filterOption?.amenities}
               onChange={(value) => {
@@ -244,7 +244,7 @@ const Filter = (props) => {
             />
           </Panel>
 
-          <Panel className="fw-7" header="Sq. Footage" key="5">
+          <Panel className="font-bold" header="Sq. Footage" key="5">
             <Typography.Title
               level={5}
               className="mt-0"
@@ -255,7 +255,7 @@ const Filter = (props) => {
             <InputNumber
               min={0}
               type="number"
-              className='w-100'
+              className='w-full'
               placeholder="Min Sq Ft."
               value={lot_Size_Area}
               controls={false}
@@ -266,19 +266,19 @@ const Filter = (props) => {
             />
           </Panel>
           <Panel
-            className="fw-7"
+            className="font-bold"
             header="Property & Parking"
             key="6"
           >
             <Typography.Title
               level={5}
-              className='mt-5'
+              className='mt-1'
               ellipsis={{ tooltip: true }}
             >
               Parking
             </Typography.Title>
             <Select
-              className='w-100'
+              className='w-full'
               placeholder="Parking Type"
               value={parking_Type}
               onChange={(value) => {
@@ -289,13 +289,13 @@ const Filter = (props) => {
 
             <Typography.Title
               level={5}
-              className='mt-5'
+              className='mt-1'
               ellipsis={{ tooltip: true }}
             >
               Property
             </Typography.Title>
             <Select
-              className='w-100'
+              className='w-full'
               placeholder="Property Type"
               value={property_Type}
               onChange={(value) => {
@@ -312,7 +312,7 @@ const Filter = (props) => {
         <Col span={22}>
           <Typography.Title level={4} style={{ margin: "0px 18px" }}>
             {/* Properties for you */}
-            <Space style={{ marginLeft: "15px" }}>
+            <Space className="mt-3.5">
               <Button icon={<FilterFilled />} onClick={openDrawer}>
                 Filter
               </Button>

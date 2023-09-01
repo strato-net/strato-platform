@@ -223,7 +223,7 @@ function PropertyCreateModal({
 
   const primaryAction = {
     content: modalView ? (
-      id ?"Update Property":"Create a Property Listing"
+      id ? "Update Property" : "Create a Property Listing"
     ) : (
       <>
         <Button type="link" onClick={handleModalToggle}>
@@ -328,7 +328,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                className='w-100'
+                className='w-full'
                 label="Total Units"
                 id="numberOfUnitsTotal"
                 type="Number"
@@ -354,7 +354,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                className='w-100'
+                className='w-full'
                 precision={0}
                 label="Asking Price"
                 type="Number"
@@ -402,7 +402,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                className='w-100'
+                className='w-full'
                 label="Street Number"
                 id="streetnumber"
                 type="Number"
@@ -429,7 +429,7 @@ function PropertyCreateModal({
               ]}
             >
               <Input
-                className='w-100'
+                className='w-full'
                 label="House Number"
                 id="housenumber"
                 placeholder="House Number"
@@ -496,7 +496,7 @@ function PropertyCreateModal({
             >
               <InputNumber
                 precision={0}
-                className='w-100'
+                className='w-full'
                 label="Zip Code"
                 type="Number"
                 placeholder="ZipCode"
@@ -524,7 +524,7 @@ function PropertyCreateModal({
                     <img
                       alt="Product"
                       src={selectedImage}
-                      className="w-100 h-100"
+                      className="w-full h-full"
                     />
                     <br />
                   </div>
@@ -577,7 +577,7 @@ function PropertyCreateModal({
             disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
-              if(value === "apartment" || value === "condo"){
+              if (value === "apartment" || value === "condo") {
                 handleChange("lotSizeArea", 0);
               }
             }}
@@ -598,7 +598,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                className='w-100'
+                className='w-full'
                 precision={0}
                 label="bedrooms"
                 placeholder="Bedrooms"
@@ -628,7 +628,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                className='w-100'
+                className='w-full'
                 precision={0}
                 label="bathrooms"
                 placeholder="Bathrooms"
@@ -687,7 +687,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                className='w-100'
+                className='w-full'
                 precision={0}
                 label="lotSize"
                 placeholder="Lot Size Area"
@@ -703,7 +703,7 @@ function PropertyCreateModal({
                 onWheel={(e) => {
                   e.target.blur();
                 }}
-                disabled={propertyData.propertyType === "apartment" || propertyData.propertyType === "condo"  ? true : false}
+                disabled={propertyData.propertyType === "apartment" || propertyData.propertyType === "condo" ? true : false}
               />
             </Form.Item>
           </Col>
