@@ -3,9 +3,9 @@ const factory = {
   getProductDocumentArgs(uid) {
     const args = {
       productId: `${uid + 2}`.padStart(40, '0'),
-      fileKey: "",
-      fileName: "",
-      documentType: "",
+      fileKey: `fileKey_${uid}`,
+      fileName: `fileName_${uid}`,
+      documentType: `documentType_${uid}`,
       uploadDate: 0,
       delDate: 0
     }
