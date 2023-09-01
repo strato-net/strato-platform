@@ -104,8 +104,15 @@ class PropertiesController {
         if (files) {
           //Access token for the image upload
           // const accessToken = await getServiceToken();
+          // Need to get this accessToken manually and change with curl command -
+          // curl - L - X POST 'https://keycloak.blockapps.net/auth/realms/mercata-testnet2/protocol/openid-connect/token' \
+          // -H 'Content-Type: application/x-www-form-urlencoded' \
+          // -H 'Authorization: Basic bWVyY2F0YS10ZXN0bmV0Mi1ub2RlMTowMTAzMDAxYS0zYjc2LTRiZDItOGE0NC05ZWRjYTRhMzI1NzE=' \
+          // --data - urlencode 'grant_type=password' \
+          // --data - urlencode 'username=<username>' \
+          // --data - urlencode 'password=<password>' \
           const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiI4ODYyNWYxMS1kZmU2LTQ0NjEtOTY2Ny1iMGIzYWExNDFiNTgiLCJleHAiOjE2OTM1MTAzODYsIm5iZiI6MCwiaWF0IjoxNjkzNTA2Nzg2LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiZDU4ODRlMjEtZWRkOC00MWEzLWJjYmUtYzZjMGY1MWRiZjBjIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.IcROrKZb8Q5OcSkmjfXp0IH8kp62JgJ_dEIEHwage3PAi4RUbkz7GCZFo8NhBiJGoZW52X4_5BDMTUM2gc_Uo41QQceDAgMBOuJrusU8ZHsH6wS6YXq2vx_pzKlbvsdNH5vupN1mEswiw4odUqp-D413xIzAG0dkUjDCN501XCMrfydgZK9YIiVPoFZv2T-IQp2Ihog2W9G7qbfS28jJeY1j_fC4e5hZlRv-hkSZfbtEcR3bZTsjz4aJ98ri0OHVwwfF8JqpxqrUifQQgGMLw9NqMIsbXlDzYHaSvAuicrunkdUtd4AvDUi_8TurdZ7us9nDFV3U4A2156g-gvBOKQ'
-            for (let i = 0; i < files.length; i++) {
+          for (let i = 0; i < files.length; i++) {
             console.log("contorller-files", files[i].originalname);
             const uploadResult = await uploadFileToS3(
               process.env.EXTERNAL_STORAGE_URL,
