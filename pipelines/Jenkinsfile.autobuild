@@ -210,7 +210,7 @@ pipeline {
               sh '''#!/bin/bash -le
                 set -x
                 version=$(cat VERSION)  
-                gitCommit=${env.GIT_COMMIT:0:9}         
+                gitCommit=${GIT_COMMIT:0:9}         
                 targetDir=${version}-${gitCommit}
                 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws s3 cp --recursive --exclude "*" --include "docker-compose*" . s3://blockapps-build-artifacts/${targetDir}
                 '''
