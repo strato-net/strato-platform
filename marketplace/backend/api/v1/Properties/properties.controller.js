@@ -1,8 +1,14 @@
-import { rest } from "blockapps-rest";
-import Joi from "@hapi/joi";
-import RestStatus from "http-status-codes";
-import config from "../../../load.config";
-const options = { config, cacheNonce: true };
+import { rest } from 'blockapps-rest'
+import Joi from '@hapi/joi'
+import RestStatus from 'http-status-codes'
+import config from '../../../load.config'
+import { getSignedUrlFromS3, deleteFileFromS3, uploadFileToS3 } from '../../../helpers/s3'
+import constants from '../../../helpers/constants'
+import { getServiceToken } from '../../../helpers/oauthHelper'
+import moment from 'moment'
+import crypto from "crypto";
+
+const options = { config, cacheNonce: true }
 
 class PropertiesController {
   static async get(req, res, next) {
@@ -19,9 +25,17 @@ class PropertiesController {
       }
 
       const property = await dapp.getProperty(args, chainOptions);
-      // const productImageUrl = getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
-      // const result = { ...product, imageUrl: productImageUrl }
-      rest.response.status200(res, property);
+      console.log('controller -getproperty', property)
+      const imageUrls = [];
+      await property.images.forEach(image => {
+        const url = getSignedUrlFromS3(image.fileKey, req.app.get(constants.s3ParamName))
+        imageUrls.push(url)
+      })
+        
+
+      const result = { ...property, images: imageUrls }
+      console.log('controller -result', result)
+      rest.response.status200(res, result);
 
       return next();
     } catch (e) {
@@ -34,10 +48,8 @@ class PropertiesController {
       const { dapp, query } = req;
 
       const properties = await dapp.getProperties({ ...query });
-      // const productsWithImageUrl = products.map(product => ({
-      //   ...product,
-      //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-      //   )
+      
+      // const result = properties.map(property => ({
       // }))
 
       rest.response.status200(res, properties);
@@ -50,18 +62,7 @@ class PropertiesController {
 
   static async create(req, res, next) {
     try {
-      const {
-        dapp,
-        body,
-        body: {
-          streetNumber,
-          streetName,
-          unitNumber,
-          postalCity,
-          stateOrProvince,
-          postalcode,
-        },
-      } = req;
+      const { dapp, body, files } = req;
 
       const propertyArgs = {
         ...body,
@@ -71,10 +72,13 @@ class PropertiesController {
         longitude: "",
       };
 
+      console.log('files - controller', files)
+
       PropertiesController.validateCreatePropertyArgs(propertyArgs);
 
       const propertyResult = await dapp.createProperty(propertyArgs);
       if (propertyResult) {
+
         const inventoryBody = {
           productAddress: propertyResult.productContractAddress,
           quantity: 1,
@@ -84,7 +88,37 @@ class PropertiesController {
           serialNumber: [],
         };
         const inventoryResult = await dapp.createInventory(inventoryBody);
-        if (inventoryResult) {
+
+        /* -------upload the documents and images if necessary-------- */
+        if (files) {
+          //Access token for the image upload
+          // const accessToken = await getServiceToken();
+          const accessToken = 'eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJheWpsYmFGenhrTFM3Rld6Tl9OY2ZpdVFPNU9rSm9mMTVNRGFiUm1Pc2g0In0.eyJqdGkiOiI4ODYyNWYxMS1kZmU2LTQ0NjEtOTY2Ny1iMGIzYWExNDFiNTgiLCJleHAiOjE2OTM1MTAzODYsIm5iZiI6MCwiaWF0IjoxNjkzNTA2Nzg2LCJpc3MiOiJodHRwczovL2tleWNsb2FrLmJsb2NrYXBwcy5uZXQvYXV0aC9yZWFsbXMvbWVyY2F0YS10ZXN0bmV0MiIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhZGI4MWJlNi02YTI3LTQ4MjYtYWI0MS04MGM4M2I3YWU0MTYiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJtZXJjYXRhLXRlc3RuZXQyLW5vZGUxIiwiYXV0aF90aW1lIjowLCJzZXNzaW9uX3N0YXRlIjoiZDU4ODRlMjEtZWRkOC00MWEzLWJjYmUtYzZjMGY1MWRiZjBjIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJwcm9maWxlIGVtYWlsIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNaWNoYWVsIFRhbiIsImNvbXBhbnkiOiIiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJtaWNoYWVsX3RhbkBibG9ja2FwcHMubmV0IiwiZ2l2ZW5fbmFtZSI6Ik1pY2hhZWwiLCJmYW1pbHlfbmFtZSI6IlRhbiIsImVtYWlsIjoibWljaGFlbF90YW5AYmxvY2thcHBzLm5ldCJ9.IcROrKZb8Q5OcSkmjfXp0IH8kp62JgJ_dEIEHwage3PAi4RUbkz7GCZFo8NhBiJGoZW52X4_5BDMTUM2gc_Uo41QQceDAgMBOuJrusU8ZHsH6wS6YXq2vx_pzKlbvsdNH5vupN1mEswiw4odUqp-D413xIzAG0dkUjDCN501XCMrfydgZK9YIiVPoFZv2T-IQp2Ihog2W9G7qbfS28jJeY1j_fC4e5hZlRv-hkSZfbtEcR3bZTsjz4aJ98ri0OHVwwfF8JqpxqrUifQQgGMLw9NqMIsbXlDzYHaSvAuicrunkdUtd4AvDUi_8TurdZ7us9nDFV3U4A2156g-gvBOKQ'
+            for (let i = 0; i < files.length; i++) {
+            console.log("contorller-files", files[i].originalname);
+            const uploadResult = await uploadFileToS3(
+              process.env.EXTERNAL_STORAGE_URL,
+              files[i],
+              accessToken
+            );
+
+            console.log("uploadResult", uploadResult);
+
+            const productDocumentArgs = {
+              productId: propertyResult.productContractAddress,
+              fileKey: uploadResult.data.imageKey,
+              fileName: files[i].originalname,
+              documentType: files[i].mimetype,
+            }
+            console.log("productDocumentArgs", productDocumentArgs);
+            PropertiesController.validateCreateProductDocumentArgs(productDocumentArgs)
+
+            const uploaded = await dapp.createProductDocument(productDocumentArgs)
+            console.log("uploadedFILE", uploaded);
+          }
+        }
+
+        if (propertyResult && inventoryResult) {
           console.log("propertyResult", propertyResult);
           rest.response.status200(res, propertyResult);
         }
@@ -283,13 +317,25 @@ class PropertiesController {
     const validation = createPropertySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(
-        RestStatus.BAD_REQUEST,
-        "Create Property Argument Validation Error",
-        {
-          message: `Missing args or bad format: ${validation.error.message}`,
-        }
-      );
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Property Argument Validation Error',
+        `Missing args or bad format: ${validation.error.message}`)
+    }
+  }
+
+  static validateCreateProductDocumentArgs(args) {
+    const createProductDocumentSchema = Joi.object({
+      productId: Joi.string().required(),
+      fileKey: Joi.string().required(),
+      fileName: Joi.string().required(),
+      documentType: Joi.string().required(),
+    });
+
+    const validation = createProductDocumentSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create ProductDocument Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
     }
   }
 
@@ -406,7 +452,7 @@ class PropertiesController {
       );
     }
   }
-  
+
   static validateCreateReviewArgs(args) {
     const createReviewSchema = Joi.object({
       productId: Joi.string().required(),
@@ -452,7 +498,7 @@ class PropertiesController {
 
   static validateDeleteReviewArgs(args) {
     const deleteReviewSchema = Joi.object({
-      address: Joi.string().required(),
+      reviewAddress: Joi.string().required(),
     });
 
     const validation = deleteReviewSchema.validate(args);

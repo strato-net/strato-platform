@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 // import dayjs from 'dayjs';
 
 
-const contractName = 'UserAddress_1';
+const contractName = 'UserAddress';
 const contractFilename = `${util.cwd}/dapp/addresses/contracts/UserAddress.sol`;
 
 /** 

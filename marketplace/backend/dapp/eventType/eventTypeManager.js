@@ -4,7 +4,7 @@ import eventTypeJS from './eventType'
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils'
 import { EventType } from '../../api/v1/endpoints';
 
-const contractName = 'EventTypeManager_10'
+const contractName = 'EventTypeManager'
 const contractFilename = `${util.cwd}/dapp/eventType/contracts/EventTypeManager.sol`
 
 async function uploadContract(user, _constructorArgs = {}, options) {

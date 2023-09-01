@@ -8,7 +8,7 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 
 
 /// @title A representation of Product assets
-contract Product_3 is UnitOfMeasurement, InventoryStatus {
+contract Product is UnitOfMeasurement, InventoryStatus {
 
     address public owner;
     string public ownerOrganization;

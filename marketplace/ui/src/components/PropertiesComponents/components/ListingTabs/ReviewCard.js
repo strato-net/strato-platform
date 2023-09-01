@@ -51,7 +51,7 @@ const ReviewCard = (props) => {
   };
 
   const handleDeleteReview = async () => {
-    const result = await actions.deleteReview(dispatch, { address: address });
+    const result = await actions.deleteReview(dispatch, { reviewAddress: address });
     if (result) {
       setOpen(!open)
       actions.fetchPropertyDetails(dispatch, id);

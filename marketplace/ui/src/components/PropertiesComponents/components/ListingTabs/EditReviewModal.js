@@ -40,7 +40,7 @@ const EditReviewModal = (props) => {
             onClick={() => {
               TagManager.dataLayer({
                 dataLayer: {
-                  event: 'PROPERTIES_REVIEW_SUBMITTED',
+                  event: 'PROPERTIES_EDIT_REVIEW_SUBMITTED',
                 },
               })
               handleSubmitUpdate()

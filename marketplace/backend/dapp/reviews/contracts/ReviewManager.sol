@@ -2,7 +2,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "./Review.sol";
 
 /// @title A representation of ReviewManager to manage reviews
-contract ReviewManager_0_2 {
+contract ReviewManager {
     // constructor() public {}
 
     function createReview(
@@ -16,7 +16,7 @@ contract ReviewManager_0_2 {
         uint _createdDate,
         uint _delDate
     ) returns (uint256, address) {
-        Review_0_5 review = new Review_0_5(
+        Review review = new Review(
             _productId,
             _propertyId,
             _reviewerAddress,
@@ -37,7 +37,7 @@ contract ReviewManager_0_2 {
         uint _rating,
         address _address
     ) returns (uint256) {
-        Review_0_5 review = Review_0_5(_address);
+        Review review = Review(_address);
         return review.update(
                 _title,
                 _description,
@@ -46,7 +46,7 @@ contract ReviewManager_0_2 {
     }
 
     function deleteReview(address _reviewAddress) returns (uint256, string) {
-        Review_0_5 review = Review_0_5(_reviewAddress);
+        Review review = Review(_reviewAddress);
         return review.deleteReview();
     }
 }

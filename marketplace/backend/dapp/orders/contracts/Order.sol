@@ -128,7 +128,7 @@ contract Order is OrderStatus {
     // check for open status to closed status
      if(_status == OrderStatus.CLOSED){
        for(uint i=0;i<orderLines.length;i++){
-        OrderLine_2 orderLine = OrderLine_2(orderLines[i]);
+        OrderLine orderLine = OrderLine(orderLines[i]);
         // if(!orderLine.isSerialUploaded()){
         //   return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
         // }
@@ -170,7 +170,7 @@ contract Order is OrderStatus {
         return (RestStatus.FORBIDDEN,address(0));
       } 
 
-      OrderLine_2 orderLine=new OrderLine_2(_orderAddress, _productId, _inventoryId, _quantity, _pricePerUnit, _shippingCharges
+      OrderLine orderLine=new OrderLine(_orderAddress, _productId, _inventoryId, _quantity, _pricePerUnit, _shippingCharges
       , _tax, _createdDate);
       orderLines.push(address(orderLine));
       return (RestStatus.OK,address(orderLine));
@@ -205,7 +205,7 @@ contract Order is OrderStatus {
       string inventories = "";
       string orderLineQuantities = "";
       for(uint i=0;i<orderLines.length;i++){
-        OrderLine_2 orderLine = OrderLine_2(address(orderLines[i]));
+        OrderLine orderLine = OrderLine(address(orderLines[i]));
         Inventory inventory = Inventory(address(orderLine.inventoryId()));
         inventories += string(address(orderLine.inventoryId())) + ",";
         orderLineQuantities += string(orderLine.quantity()) + ",";

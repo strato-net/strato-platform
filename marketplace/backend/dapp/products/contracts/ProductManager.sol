@@ -26,7 +26,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         string _subCategory,
         uint _createdDate
     ) returns (uint256, address) {
-        Product_3 product = new Product_3(
+        Product product = new Product(
             _name,
             _description,
             _manufacturer,
@@ -57,7 +57,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         string _userUniqueProductCode,
         uint _scheme
     ) returns (uint256) {
-        Product_3 product = Product_3(_productAddress);
+        Product product = Product(_productAddress);
         return
             product.update(
                 _name,
@@ -70,7 +70,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     }
 
     function deleteProduct(address _productAddress) returns (uint256, string) {
-        Product_3 product = Product_3(_productAddress);
+        Product product = Product(_productAddress);
         return product.deleteProduct();
     }
 
@@ -84,7 +84,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         string[] _serialNumbers
     ) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
-            Product_3 product = Product_3(_productAddress);
+            Product product = Product(_productAddress);
             return
                 product.addInventory(
                     _quantity,
@@ -111,7 +111,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
                 ] = true;
             }
 
-            Product_3 product = Product_3(_productAddress);
+            Product product = Product(_productAddress);
             return
                 product.addInventory(
                     _quantity,
@@ -131,7 +131,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         InventoryStatus _status,
         uint _scheme
     ) returns (uint256) {
-        Product_3 product = Product_3(_productAddress);
+        Product product = Product(_productAddress);
         return
             product.updateInventory(
                 _inventory,
@@ -284,7 +284,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         bool _sprinklerSystem,
         bool _waterFront
     ) returns (uint256, address) {
-        Property_0_5 property = new Property_0_5(
+        Property property = new Property(
             _productId,
             _listPrice,
             _streetNumber,
@@ -467,7 +467,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         bool _sprinklerSystem,
         bool _waterFront
     ) public returns (uint256) {
-        Property_0_5 property = Property_0_5(_propertyAddress);
+        Property property = Property(_propertyAddress);
 
         return
             property.update(

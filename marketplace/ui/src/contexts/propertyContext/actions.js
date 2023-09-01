@@ -46,10 +46,9 @@ const actions = {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: "application/json"
         },
-        body: JSON.stringify(payload),
+        body: payload,
       });
 
       const body = await response.json();
@@ -331,7 +330,7 @@ const actions = {
     dispatch({ type: actionDescriptors.deleteReview, payload })
     try {
       const response = await fetch(`${apiUrl}/properties/review/delete`, {
-        method: HTTP_METHODS.POST,
+        method: HTTP_METHODS.PUT,
         credentials: "same-origin",
         headers: {
           Accept: "application/json",
