@@ -22,6 +22,7 @@ import {
   usePropertiesDispatch,
   usePropertiesState,
 } from "../../../contexts/propertyContext";
+import TagManager from "react-gtm-module";
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj, homeTypeData } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
@@ -204,6 +205,11 @@ function PropertyDetails() {
               type="primary"
               onClick={() => {
                 toggleCreateModal(true);
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: "PROPERTIES_EDIT_PROPERTY_CLICK",
+                  },
+                });
               }}
               style={{ marginLeft: "5px" }}
             >
@@ -327,6 +333,11 @@ function PropertyDetails() {
                   style={{ marginLeft: "50px", marginTop: "30px" }}
                   onClick={() => {
                     setTalkToSalesModal(!isTalkToSalesModalOpen);
+                    TagManager.dataLayer({
+                      dataLayer: {
+                        event: "PROPERTIES_SUBMIT_INQUIRY_TO_SALES",
+                      },
+                    });
                   }}
                 >
                   Talk to Sales
