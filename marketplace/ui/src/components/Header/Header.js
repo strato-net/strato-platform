@@ -240,7 +240,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
       />
 
       <Space size="large">
-        {!(roleIndex === undefined || roleIndex === 1) || <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
+        {!(roleIndex === undefined || roleIndex === 1) && <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
           {sell}
           {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
         </Button>}

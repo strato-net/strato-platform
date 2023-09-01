@@ -84,10 +84,10 @@ const Filter = (props) => {
           expandIconPosition={"end"}
           defaultActiveKey={["1", "2"]}
         >
-          <Panel style={{ fontWeight: 700 }} header="Price Range" key="1">
+          <Panel className="fw-7" header="Price Range" key="1">
             <Typography.Title
               level={5}
-              style={{ marginTop: 0 }}
+              className="mt-0"
               ellipsis={{ tooltip: true }}
             >
               Min Price
@@ -125,10 +125,10 @@ const Filter = (props) => {
               onWheel={(e) => e.target.blur()}
             />
           </Panel>
-          <Panel style={{ fontWeight: 700 }} header="Location" key="2">
+          <Panel className="fw-7" header="Location" key="2">
             <Typography.Title
               level={5}
-              style={{ marginTop: 0 }}
+              className="mt-0"
               ellipsis={{ tooltip: true }}
             >
               Zip Code
@@ -165,13 +165,13 @@ const Filter = (props) => {
           </Panel>
 
           <Panel
-            style={{ fontWeight: 700 }}
+            className="fw-7"
             header="Bedrooms & Bathrooms"
             key="3"
           >
             <Typography.Title
               level={5}
-              style={{ marginTop: 0 }}
+              className="mt-0"
               ellipsis={{ tooltip: true }}
             >
               Min Bedrooms
@@ -202,7 +202,7 @@ const Filter = (props) => {
             />
             <Typography.Title
               level={5}
-              style={{ marginTop: 0 }}
+              className="mt-0"
               ellipsis={{ tooltip: true }}
             >
               Min Bathrooms
@@ -233,7 +233,7 @@ const Filter = (props) => {
             />
           </Panel>
 
-          <Panel style={{ fontWeight: 700 }} header="Amenities" key="4">
+          <Panel className="fw-7" header="Amenities" key="4">
             <Checkbox.Group
               style={{ display: "grid", lineHeight: "30px" }}
               options={amenities}
@@ -244,10 +244,10 @@ const Filter = (props) => {
             />
           </Panel>
 
-          <Panel style={{ fontWeight: 700 }} header="Sq. Footage" key="5">
+          <Panel className="fw-7" header="Sq. Footage" key="5">
             <Typography.Title
               level={5}
-              style={{ marginTop: 0 }}
+              className="mt-0"
               ellipsis={{ tooltip: true }}
             >
               Min Sq Ft.
@@ -266,7 +266,7 @@ const Filter = (props) => {
             />
           </Panel>
           <Panel
-            style={{ fontWeight: 700 }}
+            className="fw-7"
             header="Property & Parking"
             key="6"
           >
