@@ -2,7 +2,7 @@ describe("Renders Certifier Page", () => {
 
     it("it should render certifier homepage for certifier login", () => {
         cy.visit('/')
-        cy.get("#Login").click();
+        cy.get("#login").click();
         cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"));
 
         cy.wait(20000);
@@ -32,7 +32,7 @@ describe("Renders Certifier Page", () => {
 
     it.only("it should check certifier flow for user with certifier & trading entity roles", () => {
         cy.visit('/')
-        cy.get("#Login").click();
+        cy.get("#login").click();
         
         cy.login(Cypress.env("dualRoleEmail"), Cypress.env("dualRolePassword"));
         cy.wait(20000);

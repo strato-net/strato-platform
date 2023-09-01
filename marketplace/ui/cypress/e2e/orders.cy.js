@@ -9,7 +9,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -19,7 +19,7 @@ describe("Renders Orders Page", () => {
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
     cy.get("#orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller();
 
     cy.get("#marketplace").should("exist");
@@ -73,7 +73,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -83,7 +83,7 @@ describe("Renders Orders Page", () => {
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
     cy.get("#orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller();
 
     cy.get("#marketplace").should("exist");
@@ -162,7 +162,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -172,7 +172,7 @@ describe("Renders Orders Page", () => {
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
     cy.get("#orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller();
 
     cy.get("#Art").click();
@@ -228,7 +228,7 @@ describe("Renders Orders Page", () => {
               cy.get("#orders").should("not.exist");
 
               cy.visit('/')
-              cy.get("#Login").click();
+              cy.get("#login").click();
               cy.login()
 
               cy.get("#orders").should("exist");
@@ -259,7 +259,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -269,7 +269,7 @@ describe("Renders Orders Page", () => {
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
     cy.get("#orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login();
 
     cy.get("#marketplace").should("exist");
@@ -321,7 +321,7 @@ describe("Renders Orders Page", () => {
               cy.get("#orders").should("not.exist");
 
               cy.visit('/')
-              cy.get("#Login").click();
+              cy.get("#login").click();
               cy.loginAsSeller()
 
               cy.get("#orders").should("exist");
@@ -360,7 +360,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -372,7 +372,7 @@ describe("Renders Orders Page", () => {
     cy.get("#orders").should("not.exist");
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("include", "/marketplace");
@@ -423,7 +423,7 @@ describe("Renders Orders Page", () => {
               cy.get("#orders").should("not.exist");
 
               cy.visit('/')
-              cy.get("#Login").click();
+              cy.get("#login").click();
               cy.loginAsSeller()
 
               cy.get("#orders").should("exist");

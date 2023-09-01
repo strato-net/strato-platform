@@ -371,50 +371,52 @@ function PropertyDetails() {
             <Row>
               <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
                 <div className="tab-card">
-                  {tabs.map((tab) => (
-                    <Col
-                      sm={6}
-                      key={tab.key}
-                      id={tab.key}
-                      style={{ margin: "auto", padding: "10px" }}
+                  {tabs.map((tab) => {
+                    const {key, label} = tab;
+                    return <Col
+                    sm={6}
+                    key={key}
+                    id={key}
+                    style={{ margin: "auto", padding: "10px" }}
+                  >
+                    <div
+                      style={{
+                        padding: "5px",
+                        backgroundColor: activeTab === key && "#EDEDED",
+                        fontSize: "18px",
+                        textAlign: "center"
+                      }}
                     >
-                      <div
-                        style={{
-                          padding: "5px",
-                          backgroundColor: activeTab === tab.key && "#EDEDED",
-                          fontSize: "18px",
-                          textAlign: "center"
-                        }}
+                      <a
+                        href={`#${key}`}
+                        onClick={() => setActiveTab(key)}
                       >
-                        <a
-                          href={`#${tab.key}`}
-                          onClick={() => setActiveTab(tab.key)}
-                        >
-                          {tab.label}
-                        </a>
-                      </div>
-                    </Col>
-                  ))}
+                        {label}
+                      </a>
+                    </div>
+                  </Col>
+                  })}
                 </div>
 
-                {tabs.map((tab, index) => (
-                  <>
-                    <div id={tab.key}>
-                      <div style={{ paddingTop: "20px" }}>
-                        <Typography.Title level={5} style={{
-                          backgroundColor: activeTab === tab.key && "#EDEDED",
-                          display: "inline-block",
-                          padding: "10px",
-                          borderRadius: "5px"
-                        }}>
-                          <a style={{ color: "black" }} href={`#${tab.key}`}>{tab.label}</a>
-                        </Typography.Title>
-                      </div>
-                      {tab.children}
+                {tabs.map((tab, index) => {
+                  const {key, label, children} = tab;
+                  return   <>
+                  <div id={key}>
+                    <div style={{ paddingTop: "20px" }}>
+                      <Typography.Title level={5} style={{
+                        backgroundColor: activeTab === key && "#EDEDED",
+                        display: "inline-block",
+                        padding: "10px",
+                        borderRadius: "5px"
+                      }}>
+                        <a style={{ color: "black" }} href={`#${key}`}>{label}</a>
+                      </Typography.Title>
                     </div>
-                    <div style={{ width: "100%", margin: "50px auto" }}></div>
-                  </>
-                ))}
+                    {children}
+                  </div>
+                  <div style={{ width: "100%", margin: "50px auto" }}></div>
+                </>
+                })}
               </Col>
             </Row>
           </Col>

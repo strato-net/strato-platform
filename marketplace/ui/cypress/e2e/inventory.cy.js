@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 describe("Renders Inventory Page", () => {
   beforeEach(function () {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
   });
 

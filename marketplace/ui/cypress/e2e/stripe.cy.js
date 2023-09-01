@@ -16,7 +16,7 @@ it("it should create product, inventory and buy using pay now option - success",
   }).as('productNameCall');
 
   cy.visit('/')
-  cy.get("#Login").click();
+  cy.get("#login").click();
   cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
   const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -84,7 +84,7 @@ it("it should create product, inventory and buy using pay now option - success",
   cy.get("#user-dropdown").click();
   cy.get("#logout").click();
   cy.get("#orders").should("not.exist");
-  cy.get("#Login").click();
+  cy.get("#login").click();
 
   cy.login(Cypress.env('teEmail'), Cypress.env('tePassword'));
   cy.get("#marketplace").should("exist");
@@ -165,7 +165,7 @@ it("it should create product, inventory and buy using pay now option - insuffici
   }).as('productNameCall');
 
   cy.visit('/')
-  cy.get("#Login").click();
+  cy.get("#login").click();
   cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"))
 
   const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -232,7 +232,7 @@ it("it should create product, inventory and buy using pay now option - insuffici
   cy.get("#user-dropdown").click();
   cy.get("#logout").click();
   cy.get("#orders").should("not.exist");
-  cy.get("#Login").click();
+  cy.get("#login").click();
 
   cy.login(Cypress.env('teEmail'), Cypress.env('tePassword'));
   cy.get("#marketplace").should("exist");

@@ -160,7 +160,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
   const isLogin = () => {
 
     if (loginUrl) {
-      return <a href={loginUrl} id="Login" className="text-base text-white"
+      return <a href={loginUrl} id="login" className="text-base text-white"
         onClick={() => {
           TagManager.dataLayer({
             dataLayer: {

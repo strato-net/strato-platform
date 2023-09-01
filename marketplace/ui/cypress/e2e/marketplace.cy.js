@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 describe("Renders Marketplace Page", () => {
   it("it should render marketplace dashboard", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("include", "/marketplace");
@@ -38,7 +38,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render product list page", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("contain", "marketplace");
@@ -66,7 +66,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render sub-categories, products, brands and inventories on selecting categories", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("contain", "marketplace");
@@ -135,7 +135,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render inventories based on filter selection", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("contain", "marketplace");
@@ -200,7 +200,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render product detail page", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.request({
@@ -304,7 +304,7 @@ describe("Renders Marketplace Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -375,7 +375,7 @@ describe("Renders Marketplace Page", () => {
     cy.get("#logout").click();
     cy.get("#orders").should("not.exist");
 
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller();
     cy.get("#marketplace").should("exist");
     cy.url().should("contain", "marketplace");

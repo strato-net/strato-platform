@@ -1,7 +1,7 @@
 describe("Renders User onboarding Page", () => {
     it("should be able to click on login and verify authentication", () => {
         cy.visit('/')
-        cy.get("#Login").click();
+        cy.get("#login").click();
         cy.login()
 
         cy.get("#marketplace").should("exist");
@@ -13,7 +13,7 @@ describe("Renders User onboarding Page", () => {
 
     it("should be able to logout", () => {
         cy.visit('/')
-        cy.get("#Login").click();
+        cy.get("#login").click();
         cy.login()
 
         cy.get("#marketplace").should("exist");
