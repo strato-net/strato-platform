@@ -1046,7 +1046,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
       let ownedProducts = await managers.productManager.getProducts({ category: 'Membership' }, getOptions);
-      ownedProducts = ownedProducts.filter(m => m.userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
+      ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
       console.log ('ownedProducts', ownedProducts)
       
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
@@ -1058,7 +1058,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       console.log("ownedItems", ownedItems)
       
       // Get Memberhships where productId = Items.productId 
-      let ownedMemberships = await membershipJs.getAll(rawAdmin, { ownerOrganization: userOrganization }, getOptions);
+      let ownedMemberships = await membershipJs.getAll(rawAdmin, {  }, getOptions); //ownerOrganization: userOrganization
       ownedMemberships = ownedMemberships.filter(membership =>
         ownedItems.some(item => membership.productId === item.productId)
       );
