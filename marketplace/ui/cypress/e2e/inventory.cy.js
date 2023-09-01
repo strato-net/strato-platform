@@ -9,8 +9,8 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should render empty inventory list page", () => {
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
     cy.request({
       method: "GET",
@@ -33,8 +33,8 @@ describe("Renders Inventory Page", () => {
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
 
-    cy.get("#Products").should("exist");
-    cy.get("#Products").click();
+    cy.get("#products").should("exist");
+    cy.get("#products").click();
     cy.url().should("include", "/products");
     cy.get("#add-product-button").should("exist");
     cy.get("#add-product-button").click();
@@ -54,11 +54,11 @@ describe("Renders Inventory Page", () => {
     cy.get("#create-product-button").click();
     cy.contains("Product created successfully").should("be.visible");
 
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
     cy.get("button").contains("Add Inventory").should("exist");
     cy.get("button").contains("Add Inventory").click();
@@ -105,11 +105,11 @@ describe("Renders Inventory Page", () => {
     const productName = `Corn-Seeds-${dayjs().unix()}`;
     cy.createProduct(productName);
 
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
     cy.get("button").contains("Add Inventory").should("exist");
     cy.get("button").contains("Add Inventory").click();
@@ -147,8 +147,8 @@ describe("Renders Inventory Page", () => {
 
 
   it("it should render inventory list page", () => {
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
     cy.request({
       method: "GET",
@@ -192,8 +192,8 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should edit an inventory", () => {
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
 
     cy.request({
@@ -228,8 +228,8 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should preview an inventory", () => {
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
     cy.request({
       method: "GET",
@@ -331,8 +331,8 @@ describe("Renders Inventory Page", () => {
     cy.createProduct(productName);
     cy.createInventory(productName);
 
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
 
     cy.request({
@@ -359,8 +359,8 @@ describe("Renders Inventory Page", () => {
   });
 
   it("it should render events list of an inventory", () => {
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
 
     cy.request({

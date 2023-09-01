@@ -8,8 +8,8 @@ describe("Renders Products Page", () => {
 
     cy.checkCategory();
 
-    cy.get("#Products").should("exist");
-    cy.get("#Products").click();
+    cy.get("#products").should("exist");
+    cy.get("#products").click();
     cy.url().should("include", "/products");
   });
 

@@ -9,8 +9,8 @@ describe("Renders Events Page", () => {
   });
 
   it("it should render empty event type list components", () => {
-    cy.get("#Events").should("exist");
-    cy.get("#Events").click();
+    cy.get("#events").should("exist");
+    cy.get("#events").click();
     cy.url().should("include", "/events");
     cy.request({
       method: "GET",
@@ -26,8 +26,8 @@ describe("Renders Events Page", () => {
   });
 
   it("it should add an event type", () => {
-    cy.get("#Events").should("exist");
-    cy.get("#Events").click();
+    cy.get("#events").should("exist");
+    cy.get("#events").click();
     cy.url().should("include", "/events");
 
     cy.get("#create-event-type-button").should("exist");
@@ -51,8 +51,8 @@ describe("Renders Events Page", () => {
     cy.createProduct(productName);
     cy.createInventory(productName);
 
-    cy.get("#Events").should("exist");
-    cy.get("#Events").click();
+    cy.get("#events").should("exist");
+    cy.get("#events").click();
     cy.url().should("include", "/events");
 
     cy.get("#event-tab").should("exist");
@@ -96,8 +96,8 @@ describe("Renders Events Page", () => {
   });
 
   // it("it should certify an event", () => {
-  //   cy.get("#Events").should("exist");
-  //   cy.get("#Events").click();
+  //   cy.get("#events").should("exist");
+  //   cy.get("#events").click();
   //   cy.url().should("include", "/events");
   //   cy.wait(10000);
   //   cy.get("#certify-event-tab").should("exist");

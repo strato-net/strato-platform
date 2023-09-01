@@ -148,24 +148,24 @@ function PropertyDetails() {
 
   const tabs = [
     {
-      key: "Overview",
+      key: "overview",
       label: `Overview`,
-      children: <OverviewTab id="#Overview" description={description} />,
+      children: <OverviewTab id="overview" description={description} />,
     },
     {
-      key: "Features",
+      key: "features",
       label: `Features`,
-      children: <FeaturesTab id="#Features" property={property?.fields} />,
+      children: <FeaturesTab id="features" property={property?.fields} />,
     },
     {
-      key: "Price",
+      key: "price",
       label: `History`,
-      children: <PriceHistoryTab id="#Price" property={property?.fields} />,
+      children: <PriceHistoryTab id="price" property={property?.fields} />,
     },
     {
-      key: "Reviews",
+      key: "reviews",
       label: `Reviews`,
-      children: <ReviewTab id="#Reviews" reviews={propertyDetails?.reviews} propertyId={propertyDetails?.address} productId={propertyDetails?.productId} />,
+      children: <ReviewTab id="reviews" reviews={propertyDetails?.reviews} propertyId={propertyDetails?.address} productId={propertyDetails?.productId} />,
     },
   ];
 
@@ -434,7 +434,7 @@ function PropertyDetails() {
         isEdit={true}
       />}
       <Modal open={isTalkToSalesModalOpen} footer={[]} onCancel={() => handleCancel()}>
-      <TalkToSalesModal />
+        <TalkToSalesModal />
       </Modal>
     </>
   );

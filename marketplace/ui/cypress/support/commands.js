@@ -76,8 +76,8 @@ Cypress.Commands.add("loginAsCertifier", () => {
 });
 
 Cypress.Commands.add("createProduct", (productName) => {
-  cy.get("#Products").should("exist");
-  cy.get("#Products").click();
+  cy.get("#products").should("exist");
+  cy.get("#products").click();
   cy.url().should("include", "/products");
   cy.get("#add-product-button").should("exist");
   cy.get("#add-product-button").click();
@@ -99,11 +99,11 @@ Cypress.Commands.add("createProduct", (productName) => {
 });
 
 Cypress.Commands.add("createInventory", (productName) => {
-  cy.get("#Inventory").should("exist");
-  cy.get("#Inventory").click();
+  cy.get("#inventory").should("exist");
+  cy.get("#inventory").click();
   cy.url().should("include", "/inventories");
-  cy.get("#Inventory").should("exist");
-  cy.get("#Inventory").click();
+  cy.get("#inventory").should("exist");
+  cy.get("#inventory").click();
   cy.url().should("include", "/inventories");
   cy.get("button").contains("Add Inventory").should("exist");
   cy.get("button").contains("Add Inventory").click();

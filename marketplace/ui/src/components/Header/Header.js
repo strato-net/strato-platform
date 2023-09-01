@@ -53,11 +53,11 @@ const HeaderComponent = ({ user, loginUrl }) => {
     // {
     //   role: 0,
     //   items: [
-    { label: <div id="Marketplace">Marketplace</div>, key: '0' },
-    { label: <div id="Orders">Orders</div>, key: '1' },
-    { label: <div id="Inventory">Inventory</div>, key: '2' },
-    { label: <div id="Products">Products</div>, key: '3' },
-    { label: <div id="Events">Events</div>, key: '4' },
+    { label: <div id="marketplace">Marketplace</div>, key: '0' },
+    { label: <div id="orders">Orders</div>, key: '1' },
+    { label: <div id="inventory">Inventory</div>, key: '2' },
+    { label: <div id="products">Products</div>, key: '3' },
+    { label: <div id="events">Events</div>, key: '4' },
     //   ]
     // }
   ];

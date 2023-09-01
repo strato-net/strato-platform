@@ -4,11 +4,11 @@ describe("Renders User onboarding Page", () => {
         cy.get("#Login").click();
         cy.login()
 
-        cy.get("#Marketplace").should("exist");
-        cy.get("#Orders").should("exist");
-        cy.get("#Inventory").should("exist");
-        cy.get("#Products").should("exist");
-        cy.get("#Events").should("exist");
+        cy.get("#marketplace").should("exist");
+        cy.get("#orders").should("exist");
+        cy.get("#inventory").should("exist");
+        cy.get("#products").should("exist");
+        cy.get("#events").should("exist");
     });
 
     it("should be able to logout", () => {
@@ -16,19 +16,19 @@ describe("Renders User onboarding Page", () => {
         cy.get("#Login").click();
         cy.login()
 
-        cy.get("#Marketplace").should("exist");
-        cy.get("#Orders").should("exist");
-        cy.get("#Inventory").should("exist");
-        cy.get("#Products").should("exist");
-        cy.get("#Events").should("exist");
+        cy.get("#marketplace").should("exist");
+        cy.get("#orders").should("exist");
+        cy.get("#inventory").should("exist");
+        cy.get("#products").should("exist");
+        cy.get("#events").should("exist");
 
 
         cy.get("#user-dropdown").click();
         cy.get("#logout").click();
-        cy.get("#Marketplace").should("exist");
-        cy.get("#Orders").should("not.exist");
-        cy.get("#Inventory").should("not.exist");
-        cy.get("#Products").should("not.exist");
-        cy.get("#Events").should("not.exist");
+        cy.get("#marketplace").should("exist");
+        cy.get("#orders").should("not.exist");
+        cy.get("#inventory").should("not.exist");
+        cy.get("#products").should("not.exist");
+        cy.get("#events").should("not.exist");
     });
 });
