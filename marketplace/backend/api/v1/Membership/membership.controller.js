@@ -93,7 +93,13 @@ class MembershipController {
       let results = await dapp.getPurchasedMemberships()
       //Get image location associated with each membership/product
       results = results.map((result) => { 
-        const img  =  getSignedUrlFromS3(result.fileLocation, req.app.get(constants.s3ParamName));
+        let img;
+        if (result.fileLocation === null) {
+          img = null;
+        }
+        else{
+          img  =  getSignedUrlFromS3(result.fileLocation, req.app.get(constants.s3ParamName));
+        }
         return {...result, productImageLocation: img} });
       rest.response.status200(res, results)
       

@@ -1075,25 +1075,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       const combinedData = ownedItems
         .filter(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
-          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
 
-          return product && memberships.length > 0 && productFiles.length > 0;
+          return product //&& productFiles.length > 0; //&& memberships.length > 0
         })
         .map(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
-          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
 
           return {
             itemNumber: item.itemNumber,
             productId: item.productId,
-            fileLocation: productFiles[0].fileLocation,
+            fileLocation: null,//productFiles[0].fileLocation,
             productName: product.name,
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,
-            timePeriodInMonths: memberships[0].timePeriodInMonths,
-            savings: memberships[0].savings,
+            timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
+            savings: null //memberships[0].savings,
             
           };
         });
