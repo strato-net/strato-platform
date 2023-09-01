@@ -1,5 +1,5 @@
 import { Kafka } from 'kafkajs';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 
 const kafka = new Kafka({
     clientId: 'newsie',
@@ -10,7 +10,7 @@ const consumer = kafka.consumer({ groupId: 'newsies' })
 
 async function bootstrapWebsocketToExpress(expressServer) {
     // create websocket server and add on to express server
-    const websocketServer = new WebSocket.Server({
+    const websocketServer = new WebSocketServer({
         noServer: true,
         path: '/eventstream' // todo: better name?
     });
@@ -30,7 +30,8 @@ async function bootstrapWebsocketToExpress(expressServer) {
         eachMessage: async ({_topic, _partition, message}) => {
             websocketServer.clients.forEach((client) => {
                 if (client.readyState == WebSocket.OPEN) {
-                    client.send(message.value)
+                    client.send(message.value.toString());
+                    console.log("Sent kafka msg to client");
                 }
             })
             console.log("Received the following kafka msg ", message.value)

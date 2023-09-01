@@ -3,34 +3,46 @@ import { Tabs, Input, Button } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import ActiveTab from "./ActiveTab";
 import InactiveTab from "./InactiveTab";
-import { actions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import useDebounce from "../UseDebounce";
+import useWebSocket from "react-use-websocket";
 
-
-const MyAssets = () => {
+const Notification = () => {
     const { Search } = Input;
-    const dispatch = useProductDispatch();
-    const { products, isProductsLoading } = useProductState();
-    const limit = 10;
-    const [offset, setOffset] = useState(0);
-    const [queryValue, setQueryValue] = useState("");
-    const debouncedSearchTerm = useDebounce(queryValue, 1000);
+    // const endpoint = `${process.env.REACT_APP_URL}/eventstream`
+    // console.log(endpoint)
+    const endpoint = "ws://localhost/eventstream"; //TODO: how to make this more flexible?
+    const { lastMessage, getWebSocket, sendMessage } = useWebSocket(endpoint, {
+        share: true,
+        shouldReconnect: (closeEvent) => {
+            console.log("going to reconnect after closeEvent ", closeEvent);
+            return true},
+        onOpen: () => console.log("websocket opened"),
+        onClose: () => console.log("websocket closed"),
+        onError: (err) => console.log("websocket error: ", err)
+    })
+    const [notifications, setNotifications] = useState([]);
+    // console.log("notifications, ", notifications);
+    console.log(getWebSocket());
+
 
     useEffect(() => {
-        actions.fetchProduct(dispatch, limit, offset, debouncedSearchTerm);
-    }, [dispatch, limit, offset, debouncedSearchTerm]);
+        if (lastMessage !== null) {
+            const newEvent = JSON.parse(lastMessage.data);
+            console.log("new message: ", newEvent);
+            setNotifications((prevNotif) => prevNotif.concat(newEvent));
+            console.log("notifications: ", notifications);
+        }
+    }, [lastMessage, setNotifications]);
 
     const items = [
         {
             key: "1",
             label: "Active",
-            children: <ActiveTab products={products} />
+            children: <ActiveTab products={[]} />
         },
         {
             key: "2",
             label: "Inactive",
-            children: <InactiveTab products={products} />
+            children: <InactiveTab products={[]} />
         }
     ]
 
@@ -58,4 +70,4 @@ const MyAssets = () => {
 }
 
 
-export default MyAssets;
+export default Notification;
