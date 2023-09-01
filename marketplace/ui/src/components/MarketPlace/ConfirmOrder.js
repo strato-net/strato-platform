@@ -40,7 +40,6 @@ import TagManager from "react-gtm-module";
 
 
 const { TextArea } = Input;
-const regex = /\d/;
 
 
 
