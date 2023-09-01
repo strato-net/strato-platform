@@ -240,7 +240,7 @@ const HeaderComponent = ({ user, loginUrl }) => {
       />
 
       <Space size="large">
-        {!(roleIndex === undefined || roleIndex === 1) && <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
+        {!(roleIndex === undefined || roleIndex === 1) && <Button className="border-0 mt-5" onClick={() => setOpen(true)}>
           {sell}
           {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
         </Button>}
@@ -285,14 +285,14 @@ const HeaderComponent = ({ user, loginUrl }) => {
         width={350}
         footer={null}
       >
-        <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
+        <Row gutter={[16, 16]} className="mt-5">
           {menu.map((item, index) => {
             const { icon, label, url } = item;
             return (
               <Col span={6} offset={4} key={index} className="menu-card" onClick={() => { redirect(url) }} >
-                <div style={{ margin: "auto", textAlign: "center" }}>
+                <div className="m-auto text-center" >
                   {icon}
-                  <p style={{ marginTop: "2px" }}>{label}</p>
+                  <p className="mt-0.5" >{label}</p>
                 </div>
               </Col>
             );

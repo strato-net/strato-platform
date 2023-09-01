@@ -5,7 +5,7 @@ const ClickableCell = ({ children, href }) => {
 
   return (
     <div
-      style={{ cursor: "pointer" }}
+      className="cursor-pointer"
       onClick={() => {
         navigate(href);
       }}

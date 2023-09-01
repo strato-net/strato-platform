@@ -150,3 +150,7 @@ display: none !important;
 .border-btm {
   border-bottom: 1px solid black;
 }
+
+.h-90 {
+  height: 90%;
+}
