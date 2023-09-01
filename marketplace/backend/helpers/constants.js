@@ -31,7 +31,7 @@ export const STRIPE_ENV = {
     STRIPE_SECRET_KEY: getEnvVariable("STRIPE_SECRET_KEY"),
   },
   CHECKOUT: {
-    PAYMENT_METHOD_TYPES: ["card", "us_bank_account"],
+    PAYMENT_METHOD_TYPES: ["card","us_bank_account"],
     SUCCESS_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/order/status?session_id={CHECKOUT_SESSION_ID}`,
     CANCEL_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/checkout`
   },

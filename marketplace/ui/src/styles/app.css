@@ -107,3 +107,8 @@
 :where(.css-9ntgx0).ant-checkbox-wrapper+:where(.css-9ntgx0).ant-checkbox-wrapper {
   margin-inline-start: 0px;
 }
+
+.hover\:bg-red:hover {
+  --tw-bg-opacity: 1;
+  background-color: #ffa39e;
+}

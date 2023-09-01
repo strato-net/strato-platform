@@ -31,6 +31,7 @@ import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
+import MyAssets from "./components/MyAssets";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -351,6 +352,15 @@ const AuthenticatedRoutes = ({ user, users }) => {
               <EventSerialNumberList user={user} users={users} />
             </EventsProvider>
           </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.MyAssets.url}
+        element={
+          <ProductsProvider>
+            <MyAssets />
+          </ProductsProvider>
         }
       />
       <Route
