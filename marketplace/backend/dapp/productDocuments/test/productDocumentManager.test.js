@@ -27,7 +27,7 @@ describe('ProductDocumentManager', function () {
     let newOptions;
     let adminOrganization;
 
-    const factoryArgs = () => ({ ...(factory.getProductDocumentManagerArgs(util.uid())) });
+    const createArgs = () => ({ ...(factory.createArgs(util.uid())) });
 
     before(async () => {
         assert.isDefined(
@@ -83,7 +83,7 @@ describe('ProductDocumentManager', function () {
 
     it('Create ProductDocument - 201', async () => {
         // Create productDocument via upload
-        const args = factoryArgs(globalAdmin)
+        const args = createArgs(globalAdmin)
         contract = await productDocumentManager.uploadContract(globalAdmin, args, newOptions);
         const [restStatus, address] = contract;
         assert.equal(restStatus, RestStatus.OK, 'should succeed')
