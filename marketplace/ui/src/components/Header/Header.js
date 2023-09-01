@@ -26,8 +26,9 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
 
-const HeaderComponent = ({ isOauth, user, loginUrl }) => {
+const HeaderComponent = ({ user, loginUrl }) => {
   const navigate = useNavigate();
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
