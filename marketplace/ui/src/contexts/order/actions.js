@@ -33,6 +33,28 @@ const actionDescriptors = {
   setMessage: "set_message",
 };
 
+async function sendGridSendEmail(to, subject, htmlContent) {
+  // const BACKEND_URL = `http://localhost/api/v1/order/send-email`; 
+  const BACKEND_URL = `${apiUrl}/order/send-email`; 
+  try {
+    const response = await fetch(BACKEND_URL, {
+      method: HTTP_METHODS.POST,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ to, subject, htmlContent })
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error('Error sending email: ' + text);
+    }
+    console.log('Email sent successfully!');
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
+}
+
 const actions = {
   resetMessage: (dispatch) => {
     dispatch({ type: actionDescriptors.resetMessage });
@@ -366,7 +388,8 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while updating Order");
     }
-  }
+  },
+  sendGridSendEmail,
 };
 
 export { actionDescriptors, actions };

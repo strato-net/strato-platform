@@ -314,40 +314,27 @@ const ConfirmOrder = () => {
 
   const navigate = useNavigate();
 
-  async function sendGridSendEmail(to, subject, htmlContent) {
-    const SENDGRID_API_URL = 'https://api.sendgrid.com/v3/mail/send';
-    const SENDGRID_API_KEY = process.env.REACT_APP_SENDGRID_API_KEY;
-    const emailData = {
-        personalizations: [{
-            to: [{ email: to }],
-            subject: subject
-        }],
-        from: { email: "srinjoy_chakravarty@blockapps.net", name: "Blockapps.net" },
-        content: [{
-            type: 'text/html',
-            value: htmlContent
-        }]
-    };
-    try {
-        const response = await fetch(SENDGRID_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SENDGRID_API_KEY}`
-            },
-            body: JSON.stringify(emailData)
-        });
-        if (!response.ok) {
-            const text = await response.text();
-            throw new Error('Error sending email: ' + text);
-        }
-        console.log('Email sent successfully!');
-    } catch (error) {
-        console.error('Error sending email:', error);
-        throw error;
-    }
-  }
-
+  // async function sendGridSendEmail(to, subject, htmlContent) {
+  //   const BACKEND_URL = 'http://localhost/api/v1/order/send-email'; 
+  //   try {
+  //     const response = await fetch(BACKEND_URL, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       },
+  //       body: JSON.stringify({ to, subject, htmlContent })
+  //     });
+  //     if (!response.ok) {
+  //       const text = await response.text();
+  //       throw new Error('Error sending email: ' + text);
+  //     }
+  //     console.log('Email sent successfully!');
+  //   } catch (error) {
+  //     console.error('Error sending email:', error);
+  //     throw error;
+  //   }
+  // }
+  
   const handleOrderConfirm = async () => {
     let concatenatedOrderString = "";
     for (let i = 0; i < confirmOrderList.length; i++) {
@@ -388,9 +375,8 @@ const ConfirmOrder = () => {
         <p style="font-size: 10px; margin-top: 20px;">This email was sent from a notification only address that cannot accept incoming email. Please do not reply to this message.</p>
       </div>
     `
-
     try {
-      await sendGridSendEmail(user.preferred_username, "New Membership Order", htmlContent);
+      await orderActions.sendGridSendEmail(user.preferred_username, "New Membership Order", htmlContent);
     } catch (error) {
       console.error('Failed to send email:', error);
     }
