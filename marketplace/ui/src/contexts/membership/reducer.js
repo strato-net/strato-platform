@@ -22,6 +22,24 @@ const reducer = (state, action) => {
         isMembershipLoading: false
       };
     
+    case actionDescriptors.fetchPurchasedMemberships:
+      return {
+        ...state,
+        isPurchasedMembershipLoading: true
+      };
+    case actionDescriptors.fetchPurchasedMembershipsSuccessful:
+      return {
+        ...state,
+        purchasedMemberships: action.payload,
+        isPurchasedMembershipLoading: false
+      };
+    case actionDescriptors.fetchPurchasedMembershipsFailed:
+      return {
+        ...state,
+        error: action.error,
+        isPurchasedMembershipLoading: false
+      };
+        
     case actionDescriptors.resetMessage:
       return {
         ...state,

@@ -32,6 +32,9 @@ const actionDescriptors = {
   fetchMembershipFromDetails: "fetch_membership_of_inventory",
   fetchMembershipFromDetailsSuccessful: "fetch_membership_of_inventory_successful",
   fetchMembershipFromDetailsFailed: "fetch_membership_of_inventory_failed",
+  fetchPurchasedMemberships: "fetch_purchased_memberships",
+  fetchPurchasedMembershipsSuccessful: "fetch_purchased_memberships_successful",
+  fetchPurchasedMembershipsFailed: "fetch_purchased_memberships_failed",
 };
 
 const actions = {
@@ -295,6 +298,34 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchMembershipFromDetailsFailed, error: undefined });
+    }
+  },
+  
+  fetchPurchasedMemberships: async (dispatch) => {
+    // const query = queryValue
+    //   ? `&serviceTypeId=${queryValue}`
+    //   : "";
+
+    dispatch({ type: actionDescriptors.fetchPurchasedMemberships });
+
+    try {
+      console.log("im here")
+      const response = await fetch(`${apiUrl}/membership/purchased`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+      console.log("fetchPurchasedMemberships response: ", body.data)
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchPurchasedMembershipsSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchPurchasedMembershipsFailed, error: undefined });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchPurchasedMembershipsFailed, error: undefined });
     }
   },
 };

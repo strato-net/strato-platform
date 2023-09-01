@@ -32,6 +32,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { useLocation } from "react-router-dom";
+import PurchasedList from "./PurchasedList";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -176,12 +177,10 @@ const Membership = ( user ) => {
     {
         key: 'purchase',
         label: 'Purchased',
-        children: 'Content of Tab Pane 1',
     },
     {
         key: 'issued',
         label: 'Issued',
-        children: 'Content of Tab Pane 2',
     }
     ];
 
@@ -290,21 +289,13 @@ const Membership = ( user ) => {
                             <>
                                 {memberships.length !== 0 ? (
                                     (typeDisplay === "purchase") ?
-                                        (<div className="my-4">
-                                            {/* Yo AMoney, you go here 
-                                            {memberships.map((product, index) => {
-                                                return (
-                                                    <MembershipCard
-                                                        user={user}
-                                                        membership={product}
-                                                        categorys={categorys}
-                                                        subCategorys={subCategorys}
-                                                        key={index}
-                                                        debouncedSearchTerm={debouncedSearchTerm}
-                                                    />
-                                                );
-                                            })} */}
-                                        </div>) :
+                                        <PurchasedList 
+                                        user={user}
+                                        categorys={categorys}
+                                        subCategorys={subCategorys}
+                                        debouncedSearchTerm={debouncedSearchTerm}
+                                        /> 
+                                        :
                                         (<div className="my-4">
                                             {memberships.map((product, index) => {
                                                 return (
