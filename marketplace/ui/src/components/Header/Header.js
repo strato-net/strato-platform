@@ -240,29 +240,29 @@ const HeaderComponent = ({ user, loginUrl }) => {
       />
 
       <Space size="large">
-        {!(roleIndex === undefined || roleIndex === 1) && <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
-            {sell}
-            {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
-          </Button>}
-        {!(roleIndex === undefined || roleIndex === 1) &&  <Badge
-            className="cursor-pointer"
-            count={cartList.length}
-            onClick={() => {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_shopping_cart',
-                },
-              });
-              navigate("/checkout");
+        {!(roleIndex === undefined || roleIndex === 1) || <Button style={{ border: "none", marginTop: "20px" }} onClick={() => setOpen(true)}>
+          {sell}
+          {/* <Typography.Text style={{color:"white"}}> Sell</Typography.Text> */}
+        </Button>}
+        {!(roleIndex === undefined || roleIndex === 1) && <Badge
+          className="cursor-pointer"
+          count={cartList.length}
+          onClick={() => {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_shopping_cart',
+              },
+            });
+            navigate("/checkout");
+          }}
+        >
+          <Avatar
+            style={{
+              backgroundColor: "#181EAC",
             }}
-          >
-            <Avatar
-              style={{
-                backgroundColor: "#181EAC",
-              }}
-              icon={<ShoppingCartOutlined />}
-            />
-          </Badge>
+            icon={<ShoppingCartOutlined />}
+          />
+        </Badge>
         }
         {
           roleIndex === undefined || roleIndex === 1
@@ -274,28 +274,28 @@ const HeaderComponent = ({ user, loginUrl }) => {
             </Dropdown>
         }
       </Space>
+
       <Modal
         closeIcon={true}
         title="What kind of asset we are selling ?"
         centered
-        open={open}
+        visible={open}
         onOk={() => setOpen(false)}
         onCancel={() => setOpen(false)}
-        width={'350px'}
-        height={'90%'}
-        footer={false}
+        width={350}
+        footer={null}
       >
         <Row gutter={[16, 16]} style={{ marginTop: "20px" }}>
           {menu.map((item, index) => {
-            const { icon, label, url } = item
-            return <Col className="menu-card" onClick={() => { redirect(url) }}
-              span={6} offset={4}
-              key={index} style={{ display: "flex", padding: "5px" }}>
-              <div style={{ margin: "auto" }}>
-                <div style={{ margin: "auto" }}>{icon}</div>
-                <p style={{ textAlign: "center",marginTop:"2px" }}>{label}</p>
-              </div>
-            </Col>
+            const { icon, label, url } = item;
+            return (
+              <Col span={6} offset={4} key={index} className="menu-card" onClick={() => { redirect(url) }} >
+                <div style={{ margin: "auto", textAlign: "center" }}>
+                  {icon}
+                  <p style={{ marginTop: "2px" }}>{label}</p>
+                </div>
+              </Col>
+            );
           })}
         </Row>
       </Modal>

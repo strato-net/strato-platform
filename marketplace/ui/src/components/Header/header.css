@@ -1,32 +1,35 @@
-.ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected,
-.ant-menu-light
-  .ant-menu-item:hover:not(.ant-menu-item-selected):not(
-    .ant-menu-submenu-selected
-  ) {
+.ant-menu-light.ant-menu-horizontal>.ant-menu-item-selected,
+.ant-menu-light .ant-menu-item:hover:not(.ant-menu-item-selected):not(.ant-menu-submenu-selected) {
   color: white;
   font-weight: bold;
 }
 
-.ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
+.ant-menu-light.ant-menu-horizontal>.ant-menu-item-selected::after {
   border-width: 2px;
   border-bottom-color: white;
 }
 
-.ant-menu-light.ant-menu-horizontal > .ant-menu-item:hover::after {
+.ant-menu-light.ant-menu-horizontal>.ant-menu-item:hover::after {
   border-width: 2px;
   border-bottom-color: white;
 }
 
-.anticon svg{
+.anticon svg {
   display: block;
 }
 
-.menu-card:hover{
+.menu-card {
+  display: flex;
+  padding: 5px;
+}
+
+.menu-card:hover {
   background-color: #E3E4FF;
   border-radius: 12px;
   cursor: pointer;
   /* color: blue; */
 }
-.ant-modal-title{
+
+.ant-modal-title {
   text-align: center;
 }
