@@ -184,5 +184,7 @@ export default {
   contractFilename,
   marshalOut,
   createProductDocument,
+  getProductDocument,
+  getProductDocuments,
   deleteProductDocument,
 };
