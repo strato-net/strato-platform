@@ -13,7 +13,7 @@ contract ProductDocumentManager {
         int _uploadDate,
         uint _delDate
     ) returns (uint256, address) {
-        ProductDocument_1 productDocument = new ProductDocument_1(
+        ProductDocument productDocument = new ProductDocument(
          _productId,
          _fileKey,
          _fileName,
@@ -26,7 +26,7 @@ contract ProductDocumentManager {
     }
 
     function deleteProductDocument(address _productDocumentAddress) returns (uint256, string) {
-        ProductDocument_1 productDocument = ProductDocument_1(_productDocumentAddress);
+        ProductDocument productDocument = ProductDocument(_productDocumentAddress);
         return productDocument.deleteProductDocument();
     }
 

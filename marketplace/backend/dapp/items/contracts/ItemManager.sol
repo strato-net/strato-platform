@@ -165,7 +165,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         //     return (RestStatus.BAD_REQUEST,address(0),address(0));
         // }
         // get Dapp contract from dapp chain
-        Dapp_0_2 dapp = Dapp_0_2(address(_dappAddress));
+        Dapp_0_3 dapp = Dapp_0_3(address(_dappAddress));
         ProductManager productManager = dapp.productManager();
 
         (address productId, address inventoryId) = getProductAndInventory(
