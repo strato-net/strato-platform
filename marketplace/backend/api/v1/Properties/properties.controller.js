@@ -75,8 +75,8 @@ class PropertiesController {
       await geocodeAddress(`${body.streetNumber} ${body.streetName}, ${body.postalCity} ${body.stateOrProvince} ${body.postalcode}`)
         .then(coordinates => {
           if (coordinates) {
-            propertyArgs.longitude = coordinates[0]
-            propertyArgs.latitude = coordinates[1]
+            propertyArgs.longitude = JSON.stringify(coordinates[0])
+            propertyArgs.latitude = JSON.stringify(coordinates[1])
           } else {
             rest.response.status400('Geocoding failed for the provided address.');
           }
