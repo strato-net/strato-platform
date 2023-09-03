@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 // import dayjs from 'dayjs';
 
 
-const contractName = 'EventType_10';
+const contractName = 'EventType';
 const contractFilename = `${util.cwd}/dapp/eventType/contracts/EventType.sol`;
 
 /** 

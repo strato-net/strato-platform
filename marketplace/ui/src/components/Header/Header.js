@@ -63,10 +63,10 @@ const HeaderComponent = ({ user, loginUrl }) => {
   ];
 
   const menu = [
-    { name: "arts", icon: arts, label: "Arts", url: "" },
+    { name: "arts", icon: arts, label: "Arts", url: "/category/Art" },
     { name: "property", icon: property, label: "Property", url: "/properties" },
-    { name: "carbon", icon: carbon, label: "Carbon", url: "" },
-    { name: "loyalty", icon: loyalty, label: "Loyalty", url: "" }
+    { name: "carbon", icon: carbon, label: "Carbon", url: "/category/Carbon" },
+    { name: "loyalty", icon: loyalty, label: "Loyalty", url: "category/Real Estate" }
   ]
 
   const navUrls = [
@@ -152,9 +152,9 @@ const HeaderComponent = ({ user, loginUrl }) => {
     else setRoleIndex(1)
   }, [user])
 
-  const redirect = () => {
+  const redirect = (url) => {
     setOpen(false)
-    navigate("/properties")
+    navigate(url)
   }
 
   const isLogin = () => {

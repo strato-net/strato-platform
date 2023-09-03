@@ -25,6 +25,7 @@ import {
   usePropertiesState,
 } from "../../../contexts/propertyContext";
 import TalkToSalesModal from "./TalkToSalesModal";
+import TagManager from "react-gtm-module";
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
@@ -82,7 +83,6 @@ function PropertyDetails() {
       });
     }
   };
-
   const defaultProps = {
     center: {
       lat: 10.99835602,
@@ -91,14 +91,14 @@ function PropertyDetails() {
     zoom: 11
   };
 
-  const images = [
-    "https://images.pexels.com/photos/186077/pexels-photo-186077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    "https://images.pexels.com/photos/1732414/pexels-photo-1732414.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    "https://images.pexels.com/photos/3935328/pexels-photo-3935328.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    "https://images.pexels.com/photos/8894808/pexels-photo-8894808.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    "https://images.pexels.com/photos/13008560/pexels-photo-13008560.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
-  ]
+  // const images = [
+  //   "https://images.pexels.com/photos/186077/pexels-photo-186077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+  //   "https://images.pexels.com/photos/1732414/pexels-photo-1732414.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+  //   "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+  //   "https://images.pexels.com/photos/3935328/pexels-photo-3935328.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+  //   "https://images.pexels.com/photos/8894808/pexels-photo-8894808.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+  //   "https://images.pexels.com/photos/13008560/pexels-photo-13008560.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
+  // ]
 
   const {
     reviews,
@@ -117,6 +117,7 @@ function PropertyDetails() {
     bathroomsTotalInteger,
     standardStatus,
     numberOfUnitsTotal,
+    images
   } = propertyDetails || {};
 
   const getSelectedCategories = () => {
@@ -215,6 +216,11 @@ function PropertyDetails() {
               type="primary"
               onClick={() => {
                 toggleCreateModal(true);
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: "PROPERTIES_EDIT_PROPERTY_CLICK",
+                  },
+                });
               }}
               style={{ marginLeft: "5px" }}
             >
@@ -227,6 +233,7 @@ function PropertyDetails() {
     )
   }
 
+  console.log(propertyDetails)
   return (
     <>
       {contextHolder}
@@ -337,6 +344,11 @@ function PropertyDetails() {
                   style={{ marginLeft: "50px", marginTop: "30px" }}
                   onClick={() => {
                     setTalkToSalesModal(!isTalkToSalesModalOpen);
+                    TagManager.dataLayer({
+                      dataLayer: {
+                        event: "PROPERTIES_SUBMIT_INQUIRY_TO_SALES",
+                      },
+                    });
                   }}
                 >
                   Talk to Sales

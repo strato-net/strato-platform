@@ -4,23 +4,21 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Event';
-const contractFilename = `${util.cwd}/dapp/items/contracts/Event.sol`;
-
+const contractName = 'ProductDocument';
+const contractFilename = `${util.cwd}/dapp/productDocuments/contracts/ProductDocument.sol`;
 /** 
- * Upload a new Event 
+ * Upload a new productDocument 
  * @param user User token (typically an admin)
- * @param _constructorArgs Arguments of Event's constructor
+ * @param _constructorArgs Arguments of productDocument's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
  * @returns Contract object
  * */
 async function uploadContract(user, _constructorArgs, options) {
-    const constructorArgs = marshalIn(_constructorArgs);
 
     const contractArgs = {
         name: contractName,
         source: await importer.combine(contractFilename),
-        args: util.usc(constructorArgs),
+        args: util.usc(_constructorArgs),
     };
 
     let error = [];
@@ -44,7 +42,7 @@ async function uploadContract(user, _constructorArgs, options) {
  * Augment contract arguments before they are used to post a contract.
  * Its counterpart is {@link marshalOut `marshalOut`}.
  * 
- * As our arguments come into the event contract they first pass through `marshalIn` and 
+ * As our arguments come into the productDocument contract they first pass through `marshalIn` and 
  * when we retrieve contract state they pass through {@link marshalOut `marshalOut`}.
  * 
  * (A mathematical analogy: `marshalIn` and {@link marshalOut `marshalOut`} form something like a 
@@ -53,16 +51,12 @@ async function uploadContract(user, _constructorArgs, options) {
  */
 function marshalIn(_args) {
     const defaultArgs = {
-        eventTypeId: '',
-        eventBatchId: '',
-        itemSerialNumber: '',
-        itemAddress: '',
-        date: 0,
-        summary: '',
-        certifier: '',
-        certifierComment: '',
-        certifiedDate: 0,
-        createdDate: 0
+        productId: '',
+        fileKey: '',
+        fileName: '',
+        documentType: '',
+        uploadDate: 0,
+        delDate: 0,
     };
 
     const args = {
@@ -76,7 +70,7 @@ async function getHistory(user, chainId, address, options) {
     const contractArgs = {
         name: `history@${contractName}`,
     }
-        ;
+
     const copyOfOptions = {
         ...options,
         query: {
@@ -93,7 +87,7 @@ async function getHistory(user, chainId, address, options) {
  * Augment returned contract state before it is returned.
  * Its counterpart is {@link marshalIn `marshalIn`}.
  * 
- * As our arguments come into the event contract they first pass through {@link marshalIn `marshalIn`} 
+ * As our arguments come into the productDocument contract they first pass through {@link marshalIn `marshalIn`} 
  * and when we retrieve contract state they pass through `marshalOut`.
  * 
  * (A mathematical analogy: {@link marshalIn `marshalIn`} and `marshalOut` form something like a 
@@ -108,17 +102,17 @@ function marshalOut(_args) {
 }
 
 /**
- * Bind functions relevant for event to the _contract object. 
+ * Bind functions relevant for productDocument to the _contract object. 
  * @param user User token
  * @param _contract Contract object from `rest.createContract()` etc.
- * @param options Event deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
+ * @param options productDocument deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 
 
 function bind(user, _contract, options) {
     const contract = { ..._contract };
 
-    contract.get = async (args = { address: contract.address, }) => get(user, args, options);
+    contract.get = async (args = { address: contract.address }) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
@@ -127,14 +121,14 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing Event contract to a new user token. Useful for having multiple users test
+ * Bind an existing productDocument contract to a new user token. Useful for having multiple users test
  * the same contract.
- * @example <caption>Create an admin and user bound to the same new event contract.</caption>
+ * @example <caption>Create an admin and user bound to the same new productDocument contract.</caption>
  * const adminBoundContract = uploadContract(adminToken, args, options);
  * const userBoundContract = bindAddress(userToken, adminBoundContract.address, options);
  * @param user User token
- * @param address Address of the Event contract
- * @param options Event deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
+ * @param address Address of the productDocument contract
+ * @param options productDocument deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 function bindAddress(user, address, options) {
     const contract = {
@@ -146,34 +140,36 @@ function bindAddress(user, address, options) {
 
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
- * @param args Lookup with an address or uniqueEventID.
+ * @param args Lookup with an address or uniqueProductID.
  * @returns Contract state in cirrus
  */
 
 
+
 async function get(user, args, options) {
-    const { uniqueEventID, address, ...restArgs } = args;
-    let event;
+    const { uniqueProductID, address, ...restArgs } = args;
+    let product;
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        event = await searchOne(contractName, searchArgs, options, user);
+        product = await searchOne(contractName, searchArgs, options, user);
     } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueEventID', value: uniqueEventID });
-        event = await searchOne(contractName, searchArgs, options, user);
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueProductID', value: uniqueProductID });
+        product = await searchOne(contractName, searchArgs, options, user);
     }
-    if (!event) {
+    if (!product) {
         return undefined;
     }
 
+
     return marshalOut({
-        ...event,
+        ...product,
     });
 }
 
 async function getAll(admin, args = {}, options) {
-    const events = await searchAllWithQueryArgs(contractName, args, options, admin)
-    return events.map((event) => marshalOut(event))
+    const documents = await searchAllWithQueryArgs(contractName, args, options, admin)
+    return documents.map((document) => marshalOut(document))
 }
 
 /**

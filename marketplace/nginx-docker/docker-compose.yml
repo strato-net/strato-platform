@@ -7,7 +7,7 @@ services:
       - SSL=${SSL:-false}
       - SSL_CERT_TYPE=${SSL_CERT_TYPE:-crt}
     build: .
-    image: marketplace-dev-nginx
+    image: marketplace-dev-nginx:2.0
     ports:
       - 80:80
       - 443:443
