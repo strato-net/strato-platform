@@ -19,7 +19,7 @@ import "/dapp/reviews/contracts/ReviewManager.sol";
  *
  */
 
-contract Dapp_0_2 {
+contract Dapp_0_3 {
     event OrgAdded(string orgName);
     event OrgUnitAdded(string orgName, string orgUnit);
     event CommonNameAdded(string orgName, string orgUnit, string commonName);
