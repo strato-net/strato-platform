@@ -13,7 +13,7 @@ function useQuery() {
 }
 
 const EventDetails = ({ user, users }) => {
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
   const [chainId, setChainId] = useState(undefined);
 
   const dispatch = useEventDispatch();
@@ -38,11 +38,11 @@ const EventDetails = ({ user, users }) => {
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined && chainId !== undefined) {
-      actions.fetchEventDetails(dispatch, Id, chainId);
-      actions.fetchEventAudit(dispatch, Id, chainId);
+    if (id !== undefined && chainId !== undefined) {
+      actions.fetchEventDetails(dispatch, id, chainId);
+      actions.fetchEventAudit(dispatch, id, chainId);
     }
-  }, [Id, dispatch]);
+  }, [id, dispatch]);
 
   const details = eventDetails;
   const audits = eventsAudit;
@@ -118,7 +118,7 @@ const EventDetails = ({ user, users }) => {
   //     dataIndex: "ownerCommonName",
   //   },
   // ];
-  if (Id !== undefined && !iseventDetailsLoading && details !== null) {
+  if (id !== undefined && !iseventDetailsLoading && details !== null) {
     if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";
     }

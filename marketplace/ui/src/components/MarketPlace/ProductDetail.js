@@ -64,7 +64,7 @@ const ProductDetails = ({ user, users }) => {
 
   const [eventList, setEventList] = useState([])
   const [eventDetailList, setEventDetailList] = useState([])
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
   const [isEventSelected, setIsEventSelected] = useState(false);
   const [isSerialNumberSelected, setIsSerialNumberSelected] = useState(false);
   const [serialNumber, setSerialNumber] = useState(false);
@@ -78,11 +78,11 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (user) {
-      if (Id !== undefined) {
-        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+      if (id !== undefined) {
+        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, id);
       }
     }
-  }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
+  }, [limit, offset, debouncedSearchTerm, eventDispatch, id, user])
 
 
   useEffect(() => {
@@ -135,13 +135,13 @@ const ProductDetails = ({ user, users }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    if (Id !== undefined) {
-      actions.fetchInventoryDetail(dispatch, Id);
+    if (id !== undefined) {
+      actions.fetchInventoryDetail(dispatch, id);
       if (user) {
-        itemsActions.fetchSerialNumbers(itemDispatch, Id);
+        itemsActions.fetchSerialNumbers(itemDispatch, id);
       }
     }
-  }, [Id, dispatch, itemDispatch, user]);
+  }, [id, dispatch, itemDispatch, user]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -270,7 +270,7 @@ const ProductDetails = ({ user, users }) => {
               }
             }
             setIsEventSelected(true);
-            eventActions.fetchEventDetails(eventDispatch, Id, text.eventTypeId)
+            eventActions.fetchEventDetails(eventDispatch, id, text.eventTypeId)
           }}
         >
           {decodeURIComponent(text.eventTypeName)}

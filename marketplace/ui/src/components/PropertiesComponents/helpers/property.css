@@ -1,0 +1,8 @@
+.tab-card {
+  display: flex;
+  z-index: 1;
+  background: white;
+  justify-content: space-between;
+  position: sticky;
+  top: 0px;
+}

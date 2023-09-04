@@ -9,7 +9,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -18,12 +18,12 @@ describe("Renders Orders Page", () => {
 
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#orders").should("not.exist");
+    cy.get("#login").click();
     cy.loginAsSeller();
 
-    cy.get("#Marketplace").should("exist");
-    cy.get("#Marketplace").click();
+    cy.get("#marketplace").should("exist");
+    cy.get("#marketplace").click();
     cy.url().should("include", "/marketplace");
 
     cy.get("#Art").should("exist");
@@ -73,7 +73,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -82,12 +82,12 @@ describe("Renders Orders Page", () => {
 
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#orders").should("not.exist");
+    cy.get("#login").click();
     cy.loginAsSeller();
 
-    cy.get("#Marketplace").should("exist");
-    cy.get("#Marketplace").click();
+    cy.get("#marketplace").should("exist");
+    cy.get("#marketplace").click();
     cy.url().should("include", "/marketplace");
 
     cy.get("#Art").should("exist");
@@ -132,7 +132,7 @@ describe("Renders Orders Page", () => {
             orderAddress = body.data[0][1]
             if (orderAddress) {
               cy.contains("Order created successfully").should("be.visible");
-              cy.get("#Orders").click();
+              cy.get("#orders").click();
               cy.url().should("include", "/orders");
               cy.get("#bought-tab").should("exist");
               cy.get("#bought-tab").click();
@@ -162,7 +162,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -171,13 +171,13 @@ describe("Renders Orders Page", () => {
 
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#orders").should("not.exist");
+    cy.get("#login").click();
     cy.loginAsSeller();
 
     cy.get("#Art").click();
-    cy.get("#Marketplace").should("exist");
-    cy.get("#Marketplace").click();
+    cy.get("#marketplace").should("exist");
+    cy.get("#marketplace").click();
     cy.url().should("include", "/marketplace");
 
     cy.get("#Art").should("exist");
@@ -225,13 +225,13 @@ describe("Renders Orders Page", () => {
               cy.contains("Order created successfully").should("be.visible");
               cy.get("#user-dropdown").click();
               cy.get("#logout").click();
-              cy.get("#Orders").should("not.exist");
+              cy.get("#orders").should("not.exist");
 
               cy.visit('/')
-              cy.get("#Login").click();
+              cy.get("#login").click();
               cy.login()
 
-              cy.get("#Orders").should("exist");
+              cy.get("#orders").should("exist");
               cy.visit(`/marketplace/sold-orders/${orderAddress}`)
 
               cy.get('textarea[placeholder="Enter Comments"]').type("I want to close this order");
@@ -259,7 +259,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -268,12 +268,12 @@ describe("Renders Orders Page", () => {
 
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
-    cy.get("#Login").click();
+    cy.get("#orders").should("not.exist");
+    cy.get("#login").click();
     cy.login();
 
-    cy.get("#Marketplace").should("exist");
-    cy.get("#Marketplace").click();
+    cy.get("#marketplace").should("exist");
+    cy.get("#marketplace").click();
     cy.url().should("include", "/marketplace");
 
     cy.get("#Art").should("exist");
@@ -318,13 +318,13 @@ describe("Renders Orders Page", () => {
               cy.contains("Order created successfully").should("be.visible");
               cy.get("#user-dropdown").click();
               cy.get("#logout").click();
-              cy.get("#Orders").should("not.exist");
+              cy.get("#orders").should("not.exist");
 
               cy.visit('/')
-              cy.get("#Login").click();
+              cy.get("#login").click();
               cy.loginAsSeller()
 
-              cy.get("#Orders").should("exist");
+              cy.get("#orders").should("exist");
               cy.visit(`/marketplace/sold-orders/${orderAddress}`)
               cy.url().should(`include`, `/marketplace/sold-orders/${orderAddress}`);
 
@@ -360,7 +360,7 @@ describe("Renders Orders Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
@@ -369,10 +369,10 @@ describe("Renders Orders Page", () => {
 
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
+    cy.get("#orders").should("not.exist");
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("include", "/marketplace");
@@ -420,13 +420,13 @@ describe("Renders Orders Page", () => {
               cy.contains("Order created successfully").should("be.visible");
               cy.get("#user-dropdown").click();
               cy.get("#logout").click();
-              cy.get("#Orders").should("not.exist");
+              cy.get("#orders").should("not.exist");
 
               cy.visit('/')
-              cy.get("#Login").click();
+              cy.get("#login").click();
               cy.loginAsSeller()
 
-              cy.get("#Orders").should("exist");
+              cy.get("#orders").should("exist");
               cy.visit(`/marketplace/sold-orders/${orderAddress}`)
               
               cy.get("#upload-button").should("exist");

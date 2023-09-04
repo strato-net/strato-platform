@@ -18,7 +18,7 @@ import ClickableCell from "../ClickableCell";
 
 
 const BoughtOrderItemDetail = ({ user, users }) => {
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
  
   const [data, setdata] = useState([]);
   const { state } = useLocation();
@@ -64,10 +64,10 @@ const BoughtOrderItemDetail = ({ user, users }) => {
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined) {
-      actions.fetchOrderLineItemDetails(dispatch, Id);    
+    if (id !== undefined) {
+      actions.fetchOrderLineItemDetails(dispatch, id);    
     }
-  }, [Id, dispatch]);
+  }, [id, dispatch]);
 
 
   const navigate = useNavigate();
@@ -85,7 +85,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
     });
   }
 
-  if (Id !== undefined && !isorderDetailsLoading && details !== null) {
+  if (id !== undefined && !isorderDetailsLoading && details !== null) {
     if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";
     }

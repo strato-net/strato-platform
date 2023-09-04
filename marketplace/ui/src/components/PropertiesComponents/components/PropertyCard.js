@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Carousel } from "antd";
+import { Card, Carousel, Image } from "antd";
 
 const images = [
   "https://images.pexels.com/photos/186077/pexels-photo-186077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
@@ -27,13 +27,13 @@ function PropertyCard(props) {
   return (
     <Card
       hoverable
-      style={{ width: 300, margin: 10 }}
+      className="m-2.5 w-80"
       cover={
         <Carousel>
           {images?.map((img, key) => (
             <div key={key}>
-              <img
-                style={{ width: "100%", height: 200 }}
+              <Image
+                className="w-full h-52"
                 alt={img.url}
                 src={img}
               />

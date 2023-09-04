@@ -23,7 +23,6 @@ const ReviewTab = (props) => {
 
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const { message, success, isReviewAdding } = usePropertiesState();
-
   useEffect(() => {
     const listOfReviews = []
     reviews?.forEach((review) => {
@@ -104,7 +103,7 @@ const ReviewTab = (props) => {
           handleCancel={handleCancel}
           handleSubmit={handleSubmit}
         />
-        <div style={{ margin: "10px" }}>
+        <Col className="mt-2.5">
           {reviewsList?.map((review, index) => {
             return <ReviewCard
               review={review}
@@ -115,7 +114,7 @@ const ReviewTab = (props) => {
               userAddress={user.userAddress}
               id={props.propertyId} />
           })}
-        </div>
+        </Col>
       </Col>
     </>
   );

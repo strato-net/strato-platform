@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 describe("Renders Marketplace Page", () => {
   it("it should render marketplace dashboard", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("include", "/marketplace");
@@ -38,7 +38,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render product list page", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("contain", "marketplace");
@@ -66,7 +66,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render sub-categories, products, brands and inventories on selecting categories", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("contain", "marketplace");
@@ -135,7 +135,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render inventories based on filter selection", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.url().should("contain", "marketplace");
@@ -200,7 +200,7 @@ describe("Renders Marketplace Page", () => {
 
   it("it should render product detail page", () => {
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     cy.request({
@@ -304,13 +304,13 @@ describe("Renders Marketplace Page", () => {
     }).as('productNameCall');
 
     cy.visit('/')
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.login()
 
     const productName = `Corn-Seeds-${dayjs().unix()}`;
 
-    cy.get("#Products").should("exist");
-    cy.get("#Products").click();
+    cy.get("#products").should("exist");
+    cy.get("#products").click();
     cy.url().should("include", "/products");
     cy.get("#add-product-button").should("exist");
     cy.get("#add-product-button").click();
@@ -330,11 +330,11 @@ describe("Renders Marketplace Page", () => {
     cy.get("#create-product-button").click();
     cy.contains("Product created successfully").should("be.visible");
 
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
-    cy.get("#Inventory").should("exist");
-    cy.get("#Inventory").click();
+    cy.get("#inventory").should("exist");
+    cy.get("#inventory").click();
     cy.url().should("include", "/inventories");
     cy.get("button").contains("Add Inventory").should("exist");
     cy.get("button").contains("Add Inventory").click();
@@ -373,11 +373,11 @@ describe("Renders Marketplace Page", () => {
     cy.get("#inventory-list").children().first().contains("Unpublished").should("be.visible");
     cy.get("#user-dropdown").click();
     cy.get("#logout").click();
-    cy.get("#Orders").should("not.exist");
+    cy.get("#orders").should("not.exist");
 
-    cy.get("#Login").click();
+    cy.get("#login").click();
     cy.loginAsSeller();
-    cy.get("#Marketplace").should("exist");
+    cy.get("#marketplace").should("exist");
     cy.url().should("contain", "marketplace");
     cy.get("#viewMore").should("be.enabled").click();
     cy.url().should("contain", "/marketplace/category");
