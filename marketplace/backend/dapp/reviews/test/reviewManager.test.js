@@ -29,8 +29,9 @@ describe('ReviewManager', function () {
   let args;
 
   const factoryArgs = () => ({ ...(factory.getReviewArgs(util.uid())) });
-  const updateReviewArg = () => ({ ...(factory.updateReviewArgs(util.uid())) }); 
-  const deleteReviewArg = () => ({ ...(factory.deleteReviewArgs(util.uid())) }); 
+  const updateReviewArg = () => ({ ...(factory.updateReviewArgs(util.uid())) });
+  const deleteReviewArg = () => ({ ...(factory.deleteReviewArgs(util.uid())) });
+  const getAllReviewsArgs = () => ({ ...(factory.getAllReviewArgs(util.uid())) });
 
   before(async () => {
     assert.isDefined(
@@ -88,33 +89,29 @@ describe('ReviewManager', function () {
   });
 
   it('Add Review - 201', async () => {
-   let [restStatus, reviewAddress] = await reviewManager.createReview(globalAdmin,contract, args, newOptions);
+    let [restStatus, reviewAddress] = await reviewManager.createReview(globalAdmin, contract, args, newOptions);
     assert.equal(restStatus, RestStatus.OK, 'should succeed')
   });
 
-
-  // it('Update Review - 201', async () => {
-  //   args = updateReviewArg()
-  //   let update = await reviewManager.updateReview(globalAdmin, contract, args, newOptions);
-  //   console.log("update--------------->>>>>>>>>>", update);
-  //   //  assert.hasAnyKeys(contract, ["address"], "update Review contract has address")
-  //   //  assert.equal(restStatus, RestStatus.OK, 'should succeed')
-  //  });
-
   it('Get All Reviews - 201', async () => {
-    const reviews = await reviewManager.getReviews(globalAdmin,{}, newOptions);
+    // args = getAllReviewsArgs();
+    const reviews = await reviewManager.getReviews(globalAdmin, args = {}, newOptions);
     assert(Array.isArray(reviews), 'should be array');
-    assert.isAtLeast(reviews.length, 1, 'reviews has length of 1');
+    assert(reviews.length.isAtLeast(1, 'reviews has length of 1'));
   });
 
-  // testing......... 
-  // it('Delete Review - 201', async () => {
-  //   args = deleteReviewArg(globalAdmin)
-  //   const reviews = await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
-  //   console.log("delete----reviews-------------------------------------------------------------------", reviews);
-  //   // assert(Array.isArray(reviews), 'should be array');
-  //   // assert.isAtLeast(reviews.length, 1, 'reviews has length of 1');
-  // });
+  it('Update Review - 201', async () => {
+    args = updateReviewArg()
+    let update = await reviewManager.updateReview(globalAdmin, contract, args, newOptions);
+    assert.hasAnyKeys(contract, ["address"], "update Review contract has address")
+    assert.equal(restStatus, RestStatus.OK, 'should succeed')
+  });
+
+  it('Delete Review - 201', async () => {
+    args = deleteReviewArg()
+    const reviews = await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
+  });
+
 
 
 });

@@ -26,7 +26,14 @@ const factory = {
   },
   deleteReviewArgs(uid) {
     const args = {
-      address: `${uid + 2}`.padStart(40, '0'),
+      reviewAddress: `${uid + 2}`.padStart(40, '0'),
+    }
+    return args;
+  },
+  getAllReviewArgs(uid) {
+    const args = {
+      productId: `${uid + 2}`.padStart(40, '0'),
+      propertyId: `${uid + 2}`.padStart(40, '0'),
     }
     return args;
   }
