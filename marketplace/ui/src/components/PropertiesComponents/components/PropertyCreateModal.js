@@ -13,10 +13,12 @@ import {
   Row,
   Button,
   Typography,
+  Upload,
 } from "antd";
 
 import {
   ArrowLeftOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -38,13 +40,13 @@ const { Panel } = Collapse;
 const { Option } = Select;
 const { Text } = Typography;
 
-// const getBase64 = (file) =>
-//   new Promise((resolve, reject) => {
-//     const reader = new FileReader();
-//     reader.readAsDataURL(file);
-//     reader.onload = () => resolve(reader.result);
-//     reader.onerror = (error) => reject(error);
-//   });
+const getBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
 
 function PropertyCreateModal({
   isCreateModalOpen,
@@ -57,17 +59,19 @@ function PropertyCreateModal({
   const [modalView, setModalView] = useState(true);
   const [isCreateConfirmModalOpen, toggleCreateConfirmModal] = useState(false);
 
+  const [disableLotSize, setDisableLotSize] = useState(false);
+
   const [api, contextHolder] = notification.useNotification();
   const dispatch = usePropertiesDispatch();
 
   const { message, success, isCreatePropertySubmitting, isUpdatePropertySubmitting } = usePropertiesState();
   const [propertyData, setPropertyData] = useState(formData);
   //TODO:- Can uncomment when use image upload ***
-  // const [selectedImage, setSelectedImage] = useState(null);
-  // const [previewOpen, setPreviewOpen] = useState(false);
-  // const [previewImage, setPreviewImage] = useState("");
-  // const [previewTitle, setPreviewTitle] = useState("");
-  // const [fileList, setFileList] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [fileList, setFileList] = useState([]);
 
   const {
     title,
@@ -152,7 +156,6 @@ function PropertyCreateModal({
 
     const body = propertyData
 
-    // let [productContractRest, productContractAddress, propertyContractRest, propertyContractAddress] = await actions.createProperty(dispatch, body);
     if (id) {
       let {
         chainId,
@@ -182,44 +185,42 @@ function PropertyCreateModal({
 
       }
     } else {
-      let response = await actions.createProperty(dispatch, body);
-      if (response) {
-        toggleCreateModal(false)
-        toggleCreateConfirmModal(false)
-        setModalView(true);
-        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
-        setPropertyData(createPropertyFormInitialData)
-      }
-    }
 
-    //TODO:- Can uncomment when use image upload ***
-    //   if (projectImages) {
-    //     const formData = new FormData()
-    //     formData.append('projectAddress', projectAddress)
-    //     formData.append('section', uploadSections.IMAGES)
-    //     projectImages.forEach((file) => {
-    //       formData.append('projectImageFiles', file.originFileObj);
-    //     });
-    //     await ProjectDocumentActions.uploadProjectDocument(projectDocumentDispatch, formData);
-    //   }
-    //   Modal.destroyAll();
+      console.log(body)
+      // const formData = new FormData()
+      //   for (const key in body) {
+      //     formData.append(key, body[key])
+      //   }
+      //   fileList.forEach((file) => {
+      //     formData.append('images', file.originFileObj);
+      //   }); 
+
+      // let response = await actions.createProperty(dispatch, formData);
+      // if (response) {
+      //   toggleCreateModal(false)
+      //   toggleCreateConfirmModal(false)
+      //   setModalView(true);
+      //   actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+      //   setPropertyData(createPropertyFormInitialData)
+      //       Modal.destroyAll();
+      // }
+    }
   };
 
-  //TODO:- Can uncomment when use image upload ***
-  // const handleCancel = () => setPreviewOpen(false);
-  // const handlePreview = async (file) => {
-  //   if (!file.url && !file.preview) {
-  //     file.preview = await getBase64(file.originFileObj);
-  //   }
-  //   setPreviewImage(file.url || file.preview);
-  //   setPreviewOpen(true);
-  //   setPreviewTitle(
-  //     file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
-  //   );
-  // };
-  // const handleFileChange = ({ fileList: newFileList }) => {
-  //   setFileList(newFileList);
-  // }
+  const handleCancel = () => setPreviewOpen(false);
+  const handlePreview = async (file) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj);
+    }
+    setPreviewImage(file.url || file.preview);
+    setPreviewOpen(true);
+    setPreviewTitle(
+      file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
+    );
+  };
+  const handleFileChange = ({ fileList: newFileList }) => {
+    setFileList(newFileList);
+  }
 
   const primaryAction = {
     content: modalView ? (
@@ -232,7 +233,7 @@ function PropertyCreateModal({
         <Text>Property Listing - House Facts</Text>
       </>
     ),
-    disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
+    // disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
     onConfirm: showConfirmationModal
   };
@@ -516,44 +517,36 @@ function PropertyCreateModal({
           </Col>
         </Row>
 
-        {/* <Form.Item label="Upload Image" name="image">
-              <div className="w-48 h-36 p-4 border-secondryD border rounded flex flex-col justify-around">
-                {selectedImage ? (
-                  <div className="h-20">
-                    <img
-                      alt="Product"
-                      src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
-                    />
-                    <br />
-                  </div>
-                ) : (
-                  <PictureOutlined className="text-7xl text-primary opacity-10" />
-                )}
-                <Upload
-                  onChange={(e) => {
-                    setSelectedImage(URL.createObjectURL(e.file.originFileObj));
-                  }}
-                  customRequest={() => { }}
-                  style={{ display: "none" }}
-                  accept="image/png, image/jpeg"
-                  maxCount={1}
-                  showUploadList={false}
-                  beforeUpload={beforeUpload}
-                >
-                  <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                    Browse
-                  </div>
-                </Upload>
-              </div>
-
-              <div className="flex items-start">
-                <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                <p className="mt-1 text-xs italic ml-1 mr-4">
-                  use jpg, png format of size less than 1mb
-                </p>
-              </div>
-            </Form.Item> */}
+        <Form.Item>
+        <Upload
+        listType="picture-card"
+        fileList={fileList}
+        onPreview={handlePreview}
+        onChange={handleFileChange}
+        accept="image/*"
+      >
+        {fileList.length >= 8 ? null : 
+            <div>
+            <PlusOutlined />
+            <div
+              style={{
+                marginTop: 8,
+              }}
+            >
+              Upload
+            </div>
+          </div>}
+      </Upload>
+      <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancel}>
+        <img
+          alt="example"
+          style={{
+            width: '100%',
+          }}
+          src={previewImage}
+        />
+      </Modal>
+        </Form.Item>
       </Form>
     )
   }
@@ -576,8 +569,11 @@ function PropertyCreateModal({
             disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
-              if(value === "apartment" || value === "condo"){
+              if((value === "apartment" || value === "condo")) {
+                setDisableLotSize(true)
                 handleChange("lotSizeArea", 0);
+              } else {
+                setDisableLotSize(false)
               }
             }}
             options={homeTypeData}
@@ -702,7 +698,7 @@ function PropertyCreateModal({
                 onWheel={(e) => {
                   e.target.blur();
                 }}
-                disabled={propertyData.propertyType === "apartment" || propertyData.propertyType === "condo"  ? true : false}
+                disabled={disableLotSize}
               />
             </Form.Item>
           </Col>

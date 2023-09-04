@@ -1,7 +1,7 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
 /// @title A representation of Property assets
-contract Property_0_5 {
+contract Property {
     address public productId;
     int public listPrice;
     int public streetNumber;

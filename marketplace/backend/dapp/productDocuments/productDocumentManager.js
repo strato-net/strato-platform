@@ -9,15 +9,15 @@ import {
 } from "/helpers/utils";
 import dayjs from "dayjs";
 
-import reviewJs from "./review";
+import productDocumentJs from "./productDocument";
 
-const contractName = "ReviewManager";
-const contractFilename = `${util.cwd}/dapp/reviews/contracts/ReviewManager.sol`;
+const contractName = "ProductDocumentManager";
+const contractFilename = `${util.cwd}/dapp/productDocuments/contracts/ProductDocumentManager.sol`;
 
 /**
- * Upload a new review manager
+ * Upload a new productDocument manager
  * @param user User token (typically an admin)
- * @param _constructorArgs Arguments of review's constructor
+ * @param _constructorArgs Arguments of productDocument's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  * @returns Contract object
  * */
@@ -49,7 +49,7 @@ async function uploadContract(user, _constructorArgs, options) {
  * Augment returned contract state before it is returned.
  * Its counterpart is {@link marshalIn `marshalIn`}.
  *
- * As our arguments come into the reviewManager contract they first pass through {@link marshalIn `marshalIn`}
+ * As our arguments come into the productManager contract they first pass through {@link marshalIn `marshalIn`}
  * and when we retrieve contract state they pass through `marshalOut`.
  *
  * (A mathematical analogy: {@link marshalIn `marshalIn`} and `marshalOut` form something like a
@@ -77,7 +77,7 @@ function marshalOut(_args) {
  * const adminBoundContract = uploadContract(adminToken, args, options);
  * const userBoundContract = bindAddress(userToken, adminBoundContract.address, options);
  * @param user User token
- * @param address Address of the Review contract
+ * @param address Address of the Product contract
  * @param options Product deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 function bindAddress(user, address, options) {
@@ -94,36 +94,34 @@ function bind(user, _contract, options) {
     ...options,
   };
   contract.getState = async () => getState(user, contract, options);
-  contract.getReview = async (args, _options = defaultOptions) =>
-    getReview(user, args, _options);
-  contract.getReviews = async (args, _options = defaultOptions) =>
-    getReviews(user, args, _options);
-  contract.createReview = async (args) =>
-    createReview(user, contract, args, options);
-  contract.updateReview = async (args) =>
-    updateReview(user, contract, args, options);
-  contract.deleteReview = async (args) =>
-    deleteReview(user, contract, args, options);
+  contract.getProductDocument = async (args, _options = defaultOptions) =>
+    getProductDocument(user, args, _options);
+  contract.getProductDocuments = async (args, _options = defaultOptions) =>
+    getProductDocuments(user, args, _options);
+  contract.createProductDocument = async (args) =>
+    createProductDocument(user, contract, args, options);
+  contract.deleteProductDocument = async (args) =>
+    deleteProductDocument(user, contract, args, options);
   return contract;
 }
 
 /**
- * get the reviews
+ * get the productDocuments
  */
-async function getReview(user, args, options) {
-  console.log('review-manager getReview', args)
-  return reviewJs.get(user, args, options);
+async function getProductDocument(user, args, options) {
+  return productDocumentJs.get(user, args, options);
 }
 
-async function getReviews(user, args, options) {
-  return reviewJs.getAll(user, args, options);
+async function getProductDocuments(user, args, options) {
+  return productDocumentJs.getAll(user, args, options);
 }
 
-// * Add the reviews
-async function createReview(admin, contract, _args, baseOptions) {
+// * Add the productDocuments
+async function createProductDocument(admin, contract, _args, baseOptions) {
+  console.log('document-manager document', _args)
   const callArgs = {
     contract,
-    method: "createReview",
+    method: "createProductDocument",
     args: util.usc({
       ..._args,
     }),
@@ -133,7 +131,7 @@ async function createReview(admin, contract, _args, baseOptions) {
     history: [contractName],
   };
 
-  const [restStatus, reviewAddress] = await rest.call(
+  const [restStatus, productDocumentAddress] = await rest.call(
     admin,
     callArgs,
     options
@@ -141,42 +139,17 @@ async function createReview(admin, contract, _args, baseOptions) {
 
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus, reviewAddress];
-}
-
-async function updateReview(admin, contract, _args, baseOptions) {
-  const callArgs = {
-    contract,
-    method: "updateReview",
-    args: util.usc({
-      ..._args,
-    }),
-  };
-
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-  const [restStatus] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return [restStatus];
+console.log("productDocumentAddress++++", productDocumentAddress)
+  return [restStatus, productDocumentAddress];
 }
 
 /**
- * Delete review
+ * Delete productDocuments
  */
-async function deleteReview(admin, contract, _args, baseOptions) {
+async function deleteProductDocument(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
-    method: "deleteReview",
+    method: "deleteProductDocument",
     args: util.usc({
       ..._args,
     }),
@@ -210,8 +183,6 @@ export default {
   contractName,
   contractFilename,
   marshalOut,
-  createReview,
-  updateReview,
-  deleteReview,
-  getReviews
+  createProductDocument,
+  deleteProductDocument,
 };

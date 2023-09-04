@@ -9,7 +9,7 @@ import "/dapp/items/contracts/Item.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets
-contract OrderLine_2 is ItemStatus,OrderStatus{
+contract OrderLine is ItemStatus,OrderStatus{
 
     address public owner;
     string public ownerOrganization;
@@ -83,7 +83,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
         }
 
-        Item_3 item = Item_3(address(_items[i]));
+        Item item = Item(address(_items[i]));
 
         // check published status of items
         if(item.status() != ItemStatus.PUBLISHED){

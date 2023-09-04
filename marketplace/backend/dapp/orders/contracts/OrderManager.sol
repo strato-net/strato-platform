@@ -47,7 +47,7 @@ contract OrderManager is RestStatus,OrderStatus{
     }
 
     function addOrderLineItems(address _orderLineId,string[] _items, uint _createdDate) public  returns(uint256, string, string){
-        OrderLine_2 orderLine = OrderLine_2(_orderLineId);
+        OrderLine orderLine = OrderLine(_orderLineId);
         return orderLine.addOrderLineItems(_orderLineId,_items,_createdDate);
     }
 }

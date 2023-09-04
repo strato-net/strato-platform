@@ -1,22 +1,22 @@
 import aws from 'aws-sdk'
+import axios from 'axios';
 
-export const uploadFileToS3 = async function (fileKey, fileBuffer, s3Options) {
-  const s3 = new aws.S3(s3Options)
-  return new Promise((resolve, reject) => {
-    s3.upload(
-      {
-        Bucket: s3Options.bucket.Bucket,
-        Key: fileKey,
-        Body: fileBuffer,
-      },
-      (err, data) => {
-        if (err) {
-          return reject(err)
-        }
-        return resolve(data)
-      },
-    )
+export const uploadFileToS3 = async ( endpoint, data, accessToken) => {
+
+  return axios.post(endpoint, data, {
+
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
   })
+  .then(response => {
+    console.log('POST request successful:', response.data);
+    return response.data;
+  })
+  .catch(error => {
+    console.error('Error making POST request:', error);
+    return error;
+  });
 }
 
 export const getFileStreamFromS3 = function (fileKey, s3Options) {
@@ -38,8 +38,6 @@ export const getSignedUrlFromS3 = function (fileKey, s3Options) {
   });
   return signedUrl
 }
-
-
 
 export const deleteFileFromS3 = async function (fileKey, s3Options) {
   const s3 = new aws.S3(s3Options)

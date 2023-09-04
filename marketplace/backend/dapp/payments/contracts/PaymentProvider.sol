@@ -5,7 +5,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/payments/contracts/PaymentServices.sol";
 
 /// @title A representation of PaymentProvider_1 assets
-contract PaymentProvider_1 is PaymentServices{
+contract PaymentProvider is PaymentServices{
 
     address public owner;
     string public ownerOrganization;

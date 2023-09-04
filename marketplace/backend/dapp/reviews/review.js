@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Review_0_5';
+const contractName = 'Review';
 const contractFilename = `${util.cwd}/dapp/reviews/contracts/Review.sol`;
 /** 
  * Upload a new review 

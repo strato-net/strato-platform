@@ -88,7 +88,7 @@ const getCredentialsFromTokenEnv = (envVariable) => {
   return getCredentialsFromToken(token)
 }
 
-const getServiceToken = async () => {
+export const getServiceToken = async () => {
   const oauth = await oauthUtil.init(config.nodes[0].oauth)
   let token = CACHED_DATA.serviceToken
   const expiresAt = CACHED_DATA.serviceTokenExpiresAt

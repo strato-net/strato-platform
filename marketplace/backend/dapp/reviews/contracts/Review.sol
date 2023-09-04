@@ -2,7 +2,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 
 /// @title A representation of Review assets
-contract Review_0_5 {
+contract Review {
     address public productId;
     address public propertyId;
     address public reviewerAddress;
