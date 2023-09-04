@@ -187,23 +187,23 @@ function PropertyCreateModal({
     } else {
 
       console.log(body)
-      // const formData = new FormData()
-      //   for (const key in body) {
-      //     formData.append(key, body[key])
-      //   }
-      //   fileList.forEach((file) => {
-      //     formData.append('images', file.originFileObj);
-      //   }); 
+      const formData = new FormData()
+        for (const key in body) {
+          formData.append(key, body[key])
+        }
+        fileList.forEach((file) => {
+          formData.append('images', file.originFileObj);
+        }); 
 
-      // let response = await actions.createProperty(dispatch, formData);
-      // if (response) {
-      //   toggleCreateModal(false)
-      //   toggleCreateConfirmModal(false)
-      //   setModalView(true);
-      //   actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
-      //   setPropertyData(createPropertyFormInitialData)
-      //       Modal.destroyAll();
-      // }
+      let response = await actions.createProperty(dispatch, formData);
+      if (response) {
+        toggleCreateModal(false)
+        toggleCreateConfirmModal(false)
+        setModalView(true);
+        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
+        setPropertyData(createPropertyFormInitialData)
+            Modal.destroyAll();
+      }
     }
   };
 
