@@ -79,7 +79,7 @@ function PropertyListings() {
             properties?.map((property, index) => {
               const { listPrice, address } = property
               return listPrice && (
-                <Col key={index} style={{ padding: '10px' }}>
+                <Col key={index} className='p-3' >
                   <Link to={`/properties/${address}`} onClick={() => {
                     TagManager.dataLayer({
                       dataLayer: {
@@ -130,7 +130,7 @@ function PropertyListings() {
       <Row justify="center">
         <Col span={22}>
           <Row wrap gutter={{ xs: 8, sm: 16, md: 24, lg: 32 }} className='mt-5 justify-between' >
-            <Typography.Title level={4} className='mt-3.5' style={{ padding: "0px 16px" }}>
+            <Typography.Title level={4} className='mt-3.5 py-0 px-4' >
               Recommended Properties
             </Typography.Title>
             <Col className='flex justify-between'>
@@ -147,7 +147,7 @@ function PropertyListings() {
 
           {Object.keys(appliedFilter).map((item, index) => {
             if (item === "amenities" && filterOption[item].length === 0) return false;
-            return (filterOption[item] && <Tag style={{ margin: "5px" }} key={index}
+            return (filterOption[item] && <Tag className='m-1' key={index}
               closable onClose={() => { handleTagClose(item) }}
             >
               {filterlabel[item]}: {item === "amenities"

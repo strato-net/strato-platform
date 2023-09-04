@@ -310,7 +310,7 @@ const Filter = (props) => {
       <Row>
         <Col span={1}></Col>
         <Col span={22}>
-          <Typography.Title level={4} style={{ margin: "0px 18px" }}>
+          <Typography.Title level={4} className="my-0 mx-5">
             {/* Properties for you */}
             <Space className="mt-3.5">
               <Button icon={<FilterFilled />} onClick={openDrawer}>

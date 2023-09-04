@@ -92,22 +92,23 @@ const ReviewCard = (props) => {
       <Space
         direction="vertical"
         size="small"
-        style={{ marginTop: "30px", width: "400px" }}
+        className="mt-8"
+        style={{ width: "400px" }}
         key={index}
       >
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <div className="flex justify-between">
           <Typography.Text type="secondary">
             <Avatar size="small" icon={<UserOutlined />} />
-            <Typography.Text type="secondary" style={{ padding: "8px" }}>
+            <Typography.Text type="secondary" className="p-2" >
               {reviewerName}
             </Typography.Text>
           </Typography.Text>
-          <Row style={{display: 'flex', alignItems:'center'}}>
-            { userAddress === reviewerAddress &&
-              <div style={{ justifyContent: "flex-end" }}>
+          <Row className="flex items-center">
+            {userAddress === reviewerAddress &&
+              <div className="justify-end">
                 <Button
                   type="primary"
-                  style={{ marginRight: "6px" }}
+                  className="mr-2"
                   icon={<EditOutlined />}
                   onClick={() => {
                     setOpen(!open)
@@ -116,7 +117,7 @@ const ReviewCard = (props) => {
                 <Button
                   danger
                   type="primary"
-                  style={{ marginRight: "6px" }}
+                  className="mr-2"
                   icon={<DeleteOutlined />}
                   onClick={() => {
                     setDeleteModalOpen(!deleteModalOpen)
@@ -124,7 +125,7 @@ const ReviewCard = (props) => {
                 />
               </div>
             }
-            <Typography.Text strong type="primary" style={{ marginRight: "6px" }}>
+            <Typography.Text strong type="primary" className="mr-2" >
               {rating}
             </Typography.Text>
             <Image src={star} width={20} height={20} preview={false} />
@@ -133,10 +134,10 @@ const ReviewCard = (props) => {
         <Typography.Text type="secondary">
           Reviewed on {unixToDate(createdDate)}
         </Typography.Text>
-        <Typography.Text style={{ position: "relative", top: "10px" }} strong>
+        <Typography.Text className="relative top-2.5" strong>
           {title}
         </Typography.Text>
-        <Typography.Text style={{ position: "relative", top: "6px" }}>
+        <Typography.Text className="relative top-1.5" >
           {decodedDescription}
         </Typography.Text>
         {description?.length > 100 ? (

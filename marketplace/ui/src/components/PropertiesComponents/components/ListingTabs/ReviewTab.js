@@ -103,7 +103,7 @@ const ReviewTab = (props) => {
           handleCancel={handleCancel}
           handleSubmit={handleSubmit}
         />
-        <div style={{ margin: "10px" }}>
+        <Col className="mt-2.5">
           {reviewsList?.map((review, index) => {
             return <ReviewCard
               review={review}
@@ -114,7 +114,7 @@ const ReviewTab = (props) => {
               userAddress={user.userAddress}
               id={props.propertyId} />
           })}
-        </div>
+        </Col>
       </Col>
     </>
   );

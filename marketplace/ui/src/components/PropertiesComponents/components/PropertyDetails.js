@@ -30,7 +30,7 @@ import UploadPhotosModal from "../../Product/UploadPhotosModal";
 import { categoriesObj } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
 import { useAuthenticateState } from "../../../contexts/authentication";
-const AnyReactComponent = ({ text }) => <div>{text}</div>;
+const AnyReactComponent = ({ text }) => <Col>{text}</Col>;
 
 function PropertyDetails() {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -91,14 +91,14 @@ function PropertyDetails() {
     zoom: 11
   };
 
-  // const images = [
-  //   "https://images.pexels.com/photos/186077/pexels-photo-186077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-  //   "https://images.pexels.com/photos/1732414/pexels-photo-1732414.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-  //   "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-  //   "https://images.pexels.com/photos/3935328/pexels-photo-3935328.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-  //   "https://images.pexels.com/photos/8894808/pexels-photo-8894808.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-  //   "https://images.pexels.com/photos/13008560/pexels-photo-13008560.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
-  // ]
+  const images = [
+    "https://images.pexels.com/photos/186077/pexels-photo-186077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    "https://images.pexels.com/photos/1732414/pexels-photo-1732414.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    "https://images.pexels.com/photos/3935328/pexels-photo-3935328.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    "https://images.pexels.com/photos/8894808/pexels-photo-8894808.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+    "https://images.pexels.com/photos/13008560/pexels-photo-13008560.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
+  ]
 
   const {
     reviews,
@@ -117,7 +117,7 @@ function PropertyDetails() {
     bathroomsTotalInteger,
     standardStatus,
     numberOfUnitsTotal,
-    images
+    // images
   } = propertyDetails || {};
 
   const getSelectedCategories = () => {
@@ -193,9 +193,9 @@ function PropertyDetails() {
 
   const dataNotFound = () => {
     return (
-      <div className="h-96 flex justify-center items-center" id="product-list">
+      <Col className="h-96 flex justify-center items-center" id="product-list">
         No property detail available
-      </div>
+      </Col>
     )
   }
 
@@ -209,9 +209,9 @@ function PropertyDetails() {
         <>
           <Typography.Title
             level={4}
-            style={{ padding: "0px 16px" }}
+            className="px-0 py-4"
           ></Typography.Title>
-          <Col style={{ marginRight: "50px" }}>
+          <Col className="mr-12">
             <Button
               type="primary"
               onClick={() => {
@@ -222,7 +222,7 @@ function PropertyDetails() {
                   },
                 });
               }}
-              style={{ marginLeft: "5px" }}
+              className="ml-1"
             >
               <EditOutlined />
               Edit
@@ -233,7 +233,6 @@ function PropertyDetails() {
     )
   }
 
-  console.log(propertyDetails)
   return (
     <>
       {contextHolder}
@@ -243,21 +242,21 @@ function PropertyDetails() {
         && editBox()
       }
       {isPropertyDetailsLoading ? (
-        <div className="h-96 flex justify-center items-center">
+        <Col className="h-96 flex justify-center items-center">
           <Spin spinning={isPropertyDetailsLoading} size="large" />
-        </div>
+        </Col>
       ) : (
         propertyDetails
-          ? <Col span={22} style={{ margin: "auto", marginBottom: "100px" }}>
+          ? <Col span={22} className="m-auto mb-24" >
             <Row>
               <Col sm={24} lg={14} >
                 <ImageCollage images={images} />
               </Col>
               <Col sm={24} lg={10} >
-                <Row justify={"center"} align="top" style={{ marginTop: 20 }}>
+                <Row justify={"center"} align="top" className="mt-5">
                   <Col sm={24} md={20}>
                     <Space direction="horizontal">
-                      <Title style={{ margin: "0px 10px 0px 0px" }} level={4}>
+                      <Title className="m-0 mt-2" level={4}>
                         $ {listPrice?.toLocaleString()}
                       </Title>
                       <Text>{bedroomsTotal} Bed</Text>
@@ -268,25 +267,23 @@ function PropertyDetails() {
                     </Space>
 
                     <Row>
-                      <Text style={{ margin: "5px 0px 0px 10px" }} level={4}>
+                      <Text className="m-0 mt-1 mb-2" level={4}>
                         {postalCity}, {stateOrProvince},{postalcode}
                       </Text>
                     </Row>
                     <Row>
                       <span
+                        className="w-3 h-3 m-1"
                         style={{
-                          width: "10px",
-                          height: "10px",
                           borderRadius: "50%",
                           backgroundColor: `${standardStatus === "Active" ? "green" : "red"
                             }`,
-                          margin: "5px",
                         }}
                       ></span>
                       <Text strong>{standardStatus}</Text>
                     </Row>
-                    <Row style={{ marginTop: "15px" }}>
-                      <Col span={24} style={{ lineHeight: "30px" }}>
+                    <Row className="mt-4" >
+                      <Col span={24} className="leading-7" >
                         <Row>
                           <Col span={8}>
                             <Text strong>Property Type</Text>
@@ -341,7 +338,7 @@ function PropertyDetails() {
                 </Row>
                 <Button
                   type="primary"
-                  style={{ marginLeft: "50px", marginTop: "30px" }}
+                  className="ml-12 mt-7"
                   onClick={() => {
                     setTalkToSalesModal(!isTalkToSalesModalOpen);
                     TagManager.dataLayer({
@@ -356,16 +353,8 @@ function PropertyDetails() {
               </Col>
             </Row>
             <Row>
-              <Col sm={24} lg={14} style={{ marginTop: "50px" }}>
-                <div
-                  style={{
-                    width: "100%",
-                    height: "300px",
-                    background: "grey",
-                    margin: "auto",
-                    textAlign: "center",
-                  }}
-                >
+              <Col sm={24} lg={14} className="mt-12" >
+                <Col className="w-full m-auto text-center h-80" >
                   <GoogleMapReact
                     bootstrapURLKeys={{ key: "" }}
                     defaultCenter={defaultProps.center}
@@ -377,57 +366,52 @@ function PropertyDetails() {
                       text="My Marker"
                     />
                   </GoogleMapReact>
-                </div>
+                </Col>
               </Col>
             </Row>
             <Row>
               <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
-                <div className="tab-card">
+                <Col className="tab-card">
                   {tabs.map((tab) => {
-                    const {key, label} = tab;
+                    const { key, label } = tab;
                     return <Col
-                    sm={6}
-                    key={key}
-                    id={key}
-                    style={{ margin: "auto", padding: "10px" }}
-                  >
-                    <div
-                      style={{
-                        padding: "5px",
-                        backgroundColor: activeTab === key && "#EDEDED",
-                        fontSize: "18px",
-                        textAlign: "center"
-                      }}
+                      sm={6}
+                      key={key}
+                      id={key}
+                      className="m-auto p-3"
                     >
-                      <a
-                        href={`#${key}`}
-                        onClick={() => setActiveTab(key)}
+                      <Col
+                        className="p-1 text-center text-base"
+                        style={{
+                          backgroundColor: activeTab === key && "#EDEDED",
+                        }}
                       >
-                        {label}
-                      </a>
-                    </div>
-                  </Col>
+                        <a
+                          href={`#${key}`}
+                          onClick={() => setActiveTab(key)}
+                        >
+                          {label}
+                        </a>
+                      </Col>
+                    </Col>
                   })}
-                </div>
+                </Col>
 
                 {tabs.map((tab, index) => {
-                  const {key, label, children} = tab;
-                  return   <>
-                  <div id={key}>
-                    <div style={{ paddingTop: "20px" }}>
-                      <Typography.Title level={5} style={{
-                        backgroundColor: activeTab === key && "#EDEDED",
-                        display: "inline-block",
-                        padding: "10px",
-                        borderRadius: "5px"
-                      }}>
-                        <a style={{ color: "black" }} href={`#${key}`}>{label}</a>
-                      </Typography.Title>
-                    </div>
-                    {children}
-                  </div>
-                  <div style={{ width: "100%", margin: "50px auto" }}></div>
-                </>
+                  const { key, label, children } = tab;
+                  return <>
+                    <Col id={key}>
+                      <Col className="pt-5" >
+                        <Typography.Title level={5} className="p-3 rounded-md inline-block" style={{
+                          backgroundColor: activeTab === key && "#EDEDED",
+                        }}>
+                          <a style={{ color: "black" }} href={`#${key}`}>{label}</a>
+                        </Typography.Title>
+                      </Col>
+                      {children}
+                    </Col>
+                    <Col className="m-13 mx-auto w-full" ></Col>
+                  </>
                 })}
               </Col>
             </Row>

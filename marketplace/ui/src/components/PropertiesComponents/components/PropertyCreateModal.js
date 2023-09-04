@@ -188,12 +188,12 @@ function PropertyCreateModal({
 
       console.log(body)
       const formData = new FormData()
-        for (const key in body) {
-          formData.append(key, body[key])
-        }
-        fileList.forEach((file) => {
-          formData.append('images', file.originFileObj);
-        }); 
+      for (const key in body) {
+        formData.append(key, body[key])
+      }
+      fileList.forEach((file) => {
+        formData.append('images', file.originFileObj);
+      });
 
       let response = await actions.createProperty(dispatch, formData);
       if (response) {
@@ -202,7 +202,7 @@ function PropertyCreateModal({
         setModalView(true);
         actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
         setPropertyData(createPropertyFormInitialData)
-            Modal.destroyAll();
+        Modal.destroyAll();
       }
     }
   };
@@ -519,34 +519,28 @@ function PropertyCreateModal({
         </Row>
 
         <Form.Item>
-        <Upload
-        listType="picture-card"
-        fileList={fileList}
-        onPreview={handlePreview}
-        onChange={handleFileChange}
-        accept="image/*"
-      >
-        {fileList.length >= 8 ? null : 
-            <div>
-            <PlusOutlined />
-            <div
-              style={{
-                marginTop: 8,
-              }}
-            >
-              Upload
-            </div>
-          </div>}
-      </Upload>
-      <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancel}>
-        <img
-          alt="example"
-          style={{
-            width: '100%',
-          }}
-          src={previewImage}
-        />
-      </Modal>
+          <Upload
+            listType="picture-card"
+            fileList={fileList}
+            onPreview={handlePreview}
+            onChange={handleFileChange}
+            accept="image/*"
+          >
+            {fileList.length >= 8 ? null :
+              <div>
+                <PlusOutlined />
+                <div className="mt-2">
+                  Upload
+                </div>
+              </div>}
+          </Upload>
+          <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancel}>
+            <img
+              alt="example"
+              className="w-full"
+              src={previewImage}
+            />
+          </Modal>
         </Form.Item>
       </Form>
     )
@@ -570,7 +564,7 @@ function PropertyCreateModal({
             disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
-              if((value === "apartment" || value === "condo")) {
+              if ((value === "apartment" || value === "condo")) {
                 setDisableLotSize(true)
                 handleChange("lotSizeArea", 0);
               } else {
@@ -708,12 +702,12 @@ function PropertyCreateModal({
         <Collapse
           expandIconPosition={"end"}
           defaultActiveKey={[]}
-          style={{ margin: "10px 0px" }}
+          className="my-3 mx-0"
         >
           {collapseData.map((item, index) => {
             return (
               <Panel
-                style={{ fontWeight: 700 }}
+                className="font-bold"
                 header={item.header}
                 key={index}
               >
