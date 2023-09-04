@@ -34,7 +34,7 @@ import RestStatus from "http-status-codes";
 import TagManager from "react-gtm-module";
 
 const SoldOrderDetails = ({ user, users }) => {
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
   const { Text } = Typography;
@@ -119,13 +119,13 @@ const SoldOrderDetails = ({ user, users }) => {
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined) {
+    if (id !== undefined) {
       getData();
     }
-  }, [Id, dispatch]);
+  }, [id, dispatch]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id);
+    const data = await actions.fetchOrderDetails(dispatch, id);
     if (data != null) {
       getPaymentStatus(data.paymentSessionId);
     }
@@ -174,7 +174,7 @@ const SoldOrderDetails = ({ user, users }) => {
     });
   }
 
-  if (Id !== undefined && !isorderDetailsLoading && details !== null) {
+  if (id !== undefined && !isorderDetailsLoading && details !== null) {
     if (details["ownerOrganizationalUnit"] === "") {
       details["ownerOrganizationalUnit"] = "N/A";
     }
@@ -241,7 +241,7 @@ const SoldOrderDetails = ({ user, users }) => {
     body = {};
     if (selectedDate == null) {
       body = {
-        address: Id,
+        address: id,
 
         updates: {
           sellerComments: comment,
@@ -251,7 +251,7 @@ const SoldOrderDetails = ({ user, users }) => {
       };
     } else {
       body = {
-        address: Id,
+        address: id,
       
         updates: {
           sellerComments: comment,
@@ -263,7 +263,7 @@ const SoldOrderDetails = ({ user, users }) => {
     let isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
-      await actions.fetchOrderDetails(dispatch, Id);
+      await actions.fetchOrderDetails(dispatch, id);
     }
   };
 
@@ -276,7 +276,7 @@ const SoldOrderDetails = ({ user, users }) => {
         return;
       }
       body = {
-        address: Id,
+        address: id,
       
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
@@ -286,7 +286,7 @@ const SoldOrderDetails = ({ user, users }) => {
       };
     } else {
       body = {
-        address: Id,
+        address: id,
         
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
@@ -297,7 +297,7 @@ const SoldOrderDetails = ({ user, users }) => {
     const isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(selectedStatus);
-      await actions.fetchOrderDetails(dispatch, Id);
+      await actions.fetchOrderDetails(dispatch, id);
     }
   };
 
@@ -354,7 +354,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   onClick={() => {
                     navigate(
                       `${routes.SoldOrderItemDetail.url.replace(":id", text.address)}`,
-                      { state: { orderId: orderDetails.orderId, address: Id } }
+                      { state: { orderId: orderDetails.orderId, address: id } }
                     );
                   }}
                   className="hover:text-primaryHover cursor-pointer"
@@ -667,7 +667,7 @@ const SoldOrderDetails = ({ user, users }) => {
           dispatch={dispatch}
           actions={actions}
           isLoading={isCreateOrderLineItem}
-          Id={Id}
+          id={id}
         />
       )}
       {isConfirmStatusModalOpen && (

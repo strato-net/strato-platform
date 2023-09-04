@@ -4,7 +4,7 @@ import { Col, Typography } from 'antd';
 function OverviewTab({description}) {
   return (
     <Col>
-      <Typography.Paragraph style={{ textAlign: "justify" }}>
+      <Typography.Paragraph className='text-justify'>
         {description}
       </Typography.Paragraph>
     </Col>

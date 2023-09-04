@@ -16,10 +16,7 @@ import {
   Upload,
 } from "antd";
 
-import {
-  ArrowLeftOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
+import { ArrowLeftOutlined, PlusOutlined } from "@ant-design/icons";
 
 import {
   categoriesObj,
@@ -53,7 +50,6 @@ function PropertyCreateModal({
   toggleCreateModal,
   formData,
 }) {
-
   let { id } = useParams();
 
   const [modalView, setModalView] = useState(true);
@@ -64,7 +60,12 @@ function PropertyCreateModal({
   const [api, contextHolder] = notification.useNotification();
   const dispatch = usePropertiesDispatch();
 
-  const { message, success, isCreatePropertySubmitting, isUpdatePropertySubmitting } = usePropertiesState();
+  const {
+    message,
+    success,
+    isCreatePropertySubmitting,
+    isUpdatePropertySubmitting,
+  } = usePropertiesState();
   const [propertyData, setPropertyData] = useState(formData);
   //TODO:- Can uncomment when use image upload ***
   const [selectedImage, setSelectedImage] = useState(null);
@@ -153,8 +154,7 @@ function PropertyCreateModal({
 
   //creates the listing for property
   const handleSubmitCreateProperty = async () => {
-
-    const body = propertyData
+    const body = propertyData;
 
     if (id) {
       let {
@@ -176,33 +176,29 @@ function PropertyCreateModal({
       } = body;
       updatedData["propertyAddress"] = address;
 
-
       let response = await actions.updateProperty(dispatch, updatedData);
       if (response) {
-        toggleCreateModal(false)
-        toggleCreateConfirmModal(false)
+        toggleCreateModal(false);
+        toggleCreateConfirmModal(false);
         setModalView(true);
-
       }
     } else {
-
-      console.log(body)
-      const formData = new FormData()
-        for (const key in body) {
-          formData.append(key, body[key])
-        }
-        fileList.forEach((file) => {
-          formData.append('images', file.originFileObj);
-        }); 
+      const formData = new FormData();
+      for (const key in body) {
+        formData.append(key, body[key]);
+      }
+      fileList.forEach((file) => {
+        formData.append("images", file.originFileObj);
+      });
 
       let response = await actions.createProperty(dispatch, formData);
       if (response) {
-        toggleCreateModal(false)
-        toggleCreateConfirmModal(false)
+        toggleCreateModal(false);
+        toggleCreateConfirmModal(false);
         setModalView(true);
-        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0)
-        setPropertyData(createPropertyFormInitialData)
-            Modal.destroyAll();
+        actions.fetchProperties(dispatch, LIMIT_PER_PAGE, 0);
+        setPropertyData(createPropertyFormInitialData);
+        Modal.destroyAll();
       }
     }
   };
@@ -220,11 +216,15 @@ function PropertyCreateModal({
   };
   const handleFileChange = ({ fileList: newFileList }) => {
     setFileList(newFileList);
-  }
+  };
 
   const primaryAction = {
     content: modalView ? (
-      id ?"Update Property":"Create a Property Listing"
+      id ? (
+        "Update Property"
+      ) : (
+        "Create a Property Listing"
+      )
     ) : (
       <>
         <Button type="link" onClick={handleModalToggle}>
@@ -235,7 +235,7 @@ function PropertyCreateModal({
     ),
     // disabled: modalView ? isDisabledCreateView : isDisabledFactsView,
     onToggle: handleModalToggle,
-    onConfirm: showConfirmationModal
+    onConfirm: showConfirmationModal,
   };
 
   const openToast = (placement) => {
@@ -256,13 +256,14 @@ function PropertyCreateModal({
     }
   };
 
-
   function convertCategories() {
     const convertedData = [];
     for (const category in categoriesObj) {
       if (categoriesObj.hasOwnProperty(category)) {
         convertedData.push({
-          header: category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' '),
+          header:
+            category.charAt(0).toUpperCase() +
+            category.slice(1).replace("_", " "),
           options: categoriesObj[category],
           keyName: category,
         });
@@ -280,9 +281,7 @@ function PropertyCreateModal({
         <Form.Item
           label="Listing Title"
           name="title"
-          rules={[
-            { required: true, message: "Please enter project title." },
-          ]}
+          rules={[{ required: true, message: "Please enter project title." }]}
         >
           <Input
             label="title"
@@ -324,12 +323,10 @@ function PropertyCreateModal({
             <Form.Item
               label="Total Units"
               name="totalUnits"
-              rules={[
-                { required: true, message: "Please enter total units." },
-              ]}
+              rules={[{ required: true, message: "Please enter total units." }]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className="w-full"
                 label="Total Units"
                 id="numberOfUnitsTotal"
                 type="Number"
@@ -355,7 +352,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className="w-full"
                 precision={0}
                 label="Asking Price"
                 type="Number"
@@ -403,7 +400,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className="w-full"
                 label="Street Number"
                 id="streetnumber"
                 type="Number"
@@ -430,7 +427,7 @@ function PropertyCreateModal({
               ]}
             >
               <Input
-                style={{ width: "100%" }}
+                className="w-full"
                 label="House Number"
                 id="housenumber"
                 placeholder="House Number"
@@ -458,6 +455,7 @@ function PropertyCreateModal({
             label="State"
             value={stateOrProvince}
             defaultValue={stateOrProvince}
+            disabled={id}
             placeholder="Select State"
             onSelect={(e) => {
               handleChange("stateOrProvince", e);
@@ -490,13 +488,11 @@ function PropertyCreateModal({
             <Form.Item
               label="Zip Code"
               name="postalcode"
-              rules={[
-                { required: true, message: "Please enter a zip code." },
-              ]}
+              rules={[{ required: true, message: "Please enter a zip code." }]}
             >
               <InputNumber
                 precision={0}
-                style={{ width: "100%" }}
+                className="w-full"
                 label="Zip Code"
                 type="Number"
                 placeholder="ZipCode"
@@ -518,38 +514,32 @@ function PropertyCreateModal({
         </Row>
 
         <Form.Item>
-        <Upload
-        listType="picture-card"
-        fileList={fileList}
-        onPreview={handlePreview}
-        onChange={handleFileChange}
-        accept="image/*"
-      >
-        {fileList.length >= 8 ? null : 
-            <div>
-            <PlusOutlined />
-            <div
-              style={{
-                marginTop: 8,
-              }}
-            >
-              Upload
-            </div>
-          </div>}
-      </Upload>
-      <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancel}>
-        <img
-          alt="example"
-          style={{
-            width: '100%',
-          }}
-          src={previewImage}
-        />
-      </Modal>
+          <Upload
+            listType="picture-card"
+            fileList={fileList}
+            onPreview={handlePreview}
+            onChange={handleFileChange}
+            accept="image/*"
+          >
+            {fileList.length >= 8 ? null : (
+              <div>
+                <PlusOutlined />
+                <div className="mt-2">Upload</div>
+              </div>
+            )}
+          </Upload>
+          <Modal
+            open={previewOpen}
+            title={previewTitle}
+            footer={null}
+            onCancel={handleCancel}
+          >
+            <img alt="example" className="w-full" src={previewImage} />
+          </Modal>
         </Form.Item>
       </Form>
-    )
-  }
+    );
+  };
 
   const formStepSec = () => {
     return (
@@ -557,9 +547,7 @@ function PropertyCreateModal({
         <Form.Item
           label="Home Type"
           name="homeType"
-          rules={[
-            { required: true, message: "Please Select Home Type." },
-          ]}
+          rules={[{ required: true, message: "Please Select Home Type." }]}
         >
           <Select
             label="homeType"
@@ -569,11 +557,11 @@ function PropertyCreateModal({
             disabled={id}
             onSelect={(value) => {
               handleChange("propertyType", value);
-              if((value === "apartment" || value === "condo")) {
-                setDisableLotSize(true)
+              if (value === "apartment" || value === "condo") {
+                setDisableLotSize(true);
                 handleChange("lotSizeArea", 0);
               } else {
-                setDisableLotSize(false)
+                setDisableLotSize(false);
               }
             }}
             options={homeTypeData}
@@ -593,7 +581,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className="w-full"
                 precision={0}
                 label="bedrooms"
                 placeholder="Bedrooms"
@@ -623,7 +611,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className="w-full"
                 precision={0}
                 label="bathrooms"
                 placeholder="Bathrooms"
@@ -647,9 +635,7 @@ function PropertyCreateModal({
             <Form.Item
               label="Living Area"
               name="livingArea"
-              rules={[
-                { required: true, message: "Please enter square feet" },
-              ]}
+              rules={[{ required: true, message: "Please enter square feet" }]}
             >
               <InputNumber
                 precision={0}
@@ -682,7 +668,7 @@ function PropertyCreateModal({
               ]}
             >
               <InputNumber
-                style={{ width: "100%" }}
+                className="w-full"
                 precision={0}
                 label="lotSize"
                 placeholder="Lot Size Area"
@@ -698,7 +684,12 @@ function PropertyCreateModal({
                 onWheel={(e) => {
                   e.target.blur();
                 }}
-                disabled={disableLotSize}
+                disabled={
+                  propertyData.propertyType === "apartment" ||
+                  propertyData.propertyType === "condo"
+                    ? true
+                    : false
+                }
               />
             </Form.Item>
           </Col>
@@ -707,15 +698,11 @@ function PropertyCreateModal({
         <Collapse
           expandIconPosition={"end"}
           defaultActiveKey={[]}
-          style={{ margin: "10px 0px" }}
+          className="my-3 mx-0"
         >
           {collapseData.map((item, index) => {
             return (
-              <Panel
-                style={{ fontWeight: 700 }}
-                header={item.header}
-                key={index}
-              >
+              <Panel className="font-bold" header={item.header} key={index}>
                 {item.options.map((opt, key) => {
                   return (
                     <Checkbox
@@ -735,8 +722,9 @@ function PropertyCreateModal({
             );
           })}
         </Collapse>
-      </Form>)
-  }
+      </Form>
+    );
+  };
 
   return (
     <>
@@ -748,7 +736,9 @@ function PropertyCreateModal({
         title={primaryAction.content}
         onOk={modalView ? primaryAction.onToggle : primaryAction.onConfirm}
         okType={"primary"}
-        okText={modalView ? "Continue" : id ? "Update Property" : "Create Property"}
+        okText={
+          modalView ? "Continue" : id ? "Update Property" : "Create Property"
+        }
         okButtonProps={{ disabled: primaryAction.disabled }}
         onCancel={() => {
           toggleCreateModal(false);
@@ -764,7 +754,9 @@ function PropertyCreateModal({
         isCreateConfirmModalOpen={isCreateConfirmModalOpen}
         toggleCreateConfirmModal={toggleCreateConfirmModal}
         handleSubmitCreateProperty={handleSubmitCreateProperty}
-        isCreatePropertySubmitting={isCreatePropertySubmitting || isUpdatePropertySubmitting}
+        isCreatePropertySubmitting={
+          isCreatePropertySubmitting || isUpdatePropertySubmitting
+        }
         isEdit={id}
       />
     </>

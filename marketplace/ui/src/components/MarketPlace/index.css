@@ -1,3 +1,7 @@
+html {
+  scroll-behavior: smooth;
+}
+
 :where(.css-dev-only-do-not-override-9ntgx0).ant-table-wrapper
   .ant-table-thead
   > tr

@@ -2,7 +2,7 @@ describe("Renders Certifier Page", () => {
 
     it("it should render certifier homepage for certifier login", () => {
         cy.visit('/')
-        cy.get("#Login").click();
+        cy.get("#login").click();
         cy.login(Cypress.env("singleRoleEmail"), Cypress.env("singleRolePassword"));
 
         cy.wait(20000);
@@ -32,7 +32,7 @@ describe("Renders Certifier Page", () => {
 
     it.only("it should check certifier flow for user with certifier & trading entity roles", () => {
         cy.visit('/')
-        cy.get("#Login").click();
+        cy.get("#login").click();
         
         cy.login(Cypress.env("dualRoleEmail"), Cypress.env("dualRolePassword"));
         cy.wait(20000);
@@ -48,14 +48,14 @@ describe("Renders Certifier Page", () => {
             let sameLength = actualRoles.length === rolesToCompare.length;
             if (sameLength && sameMembers) {
                 cy.get("#Admin").should("not.exist");
-                cy.get("#Events").should("exist");
+                cy.get("#events").should("exist");
                 cy.request({
                     method: "GET",
                     url: "/api/v1/eventType?limit=10&offset=0"
                 }).then(({ status, body }) => {
                     expect(status).to.eq(200);
                     if(body.data.length > 0){
-                        cy.get("#Events").click();
+                        cy.get("#events").click();
                         cy.url().should("include", "/events");
                         cy.wait(15000);
                         cy.get(".ant-tabs-tab").should("have.length", 3);
@@ -84,7 +84,7 @@ describe("Renders Certifier Page", () => {
                                 "description": "Plant%20seed%20"
                             }
                         }).then(({ status, body }) => {
-                            cy.get("#Events").click();
+                            cy.get("#events").click();
                             cy.url().should("include", "/events");
                             cy.wait(15000);
                             cy.get(".ant-tabs-tab").should("have.length", 3);

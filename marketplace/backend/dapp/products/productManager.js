@@ -335,7 +335,7 @@ async function getInventory(user, contract, args, options) {
   try {
     const inventory = await inventoryJs.get(user, args, options);
     if (!inventory) {
-      throw new Error("product Id should be defined in inventory");
+      throw new Error("product id should be defined in inventory");
     }
     const product = await contract.getProduct(
       { address: inventory.productId },

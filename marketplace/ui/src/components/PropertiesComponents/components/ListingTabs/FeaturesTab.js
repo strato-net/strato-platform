@@ -28,8 +28,8 @@ const FeaturesTab = () => {
   return (
     <Row>
       {data.map((item, index) => {
-        return <Col span={12} style={{ padding: '20px' }}> <Space direction="vertical">
-          <Title level={5} style={{ marginBottom: '-5px' }}>{item.title}</Title>
+        return <Col span={12} className='p-5'> <Space direction="vertical">
+          <Title level={5} className='mt-1'>{item.title}</Title>
           <Text> {item.description} </Text>
           <Text> {item.comment} </Text>
         </Space>

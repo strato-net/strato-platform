@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import GoogleMapReact from 'google-map-react';
 import {
   Spin,
   Typography,
@@ -10,6 +11,7 @@ import {
   Space,
   Modal,
 } from "antd";
+import "../helpers/property.css"
 import ImageCollage from "../../Carousel/ImageCollage";
 import OverviewTab from "./ListingTabs/OverviewTab";
 import FeaturesTab from "./ListingTabs/FeaturesTab";
@@ -22,14 +24,16 @@ import {
   usePropertiesDispatch,
   usePropertiesState,
 } from "../../../contexts/propertyContext";
+import TalkToSalesModal from "./TalkToSalesModal";
 import TagManager from "react-gtm-module";
 import UploadPhotosModal from "../../Product/UploadPhotosModal";
-import { categoriesObj, homeTypeData } from "../helpers/constants";
+import { categoriesObj } from "../helpers/constants";
 import PropertyCreateModal from "./PropertyCreateModal";
 import { useAuthenticateState } from "../../../contexts/authentication";
-import TalkToSalesModal from "./TalkToSalesModal";
+const AnyReactComponent = ({ text }) => <Col>{text}</Col>;
 
 function PropertyDetails() {
+  const [activeTab, setActiveTab] = useState("Overview");
   const [isUploadPhotosModalOpen, setUploadPhotosModal] = useState(false);
   const [isCreateModalOpen, toggleCreateModal] = useState(false);
   const [isTalkToSalesModalOpen, setTalkToSalesModal] = useState(false);
@@ -78,6 +82,13 @@ function PropertyDetails() {
         key: 2,
       });
     }
+  };
+  const defaultProps = {
+    center: {
+      lat: 10.99835602,
+      lng: 77.01502627
+    },
+    zoom: 11
   };
 
   const images = [
@@ -138,24 +149,24 @@ function PropertyDetails() {
 
   const tabs = [
     {
-      key: "Overview",
+      key: "overview",
       label: `Overview`,
-      children: <OverviewTab description={description} />,
+      children: <OverviewTab id="overview" description={description} />,
     },
     {
-      key: "Features",
+      key: "features",
       label: `Features`,
-      children: <FeaturesTab property={property?.fields} />,
+      children: <FeaturesTab id="features" property={property?.fields} />,
     },
     {
-      key: "Price",
-      label: `Price and Tax History`,
-      children: <PriceHistoryTab property={property?.fields} />,
+      key: "price",
+      label: `History`,
+      children: <PriceHistoryTab id="price" property={property?.fields} />,
     },
     {
-      key: "Reviews",
+      key: "reviews",
       label: `Reviews`,
-      children: <ReviewTab reviews={propertyDetails?.reviews} propertyId={propertyDetails?.address} productId={propertyDetails?.productId} />,
+      children: <ReviewTab id="reviews" reviews={propertyDetails?.reviews} propertyId={propertyDetails?.address} productId={propertyDetails?.productId} />,
     },
   ];
 
@@ -182,9 +193,9 @@ function PropertyDetails() {
 
   const dataNotFound = () => {
     return (
-      <div className="h-96 flex justify-center items-center" id="product-list">
+      <Col className="h-96 flex justify-center items-center" id="product-list">
         No property detail available
-      </div>
+      </Col>
     )
   }
 
@@ -198,9 +209,9 @@ function PropertyDetails() {
         <>
           <Typography.Title
             level={4}
-            style={{ padding: "0px 16px" }}
+            className="px-0 py-4"
           ></Typography.Title>
-          <Col style={{ marginRight: "50px" }}>
+          <Col className="mr-12">
             <Button
               type="primary"
               onClick={() => {
@@ -211,7 +222,7 @@ function PropertyDetails() {
                   },
                 });
               }}
-              style={{ marginLeft: "5px" }}
+              className="ml-1"
             >
               <EditOutlined />
               Edit
@@ -222,7 +233,6 @@ function PropertyDetails() {
     )
   }
 
-  console.log(propertyDetails)
   return (
     <>
       {contextHolder}
@@ -232,21 +242,21 @@ function PropertyDetails() {
         && editBox()
       }
       {isPropertyDetailsLoading ? (
-        <div className="h-96 flex justify-center items-center">
+        <Col className="h-96 flex justify-center items-center">
           <Spin spinning={isPropertyDetailsLoading} size="large" />
-        </div>
+        </Col>
       ) : (
         propertyDetails
-          ? <Col span={22} style={{ margin: "auto", marginBottom: "100px" }}>
+          ? <Col span={22} className="m-auto mb-24" >
             <Row>
-              <Col sm={24} lg={14} style={{ backgroundColor: "" }}>
+              <Col sm={24} lg={14} >
                 <ImageCollage images={images} />
               </Col>
-              <Col sm={24} lg={10} style={{ backgroundColor: "" }}>
-                <Row justify={"center"} align="top" style={{ marginTop: 20 }}>
+              <Col sm={24} lg={10} >
+                <Row justify={"center"} align="top" className="mt-5">
                   <Col sm={24} md={20}>
                     <Space direction="horizontal">
-                      <Title style={{ margin: "0px 10px 0px 0px" }} level={4}>
+                      <Title className="m-0 mt-2" level={4}>
                         $ {listPrice?.toLocaleString()}
                       </Title>
                       <Text>{bedroomsTotal} Bed</Text>
@@ -257,30 +267,28 @@ function PropertyDetails() {
                     </Space>
 
                     <Row>
-                      <Text style={{ margin: "5px 0px 0px 10px" }} level={4}>
+                      <Text className="m-0 mt-1 mb-2" level={4}>
                         {postalCity}, {stateOrProvince},{postalcode}
                       </Text>
                     </Row>
                     <Row>
                       <span
+                        className="w-3 h-3 m-1"
                         style={{
-                          width: "10px",
-                          height: "10px",
                           borderRadius: "50%",
                           backgroundColor: `${standardStatus === "Active" ? "green" : "red"
                             }`,
-                          margin: "5px",
                         }}
                       ></span>
                       <Text strong>{standardStatus}</Text>
                     </Row>
-                    <Row style={{ marginTop: "15px" }}>
-                      <Col style={{ lineHeight: "30px" }}>
+                    <Row className="mt-4" >
+                      <Col span={24} className="leading-7" >
                         <Row>
                           <Col span={8}>
                             <Text strong>Property Type</Text>
                           </Col>
-                          <Col span={16}>{homeTypeData[propertyType]}</Col>
+                          <Col span={16}>{propertyType}</Col>
                         </Row>
 
                         <Row>
@@ -330,7 +338,7 @@ function PropertyDetails() {
                 </Row>
                 <Button
                   type="primary"
-                  style={{ marginLeft: "50px", marginTop: "30px" }}
+                  className="ml-12 mt-7"
                   onClick={() => {
                     setTalkToSalesModal(!isTalkToSalesModalOpen);
                     TagManager.dataLayer({
@@ -345,21 +353,66 @@ function PropertyDetails() {
               </Col>
             </Row>
             <Row>
-              <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
-                <Tabs defaultActiveKey="Overview" items={tabs} />
+              <Col sm={24} lg={14} className="mt-12" >
+                <Col className="w-full m-auto text-center h-80" >
+                  <GoogleMapReact
+                    bootstrapURLKeys={{ key: "" }}
+                    defaultCenter={defaultProps.center}
+                    defaultZoom={defaultProps.zoom}
+                  >
+                    <AnyReactComponent
+                      lat={59.955413}
+                      lng={30.337844}
+                      text="My Marker"
+                    />
+                  </GoogleMapReact>
+                </Col>
               </Col>
-              <Col sm={24} lg={10} style={{ marginTop: "50px" }}>
-                <div
-                  style={{
-                    width: "300px",
-                    height: "200px",
-                    background: "grey",
-                    margin: "auto",
-                    textAlign: "center",
-                  }}
-                >
-                  MAP
-                </div>
+            </Row>
+            <Row>
+              <Col sm={24} lg={14} style={{ minHeight: "300px" }}>
+                <Col className="tab-card">
+                  {tabs.map((tab) => {
+                    const { key, label } = tab;
+                    return <Col
+                      sm={6}
+                      key={key}
+                      id={key}
+                      className="m-auto p-3"
+                    >
+                      <Col
+                        className="p-1 text-center text-base"
+                        style={{
+                          backgroundColor: activeTab === key && "#EDEDED",
+                        }}
+                      >
+                        <a
+                          href={`#${key}`}
+                          onClick={() => setActiveTab(key)}
+                        >
+                          {label}
+                        </a>
+                      </Col>
+                    </Col>
+                  })}
+                </Col>
+
+                {tabs.map((tab, index) => {
+                  const { key, label, children } = tab;
+                  return <>
+                    <Col id={key}>
+                      <Col className="pt-5" >
+                        <Typography.Title level={5} className="p-3 rounded-md inline-block" style={{
+                          backgroundColor: activeTab === key && "#EDEDED",
+                        }}>
+                          <a style={{ color: "black" }} href={`#${key}`}>{label}</a>
+                        </Typography.Title>
+                      </Col>
+                      {children}
+                    </Col>
+                    <Col className="m-13 mx-auto w-full" ></Col>
+                  </>
+                })}
               </Col>
             </Row>
           </Col>
@@ -379,7 +432,7 @@ function PropertyDetails() {
         isEdit={true}
       />}
       <Modal open={isTalkToSalesModalOpen} footer={[]} onCancel={() => handleCancel()}>
-      <TalkToSalesModal />
+        <TalkToSalesModal />
       </Modal>
     </>
   );

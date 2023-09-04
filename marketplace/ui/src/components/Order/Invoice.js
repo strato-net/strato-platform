@@ -9,7 +9,7 @@ import { Spin } from "antd";
 
 
 const Invoice = () => {
-  const [Id, setId] = useState(undefined);
+  const [id, setId] = useState(undefined);
 
   const dispatch = useOrderDispatch();
   const {
@@ -29,10 +29,10 @@ const Invoice = () => {
   }, [routeMatch]);
 
   useEffect(() => {
-    if (Id !== undefined ) {
-      actions.fetchOrderDetails(dispatch, Id);
+    if (id !== undefined ) {
+      actions.fetchOrderDetails(dispatch, id);
     }
-  }, [Id, dispatch]);
+  }, [id, dispatch]);
 
 
 

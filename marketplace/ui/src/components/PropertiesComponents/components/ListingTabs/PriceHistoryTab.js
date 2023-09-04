@@ -8,12 +8,12 @@ function PriceHistoryTab(props) {
     <Col>
       <Row>
         <Col span={11} offset={1}>
-          <Typography.Title level={5} style={{ marginTop: 0 }}>Price History</Typography.Title>
+          <Typography.Title level={5} className='mt-0'>Price History</Typography.Title>
           <Row>
             <Col span={24}>
               <Row>
-                <Col span={12}><Typography.Paragraph style={{ borderBottom: "1px solid black" }}>Sale Date</Typography.Paragraph></Col>
-                <Col span={12}><Typography.Paragraph style={{ borderBottom: "1px solid black" }}>Price</Typography.Paragraph></Col>
+                <Col span={12}><Typography.Paragraph className='border-btm'>Sale Date</Typography.Paragraph></Col>
+                <Col span={12}><Typography.Paragraph className='border-btm'>Price</Typography.Paragraph></Col>
               </Row>
               <Row>
                 <Col span={11}>
@@ -30,16 +30,16 @@ function PriceHistoryTab(props) {
         </Col>
 
         <Col span={11} offset={1}>
-          <Typography.Title level={5} style={{ marginTop: 0 }}>Tax History</Typography.Title>
+          <Typography.Title level={5} className='mt-0'>Tax History</Typography.Title>
           <Row >
             <Col span={12}>
-              <Typography.Paragraph style={{ borderBottom: "1px solid black" }}>Date</Typography.Paragraph>
+              <Typography.Paragraph className='border-btm'>Date</Typography.Paragraph>
               <Typography.Paragraph>12 july</Typography.Paragraph>
               <Typography.Paragraph>13 july</Typography.Paragraph>
               <Typography.Paragraph>14 july</Typography.Paragraph>
             </Col>
             <Col span={12}>
-              <Typography.Paragraph style={{ borderBottom: "1px solid black" }}>Assessment</Typography.Paragraph>
+              <Typography.Paragraph className='border-btm'>Assessment</Typography.Paragraph>
               <Typography.Paragraph>$ 442300</Typography.Paragraph>
               <Typography.Paragraph>$ 440000</Typography.Paragraph>
               <Typography.Paragraph>$ 640000</Typography.Paragraph>
