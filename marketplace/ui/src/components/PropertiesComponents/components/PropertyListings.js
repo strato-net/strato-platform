@@ -58,7 +58,7 @@ function PropertyListings() {
     let filters = {...filterOption}
     filters["owner"] = user.userAddress;
     setFilterOption(filters);
-    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
+    actions.fetchProperties(dispatch, limit, currentPage - 1, filters)
   }
 
   const clearFilter = () => {
