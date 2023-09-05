@@ -162,7 +162,7 @@ class PropertiesController {
       const propertyArgs = {
         ...body,
         standardStatus: "Active",
-        
+
         //use google maps api to get lat and long, then convert to string
         latitude: "",
         longitude: "",
