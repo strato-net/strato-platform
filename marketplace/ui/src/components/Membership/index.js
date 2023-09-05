@@ -31,7 +31,7 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate  } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 
 const { Search } = Input;
@@ -93,8 +93,20 @@ const Membership = ( user ) => {
         }
     };
 
-    let { memberships, ismembershipsLoading, message, success } = useMembershipState();
 
+    let { memberships, ismembershipsLoading, message, success, stripeStatus, isLoadingStripeStatus } = useMembershipState();
+   
+    
+    useEffect(() => {
+        actions.sellerStripeStatus(dispatch, user?.user?.organization);
+    }, [dispatch, user]);
+    
+    const navigate = useNavigate();
+    
+    const onboardSeller = async () => {
+        navigate(routes.OnboardingSellerToStripe.url)
+    }
+    
     //We want to show all inventories associated to a membership, but also
     //All memberships that do not have inventories
     //So we create a new list of memberships objects, creating a new object for each inventory
@@ -187,7 +199,7 @@ const Membership = ( user ) => {
     return (
         <>
             {contextHolder}
-            {ismembershipsLoading || iscategorysLoading || issubCategorysLoading ? (
+            {stripeStatus === null || ismembershipsLoading || iscategorysLoading || issubCategorysLoading || isLoadingStripeStatus ? (
                 <div className="h-screen flex justify-center items-center">
                     <Spin spinning={ismembershipsLoading} size="large" />
                 </div>
@@ -200,20 +212,36 @@ const Membership = ( user ) => {
                                 No product found
                             </Title>
                             <Text className="text-sm">Start adding your product</Text>
-                            <Button
-                                id="add-product-button"
-                                type="primary"
-                                className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6"
-                                onClick={() => {
-                                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            <div className="flex items-center">
+                                <Button
+                                    type="primary"
+                                    className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 mr-3"
+                                    onClick={() => {
+                                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                                         window.location.href = loginUrl;
-                                    } else {
-                                        showModal()
-                                    }
-                                }}
-                            >
-                                Add Memberships
-                            </Button>
+                                        } else {
+                                        onboardSeller()
+                                        }
+                                    }}
+                                    disabled={stripeStatus.detailsSubmitted}
+                                    >
+                                    {"Setup Stripe Account"}
+                                </Button>
+                                <Button
+                                    id="add-product-button"
+                                    type="primary"
+                                    className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6"
+                                    onClick={() => {
+                                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                            window.location.href = loginUrl;
+                                        } else {
+                                            showModal()
+                                        }
+                                    }}
+                                >
+                                    Add Memberships
+                                </Button>
+                            </div>
                         </div>
                     ) : (
                         <>
@@ -278,8 +306,17 @@ const Membership = ( user ) => {
                                     <Button
                                         id="add-product-button"
                                         type="primary"
-                                        style={{ backgroundColor: '#6e7ddd', color: 'white', margin: '10px', fontWeight: 'bold' }}
-                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40">
+                                        style={{ color: 'white', margin: '10px', fontWeight: 'bold' }}
+                                        className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40"
+                                        disabled={stripeStatus.detailsSubmitted}
+                                        onClick={() => {
+                                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                              window.location.href = loginUrl;
+                                            } else {
+                                              onboardSeller()
+                                            }
+                                            }}
+                                        >
                                         <span style={{ fontWeight: 'normal' }}> Setup  </span>
                                         <span style={{ fontWeight: '900', margin: '0 5px' }}>  Stripe  </span>
                                         <span style={{ fontWeight: 'normal' }}> Account</span>

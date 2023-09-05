@@ -12,7 +12,7 @@ import ServiceJson from "/seeder-utility/service.json";
 import { ROLE } from "/helpers/constants";
 const options = { config, logger: console }
 const loadEnv = dotenv.config()
-
+import { fsUtil } from 'blockapps-rest'
 
 describe("Marketplace Dapp - deploy contracts, bootnode organization", function () {
   this.timeout(config.timeout)
@@ -92,13 +92,19 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     assert.equal(deployment.dapp.contract.address, dapp.address)
   })
   
-  it('Should populate services', async () => {
-    let _dapp = await dappJs.uploadDappContract(adminUser, options)
+   it('Should populate services', async () => {
+    // let _dapp = await dappJs.uploadDappContract(adminUser, options)
+    const deploy = fsUtil.getYaml(`${config.configDirPath}/${config.deployFilename}`)
+    const options = { config }
+
+    const _dapp = await dappJs.bind(adminUser, deploy.dapp.contract, {       
+      ...options,
+    })
+
     const result = await ServiceSeederJs.createServices(_dapp)
     assert(Array.isArray(result), 'result should be an array')
     assert.equal(result.length, ServiceJson.services.length)
   })
-
 
 })
   // it('Should create and assign admin role', async () => {
