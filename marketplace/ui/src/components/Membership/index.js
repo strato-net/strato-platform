@@ -11,6 +11,7 @@ import {
     Image,
     Typography,
     Pagination,
+    Tabs
 } from "antd";
 import { DownOutlined } from '@ant-design/icons';
 import MembershipCard from "./MembershipCard";
@@ -30,7 +31,8 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate  } from "react-router-dom";
+import PurchasedList from "./PurchasedList";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -57,6 +59,7 @@ const Membership = ( user ) => {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(10);
     const debouncedSearchTerm = useDebounce(queryValue, 1000);
+    let [typeDisplay, setTypeDisplay] = useState("purchase");
 
     //Categories
     const categoryDispatch = useCategoryDispatch();
@@ -173,6 +176,25 @@ const Membership = ( user ) => {
             key: '2',
         },
     ];
+    const onChange = (key) => {
+        setTypeDisplay(key);
+        typeDisplay = key;
+      };
+
+    useEffect(() => {
+        setTypeDisplay(typeDisplay);
+    })
+      
+    const items = [
+    {
+        key: 'purchase',
+        label: 'Purchased',
+    },
+    {
+        key: 'issued',
+        label: 'Issued',
+    }
+    ];
 
     return (
         <>
@@ -240,10 +262,11 @@ const Membership = ( user ) => {
                                     <Typography.Text className="text-2xl">
                                         Memberships
                                     </Typography.Text>
-                                    <div>
-                                        <Typography.Text style={{ fontSize: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <Typography.Text style={{ fontSize: '10px', marginRight: '80px' }}>
                                             {memberships.length}  Memberships found
                                         </Typography.Text>
+                                        <Tabs defaultActiveKey="1" items={items} onChange={onChange} />
                                     </div>
                                 </Col>
                                 {/* <Col>
@@ -302,20 +325,28 @@ const Membership = ( user ) => {
                             </div>
                             <>
                                 {memberships.length !== 0 ? (
-                                    <div className="my-4">
-                                        {memberships.map((product, index) => {
-                                            return (
-                                                <MembershipCard
-                                                    user={user}
-                                                    membership={product}
-                                                    categorys={categorys}
-                                                    subCategorys={subCategorys}
-                                                    key={index}
-                                                    debouncedSearchTerm={debouncedSearchTerm}
-                                                />
-                                            );
-                                        })}
-                                    </div>
+                                    (typeDisplay === "purchase") ?
+                                        <PurchasedList 
+                                        user={user}
+                                        categorys={categorys}
+                                        subCategorys={subCategorys}
+                                        debouncedSearchTerm={debouncedSearchTerm}
+                                        /> 
+                                        :
+                                        (<div className="my-4">
+                                            {memberships.map((product, index) => {
+                                                return (
+                                                    <MembershipCard
+                                                        user={user}
+                                                        membership={product}
+                                                        categorys={categorys}
+                                                        subCategorys={subCategorys}
+                                                        key={index}
+                                                        debouncedSearchTerm={debouncedSearchTerm}
+                                                    />
+                                                );
+                                            })}
+                                        </div>)
                                 ) : (
                                     <p className="flex justify-center my-10"> No data found</p>
                                 )}
