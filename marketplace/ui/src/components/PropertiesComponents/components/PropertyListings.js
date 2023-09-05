@@ -8,6 +8,7 @@ import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/pro
 import PropertyCreateModal from './PropertyCreateModal'
 import { createPropertyFormInitialData, filterlabel, propertyConstants } from '../helpers/constants'
 import TagManager from "react-gtm-module";
+import { useAuthenticateState } from '../../../contexts/authentication'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
@@ -21,6 +22,7 @@ function PropertyListings() {
   const dispatch = usePropertiesDispatch()
   const { properties, isPropertiesLoading, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
+  const { user } = useAuthenticateState();
 
   useEffect(() => {
     document.title = "Welcome to Mercata Properties"
@@ -49,7 +51,10 @@ function PropertyListings() {
 
   const applyFilter = () => {
     setAppliedFilter(filterOption)
-    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
+    // for checking only
+    // actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
+    let check = {...filterOption, owner:user.userAddress}
+    actions.fetchProperties(dispatch, limit, currentPage - 1, check)
   }
 
   const clearFilter = () => {

@@ -2,6 +2,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
 /// @title A representation of Property assets
 contract Property {
+    address public owner; 
     address public productId;
     int public listPrice;
     int public streetNumber;
@@ -188,6 +189,7 @@ contract Property {
         bool _sprinklerSystem,
         bool _waterFront
     ) public {
+        owner = msg.sender;
         productId = _productId;
         listPrice = _listPrice;
         streetNumber = _streetNumber;
