@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
 import classNames from "classnames";
-import { Card, Popover, Spin, Button } from "antd";
+import { Card, Popover, Spin, Button, Table, Typography, Row} from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
@@ -10,6 +10,7 @@ import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import ListNowModal from "../Membership/ListNowModal";
+import PublishNowModal from "../Membership/PublishNowModal";
 import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import {
@@ -17,6 +18,9 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import { actions } from "../../contexts/inventory/actions";
+import TagManager from "react-gtm-module";
+
+const { Title } = Typography;
 
 const MembershipCard = ({
   user,
@@ -30,12 +34,13 @@ const MembershipCard = ({
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
+  const [viewable, setViewable] = useState(false);
   
   
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const {isCreateInventorySubmitting } = useInventoryState();
   const dispatch = useInventoryDispatch();
-
+  console.log("membership", membership)//TODO DELETE THIS
   const showModal = () => {
     hide();
     setOpen(true);
@@ -67,8 +72,11 @@ const MembershipCard = ({
   }, [membership]);
 
   
-  const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
+  const callDetailPage = (index) => {
+    if (state !== null && state !== undefined) {
+      console.log(state);
+      navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
+  }
   }
   
   const closeListNowModal = () => {
@@ -77,6 +85,10 @@ const MembershipCard = ({
 
   const openListNowModal = () => {
     setVisible(true);
+  };
+
+  const openInventoryNowModal = () => {
+    setViewable(true);
   };
   
   const getSchema = (isListNowModalOpen) => {
@@ -108,9 +120,105 @@ const MembershipCard = ({
     onSubmit: function (values) {
       handleCreateFormSubmit(values);
     },
+    // onUpdateInventory: async (inventory_) => {
+    //     console.log("We updating this inventory_", inventory_)
+    //     const body = {
+    //       productAddress: inventory_.productId,
+    //       inventory: inventory_.address,
+    //       updates: {
+    //         pricePerUnit: 0,//TODO fix this //values.pricePerUnit,
+    //         status: !inventory_.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
+    //       },
+    //     };
+
+    //     TagManager.dataLayer({
+    //       dataLayer: {
+    //         event: 'update_inventory',
+    //       },
+    //     });
+    //     let isDone = await actions.updateInventory(dispatch, body);
+
+    //     if (isDone) {
+    //       actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
+    //       handleCancel();
+    //     }
+    // },
     enableReinitialize: true,
   });
+
+ const canIdo = (indx) =>   (<Button type="text"
+                  className="text-primary text-sm cursor-pointer"
+                  onClick={callDetailPage.bind(this, indx)}
+                >
+                  Preview
+                </Button>)
   
+  const canIdo2 = (inv, texts) => (<Row 
+                     style={{justifyContent: 'space-between'}}> 
+                      <p>{texts} </p> 
+                      <EditOutlined onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            // formik.setFieldValue("name", membership.product.name);
+                            // formik.setFieldValue("tempInv", inv);
+                            openInventoryNowModal();
+                          }
+                          }} />  
+                    </Row>)
+
+
+  let data = membership.inventories.map((inventory, index) => { 
+      return {key: index,
+          name: inventory.block_timestamp,
+          age: inventory.availableQuantity,
+          published: canIdo2(inventory, inventory.status ? "Published" : "Unpublished"),
+          preview: canIdo(index),
+          address: "$ " + String(inventory.pricePerUnit)}});
+  
+  const columns = [
+
+        {
+          title: 'Date',
+          dataIndex: 'name',
+          key: 'name',
+          width: '20%',
+          color: "red",
+          // ...getColumnSearchProps('name'),
+        },
+        {
+          title: 'Quantity',
+          dataIndex: 'age',
+          key: 'age',
+          width: '15%',
+          // ...getColumnSearchProps('age'),
+        },
+        {
+          title: 'Published/Unpublished',
+          dataIndex: 'published',
+          key: 'published',
+          width: '30%',
+          // ...getColumnSearchProps('age'),
+        },
+        {
+          title: 'Price',
+          dataIndex: 'address',
+          key: 'address',
+          width: '20%',
+          // ...getColumnSearchProps('address'),
+          sorter: (a, b) => a.address.length - b.address.length,
+          sortDirections: ['descend', 'ascend'],
+        },
+        {
+          title: '',
+          dataIndex: 'preview',
+          key: 'preview',
+          width: '7%', 
+        }
+  ];
+ 
+ 
+
   const handleCreateFormSubmit = async (values) => {
     if (user) {
         if (formik.values.price !== "" && formik.values.quantity !== "") {
@@ -184,12 +292,12 @@ const MembershipCard = ({
                      List for Sale
                    </Button>
                 :null}
-                <Button type="text"
+                {/* <Button type="text"
                   className="text-primary text-sm cursor-pointer"
                   onClick={callDetailPage}
                 >
                   Preview
-                </Button>
+                </Button> */}
                 
                 {/* <Popover
                   placement="bottomLeft"
@@ -263,6 +371,11 @@ const MembershipCard = ({
               </div>
             </div>
           </div>
+          <> </> 
+          <div style={{marginTop: "20px"  , borderRadius: '10px', border: '1px solid #333', padding: '10px'}}>
+          <Title  level={5}>Inventories</Title>
+          <Table bordered pagination={false} columns={columns} dataSource={data} />
+          </div>
           {/* {open && (
             <DeleteProductModal
               open={open}
@@ -283,7 +396,7 @@ const MembershipCard = ({
         </Card>
       )}
       {visible && (
-        <ListNowModal
+        <PublishNowModal
           open={visible}
           user={user}
           handleCancel={closeListNowModal}
@@ -291,6 +404,7 @@ const MembershipCard = ({
           formik={formik}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
+          inventory={formik.values.tempInv}
         />
       )}
     </>

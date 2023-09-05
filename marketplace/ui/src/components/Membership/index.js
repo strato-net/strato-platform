@@ -94,6 +94,14 @@ const Membership = ( user ) => {
 
     let { memberships, ismembershipsLoading, message, success } = useMembershipState();
 
+
+    const memberships_issued = memberships
+        .filter((membership_) => membership_.inventories.length > 0)
+        .filter((membership) => membership.ownerOrganization === membership.inventories[0].manufacturer);
+        // .map((membership_) => {});
+
+    console.log("memberships_issued", memberships_issued)
+    console.log("memberships source", memberships)
     //We want to show all inventories associated to a membership, but also
     //All memberships that do not have inventories
     //So we create a new list of memberships objects, creating a new object for each inventory
@@ -306,7 +314,7 @@ const Membership = ( user ) => {
                                             })} */}
                                         </div>) :
                                         (<div className="my-4">
-                                            {memberships.map((product, index) => {
+                                            {memberships_issued.map((product, index) => {
                                                 return (
                                                     <MembershipCard
                                                         user={user}
