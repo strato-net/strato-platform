@@ -187,7 +187,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
                   <InventoriesProvider>
                     <ServicesProvider>
                       <MembershipsProvider>
-                        <Membership user={user} users={users}/>
+                          <Membership user={user} users={users}/>
                       </MembershipsProvider>  
                     </ServicesProvider>  
                   </InventoriesProvider>              

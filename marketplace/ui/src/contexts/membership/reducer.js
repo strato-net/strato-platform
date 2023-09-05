@@ -22,6 +22,24 @@ const reducer = (state, action) => {
         isMembershipLoading: false
       };
     
+    case actionDescriptors.fetchPurchasedMemberships:
+      return {
+        ...state,
+        isPurchasedMembershipLoading: true
+      };
+    case actionDescriptors.fetchPurchasedMembershipsSuccessful:
+      return {
+        ...state,
+        purchasedMemberships: action.payload,
+        isPurchasedMembershipLoading: false
+      };
+    case actionDescriptors.fetchPurchasedMembershipsFailed:
+      return {
+        ...state,
+        error: action.error,
+        isPurchasedMembershipLoading: false
+      };
+        
     case actionDescriptors.resetMessage:
       return {
         ...state,
@@ -177,6 +195,40 @@ const reducer = (state, action) => {
         ...state,
         isImportAssetsModalOpen: false
       }
+    case actionDescriptors.onboardSellerToStripe:
+      return {
+        ...state,
+        isOnboardingSellerToStripe: true
+      };
+    case actionDescriptors.onboardSellerToStripeSuccessful:
+      return {
+        ...state,
+        onboardedSeller: action.payload,
+        isOnboardingSellerToStripe: false
+      };
+    case actionDescriptors.onboardSellerToStripeFailed:
+      return {
+        ...state,
+        error: action.error,
+        isOnboardingSellerToStripe: false
+      };
+    case actionDescriptors.sellerStripeStatus:
+      return {
+        ...state,
+        isLoadingStripeStatus: true
+      };
+    case actionDescriptors.sellerStripeStatusSuccessful:
+      return {
+        ...state,
+        stripeStatus: action.payload,
+        isLoadingStripeStatus: false
+      };
+    case actionDescriptors.sellerStripeStatusFailed:
+      return {
+        ...state,
+        error: action.error,
+        isLoadingStripeStatus: false
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

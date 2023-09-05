@@ -13,7 +13,7 @@ withCredentials([
           STRATO_PORT        : 443,
           //STRATO_LOCAL_IP    : '172.17.0.1',  // Only enable when running STRATO node locally
           //BOOTNODE_IP        : "",    // Enable when setting up new STRATO node conected to Mercata
-          OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/mercata-testnet/.well-known/openid-configuration",
+          OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration",
           OAUTH_CLIENT_ID    : "${MEMBERSHIP_MERCATA_TESTNET2_KEYCLOAK_CLIENT_ID}",
           OAUTH_CLIENT_SECRET: "${MEMBERSHIP_MERCATA_TESTNET2_KEYCLOAK_CLIENT_SECRET}",
       ],

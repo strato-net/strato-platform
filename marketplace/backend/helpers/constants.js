@@ -37,8 +37,8 @@ export const STRIPE_ENV = {
   },
   ACCOUNT_ONBOARDING: {
     TYPE: 'accountOnboarding',
-    REFRESH_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories/stripe/onboarding`,
-    RETURN_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories`
+    REFRESH_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/memberships/stripe/onboarding`,
+    RETURN_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/memberships`
   }
 }
 Object.freeze(STRIPE_ENV)
