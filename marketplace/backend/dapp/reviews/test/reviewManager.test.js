@@ -86,7 +86,7 @@ describe("ReviewManager", function () {
 
     args = factoryArgs(globalAdmin);
 
-  });  
+  });
 
   it("Add Review - 201", async () => {
     contract = await reviewManager.uploadContract(
@@ -112,11 +112,11 @@ describe("ReviewManager", function () {
     args = getAllReviewArg();
     const reviews = await reviewManager.getReviews(
       globalAdmin,
-      args,
+      {},
       newOptions
     );
     assert(Array.isArray(reviews), "should be array");
-    assert(reviews.length.isAtLeast(1, "reviews has length of 1"));
+    assert.isAtLeast(1, reviews.length, "reviews has length of 1")
   });
 
   it("Update Review - 201", async () => {
