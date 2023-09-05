@@ -112,6 +112,4 @@ describe('ReviewManager', function () {
     const reviews = await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
   });
 
-
-
 });

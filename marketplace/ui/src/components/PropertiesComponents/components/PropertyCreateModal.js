@@ -686,7 +686,7 @@ function PropertyCreateModal({
                 }}
                 disabled={
                   propertyData.propertyType === "apartment" ||
-                  propertyData.propertyType === "condo"
+                    propertyData.propertyType === "condo"
                     ? true
                     : false
                 }

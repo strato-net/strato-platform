@@ -2,7 +2,7 @@ import React from 'react'
 import { Modal, Divider, Typography } from 'antd'
 import TagManager from "react-gtm-module";
 
-function DeleteReviewModal({ open, handleDeleteReview, isReviewDeleting, handleCancel}) {
+function DeleteReviewModal({ open, handleDeleteReview, isReviewDeleting, handleCancel }) {
 
   const primaryAction = {
     content: 'Delete Review - Confirmation',

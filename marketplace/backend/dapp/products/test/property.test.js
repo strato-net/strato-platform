@@ -69,7 +69,7 @@ describe('Property', function () {
             adminResponse.message
         )
         globalAdmin = { ...adminResponse.user, ...adminCredentials }
-        
+
         const adminCert = await certificateJs.getCertificateMe(globalAdmin)
         adminOrganization = adminCert.organization;
 

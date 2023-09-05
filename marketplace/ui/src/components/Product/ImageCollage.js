@@ -11,12 +11,12 @@ const ImageCollage = (props) => {
 
   return (
     <>
-      <div style={{ width: '800px', height: '600px', margin: 'auto', marginTop: '20px' }}>
+      <div className='h-600 w-800 m-auto mt-5'>
         <Row
           gutter={{ xs: 8, sm: 16 }}
           justify="space-around"
           align="middle"
-          style={{ cursor: "pointer" }}>
+          className='cursor-pointer'>
           <Col span={16}>
             <CarouselComponent images={images} />
           </Col>
@@ -55,7 +55,7 @@ const ImageCollage = (props) => {
         <div >
           {images?.map((item, index) => {
             return (
-              <div style={{ padding: '20px' }}>
+              <div className='p-5'>
                 <Image
                   width={'100%'}
                   onClick={() => { handleImagePreview() }}
@@ -72,4 +72,4 @@ const ImageCollage = (props) => {
   )
 }
 
-export default ImageCollage
+export default ImageCollage;

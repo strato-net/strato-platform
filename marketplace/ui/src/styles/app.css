@@ -154,3 +154,11 @@ display: none !important;
 .h-90 {
   height: 90%;
 }
+
+.h-600 {
+  height: 600px;
+}
+
+.w-800 {
+  width: 800px;
+}

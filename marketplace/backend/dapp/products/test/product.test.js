@@ -27,7 +27,7 @@ describe('Product', function () {
     let newOptions;
     let adminOrganization;
 
-    const factoryArgs = (userAddress) => ({ ...(factory.getProductArgs(util.uid(),userAddress)) });
+    const factoryArgs = (userAddress) => ({ ...(factory.getProductArgs(util.uid(), userAddress)) });
 
     before(async () => {
         assert.isDefined(
@@ -68,7 +68,7 @@ describe('Product', function () {
             adminResponse.message
         )
         globalAdmin = { ...adminResponse.user, ...adminCredentials }
-        
+
         const adminCert = await certificateJs.getCertificateMe(globalAdmin)
         adminOrganization = adminCert.organization;
 

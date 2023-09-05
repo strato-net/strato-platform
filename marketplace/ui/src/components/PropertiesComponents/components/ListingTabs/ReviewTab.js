@@ -110,7 +110,7 @@ const ReviewTab = (props) => {
               index={index}
               setOpen={setOpen}
               open={open}
-              handleRead={() => { handleRead(index) }} 
+              handleRead={() => { handleRead(index) }}
               userAddress={user.userAddress}
               id={props.propertyId} />
           })}

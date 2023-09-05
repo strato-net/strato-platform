@@ -728,9 +728,9 @@ const ProductDetails = ({ user, users }) => {
                   </div>
                 </Space>
                 :
-                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
-                If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
-              </Paragraph>
+                <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">
+                  If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+                </Paragraph>
               }
               <Tabs
                 defaultActiveKey="1"
