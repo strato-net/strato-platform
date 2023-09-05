@@ -28,6 +28,7 @@ describe("ReviewManager", function () {
   const factoryArgs = () => ({ ...factory.getReviewArgs(util.uid()) });
   const updateReviewArg = () => ({ ...factory.updateReviewArgs(util.uid()) });
   const deleteReviewArg = () => ({ ...factory.deleteReviewArgs(util.uid()) });
+  const getAllReviewArg = () => ({ ...factory.getAllReviewArgs(util.uid()) });
 
   before(async () => {
     assert.isDefined(
@@ -85,6 +86,9 @@ describe("ReviewManager", function () {
 
     args = factoryArgs(globalAdmin);
 
+  });  
+
+  it("Add Review - 201", async () => {
     contract = await reviewManager.uploadContract(
       globalAdmin,
       args,
@@ -95,9 +99,6 @@ describe("ReviewManager", function () {
       ["address"],
       "upload Review contract has address"
     );
-  });
-
-  it("Add Review - 201", async () => {
     let [restStatus] = await reviewManager.createReview(
       globalAdmin,
       contract,
@@ -108,10 +109,10 @@ describe("ReviewManager", function () {
   });
 
   it("Get All Reviews - 201", async () => {
-    // args = getAllReviewsArgs();
+    args = getAllReviewArg();
     const reviews = await reviewManager.getReviews(
       globalAdmin,
-      (args = {}),
+      args,
       newOptions
     );
     assert(Array.isArray(reviews), "should be array");
