@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
-import { Tabs, Input, Button } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
-import ActiveTab from "./ActiveTab";
-import InactiveTab from "./InactiveTab";
+import NotifcationCard from "./NotificationCard";
 import useWebSocket from "react-use-websocket";
 
 const Notification = () => {
-    const { Search } = Input;
-    // const endpoint = `${process.env.REACT_APP_URL}/eventstream`
-    // console.log(endpoint)
-    const endpoint = "ws://localhost/eventstream"; //TODO: how to make this more flexible?
-    const { lastMessage, getWebSocket, sendMessage } = useWebSocket(endpoint, {
+    function constructEndpoint(){
+        const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:" ;
+        const port = window.location.port ? ":" + window.location.port : "" ;
+        return wsProtocol + "//" + window.location.hostname + port + "/eventstream" ;
+    }
+
+    function myFilter(message) {
+        const event = JSON.parse(message.data);
+        return event?.eventEvent?.eventName === "OwnershipUpdate";
+    }
+    const { lastMessage } = useWebSocket(constructEndpoint(), {
         share: true,
+        filter: myFilter,
         shouldReconnect: (closeEvent) => {
             console.log("going to reconnect after closeEvent ", closeEvent);
             return true},
@@ -20,52 +24,31 @@ const Notification = () => {
         onError: (err) => console.log("websocket error: ", err)
     })
     const [notifications, setNotifications] = useState([]);
-    // console.log("notifications, ", notifications);
-    console.log(getWebSocket());
-
 
     useEffect(() => {
         if (lastMessage !== null) {
             const newEvent = JSON.parse(lastMessage.data);
             console.log("new message: ", newEvent);
-            setNotifications((prevNotif) => prevNotif.concat(newEvent));
-            console.log("notifications: ", notifications);
+            setNotifications((prevNotif) => {if (prevNotif.length < 20) return prevNotif.concat(newEvent); else return prevNotif});
         }
     }, [lastMessage, setNotifications]);
 
-    const items = [
-        {
-            key: "1",
-            label: "Active",
-            children: <ActiveTab products={[]} />
-        },
-        {
-            key: "2",
-            label: "Inactive",
-            children: <InactiveTab products={[]} />
-        }
-    ]
-
     return (
-        <>
-            <div className="flex mx-16">
-                <Tabs items={items} defaultActiveKey="1" className="mt-6" />
-            </div>
-            <div className="absolute top-28 right-32">
-                <Search
-                    className="w-96"
-                    placeholder="Search by any Keyword"
-                    enterButton="Search"
-                    prefix={<SearchOutlined style={{ color: "#989898" }} />}
-                />
-                <Button
-                    className="w-32 ml-12"
-                    type="primary"
-                >
-                    Filter
-                </Button>
-            </div>
-        </>
+        <div>
+            {notifications.length > 0 ? (
+                <div className="flex flex-wrap my-4 gap-8">
+                    {notifications.map((notif) => {
+                        return (
+                            <NotifcationCard
+                                notification={notif}
+                            />
+                        );
+                    })}
+                </div>
+            ) : (
+                <p className="flex justify-center my-10"> No data found</p>
+            )}
+        </div>
     )
 }
 
