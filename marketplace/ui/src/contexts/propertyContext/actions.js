@@ -159,6 +159,8 @@ const actions = {
         queryParams.push(`&gteQuery[]=${QueryKeys[item]},${options[item]}`);
       } else if (item === 'zip_code' || item === 'state' || item === 'property_Type') {
         queryParams.push(`&${QueryKeys[item]}=${options[item]}`);
+      } else if (item === 'owner') {
+        queryParams.push(`&${item}=${options[item]}`);
       }
     }
 

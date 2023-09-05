@@ -54,9 +54,9 @@ function PropertyListings() {
     actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
-  const myList = () =>{
+  const myList = () => {
     filterOption["owner"] = user.userAddress;
-  actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
+    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
   const clearFilter = () => {
@@ -151,7 +151,7 @@ function PropertyListings() {
                 }}
               >List Property</Button>
               <Button className='mt-3.5 ml-1'
-              onClick={myList}
+                onClick={myList}
               >MY</Button>
             </Col>
           </Row>
