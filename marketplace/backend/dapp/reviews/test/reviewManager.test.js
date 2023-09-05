@@ -120,7 +120,7 @@ describe("ReviewManager", function () {
 
   it("Update Review - 201", async () => {
     args = updateReviewArg();
-    await reviewManager.updateReview(globalAdmin, contract, args, newOptions);
+    const restStatus = await reviewManager.updateReview(globalAdmin, contract, args, newOptions);
     assert.hasAnyKeys(
       contract,
       ["address"],
@@ -131,6 +131,7 @@ describe("ReviewManager", function () {
 
   it("Delete Review - 201", async () => {
     args = deleteReviewArg();
-    await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
+    const [restStatus, message] = await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
+    assert.equal(restStatus, RestStatus.OK, "should succeed");
   });
 });
