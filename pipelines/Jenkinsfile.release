@@ -284,7 +284,7 @@ pipeline {
             // any ideas how to avoid that?
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
           }
-        },
+        }
       }
     }
   }
