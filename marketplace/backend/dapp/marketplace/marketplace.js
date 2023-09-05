@@ -344,6 +344,10 @@ async function getTopSellingProducts(admin, args = {}, options) {
                 ...inventory,
                 membershipId: membership.address,
                 totalSavings: totalSavings,
+                taxes:  inventory.taxDollarAmount === 0 ? (
+                inventory.taxPercentageAmount === 0 ? 0  : inventory.taxPercentageAmount/10000)
+                        :  inventory.taxDollarAmount,
+                isTaxPercentage :  inventory.taxDollarAmount === 0
             });
         });
     });
