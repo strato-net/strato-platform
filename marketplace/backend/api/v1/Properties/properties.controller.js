@@ -162,7 +162,7 @@ class PropertiesController {
       const propertyArgs = {
         ...body,
         standardStatus: "Active",
-        
+
         //use google maps api to get lat and long, then convert to string
         latitude: "",
         longitude: "",
@@ -328,7 +328,7 @@ class PropertiesController {
     if (validation.error) {
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
-        "Create Property Argument Validation Error",
+        `Create Property Argument Validation Error`,
         `Missing args or bad format: ${validation.error.message}`
       );
     }

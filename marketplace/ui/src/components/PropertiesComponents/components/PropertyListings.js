@@ -26,7 +26,7 @@ function PropertyListings() {
 
   useEffect(() => {
     document.title = "Welcome to Mercata Properties"
-    actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
+    actions.fetchProperties(dispatch, limit, limit * (currentPage - 1), filterOption)
   }, [dispatch, currentPage, limit])
 
 
