@@ -1093,8 +1093,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,
             timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
-            savings: null //memberships[0].savings,
-            
+            savings: null, //memberships[0].savings,
+            membershipAddress: null //memberships[0].address
           };
         });
       console.log('combinedData', combinedData);

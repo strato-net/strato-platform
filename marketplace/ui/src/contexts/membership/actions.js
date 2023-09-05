@@ -127,21 +127,22 @@ const actions = {
     const query = queryValue
       ? `&productId=${queryValue}`
       : "";
-
+      console.log(3)
     dispatch({ type: actionDescriptors.fetchMembership });
-
+    console.log(4)
     try {
       const response = await fetch(`${apiUrl}/membership?${query}`, {
         method: HTTP_METHODS.GET,
       });
 
       const body = await response.json();
-
+      console.log("fetchMembership response: ", body.data)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMembershipSuccessful,
           payload: body.data,
         });
+        console.log(5)
         return;
       }
       dispatch({ type: actionDescriptors.fetchMembershipFailed, error: undefined });
@@ -384,7 +385,6 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchPurchasedMemberships });
 
     try {
-      console.log("im here")
       const response = await fetch(`${apiUrl}/membership/purchased`, {
         method: HTTP_METHODS.GET,
       });

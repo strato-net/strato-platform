@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import MembershipCardPurchased from "./MembershipCardPurchased";
+import MembershipCard from "./MembershipCard";
 import { Spin } from "antd";
 import {
   useMembershipDispatch,
@@ -9,7 +9,7 @@ import { actions } from "../../contexts/membership/actions";
 import { Image, Typography } from "antd";
 import { Images } from "../../images";
 
-const PurchasedList = (
+const IssuedList = (
   user,
   categorys,
   subCategorys,
@@ -17,21 +17,33 @@ const PurchasedList = (
   debouncedSearchTerm
 ) => {
   const dispatch = useMembershipDispatch();
-  const { purchasedMemberships, isPurchasedMembershipLoading } =
-    useMembershipState();
+  let {
+    memberships,
+    ismembershipsLoading,
+  } = useMembershipState();
+  
   useEffect(() => {
-    actions.fetchPurchasedMemberships(dispatch);
+    console.log(1)
+    actions.fetchMembership(dispatch);
+    console.log(2)
   }, []);
-  console.log("purchasedMemberships");
+
+  const memberships_issued = memberships
+    .filter((membership_) => membership_.inventories.length > 0)
+    .filter(
+      (membership) =>
+        membership.ownerOrganization === membership.inventories[0].manufacturer
+    );
+console.log("ismembershipsLoading", ismembershipsLoading);
   const { Title } = Typography;
   return (
     <>
-      <h2 className="text-2xl font-semibold">Purchased Memberships</h2>
-      {isPurchasedMembershipLoading ? (
+      <h2 className="text-2xl font-semibold">Issued Memberships</h2>
+      {ismembershipsLoading ? (
         <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isPurchasedMembershipLoading} size="large" />
+          <Spin spinning={ismembershipsLoading} size="large" />
         </div>
-      ) : purchasedMemberships.length === 0 ? (
+      ) : memberships_issued.length === 0 ? (
         <div className="h-screen justify-center flex flex-col items-center">
           <Image src={Images.noProductSymbol} preview={false} />
           <Title level={3} className="mt-2">
@@ -40,15 +52,15 @@ const PurchasedList = (
         </div>
       ) : (
         <div className="my-4">
-          {purchasedMemberships.map((product, index) => {
+          {memberships_issued.map((product, index) => {
             return (
-              <MembershipCardPurchased
+              <MembershipCard
                 user={user}
                 membership={product}
                 categorys={categorys}
                 subCategorys={subCategorys}
+                key={index}
                 debouncedSearchTerm={debouncedSearchTerm}
-                membershipId={product.itemNumber}
               />
             );
           })}
@@ -58,4 +70,4 @@ const PurchasedList = (
   );
 };
 
-export default PurchasedList;
+export default IssuedList;
