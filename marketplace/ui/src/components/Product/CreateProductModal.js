@@ -48,7 +48,7 @@ const CreateProductModal = ({
     leastSellableUnit: "",
     description: "",
     active: true,
-    userUniqueProductCode:""
+    userUniqueProductCode: ""
   };
 
   const formik = useFormik({
@@ -77,7 +77,7 @@ const CreateProductModal = ({
           isActive: values.active,
           category: values.category.name,
           subCategory: values.subCategory.name,
-          userUniqueProductCode:values.userUniqueProductCode,
+          userUniqueProductCode: values.userUniqueProductCode,
         },
       };
 
@@ -106,11 +106,11 @@ const CreateProductModal = ({
   function beforeUpload(file) {
     const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
     if (!isJpgOrPng) {
-      openToast("bottom","Image must be of jpeg or png format");
+      openToast("bottom", "Image must be of jpeg or png format");
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
-      openToast("bottom","Cannot upload an image of size more than 1mb");
+      openToast("bottom", "Cannot upload an image of size more than 1mb");
     }
     return isJpgOrPng && isLt1M;
   }
@@ -165,7 +165,7 @@ const CreateProductModal = ({
                     <img
                       alt="Product"
                       src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
+                      className="w-full h-full"
                     />
                     <br />
                   </div>
@@ -178,7 +178,7 @@ const CreateProductModal = ({
                     formik.setFieldValue("image", e.file.originFileObj);
                   }}
                   customRequest={() => { }}
-                  style={{ display: "none" }}
+                  className="hidden"
                   accept="image/png, image/jpeg"
                   maxCount={1}
                   showUploadList={false}
@@ -363,22 +363,22 @@ const CreateProductModal = ({
               )}
             </Form.Item>
             <div className="flex justify-between mt-4 items-center">
-            <Form.Item label="Active" name="active">
-              <Radio.Group
-                value={formik.values.active}
-                onChange={formik.handleChange}
-                name="active"
-              >
-                <Radio value={true}>Yes</Radio>
-                <Radio value={false}>No</Radio>
-              </Radio.Group>
+              <Form.Item label="Active" name="active">
+                <Radio.Group
+                  value={formik.values.active}
+                  onChange={formik.handleChange}
+                  name="active"
+                >
+                  <Radio value={true}>Yes</Radio>
+                  <Radio value={false}>No</Radio>
+                </Radio.Group>
 
-              {formik.touched.active && formik.errors.active && (
-                <span className="text-error text-xs">
-                  {formik.errors.active}
-                </span>
-              )}
-            </Form.Item>
+                {formik.touched.active && formik.errors.active && (
+                  <span className="text-error text-xs">
+                    {formik.errors.active}
+                  </span>
+                )}
+              </Form.Item>
               <Form.Item
                 label="Unique Product Code"
                 name="userUniqueProductCode"
@@ -398,7 +398,7 @@ const CreateProductModal = ({
                 )}
               </Form.Item>
             </div>
-           
+
           </div>
         </div>
       </Form>

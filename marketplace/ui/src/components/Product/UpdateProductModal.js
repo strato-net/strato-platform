@@ -48,14 +48,14 @@ const UpdateProductModal = ({
       address: "",
     },
     manufacturer: "",
-    unitofmeasurement:{
+    unitofmeasurement: {
       name: null,
       value: "",
     },
     leastSellableUnit: "",
     description: "",
     active: true,
-    userUniqueProductCode:""
+    userUniqueProductCode: ""
   };
 
   const formik = useFormik({
@@ -78,15 +78,15 @@ const UpdateProductModal = ({
           name: productToUpdate.subCategory,
         },
         manufacturer: decodeURIComponent(productToUpdate.manufacturer),
-        unitofmeasurement:{
-         name: UNIT_OF_MEASUREMENTS[productToUpdate.unitOfMeasurement],
-         value: productToUpdate.unitOfMeasurement
+        unitofmeasurement: {
+          name: UNIT_OF_MEASUREMENTS[productToUpdate.unitOfMeasurement],
+          value: productToUpdate.unitOfMeasurement
         },
         leastSellableUnit: productToUpdate.leastSellableUnit,
         description: decodeURIComponent(productToUpdate.description),
         active: productToUpdate.isActive,
         image: productToUpdate.imageUrl,
-        userUniqueProductCode:productToUpdate.userUniqueProductCode
+        userUniqueProductCode: productToUpdate.userUniqueProductCode
       };
       setFormState(nextState);
       setSelectedImage(productToUpdate.imageUrl);
@@ -191,7 +191,7 @@ const UpdateProductModal = ({
                     <img
                       alt="Product"
                       src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
+                      className="w-full h-full"
                     />
                     <br />
                   </div>
@@ -205,7 +205,7 @@ const UpdateProductModal = ({
                     setIsImgChanged(true);
                   }}
                   customRequest={() => { }}
-                  style={{ display: "none" }}
+                  className="hidden"
                   accept="image/png, image/jpeg"
                   maxCount={1}
                   showUploadList={false}
@@ -388,23 +388,23 @@ const UpdateProductModal = ({
               )}
             </Form.Item>
             <div className="flex justify-between mt-4 ">
-            <Form.Item label="Active" name="active" className="mt-4">
-              <Radio.Group
-                value={formik.values.active}
-                onChange={formik.handleChange}
-                name="active"
-              >
-                <Radio value={true}>Yes</Radio>
-                <Radio value={false}>No</Radio>
-              </Radio.Group>
+              <Form.Item label="Active" name="active" className="mt-4">
+                <Radio.Group
+                  value={formik.values.active}
+                  onChange={formik.handleChange}
+                  name="active"
+                >
+                  <Radio value={true}>Yes</Radio>
+                  <Radio value={false}>No</Radio>
+                </Radio.Group>
 
-              {formik.touched.active && formik.errors.active && (
-                <span className="text-error text-xs">
-                  {formik.errors.active}
-                </span>
-              )}
-            </Form.Item>
-            <Form.Item
+                {formik.touched.active && formik.errors.active && (
+                  <span className="text-error text-xs">
+                    {formik.errors.active}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item
                 label="Unique Product Code"
                 name="userUniqueProductCode"
                 className="w-72"
@@ -422,7 +422,7 @@ const UpdateProductModal = ({
                   </span>
                 )}
               </Form.Item>
-              </div>
+            </div>
           </div>
         </div>
       </Form>
