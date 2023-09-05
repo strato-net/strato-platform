@@ -51,10 +51,12 @@ function PropertyListings() {
 
   const applyFilter = () => {
     setAppliedFilter(filterOption)
-    // for checking only
-    // actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
-    let check = {...filterOption, owner:user.userAddress}
-    actions.fetchProperties(dispatch, limit, currentPage - 1, check)
+    actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
+  }
+
+  const myList = () =>{
+    filterOption["owner"] = user.userAddress;
+  actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
   const clearFilter = () => {
@@ -91,7 +93,8 @@ function PropertyListings() {
                         event: `PROPERTIES_VIEW_${address}`,
                       },
                     });
-                  }}>                    <PropertyCard property={property} />
+                  }}>
+                    <PropertyCard property={property} />
                   </Link>
                 </Col>
               )
@@ -147,6 +150,9 @@ function PropertyListings() {
                   toggleCreateModal(true)
                 }}
               >List Property</Button>
+              <Button className='mt-3.5 ml-1'
+              onClick={myList}
+              >MY</Button>
             </Col>
           </Row>
 
