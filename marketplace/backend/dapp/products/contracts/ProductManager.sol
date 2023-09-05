@@ -285,6 +285,8 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         bool _waterFront
     ) returns (uint256, address) {
         Property property = new Property(
+            tx.origin,
+            
             _productId,
             _listPrice,
             _streetNumber,

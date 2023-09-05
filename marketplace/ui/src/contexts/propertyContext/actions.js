@@ -157,10 +157,8 @@ const actions = {
         queryParams.push(`&sort=${QueryKeys[options[item]]}`);
       } else if (item === 'lot_Size_Area') {
         queryParams.push(`&gteQuery[]=${QueryKeys[item]},${options[item]}`);
-      } else if (item === 'zip_code' || item === 'state' || item === 'property_Type') {
+      } else if (item === 'zip_code' || item === 'state' || item === 'property_Type' || item === 'ownerOrganization') {
         queryParams.push(`&${QueryKeys[item]}=${options[item]}`);
-      } else if (item === 'owner') {
-        queryParams.push(`&${item}=${options[item]}`);
       }
     }
 

@@ -257,6 +257,7 @@ export const QueryKeys = {
   maxlistPrice: "+listPrice",
   minlotSizeArea: "-lotSizeArea",
   maxlotSizeArea: "+lotSizeArea",
+  ownerOrganization:"ownerOrganization",
 }
 
 export const createPropertyFormInitialData = {

@@ -55,8 +55,8 @@ function PropertyListings() {
   }
 
   const myList = () => {
-    let filters = {...filterOption}
-    filters["owner"] = user.userAddress;
+    let filters = { ...filterOption }
+    filters["ownerOrganization"] = user.organization;
     setFilterOption(filters);
     actions.fetchProperties(dispatch, limit, currentPage - 1, filters)
   }
