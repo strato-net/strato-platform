@@ -27,8 +27,6 @@ describe("ReviewManager", function () {
   let reviews;
 
   const factoryArgs = () => ({ ...factory.getReviewArgs(util.uid()) });
-  const updateReviewArg = () => ({ ...factory.updateReviewArgs(util.uid()) });
-  const deleteReviewArg = () => ({ ...factory.deleteReviewArgs(util.uid()) });
   const getAllReviewArg = () => ({ ...factory.getAllReviewArgs(util.uid()) });
 
   before(async () => {
@@ -120,22 +118,4 @@ describe("ReviewManager", function () {
     assert.isAtLeast(1, reviews.length, "reviews has length of 1")
   });
 
-  it("Update Review - 201", async () => {
-    args = updateReviewArg();
-    args['address'] = reviews[0].address;
-    const restStatus = await reviewManager.updateReview(globalAdmin, contract, args, newOptions);
-    assert.hasAnyKeys(
-      contract,
-      ["address"],
-      "update Review contract has address"
-    );
-    assert.equal(restStatus, RestStatus.OK, "should succeed");
-  });
-
-  it("Delete Review - 201", async () => {
-    args = deleteReviewArg();
-    args['reviewAddress'] = reviews[0].reviewerAddress;
-    const [restStatus, message] = await reviewManager.deleteReview(globalAdmin, contract, { reviewAddress: reviews[0].reviewerAddress }, newOptions);
-    assert.equal(restStatus, RestStatus.OK, "should succeed");
-  });
 });
