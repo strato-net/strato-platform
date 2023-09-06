@@ -24,6 +24,7 @@ describe("ReviewManager", function () {
   let newOptions;
   let adminOrganization;
   let args;
+  let reviews;
 
   const factoryArgs = () => ({ ...factory.getReviewArgs(util.uid()) });
   const updateReviewArg = () => ({ ...factory.updateReviewArgs(util.uid()) });
@@ -110,7 +111,7 @@ describe("ReviewManager", function () {
 
   it("Get All Reviews - 201", async () => {
     args = getAllReviewArg();
-    const reviews = await reviewManager.getReviews(
+    reviews = await reviewManager.getReviews(
       globalAdmin,
       {},
       newOptions
@@ -121,6 +122,7 @@ describe("ReviewManager", function () {
 
   it("Update Review - 201", async () => {
     args = updateReviewArg();
+    args['address'] = reviews[0].address;
     const restStatus = await reviewManager.updateReview(globalAdmin, contract, args, newOptions);
     assert.hasAnyKeys(
       contract,
@@ -132,7 +134,8 @@ describe("ReviewManager", function () {
 
   it("Delete Review - 201", async () => {
     args = deleteReviewArg();
-    const [restStatus, message] = await reviewManager.deleteReview(globalAdmin, contract, args, newOptions);
+    args['reviewAddress'] = reviews[0].reviewerAddress;
+    const [restStatus, message] = await reviewManager.deleteReview(globalAdmin, contract, { reviewAddress: reviews[0].reviewerAddress }, newOptions);
     assert.equal(restStatus, RestStatus.OK, "should succeed");
   });
 });
