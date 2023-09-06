@@ -1045,8 +1045,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       console.log("userOrganization", userOrganization)
       
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
-      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership' }, getOptions);
-      ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
+      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization }, getOptions);
+      ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer) // && m.ownerOrganization === userOrganization)
       console.log ('ownedProducts', ownedProducts)
       
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
@@ -1093,8 +1093,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,
             timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
-            savings: null //memberships[0].savings,
-            
+            savings: null, //memberships[0].savings,
+            membershipAddress: null //memberships[0].address
           };
         });
       console.log('combinedData', combinedData);
