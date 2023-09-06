@@ -41,9 +41,18 @@ const CartComponent = ({ columns, data }) => {
         setTotal(tot)
     }, [data])
     let totalNew = 0;
-    data.forEach(element => { totalNew += element.amount; });
+    data.forEach(element => { totalNew += (element.amount + element.tax); });
 
-    const finalTotal = ( total +tax +shipping ).toFixed(2);  
+    const finalTotal = ( total +tax +shipping ).toFixed(2);
+    //To future dev, amount_ is for the column amount in the table, it includes tax
+    //Why total uses amount
+    columns[8].dataIndex = "amount_";
+    
+    data.forEach(element => { 
+        element.amount_ =   !element.isTaxPercentage ? element.amount * (1 + parseFloat(element.tax)/10000) : element.amount + parseFloat(element.tax)
+    });
+
+      
     return (
         <Card className="my-4">
             <div>
