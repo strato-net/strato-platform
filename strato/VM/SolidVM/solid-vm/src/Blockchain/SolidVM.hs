@@ -2777,7 +2777,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
                           Right parsedArgs -> parsedArgs
                           _ -> internalError "Failed to parse constructor args in a create builtin call" argString
   execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
-  return $ SContract contractName' $ accountOnUnspecifiedChain
+  return $ ((flip SAccount) False) . accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $ erNewContractAccount execResults
   
@@ -2792,7 +2792,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
-  return $ SContract contractName' $ accountOnUnspecifiedChain
+  return $ ((flip SAccount) False) . accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $ erNewContractAccount execResults
 
