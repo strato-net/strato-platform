@@ -32,6 +32,7 @@ so that they could be properly moved to their respective version's subsection.
 - Proper behavior of virtual, override, and visibility modifiers
 - Introduction of `es6` and `strict` pragmas, which enable braced and qualified import syntax, and proper visibility modifier behavior, respectively.
 - `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
+- SolidVM built-in `create` and `create2` functions which allows for the explicit creation of contracts within SolidVM contracts
 
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler

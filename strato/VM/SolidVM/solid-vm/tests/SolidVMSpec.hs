@@ -7327,3 +7327,121 @@ contract qq {
 contract qq {
   function badVariadic (uint a, variadic b, string c) {}
 }|]) `shouldThrow` anyParseError
+
+  it "can use create and create2 built-in function calls" . runTest $ do
+    runBS [r|
+contract A {
+  uint x = 1;
+  string y;
+  constructor (uint _x, string _y) {
+    x = _x;
+    y = _y;
+  }
+}
+
+contract B {
+  uint x = 2;
+  constructor (uint _x) {
+    x = _x;
+  }
+}
+
+contract qq {
+  A a;
+  B b;
+
+  constructor() {
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+  }
+}|]
+    getFields ["b"] `shouldReturn`
+      [ bContract "B" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]") ]
+    [BContract "A" a] <- getFields ["a"]
+    [BContract "B" b] <- getFields ["b"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+
+  it "should throw an error when using create built-in function call while missing a parameter" $ runTest (
+    runBS [r|
+contract A {
+  uint x = 1;
+  string y;
+  constructor (uint _x, string _y) {
+    x = _x;
+    y = _y;
+  }
+}
+
+contract qq {
+  A a;
+
+  constructor() {
+    a = create("contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+  }
+}|]) `shouldThrow` anyTypeError
+
+  it "should throw an error when using create built-in function call while contract name is empty " $ runTest (
+    runBS [r|
+contract A {
+  uint x = 1;
+  string y;
+  constructor (uint _x, string _y) {
+    x = _x;
+    y = _y;
+  }
+}
+
+contract qq {
+  A a;
+
+  constructor() {
+    a = create("", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+  }
+}|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "should throw an error when using create built-in function call while contract src is empty " $ runTest (
+    runBS [r|
+contract A {
+  uint x = 1;
+  string y;
+  constructor (uint _x, string _y) {
+    x = _x;
+    y = _y;
+  }
+}
+
+contract qq {
+  A a;
+
+  constructor() {
+    a = create("A", "", "(3, 'hi')");
+  }
+}|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "should throw an error when using create built-in function call while contract name is not in the src " $ runTest (
+    runBS [r|
+contract A {
+  uint x = 1;
+  string y;
+  constructor (uint _x, string _y) {
+    x = _x;
+    y = _y;
+  }
+}
+
+contract B {
+  uint x = 2;
+  constructor (uint _x) {
+    x = _x;
+  }
+}
+
+contract qq {
+  B b;
+
+  constructor() {
+    b = create("B", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3)");
+  }
+}|]) `shouldThrow` anyMissingTypeError

@@ -2767,7 +2767,36 @@ callBuiltin "parseCert" [SString cert] _ = do
   curContract <- getCurrentContract
   return $ certificateMap (Just cert) curContract
 
-callBuiltin x _ _ = unknownFunction "callBuiltin" x
+callBuiltin "create" args@[SString contractName', SString contractSrc, SString argString] _ = do
+  when (contractName' == "" || contractSrc == "") 
+    $ invalidArguments "The contract name and src arguments for the create function should not be empty" args
+  creator <- getCurrentAccount
+  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  newAddress <- getNewAddress creator
+  let constructorArgs = case runParser parseArgs initialParserState "" argString of
+                          Right parsedArgs -> parsedArgs
+                          _ -> internalError "Failed to parse constructor args in a create builtin call" argString
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
+  return $ SContract contractName' $ accountOnUnspecifiedChain
+    $ fromMaybe (internalError "a call to create did not create an address" execResults)
+    $ erNewContractAccount execResults
+  
+callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SString argString] _ = do
+  when (contractName' == "" || contractSrc == "") 
+    $ invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
+  creator <- getCurrentAccount
+  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  let constructorArgs = case runParser parseArgs initialParserState "" argString of
+                          Right parsedArgs -> parsedArgs
+                          _ -> internalError "Failed to parse constructor args in a create builtin call" argString
+  constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
+  newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
+  return $ SContract contractName' $ accountOnUnspecifiedChain
+    $ fromMaybe (internalError "a call to create did not create an address" execResults)
+    $ erNewContractAccount execResults
+
+callBuiltin x args _ = unknownFunction ("callBuiltin " ++ show args) x
 
 
 
