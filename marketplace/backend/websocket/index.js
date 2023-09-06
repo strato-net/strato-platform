@@ -13,33 +13,44 @@ async function bootstrapWebsocketToExpress(expressServer) {
     const websocketServer = new WebSocketServer({
         noServer: true,
         path: '/eventstream' // todo: better name?
-    });
+    })
 
     expressServer.on('upgrade', (request, socket, head) => {
         websocketServer.handleUpgrade(request, socket, head,
-            () => {
-                console.log("established websocket connection with client")
-            })
+            (websocket) => websocketServer.emit('connection', websocket, request)
+        )
     })
 
-    // set up kafka consumer
-    await consumer.connect()
-    await consumer.subscribe({topic: 'solidvmevents'})
-
-    await consumer.run({
-        eachMessage: async ({_topic, _partition, message}) => {
-            websocketServer.clients.forEach((client) => {
-                if (client.readyState == WebSocket.OPEN) {
-                    client.send(message.value.toString());
-                    console.log("Sent kafka msg to client");
+    websocketServer.on('connection', 
+        function handleConnection(wsConnection){
+            wsConnection.on('message', (msg) => {
+                if(msg.toString() === "ping"){
+                    wsConnection.send("pong")
                 }
             })
-            console.log("Received the following kafka msg ", message.value)
         }
-    })
+    )
+
+    try{
+        // set up kafka consumer
+        await consumer.connect();
+        await consumer.subscribe({topic: 'solidvmevents'});
+    
+        await consumer.run({
+            eachMessage: async ({ message }) => {
+                websocketServer.clients.forEach((client) => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(message.value.toString())
+                    }
+                })
+            }
+        });
+    } catch (err) {
+        console.log("Error while trying to set up or run kafka consumer: ", err)
+    }
 
 
-    return websocketServer;
+    return websocketServer
 }
 
 export default bootstrapWebsocketToExpress
