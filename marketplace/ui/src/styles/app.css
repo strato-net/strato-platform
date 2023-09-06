@@ -154,3 +154,10 @@ display: none !important;
 .h-90 {
   height: 90%;
 }
+.ant-tabs-tab-active {
+  background-color: #181eac !important;
+}
+
+.ant-tabs-tab-active > div > span {
+  color: white !important;
+}

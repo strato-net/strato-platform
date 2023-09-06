@@ -2,6 +2,11 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
 /// @title A representation of Property assets
 contract Property {
+    address public owner;
+    string public ownerOrganization;
+    string public ownerOrganizationalUnit;
+    string public ownerCommonName;
+
     address public productId;
     int public listPrice;
     int public streetNumber;
@@ -99,6 +104,7 @@ contract Property {
     bool public waterFront;
 
     constructor(
+        address _owner,
         address _productId,
         int _listPrice,
         int _streetNumber,
@@ -188,6 +194,8 @@ contract Property {
         bool _sprinklerSystem,
         bool _waterFront
     ) public {
+        owner = _owner;
+        
         productId = _productId;
         listPrice = _listPrice;
         streetNumber = _streetNumber;
@@ -283,8 +291,13 @@ contract Property {
         sauna = _sauna;
         sprinklerSystem = _sprinklerSystem;
         waterFront = _waterFront;
+
+        mapping(string => string) ownerCert = getUserCert(owner);
+        ownerOrganization = ownerCert["organization"];
+        ownerOrganizationalUnit = ownerCert["organizationalUnit"];
+        ownerCommonName = ownerCert["commonName"];
     }
-    
+
     function update(
         int _listPrice,
         int _streetNumber,
