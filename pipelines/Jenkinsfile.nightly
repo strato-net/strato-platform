@@ -209,6 +209,7 @@ pipeline {
             withCredentials([
                 usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
+              dir ('strato-worktree') {
               sh '''#!/bin/bash -le
                 set -x
                 version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)     
@@ -221,6 +222,7 @@ pipeline {
                 aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
                 '''
               }
+            }
           },
 /*            
           'Apex tests': {
