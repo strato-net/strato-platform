@@ -111,7 +111,6 @@ function bind(user, _contract, options) {
  * get the reviews
  */
 async function getReview(user, args, options) {
-  console.log('review-manager getReview', args)
   return reviewJs.get(user, args, options);
 }
 
