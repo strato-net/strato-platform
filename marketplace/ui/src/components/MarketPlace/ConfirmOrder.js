@@ -313,31 +313,14 @@ const ConfirmOrder = () => {
   ];
 
   const navigate = useNavigate();
-
-  // async function sendGridSendEmail(to, subject, htmlContent) {
-  //   const BACKEND_URL = 'http://localhost/api/v1/order/send-email'; 
-  //   try {
-  //     const response = await fetch(BACKEND_URL, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json'
-  //       },
-  //       body: JSON.stringify({ to, subject, htmlContent })
-  //     });
-  //     if (!response.ok) {
-  //       const text = await response.text();
-  //       throw new Error('Error sending email: ' + text);
-  //     }
-  //     console.log('Email sent successfully!');
-  //   } catch (error) {
-  //     console.error('Error sending email:', error);
-  //     throw error;
-  //   }
-  // }
   
   const handleOrderConfirm = async () => {
     let concatenatedOrderString = "";
+    let firstSellerOrg;
     for (let i = 0; i < confirmOrderList.length; i++) {
+      if (i === 0) {
+        firstSellerOrg = confirmOrderList[i].sellerOrganization;
+      }
       let orderItem = confirmOrderList[i];
       let itemName = orderItem.item.name;
       let itemPrice = orderItem.unitPrice;
@@ -370,7 +353,7 @@ const ConfirmOrder = () => {
         <p style="text-align: left;">${shippingAddr}</p>
         <p style="text-align: left;">Yours,</p>
         <div style="display: flex; align-items: center;"><img style="margin-right: 10px; width: 60px; height: 60px;" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
-          <h3 style="color: #000; font-weight: 100; text-align: left;"><strong>Hamrah Aesthetics</strong> <em><span style="text-decoration: underline;">powered by</span> the BlockApps Marketplace on </em><strong>Mercata&#8482;</strong><em><br /></em></h3>
+          <h3 style="color: #000; font-weight: 100; text-align: left;"><strong>${firstSellerOrg}</strong> <em><span style="text-decoration: underline;">powered by</span> the BlockApps Marketplace on </em><strong>Mercata&#8482;</strong><em><br /></em></h3>
         </div>
         <p style="font-size: 10px; margin-top: 20px;">This email was sent from a notification only address that cannot accept incoming email. Please do not reply to this message.</p>
       </div>

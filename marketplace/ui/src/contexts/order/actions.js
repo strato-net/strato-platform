@@ -34,7 +34,6 @@ const actionDescriptors = {
 };
 
 async function sendGridSendEmail(to, subject, htmlContent) {
-  // const BACKEND_URL = `http://localhost/api/v1/order/send-email`; 
   const BACKEND_URL = `${apiUrl}/order/send-email`; 
   try {
     const response = await fetch(BACKEND_URL, {
