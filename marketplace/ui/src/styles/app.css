@@ -161,4 +161,11 @@ display: none !important;
 
 .w-800 {
   width: 800px;
+  
+.ant-tabs-tab-active {
+  background-color: #181eac !important;
+}
+
+.ant-tabs-tab-active > div > span {
+  color: white !important;
 }

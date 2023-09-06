@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Spin, Pagination, notification, Button, Tag } from 'antd'
+import { Row, Col, Typography, Spin, Pagination, notification, Button, Tag, Tabs } from 'antd'
 import PropertyCard from './PropertyCard'
 import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
@@ -8,6 +8,7 @@ import { usePropertiesState, usePropertiesDispatch } from '../../../contexts/pro
 import PropertyCreateModal from './PropertyCreateModal'
 import { createPropertyFormInitialData, filterlabel, propertyConstants } from '../helpers/constants'
 import TagManager from "react-gtm-module";
+import { useAuthenticateState } from '../../../contexts/authentication'
 const { LIMIT_PER_PAGE } = propertyConstants;
 
 function PropertyListings() {
@@ -21,10 +22,11 @@ function PropertyListings() {
   const dispatch = usePropertiesDispatch()
   const { properties, isPropertiesLoading, message, success } = usePropertiesState();
   const [api, contextHolder] = notification.useNotification();
+  const { user } = useAuthenticateState();
 
   useEffect(() => {
     document.title = "Welcome to Mercata Properties"
-    actions.fetchProperties(dispatch, limit, limit * (currentPage - 1))
+    actions.fetchProperties(dispatch, limit, limit * (currentPage - 1), filterOption)
   }, [dispatch, currentPage, limit])
 
 
@@ -71,6 +73,17 @@ function PropertyListings() {
     actions.fetchProperties(dispatch, limit, currentPage - 1, data)
   }
 
+  const handleTab = (label) => {
+    if (label === 'All') {
+      actions.fetchProperties(dispatch, limit, limit * (currentPage - 1), {})
+    } else {
+      let filters = { ...filterOption }
+      filters["ownerOrganization"] = user.organization;
+      setFilterOption(filters);
+      actions.fetchProperties(dispatch, limit, currentPage - 1, filters)
+    }
+  }
+
   const propertyList = () => {
     return (
       <>
@@ -86,7 +99,8 @@ function PropertyListings() {
                         event: `PROPERTIES_VIEW_${address}`,
                       },
                     });
-                  }}>                    <PropertyCard property={property} />
+                  }}>
+                    <PropertyCard property={property} />
                   </Link>
                 </Col>
               )
@@ -136,12 +150,25 @@ function PropertyListings() {
             <Col className='flex justify-between'>
               <Filter applyFilter={applyFilter} clearFilter={clearFilter}
                 handleChange={handleChange} filterOption={filterOption} />
+              <Tabs
+                defaultActiveKey="2"
+                className='mr-5 mt-2'
+                type="card"
+                items={[{ label: "All" }, { label: user?.organization || "organization" }].map((item, i) => {
+                  const id = String(i + 1);
+                  return {
+                    label: (<span min-w-4 onClick={() => { handleTab(item.label) }}> {item.label}</span>),
+                    key: id,
+                    children: ``,
+                  };
+                })}
+              />
               <Button type="primary"
                 className='mt-3.5'
                 onClick={() => {
                   toggleCreateModal(true)
                 }}
-              >List Property</Button>
+              >Create Property</Button>
             </Col>
           </Row>
 
