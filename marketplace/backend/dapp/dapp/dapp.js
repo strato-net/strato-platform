@@ -1055,6 +1055,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       ownedItems = ownedItems.filter(item =>
         ownedProducts.some(product => item.productId === product.address)
       );
+      
       console.log("ownedItems", ownedItems)
       
       // Get Memberhships where productId = Items.productId 
