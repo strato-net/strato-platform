@@ -455,7 +455,7 @@ processTheMessages env conn messages = do
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n'' <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
 
                 --Create mapping tables
-                forM_ mapNames $ \m -> do 
+                deferredForeignKeysForMappings <- fmap concat $ forM mapNames $ \m -> do 
                   outputData conn $ createMappingTable g nameParts m --Tables are created
 
 -- mark        
@@ -463,7 +463,6 @@ processTheMessages env conn messages = do
                 deferredForeignKeys <- case (_contractType c ) of
                   AbstractType -> do
                     outputData conn $ createAbstractTable g c nameParts
-                    return []
                   _ -> do
                     outputData conn $ createExpandIndexTable g c nameParts
                 
@@ -471,7 +470,7 @@ processTheMessages env conn messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
   
-                return deferredForeignKeys
+                return $ deferredForeignKeys ++ deferredForeignKeysForMappings
 
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
                 outputData conn $ createForeignIndexesForJoins deferredForeignKey

@@ -330,6 +330,16 @@ getDeferredForeignKeys tableName c o a =
       foreignTableName=indexTableName o a $ labelToText x
       }
 
+getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForMapping tableName o a =
+    [ForeignKeyInfo {
+      tableName=tableName,
+      columnName=T.pack "record_id",
+      foreignTableName=indexTableName o a $ (\case
+                                                MappingTableName _ _ n' _ -> n'
+                                                _ -> "") tableName
+      }]
+
 createIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
@@ -354,32 +364,37 @@ createAbstractTable :: OutputM m
                  => IORef Globals
                  -> Contract
                  -> (Text, Text, Text)
-                 -> ConduitM () Text m ()
+                 -> ConduitM () Text m [ForeignKeyInfo]
 createAbstractTable globalsIORef contract (o, a, n) = do
   let tableName = abstractTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
-  when (not tableExists) $ do
+  if tableExists
+  then return []
+  else do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     yield $ createAbstractTableQuery contract (o,a,n)
     setTableCreated globalsIORef tableName (list++ ["\"data\" jsonb"])
+    return $ getDeferredForeignKeys tableName contract o a
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable :: OutputM m
                  => IORef Globals
                  -> (Text, Text, Text)
                  -> Text
-                 -> ConduitM () Text m ()
+                 -> ConduitM () Text m [ForeignKeyInfo]
 createMappingTable globalsIORef (o, a, n) m = do
   let tableName = mappingTableName o a n m
   tableExists <- isTableCreated globalsIORef tableName
 
   $logInfoLS "createMappingTable/mappingTableExists" (tableName, tableExists)
-
-  when (not tableExists) $ do
+  if tableExists
+  then return []
+  else do
     incNumMappingTables
     yield $ (createMappingTableQuery (o, a, n, m))
     let list = ["key","value"]
     setTableCreated globalsIORef tableName list
+    return $ getDeferredForeignKeysForMapping tableName o a
 
 createHistoryTable' :: OutputM m
                    => IORef Globals
