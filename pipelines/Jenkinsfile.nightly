@@ -209,18 +209,20 @@ pipeline {
             withCredentials([
                 usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
-              sh '''#!/bin/bash -le
-                set -x
-                version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)     
-                AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
-                aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
+              dir ('strato-worktree') {
+                sh '''#!/bin/bash -le
+                  set -x
+                  version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)     
+                  AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
+                  aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
                 '''
               }
+            }
           },
 /*            
           'Apex tests': {
