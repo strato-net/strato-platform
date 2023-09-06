@@ -32,7 +32,8 @@ const PurchasedList = (
       ) : (
         <div className="my-4">
           <h2 className="text-2xl font-semibold">Purchased Memberships</h2>
-          {purchasedMemberships.map((product, index) => {
+          { purchasedMemberships.length > 0 ? (
+          purchasedMemberships.map((product, index) => {
             return (
               <MembershipCardPurchased
                 user={user}
@@ -40,10 +41,14 @@ const PurchasedList = (
                 categorys={categorys}
                 subCategorys={subCategorys}
                 debouncedSearchTerm={debouncedSearchTerm}
+                key={index}
                 membershipId={product.itemNumber}
               />
             );
-          })}
+          })
+          ) : (
+            <p className="flex justify-center my-10 text-xl"> No data found</p>
+          )}
         </div>
       )}
     </>

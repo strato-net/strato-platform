@@ -208,45 +208,7 @@ const Membership = ( user ) => {
                 </div>
             ) : (
                 <div className="mx-16 mt-14 h-screen">
-                    {memberships.length === 0 && offset === 0 ? (
-                        <div className="h-screen justify-center flex flex-col items-center">
-                            <Image src={Images.noProductSymbol} preview={false} />
-                            <Title level={3} className="mt-2">
-                                No product found
-                            </Title>
-                            <Text className="text-sm">Start adding your product</Text>
-                            <div className="flex items-center">
-                                <Button
-                                    type="primary"
-                                    className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 mr-3"
-                                    onClick={() => {
-                                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                                        window.location.href = loginUrl;
-                                        } else {
-                                        onboardSeller()
-                                        }
-                                    }}
-                                    disabled={stripeStatus.detailsSubmitted}
-                                    >
-                                    {"Setup Stripe Account"}
-                                </Button>
-                                <Button
-                                    id="add-product-button"
-                                    type="primary"
-                                    className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6"
-                                    onClick={() => {
-                                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                                            window.location.href = loginUrl;
-                                        } else {
-                                            showModal()
-                                        }
-                                    }}
-                                >
-                                    Add Memberships
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
+                    {
                         <>
                             <div className="flex justify-between">
                                 <Col>
@@ -327,7 +289,7 @@ const Membership = ( user ) => {
                                 </div>
                             </div>
                             <>
-                                {memberships.length !== 0 ? (
+                                {
                                     (typeDisplay === "purchase") ?
                                         <PurchasedList 
                                         user={user}
@@ -336,23 +298,65 @@ const Membership = ( user ) => {
                                         debouncedSearchTerm={debouncedSearchTerm}
                                         /> 
                                         :
-                                        (<div className="my-4">
-                                            {memberships_issued.map((product, index) => {
-                                                return (
-                                                    <MembershipCard
-                                                        user={user}
-                                                        membership={product}
-                                                        categorys={categorys}
-                                                        subCategorys={subCategorys}
-                                                        key={index}
-                                                        debouncedSearchTerm={debouncedSearchTerm}
-                                                    />
-                                                );
-                                            })}
-                                        </div>)
-                                ) : (
-                                    <p className="flex justify-center my-10"> No data found</p>
-                                )}
+                                    (<div className="my-4">
+                                        { memberships.length > 0 ?
+                                        memberships_issued.map((product, index) => {
+                                            return (
+                                                <MembershipCard
+                                                    user={user}
+                                                    membership={product}
+                                                    categorys={categorys}
+                                                    subCategorys={subCategorys}
+                                                    key={index}
+                                                    debouncedSearchTerm={debouncedSearchTerm}
+                                                />
+                                            );
+                                        }
+                                    )
+                                    :
+                                    (
+                                        <>
+                                        <h2 className="text-2xl font-semibold">Issued Memberships</h2>
+                                        <div className="h-screen justify-center flex flex-col items-center">
+                                            <Image src={Images.noProductSymbol} preview={false} />
+                                            <Title level={3} className="mt-2">
+                                                No product found
+                                            </Title>
+                                            <Text className="text-sm">Start adding your product</Text>
+                                            <div className="flex items-center">
+                                                <Button
+                                                    type="primary"
+                                                    className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 mr-3"
+                                                    onClick={() => {
+                                                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                                        window.location.href = loginUrl;
+                                                        } else {
+                                                        onboardSeller()
+                                                        }
+                                                    }}
+                                                    disabled={stripeStatus.detailsSubmitted}
+                                                    >
+                                                    {"Setup Stripe Account"}
+                                                </Button>
+                                                <Button
+                                                    id="add-product-button"
+                                                    type="primary"
+                                                    className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6"
+                                                    onClick={() => {
+                                                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                                                            window.location.href = loginUrl;
+                                                        } else {
+                                                            showModal()
+                                                        }
+                                                    }}
+                                                >
+                                                    Add Memberships
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        </>
+                                    )}
+                                </div>)}
                                 <Pagination
                                     current={page}
                                     onChange={onPageChange}
@@ -362,7 +366,7 @@ const Membership = ( user ) => {
                                 <div className="pb-12"></div>
                             </>
                         </>
-                    )}
+                    }
                 </div>
             )}
             {open && (
