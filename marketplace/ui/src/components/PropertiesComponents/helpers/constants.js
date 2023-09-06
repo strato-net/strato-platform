@@ -221,7 +221,7 @@ export const propertyCheckBox = {
 };
 
 export const propertyConstants = {
-  LIMIT_PER_PAGE: 10,
+  LIMIT_PER_PAGE: 8,
   MAX_PRICE_VALUE: 0
 }
 

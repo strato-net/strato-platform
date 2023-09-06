@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Row, Col, Typography, Spin, Pagination, notification, Button, Tag } from 'antd'
+import { Row, Col, Typography, Spin, Pagination, notification, Button, Tag, Tabs } from 'antd'
 import PropertyCard from './PropertyCard'
 import Filter from './Filter'
 import { actions } from '../../../contexts/propertyContext/actions'
@@ -54,13 +54,6 @@ function PropertyListings() {
     actions.fetchProperties(dispatch, limit, currentPage - 1, filterOption)
   }
 
-  const myList = () => {
-    let filters = { ...filterOption }
-    filters["ownerOrganization"] = user.organization;
-    setFilterOption(filters);
-    actions.fetchProperties(dispatch, limit, currentPage - 1, filters)
-  }
-
   const clearFilter = () => {
     setCurrentPage(1);
     setAppliedFilter({});
@@ -78,6 +71,17 @@ function PropertyListings() {
     setFilterOption(data);
     setAppliedFilter(data);
     actions.fetchProperties(dispatch, limit, currentPage - 1, data)
+  }
+
+  const handleTab = (label) => {
+    if (label === 'All') {
+      actions.fetchProperties(dispatch, limit, limit * (currentPage - 1), {})
+    } else {
+      let filters = { ...filterOption }
+      filters["ownerOrganization"] = user.organization;
+      setFilterOption(filters);
+      actions.fetchProperties(dispatch, limit, currentPage - 1, filters)
+    }
   }
 
   const propertyList = () => {
@@ -146,15 +150,25 @@ function PropertyListings() {
             <Col className='flex justify-between'>
               <Filter applyFilter={applyFilter} clearFilter={clearFilter}
                 handleChange={handleChange} filterOption={filterOption} />
+              <Tabs
+                defaultActiveKey="2"
+                className='mr-5 mt-2'
+                type="card"
+                items={[{ label: "All" }, { label: user?.organization || "organization" }].map((item, i) => {
+                  const id = String(i + 1);
+                  return {
+                    label: (<span min-w-4 onClick={() => { handleTab(item.label) }}> {item.label}</span>),
+                    key: id,
+                    children: ``,
+                  };
+                })}
+              />
               <Button type="primary"
                 className='mt-3.5'
                 onClick={() => {
                   toggleCreateModal(true)
                 }}
-              >List Property</Button>
-              <Button className='mt-3.5 ml-1'
-                onClick={myList}
-              >MY</Button>
+              >Create Property</Button>
             </Col>
           </Row>
 
