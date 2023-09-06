@@ -38,6 +38,7 @@ import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
+import Service from "./components/Service";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -242,6 +243,27 @@ const AuthenticatedRoutes = ({ user, users }) => {
                 </CategorysProvider>
               </MembershipsProvider>
             </EventsProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.Services.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ProductsProvider>
+                  <InventoriesProvider>
+                    <MembershipsProvider>
+                      <ServicesProvider>
+                        <Service user={user} users={users}/>
+                      </ServicesProvider>  
+                    </MembershipsProvider>
+                  </InventoriesProvider>              
+                </ProductsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
           </UsersProvider>
         }
       />
