@@ -1,6 +1,4 @@
-const NotifcationCard = ({notification}) => {
-    console.log('AYAS LOGS PART TWOOOO', notification)
-  
+const NotifcationCard = ({notification}) => {  
     return (
         <div>
         { notification ? (

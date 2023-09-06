@@ -1,37 +1,33 @@
 import { useEffect, useState } from "react";
 import NotifcationCard from "./NotificationCard";
-import useWebSocket from "react-use-websocket";
+import { useEventStream } from "../../helpers/websocket";
 
 const Notification = () => {
-    function constructEndpoint(){
-        const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:" ;
-        const port = window.location.port ? ":" + window.location.port : "" ;
-        return wsProtocol + "//" + window.location.hostname + port + "/eventstream" ;
-    }
+    
 
-    function myFilter(message) {
+    function ownershipUpdateFilter(message) {
         const event = JSON.parse(message.data);
         return event?.eventEvent?.eventName === "OwnershipUpdate";
     }
-    const { lastMessage } = useWebSocket(constructEndpoint(), {
-        share: true,
-        filter: myFilter,
-        shouldReconnect: (closeEvent) => {
-            console.log("going to reconnect after closeEvent ", closeEvent);
-            return true},
-        onOpen: () => console.log("websocket opened"),
-        onClose: () => console.log("websocket closed"),
-        onError: (err) => console.log("websocket error: ", err)
-    })
+    const { lastMessage } = useEventStream((msg) => JSON.parse(msg.data)?.eventEvent?.eventName === "CertificateRegistered");
+    const { lastMessage: lastOwnershipUpdate } = useEventStream(ownershipUpdateFilter)
     const [notifications, setNotifications] = useState([]);
 
     useEffect(() => {
         if (lastMessage !== null) {
             const newEvent = JSON.parse(lastMessage.data);
             console.log("new message: ", newEvent);
-            setNotifications((prevNotif) => {if (prevNotif.length < 20) return prevNotif.concat(newEvent); else return prevNotif});
+            setNotifications((prevNotif) => {if (prevNotif.length > 20) return prevNotif; else return prevNotif.concat(newEvent)});
         }
     }, [lastMessage, setNotifications]);
+
+    useEffect(() => {
+        if (lastOwnershipUpdate !== null) {
+            const newOU = JSON.parse(lastOwnershipUpdate.data);
+            console.log("ownership update");
+            setNotifications((prevNotif) => {if (prevNotif.length > 20) return prevNotif; else return prevNotif.concat(newOU)});
+        }
+    }, [lastOwnershipUpdate, setNotifications]);
 
     return (
         <div>
