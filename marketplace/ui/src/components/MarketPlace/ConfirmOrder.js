@@ -124,17 +124,17 @@ const ConfirmOrder = () => {
     setData(cartData);
     let t = 0;
     confirmOrderList.forEach((item) => {
-      t += item.tax;
+      t += parseFloat(item.tax);
     });
     setTax(t);
     let s = 0;
     confirmOrderList.forEach((item) => {
-      s += item.shippingCharges;
+      s += parseFloat(item.shippingCharges);
     });
     setShipping(s);
     let sum = 0;
     confirmOrderList.forEach((item) => {
-      sum += item.amount;
+      sum += parseFloat(item.amount);
     });
     setTotal(sum);
   }, [marketplaceDispatch, confirmOrderList, storedData]);

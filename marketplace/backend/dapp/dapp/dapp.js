@@ -941,19 +941,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       });
 
       const groupedData = inventories.reduce((acc, inventory) => {
-        if (!acc[inventory.ownerOrganization]) {
-          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, data: [] };
+        if (!acc[inventory.productId]) {
+          const taxRate    = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount :  inventory.taxDollarAmount)/100;
+          acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: inventory.taxDollarAmount === 0, data: [] };
         }
-        acc[inventory.ownerOrganization].data.push(inventory);
+        acc[inventory.productId].data.push(inventory);
         return acc;
       }, {});
 
       const inventoriesData = Object.values(groupedData);
       const total = inventoriesData.reduce((acc, obj) => {
-        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.quantity, 0);
-        return acc + result;
-      }, 0);
-
+        const result = obj.data.reduce((total, curr) => obj.tax !==0 ?
+          (obj.isTaxPercentage ?
+          ((total + ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax/100))) ) * 100) / 100
+          : total + (curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity) 
+         )   : (total + curr.pricePerUnit * curr.quantity) , 0);
+        return Number(acc) + Number(result);
+      }, 0).toFixed(2);
+      
       if (total != recievedOrderTotal) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
       }
