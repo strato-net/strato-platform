@@ -221,7 +221,6 @@ pipeline {
               }
           },
 
-/*            
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -290,7 +289,6 @@ pipeline {
               sh 'npm run test'
             }
           },
- */
         )
       }
     }
