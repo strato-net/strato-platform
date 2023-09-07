@@ -127,7 +127,7 @@ contract Item_3 is ItemStatus {
         address _inventoryId
     ) public returns (uint256) {
         // caller must be current owner to transfer ownership
-        if (tx.origin != owner) {
+        if(ownerOrganization != getUserOrganization(tx.origin)){
             return RestStatus.FORBIDDEN;
         }
 
