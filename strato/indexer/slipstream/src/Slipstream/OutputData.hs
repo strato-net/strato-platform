@@ -861,7 +861,8 @@ insertAbstractTableQuery cs = concat $
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)  
-              keySt  = wrapAndEscapeDouble $ escapeQuotes <$> (baseAbstractColumns ++ filter (`notElem` baseAbstractColumns) abColumns)
+              list = filter (`notElem` baseAbstractColumns) abColumns
+              keySt  = wrapAndEscapeDouble $ escapeQuotes <$> (baseAbstractColumns ++ list)
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -890,8 +891,11 @@ insertAbstractTableQuery cs = concat $
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    data = excluded.data|]
+    contract_name = excluded.contract_name|]
+                , if null list then "" else ",\n    "
+                , tableUpsert $ list
+                ,[r|
+      data = excluded.data|]
                 , ";"
                 ]
 
