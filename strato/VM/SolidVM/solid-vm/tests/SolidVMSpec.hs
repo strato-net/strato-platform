@@ -4197,7 +4197,7 @@ contract qq{
   it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-
+  
   constructor () public {
     }
 }
@@ -4530,7 +4530,7 @@ contract qq {
   it "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-
+  
   constructor () public {
     }
 }
