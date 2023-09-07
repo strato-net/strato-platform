@@ -466,7 +466,7 @@ expandAbstractTable :: OutputM m
                  -> (Text, Text, Text)
                  -> ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable globalsIORef contract (o, a, n)= do
-  let tableName = indexTableName o a n
+  let tableName = abstractTableName o a n
   expandAbstractContractTable globalsIORef contract tableName
 
 expandHistoryTable :: OutputM m =>
