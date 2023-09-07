@@ -28,6 +28,9 @@ module Slipstream.OutputData (
   createExpandEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
+  createExpandAbstractTable,
+  expandAbstractTable,
+  expandAbstractContractTable,
   notifyPostgREST,
   createExpandHistoryTable,
   cirrusInfo,
@@ -284,6 +287,17 @@ createExpandIndexTable g c nameParts = do
   expansionForeignKeys <- expandIndexTable g c nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
+createExpandAbstractTable
+  :: OutputM m
+  => IORef Globals
+  -> Contract
+  -> (Text, Text, Text)
+  -> ConduitM () Text m [ForeignKeyInfo]
+createExpandAbstractTable g c nameParts = do
+  creationForeignKeys <- createAbstractTable g c nameParts
+  expansionForeignKeys <- expandAbstractTable g c nameParts
+  return $ creationForeignKeys ++ expansionForeignKeys
+
 data ForeignKeyInfo =
   ForeignKeyInfo {
     tableName :: TableName,
@@ -446,6 +460,15 @@ expandIndexTable globalsIORef contract (o, a, n)= do
   let tableName = indexTableName o a n
   expandContractTable globalsIORef contract tableName
 
+expandAbstractTable :: OutputM m
+                 => IORef Globals
+                 -> Contract
+                 -> (Text, Text, Text)
+                 -> ConduitM () Text m [ForeignKeyInfo]
+expandAbstractTable globalsIORef contract (o, a, n)= do
+  let tableName = indexTableName o a n
+  expandAbstractContractTable globalsIORef contract tableName
+
 expandHistoryTable :: OutputM m =>
                       IORef Globals ->
                       Contract ->
@@ -540,6 +563,49 @@ expandContractTable globalsIORef contract tableName = do
               columnName = colName,
               foreignTableName = let a' = case a of; "" -> n; _ -> a
                                  in indexTableName o a' $ labelToText foreignName
+              }
+          _ -> []
+
+expandAbstractContractTable :: OutputM m
+                    => IORef Globals
+                    -> Contract
+                    -> TableName
+                    -> ConduitM () Text m [ForeignKeyInfo]
+expandAbstractContractTable globalsIORef contract tableName = do
+  columns <- getTableColumns globalsIORef tableName
+  case columns of
+    Nothing -> do
+      $logErrorLS "expandTable" $ T.concat
+          [ "Table "
+          , (tableNameToText tableName)
+          , " does not exist, but we are trying to expand it?"
+          ]
+      return []
+    Just cols -> do
+      let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
+          difference new old = filter ((`notElem` old) . fst) new
+          extras = difference list (partialParseTableColumns cols)
+          extraTableColumns = tableColumns extras
+      unless (null extraTableColumns) $ do
+        $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+        $logInfoS "expandTable" $ T.concat
+            [ "Adding columns to "
+            , (tableNameToText tableName)
+            , " for the following new fields: "
+            , T.intercalate ", " extraTableColumns
+            ]
+        setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
+        yield $ expandTableQuery tableName extraTableColumns
+      return $
+        case tableName of
+          AbstractTableName o a n ->
+            flip map
+            [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- extras] $ \(colName, foreignName) ->
+            ForeignKeyInfo {
+              tableName = tableName,
+              columnName = colName,
+              foreignTableName = let a' = case a of; "" -> n; _ -> a
+                                 in abstractTableName o a' $ labelToText foreignName
               }
           _ -> []
 
