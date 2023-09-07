@@ -115,54 +115,15 @@ const Membership = (user) => {
     navigate(routes.OnboardingSellerToStripe.url);
   };
 
-  const memberships_issued = memberships
-    .filter((membership_) => membership_.inventories.length > 0)
-    .filter(
-      (membership) =>
-        membership.ownerOrganization === membership.inventories[0].manufacturer
-    );
 
-  //We want to show all inventories associated to a membership, but also
-  //All memberships that do not have inventories
-  //So we create a new list of memberships objects, creating a new object for each inventory
-  //and then we flatten the list
-  const membershipsAsInventories = memberships
-    .filter((membership_) => membership_.inventories.length > 0)
-    .map((membership_) => {
-      return membership_.inventories.map((inventory) => {
-        return {
-          ...membership_,
-          ...inventory,
-          product_with_inventory: 1,
-          inventoryAddress: inventory.address,
-          membershipAddress: membership_.address,
-        };
-      });
-    })
-    .flat();
-  //Then we combine lists of memberships that do not have inventories with the list of inventories/memberhsips
-  memberships = [
-    ...memberships
-      .filter((membership_) => membership_.inventories.length === 0)
-      .map((membership_) => {
-        return {
-          ...membership_,
-          product_with_inventory: 0,
-          inventoryAddress: null,
-          membershipAddress: membership_.address,
-        };
-      }),
-    ...membershipsAsInventories,
-  ];
-
-  useEffect(() => {
-    if (isSearch) {
-      setOffset(0);
-      actions.fetchMembership(dispatch, limit, 0, debouncedSearchTerm);
-      setIsSearch(false);
-    } else setIsSearch(true);
-    actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
-  }, [limit, offset, debouncedSearchTerm]);
+  // useEffect(() => {
+  //   if (isSearch) {
+  //     setOffset(0);
+  //     actions.fetchMembership(dispatch, limit, 0, debouncedSearchTerm);
+  //     setIsSearch(false);
+  //   } else setIsSearch(true);
+  //   actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
+  // }, [limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
     let len = memberships.length;
@@ -363,20 +324,6 @@ const Membership = (user) => {
                   subCategorys={subCategorys}
                   debouncedSearchTerm={debouncedSearchTerm}
                 />
-                // <div className="my-4">
-                //   {memberships_issued.map((product, index) => {
-                //     return (
-                //       <MembershipCard
-                //         user={user}
-                //         membership={product}
-                //         categorys={categorys}
-                //         subCategorys={subCategorys}
-                //         key={index}
-                //         debouncedSearchTerm={debouncedSearchTerm}
-                //       />
-                //     );
-                //   })}
-                // </div>
               )}
               <Pagination
                 current={page}
