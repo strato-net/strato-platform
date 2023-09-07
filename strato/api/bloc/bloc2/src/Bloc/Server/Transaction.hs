@@ -571,13 +571,18 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwtToken) Nothing
         Just addr' -> return addr'
-      let err = CouldNotFind $ Text.concat
-                [ "postBlocTransaction': Couldn't find common name for user address "
-                , Text.pack $ formatAddressWithoutColor addr
-                ]
-      userCert <- maybe (throwIO err) pure =<<
-        A.select (A.Proxy @Certificate) addr
-      let userContractAddr = deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash Nothing
+      walletFlag <- useWalletsByDefault <$> getBlocEnv
+      let useWallet = fromMaybe walletFlag mUseWallet
+      userContractAddr <- if useWallet
+        then do
+          let err = CouldNotFind $ Text.concat
+                    [ "postBlocTransaction': Couldn't find common name for user address "
+                    , Text.pack $ formatAddressWithoutColor addr
+                    ]
+          userCert <- maybe (throwIO err) pure =<<
+            A.select (A.Proxy @Certificate) addr
+          pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash Nothing
+        else pure addr
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0
@@ -680,8 +685,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
                         resolve
-            walletFlag <- useWalletsByDefault <$> getBlocEnv
-            let bfp' = bool bfp bfpWallet $ fromMaybe walletFlag mUseWallet
+            let bfp' = bool bfp bfpWallet useWallet
             fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp' jwtToken
           xs -> do
             p <- mapM fromFunction xs
@@ -705,8 +709,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                               ) p)
                         chainId
                         resolve
-            walletFlag <- useWalletsByDefault <$> getBlocEnv
-            let bflp' = bool bflp bflpWallet $ fromMaybe walletFlag mUseWallet
+            let bflp' = bool bflp bflpWallet useWallet
             fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp' jwtToken
         GENESIS -> case txs of
           [] -> return []
