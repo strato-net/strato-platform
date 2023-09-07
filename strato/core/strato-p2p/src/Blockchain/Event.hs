@@ -87,6 +87,8 @@ import           Text.Tools
 
 import           Debug.Trace                           (trace)
 
+import           GHC.Stack
+
 setTitleAndProduceBlocks :: ( MonadLogger m
                             , MonadIO m
                             , Stacks Block m
@@ -123,7 +125,7 @@ yieldR = yield . Right
 yieldL :: Monad m => e -> ConduitT i (Either e a) m ()
 yieldL = yield . Left
 
-handleEvents :: MonadP2P m => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
+handleEvents :: (MonadP2P m, HasCallStack) => PPeer -> ConduitM Event (Either P2PCNC Message) m ()
 handleEvents peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
     MsgEvt Status{} -> error "A status message appeared after the handshake"
@@ -231,21 +233,12 @@ handleEvents peer = awaitForever $ \case
             headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
             let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
                 (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
-            -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
-            -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
-            --     neededHashes = map headerHash neededHeaders
-            --     neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
-            --     unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
-            -- unless (null unfoundParents) $ do
-            --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
-            --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
-            --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
-
-            lift $ putBlockHeaders neededHeaders'
-            lift $ putRemainingBHeaders remainingHeaders
-            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
-            yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
-            lift stampActionTimestamp
+            unless (null neededHeaders') $ do
+                lift $ putBlockHeaders neededHeaders'
+                lift $ putRemainingBHeaders remainingHeaders
+                $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
+                yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
+                lift stampActionTimestamp
           else $logInfoS "handleEvents/BlockHeaders" $ T.unlines [
             "Tried to request more block headers but it seems the block headers cache is currenlty being used.",
             "If this message shows up a lot but the node's best block # doesn't increase,",
