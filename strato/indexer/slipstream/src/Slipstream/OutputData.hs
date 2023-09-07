@@ -894,8 +894,6 @@ insertAbstractTableQuery cs = concat $
     contract_name = excluded.contract_name|]
                 , if null list then "" else ",\n    "
                 , tableUpsert $ list
-                ,[r|
-      data = excluded.data|]
                 , ";"
                 ]
 
