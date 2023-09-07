@@ -69,6 +69,8 @@ import           Blockchain.Strato.Model.Util
 import           Blockchain.Watchdog
 import           BlockApps.X509
 
+import GHC.Stack (HasCallStack)
+
 -- This is a placeholder until the root certs can be held in a proper database
 rootCerts' :: S.Set X509Certificate
 rootCerts' = S.fromList [rootCert]
@@ -148,7 +150,7 @@ debounceTxSendsAndUnseq = do
       yieldMany . map W.Transactions $ chunksOf 100 txs
     Left (ToUnseq ie) -> lift $ Mod.output ie
 
-handleMsgClientConduit :: MonadP2P m
+handleMsgClientConduit :: (MonadP2P m, HasCallStack)
                        => Point
                        -> PPeer
                        -> ConduitM Event (Either P2PCNC Message) m ()
@@ -195,24 +197,26 @@ handleMsgClientConduit myId peer = do
                 when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-                yield . Right $ GetChainDetails []
-                handleGetChainDetails peer S.empty
-                lift stampActionTimestamp
+                (BestBlock _ blockNum myTD) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+                when (peerTD > myTD) $ do
+                    mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                    yield . Right $ GetBlockHeaders (BlockNumber (max (blockNum - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                    yield . Right $ GetChainDetails []
+                    handleGetChainDetails peer S.empty
+                    lift stampActionTimestamp
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
                 (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
                 -- we set to 0 cause we dont necessarily know the number yet
                 lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-                (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-                yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-                yield . Right $ GetChainDetails []
-                handleGetChainDetails peer S.empty
-                lift stampActionTimestamp
+                (BestBlock _ blockNum myTD) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+                when (peerTD > myTD) $ do
+                    mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                    yield . Right $ GetBlockHeaders (BlockNumber (max (blockNum - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                    yield . Right $ GetChainDetails []
+                    handleGetChainDetails peer S.empty
+                    lift stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
@@ -253,12 +257,13 @@ handleMsgServerConduit myPubkey peer = do
                   genesisHash = genHash,
                   rootCerts= rootCerts'
               }
-              (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-              mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-              yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-              yield . Right $ GetChainDetails []
-              handleGetChainDetails peer S.empty
-              lift stampActionTimestamp
+              (BestBlock _ blockNum myTD) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+              when (peerTD > myTD) $ do
+                  mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                  yield . Right $ GetBlockHeaders (BlockNumber (max (blockNum - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                  yield . Right $ GetChainDetails []
+                  handleGetChainDetails peer S.empty
+                  lift stampActionTimestamp
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
@@ -272,12 +277,13 @@ handleMsgServerConduit myPubkey peer = do
                   latestHash = bHash,
                   genesisHash = genHash
               })
-            (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-            mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-            yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-            yield . Right $ GetChainDetails []
-            handleGetChainDetails peer S.empty
-            lift stampActionTimestamp
+            (BestBlock _ blockNum myTD) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+            when (peerTD > myTD) $ do
+                mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+                yield . Right $ GetBlockHeaders (BlockNumber (max (blockNum - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+                yield . Right $ GetChainDetails []
+                handleGetChainDetails peer S.empty
+                lift stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
@@ -294,6 +300,14 @@ assertHandshake mmsg = do
     let theFail = maybe PeerDisconnected EventBeforeHandshake mmsg
     $logErrorS "assertHandshake" . T.pack $ "assertHandshake called: " ++ show theFail
     throwIO theFail
+
+-- requestBlocksAndHeadersIfLesserDiff :: MonadP2P m => Integer -> BestBlock -> PPeer -> m ()
+-- requestBlocksAndHeadersIfLesserDiff peerTD (BestBlock _ blockNum myTD) peer = when (peerTD > myTD) $ do
+--     mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+--     yield . Right $ GetBlockHeaders (BlockNumber (max (blockNum - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+--     yield . Right $ GetChainDetails []
+--     handleGetChainDetails peer S.empty
+--     lift stampActionTimestamp
 
 cbSafeTake' :: forall o m. Monad m
             => Int
