@@ -142,6 +142,7 @@ const actions = {
           type: actionDescriptors.fetchMembershipSuccessful,
           payload: body.data,
         });
+
         return;
       }
       dispatch({ type: actionDescriptors.fetchMembershipFailed, error: undefined });
@@ -384,7 +385,6 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchPurchasedMemberships });
 
     try {
-      console.log("im here")
       const response = await fetch(`${apiUrl}/membership/purchased`, {
         method: HTTP_METHODS.GET,
       });
