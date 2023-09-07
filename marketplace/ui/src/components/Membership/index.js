@@ -218,7 +218,7 @@ const Membership = (user) => {
                 <Typography.Text
                   style={{ fontSize: "10px", marginRight: "80px" }}
                 >
-                  {memberships.length} Memberships found
+                  {memberships.length} Issued Memberships found
                 </Typography.Text>
                 <Tabs defaultActiveKey="1" items={items} onChange={onChange} />
               </div>
