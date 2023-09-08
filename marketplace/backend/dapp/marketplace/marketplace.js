@@ -173,22 +173,24 @@ async function getAll(admin, args = {}, options) {
             // Find the membership for this product
             const membership = membershipMap.get(product.address);
 
-            if (membership.address !== null || membership.address !== undefined) {
-                // Get all the membership services for this membership
-                const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
+            // If there is a membership for this product
+            if (! (membership === null || membership === undefined)){
 
-                // Build the service data for each membership service
-                const membershipData = {
-                    services: membershipServices.map(service => {
-                        const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
-                        const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
+                    // Get all the membership services for this membership
+                    const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
 
-                        return {
-                            ...service,
-                            servicePrice,
-                            serviceDiscount
-                        };
-                    }),
+                    // Build the service data for each membership service
+                    const membershipData = {
+                        services: membershipServices.map(service => {
+                            const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
+                            const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
+
+                            return {
+                                ...service,
+                                servicePrice,
+                                serviceDiscount
+                            };
+                        }),
                 }
 
                 // Calculate the total savings for this membership
@@ -200,10 +202,14 @@ async function getAll(admin, args = {}, options) {
                     ...inventory,
                     membershipId: membership.address,
                     totalSavings: totalSavings,
+                    taxes:  inventory.taxDollarAmount === 0 ? (
+                        inventory.taxPercentageAmount === 0 ? 0  :inventory.taxPercentageAmount/10000)
+                        :  inventory.taxDollarAmount,
+                    isTaxPercentage :  inventory.taxDollarAmount === 0
                 });
-            }
-        }); 
-    
+            } 
+        });
+
     });
     
     return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
@@ -339,6 +345,10 @@ async function getTopSellingProducts(admin, args = {}, options) {
                 ...inventory,
                 membershipId: membership.address,
                 totalSavings: totalSavings,
+                taxes:  inventory.taxDollarAmount === 0 ? (
+                inventory.taxPercentageAmount === 0 ? 0  : inventory.taxPercentageAmount/10000)
+                        :  inventory.taxDollarAmount,
+                isTaxPercentage :  inventory.taxDollarAmount === 0
             });
         });
     });
