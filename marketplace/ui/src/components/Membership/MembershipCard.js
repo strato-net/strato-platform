@@ -35,12 +35,12 @@ const MembershipCard = ({
   const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
   const [viewable, setViewable] = useState(false);
+  console.log("membership", membership)
   
   
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const {isCreateInventorySubmitting } = useInventoryState();
   const dispatch = useInventoryDispatch();
-  console.log("membership", membership)//TODO DELETE THIS
   const showModal = () => {
     hide();
     setOpen(true);
@@ -74,9 +74,8 @@ const MembershipCard = ({
   
   const callDetailPage = (index) => {
     if (state !== null && state !== undefined) {
-      console.log(state);
       navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
-  }
+    }
   }
   
   const closeListNowModal = () => {
@@ -120,60 +119,37 @@ const MembershipCard = ({
     onSubmit: function (values) {
       handleCreateFormSubmit(values);
     },
-    // onUpdateInventory: async (inventory_) => {
-    //     console.log("We updating this inventory_", inventory_)
-    //     const body = {
-    //       productAddress: inventory_.productId,
-    //       inventory: inventory_.address,
-    //       updates: {
-    //         pricePerUnit: 0,//TODO fix this //values.pricePerUnit,
-    //         status: !inventory_.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-    //       },
-    //     };
-
-    //     TagManager.dataLayer({
-    //       dataLayer: {
-    //         event: 'update_inventory',
-    //       },
-    //     });
-    //     let isDone = await actions.updateInventory(dispatch, body);
-
-    //     if (isDone) {
-    //       actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
-    //       handleCancel();
-    //     }
-    // },
     enableReinitialize: true,
   });
 
- const canIdo = (indx) =>   (<Button type="text"
+ const previewCol = (indx) =>   (<Button type="text"
                   className="text-primary text-sm cursor-pointer"
                   onClick={callDetailPage.bind(this, indx)}
                 >
                   Preview
                 </Button>)
   
-  const canIdo2 = (inv, texts) => (<Row 
+  const updateCol = (inv, texts) => (<Row 
                      style={{justifyContent: 'space-between'}}> 
                       <p>{texts} </p> 
                       <EditOutlined onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             window.location.href = loginUrl;
                           } else {
-                            // formik.setFieldValue("name", membership.product.name);
-                            // formik.setFieldValue("tempInv", inv);
-                            openInventoryNowModal();
+                            formik.setFieldValue("name", membership.product.name);
+                            formik.setFieldValue("tempInv", inv);
+                            openListNowModal();
                           }
                           }} />  
                     </Row>)
 
 
   let data = membership.inventories.map((inventory, index) => { 
-      return {key: index,
+    return {key: index,
           name: inventory.block_timestamp,
           age: inventory.availableQuantity,
-          published: canIdo2(inventory, inventory.status ? "Published" : "Unpublished"),
-          preview: canIdo(index),
+          published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
+          preview: previewCol(index),
           address: "$ " + String(inventory.pricePerUnit)}});
   
   const columns = [
@@ -263,8 +239,8 @@ const MembershipCard = ({
                   alt=""
                   src={membership.productImageLocation}
                 />  
-                {membership.product_with_inventory ?  
-                  (membership.isInventoryAvailable ?
+                {membership.inventories.some(inv => inv.status === 1) ?  
+                  (membership.inventories.every(inv => inv.status === 1)  ?
                       (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px"  }}> For Sale </Button>) 
                       : (<Button type="primary" shape="round"  style={{ background: "red", marginTop: "10px"  }}> Retained </Button>) )
                   :(<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px"  }}> Not for Sale </Button>)}
@@ -398,12 +374,11 @@ const MembershipCard = ({
       {visible && (
         <PublishNowModal
           open={visible}
-          user={user}
           handleCancel={closeListNowModal}
+          user={user}
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
-          isCreateMembershipSubmitting={isCreateInventorySubmitting}
           inventory={formik.values.tempInv}
         />
       )}

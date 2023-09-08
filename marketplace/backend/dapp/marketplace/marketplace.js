@@ -173,34 +173,37 @@ async function getAll(admin, args = {}, options) {
             // Find the membership for this product
             const membership = membershipMap.get(product.address);
 
-            // Get all the membership services for this membership
-            const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
+            if (membership.address !== null || membership.address !== undefined) {
+                // Get all the membership services for this membership
+                const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
 
-            // Build the service data for each membership service
-            const membershipData = {
-                services: membershipServices.map(service => {
-                    const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
-                    const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
+                // Build the service data for each membership service
+                const membershipData = {
+                    services: membershipServices.map(service => {
+                        const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
+                        const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
 
-                    return {
-                        ...service,
-                        servicePrice,
-                        serviceDiscount
-                    };
-                }),
+                        return {
+                            ...service,
+                            servicePrice,
+                            serviceDiscount
+                        };
+                    }),
+                }
+
+                // Calculate the total savings for this membership
+                const totalSavings = calculateTotalSavings(membershipData.services);
+
+                // Add the membership data to the product
+                productWithMembership.push({
+                    ...product,
+                    ...inventory,
+                    membershipId: membership.address,
+                    totalSavings: totalSavings,
+                });
             }
-
-            // Calculate the total savings for this membership
-            const totalSavings = calculateTotalSavings(membershipData.services);
-
-            // Add the membership data to the product
-            productWithMembership.push({
-                ...product,
-                ...inventory,
-                membershipId: membership.address,
-                totalSavings: totalSavings,
-            });
-        });
+        }); 
+    
     });
     
     return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
