@@ -1175,7 +1175,8 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
     expResultVal <- getVar =<< expToVar tryExpression
     return expResultVal
   case mRes of
-    Left ex -> do
+    Left (ex :: SolidException) -> do
+      $logInfoS "DEBUG" $ T.pack $ show ex
       res1 <- solidityExceptionHandler catchBlockMap ex
       return res1
     Right aRealVal -> do
@@ -3162,20 +3163,24 @@ encodeForReturn' x = todo "Cannot encode this return type: " x
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex = do
+  $logInfoS "DEBUG2" $ T.pack $ show catchBlockMap
   let solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do
         case M.lookup "Panic" cbm of
           Nothing -> do
             case M.lookup "Nill" cbm of
               Nothing -> errFunc s1 s2
               Just (_, stmts) -> do
+                popCallInfo
                 res' <-  runStatementBlock stmts
                 return res'
           Just (mVar, block) -> do
             case mVar of
               Nothing -> do
+                popCallInfo
                 res' <-  runStatementBlock block
                 return res'
               Just (varName, varType) -> do
+                popCallInfo
                 addLocalVariable varType varName (SInteger errCode)
                 res <- runStatementBlock block
                 return res
@@ -3211,14 +3216,17 @@ solidityExceptionHandler catchBlockMap ex = do
           case M.lookup "Nill" catchBlockMap of
             Nothing -> arityMismatch s1 i1 i2
             Just (_, stmts) -> do
+              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
+              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
+              popCallInfo
               addLocalVariable varType varName (SInteger 9)
               res <- runStatementBlock block
               return res
@@ -3234,14 +3242,17 @@ solidityExceptionHandler catchBlockMap ex = do
           case M.lookup "Nill" catchBlockMap of
             Nothing -> divideByZero s1
             Just (_, stmts) -> do
+              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
+              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
+              popCallInfo
               addLocalVariable varType varName (SInteger 12)
               res <- runStatementBlock block
               return res
@@ -3253,14 +3264,17 @@ solidityExceptionHandler catchBlockMap ex = do
               _ <- require False s1
               return Nothing
             Just (_, stmts) -> do
+              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
+              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
+              popCallInfo
               addLocalVariable varType varName (SString (fromMaybe "Require Error" s1))
               res <- runStatementBlock block
               return res
@@ -3272,14 +3286,17 @@ solidityExceptionHandler catchBlockMap ex = do
               _ <- assert False
               return Nothing
             Just (_, stmts) -> do
+              popCallInfo
               res' <-  runStatementBlock stmts
               return res'
         Just (mVar, block) -> do
           case mVar of
             Nothing -> do
+              popCallInfo
               res' <-  runStatementBlock block
               return res'
             Just (varName, varType) -> do
+              popCallInfo
               addLocalVariable varType varName (SString "Assertion Error")
               res <- runStatementBlock block
               return res
