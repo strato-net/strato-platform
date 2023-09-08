@@ -384,6 +384,8 @@ const MembershipCard = ({
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
+          type="New"
+          id="None"
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />

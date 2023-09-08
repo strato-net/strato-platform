@@ -8,6 +8,8 @@ const ListNowModal = ({
   handleCancel,
   user,
   formik,
+  type,
+  id,
   getIn,
   isCreateMembershipSubmitting,
 }) => {
@@ -58,6 +60,11 @@ const ListNowModal = ({
       key: "membership",
     },
     {
+      title: "Id",
+      dataIndex: "id",
+      key: "id",
+    },
+    {
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
@@ -72,6 +79,11 @@ const ListNowModal = ({
       dataIndex: "price",
       key: "price",
     },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
+    },
   ];
 
   const data = [
@@ -79,6 +91,7 @@ const ListNowModal = ({
       key: "1",
       seller: seller,
       membership: membership,
+      id: id,
       quantity: (
         <>
           <InputNumber
@@ -142,12 +155,15 @@ const ListNowModal = ({
           )}
         </>
       ),
+      type: type,
     },
   ];
 
   return (
     <Modal
-      width={800}
+      // width={800}
+      style={{ maxWidth: '1000px' }}
+      width="auto"
       title="Create Listing"
       open={open}
       onCancel={handleCancel}
