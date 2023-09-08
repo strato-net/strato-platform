@@ -36,6 +36,10 @@ import qualified Data.Text                             as T
 -- import           Data.Traversable                      (for)
 import           GHC.IO.Exception                      
 import           UnliftIO
+--import qualified Control.Concurrent.PooledIO.Final as Pool
+--import           Control.DeepSeq (NFData)
+--import           Data.Traversable (Traversable, traverse)
+--import           UnliftIO.Async
 
 import           BlockApps.Logging
 import           Blockchain.CommunicationConduit
@@ -119,7 +123,6 @@ runEthClientConduit peer pSource pSink seqSrc peerStr = do
                       .| eventSink
                       .| pSink
 
-
 runPeerInList :: ( MonadP2P m
                  , RunsClient m
                  )
@@ -147,7 +150,8 @@ stratoP2PClient runner = runner $ \sSource -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        _ <- async (multiThreadedClient peers activePeersSem sSource)
+        --_ <- async (multiThreadedClient peers activePeersSem sSource)
+        _ <- withAsync (multiThreadedClient peers activePeersSem sSource) $ \res -> waitCatch res
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
     where
@@ -155,15 +159,29 @@ stratoP2PClient runner = runner $ \sSource -> do
       multiThreadedClient [] _ _ = do
         $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
         liftIO $ threadDelay 10000000
-      multiThreadedClient peers sem sSource = void . forConcurrently peers $ \p -> do
-        let isRunning = pPeerActiveState p == 1
-        unless isRunning $ do
-          (liftIO (SSem.tryWait sem)) >>= \case
-            Nothing -> return ()
-            Just _  -> do
-              result <- runPeerInList p sSource
-              handleRunPeerResult p result
-              liftIO (SSem.signal sem)
+      --multiThreadedClient peers sem sSource = void . forConcurrently peers $ \p -> do
+      multiThreadedClient peers sem sSource = mapM_ (\p -> do let isRunning = pPeerActiveState p == 1
+                                                              unless isRunning $ do
+                                                                (liftIO (SSem.tryWait sem)) >>= \case
+                                                                  Nothing -> return ()
+                                                                  Just _  -> do
+                                                                    result <- runPeerInList p sSource
+                                                                    handleRunPeerResult p result
+                                                                    liftIO (SSem.signal sem)
+                                                    ) peers
+      {-
+      multiThreadedClient peers sem sSource = pooledMapConcurrentlyN_ (length peers)
+                                                                      (\p -> do let isRunning = pPeerActiveState p == 1
+                                                                                unless isRunning $ do
+                                                                                  (liftIO (SSem.tryWait sem)) >>= \case
+                                                                                    Nothing -> return ()
+                                                                                    Just _  -> do
+                                                                                      result <- runPeerInList p sSource
+                                                                                      handleRunPeerResult p result
+                                                                                      liftIO (SSem.signal sem)
+                                                                      )
+                                                                      peers
+      -}
 
       handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException a -> m ()
       handleRunPeerResult thePeer = \case

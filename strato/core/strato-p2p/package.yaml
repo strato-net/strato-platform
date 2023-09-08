@@ -50,6 +50,7 @@ library:
     - cross-monitoring
     - crypto-pubkey-types
     - data-default
+    - deepseq
     - dlist
     - dns
     - either
@@ -71,11 +72,13 @@ library:
     - milena
     - milena-tools
     - monad-alter
+    - monad-logger
     - monadIO
     - mtl
     - network
     - ordered-containers
     - persistent
+    - pooled-io
     - prometheus-client
     - random
     - Ranged-sets
