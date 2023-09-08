@@ -35,6 +35,7 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { useLocation, useNavigate } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
+import ListNowIndex from "./ListNowIndex";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -63,6 +64,7 @@ const Membership = (user) => {
   const [total, setTotal] = useState(10);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   let [typeDisplay, setTypeDisplay] = useState("purchase");
+  const [visible, setVisible] = useState(false);
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
@@ -189,7 +191,13 @@ const Membership = (user) => {
       label: "Issued",
     },
   ];
+  const closeSellModal = () => {
+    setVisible(false);
+  };
 
+  const openSellModal = () => {
+    setVisible(true);
+  };
   return (
     <>
       {contextHolder}
@@ -266,6 +274,17 @@ const Membership = (user) => {
                   margin: "10px",
                 }}
                 className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                onClick={() => {
+                  if (
+                    hasChecked &&
+                    !isAuthenticated &&
+                    loginUrl !== undefined
+                  ) {
+                    window.location.href = loginUrl;
+                  } else {
+                    openSellModal();
+                  }
+                }}
               >
                 Sell Existing Membership{" "}
               </Button>
@@ -345,6 +364,19 @@ const Membership = (user) => {
           //   resetPage={onPageChange}
           //   page={page}
           //   debouncedSearchTerm={debouncedSearchTerm}
+        />
+      )}
+      {visible && (
+        <ListNowIndex
+          open={visible}
+          user={user}
+          handleCancel={closeSellModal}
+          onClick={openSellModal}
+          // formik={formik}
+          // type="New"
+          // id="None"
+          // getIn={getIn}
+          // isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
       {message && openToast("bottom")}
