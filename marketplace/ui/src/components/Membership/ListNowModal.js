@@ -11,7 +11,7 @@ const ListNowModal = ({
   getIn,
   isCreateMembershipSubmitting,
 }) => {
-  const seller = user.user.organization;
+  const seller = user.user.user.organization;
   const membership = formik.values.name;
   
   const handleFormatter = (value) => {
