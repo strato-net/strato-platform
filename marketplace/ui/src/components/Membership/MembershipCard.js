@@ -72,10 +72,11 @@ const MembershipCard = ({
   }, [membership]);
 
   
-  const callDetailPage = (index) => {
+  const callDetailPage = (index, address) => {
     if (state !== null && state !== undefined) {
       navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
     }
+
   }
   
   const closeListNowModal = () => {
@@ -88,6 +89,10 @@ const MembershipCard = ({
 
   const openInventoryNowModal = () => {
     setViewable(true);
+  };
+  
+  const closeInventoryNowModal = () => {
+    setViewable(false);
   };
   
   const getSchema = (isListNowModalOpen) => {
@@ -122,9 +127,10 @@ const MembershipCard = ({
     enableReinitialize: true,
   });
 
- const previewCol = (indx) =>   (<Button type="text"
+
+ const previewCol = (indx, address) =>   (<Button type="text"
                   className="text-primary text-sm cursor-pointer"
-                  onClick={callDetailPage.bind(this, indx)}
+                  onClick={callDetailPage.bind(this, indx, address)}
                 >
                   Preview
                 </Button>)
@@ -149,7 +155,7 @@ const MembershipCard = ({
           name: inventory.block_timestamp,
           age: inventory.availableQuantity,
           published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
-          preview: previewCol(index),
+          preview: previewCol(index, inventory.address),
           address: "$ " + String(inventory.pricePerUnit)}});
   
   const columns = [
@@ -207,6 +213,8 @@ const MembershipCard = ({
             // Status should always be published if we use List Now
             status: INVENTORY_STATUS.PUBLISHED,
             serialNumber: [],
+            taxPercentageAmount: formik.values.taxPercentageAmount,
+            taxDollarAmount: formik.values.taxDollarAmount,
           };
           const createInventory = await actions.createInventory(
             dispatch,
@@ -268,41 +276,6 @@ const MembershipCard = ({
                      List for Sale
                    </Button>
                 :null}
-                {/* <Button type="text"
-                  className="text-primary text-sm cursor-pointer"
-                  onClick={callDetailPage}
-                >
-                  Preview
-                </Button> */}
-                
-                {/* <Popover
-                  placement="bottomLeft"
-                  open={openPop}
-                  onOpenChange={handleOpenChange}
-                  title={
-                    <div className="font-medium">
-                      <div
-                        className="flex items-center cursor-pointer"
-                        onClick={showEditModal}
-                        id="edit-button"
-                      >
-                        <EditOutlined />
-                        <p className="ml-3">Edit</p>
-                      </div>
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showModal}
-                        id="delete-button"
-                      >
-                        <DeleteOutlined />
-                        <p className="ml-3">Delete</p>
-                      </div>
-                    </div>
-                  }
-                  trigger="click"
-                >
-                  <MoreOutlined />
-                </Popover> */}
                 </div>
               </div>
               <div className="flex mt-1.5 items-center">
@@ -371,8 +344,20 @@ const MembershipCard = ({
           )} */}
         </Card>
       )}
-      {visible && (
+      {viewable && (
         <PublishNowModal
+          open={viewable}
+          user={user}
+          handleCancel={closeInventoryNowModal}
+          onClick={openInventoryNowModal}
+          formik={formik}
+          getIn={getIn}
+          isCreateMembershipSubmitting={isCreateInventorySubmitting}
+          inventory={formik.values.tempInv}
+        />
+      )}
+      {visible && (
+        <ListNowModal
           open={visible}
           handleCancel={closeListNowModal}
           user={user}

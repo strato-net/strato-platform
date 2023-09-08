@@ -25,7 +25,6 @@ const MembershipCardPurchased = ({
   debouncedSearchTerm,
   membershipId
 }) => {
-  console.log("membership", membership);
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
