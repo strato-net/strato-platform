@@ -39,6 +39,7 @@ so that they could be properly moved to their respective version's subsection.
 - POST `/transaction` calls redirected to the corresponding User contract
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
+- Bagger no longer crashes the VM upon encountering a transaction that exceeds the nonce or size limit
 ### Removed
 - `bloc22` database removed
 

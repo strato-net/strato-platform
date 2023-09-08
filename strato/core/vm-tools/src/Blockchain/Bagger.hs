@@ -111,8 +111,8 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
         Just f@TFCodeCollectionNotFound{} -> recoverable f
         Just f@TFInvalidPragma{} -> recoverable f
-        Just f@TFNonceLimitExceeded{} -> error $ "mineTransactions' we messed up: " ++ format f
-        Just f@TFTXSizeLimitExceeded{} -> error $ "mineTransactions' we messed up: " ++ format f
+        Just f@TFNonceLimitExceeded{} -> recoverable f
+        Just f@TFTXSizeLimitExceeded{} -> recoverable f
 
 -- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 -- rewardCoinbases us uncles ourNumber = do
