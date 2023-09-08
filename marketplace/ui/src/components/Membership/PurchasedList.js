@@ -22,7 +22,6 @@ const PurchasedList = (
   useEffect(() => {
     actions.fetchPurchasedMemberships(dispatch);
   }, []);
-  console.log("purchasedMemberships");
   const { Title } = Typography;
   return (
     <>
