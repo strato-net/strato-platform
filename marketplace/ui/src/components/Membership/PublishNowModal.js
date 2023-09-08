@@ -17,7 +17,6 @@ const PublishNowModal = ({
   user,
   formik,
   getIn,
-  isCreateMembershipSubmitting,
   inventory
 }) => {
   const seller = user.user.organization;
@@ -27,28 +26,17 @@ const PublishNowModal = ({
   const dispatch = useInventoryDispatch();
 
   const onUpdateInventory_ = async (inventory_) => {
-        console.log("We updating this inventory_", inventory_)
         const body = {
           productAddress: inventory_.productId,
           inventory: inventory_.address,
           updates: {
             pricePerUnit: inventory_.pricePerUnit,
-            status: !inventory_.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
+            status: inventory_.status == 2 ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
           },
         };
 
-        TagManager.dataLayer({
-          dataLayer: {
-            event: 'update_inventory',
-          },
-        });
-        console.log("\n\n\n\n\n\n-------------------");
         let isDone = await actions.updateInventory(dispatch, body);
-        console.log("isDone", isDone); 
-        // if (isDone) {
-        //   actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
-        //   handleCancel();
-        // }
+         window.location.replace("/marketplace/memberships/")
     }
 
   const columns = [
@@ -122,14 +110,16 @@ const PublishNowModal = ({
     <Modal
       title={"Are you sure you want to change the status of this inventory?"}
       open={open}
+      onCancel={handleCancel}
+      onOk={formik.handleSubmit}
       footer={[
         <Button
           key="list-now"
-          // onClick={onUpdateInventory_(inventory)}
-          loading={isCreateMembershipSubmitting}
+          onClick={onUpdateInventory_.bind(this, inventory)}
+          onCancel={handleCancel}
           type="primary"
         >
-          Change to {inventory.status ? "Unpublished" : "Published"}
+          Change to {inventory.status !== 1 ? "Published" : "Unpublished" }
         </Button>,
       ]}
     >

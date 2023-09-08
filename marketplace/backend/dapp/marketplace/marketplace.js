@@ -209,6 +209,7 @@ async function getAll(admin, args = {}, options) {
                 });
             } 
         });
+
     });
     
     return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
