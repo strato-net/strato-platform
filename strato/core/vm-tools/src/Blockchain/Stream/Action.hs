@@ -98,7 +98,7 @@ instance FromJSON CallData where
     <*> (o .: "value")
     <*> (o .: "input")
     <*> (o .:? "output")
-  parseJSON o = error $ "parseJSON CallData: Expected object, got: " ++ show o
+  parseJSON o = fail $ "parseJSON CallData: Expected object, got: " ++ show o
 
 emptyCallData :: CallData
 emptyCallData = CallData
@@ -199,7 +199,39 @@ instance FromJSON ActionData where
       SolidVM -> explicitParseField parseDiffSolidVM) o "diff"
     dt <- o .: "types"
     return $ ActionData ch og ap ck df dt
-  parseJSON o = error $ "parseJSON ActionData: Expected object, got: " ++ show o
+  parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
+
+data Delegatecall = Delegatecall
+  { _delegatecallStorageAccount :: Account
+  , _delegatecallCodeAccount    :: Account
+  , _delegatecallOrganization   :: Text
+  , _delegatecallApplication    :: Text
+  } deriving (Eq, Show, Generic, NFData)
+makeLenses ''Delegatecall
+
+instance Format Delegatecall where
+  format Delegatecall{..} =
+    "delegatecallStorageAccount: " ++ format _delegatecallStorageAccount ++ "\n"
+    ++ "delegatecallCodeAccount: " ++ format _delegatecallCodeAccount ++ "\n"
+    ++ "delegatecallOrganization: " ++ T.unpack _delegatecallOrganization ++ "\n"
+    ++ "delegatecallApplication: " ++ T.unpack _delegatecallApplication
+
+instance ToJSON Delegatecall where
+  toJSON Delegatecall{..} = object
+    [ "storageAccount" .= _delegatecallStorageAccount
+    , "codeAccount"    .= _delegatecallCodeAccount
+    , "organization"   .= _delegatecallOrganization
+    , "application"    .= _delegatecallApplication
+    ]
+
+instance FromJSON Delegatecall where
+  parseJSON (Object o) = do
+    s <- o .: "storageAccount"
+    c <- o .: "codeAccount"
+    r <- o .: "organization"
+    a <- o .: "application"
+    pure $ Delegatecall s c r a
+  parseJSON o = fail $ "parseJSON Delegatecall: Expected object, got: " ++ show o
 
 data Action = Action
   { _blockHash          :: Keccak256
@@ -211,6 +243,7 @@ data Action = Action
   , _actionData         :: Map Account ActionData
   , _metadata           :: Maybe (Map Text Text)
   , _events             :: S.Seq Event
+  , _delegatecalls      :: S.Seq Delegatecall
   } deriving (Eq, Show, Generic, NFData)
 makeLenses ''Action
 
@@ -225,6 +258,7 @@ instance Format Action where
     ++ "actionData:\n" ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ M.toList _actionData) ++ "\n"
     ++ "actionMetadata: " ++ unwords (map (\(k, v) -> "(" ++ CL.blue (show k) ++ ": " ++ show (shorten 30 $ T.unpack v) ++ ")") $ M.toList $ fromMaybe M.empty $ _metadata) ++ "\n"
     ++ "actionEvents: " ++ unlines (map show $ toList _events) ++ "\n"
+    ++ "actionDelegatecalls: " ++ unlines (map show $ toList _delegatecalls) ++ "\n"
 
 instance ToJSON Action where
   toJSON Action{..} = object
@@ -237,6 +271,7 @@ instance ToJSON Action where
     , "data"            .= _actionData
     , "metadata"        .= _metadata
     , "events"          .= _events
+    , "delegatecalls"   .= _delegatecalls
     ]
 
 instance FromJSON Action where
@@ -250,7 +285,8 @@ instance FromJSON Action where
     <*> (o .: "data")
     <*> (o .: "metadata")
     <*> (o .: "events")
-  parseJSON o = error $ "parseJSON Action: Expected object, got: " ++ show o
+    <*> (fromMaybe S.empty <$> (o .:? "delegatecalls"))
+  parseJSON o = fail $ "parseJSON Action: Expected object, got: " ++ show o
 
 instance Arbitrary CallType where
   arbitrary = genericArbitrary
@@ -262,6 +298,9 @@ instance Arbitrary DataDiff where
   arbitrary = genericArbitrary
 
 instance Arbitrary ActionData where
+  arbitrary = genericArbitrary
+
+instance Arbitrary Delegatecall where
   arbitrary = genericArbitrary
 
 instance Arbitrary Action where

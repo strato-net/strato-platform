@@ -264,6 +264,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                   SolidVMCode _ ch' -> ch'
                   CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block")
             , A._events = S.empty
+            , A._delegatecalls = S.empty
             }
           fromDiff :: Diff a 'Eventual -> a
           fromDiff (Value v) = v
