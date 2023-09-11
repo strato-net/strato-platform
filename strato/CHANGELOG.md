@@ -38,6 +38,10 @@ so that they could be properly moved to their respective version's subsection.
 - POST `/transaction` calls redirected to the corresponding User contract
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
+- String formatting related errors in `.code` SolidVM tests
+- Typechecker test errors that were missing `pragma strict` and failing
+- The out-of-scope errors of storage variables for Solidity try/catch statements
+- Free function overloading conflict with the import resolver 
 ### Removed
 - `bloc22` database removed
 
