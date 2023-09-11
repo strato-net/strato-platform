@@ -129,16 +129,18 @@ const InvoiceComponent = ({ invoice }) => {
 
   useEffect(() => {
    
+    let subtot = 0;
     let tax = 0;
     let shipping = 0;
     invoice.orderLines.forEach(item => {
       tax += item.tax;
       shipping += item.shippingCharges;
+      subtot += (item.pricePerUnit * item.quantity);
     });
    
     settotalTax(tax);
     settotalShipping(shipping);
-    setSubtotal(invoice.orderTotal-tax-shipping);
+    setSubtotal(subtot);
   }, [invoice])
 
 
@@ -229,9 +231,9 @@ const InvoiceComponent = ({ invoice }) => {
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${item.shippingCharges}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${item.tax}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${item.tax / 100}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${item.amount}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${(item.pricePerUnit * item.quantity) + (item.tax /100)}</Text>
             </View>
           ))}
           {/* <View style={styles.tableRow} >
@@ -252,7 +254,7 @@ const InvoiceComponent = ({ invoice }) => {
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Tax</Text>
-              <Text style={styles.bottomLabel}>${totalTax}</Text>
+              <Text style={styles.bottomLabel}>${totalTax/100}</Text>
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Shipping</Text>
@@ -260,7 +262,7 @@ const InvoiceComponent = ({ invoice }) => {
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Total</Text>
-              <Text style={styles.bottomLabel}>${invoice.orderTotal}</Text>
+              <Text style={styles.bottomLabel}>${subtotal+ totalShipping + (totalTax/100)}</Text>
             </View>
           </View>
         </View>

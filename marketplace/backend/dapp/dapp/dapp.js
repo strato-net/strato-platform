@@ -967,10 +967,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       for (const inventory of inventoriesData) {
         const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.quantity), 0);
         const shippingCharge = inventoryTotal * CHARGES.SHIPPING;
-        const tax = inventoryTotal * CHARGES.TAX;
-
-        // shipping charge for order 
-        const orderTotal = inventoryTotal + shippingCharge + tax;
+        const tax = (inventoriesData.reduce((acc, obj) => {
+           const result = obj.data.reduce((total, curr) => obj.tax !==0 ?
+            (obj.isTaxPercentage ?
+            (( ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax/100))) ) * 100) / 100
+            :(curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity) 
+           )   : (curr.pricePerUnit * curr.quantity) , 0);
+          return Number(acc) + Number(result); }, 0).toFixed(2));
+        
+        const orderTotal = Number(inventoryTotal) + Number(shippingCharge) + Number(tax);
         const amountPaid = orderTotal;  // need to remove if no further use
 
         const orderArgs = {
@@ -995,7 +1000,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         for (const inventoryObject of inventory.data) {
 
           const shippingCharges = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
-          const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
+          const tax = inventoryObject.taxDollarAmount !== 0 ? inventoryObject.taxDollarAmount/100 : (inventoryObject.pricePerUnit * inventoryObject.quantity) * (inventoryObject.taxPercentageAmount / 100);
 
           await managers.orderManager.addOrderLine({
             orderAddress,
