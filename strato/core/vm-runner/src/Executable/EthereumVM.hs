@@ -580,8 +580,9 @@ sendOutEvent (OutAction act) =
                 }
           _ -> Nothing
       ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
+      dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
       actionEvents = [NewAction act]
-   in void . produceVMEvents $ ccEvents ++ actionEvents
+   in void . produceVMEvents $ ccEvents ++ dcEvents ++ actionEvents
 sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = do
