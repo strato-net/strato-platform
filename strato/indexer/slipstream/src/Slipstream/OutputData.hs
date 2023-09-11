@@ -242,6 +242,7 @@ baseAbstractColumns = [ "record_id"
               , "transaction_hash"
               , "transaction_sender"
               , "contract_name"
+              , "data"
               ]
 
 baseTableColumns :: TableColumns
@@ -720,7 +721,7 @@ createAbstractTableQuery contract (o, a, n) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "contract_name text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list) ++ ["data jsonb"]
+               "block_number text", "transaction_hash text", "transaction_sender text", "contract_name text", "data jsonb"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list)
         , ",\n  PRIMARY KEY (record_id));"
         ]
 
