@@ -1176,7 +1176,6 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
     return expResultVal
   case mRes of
     Left (ex :: SolidException) -> do
-      $logInfoS "DEBUG" $ T.pack $ show ex
       res1 <- solidityExceptionHandler catchBlockMap ex
       return res1
     Right aRealVal -> do
@@ -3163,7 +3162,6 @@ encodeForReturn' x = todo "Cannot encode this return type: " x
 {- BEN WILL REFACTOR THIS SOMEDAY -}
 solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex = do
-  $logInfoS "DEBUG2" $ T.pack $ show catchBlockMap
   let solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do
         case M.lookup "Panic" cbm of
           Nothing -> do
