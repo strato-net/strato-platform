@@ -20,13 +20,15 @@ module SolidVM.Model.CodeCollection.Function (
   Using,
   FunctionCallType(..),
   tShow,
-  tShow',
+  tShowVisibility,
   tRead,
   funcArgs,
   funcVals,
   funcStateMutability,
   funcContents,
   funcVisibility,
+  funcVirtual,
+  funcOverrides,
   funcConstructorCalls,
   funcModifiers,
   funcContext,
@@ -110,14 +112,14 @@ data Visibility = Private
                 | External
   deriving (Eq,Show,Generic, NFData)
 
-tShow' :: Visibility -> Text
-tShow' Private = "private"
-tShow' Public = "public"
-tShow' Internal = "internal"
-tShow' External = "external"
+tShowVisibility :: Visibility -> Text
+tShowVisibility Private = "private"
+tShowVisibility Public = "public"
+tShowVisibility Internal = "internal"
+tShowVisibility External = "external"
 
 instance ToJSON Visibility where
-  toJSON = String . tShow'
+  toJSON = String . tShowVisibility
 instance FromJSON Visibility
 instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
 instance ToSchema Visibility where
@@ -140,6 +142,8 @@ data FuncF a = Func
   -- relevance when constructing from the db.
   , _funcContents :: Maybe [StatementF a]
   , _funcVisibility :: Maybe Visibility
+  , _funcVirtual :: Bool
+  , _funcOverrides :: Maybe [SolidString] -- override can be for multiple contracts, e.g. override(Base1, Base2)
   , _funcConstructorCalls :: Map SolidString [(ExpressionF a)]
   , _funcModifiers :: [(SolidString, [(ExpressionF a)])]
   , _funcContext :: a

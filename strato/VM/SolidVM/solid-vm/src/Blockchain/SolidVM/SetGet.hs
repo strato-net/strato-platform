@@ -385,4 +385,5 @@ showSM (SContractFunction maybeContractName address functionName ) = do
       contract <- getCurrentContract
       return $ CC._contractName contract
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
+showSM (SVariadic xs) = ('[':) . (++"]") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x
