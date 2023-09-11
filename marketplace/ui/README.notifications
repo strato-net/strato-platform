@@ -1,4 +1,4 @@
-# Notifications/Live UI Updates
+# Adding Notifications/Live UI Updates to the Marketplace Frontend
 This write up explains how to add notifications or have the UI update in some way without the user needing to refresh the page. 
 
 ### Prerequisites
@@ -54,8 +54,9 @@ There is a helper function called `useEventStream` within `marketplace/ui/src/he
   readyState: number,
   // If using a shared websocket, return value will be a proxy-wrapped websocket, with certain properties/methods protected
   getWebSocket: () => (WebSocketLike | null),
-}```
-However, you will likely only want to use `lastMessage` or `lastJsonMessage` (returns `lastMessage.data` as a JSON-parsed object). Both will be null until the first message is recieved. Optionally, you can provide a filter function, which will cause `lastMessage`/`lastJsonMessage` to only update when the filter function returns true. For example, if we only cared about new certificates registered, we could do
+}
+```
+However, you will likely only want to use `lastMessage` or `lastJsonMessage` (returns `lastMessage.data` as a JSON-parsed object). Both will be null until the first message is received. Optionally, you can provide a filter function, which will cause `lastMessage`/`lastJsonMessage` to only update when the filter function returns true. For example, if we only cared about new certificates registered, we could do
 ```
 const { lastMessage } = useEventStream((msg) => 
     JSON.parse(msg.data)?.eventEvent?.eventName === "CertificateRegistered");
@@ -79,8 +80,11 @@ useEffect(() => {
 ```
 
 ### Current Limitations
-This sytem currently has the following limitations:
+This system currently has the following limitations:
 
-- *Can only get events that occur during the session*: this system currently can only notify of events that occur duing the user's session. If an event (such as an item being sold) occurs while the user is not logged in, the system currently has no way of keeping track what was the last event they viewed. It has no way of knowing what past events are and aren't news to the user.
+- *Can only get events that occur during the session*: this system currently can only notify of events that occur during the user's session. If an event (such as an item being sold) occurs while the user is not logged in, the system currently has no way of keeping track what was the last event they viewed. It has no way of knowing what past events are and aren't news to the user.
 
 - *Cannot send email notifications*: supporting email notifications will require platform-level changes since we currently do not store users' emails anywhere on-chain, in vault, or in the marketplace backend.
+
+### Where Can I Find More Information?
+This information is also located in Confluence at https://blockapps.atlassian.net/l/cp/C8QrEQPR
