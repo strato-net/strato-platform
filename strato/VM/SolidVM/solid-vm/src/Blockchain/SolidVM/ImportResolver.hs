@@ -32,10 +32,10 @@ import           Control.Monad.Trans.Class            (lift)
 import           Control.Monad.Trans.Except
 import           Control.Lens                         hiding (assign, from, to, bimap, Context)
 import           Data.Default
-import           Data.Foldable                        (foldrM)
+import           Data.Foldable                        (foldl', foldrM)
 import           Data.Map                             (Map)
 import qualified Data.Map                             as M
-import           Data.Maybe                           (fromMaybe)
+import           Data.Maybe                           (fromJust, fromMaybe)
 import qualified Data.Set                             as S
 import           Data.Text                            (Text)
 import qualified Data.Text                            as T
@@ -77,11 +77,25 @@ mergeUnresolvedFileUnitsIgnoreDuplicates :: UnresolvedFileUnitsF a -> Unresolved
 mergeUnresolvedFileUnitsIgnoreDuplicates (UFU i p u) (UFU j q v) = UFU (i <> j) (p <> q) (u <> v)
 
 mergeUnresolvedFileUnits :: Show a => UnresolvedFileUnitsF a -> UnresolvedFileUnitsF a -> Either Text (UnresolvedFileUnitsF a)
-mergeUnresolvedFileUnits (UFU i p u) (UFU j q v) =
-  let n = M.intersection u v
-   in if null n
-        then Right $ UFU (i <> j) (p <> q) (u <> v)
-        else Left . T.pack $ "Duplicate values: " ++ show n
+mergeUnresolvedFileUnits (UFU i p u) (UFU j q v) = do
+  -- Checking if there are duplicates and if there are,
+  -- determine if they are functions that are overloadable.
+  let duplicates = M.toList $ M.intersection u v
+      overloads = map (\(k, val) -> do
+                        let otherVal = fromJust $ M.lookup k v
+                          in case (val, otherVal) of
+                               (FUFunction v1, FUFunction v2) -> if (_funcArgs v1) == (_funcArgs v2)
+                                                                   then (False, k, FUFunction v1)
+                                                                   else (True, k, FUFunction v1{_funcOverload = (_funcOverload v1) ++ [v2]})
+                               _ -> (False, k, val)
+                          ) duplicates
+      mergeAsOverloads = all (\(b, _, _) -> b) overloads
+      newFileUnits = foldl' (\accumMap (_, k, newVal) -> M.insert k newVal accumMap) u overloads
+  if null duplicates
+    then Right $ UFU (i <> j) (p <> q) (u <> v)
+    else if mergeAsOverloads
+           then Right $ UFU (i <> j) (p <> q) (newFileUnits)
+           else Left . T.pack $ "Duplicate values: " ++ show duplicates
 
 instance Semigroup (UnresolvedFileUnitsF a) where
   (<>) = mergeUnresolvedFileUnitsIgnoreDuplicates

@@ -6356,7 +6356,7 @@ contract qq{
   constructor() public {
     myNum = sum(myArr);
   }
-}|]) `shouldThrow` anyParseError
+}|]) `shouldThrow` anyTypeError
 
 
   it "can declare a constant at the file level and use it" . runTest $ do
