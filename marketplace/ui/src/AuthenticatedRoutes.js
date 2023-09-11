@@ -36,6 +36,8 @@ import EventSerialNumberList from "./components/Event/EventSerialNumberList";
 import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
+import { StorageProvider } from "./contexts/storage";
+import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
 
@@ -435,8 +437,28 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
-      <Route path="*" element={<Navigate to={"/"} replace />} />
+      <Route
+        exact
+        path={routes.Storage.url}
+        element={
+          <UsersProvider>
+            <StorageProvider>
+              <Storage user={user} users={users} />
+            </StorageProvider>
+          </UsersProvider>}
+      />
+      <Route
+        path="/"
+        element={<Navigate
+          to={"/marketplace"}
+          replace />}
+      />
+      <Route
+        path="*"
+        element={<Navigate
+          to={"/"}
+          replace />}
+      />
     </Routes>
   );
 };

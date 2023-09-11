@@ -73,7 +73,7 @@ solidityLanguage = javaStyle {
      "function", "returns", "return", "modifier", "revert",
      "delete", "constant", "storage", "memory", "calldata", "immutable",
      "if","else","while","for","break","continue",
-     "suicide", "this", 
+     "suicide", "this",
      "call", "callcode", "length", "sha3",
      "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",
@@ -84,7 +84,7 @@ solidityLanguage = javaStyle {
      --The following are protected as they are also names for cirrus columns
     --"block_number", "block_timestamp", "block_hash",
     --"record_id", "transaction_hash", "transaction_sender"
-     "receive", "fallback"
+     "receive", "fallback", "virtual", "override"
     ],
   P.reservedOpNames = [
     "!", "&&", "||", "==", "!=",

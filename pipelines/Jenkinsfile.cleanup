@@ -1,4 +1,4 @@
-def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
+def cleanOldWorkspaces(Integer olderThanNumDays = 4) {
 
   script {
     def diskspaceAvailableBefore = sh(
@@ -9,8 +9,10 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
     echo "diskspaceAvailableBefore=$diskspaceAvailableBefore kilobytes"
     
     // `stack purge` in every jenkins workspace directory that was not updated for at least $olderThanNumDays days and is not a @tmp dir.
+    def stackCachesOlderThan = 3
     sh """
-      for f in \$(find ../ -maxdepth 1 -type d -mtime +$olderThanNumDays | grep -v @tmp); do 
+      
+      for f in \$(find ../ -maxdepth 1 -type d -mtime +$stackCachesOlderThan | grep -v @tmp); do 
         (
           cd "\$f"
           pwd
@@ -25,9 +27,9 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 5) {
       done
     """
 
-    // remove jenkins workspace directories that was not updated for more than (3 * $olderThanNumDays) days
+    // remove jenkins workspace directories that was not updated for more than (2 * $olderThanNumDays) days
     sh """
-      for f in \$(find ../ -maxdepth 1 -type d -mtime +\$((3*$olderThanNumDays))); do 
+      for f in \$(find ../ -maxdepth 1 -type d -mtime +\$((2*$olderThanNumDays))); do 
         (
           if [ "\$f" != "../\${PWD##*/}" ]; then
             sudo rm -rf "\$f"
@@ -80,7 +82,7 @@ pipeline {
           agent { label "test1" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(5)
+              def diskspaceFreed = cleanOldWorkspaces()
               echo "Diskspace freed on test1: $diskspaceFreed kilobytes"
             }
           }
@@ -99,7 +101,7 @@ pipeline {
           agent { label "test2" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(5)
+              def diskspaceFreed = cleanOldWorkspaces()
               echo "Diskspace freed on test2: $diskspaceFreed kilobytes"
             }
           }
@@ -118,7 +120,7 @@ pipeline {
           agent { label "test3" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(5)
+              def diskspaceFreed = cleanOldWorkspaces()
               echo "Diskspace freed on test3: $diskspaceFreed kilobytes"
             }
           }
@@ -137,7 +139,7 @@ pipeline {
           agent { label "test4" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(5)
+              def diskspaceFreed = cleanOldWorkspaces()
               echo "Diskspace freed on test4: $diskspaceFreed kilobytes"
             }
           }
@@ -156,7 +158,7 @@ pipeline {
           agent { label "test5" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(5)
+              def diskspaceFreed = cleanOldWorkspaces()
               echo "Diskspace freed on test5: $diskspaceFreed kilobytes"
             }
           }
