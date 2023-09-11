@@ -40,6 +40,7 @@
     "test:api:marketplace": "yarn mocha-babel test/v1/marketplace.test.js -b",
     "test:api:membership": "yarn mocha-babel test/v1/membership.test.js -b",
     "test:api:membershipService": "yarn mocha-babel test/v1/membershipService.test.js -b",
+    "test:api:serviceUsage": "yarn mocha-babel test/v1/serviceUsage.test.js -b",
     "test:api": "yarn mocha-babel test/v1/ -b",
     "addToDapp": "babel-node membership-utility/addToDapp.js",
     "clean": "rm -f ${CONFIG_DIR_PATH:-config}/*.deploy.yaml ${CONFIG_DIR_PATH:-config}/testdeploy.*"
