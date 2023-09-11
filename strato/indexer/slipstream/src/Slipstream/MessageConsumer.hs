@@ -80,6 +80,7 @@ getAndProcessMessages :: ( MonadLogger m
                          , Accessible (IORef Globals) m
                          , Selectable Account AddressState m
                          , Selectable Account CodeCollection m
+                         , Selectable Account Contract m
                          , Selectable Word256 ParentChainIds m
                          , HasCodeDB m
                          )
@@ -95,6 +96,7 @@ getAndProcessMessages' :: ( MonadLogger m
                           , Accessible (IORef Globals) m
                           , Selectable Account AddressState m
                           , Selectable Account CodeCollection m
+                          , Selectable Account Contract m
                           , Selectable Word256 ParentChainIds m
                           , HasCodeDB m
                           )

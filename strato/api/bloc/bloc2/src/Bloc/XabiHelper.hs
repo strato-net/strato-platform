@@ -162,4 +162,4 @@ tFormTypeToType = \case
   (SolidType.Account _)                   ->  (XabiType.Account)
   (SolidType.Fixed _ _)                   ->  (XabiType.Bool) --Questionable at best
   (SolidType.Error _ ss)                  ->  (XabiType.UnknownLabel ss)          --Questionable at best
-  SolidType.Variadic                      ->  error "type (variadic) is not an indexable type"
+  SolidType.Variadic                      ->  XabiType.Variadic

@@ -43,7 +43,7 @@ import           BlockApps.Logging
 import           Blockchain.Data.TransactionResult
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Stream.Action (Action)
+import           Blockchain.Stream.Action (Action, Delegatecall)
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
 import           Blockchain.Stream.Raw
@@ -61,6 +61,7 @@ data VMEvent =
     historyList :: [Text],
     recordMappings :: [Text]
     } |
+  DelegatecallMade Delegatecall |
   NewTransactionResult TransactionResult deriving (Show, Generic)
 
 instance JSON.ToJSON VMEvent where
@@ -81,6 +82,8 @@ instance Format VMEvent where
     ++ (if (not $ null rm) then " " ++ show rm else "")
     ++ "\n    "
     ++ show (shorten 120 (T.unpack c))
+  format (DelegatecallMade d) =
+    "DelegatecallMade: " ++ format d
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 class HasVMEventsSink k where

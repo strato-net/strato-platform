@@ -107,6 +107,8 @@ services:
       - marketplace-backend
     environment:
       - NODE_ENV=${NODE_ENV:-production}
+      - ASSET_TABLE_NAME=${ASSET_TABLE_NAME}
+      - SALE_TABLE_NAME=${SALE_TABLE_NAME}
     build: .
     image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
@@ -202,6 +204,10 @@ services:
     - svmDev=${svmDev}
     - txSizeLimit=${txSizeLimit}
     - useSyncMode=${useSyncMode}
+    - userRegistryAddress=${userRegistryAddress}
+    - userRegistryCodeHash=${userRegistryCodeHash}
+    - useBuiltinUserRegistry=${useBuiltinUserRegistry}
+    - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}

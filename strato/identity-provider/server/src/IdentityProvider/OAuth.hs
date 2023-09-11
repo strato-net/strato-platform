@@ -22,12 +22,13 @@ import           Network.HTTP.Types.Header           (hContentType, hAuthorizati
 import           Servant.Client                      (BaseUrl, parseBaseUrl)
 
 
-data RealmMinInfo = -- minimum info user must provide to support realm
-    RealmMinInfo {
-        discoveryUrl :: String,
-        clientId     :: String,
-        clientSecret :: String,
-        nodeUrl      :: Maybe String
+data ProvidedRealmInfo = -- info user provides to support realm
+    ProvidedRealmInfo {
+        discoveryUrl    :: String,
+        clientId        :: String,
+        clientSecret    :: String,
+        nodeUrl         :: Maybe String,
+        fallbackNodeUrl :: Maybe String
     } deriving (Show, Generic, FromJSON, ToJSON)
 
 data OAuthEndpoints =
@@ -38,29 +39,34 @@ data OAuthEndpoints =
 
 data RealmDetails =
     RealmDetails {
-        realmEndpoints    :: OAuthEndpoints,
-        realmClientId     :: String,
-        realmClientSecret :: String,
-        associatedNodeUrl :: BaseUrl
+        realmEndpoints      :: OAuthEndpoints,
+        realmClientId       :: String,
+        realmClientSecret   :: String,
+        associatedNodeUrl   :: BaseUrl,
+        associatedFallback  :: BaseUrl
     } deriving (Show)
 
 type RealmData = Map String RealmDetails -- realm name -> realm data
 
-getRealmData :: MonadIO m => [RealmMinInfo] -> m RealmData
+getRealmData :: MonadIO m => [ProvidedRealmInfo] -> m RealmData
 getRealmData realmInfos = fromList <$> mapM parseRealmMinInfo realmInfos
     where
-        parseRealmMinInfo :: MonadIO m => RealmMinInfo -> m (String, RealmDetails)
+        parseRealmMinInfo :: MonadIO m => ProvidedRealmInfo -> m (String, RealmDetails)
         parseRealmMinInfo realmInfo = do
             endpoints <- getEndpointsFromDiscovery $ discoveryUrl realmInfo
             let realmName = extractRealmName $ issuer endpoints
             nurl <- liftIO $ parseBaseUrl $ case nodeUrl realmInfo of
                     Just url -> url
                     Nothing -> "https://node2." <> realmName <> ".blockapps.net" -- if no url provided, assume network follows this pattern
+            nurl2 <- liftIO $ parseBaseUrl $ case fallbackNodeUrl realmInfo of
+                    Just url -> url
+                    Nothing -> "https://node1." <> realmName <> ".blockapps.net" -- node1 usually gets more traffic, so preference for node2
             return (realmName, RealmDetails {
                 realmEndpoints = endpoints,
                 realmClientId = clientId realmInfo,
                 realmClientSecret = clientSecret realmInfo,
-                associatedNodeUrl = nurl
+                associatedNodeUrl = nurl,
+                associatedFallback = nurl2
             })
 
 getEndpointsFromDiscovery :: MonadIO m => String -> m OAuthEndpoints

@@ -29,12 +29,17 @@ so that they could be properly moved to their respective version's subsection.
 - Derived contracts are inserted as rows in abstract tables
 - Support for imports from addresses in SolidVM
 - More lenient P2P disable times to prevent non-validators from being "locked out"
+- Proper behavior of virtual, override, and visibility modifiers
+- Introduction of `es6` and `strict` pragmas, which enable braced and qualified import syntax, and proper visibility modifier behavior, respectively.
+- `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
+- SolidVM built-in `create` and `create2` functions which allows for the explicit creation of contracts within SolidVM contracts
 
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
+- Bagger no longer crashes the VM upon encountering a transaction that exceeds the nonce or size limit
 ### Removed
 - `bloc22` database removed
 
