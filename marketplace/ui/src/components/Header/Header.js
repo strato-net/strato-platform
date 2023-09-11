@@ -56,7 +56,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         // { label: <div id="Products">Products</div>, key: '3' },
         { label: <div id="Products">Memberships</div>, key: '5' },
         // { label: <div id="Events">Events</div>, key: '4' },        
-        showStorage && { label: <div id="Storage">Storage</div>, key: '5' },
+        // showStorage && { label: <div id="Storage">Storage</div>, key: '5' },
       ]
     },
     {
