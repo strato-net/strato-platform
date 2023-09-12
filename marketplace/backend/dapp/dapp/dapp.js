@@ -1214,34 +1214,36 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           const productFiles = await productFileJs.getAll(rawAdmin, {productId: productAddresses}, createOptions)
           console.log("dapp productFiles: ", productFiles)
           
-          const membershipArgs = {
+        const membershipArgs = {
             createdDate: memberships[0].createdDate,
             timePeriodInMonths: memberships[0].timePeriodInMonths,
             additionalInfo: memberships[0].additionalInfo
         }
-
-        const membershipServiceArgs = [
-          {
-            serviceId: membershipServices[0].serviceId,
-            membershipPrice:  membershipServices[0].membershipPrice,
-            discountPrice:  membershipServices[0].discountPrice,
-            maxQuantity:  membershipServices[0].maxQuantity,
-            createdDate: membershipServices[0].createdDate,
-            isActive: membershipServices[0].isActive,
-          },
-        ];
-
-        const productFileArgs = [
-          {
-            fileLocation: productFiles[0].fileLocation,
-            fileHash: productFiles[0].fileHash,
-            fileName: productFiles[0].fileName,
-            uploadDate: productFiles[0].uploadDate,
-            createdDate: productFiles[0].createdDate,
-            currentSection: productFiles[0].currentSection,
-            currentType: productFiles[0].currentType,
-          },
-        ];
+        
+        const membershipServiceArgs = membershipServices.map((membershipService) => {
+          return {
+            serviceId: membershipService.serviceId,
+            membershipPrice: membershipService.membershipPrice,
+            discountPrice: membershipService.discountPrice,
+            maxQuantity: membershipService.maxQuantity,
+            createdDate: membershipService.createdDate,
+            isActive: membershipService.isActive,
+          };
+        });
+        
+        const productFileArgs = productFiles.map((productFile) => {
+          return {
+            fileLocation: productFile.fileLocation,
+            fileHash: productFile.fileHash,
+            fileName: productFile.fileName,
+            uploadDate: productFile.uploadDate,
+            createdDate: productFile.createdDate,
+            currentSection: productFile.currentSection,
+            currentType: productFile.currentType,
+          };
+        });
+        
+        
 
           console.log("comes here")
           const memberResponse = await managers.membershipManager.addMembershipOrderFlow({ 
@@ -1249,7 +1251,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
             productId: productId,
             membershipArgs: membershipArgs, 
             membershipServiceArgs: membershipServiceArgs, 
-            productFileArgs: productFileArgs
+            productFileArgs:  productFileArgs
           });
           console.log("reach here: ", memberResponse)
           result.push({ status, productId, inventoryId });
