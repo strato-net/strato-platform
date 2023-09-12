@@ -7,7 +7,7 @@ import HFlags
 import           Data.ByteString.Internal
 import           Blockchain.Strato.Model.Util
 
-defineFlag "network" (""::String) "Choose a network to join"
+defineFlag "network" ("mercata"::String) "Choose a network to join"
 defineFlag "networkID" (-1::Integer) "set a custom network ID for the client"
 defineFlag "testnet" False "connect to testnet"
 

@@ -169,7 +169,7 @@ services:
     - mineBlocks=${mineBlocks:-true}
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
-    - network=${network:-mercata}
+    - network=${network}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
