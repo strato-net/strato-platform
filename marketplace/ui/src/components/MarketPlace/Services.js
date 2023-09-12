@@ -14,13 +14,13 @@ const ServiceTable = ({ data, onDataChange, lockedField }) => {
   const edit = () => {
     form.setFieldsValue({
       User: '',
-      Membership_id: '',
-      Service: '',
-      Status: '',
-      Summary: '',
-      Comments: '',
-      Price_Paid: '',
-      Date: null,
+      membership_id: '',
+      service: '',
+      status: '',
+      summary: '',
+      comments: '',
+      price_Paid: '',
+      date: null,
     });
     onDataChange([...data, { key: 'new' }]);
   };
@@ -41,16 +41,16 @@ const ServiceTable = ({ data, onDataChange, lockedField }) => {
   const columns = [
     {
       title: 'User',
-      dataIndex: 'User',
+      dataIndex: 'user',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="User" initialValue={record.User}>
-              <Input prefix={lockedField === 'User' && <LockOutlined />} disabled={lockedField === 'User'} />
+            <Form.Item name="user" initialValue={record.user}>
+              <Input prefix={lockedField === 'user' && <LockOutlined />} disabled={lockedField === 'user'} />
             </Form.Item>
           );
         }
-        return record.User;
+        return record.user;
       },
     },
     {
@@ -69,12 +69,12 @@ const ServiceTable = ({ data, onDataChange, lockedField }) => {
     },
     {
       title: 'Membership ID',
-      dataIndex: 'Membership_id',
+      dataIndex: 'membership_id',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="Membership_id" initialValue={record.Membership_id}>
-              <Input disabled={lockedField === 'Membership_id'} />
+            <Form.Item name="membership_id" initialValue={record.membership_id}>
+              <Input disabled={lockedField === 'membership_id'} />
             </Form.Item>
           );
         }
@@ -83,71 +83,71 @@ const ServiceTable = ({ data, onDataChange, lockedField }) => {
     },
     {
       title: 'Service',
-      dataIndex: 'Service',
+      dataIndex: 'service',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="Service" initialValue={record.Service}>
-              <Select disabled={lockedField === 'Service'}>
-                <Option value="Service1">Service1</Option>
-                <Option value="Service2">Service2</Option>
+            <Form.Item name="service" initialValue={record.service}>
+              <Select disabled={lockedField === 'service'}>
+                <Option value="service1">service1</Option>
+                <Option value="service2">service2</Option>
                 {/* Add more service options as needed */}
               </Select>
             </Form.Item>
           );
         }
-        return record.Service;
+        return record.service;
       },
     },
     {
       title: 'Summary',
-      dataIndex: 'Summary',
+      dataIndex: 'summary',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="Summary" initialValue={record.Summary}>
+            <Form.Item name="summary" initialValue={record.summary}>
               <Input />
             </Form.Item>
           );
         }
-        return record.Summary;
+        return record.summary;
       },
     },
     {
       title: 'Date',
-      dataIndex: 'Date',
+      dataIndex: 'date',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="Date" initialValue={record.Date}>
+            <Form.Item name="date" initialValue={record.date}>
               <DatePicker />
             </Form.Item>
           );
         }
-        return record.Date;
+        return record.date;
       },
     },
     {
       title: 'Comments',
-      dataIndex: 'Comments',
+      dataIndex: 'comments',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="Comments" initialValue={record.Comments}>
+            <Form.Item name="comments" initialValue={record.comments}>
               <Input />
             </Form.Item>
           );
         }
-        return record.Comments;
+        return record.comments;
       },
     },
     {
       title: 'Status',
-      dataIndex: 'Status',
+      dataIndex: 'status',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="Status" initialValue={record.Status}>
+            <Form.Item name="status" initialValue={record.status}>
               <Select>
                 <Option value="Status1">Status1</Option>
                 <Option value="Status2">Status2</Option>
@@ -156,21 +156,21 @@ const ServiceTable = ({ data, onDataChange, lockedField }) => {
             </Form.Item>
           );
         }
-        return record.Status;
+        return record.status;
       },
     },
     {
       title: 'Price Paid',
-      dataIndex: 'Price_Paid',
+      dataIndex: 'price_Paid',
       render: (_, record) => {
         if (isEditing(record)) {
           return (
-            <Form.Item name="Price_Paid" initialValue={record.Price_Paid}>
+            <Form.Item name="price_Paid" initialValue={record.price_Paid}>
               <Input />
             </Form.Item>
           );
         }
-        return record.Price_Paid;
+        return record.price_Paid;
       },
     },
     {
@@ -220,7 +220,7 @@ const ServiceTable = ({ data, onDataChange, lockedField }) => {
 
 const Services = () => {
   const [data, setData] = useState([]);
-  const [lockedField, setLockedField] = useState('User');
+  const [lockedField, setLockedField] = useState('user');
 
   useEffect(() => {
     // Initialize your data here if needed
@@ -234,7 +234,7 @@ const Services = () => {
     if (key === '1') {
       setLockedField('Provider');
     } else if (key === '2') {
-      setLockedField('User');
+      setLockedField('user');
     }
   };
 
