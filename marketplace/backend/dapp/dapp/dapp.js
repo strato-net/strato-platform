@@ -1185,8 +1185,73 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
         for (let orderLineAddress of orderLinesAddresses) {
           const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
+          console.log("dapp orderLineItems: ", orderLineItems)
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
+          console.log("dapp itemAddresses: ", itemAddresses)
+          
+          // Get items and get the productIds
+          const items = await managers.itemManager.getItems({ address: itemAddresses }, createOptions);
+          console.log("dapp items: ", items)
+          const productAddresses = items.map(item => item.productId);
+          console.log("dapp productAddresses: ", productAddresses)
+          
+          // Using the productIds, get the memberships
+          let memberships = await membershipJs.getAll(rawAdmin, {productId: productAddresses}, createOptions)
+          console.log("here")
+          console.log("dapp memberships:", memberships)
+          const membershipAddresses = memberships.map(membership => membership.address);
+          
+          // Transfer ownership of the items to the buyer
           const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
+          console.log("dapp productId: ", productId)
+          console.log("dapp inventoryId: ", inventoryId)
+          
+          // Get all membershipServices using membershipId
+          const membershipServices = await membershipServiceJs.getAll(rawAdmin, {membershipId: membershipAddresses}, createOptions)
+          console.log("dapp membershipServices: ", membershipServices)
+          
+          // Get all productFiles using productId
+          const productFiles = await productFileJs.getAll(rawAdmin, {productId: productAddresses}, createOptions)
+          console.log("dapp productFiles: ", productFiles)
+          
+          const membershipArgs = {
+            createdDate: memberships[0].createdDate,
+            timePeriodInMonths: memberships[0].timePeriodInMonths,
+            additionalInfo: memberships[0].additionalInfo
+        }
+
+        const membershipServiceArgs = [
+          {
+            serviceId: membershipServices[0].serviceId,
+            membershipPrice:  membershipServices[0].membershipPrice,
+            discountPrice:  membershipServices[0].discountPrice,
+            maxQuantity:  membershipServices[0].maxQuantity,
+            createdDate: membershipServices[0].createdDate,
+            isActive: membershipServices[0].isActive,
+          },
+        ];
+
+        const productFileArgs = [
+          {
+            fileLocation: productFiles[0].fileLocation,
+            fileHash: productFiles[0].fileHash,
+            fileName: productFiles[0].fileName,
+            uploadDate: productFiles[0].uploadDate,
+            createdDate: productFiles[0].createdDate,
+            currentSection: productFiles[0].currentSection,
+            currentType: productFiles[0].currentType,
+          },
+        ];
+
+          console.log("comes here")
+          const memberResponse = await managers.membershipManager.addMembershipOrderFlow({ 
+            dappAddress: contract.address,
+            productId: productId,
+            membershipArgs: membershipArgs, 
+            membershipServiceArgs: membershipServiceArgs, 
+            productFileArgs: productFileArgs
+          });
+          console.log("reach here: ", memberResponse)
           result.push({ status, productId, inventoryId });
         }
         return result;

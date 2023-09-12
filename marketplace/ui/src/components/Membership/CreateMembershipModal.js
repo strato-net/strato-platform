@@ -771,7 +771,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
       {visible && (
         <ListNowModal
           open={visible}
-          user={user}
+          user={{user}}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}

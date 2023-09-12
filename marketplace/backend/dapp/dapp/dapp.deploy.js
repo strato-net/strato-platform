@@ -67,7 +67,7 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     adminUser = { ...adminResponse.user, ...adminCredentials }
   })
 
-  it('Deploy Dapp and Add Bootmembers', async () => {
+  it.only('Deploy Dapp and Add Bootmembers', async () => {
     let members = []
     if (config.bootMembersFilename) {
       const fileContents = getYamlFile(`./${config.configDirPath}/${config.bootMembersFilename}`)
