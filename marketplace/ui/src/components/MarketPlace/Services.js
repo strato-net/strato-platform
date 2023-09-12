@@ -1,267 +1,440 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Col, Row, Tabs, Form, Input, Select, Typography, Space, DatePicker, Table } from 'antd';
-import { EditOutlined, LockOutlined, DeleteOutlined } from "@ant-design/icons";
-import "../Membership/membership.css";
+import React, { useState } from 'react';
+import { Tabs, Table, Input, Select, Button, DatePicker, Space } from 'antd';
+import {
+  EditOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  SaveOutlined,
+  LockOutlined,
+} from '@ant-design/icons';
+
 
 const { TabPane } = Tabs;
+const { Option } = Select;
 
-const ServiceTable = ({ data, onDataChange, lockedField }) => {
-  const [form] = Form.useForm();
-  const { Option } = Select;
 
-  const isEditing = (record) => record.key === 'new';
+const ServiceTable = () => {
+  const initialData = [
+    {
+      key: '1',
+      user: 'User 1',
+      provider: 'Provider 1',
+      membershipId: '12345',
+      service: 'Service A',
+      summary: 'Summary 1',
+      date: '2023-09-12',
+      comments: 'Comment 1',
+      status: 'Status 1',
+      pricePaid: '100',
+      editable: false,
+    },
+    {
+      key: '2',
+      user: 'User 2',
+      provider: 'Provider 2',
+      membershipId: '67890',
+      service: 'Service B',
+      summary: 'Summary 2',
+      date: '2023-09-13',
+      comments: 'Comment 2',
+      status: 'Status 2',
+      pricePaid: '200',
+      editable: false,
+    },
+    // Add more initial data as needed...
+  ];
 
-  const edit = () => {
-    form.setFieldsValue({
-      User: '',
-      membership_id: '',
-      service: '',
-      status: '',
-      summary: '',
-      comments: '',
-      price_Paid: '',
-      date: null,
-    });
-    onDataChange([...data, { key: 'new' }]);
+
+  const [activeTab, setActiveTab] = useState('booked');
+  const [dataBooked, setDataBooked] = useState(initialData);
+  const [dataProvided, setDataProvided] = useState(initialData);
+  const [newRow, setNewRow] = useState({
+    user: '',
+    provider: '',
+    membershipId: '',
+    service: '',
+    summary: '',
+    date: null,
+    comments: '',
+    status: '',
+    pricePaid: '',
+    editable: true,
+  });
+
+  const handleTabChange = (key) => {
+    setActiveTab(key);
   };
 
-  const deleteRow = () => {
-    onDataChange(data.filter((item) => item.key !== 'new'));
-  };
-
-  const save = async () => {
-    try {
-      const row = await form.validateFields();
-      onDataChange([...data, { ...row, key: String(data.length + 1) }]);
-    } catch (err) {
-      console.error('Validation failed:', err);
+  const handleEdit = (key) => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = [...data];
+    const item = newData.find((item) => item.key === key);
+    if (item) {
+      item.editable = true;
+      if (activeTab === 'booked') {
+        setDataBooked(newData);
+      } else {
+        setDataProvided(newData);
+      }
     }
   };
+
+  const handleCancel = (key) => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = [...data];
+    const item = newData.find((item) => item.key === key);
+    if (item) {
+      item.editable = false;
+      if (activeTab === 'booked') {
+        setDataBooked(newData);
+      } else {
+        setDataProvided(newData);
+      }
+    }
+  };
+
+  const handleUpdate = (key) => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = [...data];
+    const item = newData.find((item) => item.key === key);
+    if (item) {
+      item.editable = false;
+      if (activeTab === 'booked') {
+        setDataBooked(newData);
+      } else {
+        setDataProvided(newData);
+      }
+    }
+  };
+
+  const handleDelete = (key) => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = data.filter((item) => item.key !== key);
+    if (activeTab === 'booked') {
+      setDataBooked(newData);
+    } else {
+      setDataProvided(newData);
+    }
+  };
+
+  const handleInputChange = (e, field, key) => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = [...data];
+    const item = newData.find((item) => item.key === key);
+    if (item) {
+      item[field] = e.target.value;
+      if (activeTab === 'booked') {
+        setDataBooked(newData);
+      } else {
+        setDataProvided(newData);
+      }
+    }
+  };
+
+  const handleDateChange = (date, dateString, key) => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = [...data];
+    const item = newData.find((item) => item.key === key);
+    if (item) {
+      item.date = dateString;
+      if (activeTab === 'booked') {
+        setDataBooked(newData);
+      } else {
+        setDataProvided(newData);
+      }
+    }
+  };
+
+  const handleSelectChange = (value, key) => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = [...data];
+    const item = newData.find((item) => item.key === key);
+    if (item) {
+      item.status = value;
+      if (activeTab === 'booked') {
+        setDataBooked(newData);
+      } else {
+        setDataProvided(newData);
+      }
+    }
+  };
+
+  const handleAddRow = () => {
+    const data = activeTab === 'booked' ? dataBooked : dataProvided;
+    const newData = [...data];
+    const newKey = (Math.random() * 1000).toString();
+    newData.push({
+      key: newKey,
+      ...newRow,
+    });
+    if (activeTab === 'booked') {
+      setDataBooked(newData);
+    } else {
+      setDataProvided(newData);
+    }
+    setNewRow({
+      user: '',
+      provider: '',
+      membershipId: '',
+      service: '',
+      summary: '',
+      date: null,
+      comments: '',
+      status: '',
+      pricePaid: '',
+      editable: true,
+    });
+  };
+
+  const handleSave = () => {
+    console.log("handleSave");
+  }
+
 
   const columns = [
     {
       title: 'User',
       dataIndex: 'user',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="user" initialValue={record.user}>
-              <Input prefix={lockedField === 'user' && <LockOutlined />} disabled={lockedField === 'user'} />
-            </Form.Item>
-          );
-        }
-        return record.user;
-      },
+      key: 'user',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Select
+              placeholder="User"
+              style={{ width: 120 }}
+              onChange={(e) => handleInputChange(e, 'user', record.key)}
+              options={[
+                { value: 'jack', label: 'Jack' },
+                { value: 'lucy', label: 'Lucy' },
+              ]}
+            />
+          ) : (
+            <span>
+              {text} <LockOutlined />
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       title: 'Provider',
-      dataIndex: 'Provider',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="Provider" initialValue={record.Provider}>
-              <Input prefix={lockedField === 'Provider' && <LockOutlined />} disabled={lockedField === 'Provider'} />
-            </Form.Item>
-          );
-        }
-        return <LockOutlined />;
-      },
+      dataIndex: 'provider',
+      key: 'provider',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Select
+              placeholder="Provider"
+              style={{ width: 120 }}
+              onChange={(e) => handleInputChange(e, 'provider', record.key)}
+              options={[
+                { value: 'jack', label: 'Jack' },
+                { value: 'lucy', label: 'Lucy' },
+              ]}
+            />
+          ) : (
+            <span>
+              {text} <LockOutlined />
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       title: 'Membership ID',
-      dataIndex: 'membership_id',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="membership_id" initialValue={record.membership_id}>
-              <Input disabled={lockedField === 'membership_id'} />
-            </Form.Item>
-          );
-        }
-        return <LockOutlined />;
-      },
+      dataIndex: 'membershipId',
+      key: 'membershipId',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Select
+              placeholder="Membership ID"
+              style={{ width: 120 }}
+              onChange={(e) => handleInputChange(e, 'membershipId', record.key)}
+              options={[
+                { value: 'jack', label: 'Jack' },
+                { value: 'lucy', label: 'Lucy' },
+              ]}
+            />
+          ) : (
+            <span>
+              {text} <LockOutlined />
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       title: 'Service',
       dataIndex: 'service',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="service" initialValue={record.service}>
-              <Select disabled={lockedField === 'service'}>
-                <Option value="service1">service1</Option>
-                <Option value="service2">service2</Option>
-                {/* Add more service options as needed */}
-              </Select>
-            </Form.Item>
-          );
-        }
-        return record.service;
-      },
+      key: 'service',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Select
+              placeholder="Service"
+              style={{ width: 120 }}
+              onChange={(e) => handleInputChange(e, 'services', record.key)}
+              options={[
+                { value: 'jack', label: 'Jack' },
+                { value: 'lucy', label: 'Lucy' },
+              ]}
+            />
+          ) : (
+            <span>
+              {text} <LockOutlined />
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       title: 'Summary',
       dataIndex: 'summary',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="summary" initialValue={record.summary}>
-              <Input />
-            </Form.Item>
-          );
-        }
-        return record.summary;
-      },
+      key: 'summary',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Input value={text} placeholder='Summary' onChange={(e) => handleInputChange(e, 'summary', record.key)} />
+          ) : (
+            text
+          )}
+        </span>
+      ),
     },
     {
       title: 'Date',
       dataIndex: 'date',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="date" initialValue={record.date}>
-              <DatePicker />
-            </Form.Item>
-          );
-        }
-        return record.date;
-      },
+      key: 'date',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <DatePicker
+              // value={text ? moment(text, 'YYYY-MM-DD') : null}
+              onChange={(date, dateString) => handleDateChange(date, dateString, record.key)}
+            />
+          ) : (
+            text
+          )}
+        </span>
+      ),
     },
     {
       title: 'Comments',
       dataIndex: 'comments',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="comments" initialValue={record.comments}>
-              <Input />
-            </Form.Item>
-          );
-        }
-        return record.comments;
-      },
+      key: 'comments',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Input value={text} placeholder='Comments' onChange={(e) => handleInputChange(e, 'comments', record.key)} />
+          ) : (
+            text
+          )}
+        </span>
+      ),
     },
     {
       title: 'Status',
       dataIndex: 'status',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="status" initialValue={record.status}>
-              <Select>
-                <Option value="Status1">Status1</Option>
-                <Option value="Status2">Status2</Option>
-                {/* Add more status options as needed */}
-              </Select>
-            </Form.Item>
-          );
-        }
-        return record.status;
-      },
+      key: 'status',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Select value={text}
+              disabled={activeTab === "provided"}
+              placeholder="Status"
+              style={{ minWidth: "100px" }}
+              onChange={(value) => handleSelectChange(value, record.key)}>
+              <Option value="Status 1">Status 1</Option>
+              <Option value="Status 2">Status 2</Option>
+            </Select>
+          ) : (
+            text
+          )}
+        </span>
+      ),
     },
     {
       title: 'Price Paid',
-      dataIndex: 'price_Paid',
-      render: (_, record) => {
-        if (isEditing(record)) {
-          return (
-            <Form.Item name="price_Paid" initialValue={record.price_Paid}>
-              <Input />
-            </Form.Item>
-          );
-        }
-        return record.price_Paid;
-      },
+      dataIndex: 'pricePaid',
+      key: 'pricePaid',
+      render: (text, record) => (
+        <span>
+          {record.editable ? (
+            <Input value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
+          ) : (
+            text
+          )}
+        </span>
+      ),
     },
     {
-      title: 'Action',
-      dataIndex: 'action',
-      render: (_, record) => {
-        const editable = isEditing(record);
-        if (editable) {
-          return (
-            <Col className='flex justify-between'>
-              <Button onClick={save} type="primary" >
-                Save
-              </Button>
-              <Button onClick={deleteRow} type="default">
-                Cancel
-              </Button>
-            </Col>
-          );
-        }
-        return (
-          <Button onClick={edit} type="default" >
-            <EditOutlined />
-          </Button>
-        );
-      },
+      title: '',
+      dataIndex: 'actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space size="middle">
+          {record.editable ? (
+            <>
+              <Button
+                type="primary"
+                icon={<CheckOutlined />}
+                onClick={() => handleUpdate(record.key)}
+              />
+              <Button type="default" icon={<CloseOutlined />} onClick={() => handleCancel(record.key)} />
+            </>
+          ) : (
+            <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record.key)} />
+          )}
+          <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(record.key)} />
+        </Space>
+      ),
     },
   ];
 
+
+
   return (
-    <Form form={form} component={false}>
-      <Table
-        className='membership-table'
-        dataSource={data}
-        columns={columns}
-        rowKey="key"
-        bordered
-        pagination={false}
-        footer={() => (
-          <Button onClick={edit} type="primary">
-            Add Service Use
-          </Button>
-        )}
-      />
-    </Form>
+    <div>
+      <h1>Service Usage</h1>
+      <Tabs activeKey={activeTab} onChange={handleTabChange}>
+        <TabPane tab="Booked" key="booked">
+          <Table
+            columns={columns}
+            dataSource={dataBooked}
+            pagination={false}
+            rowKey="key"
+          />
+        </TabPane>
+        <TabPane tab="Provided" key="provided">
+          <Table
+            columns={columns}
+            dataSource={dataProvided}
+            pagination={false}
+            rowKey="key"
+          />
+        </TabPane>
+      </Tabs>
+      <Button
+        type="primary"
+        icon={<PlusOutlined />}
+        onClick={handleAddRow}
+      // disabled={!newRow.user || !newRow.provider}
+      >
+        Add Service Use
+      </Button>
+      <Button
+        type="primary"
+        icon={<SaveOutlined />}
+        onClick={handleSave}
+        disabled={!dataBooked.length && !dataProvided.length}
+      >
+        Save
+      </Button>
+    </div>
   );
 };
 
-const Services = () => {
-  const [data, setData] = useState([]);
-  const [lockedField, setLockedField] = useState('user');
-
-  useEffect(() => {
-    // Initialize your data here if needed
-  }, []);
-
-  const handleDataChange = (newData) => {
-    setData(newData);
-  };
-
-  const handleTabChange = (key) => {
-    if (key === '1') {
-      setLockedField('Provider');
-    } else if (key === '2') {
-      setLockedField('user');
-    }
-  };
-
-  return (
-    <>
-      {/* common code for adding new row for both tabs */}
-      {/* <Row>
-        <Col span={6} className="flex justify-between absolute right-24 mt-4">
-          <Button type="primary" onClick={() => handleDataChange([...data, { key: 'new' }])}>
-            Add Service Use
-          </Button>
-        </Col>
-      </Row> */}
-      <Row>
-        <Col span={22} className="m-auto">
-          <Tabs defaultActiveKey="1" size="large" tabBarGutter={30} onChange={handleTabChange}>
-            <TabPane tab="Booked" key="1">
-              <ServiceTable data={data} onDataChange={handleDataChange} lockedField={lockedField} />
-            </TabPane>
-            <TabPane tab="Provided" key="2">
-              <ServiceTable data={data} onDataChange={handleDataChange} lockedField={lockedField} />
-            </TabPane>
-          </Tabs>
-        </Col>
-      </Row>
-    </>
-  );
-};
-
-export default Services;
+export default ServiceTable;
