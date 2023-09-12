@@ -32,7 +32,7 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
 
@@ -268,6 +268,20 @@ const Membership = (user) => {
                 className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
               >
                 Sell Existing Membership{" "}
+              </Button>
+              <Button
+                id="add-product-button"
+                type="primary"
+                style={{
+                  backgroundColor: "orange",
+                  color: "white",
+                  margin: "10px",
+                }}
+                className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+              >
+                <Link to={'/memberships/services'}>
+                Services Usage
+                </Link>
               </Button>
               <Button
                 id="add-product-button"

@@ -390,7 +390,6 @@ const actions = {
       });
 
       const body = await response.json();
-      console.log("fetchPurchasedMemberships response: ", body.data)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchPurchasedMembershipsSuccessful,
