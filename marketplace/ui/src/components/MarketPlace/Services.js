@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tabs, Table, Input, Select, Button, DatePicker, Space, InputNumber } from 'antd';
+import { Tabs, Table, Input, Select, Button, DatePicker, Space, InputNumber, Row, Col, Typography } from 'antd';
 import {
   EditOutlined,
   CheckOutlined,
@@ -10,6 +10,7 @@ import {
   LockOutlined,
   CaretDownOutlined,
 } from '@ant-design/icons';
+import "./service.css"
 
 
 const { TabPane } = Tabs;
@@ -17,6 +18,7 @@ const { Option } = Select;
 
 
 const ServiceTable = () => {
+  const [isEdit, setIsEdit] = useState(false)
   const initialData = [
     {
       key: '1',
@@ -224,7 +226,8 @@ const ServiceTable = () => {
             />
           ) : (
             <span>
-              {text} <LockOutlined />
+              {text}
+              {/* {activeTab === "booked" && <LockOutlined />} */}
             </span>
           )}
         </span>
@@ -250,7 +253,8 @@ const ServiceTable = () => {
             />
           ) : (
             <span>
-              {text} <LockOutlined />
+              {text}
+              {/* {activeTab === "provided" && <LockOutlined />} */}
             </span>
           )}
         </span>
@@ -313,7 +317,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <Input value={text} suffix={<EditOutlined/>} placeholder='Summary' onChange={(e) => handleInputChange(e, 'summary', record.key)} />
+            <Input value={text} suffix={<EditOutlined />} placeholder='Summary' onChange={(e) => handleInputChange(e, 'summary', record.key)} />
           ) : (
             text
           )}
@@ -344,7 +348,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <Input value={text} suffix={<EditOutlined/>} placeholder='Comments' onChange={(e) => handleInputChange(e, 'comments', record.key)} />
+            <Input value={text} suffix={<EditOutlined />} placeholder='Comments' onChange={(e) => handleInputChange(e, 'comments', record.key)} />
           ) : (
             text
           )}
@@ -380,7 +384,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <InputNumber keyboard={true} addonAfter={<EditOutlined/>} min={0} controls={false} value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
+            <InputNumber keyboard={true} addonAfter={<EditOutlined />} min={0} controls={false} value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
           ) : (
             text
           )}
@@ -411,45 +415,83 @@ const ServiceTable = () => {
     },
   ];
 
-
+  const Filter = () => {
+    return <Col className='flex justify-between service-filter'>
+      <Typography.Title level={4}>
+        Service
+      </Typography.Title>
+      <span>
+        <Select
+          placeholder="Provider"
+          suffixIcon={<CaretDownOutlined />}
+          style={{ width: 120 }}
+          options={[
+            { value: 'jack', label: 'Jack' },
+            { value: 'lucy', label: 'Lucy' },
+          ]}
+        />
+        <Select
+          placeholder="Status"
+          className='ml-2'
+          suffixIcon={<CaretDownOutlined />}
+          style={{ width: 120 }}
+          options={[
+            { value: 'jack', label: 'Jack' },
+            { value: 'lucy', label: 'Lucy' },
+          ]}
+        />
+      </span>
+    </Col>
+  }
 
   return (
     <div>
-      <h1>Service Usage</h1>
-      <Tabs activeKey={activeTab} onChange={handleTabChange}>
-        <TabPane tab="Booked" key="booked">
-          <Table
-            columns={columns}
-            dataSource={dataBooked}
-            pagination={false}
-            rowKey="key"
-          />
-        </TabPane>
-        <TabPane tab="Provided" key="provided">
-          <Table
-            columns={columns}
-            dataSource={dataProvided}
-            pagination={false}
-            rowKey="key"
-          />
-        </TabPane>
-      </Tabs>
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        onClick={handleAddRow}
-      // disabled={!newRow.user || !newRow.provider}
-      >
-        Add Service Use
-      </Button>
-      <Button
-        type="primary"
-        icon={<SaveOutlined />}
-        onClick={handleSave}
-        disabled={!dataBooked.length && !dataProvided.length}
-      >
-        Save
-      </Button>
+      <Row className='mt-2'>
+        <Col className='flex justify-between absolute right-20 mt-2 ' span={4}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddRow}
+          // disabled={!newRow.user || !newRow.provider}
+          >
+            Add Service Use
+          </Button>
+          <Button
+            className='ml-2'
+            style={{backgroundColor:"green"}}
+            type="primary"
+            // icon={<SaveOutlined />}
+            onClick={handleSave}
+            disabled={!dataBooked.length && !dataProvided.length}
+          >
+            Save
+          </Button>
+        </Col>
+      </Row>
+      <Row>
+        <Col span={22} className='m-auto'>
+          <Tabs activeKey={activeTab} onChange={handleTabChange}>
+            <TabPane tab="Booked" key="booked">
+              {Filter()}
+              <Table
+                columns={columns}
+                dataSource={dataBooked}
+                pagination={false}
+                rowKey="key"
+              />
+            </TabPane>
+            <TabPane tab="Provided" key="provided">
+              {Filter()}
+              <Table
+                columns={columns}
+                dataSource={dataProvided}
+                pagination={false}
+                rowKey="key"
+              />
+            </TabPane>
+          </Tabs>
+        </Col>
+      </Row>
     </div>
   );
 };
