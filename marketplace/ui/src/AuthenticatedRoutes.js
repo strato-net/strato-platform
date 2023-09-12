@@ -41,6 +41,7 @@ import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
 import Service from "./components/Service";
+import Services from "./components/MarketPlace/Services";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -190,10 +191,10 @@ const AuthenticatedRoutes = ({ user, users }) => {
                   <InventoriesProvider>
                     <ServicesProvider>
                       <MembershipsProvider>
-                          <Membership user={user} users={users}/>
-                      </MembershipsProvider>  
-                    </ServicesProvider>  
-                  </InventoriesProvider>              
+                        <Membership user={user} users={users} />
+                      </MembershipsProvider>
+                    </ServicesProvider>
+                  </InventoriesProvider>
                 </ProductsProvider>
               </SubCategorysProvider>
             </CategorysProvider>
@@ -237,7 +238,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
                     <InventoriesProvider>
                       <ProductsProvider>
                         <ItemsProvider>
-                          <MembershipDetails user={user} users={users} />
+                          {/* <MembershipDetails user={user} users={users} /> */}
+                          <Services user={user} users={users} />
                         </ItemsProvider>
                       </ProductsProvider>
                     </InventoriesProvider>
@@ -259,10 +261,10 @@ const AuthenticatedRoutes = ({ user, users }) => {
                   <InventoriesProvider>
                     <MembershipsProvider>
                       <ServicesProvider>
-                        <Service user={user} users={users}/>
-                      </ServicesProvider>  
+                        <Service user={user} users={users} />
+                      </ServicesProvider>
                     </MembershipsProvider>
-                  </InventoriesProvider>              
+                  </InventoriesProvider>
                 </ProductsProvider>
               </SubCategorysProvider>
             </CategorysProvider>

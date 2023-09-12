@@ -1,0 +1,8 @@
+.ant-table-thead .ant-table-cell {
+  background-color: #061a6c !important;
+  color: white !important;
+}
+.service-filter > .ant-space-item > div > .ant-select-selector {
+  background-color: transparent;
+  border: none;
+}
