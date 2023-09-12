@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tabs, Table, Input, Select, Button, DatePicker, Space } from 'antd';
+import { Tabs, Table, Input, Select, Button, DatePicker, Space, InputNumber } from 'antd';
 import {
   EditOutlined,
   CheckOutlined,
@@ -8,6 +8,7 @@ import {
   DeleteOutlined,
   SaveOutlined,
   LockOutlined,
+  CaretDownOutlined,
 } from '@ant-design/icons';
 
 
@@ -212,6 +213,8 @@ const ServiceTable = () => {
           {record.editable ? (
             <Select
               placeholder="User"
+              suffixIcon={activeTab === "booked" ? <LockOutlined /> : <CaretDownOutlined />}
+              disabled={activeTab === "booked"}
               style={{ width: 120 }}
               onChange={(value) => handleSelectChange(value, 'user', record.key)}
               options={[
@@ -236,6 +239,8 @@ const ServiceTable = () => {
           {record.editable ? (
             <Select
               placeholder="Provider"
+              suffixIcon={activeTab === "provided" ? <LockOutlined /> : <CaretDownOutlined />}
+              disabled={activeTab === "provided"}
               style={{ width: 120 }}
               onChange={(value) => handleSelectChange(value, 'provider', record.key)}
               options={[
@@ -260,6 +265,7 @@ const ServiceTable = () => {
           {record.editable ? (
             <Select
               placeholder="Membership ID"
+              suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               onChange={(value) => handleSelectChange(value, 'membershipId', record.key)}
               options={[
@@ -284,6 +290,7 @@ const ServiceTable = () => {
           {record.editable ? (
             <Select
               placeholder="Service"
+              suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               onChange={(value) => handleSelectChange(value, 'service', record.key)}
               options={[
@@ -306,7 +313,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <Input value={text} placeholder='Summary' onChange={(e) => handleInputChange(e, 'summary', record.key)} />
+            <Input value={text} suffix={<EditOutlined/>} placeholder='Summary' onChange={(e) => handleInputChange(e, 'summary', record.key)} />
           ) : (
             text
           )}
@@ -337,7 +344,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <Input value={text} placeholder='Comments' onChange={(e) => handleInputChange(e, 'comments', record.key)} />
+            <Input value={text} suffix={<EditOutlined/>} placeholder='Comments' onChange={(e) => handleInputChange(e, 'comments', record.key)} />
           ) : (
             text
           )}
@@ -352,8 +359,9 @@ const ServiceTable = () => {
         <span>
           {record.editable ? (
             <Select value={text}
-              disabled={activeTab === "provided"}
               placeholder="Status"
+              suffixIcon={<CaretDownOutlined />}
+              disabled={activeTab === "provided"}
               style={{ minWidth: "100px" }}
               onChange={(value) => handleSelectChange(value, 'status', record.key)}>
               <Option value="Status 1">Status 1</Option>
@@ -372,7 +380,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <Input value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
+            <InputNumber keyboard={true} addonAfter={<EditOutlined/>} min={0} controls={false} value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
           ) : (
             text
           )}
