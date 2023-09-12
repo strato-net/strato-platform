@@ -117,6 +117,7 @@ pipeline {
                   STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
                   CLIENT_URL="https://membership.mercata-testnet2.blockapps.net" \\
                   ssl="true" \\
+                  connectionTimeout=300 \\
                   ./strato
               """
             }

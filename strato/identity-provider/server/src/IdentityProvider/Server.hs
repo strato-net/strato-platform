@@ -27,6 +27,7 @@ import           UnliftIO                                hiding (Handler)
 import           Servant
 import           Servant.Client                          hiding (responseBody, manager)
 import           Network.HTTP.Client                     hiding (Proxy)
+import qualified Network.HTTP.Client as HTTP             (Response)
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Types.Header               (hContentType, hAuthorization)
 import           Network.HTTP.Types.Status
@@ -71,7 +72,7 @@ getAccessTokenForRealm realm = do
         Nothing -> do 
             $logErrorS "getAccessTokenForRealm" $ "Recieved PUT /identity request from a realm we don't support: " <> T.pack realm
             throwIO $ IdentityError "Identity server does not support this realm"
-        Just (RealmDetails endpoints cid csec _) -> getAccessToken cid csec (token_endpoint endpoints)
+        Just (RealmDetails endpoints cid csec _ _) -> getAccessToken cid csec (token_endpoint endpoints)
 
 -- oAuthUserToSubject :: OAuthUser -> PublicKey -> Subject
 -- oAuthUserToSubject (OAuthUser id' firstN' lastN' attr) pk =
@@ -226,17 +227,11 @@ certInCirrus token realm a name uuid mCo = do
         Nothing -> do 
             $logErrorS "certInCirrus" "Trying to find a cert on a network whose realm we don't support (How?? We should never reach this error)"
             throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown sooner"
-        Just (RealmDetails _ _ _ nurl) -> do 
-            let cirrusEndpoint = cirrusSearchPath a name uuid mCo
-                url = showBaseUrl nurl{baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
-            mgr <- liftIO $ case baseUrlScheme nurl of
-                Http -> newManager defaultManagerSettings
-                Https -> newManager tlsManagerSettings
-            templateRequest <- liftIO $ parseRequest url
-            let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
-                request = templateRequest{requestHeaders = rHead}
-            response <- liftIO $ httpLbs request mgr
-            let mCerts:: Maybe [CertificateInCirrus] = decode $ responseBody response
+        Just (RealmDetails _ _ _ nurl1 nurl2) -> do
+            response1 <- callCirrus nurl1
+            mCerts :: Maybe [CertificateInCirrus] <- if statusCode (responseStatus response1) == 200
+                then return . decode $ responseBody response1
+                else callCirrus nurl2 >>= return . decode . responseBody
             case mCerts of
                 Just certs -> do
                     $logInfoS "certInCirrus" $ T.pack $ "Checked for user's cert in Cirrus; response was: " <> show certs
@@ -253,6 +248,17 @@ certInCirrus token realm a name uuid mCo = do
                     Just "" -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
                     Just org -> ",organization.eq." <> org
             in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> orgParam <> ")"
+        
+        callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
+        callCirrus nurl = do 
+            let cirrusEndpoint = cirrusSearchPath a name uuid mCo
+                url = showBaseUrl nurl{baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
+            mgr <- liftIO $ case baseUrlScheme nurl of
+                Http -> newManager defaultManagerSettings
+                Https -> newManager tlsManagerSettings
+            request <- liftIO $ parseRequest url
+            let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
+            liftIO $ httpLbs request{requestHeaders = rHead} mgr
 
 createAndRegisterCert :: ( MonadIO m
                          , MonadLogger m
@@ -310,7 +316,7 @@ registerCert cert token realm = do
         Nothing -> do
             $logErrorS "registerCert" "Trying to register cert for realm we don't support. Error should have been thrown MUCH sooner"
             throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown MUCH sooner"
-        Just (RealmDetails _ _ _ nurl) -> do
+        Just (RealmDetails _ _ _ nurl nurl2) -> do
             mgr <- liftIO $ case baseUrlScheme nurl of
                 Http -> newManager defaultManagerSettings
                 Https -> newManager tlsManagerSettings
@@ -325,8 +331,20 @@ registerCert cert token realm = do
                     functionpayloadMetadata = Nothing
                 }
                 txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-            eresponse <- liftIO $ runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest) clientEnv
-            $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show eresponse
+                postBlocTx = runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest)
+            eresponse <- liftIO $ postBlocTx clientEnv
+            case eresponse of
+                Right response -> $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response
+                Left clienterr -> do
+                    $logErrorS "registerCert" $ T.pack $
+                        "Attempting to register on fallback node because recieved the following error when registering cert on primary node: "
+                        ++ show clienterr
+                    mgr2 <- liftIO $ case baseUrlScheme nurl2 of
+                        Http -> newManager defaultManagerSettings
+                        Https -> newManager tlsManagerSettings
+                    let clientEnv2 = mkClientEnv mgr2 nurl2{baseUrlPath = baseUrlPath nurl2 <> blocEndpoint}
+                    eresponse2 <- liftIO $ postBlocTx clientEnv2
+                    $logInfoS "registerCert" $ T.pack $ "Response from fallback node was " ++ show eresponse2
             --TODO: how to tell if cert successfully added to blockchain?
 
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe AddressAndKey)

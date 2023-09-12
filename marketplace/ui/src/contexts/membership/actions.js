@@ -37,7 +37,10 @@ const actionDescriptors = {
   onboardSellerToStripeFailed: "onboard_seller_to_stripe_failed",
   sellerStripeStatus: "seller_stripe_status",
   sellerStripeStatusSuccessful: "seller_stripe_status_successful",
-  sellerStripeStatusFailed: "seller_stripe_status_failed"
+  sellerStripeStatusFailed: "seller_stripe_status_failed",
+  fetchPurchasedMemberships: "fetch_purchased_memberships",
+  fetchPurchasedMembershipsSuccessful: "fetch_purchased_memberships_successful",
+  fetchPurchasedMembershipsFailed: "fetch_purchased_memberships_failed",
 };
 
 const actions = {
@@ -139,6 +142,7 @@ const actions = {
           type: actionDescriptors.fetchMembershipSuccessful,
           payload: body.data,
         });
+
         return;
       }
       dispatch({ type: actionDescriptors.fetchMembershipFailed, error: undefined });
@@ -370,6 +374,33 @@ const actions = {
         type: actionDescriptors.sellerStripeStatusFailed,
         error: "Error while trying to get Stripe status",
       });
+    }
+  },
+  
+  fetchPurchasedMemberships: async (dispatch) => {
+    // const query = queryValue
+    //   ? `&serviceTypeId=${queryValue}`
+    //   : "";
+
+    dispatch({ type: actionDescriptors.fetchPurchasedMemberships });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/purchased`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+      console.log("fetchPurchasedMemberships response: ", body.data)
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchPurchasedMembershipsSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchPurchasedMembershipsFailed, error: undefined });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchPurchasedMembershipsFailed, error: undefined });
     }
   },
 };

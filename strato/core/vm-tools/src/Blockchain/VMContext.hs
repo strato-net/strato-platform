@@ -74,6 +74,7 @@ module Blockchain.VMContext
     , putContextBestBlockInfo
     , compactContextM
     , lookupX509AddrFromCBHash
+    , knownFailedTxs
     ) where
 
 import           Control.DeepSeq
@@ -89,6 +90,7 @@ import           Data.Default
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
+import qualified Data.Set                           as S
 import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as Text
 import           Data.Traversable                   (for)
@@ -146,6 +148,12 @@ import           SolidVM.Model.Storable
 import           Executable.EVMFlags
 
 import           UnliftIO
+
+{-# NOINLINE knownFailedTxs #-}
+knownFailedTxs :: S.Set Keccak256
+knownFailedTxs = S.fromList
+  [ keccak256FromHex "d924cd206a64fe1a6acd77af0a25f2acc4acd23d5a169caf2e701cb9cfc3d7d8"
+  ]
 
 newtype CurrentBlockHash = CurrentBlockHash { unCurrentBlockHash :: Keccak256 }
   deriving (Generic, NFData, Show)

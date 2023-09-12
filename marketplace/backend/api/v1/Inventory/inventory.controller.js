@@ -127,6 +127,8 @@ class InventoryController {
           })).required()
         })).required()
       }).required(),
+      taxPercentageAmount: Joi.number().integer().min(0).required(),
+      taxDollarAmount:     Joi.number().integer().min(0).required(),
     });
 
     

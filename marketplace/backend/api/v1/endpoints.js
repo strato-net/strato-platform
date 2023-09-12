@@ -152,6 +152,7 @@ export const Membership = {
   get: '/:address',
   getAll: '/',
   create: '/',
+  purchased: '/purchased',
   //update: '/update',
   //transferOwnership: '/transferOwnership',
 }

@@ -941,19 +941,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       });
 
       const groupedData = inventories.reduce((acc, inventory) => {
-        if (!acc[inventory.ownerOrganization]) {
-          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, data: [] };
+        if (!acc[inventory.productId]) {
+          const taxRate    = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount :  inventory.taxDollarAmount)/100;
+          acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: inventory.taxDollarAmount === 0, data: [] };
         }
-        acc[inventory.ownerOrganization].data.push(inventory);
+        acc[inventory.productId].data.push(inventory);
         return acc;
       }, {});
 
       const inventoriesData = Object.values(groupedData);
       const total = inventoriesData.reduce((acc, obj) => {
-        const result = obj.data.reduce((total, curr) => total + curr.pricePerUnit * curr.quantity, 0);
-        return acc + result;
-      }, 0);
-
+        const result = obj.data.reduce((total, curr) => obj.tax !==0 ?
+          (obj.isTaxPercentage ?
+          ((total + ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax/100))) ) * 100) / 100
+          : total + (curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity) 
+         )   : (total + curr.pricePerUnit * curr.quantity) , 0);
+        return Number(acc) + Number(result);
+      }, 0).toFixed(2);
+      
       if (total != recievedOrderTotal) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
       }
@@ -1039,7 +1044,86 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
   };
 
+  contract.getPurchasedMemberships = async function (args, options = defaultOptions) {
+    try {
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+      console.log("userOrganization", userOrganization)
+      
+      // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
+      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
+      // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
+      console.log ('ownedProducts', ownedProducts)
+      
+      const arrayOfAddresses = ownedProducts.map(obj => obj.address);
+      console.log("arrayOfAddresses",arrayOfAddresses);
+      const args = {
+        ownerOrganization: userOrganization,
+        productId: arrayOfAddresses
+      }
+      console.log("args",args);
+      
+      // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
+      let ownedItems = await itemJs.getAll(rawAdmin, args, getOptions);
+      // Filter ownedItems based on productId and ownerOrg
+      // ownedItems = ownedItems.filter(item =>
+      //   ownedProducts.some(product => item.productId === product.address)
+      // );
+      
+      console.log("ownedItems", ownedItems)
+      
+      // Get Memberhships where productId = Items.productId 
+      let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
+      // ownedMemberships = ownedMemberships.filter(membership =>
+      //   ownedItems.some(item => membership.productId === item.productId)
+      // );
+      console.log ('ownedMemberships', ownedMemberships)
+      
+      // Get ProductFile where productId = Items.productId
+      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
+      // ownedProductFiles = ownedProductFiles.filter(file =>
+      //   ownedItems.some(item => file.productId === item.productId)
+      // );
+      console.log ('ownedProductFiles', ownedProductFiles)
+      
+      // Combine ownedProducts, ownedItems, ownedMemberships, and ownedProductFiles into one JSON object array
+      const combinedData = ownedItems
+        .filter(item => {
+          const product = ownedProducts.find(p => p.address === item.productId);
+          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
 
+          return product //&& productFiles.length > 0; //&& memberships.length > 0
+        })
+        .map(item => {
+          const product = ownedProducts.find(p => p.address === item.productId);
+          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+
+          return {
+            itemNumber: item.itemNumber,
+            productId: item.productId,
+            fileLocation: null,//productFiles[0].fileLocation,
+            productName: product.name,
+            subCategory: product.subCategory,
+            manufacturer: product.manufacturer,
+            timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
+            savings: null, //memberships[0].savings,
+            membershipAddress: null //memberships[0].address
+          };
+        });
+      console.log('combinedData', combinedData);
+      
+      return combinedData;
+    } catch (error) {
+      console.log ('error123', error)
+        if (error.response) {
+          console.log ('error.response', error.response)
+            throw new rest.RestError(error.response.status, error.response.statusText);
+        }
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getPurchasedMemberships");
+    }   
+
+  };
 
 
 

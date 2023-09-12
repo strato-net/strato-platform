@@ -88,6 +88,10 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     description: "",
     price: "",
     quantity: "",
+    isTaxPercentage: true,
+    taxDollarAmount: 0,
+    taxPercentageAmount: 0,
+    taxPercentage: 0,
     services: [
       {
         serviceId: "",
@@ -338,6 +342,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                     // Status should always be published if we use List Now
                     status: INVENTORY_STATUS.PUBLISHED,
                     serialNumber: [],
+                    taxPercentageAmount: Math.floor(updatedValues.taxPercentageAmount*100),
+                    taxDollarAmount:     Math.floor(updatedValues.taxDollarAmount*100),
                   };
 
                   const createInventory = await inventoryActions.createInventory(
