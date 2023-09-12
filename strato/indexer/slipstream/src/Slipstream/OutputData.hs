@@ -879,6 +879,12 @@ insertAbstractTableQuery cs = concat $
            in (:[]) $ T.concat
                 [ "INSERT INTO "
                 , abTableName
+                ,"\n\nbaseVals "
+                , baseVals
+                ,"\n\ncontractColumns "
+                , contractColumns
+                ,"\n\nrest "
+                , (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
                 , " "
                 , keySt
                 , "\n  VALUES "
