@@ -857,13 +857,13 @@ insertAbstractTableQuery cs = concat $
   let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab, abColumns) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns))) <$> cs
    in flip map (map snd $ partitionWith ((length . snd) *** fst) cs') $ \case
         [] -> []
-        contracts@(((x, _), (abTableName, abColumns)):_) ->
+        contracts@(((x, list), (abTableName, abColumns)):_) ->
           let contractTableName = indexTableName
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)  
-              list = filter (`notElem` baseAbstractColumns) abColumns
-              keySt  = wrapAndEscapeDouble $ escapeQuotes <$> (baseAbstractColumns ++ list)
+              list' = filter (`notElem` list) abColumns
+              keySt  =wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ list'
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -887,7 +887,7 @@ insertAbstractTableQuery cs = concat $
                 , abTableName
                 ,"\n\ncontractColumns "
                 , T.pack $ show cc
-                ,"\n\row "
+                ,"\n\n row "
                 , T.pack $ show row1
                 ,"\n\nrest "
                 , T.pack $  show cc1
@@ -906,7 +906,7 @@ insertAbstractTableQuery cs = concat $
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name|]
                 , if null list then "" else ",\n    "
-                , tableUpsert $ list
+                , tableUpsert $ list'
                 , ";"
                 ]
 
