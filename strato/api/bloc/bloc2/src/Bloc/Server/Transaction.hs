@@ -326,6 +326,10 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                   Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
                   Just x -> pure x
                 at theAccount <?= x
+            sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+              Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+              Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+
             let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
                 xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
             (argsBin, argsAsSource) <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
@@ -339,7 +343,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                 addr
                 (fromMaybe emptyTxParams _methodcallTxParams)
                 (Wei (fromIntegral $ unStrung methodcallValue))
-                (Code $ "dead" <> argsBin) -- TODO: EVM no work no more
+                (Code $ sel <> argsBin)
                 _methodcallChainid
             return $ BlocTransactionBodyResult (hash' tx) (Just tx)
       GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
@@ -448,6 +452,10 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                   Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
                   Just x -> pure x
                 at theAccount <?= x
+            sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+              Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+              Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+            
             let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
                 xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
             (argsBin, argsAsSource) <-
@@ -462,7 +470,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                 addr
                 (fromMaybe emptyTxParams _methodcallTxParams)
                 (Wei (fromIntegral $ unStrung methodcallValue))
-                (Code $ "dead" <> argsBin)
+                (Code $ sel <> argsBin)
                 _methodcallChainid
       GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where fromTransfer = \case
@@ -925,6 +933,10 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} jwtToken = do
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
                 Just x -> pure x
               at theAccount <?= x
+          sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+            Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+            Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
           (argsBin, argsAsSource) <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
@@ -938,7 +950,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters{..} jwtToken = do
               fromAddr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (Code $ "dead" <> argsBin) -- TODO: EVM no work no more
+              (Code $ sel <> argsBin)
               _methodcallChainid
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx,methodcallMethodName)
@@ -969,6 +981,9 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} jwtToken = do
     contract <- maybe (throwIO err) pure =<<
       A.select (A.Proxy @Contract)
         (Account contractAddr (unChainId <$> chainId))
+    sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
+      Just _ -> return $ Text.encodeUtf8 funcName
+      Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
     let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
         xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack funcName) $ contract ^. functions
@@ -984,7 +999,7 @@ postUsersContractMethod' cacheNonce FunctionParameters{..} jwtToken = do
         fromAddr
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
-        (Code $ ("dead"::ByteString) <> (argsBin::ByteString)) -- TODO: EVM no work no more
+        (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
     $logDebugLS "postUsersContractMethod'/tx" tx
     txHash <- postTransaction (Just txSizeLimit) tx
