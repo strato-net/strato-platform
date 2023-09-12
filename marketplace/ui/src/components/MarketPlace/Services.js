@@ -147,12 +147,12 @@ const ServiceTable = () => {
     }
   };
 
-  const handleSelectChange = (value, key) => {
+  const handleSelectChange = (value, field, key) => {
     const data = activeTab === 'booked' ? dataBooked : dataProvided;
     const newData = [...data];
     const item = newData.find((item) => item.key === key);
     if (item) {
-      item.status = value;
+      item[field] = value;
       if (activeTab === 'booked') {
         setDataBooked(newData);
       } else {
@@ -189,7 +189,16 @@ const ServiceTable = () => {
   };
 
   const handleSave = () => {
-    console.log("handleSave");
+    let data = activeTab === 'booked' ? dataBooked : dataProvided;
+    data = data.map((item, index) => {
+      item['editable'] = false;
+      return item
+    })
+    if (activeTab === 'booked') {
+      setDataBooked(data)
+    } else {
+      setDataProvided(data)
+    }
   }
 
 
@@ -204,7 +213,7 @@ const ServiceTable = () => {
             <Select
               placeholder="User"
               style={{ width: 120 }}
-              onChange={(e) => handleInputChange(e, 'user', record.key)}
+              onChange={(value) => handleSelectChange(value, 'user', record.key)}
               options={[
                 { value: 'jack', label: 'Jack' },
                 { value: 'lucy', label: 'Lucy' },
@@ -228,7 +237,7 @@ const ServiceTable = () => {
             <Select
               placeholder="Provider"
               style={{ width: 120 }}
-              onChange={(e) => handleInputChange(e, 'provider', record.key)}
+              onChange={(value) => handleSelectChange(value, 'provider', record.key)}
               options={[
                 { value: 'jack', label: 'Jack' },
                 { value: 'lucy', label: 'Lucy' },
@@ -252,7 +261,7 @@ const ServiceTable = () => {
             <Select
               placeholder="Membership ID"
               style={{ width: 120 }}
-              onChange={(e) => handleInputChange(e, 'membershipId', record.key)}
+              onChange={(value) => handleSelectChange(value, 'membershipId', record.key)}
               options={[
                 { value: 'jack', label: 'Jack' },
                 { value: 'lucy', label: 'Lucy' },
@@ -260,7 +269,7 @@ const ServiceTable = () => {
             />
           ) : (
             <span>
-              {text} <LockOutlined />
+              {text}
             </span>
           )}
         </span>
@@ -276,7 +285,7 @@ const ServiceTable = () => {
             <Select
               placeholder="Service"
               style={{ width: 120 }}
-              onChange={(e) => handleInputChange(e, 'services', record.key)}
+              onChange={(value) => handleSelectChange(value, 'service', record.key)}
               options={[
                 { value: 'jack', label: 'Jack' },
                 { value: 'lucy', label: 'Lucy' },
@@ -284,7 +293,7 @@ const ServiceTable = () => {
             />
           ) : (
             <span>
-              {text} <LockOutlined />
+              {text}
             </span>
           )}
         </span>
@@ -346,7 +355,7 @@ const ServiceTable = () => {
               disabled={activeTab === "provided"}
               placeholder="Status"
               style={{ minWidth: "100px" }}
-              onChange={(value) => handleSelectChange(value, record.key)}>
+              onChange={(value) => handleSelectChange(value, 'status', record.key)}>
               <Option value="Status 1">Status 1</Option>
               <Option value="Status 2">Status 2</Option>
             </Select>
