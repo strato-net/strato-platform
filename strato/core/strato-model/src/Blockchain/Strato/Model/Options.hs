@@ -24,4 +24,5 @@ computeNetworkID =
     where newtorkToID :: String -> Integer
           newtorkToID network = case network of 
             "mercata-hydrogen" -> 7596898649924658542 -- mercata-hydrogen networkID was manually changed
+            "mercata" -> 6909499098523985262
             n -> bytes2Integer $ map c2w n
