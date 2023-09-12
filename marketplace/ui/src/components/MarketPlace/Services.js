@@ -1,57 +1,38 @@
-import React, { useState } from 'react';
-import { Button, Col, Row, Tabs, Table, Form, Input, Select, Typography, Space } from 'antd'
-import { EditOutlined } from "@ant-design/icons"
-import "../Membership/membership.css"
+import React, { useState, useEffect } from 'react';
+import { Button, Col, Row, Tabs, Form, Input, Select, Typography, Space, DatePicker, Table } from 'antd';
+import { EditOutlined, LockOutlined, DeleteOutlined } from "@ant-design/icons";
+import "../Membership/membership.css";
 
-const ServiceTable = () => {
+const { TabPane } = Tabs;
+
+const ServiceTable = ({ data, onDataChange, lockedField }) => {
   const [form] = Form.useForm();
   const { Option } = Select;
 
-  const [data, setData] = useState([
-    {
-      key: '1',
-      User: 'User1',
-      Provider: 'Provider1',
-      Membership_id: '123',
-      Service: 'Service1',
-      Summary: 'Summary1',
-      Date: '2023-09-11',
-      Comments: 'Comments1',
-      Status: 'Status1',
-      Price_Paid: 100,
-    },
-    // Add more rows as needed
-  ]);
-  const [editingKey, setEditingKey] = useState('');
+  const isEditing = (record) => record.key === 'new';
 
-  const isEditing = (record) => record.key === editingKey;
-
-  const edit = (record) => {
+  const edit = () => {
     form.setFieldsValue({
+      User: '',
+      Membership_id: '',
+      Service: '',
+      Status: '',
       Summary: '',
       Comments: '',
-      Status: '',
-      ...record,
+      Price_Paid: '',
+      Date: null,
     });
-    setEditingKey(record.key);
+    onDataChange([...data, { key: 'new' }]);
   };
 
-  const cancel = () => {
-    setEditingKey('');
+  const deleteRow = () => {
+    onDataChange(data.filter((item) => item.key !== 'new'));
   };
 
-  const save = async (key) => {
+  const save = async () => {
     try {
       const row = await form.validateFields();
-      const newData = [...data];
-      const index = newData.findIndex((item) => key === item.key);
-
-      if (index > -1) {
-        const item = newData[index];
-        newData.splice(index, 1, { ...item, ...row });
-        setData(newData);
-        setEditingKey('');
-      }
+      onDataChange([...data, { ...row, key: String(data.length + 1) }]);
     } catch (err) {
       console.error('Validation failed:', err);
     }
@@ -61,18 +42,62 @@ const ServiceTable = () => {
     {
       title: 'User',
       dataIndex: 'User',
+      render: (_, record) => {
+        if (isEditing(record)) {
+          return (
+            <Form.Item name="User" initialValue={record.User}>
+              <Input prefix={lockedField === 'User' && <LockOutlined />} disabled={lockedField === 'User'} />
+            </Form.Item>
+          );
+        }
+        return record.User;
+      },
     },
     {
       title: 'Provider',
       dataIndex: 'Provider',
+      render: (_, record) => {
+        if (isEditing(record)) {
+          return (
+            <Form.Item name="Provider" initialValue={record.Provider}>
+              <Input prefix={lockedField === 'Provider' && <LockOutlined />} disabled={lockedField === 'Provider'} />
+            </Form.Item>
+          );
+        }
+        return <LockOutlined />;
+      },
     },
     {
       title: 'Membership ID',
       dataIndex: 'Membership_id',
+      render: (_, record) => {
+        if (isEditing(record)) {
+          return (
+            <Form.Item name="Membership_id" initialValue={record.Membership_id}>
+              <Input disabled={lockedField === 'Membership_id'} />
+            </Form.Item>
+          );
+        }
+        return <LockOutlined />;
+      },
     },
     {
       title: 'Service',
       dataIndex: 'Service',
+      render: (_, record) => {
+        if (isEditing(record)) {
+          return (
+            <Form.Item name="Service" initialValue={record.Service}>
+              <Select disabled={lockedField === 'Service'}>
+                <Option value="Service1">Service1</Option>
+                <Option value="Service2">Service2</Option>
+                {/* Add more service options as needed */}
+              </Select>
+            </Form.Item>
+          );
+        }
+        return record.Service;
+      },
     },
     {
       title: 'Summary',
@@ -91,6 +116,16 @@ const ServiceTable = () => {
     {
       title: 'Date',
       dataIndex: 'Date',
+      render: (_, record) => {
+        if (isEditing(record)) {
+          return (
+            <Form.Item name="Date" initialValue={record.Date}>
+              <DatePicker />
+            </Form.Item>
+          );
+        }
+        return record.Date;
+      },
     },
     {
       title: 'Comments',
@@ -127,23 +162,36 @@ const ServiceTable = () => {
     {
       title: 'Price Paid',
       dataIndex: 'Price_Paid',
+      render: (_, record) => {
+        if (isEditing(record)) {
+          return (
+            <Form.Item name="Price_Paid" initialValue={record.Price_Paid}>
+              <Input />
+            </Form.Item>
+          );
+        }
+        return record.Price_Paid;
+      },
     },
     {
       title: 'Action',
       dataIndex: 'action',
       render: (_, record) => {
         const editable = isEditing(record);
-        return editable ? (
-          <span>
-            <Button onClick={() => save(record.key)} type="primary">
-              Save
-            </Button>
-            <Button onClick={cancel} type="default">
-              Cancel
-            </Button>
-          </span>
-        ) : (
-          <Button onClick={() => edit(record)} type="default">
+        if (editable) {
+          return (
+            <Col className='flex justify-between'>
+              <Button onClick={save} type="primary" >
+                Save
+              </Button>
+              <Button onClick={deleteRow} type="default">
+                Cancel
+              </Button>
+            </Col>
+          );
+        }
+        return (
+          <Button onClick={edit} type="default" >
             <EditOutlined />
           </Button>
         );
@@ -152,85 +200,68 @@ const ServiceTable = () => {
   ];
 
   return (
-    <>
-      <Col span={24} className="mx-auto p-4 border border-indigo-600 rounded-lg">
-        <Col className="flex justify-between">
-          <Typography.Title level={4} className="ml-2 ">Service Usage</Typography.Title>
-          <Space wrap className="service-filter">
-            <Select
-              // defaultValue="User"
-              placeholder="User"
-              style={{ width: 120 }}
-              className="border-0"
-              // onChange={handleChange}
-              options={[
-                { value: 'option 1', label: 'option 1' },
-                { value: 'Option 2', label: 'Option 2' },
-              ]}
-            />
-            <Select
-              // defaultValue="Status"
-              placeholder="Status"
-              style={{ width: 120 }}
-              // onChange={handleChange}
-              options={[
-                { value: 'status 1', label: 'status 1' },
-                { value: 'status 2', label: 'status 2' },
-              ]}
-            />
-          </Space>
-        </Col>
-        <Form form={form} component={false}>
-          <Table
-            className='membership-table'
-            dataSource={data}
-            columns={columns}
-            rowKey="key"
-            bordered
-            pagination={false}
-          />
-        </Form>
-      </Col>
-    </>
-
+    <Form form={form} component={false}>
+      <Table
+        className='membership-table'
+        dataSource={data}
+        columns={columns}
+        rowKey="key"
+        bordered
+        pagination={false}
+        footer={() => (
+          <Button onClick={edit} type="primary">
+            Add Service Use
+          </Button>
+        )}
+      />
+    </Form>
   );
 };
 
 const Services = () => {
+  const [data, setData] = useState([]);
+  const [lockedField, setLockedField] = useState('User');
 
-  const items = [
-    {
-      key: '1',
-      label: 'Booked',
-      children: <ServiceTable />,
-    },
-    {
-      key: '2',
-      label: 'Provided',
-      children: <ServiceTable />,
-    }
-  ];
+  useEffect(() => {
+    // Initialize your data here if needed
+  }, []);
 
-  const onChange = (key) => {
-    console.log(key);
+  const handleDataChange = (newData) => {
+    setData(newData);
   };
 
+  const handleTabChange = (key) => {
+    if (key === '1') {
+      setLockedField('Provider');
+    } else if (key === '2') {
+      setLockedField('User');
+    }
+  };
 
   return (
     <>
-      <Row>
+      {/* common code for adding new row for both tabs */}
+      {/* <Row>
         <Col span={6} className="flex justify-between absolute right-24 mt-4">
-          <Button type="primary">Add Service Use</Button>
-          <Button className="bg-green-600 ml-2">Save</Button>
+          <Button type="primary" onClick={() => handleDataChange([...data, { key: 'new' }])}>
+            Add Service Use
+          </Button>
         </Col>
-      </Row>
+      </Row> */}
       <Row>
         <Col span={22} className="m-auto">
-          <Tabs defaultActiveKey="1" size="large" tabBarGutter={30} items={items} onChange={onChange} />
+          <Tabs defaultActiveKey="1" size="large" tabBarGutter={30} onChange={handleTabChange}>
+            <TabPane tab="Booked" key="1">
+              <ServiceTable data={data} onDataChange={handleDataChange} lockedField={lockedField} />
+            </TabPane>
+            <TabPane tab="Provided" key="2">
+              <ServiceTable data={data} onDataChange={handleDataChange} lockedField={lockedField} />
+            </TabPane>
+          </Tabs>
         </Col>
       </Row>
     </>
-  )
-}
+  );
+};
 
-export default Services
+export default Services;
