@@ -468,9 +468,9 @@ call' :: MonadSM m
       -> m ((SolidString, SolidString), Maybe Value)
 call' from to' fnCalltype mContract functionName isRCC argExps  = do
   let (to, ccToGet) = case fnCalltype of
-        CC.DefaultCall        -> (to', to')
-        CC.RawCall            -> (to', to')
-        CC.DelegateCall proxy -> (from, proxy)
+        CC.DefaultCall  -> (to', to')
+        CC.RawCall      -> (to', to')
+        CC.DelegateCall -> (from, to')
       fromChain = from ^. accountChainId
       toChain   = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
@@ -641,6 +641,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                     SVMType.Array _ _ -> return ()
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
+  when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack org) (T.pack parentName')
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
   where
     flattenVals (x:xs) = [x] ++ flattenVals xs
@@ -2003,7 +2004,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                     (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
               fromAddress <- getCurrentAccount
               let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
-              res <- callWithResult fromAddress toAddress (CC.DelegateCall toAddress) Nothing funcName False args'
+              res <- callWithResult fromAddress toAddress CC.DelegateCall Nothing funcName False args'
               case res of
                   Just a  -> return $ Constant  a
                   Nothing -> return $ Constant SNULL
@@ -2767,7 +2768,36 @@ callBuiltin "parseCert" [SString cert] _ = do
   curContract <- getCurrentContract
   return $ certificateMap (Just cert) curContract
 
-callBuiltin x _ _ = unknownFunction "callBuiltin" x
+callBuiltin "create" args@[SString contractName', SString contractSrc, SString argString] _ = do
+  when (contractName' == "" || contractSrc == "") 
+    $ invalidArguments "The contract name and src arguments for the create function should not be empty" args
+  creator <- getCurrentAccount
+  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  newAddress <- getNewAddress creator
+  let constructorArgs = case runParser parseArgs initialParserState "" argString of
+                          Right parsedArgs -> parsedArgs
+                          _ -> internalError "Failed to parse constructor args in a create builtin call" argString
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
+  return $ ((flip SAccount) False) . accountOnUnspecifiedChain
+    $ fromMaybe (internalError "a call to create did not create an address" execResults)
+    $ erNewContractAccount execResults
+  
+callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SString argString] _ = do
+  when (contractName' == "" || contractSrc == "") 
+    $ invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
+  creator <- getCurrentAccount
+  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  let constructorArgs = case runParser parseArgs initialParserState "" argString of
+                          Right parsedArgs -> parsedArgs
+                          _ -> internalError "Failed to parse constructor args in a create builtin call" argString
+  constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
+  newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
+  return $ ((flip SAccount) False) . accountOnUnspecifiedChain
+    $ fromMaybe (internalError "a call to create did not create an address" execResults)
+    $ erNewContractAccount execResults
+
+callBuiltin x args _ = unknownFunction ("callBuiltin " ++ show args) x
 
 
 

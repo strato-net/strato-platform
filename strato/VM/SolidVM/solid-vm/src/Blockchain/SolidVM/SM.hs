@@ -54,7 +54,8 @@ module Blockchain.SolidVM.SM (
   markDiffForAction,
   getBlockHashWithNumber,
   getBSum,
-  addEvent
+  addEvent,
+  addDelegatecall
   ) where
 
 import           Control.Monad
@@ -186,6 +187,7 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable [CallInfo] m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
+                 , Mod.Modifiable (Q.Seq Action.Delegatecall) m
                  , Mod.Modifiable (Maybe DebugSettings) m
                  , MonadUnliftIO m --todo: remove
                  , MonadCatch m
@@ -327,6 +329,10 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Event) (SM m) where
   get _   = gets (Action._events . _action)
   put _ q = modify $ action . Action.events .~ q
 
+instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) where
+  get _   = gets (Action._delegatecalls . _action)
+  put _ q = modify $ action . Action.delegatecalls .~ q
+
 runSM :: ( MonadUnliftIO m
          , MonadLogger m
          , Mod.Modifiable ContextState m
@@ -395,6 +401,7 @@ startingAction maybeCode env' chainId' = Action.Action
           Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
         Nothing -> Env.metadata env'
   , _events             = Q.empty
+  , _delegatecalls      = Q.empty
   }
 
 
@@ -453,7 +460,7 @@ getVariableOfName name = do
                                                   , "string", "keccak256", "ripemd160", "payable"
                                                   , "require", "revert", "assert", "sha3", "delegatecall", "call", "derive"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
-                                                  , "selfdestruct", "suicide", "bytes32ToString"
+                                                  , "selfdestruct", "suicide", "bytes32ToString", "create", "create2"
                                                   , "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $
         t "builtin function" $ Constant $ SBuiltinFunction name Nothing
 
@@ -823,6 +830,9 @@ markDiffForAction owner key' val' = do
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
+
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Account -> Account -> T.Text -> T.Text -> m ()
+addDelegatecall s c o a = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a)
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do

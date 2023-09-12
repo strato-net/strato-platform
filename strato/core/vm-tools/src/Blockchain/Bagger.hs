@@ -111,8 +111,9 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
         Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
         Just f@TFCodeCollectionNotFound{} -> recoverable f
         Just f@TFInvalidPragma{} -> recoverable f
-        Just f@TFNonceLimitExceeded{} -> error $ "mineTransactions' we messed up: " ++ format f
-        Just f@TFTXSizeLimitExceeded{} -> error $ "mineTransactions' we messed up: " ++ format f
+        Just f@TFNonceLimitExceeded{} -> recoverable f
+        Just f@TFTXSizeLimitExceeded{} -> recoverable f
+        Just f@TFKnownFailedTX{} -> recoverable f
 
 -- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 -- rewardCoinbases us uncles ourNumber = do
@@ -210,6 +211,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
         (p s q ++ "tx size limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
     GasLimitExceeded s q e l OutputTx{otHash=hsh} ->
         (p s q ++ "transaction gas limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
+    KnownFailedTX s q OutputTx{otHash=hsh} ->
+        (p s q ++ "known failed tx: " ++ show hsh, hsh)
 
     where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
           p' s q        = p s q ++ "low "
@@ -513,6 +516,8 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = runExceptT $ do
        throwE $ BalanceTooLow Validation Incoming txFee addressBalance t
     when (txSize >= flags_txSizeLimit) .
        throwE $ TXSizeLimitExceeded Validation Incoming txSize flags_txSizeLimit t 
+    when (otHash t `S.member` knownFailedTxs) .
+       throwE $ KnownFailedTX Validation Incoming t
     return ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()

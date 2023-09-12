@@ -1014,7 +1014,7 @@ solidityTypeToSQLType (SVMType.Struct _ _) = Just "jsonb"
 solidityTypeToSQLType (SVMType.Enum _ _ _) = Just "text"
 solidityTypeToSQLType (SVMType.Contract _) = Just "text"
 solidityTypeToSQLType (SVMType.Error _ _) = Just "text"
-solidityTypeToSQLType SVMType.Variadic = error "type (variadic) is not an indexable type"
+solidityTypeToSQLType SVMType.Variadic = Nothing
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
 

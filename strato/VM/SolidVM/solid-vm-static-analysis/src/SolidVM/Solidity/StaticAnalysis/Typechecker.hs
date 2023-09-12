@@ -278,7 +278,6 @@ addressType' = Static $ SVMType.Address False
 --AddressPayableType' :: SourceAnnotation Text -> Type'
 --AddressPayableType' = Static $ SVMType.Address True
 
-
 accountType' :: SourceAnnotation Text -> Type'
 accountType' = Static $ SVMType.Account False
 
@@ -1098,6 +1097,12 @@ payableArgs x = accountType' x
 parseCertArgs :: SourceAnnotation Text -> Type'
 parseCertArgs x = stringType' x
 
+createFuncArgs :: SourceAnnotation Text -> Type' 
+createFuncArgs x = Product [stringType' x, stringType' x, stringType' x] x
+
+saltCreateArgs :: SourceAnnotation Text -> Type' 
+saltCreateArgs x = Product [stringType' x, stringType' x, stringType' x, stringType' x] x
+
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
 getVarType' s@('u':'i':'n':'t':n) ctx = case n of
@@ -1140,6 +1145,8 @@ getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.
 getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx [] []
 getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' ctx) ctx [] []
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] []
+getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (accountType' ctx) ctx [] []
+getVarType' "create2" ctx = pure $ Function (saltCreateArgs ctx) (accountType' ctx) ctx [] []
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util" Nothing) ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg" Nothing) ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx" Nothing) ctx
