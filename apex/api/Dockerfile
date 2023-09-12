@@ -1,6 +1,6 @@
 FROM node:14-buster-slim
 RUN apt-get update && \
-    apt-get install -y git postgresql-client python build-essential && \
+    apt-get install -y git postgresql-client python build-essential curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/src/app
