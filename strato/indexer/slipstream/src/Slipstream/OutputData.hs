@@ -862,8 +862,8 @@ insertAbstractTableQuery cs = concat $
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)  
-              list' = filter (`notElem` list) abColumns
-              keySt  =wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ list'
+              list' = Map.toList $ Map.filterWithKey (\k _ -> k `notElem` baseAbstractColumns && k `notElem` abColumns) list
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ map fst (fillFirstEmptyEntries list')
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -906,7 +906,7 @@ insertAbstractTableQuery cs = concat $
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name|]
                 , if null list then "" else ",\n    "
-                , tableUpsert $ list'
+                , tableUpsert $ map fst list'
                 , ";"
                 ]
 
