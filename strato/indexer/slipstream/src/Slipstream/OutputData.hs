@@ -873,24 +873,12 @@ insertAbstractTableQuery cs = concat $
                          , T.pack . keccak256ToHex . E.transactionHash
                          , tshow . E.transactionSender
                          ]
-              row1 = flip map contracts $ \((row_),_) ->
-                    row_
-              cc = flip map contracts $ \((_, contractColumns),_) ->
-                    contractColumns
-              cc1 = flip map contracts $ \((_, contractColumns),_) ->
-                    (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
               vals = flip map contracts $ \((row, contractColumns),_) ->
                 wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
                 , abTableName
-                ,"\n\ncontractColumns "
-                , T.pack $ show cc
-                ,"\n\n row "
-                , T.pack $ show row1
-                ,"\n\nrest "
-                , T.pack $  show cc1
                 , " "
                 , keySt
                 , "\n  VALUES "
