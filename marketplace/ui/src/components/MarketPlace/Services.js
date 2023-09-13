@@ -19,6 +19,7 @@ const { Option } = Select;
 
 const ServiceTable = () => {
   const [isEdit, setIsEdit] = useState(false)
+  const [validationError, setValidationError] = useState(false)
   const initialData = [
     {
       key: '1',
@@ -194,6 +195,37 @@ const ServiceTable = () => {
       setDataProvided(data)
     }
   }
+
+  const handleValidation = (data) => {
+    for (const key in data) {
+      if (key !== 'user' && (data['provider'] === ''
+        || data['membershipId'] === ''
+        || data['service'] === ''
+        || data['summary'] === ''
+        || data['date'] === ''
+        || data['comments'] === ''
+        || data['status'] === ''
+        || data['pricePaid'] === ''
+      )) {
+        setValidationError(true)
+        return false;
+      } else if (data[key] === 'provider' && (data['user'] === ''
+        || data['membershipId'] === ''
+        || data['service'] === ''
+        || data['summary'] === ''
+        || data['date'] === ''
+        || data['comments'] === ''
+        || data['status'] === ''
+        || (data['pricePaid'] === '')
+      )) {
+        setValidationError(true)
+        return false
+      } else {
+        setValidationError(false)
+        return true;
+      }
+    }
+  };
 
 
   const columns = [
@@ -393,6 +425,7 @@ const ServiceTable = () => {
               <Button
                 type="primary"
                 icon={<CheckOutlined />}
+                disabled={!handleValidation(record)}
                 onClick={() => handleUpdate(record.key)}
               />
               {isEdit && <Button type="default" icon={<CloseOutlined />} onClick={() => handleCancel(record.key)} />}
@@ -427,8 +460,8 @@ const ServiceTable = () => {
           suffixIcon={<CaretDownOutlined />}
           style={{ width: 120 }}
           options={[
-            { value: 'jack', label: 'Jack' },
-            { value: 'lucy', label: 'Lucy' },
+            { value: 'requested', label: 'Requested' },
+            { value: 'Cancelled', label: 'Cancelled' },
           ]}
         />
       </span>
@@ -443,7 +476,8 @@ const ServiceTable = () => {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAddRow}
-          // disabled={!newRow.user || !newRow.provider}
+            // disabled={!newRow.user || !newRow.provider}
+            disabled={validationError}
           >
             Add Service Use
           </Button>
@@ -453,7 +487,8 @@ const ServiceTable = () => {
             type="primary"
             // icon={<SaveOutlined />}
             onClick={handleSave}
-            disabled={!dataBooked.length && !dataProvided.length}
+            // disabled={!dataBooked.length && !dataProvided.length}
+            disabled={validationError}
           >
             Save
           </Button>
