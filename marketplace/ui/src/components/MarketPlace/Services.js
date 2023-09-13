@@ -249,8 +249,8 @@ const ServiceTable = () => {
               style={{ width: 120 }}
               onChange={(value) => handleSelectChange(value, 'provider', record.key)}
               options={[
-                { value: 'jack', label: 'Jack' },
-                { value: 'lucy', label: 'Lucy' },
+                { value: 'BOXR', label: 'BOXR' },
+                { value: 'Eqinox', label: 'Eqinox' },
               ]}
             />
           ) : (
@@ -275,8 +275,8 @@ const ServiceTable = () => {
               style={{ width: 120 }}
               onChange={(value) => handleSelectChange(value, 'membershipId', record.key)}
               options={[
-                { value: 'jack', label: 'Jack' },
-                { value: 'lucy', label: 'Lucy' },
+                { value: 'AB1', label: 'AB1' },
+                { value: 'BC2', label: 'BC2' },
               ]}
             />
           ) : (
@@ -300,8 +300,8 @@ const ServiceTable = () => {
               style={{ width: 120 }}
               onChange={(value) => handleSelectChange(value, 'service', record.key)}
               options={[
-                { value: 'jack', label: 'Jack' },
-                { value: 'lucy', label: 'Lucy' },
+                { value: 'crossfit', label: 'crossfit' },
+                { value: 'personal training', label: 'personal training' },
               ]}
             />
           ) : (
@@ -370,8 +370,8 @@ const ServiceTable = () => {
               disabled={activeTab === "provided"}
               style={{ minWidth: "100px" }}
               onChange={(value) => handleSelectChange(value, 'status', record.key)}>
-              <Option value="Status 1">Status 1</Option>
-              <Option value="Status 2">Status 2</Option>
+              <Option value="requested">Requested</Option>
+              <Option value="Cancelled">Cancelled</Option>
             </Select>
           ) : (
             text
@@ -386,7 +386,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable && !isEdit ? (
-            <InputNumber keyboard={true} addonAfter={<EditOutlined />} min={0} controls={false} value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
+            <InputNumber keyboard={true} className='w-36' addonAfter={<EditOutlined />} min={0} controls={false} value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
           ) : (
             text
           )}
@@ -460,7 +460,7 @@ const ServiceTable = () => {
           </Button>
           <Button
             className='ml-2'
-            style={{backgroundColor:"green"}}
+            style={{ backgroundColor: "green" }}
             type="primary"
             // icon={<SaveOutlined />}
             onClick={handleSave}
