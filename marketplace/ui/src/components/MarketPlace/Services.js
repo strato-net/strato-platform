@@ -97,8 +97,7 @@ const ServiceTable = () => {
   const [validationError, setValidationError] = useState(false);
   const [activeTab, setActiveTab] = useState("booked");
   const [tableData, setTableData] = useState(boookedData);
-  const [tempData, setTempData] = useState({})
-
+  const [editIcon, setEditIcon] = useState(false)
   // const Username =  userCert?.user?.commonName;
 
   useEffect(() => {
@@ -120,36 +119,45 @@ const ServiceTable = () => {
     setActiveTab(key);
   };
 
-  const handleEdit = (key) => {
-    setIsEdit(true);
-    const item = tableData.find((item) => item.key === key);
-    // make API call and setState
-  };
+  const handleEditCancel = (key, bool, type) => {
+    setIsEdit(bool);
+    const data = tableData.filter((item, index) => {
+      if (item.key === key) {
+        item['editable'] = bool;
+        return item;
+      } else if (type === 'edit') {
+        item['editable'] = false;
+        return item;
+      } return item;
 
-  const handleCancel = (key) => {
-    setIsEdit(false);
-    // set initial state
-    setTableData(tableData)
-    // make API call and setState
-  };
-
-  const handleUpdate = (key) => {
-    // uncomment api call for updating service usage
-    // serviceUsageActions.UpdateServiceUsage(serviceUsage, tableData)
+    });
+    setTableData(data)
+    if (type === 'update') {
+      // uncomment api call for updating service usage
+      // serviceUsageActions.UpdateServiceUsage(serviceUsage, tableData)
+    }
   };
 
   const handleInputChange = (value, field, key) => {
-    // manage an temporary state for that row
+    let data = tableData.filter((item, index) => {
+      if (item.key === key) {
+        item[field] = value
+        return item;
+      } return item;
+    })
+    setTableData(data)
   };
 
   const handleAddRow = () => {
     // just add a new empty row in the tableData
-    newRowSchema['key'] = tableData.length + 1;
-    setTableData([...tableData, newRowSchema])
-
-    // uncomment api call for creating service usage
-    // serviceUsageActions.createServiceUsage(serviceUsage, tableData)
-
+    setIsEdit(false);
+    let tableCopy = tableData.map((item, index) => {
+      item['editable'] = false;
+      return item;
+    })
+    let data = { ...newRowSchema }
+    data['key'] = tableCopy.length + 1;
+    setTableData([...tableCopy, data])
   };
 
   const handleSave = () => {
@@ -158,42 +166,29 @@ const ServiceTable = () => {
       return item;
     });
     setTableData(data);
+    // uncomment api call for creating service usage
+    // serviceUsageActions.createServiceUsage(serviceUsage, tableData)
   };
 
+  const handleDelete = (key) => {
+    let data = tableData.filter(item => item.key !== key)
+    setTableData(data)
+  }
+
   const handleValidation = (data) => {
-    for (const key in data) {
-      if (
-        key !== "user" &&
-        (data["provider"] === "" ||
-          data["membershipId"] === "" ||
-          data["service"] === "" ||
-          data["summary"] === "" ||
-          data["date"] === "" ||
-          data["comments"] === "" ||
-          data["status"] === "" ||
-          data["pricePaid"] === "")
-      ) {
-        setValidationError(true);
-        return false;
-      } else if (
-        data[key] === "provider" &&
-        (data["user"] === "" ||
-          data["membershipId"] === "" ||
-          data["service"] === "" ||
-          data["summary"] === "" ||
-          data["date"] === "" ||
-          data["comments"] === "" ||
-          data["status"] === "" ||
-          data["pricePaid"] === "")
-      ) {
-        setValidationError(true);
-        return false;
-      } else {
+    const requiredFields = ["membershipId", "service", "summary", "date", "comments", "status", "pricePaid",];
+
+    if (activeTab === "booked" || activeTab === "provided") {
+      // const requiredField = activeTab === "booked" ? "provider" : "user";
+      if (requiredFields.every((field) => data[field] !== "")) {
         setValidationError(false);
         return true;
       }
     }
+    setValidationError(true);
+    return false;
   };
+
 
   const columns = [
     {
@@ -347,7 +342,7 @@ const ServiceTable = () => {
             <DatePicker
               // value={text ? moment(text, 'YYYY-MM-DD') : null}
               onChange={(date, dateString) =>
-                handleInputChange(date, dateString, record.key)
+                handleInputChange(dateString, 'date', record.key)
               }
             />
           ) : (
@@ -395,7 +390,8 @@ const ServiceTable = () => {
               }
             >
               <Option value="requested">Requested</Option>
-              <Option value="Cancelled">Cancelled</Option>
+              <Option value="cancelled">Cancelled</Option>
+              <Option value="completed">Completed</Option>
             </Select>
           ) : (
             <Typography style={{ color: "#061A6C" }}>{text}</Typography>
@@ -438,13 +434,13 @@ const ServiceTable = () => {
                 type="primary"
                 icon={<CheckOutlined />}
                 disabled={!handleValidation(record)}
-                onClick={() => handleUpdate(record.key)}
+                onClick={() => handleEditCancel(record.key, false, "update")}
               />
               {isEdit && (
                 <Button
                   type="default"
                   icon={<CloseOutlined />}
-                  onClick={() => handleCancel(record.key)}
+                  onClick={() => handleEditCancel(record.key, false, "cancel")}
                 />
               )}
             </>
@@ -452,10 +448,11 @@ const ServiceTable = () => {
             <Button
               type="primary"
               icon={<EditOutlined />}
-              onClick={() => handleEdit(record.key)}
+              disabled={!handleValidation(record) || validationError}
+              onClick={() => handleEditCancel(record.key, true, "edit")}
             />
           )}
-          {/* <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(record.key)} /> */}
+          {record.editable && !isEdit && <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(record.key)} />}
         </Space>
       ),
     },
@@ -503,12 +500,10 @@ const ServiceTable = () => {
         </Col>
       </Row>
       <Row>
-        <Col span={18}>
+        <Col span={22} className="m-auto flex justify-between">
           <Typography.Title level={4} style={{ color: "#061A6C" }}>
             Service Usage
           </Typography.Title>
-        </Col>
-        <Col span={6}>
           <span>
             <Select
               placeholder="Provider"
@@ -526,18 +521,23 @@ const ServiceTable = () => {
               style={{ width: 120 }}
               options={[
                 { value: "requested", label: "Requested" },
-                { value: "Cancelled", label: "Cancelled" },
+                { value: "cancelled", label: "Cancelled" },
+                { value: "completed", label: "Completed" },
               ]}
             />
           </span>
         </Col>
       </Row>
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        pagination={false}
-        rowKey="key"
-      />
+      <Row>
+        <Col span={22} className="m-auto">
+          <Table
+            columns={columns}
+            dataSource={tableData}
+            pagination={false}
+            rowKey="key"
+          />
+        </Col>
+      </Row>
     </>
   );
 };
