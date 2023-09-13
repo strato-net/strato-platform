@@ -299,6 +299,8 @@ const MembershipCardPurchased = ({
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
+          type="Resale"
+          id={membershipId}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
