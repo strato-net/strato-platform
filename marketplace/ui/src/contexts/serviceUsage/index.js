@@ -10,6 +10,7 @@ const ServiceUsageProvider = ({ children }) => {
     isServicesUsageLoading: false,
     isCreateServiceUsageSubmitting: false,
     serviceUsageDetail: null,
+    isServiceUsageDetailLoading:false,
     isUpdateServicesUsageLoading: false,
 
     error: undefined,

@@ -23,6 +23,13 @@ import {
   CaretDownOutlined,
 } from "@ant-design/icons";
 import "./service.css";
+import { actions as serviceUsageActions } from "../../contexts/serviceUsage/actions";
+import { actions as servicesActions } from "../../contexts/service/actions"
+import { actions as userAuthActions } from "../../contexts/users/actions"
+import { useServiceUsageDispatch } from "../../contexts/serviceUsage";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
+import { useMembershipState } from "../../contexts/membership";
+import { useServiceDispatch, useServiceState } from "../../contexts/service";
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -71,12 +78,35 @@ const provideData = [
     editable: false,
   },
 ];
+const limit = 10;
+const offset = 0;
+const query = {};
 
 const ServiceTable = () => {
+  const serviceUsageDispatch = useServiceUsageDispatch();
+  const serviceDispatch = useServiceDispatch();
+  const authUserDispatch = useAuthenticateDispatch();
+
+  // all api call states
+  const userCert = useAuthenticateState();
+  const services = useServiceState();
+  const membership = useMembershipState();
+
+
   const [isEdit, setIsEdit] = useState(false);
   const [validationError, setValidationError] = useState(false);
   const [activeTab, setActiveTab] = useState("booked");
   const [tableData, setTableData] = useState(boookedData);
+  const [tempData, setTempData] = useState({})
+
+  // console.log("Username", userCert?.user?.commonName);
+
+  useEffect(() => {
+    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query)
+    servicesActions.fetchService(serviceDispatch, limit, offset, query)
+    // userAuthActions.fetchUsers(authUserDispatch)
+
+  }, [])
 
   useEffect(() => {
     if (activeTab === "booked") {
@@ -104,24 +134,30 @@ const ServiceTable = () => {
   };
 
   const handleUpdate = (key) => {
-    // const item = newData.find((item) => item.key === key);
-    // make API call and setState
+    // uncomment api call for updating service usage
+    // serviceUsageActions.UpdateServiceUsage(serviceUsage, tableData)
   };
 
-  const handleInputChange = (e, field, key) => {
+  const handleInputChange = (value, field, key) => {
     // manage an temporary state for that row
   };
 
-  const handleDateChange = (date, dateString, key) => {
-    // it will go in the input change with a different check for date
-  };
+  // const handleDateChange = (date, dateString, key) => {
+  //   // it will go in the input change with a different check for date
+  // };
 
-  const handleSelectChange = (value, field, key) => {
-    // it will go in the input change with a different check for date
-  };
+  // const handleSelectChange = (value, field, key) => {
+  //   // it will go in the input change with a different check for date
+  // };
 
   const handleAddRow = () => {
     // just add a new empty row in the tableData
+    newRowSchema['key'] = tableData.length + 1;
+    setTableData([...tableData, newRowSchema])
+
+    // uncomment api call for creating service usage
+    // serviceUsageActions.createServiceUsage(serviceUsage, tableData)
+
   };
 
   const handleSave = () => {
@@ -187,7 +223,7 @@ const ServiceTable = () => {
               disabled={activeTab === "booked"}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleSelectChange(value, "user", record.key)
+                handleInputChange(value, "user", record.key)
               }
               options={[
                 { value: "jack", label: "Jack" },
@@ -222,7 +258,7 @@ const ServiceTable = () => {
               disabled={activeTab === "provided"}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleSelectChange(value, "provider", record.key)
+                handleInputChange(value, "provider", record.key)
               }
               options={[
                 { value: "BOXR", label: "BOXR" },
@@ -250,7 +286,7 @@ const ServiceTable = () => {
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleSelectChange(value, "membershipId", record.key)
+                handleInputChange(value, "membershipId", record.key)
               }
               options={[
                 { value: "AB1", label: "AB1" },
@@ -275,7 +311,7 @@ const ServiceTable = () => {
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleSelectChange(value, "service", record.key)
+                handleInputChange(value, "service", record.key)
               }
               options={[
                 { value: "crossfit", label: "crossfit" },
@@ -319,7 +355,7 @@ const ServiceTable = () => {
             <DatePicker
               // value={text ? moment(text, 'YYYY-MM-DD') : null}
               onChange={(date, dateString) =>
-                handleDateChange(date, dateString, record.key)
+                handleInputChange(date, dateString, record.key)
               }
             />
           ) : (
@@ -363,7 +399,7 @@ const ServiceTable = () => {
               // disabled={activeTab === "provided"}
               style={{ minWidth: "100px" }}
               onChange={(value) =>
-                handleSelectChange(value, "status", record.key)
+                handleInputChange(value, "status", record.key)
               }
             >
               <Option value="requested">Requested</Option>
@@ -448,7 +484,7 @@ const ServiceTable = () => {
         <Col span={22} className="m-auto">
           <Tabs activeKey={activeTab} onChange={handleTabChange}>
             <TabPane tab="Booked" key="booked"></TabPane>
-            <TabPane tab="Provided" key="provided" onClick={() => {handleChangeTab('provided')}}></TabPane>
+            <TabPane tab="Provided" key="provided" onClick={() => { handleChangeTab('provided') }}></TabPane>
           </Tabs>
         </Col>
         <Col

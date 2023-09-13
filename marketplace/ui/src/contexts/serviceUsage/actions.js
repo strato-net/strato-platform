@@ -67,11 +67,11 @@ const actions = {
       actions.setMessage(dispatch, "Error while creating service usage")
     }
   },
-  fetchAllServicesUsage: async (dispatch, id) => {
+  fetchAllServicesUsage: async (dispatch, limit, offset, query) => {
     dispatch({ type: actionDescriptors.fetchAllServicesUsage });
 
     try {
-      const response = await fetch(`${apiUrl}/serviceUsage`, {
+      const response = await fetch(`${apiUrl}/serviceUsage?limit=${limit}&offset=${offset}`, {
         method: HTTP_METHODS.GET
       });
 
