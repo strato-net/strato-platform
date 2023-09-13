@@ -1068,7 +1068,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       // ownedItems = ownedItems.filter(item =>
       //   ownedProducts.some(product => item.productId === product.address)
       // );
-      
       console.log("ownedItems", ownedItems)
       
       // Get Memberhships where productId = Items.productId 
@@ -1077,6 +1076,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
       console.log ('ownedMemberships', ownedMemberships)
+      
+      const arrayOwnedMemberships = ownedMemberships.map(obj => obj.address);
+      // Get MembershipServices where membershipId = ownedMemberships.address 
+      const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: arrayOwnedMemberships }, getOptions));
+      const arrayMembershipServices= membershipServices.map(obj => obj.serviceId);
+      // Get all services
+      const servicesAll = await managers.serviceManager.getAll({address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
+
+      console.log ('membershipServices:', membershipServices)
+      console.log ('servicesAll:', servicesAll)
       
       // Get ProductFile where productId = Items.productId
       let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
@@ -1099,7 +1108,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           const product = ownedProducts.find(p => p.address === item.productId);
           const memberships = ownedMemberships.filter(m => m.productId === item.productId);
           const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
-
+          const savings = membershipServices.filter(membershipService => membershipService.membershipId === memberships[0].address).map(membershipService => {
+            const matchingService = servicesAll.find(service => service.address === membershipService.serviceId);
+        
+            if (matchingService) {
+              return {
+                savings: membershipService.maxQuantity * (matchingService.price - membershipService.membershipPrice),
+              };
+            } else {
+              return " Not found";
+            }
+          });
+          
+          console.log("savings: ", savings)
           return {
             itemNumber: item.itemNumber,
             productId: item.productId,
@@ -1108,7 +1129,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,
             timePeriodInMonths: memberships[0].timePeriodInMonths,
-            savings: memberships[0].savings,
+            savings: savings[0]?.savings,
             membershipAddress: memberships[0].address
           };
         });
