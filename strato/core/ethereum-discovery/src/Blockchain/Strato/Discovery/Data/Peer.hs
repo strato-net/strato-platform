@@ -179,6 +179,7 @@ instance Mod.Accessible BondedPeers IO where
     fmap (BondedPeers . map SQL.entityVal) $ flip runSqlPool sqldb $
       SQL.selectList [ PPeerBondState SQL.==. 2
                      , PPeerEnableTime SQL.<. currentTime
+                     , PPeerActiveState SQL.==. 0
                      --, PPeerActiveThread SQL.==. False
                      ] []
 

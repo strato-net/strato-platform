@@ -21,8 +21,10 @@ module Blockchain.Strato.Indexer.IContext
     ) where
 
 import           Control.Arrow                   ((&&&))
+--import           Control.Concurrent.STM.TQueue
 import           Control.Exception
 import           Control.Monad                   (void)
+--import           Control.Monad.STM
 import qualified Control.Monad.Change.Alter      as A
 import qualified Control.Monad.Change.Modify     as Mod
 import           Control.Monad.IO.Class

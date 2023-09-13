@@ -66,7 +66,6 @@ chanSource ch reader =
               Nothing -> return ()
 {-# INLINE chanSource #-}
 
-
 -- | Convert channel into the consumer.
 --
 -- *N.B*

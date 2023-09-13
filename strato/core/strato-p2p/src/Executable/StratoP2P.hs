@@ -20,6 +20,7 @@ import           Executable.StratoP2PClient
 -- import           Executable.StratoP2PClientDirect
 import           Executable.StratoP2PServer
 import           Executable.StratoP2PLoopback
+import           Executable.StratoP2PKafkaTQueue
 
 {-
 raceAll :: [BL.LoggingT IO a]
@@ -36,7 +37,7 @@ raceAll services = liftIO $ withPool 15 $ \pool ->
 
 raceAll :: [IO ()]
         -> BL.LoggingT IO ()
-raceAll services = liftIO $ runLimited 3 services
+raceAll services = liftIO $ runLimited 4 services
 
 stratoP2P :: ( MonadP2P n
              , RunsClient n
@@ -49,9 +50,10 @@ stratoP2P runner = do
   --race_ (stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e))
   --  (race_ (stratoP2PClient runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e))
   --         (stratoP2PServer runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)))
-  raceAll [ ask $ stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
-          , ask $ stratoP2PClient runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
-          , ask $ stratoP2PServer runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
+  raceAll [ ask $ stratoP2PLoopback runner    `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
+          , ask $ stratoP2PClient runner      `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
+          , ask $ stratoP2PServer runner      `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
+          , ask $ stratoP2PKafkaTQueue        `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PKafkaTQueue ERROR" . T.pack $ show e)
           ]
   {-
   race_ (stratoP2PClient runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e))

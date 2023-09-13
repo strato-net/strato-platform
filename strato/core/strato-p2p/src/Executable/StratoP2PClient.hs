@@ -24,9 +24,10 @@ import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
 import           Control.Lens                          ((^.))
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Reader
+import           Control.Monad.Reader()
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import           Data.Conduit

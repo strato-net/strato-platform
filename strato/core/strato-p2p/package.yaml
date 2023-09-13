@@ -72,6 +72,7 @@ library:
     - milena
     - milena-tools
     - monad-alter
+    - monad-control
     - monad-logger
     - monadIO
     - mtl
@@ -87,6 +88,7 @@ library:
     - servant-client
     - servant-server
     - split
+    - stm
     - stm-conduit
     - strato-conf
     - strato-model
