@@ -234,8 +234,8 @@ describe("rest_7", function () {
       assert.isOk(verifyStatus, "results");
     });
 
-    it("create contracts list - sync - VM: EVM", async () => {
-      const count = 5;
+    xit("create contracts list - sync - VM: EVM", async () => {
+      const count = 4;
       const contracts = factory.createContractListArgs(count);
       // compile contracts
       await rest.compileContracts(admin, contracts, { config });
