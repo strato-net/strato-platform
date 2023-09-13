@@ -135,7 +135,7 @@ instance (MonadUnliftIO m, Mod.Accessible (IORef Globals) m) => Selectable Accou
     getCCForAccount acct >>= \case
       mCC@(Just _) -> do
         ds <- getDelegates g acct
-        (c, cc) <- fold . catMaybes . (mCC:) <$> traverse getCCForAccount (acct:ds)
+        (c, cc) <- fold . catMaybes . (mCC:) <$> traverse getCCForAccount ds
         pure . Just $ (contracts . at (c ^. CC.contractName) ?~ c) cc
       _ -> pure Nothing
 
