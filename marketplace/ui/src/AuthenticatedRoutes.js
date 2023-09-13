@@ -29,7 +29,6 @@ import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
 import ProductDetails from "./components/MarketPlace/ProductDetail";
-import MembershipDetails from "./components/MarketPlace/MembershipDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
 import EventSerialNumberList from "./components/Event/EventSerialNumberList";
@@ -40,7 +39,7 @@ import { StorageProvider } from "./contexts/storage";
 import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
-import Service from "./components/Service";
+import Service from "./components/Membership/Service";
 import Services from "./components/MarketPlace/Services";
 
 const AuthenticatedRoutes = ({ user, users }) => {
