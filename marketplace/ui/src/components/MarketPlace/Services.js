@@ -248,10 +248,10 @@ const ServiceTable = () => {
               ]}
             />
           ) : (
-            <span>
+            <Typography style={{color:'#061A6C'}}>
               {text}
               {/* {activeTab === "booked" && <LockOutlined />} */}
-            </span>
+            </Typography>
           )}
         </span>
       ),
@@ -301,9 +301,9 @@ const ServiceTable = () => {
               ]}
             />
           ) : (
-            <span>
+            <Typography style={{color:'#061A6C'}}>
               {text}
-            </span>
+            </Typography>
           )}
         </span>
       ),
@@ -326,9 +326,9 @@ const ServiceTable = () => {
               ]}
             />
           ) : (
-            <span>
+            <Typography style={{color:'#061A6C'}}>
               {text}
-            </span>
+            </Typography>
           )}
         </span>
       ),
@@ -359,7 +359,9 @@ const ServiceTable = () => {
               onChange={(date, dateString) => handleDateChange(date, dateString, record.key)}
             />
           ) : (
-            text
+            <Typography style={{color:'#061A6C'}}>
+              {text}
+            </Typography>
           )}
         </span>
       ),
@@ -395,7 +397,9 @@ const ServiceTable = () => {
               <Option value="Cancelled">Cancelled</Option>
             </Select>
           ) : (
-            text
+            <Typography style={{color:'#061A6C'}}>
+              {text}
+            </Typography>
           )}
         </span>
       ),
@@ -409,7 +413,9 @@ const ServiceTable = () => {
           {record.editable && !isEdit ? (
             <InputNumber keyboard={true} className='w-36' addonAfter={<EditOutlined />} min={0} controls={false} value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
           ) : (
-            text
+            <Typography style={{color:'#061A6C'}}>
+              {text}
+            </Typography>
           )}
         </span>
       ),
@@ -433,7 +439,7 @@ const ServiceTable = () => {
           ) : (
             <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record.key)} />
           )}
-          <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(record.key)} />
+          {/* <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(record.key)} /> */}
         </Space>
       ),
     },
@@ -441,8 +447,8 @@ const ServiceTable = () => {
 
   const Filter = () => {
     return <Col className='flex justify-between service-filter'>
-      <Typography.Title level={4}>
-        Service
+      <Typography.Title level={4} style={{color:'#061A6C'}}>
+        Service Usage
       </Typography.Title>
       <span>
         <Select
