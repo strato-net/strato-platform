@@ -128,7 +128,7 @@ const ServiceTable = () => {
     const newData = [...data];
     const item = newData.find((item) => item.key === key);
     if (item) {
-      item[field] = e.target.value;
+      item[field] = e;
       if (activeTab === 'booked') {
         setDataBooked(newData);
       } else {
@@ -319,7 +319,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <Input value={text} suffix={<EditOutlined />} placeholder='Summary' onChange={(e) => handleInputChange(e, 'summary', record.key)} />
+            <Input value={text} suffix={<EditOutlined />} placeholder='Summary' onChange={(e) => handleInputChange(e.target.value, 'summary', record.key)} />
           ) : (
             text
           )}
@@ -350,7 +350,7 @@ const ServiceTable = () => {
       render: (text, record) => (
         <span>
           {record.editable ? (
-            <Input value={text} suffix={<EditOutlined />} placeholder='Comments' onChange={(e) => handleInputChange(e, 'comments', record.key)} />
+            <Input value={text} suffix={<EditOutlined />} placeholder='Comments' onChange={(e) => handleInputChange(e.target.value, 'comments', record.key)} />
           ) : (
             text
           )}
@@ -406,7 +406,7 @@ const ServiceTable = () => {
                 icon={<CheckOutlined />}
                 onClick={() => handleUpdate(record.key)}
               />
-              <Button type="default" icon={<CloseOutlined />} onClick={() => handleCancel(record.key)} />
+              {isEdit && <Button type="default" icon={<CloseOutlined />} onClick={() => handleCancel(record.key)} />}
             </>
           ) : (
             <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record.key)} />
