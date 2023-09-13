@@ -71,6 +71,7 @@ const ServiceTable = () => {
   };
 
   const handleEdit = (key) => {
+    setIsEdit(true)
     const data = activeTab === 'booked' ? dataBooked : dataProvided;
     const newData = [...data];
     const item = newData.find((item) => item.key === key);
@@ -165,6 +166,7 @@ const ServiceTable = () => {
   };
 
   const handleAddRow = () => {
+    setIsEdit(false)
     const data = activeTab === 'booked' ? dataBooked : dataProvided;
     const newData = [...data];
     const newKey = (Math.random() * 1000).toString();
@@ -212,7 +214,7 @@ const ServiceTable = () => {
       key: 'user',
       render: (text, record) => (
         <span>
-          {record.editable ? (
+          {record.editable && !isEdit ? (
             <Select
               placeholder="User"
               suffixIcon={activeTab === "booked" ? <LockOutlined /> : <CaretDownOutlined />}
@@ -239,7 +241,7 @@ const ServiceTable = () => {
       key: 'provider',
       render: (text, record) => (
         <span>
-          {record.editable ? (
+          {record.editable && !isEdit ? (
             <Select
               placeholder="Provider"
               suffixIcon={activeTab === "provided" ? <LockOutlined /> : <CaretDownOutlined />}
@@ -266,7 +268,7 @@ const ServiceTable = () => {
       key: 'membershipId',
       render: (text, record) => (
         <span>
-          {record.editable ? (
+          {record.editable && !isEdit ? (
             <Select
               placeholder="Membership ID"
               suffixIcon={<CaretDownOutlined />}
@@ -291,7 +293,7 @@ const ServiceTable = () => {
       key: 'service',
       render: (text, record) => (
         <span>
-          {record.editable ? (
+          {record.editable && !isEdit ? (
             <Select
               placeholder="Service"
               suffixIcon={<CaretDownOutlined />}
@@ -330,7 +332,7 @@ const ServiceTable = () => {
       key: 'date',
       render: (text, record) => (
         <span>
-          {record.editable ? (
+          {record.editable && !isEdit ? (
             <DatePicker
               // value={text ? moment(text, 'YYYY-MM-DD') : null}
               onChange={(date, dateString) => handleDateChange(date, dateString, record.key)}
@@ -383,7 +385,7 @@ const ServiceTable = () => {
       key: 'pricePaid',
       render: (text, record) => (
         <span>
-          {record.editable ? (
+          {record.editable && !isEdit ? (
             <InputNumber keyboard={true} addonAfter={<EditOutlined />} min={0} controls={false} value={text} placeholder='Price Paid' onChange={(e) => handleInputChange(e, 'pricePaid', record.key)} />
           ) : (
             text
@@ -447,7 +449,7 @@ const ServiceTable = () => {
   return (
     <div>
       <Row className='mt-2'>
-        <Col className='flex justify-between absolute right-20 mt-2 ' span={4}>
+        <Col className='flex justify-between absolute right-20 mt-2 z-10' span={4}>
           <Button
             type="primary"
             icon={<PlusOutlined />}
