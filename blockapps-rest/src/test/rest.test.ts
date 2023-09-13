@@ -185,7 +185,7 @@ describe("rest_7", function () {
       assert.isArray(results, "should be array");
       assert.equal(results.length, contracts.length, `should be ${count}`);
       results.forEach((contract, index) => {
-        assert.equal(contract.contractName, contracts[index]['contractName'])
+        assert.equal(contract.contractName, contracts[index]['name'])
       })
     });
 
@@ -196,7 +196,7 @@ describe("rest_7", function () {
       assert.isArray(results, "should be array");
       assert.equal(results.length, contracts.length, `should be ${count}`);
       results.forEach((contract, index) => {
-        assert.equal(contract.contractName, contracts[index]['contractName'])
+        assert.equal(contract.contractName, contracts[index]['name'])
       })
     });
 
