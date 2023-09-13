@@ -99,7 +99,7 @@ const ServiceTable = () => {
   const [tableData, setTableData] = useState(boookedData);
   const [tempData, setTempData] = useState({})
 
-  // console.log("Username", userCert?.user?.commonName);
+  // const Username =  userCert?.user?.commonName;
 
   useEffect(() => {
     serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query)
@@ -141,14 +141,6 @@ const ServiceTable = () => {
   const handleInputChange = (value, field, key) => {
     // manage an temporary state for that row
   };
-
-  // const handleDateChange = (date, dateString, key) => {
-  //   // it will go in the input change with a different check for date
-  // };
-
-  // const handleSelectChange = (value, field, key) => {
-  //   // it will go in the input change with a different check for date
-  // };
 
   const handleAddRow = () => {
     // just add a new empty row in the tableData
