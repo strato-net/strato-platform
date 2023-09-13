@@ -367,7 +367,7 @@ const ServiceTable = () => {
             <Select value={text}
               placeholder="Status"
               suffixIcon={<CaretDownOutlined />}
-              disabled={activeTab === "provided"}
+              // disabled={activeTab === "provided"}
               style={{ minWidth: "100px" }}
               onChange={(value) => handleSelectChange(value, 'status', record.key)}>
               <Option value="requested">Requested</Option>
