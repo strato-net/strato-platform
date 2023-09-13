@@ -48,12 +48,7 @@ const ServiceTable = () => {
     },
     // Add more initial data as needed...
   ];
-
-
-  const [activeTab, setActiveTab] = useState('booked');
-  const [dataBooked, setDataBooked] = useState(initialData);
-  const [dataProvided, setDataProvided] = useState(initialData);
-  const [newRow, setNewRow] = useState({
+  const newRowSchema = {
     user: '',
     provider: '',
     membershipId: '',
@@ -64,7 +59,12 @@ const ServiceTable = () => {
     status: '',
     pricePaid: '',
     editable: true,
-  });
+  }
+
+  const [activeTab, setActiveTab] = useState('booked');
+  const [dataBooked, setDataBooked] = useState(initialData);
+  const [dataProvided, setDataProvided] = useState(initialData);
+  const [newRow, setNewRow] = useState(newRowSchema);
 
   const handleTabChange = (key) => {
     setActiveTab(key);
@@ -179,18 +179,7 @@ const ServiceTable = () => {
     } else {
       setDataProvided(newData);
     }
-    setNewRow({
-      user: '',
-      provider: '',
-      membershipId: '',
-      service: '',
-      summary: '',
-      date: null,
-      comments: '',
-      status: '',
-      pricePaid: '',
-      editable: true,
-    });
+    setNewRow(newRowSchema);
   };
 
   const handleSave = () => {
