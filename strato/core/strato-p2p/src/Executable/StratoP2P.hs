@@ -45,7 +45,7 @@ stratoP2P :: ( MonadP2P n
              )
           => PeerRunner n (BL.LoggingT IO) () -> BL.LoggingT IO ()
 stratoP2P runner = do
-  ask <- askRunInIO
+  ask <- askRunInIO 
   -- concurrently_ (
   --race_ (stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e))
   --  (race_ (stratoP2PClient runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e))
