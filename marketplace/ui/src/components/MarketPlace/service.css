@@ -2,7 +2,9 @@
   background-color: #061a6c !important;
   color: white !important;
 }
-.service-filter > .ant-space-item > div > .ant-select-selector {
-  background-color: transparent;
-  border: none;
+.service-filter > span > div > .ant-select-selector {
+  background-color: transparent !important;
+  border: none !important;
+  background-color: #efefef !important;
+  /* box-shadow: 0px 1px 1px 1px grey; */
 }
