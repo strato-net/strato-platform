@@ -1513,7 +1513,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }));
 
     // Get all services
-    const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
+    const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.manufacturer }, { ...options, org: managers.cirrusOrg, app: contractName, });
 
     // Combine the data and merge the service data into the membershipService data
     const combinedData = {
