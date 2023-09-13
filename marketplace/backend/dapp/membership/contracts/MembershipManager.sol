@@ -89,13 +89,14 @@ contract MembershipManager is RestStatus, ProductFileSection, ProductFileType{
                                                  _membershipArgs.imageKey, _membershipArgs.isActive, _membershipArgs.category,
                                                  _membershipArgs.subCategory, _membershipArgs.createdDate);
         
-        Membership_2 membership = new Membership_2(address(product), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
+        Membership_2 membership = new Membership_2(address(tx.origin), address(product), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
 
         //iterate throught MembershipServiceArgs array and create MembershipServices 
 
         for(uint i = 0; i < _membershipServiceArgs.length; i++) {
             MembershipServiceArgs membershipServiceArg = _membershipServiceArgs[i];
-            MembershipService membershipService = new MembershipService(address(membership), 
+            MembershipService membershipService = new MembershipService(address(tx.origin),
+                                                                        address(membership), 
                                                                         address(membershipServiceArg.serviceId), 
                                                                         membershipServiceArg.membershipPrice, 
                                                                         membershipServiceArg.discountPrice, 
@@ -109,7 +110,8 @@ contract MembershipManager is RestStatus, ProductFileSection, ProductFileType{
 
         for (uint ip = 0; ip < _productFileArgs.length; ip++) {
             ProductFileArgs productFileArg = _productFileArgs[ip];
-            ProductFile productFile = new ProductFile(address(product), 
+            ProductFile productFile = new ProductFile(  address(tx.origin),
+                                                        address(product), 
                                                         productFileArg.fileLocation, 
                                                         productFileArg.fileHash, 
                                                         productFileArg.fileName, 
@@ -129,18 +131,19 @@ contract MembershipManager is RestStatus, ProductFileSection, ProductFileType{
         return (RestStatus.OK, address(membership), address(product));
     }
     
-    function addMembershipOrderFlow(address _dappAddress, address _productId, MembershipArgs _membershipArgs, MembershipServiceArgs[] _membershipServiceArgs, ProductFileArgs[] _productFileArgs) 
+    function addMembershipOrderFlow(address _dappAddress, address _owner, address _productId, MembershipArgs _membershipArgs, MembershipServiceArgs[] _membershipServiceArgs, ProductFileArgs[] _productFileArgs) 
         returns (uint256, address, address) {
 
         dapp = Dapp(account(_dappAddress, "parent"));
 
-        Membership_2 membership = new Membership_2(address(_productId), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
+        Membership_2 membership = new Membership_2( address(_owner), address(_productId), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
 
         //iterate throught MembershipServiceArgs array and create MembershipServices 
 
         for(uint i = 0; i < _membershipServiceArgs.length; i++) {
             MembershipServiceArgs membershipServiceArg = _membershipServiceArgs[i];
-            MembershipService membershipService = new MembershipService(address(membership), 
+            MembershipService membershipService = new MembershipService(address(_owner),
+                                                                        address(membership), 
                                                                         address(membershipServiceArg.serviceId), 
                                                                         membershipServiceArg.membershipPrice, 
                                                                         membershipServiceArg.discountPrice, 
@@ -154,7 +157,8 @@ contract MembershipManager is RestStatus, ProductFileSection, ProductFileType{
 
         for (uint ip = 0; ip < _productFileArgs.length; ip++) {
             ProductFileArgs productFileArg = _productFileArgs[ip];
-            ProductFile productFile = new ProductFile(address(_productId), 
+            ProductFile productFile = new ProductFile(  address(_owner),
+                                                        address(_productId), 
                                                         productFileArg.fileLocation, 
                                                         productFileArg.fileHash, 
                                                         productFileArg.fileName, 

@@ -1084,31 +1084,32 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       //   ownedItems.some(item => file.productId === item.productId)
       // );
       console.log ('ownedProductFiles', ownedProductFiles)
-      
+      // TODO: What if there are not product files? Should we throw an error?
+      // TODO: What if there are multiple product files? Should we display all of them?
       // Combine ownedProducts, ownedItems, ownedMemberships, and ownedProductFiles into one JSON object array
       const combinedData = ownedItems
         .filter(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
-          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
 
-          return product //&& productFiles.length > 0; //&& memberships.length > 0
+          return product && productFiles.length > 0 && memberships.length > 0
         })
         .map(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
-          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
 
           return {
             itemNumber: item.itemNumber,
             productId: item.productId,
-            fileLocation: null,//productFiles[0].fileLocation,
+            fileLocation: productFiles[0].fileLocation,
             productName: product.name,
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,
-            timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
-            savings: null, //memberships[0].savings,
-            membershipAddress: null //memberships[0].address
+            timePeriodInMonths: memberships[0].timePeriodInMonths,
+            savings: memberships[0].savings,
+            membershipAddress: memberships[0].address
           };
         });
       console.log('combinedData', combinedData);
@@ -1248,6 +1249,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           console.log("comes here")
           const memberResponse = await managers.membershipManager.addMembershipOrderFlow({ 
             dappAddress: contract.address,
+            owner: newOwner,
             productId: productId,
             membershipArgs: membershipArgs, 
             membershipServiceArgs: membershipServiceArgs, 

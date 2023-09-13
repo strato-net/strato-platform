@@ -30,7 +30,8 @@ contract MembershipService {
 
 
     constructor(
-            address _membershipId
+            address _owner
+        ,   address _membershipId
         ,   address _serviceId
         ,   int _membershipPrice
         ,   int _discountPrice
@@ -38,7 +39,7 @@ contract MembershipService {
         ,   int _createdDate
         ,   bool _isActive
     ) public {
-        owner = tx.origin;
+        owner = _owner;
 
         membershipId = _membershipId;
         serviceId = _serviceId;
