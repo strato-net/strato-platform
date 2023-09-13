@@ -231,22 +231,24 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={routes.MembershipDetail.url}
         element={
           <UsersProvider>
-            <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
-                    <InventoriesProvider>
-                      <ProductsProvider>
-                        <ItemsProvider>
-                          {/* <MembershipDetails user={user} users={users} /> */}
-                          <Services user={user} users={users} />
-                        </ItemsProvider>
-                      </ProductsProvider>
-                    </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
-            </EventsProvider>
+            <ServicesProvider>
+              <EventsProvider>
+                <MembershipsProvider>
+                  <CategorysProvider>
+                    <SubCategorysProvider>
+                      <InventoriesProvider>
+                        <ProductsProvider>
+                          <ItemsProvider>
+                            {/* <MembershipDetails user={user} users={users} /> */}
+                            <Services user={user} users={users} />
+                          </ItemsProvider>
+                        </ProductsProvider>
+                      </InventoriesProvider>
+                    </SubCategorysProvider>
+                  </CategorysProvider>
+                </MembershipsProvider>
+              </EventsProvider>
+            </ServicesProvider>
           </UsersProvider>
         }
       />

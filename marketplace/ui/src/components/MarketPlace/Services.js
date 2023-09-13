@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs, Table, Input, Select, Button, DatePicker, Space, InputNumber, Row, Col, Typography } from 'antd';
 import {
   EditOutlined,
@@ -11,6 +11,9 @@ import {
   CaretDownOutlined,
 } from '@ant-design/icons';
 import "./service.css"
+import { actions as serviceUsage } from "../../contexts/serviceUsage/actions"
+import { actions as service } from "../../contexts/service/actions"
+import { useServiceDispatch, useServiceState } from '../../contexts/service';
 
 
 const { TabPane } = Tabs;
@@ -18,7 +21,17 @@ const { Option } = Select;
 
 
 const ServiceTable = () => {
+  const serviceDispatch = useServiceDispatch();
+  const limit = 10;
+  const [offset, setOffset] = useState(0);
   const [isEdit, setIsEdit] = useState(false)
+  const { services } = useServiceState()
+
+  useEffect(() => {
+    service.fetchService(serviceDispatch, limit, offset, null);
+    // service.fetchService(serviceDispatch, limit, offset, queryValue);
+  }, [])
+
   const initialData = [
     {
       key: '1',
