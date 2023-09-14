@@ -17,7 +17,7 @@ FROM base as prod
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
 COPY docker-run.sh /usr/src/app
-COPY --from=builder /usr/src/app/build .
+COPY --from=builder /usr/src/app/build build/
 EXPOSE 3002
 HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
   CMD lsof -i :3002 || \
