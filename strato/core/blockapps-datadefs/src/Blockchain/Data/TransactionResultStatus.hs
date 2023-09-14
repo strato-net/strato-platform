@@ -33,6 +33,7 @@ data TransactionFailureType = IncorrectChainId
                             | NonceLimitError
                             | TXSizeLimitError
                             | GasLimitError
+                            | KnownFailedTXError
                             deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"

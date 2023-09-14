@@ -402,6 +402,7 @@ processTheMessages :: ( MonadLogger m
                       , HasSQL m
                       , Selectable Account AddressState m
                       , Selectable Account CodeCollection m
+                      , Selectable Account Contract m
                       , Selectable Word256 ParentChainIds m
                       , HasCodeDB m
                       , Mod.Accessible (IORef Globals) m
@@ -419,6 +420,7 @@ processTheMessages env conn messages = do
       events' = parseEvents messages
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top level like this
       creates = [(c, cp, o, a, hl, rm) | CodeCollectionAdded c cp o a hl rm <- messages]
+      delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection
@@ -455,15 +457,14 @@ processTheMessages env conn messages = do
                 $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n'' <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
 
                 --Create mapping tables
-                forM_ mapNames $ \m -> do 
+                deferredForeignKeysForMappings <- fmap concat $ forM mapNames $ \m -> do 
                   outputData conn $ createMappingTable g nameParts m --Tables are created
 
 -- mark        
 
                 deferredForeignKeys <- case (_contractType c ) of
                   AbstractType -> do
-                    outputData conn $ createAbstractTable g c nameParts
-                    return []
+                    outputData conn $ createExpandAbstractTable g c nameParts
                   _ -> do
                     outputData conn $ createExpandIndexTable g c nameParts
                 
@@ -471,7 +472,7 @@ processTheMessages env conn messages = do
 
                 outputData conn $ createExpandEventTables g c nameParts
   
-                return deferredForeignKeys
+                return $ deferredForeignKeys ++ deferredForeignKeysForMappings
 
               forM_ deferredForeignKeys $ \deferredForeignKey -> do
                 outputData conn $ createForeignIndexesForJoins deferredForeignKey
@@ -481,7 +482,25 @@ processTheMessages env conn messages = do
         $logInfoS "processTheMessages" $ T.pack cc
         pure $ Left cc -- Either String String
 
-  let fkeys = rights fkeys'
+  dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
+    $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
+    mStorageContract <- select (Proxy @Contract) s
+    mCodeContract <- select (Proxy @Contract) c'
+    deferredForeignKeys <- case (,) <$> mStorageContract <*> mCodeContract of
+      Nothing -> pure []
+      Just (sc, cc) -> do
+        let c = cc{_contractName = _contractName sc}
+            mapNames = getMapNamesFromContract c
+        nameParts <- resolveNameParts o a c
+        forM_ mapNames $ outputData conn . createMappingTable g nameParts
+        deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+        outputData' conn $ createExpandHistoryTable g c nameParts
+        outputData conn $ createExpandEventTables g c nameParts
+        pure deferredForeignKeys
+    forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
+    pure $ Right deferredForeignKeys
+
+  let fkeys = rights $ fkeys' ++ dfkeys'
 
   inserts <- enterBloc2 env $ do
     forM changes $ \(acct,actions) -> do

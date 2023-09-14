@@ -28,6 +28,9 @@ module Slipstream.OutputData (
   createExpandEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
+  createExpandAbstractTable,
+  expandAbstractTable,
+  expandAbstractContractTable,
   notifyPostgREST,
   createExpandHistoryTable,
   cirrusInfo,
@@ -239,6 +242,7 @@ baseAbstractColumns = [ "record_id"
               , "transaction_hash"
               , "transaction_sender"
               , "contract_name"
+              , "data"
               ]
 
 baseTableColumns :: TableColumns
@@ -282,6 +286,17 @@ createExpandIndexTable
 createExpandIndexTable g c nameParts = do
   creationForeignKeys <- createIndexTable g c nameParts
   expansionForeignKeys <- expandIndexTable g c nameParts
+  return $ creationForeignKeys ++ expansionForeignKeys
+
+createExpandAbstractTable
+  :: OutputM m
+  => IORef Globals
+  -> Contract
+  -> (Text, Text, Text)
+  -> ConduitM () Text m [ForeignKeyInfo]
+createExpandAbstractTable g c nameParts = do
+  creationForeignKeys <- createAbstractTable g c nameParts
+  expansionForeignKeys <- expandAbstractTable g c nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
 data ForeignKeyInfo =
@@ -330,6 +345,16 @@ getDeferredForeignKeys tableName c o a =
       foreignTableName=indexTableName o a $ labelToText x
       }
 
+getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForMapping tableName o a =
+    [ForeignKeyInfo {
+      tableName=tableName,
+      columnName=T.pack "record_id",
+      foreignTableName=indexTableName o a $ (\case
+                                                MappingTableName _ _ n' _ -> n'
+                                                _ -> "") tableName
+      }]
+
 createIndexTable :: OutputM m
                  => IORef Globals
                  -> Contract
@@ -354,32 +379,37 @@ createAbstractTable :: OutputM m
                  => IORef Globals
                  -> Contract
                  -> (Text, Text, Text)
-                 -> ConduitM () Text m ()
+                 -> ConduitM () Text m [ForeignKeyInfo]
 createAbstractTable globalsIORef contract (o, a, n) = do
   let tableName = abstractTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
-  when (not tableExists) $ do
+  if tableExists
+  then return []
+  else do
     let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract^.storageDefs
     yield $ createAbstractTableQuery contract (o,a,n)
     setTableCreated globalsIORef tableName (list++ ["\"data\" jsonb"])
+    return $ getDeferredForeignKeys tableName contract o a
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable :: OutputM m
                  => IORef Globals
                  -> (Text, Text, Text)
                  -> Text
-                 -> ConduitM () Text m ()
+                 -> ConduitM () Text m [ForeignKeyInfo]
 createMappingTable globalsIORef (o, a, n) m = do
   let tableName = mappingTableName o a n m
   tableExists <- isTableCreated globalsIORef tableName
 
   $logInfoLS "createMappingTable/mappingTableExists" (tableName, tableExists)
-
-  when (not tableExists) $ do
+  if tableExists
+  then return []
+  else do
     incNumMappingTables
     yield $ (createMappingTableQuery (o, a, n, m))
     let list = ["key","value"]
     setTableCreated globalsIORef tableName list
+    return $ getDeferredForeignKeysForMapping tableName o a
 
 createHistoryTable' :: OutputM m
                    => IORef Globals
@@ -430,6 +460,15 @@ expandIndexTable :: OutputM m
 expandIndexTable globalsIORef contract (o, a, n)= do
   let tableName = indexTableName o a n
   expandContractTable globalsIORef contract tableName
+
+expandAbstractTable :: OutputM m
+                 => IORef Globals
+                 -> Contract
+                 -> (Text, Text, Text)
+                 -> ConduitM () Text m [ForeignKeyInfo]
+expandAbstractTable globalsIORef contract (o, a, n)= do
+  let tableName = abstractTableName o a n
+  expandAbstractContractTable globalsIORef contract tableName
 
 expandHistoryTable :: OutputM m =>
                       IORef Globals ->
@@ -525,6 +564,49 @@ expandContractTable globalsIORef contract tableName = do
               columnName = colName,
               foreignTableName = let a' = case a of; "" -> n; _ -> a
                                  in indexTableName o a' $ labelToText foreignName
+              }
+          _ -> []
+
+expandAbstractContractTable :: OutputM m
+                    => IORef Globals
+                    -> Contract
+                    -> TableName
+                    -> ConduitM () Text m [ForeignKeyInfo]
+expandAbstractContractTable globalsIORef contract tableName = do
+  columns <- getTableColumns globalsIORef tableName
+  case columns of
+    Nothing -> do
+      $logErrorLS "expandTable" $ T.concat
+          [ "Table "
+          , (tableNameToText tableName)
+          , " does not exist, but we are trying to expand it?"
+          ]
+      return []
+    Just cols -> do
+      let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract^.storageDefs
+          difference new old = filter ((`notElem` old) . fst) new
+          extras = difference list (partialParseTableColumns cols)
+          extraTableColumns = tableColumns extras
+      unless (null extraTableColumns) $ do
+        $logInfoS "expandTable" . T.pack $ "We just got new fields for a contract that already has a table!"
+        $logInfoS "expandTable" $ T.concat
+            [ "Adding columns to "
+            , (tableNameToText tableName)
+            , " for the following new fields: "
+            , T.intercalate ", " extraTableColumns
+            ]
+        setTableCreated globalsIORef tableName $ cols ++ extraTableColumns
+        yield $ expandTableQuery tableName extraTableColumns
+      return $
+        case tableName of
+          AbstractTableName o a n ->
+            flip map
+            [(colName, foreignName) | (colName, SVMType.Contract foreignName) <- extras] $ \(colName, foreignName) ->
+            ForeignKeyInfo {
+              tableName = tableName,
+              columnName = colName,
+              foreignTableName = let a' = case a of; "" -> n; _ -> a
+                                 in abstractTableName o a' $ labelToText foreignName
               }
           _ -> []
 
@@ -639,7 +721,7 @@ createAbstractTableQuery contract (o, a, n) =
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS " , tableNameToDoubleQuoteText tableName , " ("
         , csv $ ["record_id text", "address text", "\"chainId\" text", "block_hash text", "block_timestamp text",
-               "block_number text", "transaction_hash text", "transaction_sender text", "contract_name text"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list) ++ ["data jsonb"]
+               "block_number text", "transaction_hash text", "transaction_sender text", "contract_name text", "data jsonb"] ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list)
         , ",\n  PRIMARY KEY (record_id));"
         ]
 
@@ -775,12 +857,13 @@ insertAbstractTableQuery cs = concat $
   let cs' = (\(c@E.ProcessedContract{contractData = contractData}, ab, abColumns) -> ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns))) <$> cs
    in flip map (map snd $ partitionWith ((length . snd) *** fst) cs') $ \case
         [] -> []
-        contracts@(((x, _), (abTableName, abColumns)):_) ->
+        contracts@(((x, list), (abTableName, abColumns)):_) ->
           let contractTableName = indexTableName
                   (E.organization x)
                   (E.application x)
                   (E.contractName x)  
-              keySt  = wrapAndEscapeDouble $ escapeQuotes <$> (baseAbstractColumns ++ filter (`notElem` baseAbstractColumns) abColumns)
+              list' = (map fst $ fillFirstEmptyEntries $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) list))
+              keySt  = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++list'
               baseVals = [ \c -> makeAccount (E.chain c) (E.address c)
                          , tshow . E.address
                          , E.chain
@@ -791,7 +874,7 @@ insertAbstractTableQuery cs = concat $
                          , tshow . E.transactionSender
                          ]
               vals = flip map contracts $ \((row, contractColumns),_) ->
-                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns)) ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns]
+                wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
               inserts = csv vals
            in (:[]) $ T.concat
                 [ "INSERT INTO "
@@ -809,8 +892,9 @@ insertAbstractTableQuery cs = concat $
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    data = excluded.data|]
+    contract_name = excluded.contract_name|]
+                , if null list then "" else ",\n    "
+                , tableUpsert $ list'
                 , ";"
                 ]
 
