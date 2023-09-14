@@ -107,7 +107,8 @@ const ServiceTable = () => {
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(20)
   const [filterQuery, setFilterQuery] = useState({})
-  // const Username =  userCert?.user?.commonName;
+  const Username =  userCert?.user?.commonName;
+  const organization = userCert?.user?.organization
 
   useEffect(() => {
     serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query)
@@ -153,9 +154,12 @@ const ServiceTable = () => {
 
     });
     setTableData(data)
-    if (type === 'update') {
+    if (type === 'update' && isEdit) {
+      // we have to use update api here
       // uncomment api call for updating service usage
       // serviceUsageActions.UpdateServiceUsage(serviceUsage, tableData)
+    } else if (type === 'update' && !isEdit) {
+      // we have to use create api here
     }
   };
 
@@ -493,6 +497,8 @@ const ServiceTable = () => {
     },
   ]
 
+  const activeTabCheck = activeTab === 'booked' ? 'Provider' : 'User';
+
   return (
     <>
       <Row className="mt-2">
@@ -529,11 +535,11 @@ const ServiceTable = () => {
           </Typography.Title>
           <span className="service-filter">
             <Select
-              placeholder={activeTab === 'booked' ? 'Provider' : 'User'}
+              placeholder={activeTabCheck}
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
-              value={filterQuery[activeTab === 'booked' ? 'Provider' : 'User']}
-              onChange={(value) => { handleFilter(value, activeTab === 'booked' ? 'Provider' : 'User') }}
+              value={filterQuery[activeTabCheck]}
+              onChange={(value) => { handleFilter(value, activeTabCheck) }}
               options={activeTab === 'booked' ? providerOptions : userOptions}
             />
             <Select
