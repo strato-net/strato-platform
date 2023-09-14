@@ -31,7 +31,7 @@ emptySolidVMData :: Action.ActionData
 emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) "LambdaCorp2" "Clozure2" SolidVM (Action.SolidVMDiff M.empty) []
 
 emptyAction :: Action
-emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) M.empty Nothing S.empty
+emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) M.empty Nothing S.empty S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -133,5 +133,5 @@ spec = describe "Action conversions" $ do
           }
         , Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")]
         , Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")]
-         
+        , Action._delegatecalls = S.empty
       })

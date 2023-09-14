@@ -57,7 +57,6 @@ import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
-import           Blockchain.Strato.Model.Account (Account)
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
@@ -220,4 +219,5 @@ instance Arbitrary a => Arbitrary (FuncF a) where
 
 data FunctionCallType = DefaultCall
                       | RawCall
-                      | DelegateCall Account
+                      | DelegateCall
+                      deriving (Eq, Show)

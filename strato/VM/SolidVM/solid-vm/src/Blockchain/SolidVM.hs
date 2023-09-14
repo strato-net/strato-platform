@@ -468,9 +468,9 @@ call' :: MonadSM m
       -> m ((SolidString, SolidString), Maybe Value)
 call' from to' fnCalltype mContract functionName isRCC argExps  = do
   let (to, ccToGet) = case fnCalltype of
-        CC.DefaultCall        -> (to', to')
-        CC.RawCall            -> (to', to')
-        CC.DelegateCall proxy -> (from, proxy)
+        CC.DefaultCall  -> (to', to')
+        CC.RawCall      -> (to', to')
+        CC.DelegateCall -> (from, to')
       fromChain = from ^. accountChainId
       toChain   = to ^. accountChainId
   isAccessibleChain <- toChain `isAncestorChainOf` fromChain
@@ -641,6 +641,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps  = do
                     SVMType.Array _ _ -> return ()
                     _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
                 popCallInfo)
+  when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack org) (T.pack parentName')
   ((org, parentName'),) <$> logFunctionCall args to contract functionName f
   where
     flattenVals (x:xs) = [x] ++ flattenVals xs
@@ -2003,7 +2004,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                     (CC.NamedArgs _ ) ->  typeError "Cannot provide named args to delegate call" args)
               fromAddress <- getCurrentAccount
               let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) addr
-              res <- callWithResult fromAddress toAddress (CC.DelegateCall toAddress) Nothing funcName False args'
+              res <- callWithResult fromAddress toAddress CC.DelegateCall Nothing funcName False args'
               case res of
                   Just a  -> return $ Constant  a
                   Nothing -> return $ Constant SNULL

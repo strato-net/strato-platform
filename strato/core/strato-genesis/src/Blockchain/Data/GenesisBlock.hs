@@ -348,6 +348,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) org app = do
                                [A.Create]
           , A._metadata = getMetadata ch
           , A._events = S.empty
+          , A._delegatecalls = S.empty
           }
         where
              ch =

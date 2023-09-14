@@ -121,6 +121,7 @@ startingAction Environment{..} = Action.Action
   , _actionData               = M.empty
   , _metadata                 = envMetadata
   , _events                   = Seq.empty
+  , _delegatecalls            = Seq.empty
   }
 
 startingState :: Bool -> Bool -> Environment -> MemDBs -> IO VMState

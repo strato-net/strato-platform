@@ -51,6 +51,7 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
                              | TFInvalidPragma [(String, String)] OutputTx
                              | TFNonceLimitExceeded Integer Integer OutputTx -- accountNonceLimit, actualNonce
                              | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
+                             | TFKnownFailedTX OutputTx
                              deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -78,6 +79,7 @@ data TxRejection = WrongChainId         BaggerStage BaggerTxQueue OutputTx -- on
                  | NonceLimitExceeded   BaggerStage BaggerTxQueue Integer Integer OutputTx
                  | TXSizeLimitExceeded  BaggerStage BaggerTxQueue Integer Integer OutputTx
                  | GasLimitExceeded     BaggerStage BaggerTxQueue Integer Integer OutputTx
+                 | KnownFailedTX        BaggerStage BaggerTxQueue OutputTx
                  deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -91,6 +93,7 @@ rejectedTx (InvalidPragma _ _ _ t)  = t
 rejectedTx (NonceLimitExceeded _ _ _ _ t) = t
 rejectedTx (TXSizeLimitExceeded _ _ _ _ t) = t
 rejectedTx (GasLimitExceeded _ _ _ _ t) = t
+rejectedTx (KnownFailedTX _ _ t) = t
 
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
@@ -148,6 +151,10 @@ instance Format TxRejection where
         "\n\tgas limit "     ++ show limit ++
         "\n\ttx hash " ++ format hash ++
         "\n" ++ format o
+    format (KnownFailedTX stage queue o@OutputTx{otHash=hash}) =
+        "KnownFailedTX at stage "    ++ show stage ++ " in queue " ++ show queue ++
+        "\n\ttx hash " ++ format hash ++
+        "\n" ++ format o
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (WrongChainId   stage queue tx) =
@@ -170,6 +177,8 @@ txRejectionToAPIFailureCause (TXSizeLimitExceeded stage queue actual limit _) =
     Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.TXSizeLimitError (Just limit) (Just actual) (Just $ "The TX size is " ++ show actual  ++ " but the limit is " ++ show limit)
 txRejectionToAPIFailureCause (GasLimitExceeded stage queue actual limit _) =
     Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.GasLimitError (Just limit) (Just actual) (Just $ "The transaction takes " ++ show actual  ++ " gas but the limit is " ++ show limit)
+txRejectionToAPIFailureCause (KnownFailedTX stage queue t) =
+    Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.KnownFailedTXError Nothing Nothing (Just $ "The transaction " ++ show (otHash t)  ++ " is known to fail")
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -181,6 +190,7 @@ tfToBaggerTxRejection (TFCodeCollectionNotFound addr name tx) = CodeNotFound Val
 tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation Queued erPragmas' tx
 tfToBaggerTxRejection (TFNonceLimitExceeded limit actual tx) = NonceLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
+tfToBaggerTxRejection (TFKnownFailedTX tx) = KnownFailedTX Execution Queued tx
 
 instance Format TransactionFailureCause where
     format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
@@ -192,3 +202,4 @@ instance Format TransactionFailureCause where
     format (TFInvalidPragma erPragmas' _) = "Invalid pragma: " ++ show erPragmas'
     format (TFNonceLimitExceeded limit actual _) = "Nonce limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
     format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
+    format (TFKnownFailedTX t) = "Known failed tx: " ++ show (otHash t)
