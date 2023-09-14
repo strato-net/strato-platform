@@ -20,21 +20,6 @@
                     "name": "Membership DAO"
                 }
             ]
-        },
-        {
-            "name": "Real Estate",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "House"
-                },
-                {
-                    "name": "Apartment"
-                },
-                {
-                    "name": "Townhouse"
-                }
-            ]
         }
     ]
 }
