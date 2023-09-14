@@ -107,8 +107,8 @@ const ServiceTable = () => {
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(20)
   const [filterQuery, setFilterQuery] = useState({})
-  const Username =  userCert?.user?.commonName;
-  const organization = userCert?.user?.organization
+  const Username = userCert?.user?.commonName;
+  const organization = userCert?.user?.organization;
 
   useEffect(() => {
     serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query)
@@ -154,14 +154,17 @@ const ServiceTable = () => {
 
     });
     setTableData(data)
-    if (type === 'update' && isEdit) {
-      // we have to use update api here
-      // uncomment api call for updating service usage
-      // serviceUsageActions.UpdateServiceUsage(serviceUsage, tableData)
-    } else if (type === 'update' && !isEdit) {
-      // we have to use create api here
-    }
-  };
+    if (type === 'update') {
+      if (isEdit) {
+        // we have to use update api here
+        // uncomment api call for updating service usage
+        // serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, tableData)
+      } else {
+        // we have to use create api here
+        // serviceUsageActions.createServiceUsage(serviceUsageDispatch, tableData.at(-1))
+      }
+    };
+  }
 
   const handleInputChange = (value, field, key) => {
     let data = tableData.filter((item, index) => {
@@ -191,8 +194,14 @@ const ServiceTable = () => {
       return item;
     });
     setTableData(data);
-    // uncomment api call for creating service usage
-    // serviceUsageActions.createServiceUsage(serviceUsage, tableData)
+    if (isEdit) {
+      // we have to use update api here
+      // uncomment api call for updating service usage
+      // serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, tableData)
+    } else {
+      // we have to use create api here
+      // serviceUsageActions.createServiceUsage(serviceUsageDispatch, tableData.at(-1))
+    }
   };
 
   const handleDelete = (key) => {
