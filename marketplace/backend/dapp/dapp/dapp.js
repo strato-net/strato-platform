@@ -34,7 +34,7 @@ const contractName = "Dapp";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
-let   userCert = null;
+let userCert = null;
 
 // interface Member {
 //   access?:boolean,
@@ -126,13 +126,13 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
-async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
+async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
   console.log(contract)
   let userOrganization
-  
+
   if (!serviceUser) {
-    
+
     let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
 
     //We are not guaranteed the user will have a certificate
@@ -141,11 +141,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
-      userCert    = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
+      userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
       console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
   }
-  
+
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
@@ -463,81 +463,30 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
     const { serialNumber, ...restArgs } = args;
+    const newArgs = { ...restArgs, batchId: util.uid() };
 
-    const serialNo = [];
-    const repeatedSerialNumber = [];
     const serialNumbers = []
+    let transformedArray = []
 
-
-    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-      for (let i = 0; i < serialNumber.length; i += 200) {
-        serialNo.push(serialNumber[i].itemSerialNumber)
-        const serialNumberArr = serialNo.slice(i, i + 200);
-        const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
-
-        items.forEach(obj => {
-          const item = serialNumberArr.find(num => num === obj.serialNumber);
-          if (item) {
-            repeatedSerialNumber.push(item);
-          }
-        });
-      }
+    if (newArgs.inventoryType === "Batch") {
+      transformedArray = [{
+        "serialNumber": util.iuid()
+      }];
     }
-    if (repeatedSerialNumber.length != 0) {
-      throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
+    else {
+      for (let i = 0; i < newArgs.quantity; i++) {
+        transformedArray.push({
+          "serialNumber": util.iuid()
+        })
+      }
     }
 
     const productDetail = await managers.productManager.getProduct({ address: restArgs.productAddress }, getOptions);
 
-    let transformedArray = [];
-
-    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-      serialNumber.forEach(function (item) {
-        let rawMaterialProductNameArray = [];
-        let rawMaterialSerialNumberArray = [];
-        let rawMaterialProductIdArray = [];
-
-        if (item.rawMaterials.length != 0) {
-          item.rawMaterials.forEach(function (rawMaterial) {
-            let rawMaterialProductName = rawMaterial.rawMaterialProductName;
-            let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
-            let rawMaterialProductId = rawMaterial.rawMaterialProductId;
-
-            for (const element of rawMaterialSerialNumbers) {
-              rawMaterialProductNameArray.push(rawMaterialProductName);
-              rawMaterialSerialNumberArray.push(element);
-              rawMaterialProductIdArray.push(rawMaterialProductId);
-            }
-          });
-        }
-
-        transformedArray.push({
-          "itemNumber": parseInt(util.iuid()),
-          "serialNumber": item.itemSerialNumber,
-          "rawMaterialProductName": rawMaterialProductNameArray,
-          "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
-          "rawMaterialProductId": rawMaterialProductIdArray
-        });
-        serialNumbers.push(item.itemSerialNumber)
-      });
-    }
-    // For some reason an else statement is not working here
-    if (serialNumber.length === 0 || serialNumber.length === undefined) {
-      const quantity = args.quantity;
-      for (let i = 0; i < quantity; i++) {
-        transformedArray.push({
-          "itemNumber": parseInt(util.iuid()),
-          "serialNumber": "",
-          "rawMaterialProductName": [],
-          "rawMaterialSerialNumber": [],
-          "rawMaterialProductId": []
-        });
-      }
-    }
-    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
+    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    if(args.quantity === 0) {
+    if (args.quantity === 0) {
       return [
         createInventoryStatus,
         createdInventoryAddress,
@@ -1052,14 +1001,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
         const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
-        let itemAddresses
         let newOwner = orderLines[0].owner
         let result = []
 
         for (let orderLineAddress of orderLinesAddresses) {
-          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
-          itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
+          const orderLineProductId = orderLines[0].productId;
+          const orderLineInventoryId = orderLines[0].inventoryId;
+          // const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
+          // itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ productId: orderLineProductId, inventoryId: orderLineInventoryId, newOwner, newQuantity: orderLines[0].quantity, dappAddress });
           result.push({ status, productId, inventoryId });
         }
         return result;
@@ -1083,14 +1033,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = managers.orderManager.getOrder(args, createOptions);
-      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);    
+      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
 
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
 
-      for(let i = 0; i < result.orderLines.length; i++) {
-        const {productId, inventoryId } = result.orderLines[i];
+      for (let i = 0; i < result.orderLines.length; i++) {
+        const { productId, inventoryId } = result.orderLines[i];
         const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
 
         if (items === null || items === undefined || items.length === 0) {

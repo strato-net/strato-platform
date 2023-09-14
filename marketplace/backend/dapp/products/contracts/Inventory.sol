@@ -19,6 +19,7 @@ contract Inventory is InventoryStatus{
     int public pricePerUnit;
     string public batchId;
     int public availableQuantity;
+    string public inventoryType;
     InventoryStatus public status;
     uint public createdDate;
 
@@ -29,6 +30,7 @@ contract Inventory is InventoryStatus{
         ,   int _quantity
         ,   int _pricePerUnit
         ,   string _batchId
+        ,   string _inventoryType
         ,   InventoryStatus _status
         ,   uint _createdDate
         ,   address _owner
@@ -42,6 +44,7 @@ contract Inventory is InventoryStatus{
         pricePerUnit = _pricePerUnit;
         batchId = _batchId;
         availableQuantity = _quantity;
+        inventoryType = _inventoryType;
         status = _status;
         createdDate = _createdDate;
 

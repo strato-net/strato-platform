@@ -116,6 +116,7 @@ class InventoryController {
       pricePerUnit: Joi.number().integer().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),
+      inventoryType: Joi.string().required(),
       serialNumber: Joi.array().when(Joi.array().length(0), {
         then: Joi.array().length(0).required(),
         otherwise: Joi.array().length(Joi.ref('quantity')).items(Joi.object({

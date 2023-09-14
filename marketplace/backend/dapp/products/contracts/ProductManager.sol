@@ -41,11 +41,11 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
         return product.deleteProduct();
     }
 
-    function addInventory (address _productAddress, int _quantity, int _pricePerUnit, string _batchId, 
+    function addInventory (address _productAddress, int _quantity, int _pricePerUnit, string _batchId, string _inventoryType, 
         InventoryStatus _status, uint _createdDate, string[] _serialNumbers) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
             Product_3 product = Product_3(_productAddress);
-            return product.addInventory(_quantity, _pricePerUnit, _batchId, _status, _createdDate,tx.origin);
+            return product.addInventory(_quantity, _pricePerUnit, _batchId, _inventoryType, _status, _createdDate,tx.origin);
 
         } else {
             for (uint256 i = 0; i < _serialNumbers.length; i++) {
@@ -59,7 +59,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus,RestStatus{
             }
 
             Product_3 product = Product_3(_productAddress);
-            return product.addInventory(_quantity, _pricePerUnit, _batchId, _status, _createdDate,tx.origin);
+            return product.addInventory(_quantity, _pricePerUnit, _batchId, _inventoryType, _status, _createdDate,tx.origin);
         }
     }
 
