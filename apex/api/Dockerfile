@@ -4,7 +4,6 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/src/app
-    # Layer is shared with SMD. TODO: use shared base
     # postgres-client is required for pgtools module; also used for container health check
 WORKDIR /usr/src/app
 EXPOSE 3009

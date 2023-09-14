@@ -1,10 +1,4 @@
 FROM node:18-buster-slim
-RUN apt-get update && \
-    apt-get install -y postgresql-client build-essential && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    mkdir -p /usr/src/app \
-    # Layer is shared with Apex. TODO: use shared base
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
 RUN mkdir -p /usr/src/app && \
