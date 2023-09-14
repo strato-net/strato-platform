@@ -32,8 +32,6 @@ import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/au
 import { useMembershipState } from "../../contexts/membership";
 import { useServiceDispatch, useServiceState } from "../../contexts/service";
 
-const { TabPane } = Tabs;
-
 const newRowSchema = {
   user: "",
   provider: "",
@@ -106,16 +104,15 @@ const ServiceTable = () => {
   const [validationError, setValidationError] = useState(false);
   const [activeTab, setActiveTab] = useState("booked");
   const [tableData, setTableData] = useState(boookedData);
-  const [editIcon, setEditIcon] = useState(false)
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(20)
+  const [filterQuery, setFilterQuery] = useState({})
   // const Username =  userCert?.user?.commonName;
 
   useEffect(() => {
     serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query)
     servicesActions.fetchService(serviceDispatch, limit, offset, query)
     // userAuthActions.fetchUsers(authUserDispatch)
-
   }, [])
 
   useEffect(() => {
@@ -127,6 +124,8 @@ const ServiceTable = () => {
   }, [activeTab])
 
   const handleTabChange = (key) => {
+    setFilterQuery({})
+    setPage(0)
     setActiveTab(key);
   };
 
@@ -163,7 +162,7 @@ const ServiceTable = () => {
   const handleInputChange = (value, field, key) => {
     let data = tableData.filter((item, index) => {
       if (item.key === key) {
-        item[field] = value
+        item[field] = value ? value : ""
         return item;
       } return item;
     })
@@ -201,7 +200,6 @@ const ServiceTable = () => {
     const requiredFields = ["membershipId", "service", "summary", "date", "comments", "status", "pricePaid",];
 
     if (activeTab === "booked" || activeTab === "provided") {
-      // const requiredField = activeTab === "booked" ? "provider" : "user";
       if (requiredFields.every((field) => data[field] !== "")) {
         setValidationError(false);
         return true;
@@ -211,8 +209,10 @@ const ServiceTable = () => {
     return false;
   };
 
-  const handleFilter = (type) => {
-
+  const handleFilter = (value, key) => {
+    let data = { ...filterQuery }
+    data[key] = value;
+    setFilterQuery(data)
   }
 
   const onPageChange = (page) => {
@@ -249,7 +249,6 @@ const ServiceTable = () => {
           ) : (
             <Typography style={{ color: "#061A6C" }}>
               {text}
-              {/* {activeTab === "booked" && <LockOutlined />} */}
             </Typography>
           )}
         </span>
@@ -284,7 +283,6 @@ const ServiceTable = () => {
           ) : (
             <span>
               {text}
-              {/* {activeTab === "provided" && <LockOutlined />} */}
             </span>
           )}
         </span>
@@ -484,14 +482,6 @@ const ServiceTable = () => {
     },
   ];
 
-  const handleChangeTab = (selectedTab) => {
-    setActiveTab(selectedTab);
-    if (selectedTab === "booked") {
-      setTableData(boookedData);
-    } else {
-      setTableData(provideData);
-    }
-  }
   const tabOptions = [
     {
       key: 'booked',
@@ -542,7 +532,8 @@ const ServiceTable = () => {
               placeholder={activeTab === 'booked' ? 'Provider' : 'User'}
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
-              onChange={() => { handleFilter(activeTab === 'booked' ? 'Provider' : 'User') }}
+              value={filterQuery[activeTab === 'booked' ? 'Provider' : 'User']}
+              onChange={(value) => { handleFilter(value, activeTab === 'booked' ? 'Provider' : 'User') }}
               options={activeTab === 'booked' ? providerOptions : userOptions}
             />
             <Select
@@ -550,6 +541,8 @@ const ServiceTable = () => {
               className="ml-2"
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
+              value={filterQuery['status']}
+              onChange={(value) => { handleFilter(value, 'status') }}
               options={statusOptions}
             />
           </span>
