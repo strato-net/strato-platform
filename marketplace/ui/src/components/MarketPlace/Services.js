@@ -11,6 +11,7 @@ import {
   Row,
   Col,
   Typography,
+  Pagination,
 } from "antd";
 import {
   EditOutlined,
@@ -62,6 +63,15 @@ const boookedData = [
   },
 ];
 
+const statusOptions = [
+  { value: "requested", label: "Requested" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "completed", label: "Completed" },
+]
+
+// const providerOptions = 
+// const userOptions = 
+
 const provideData = [
   {
     key: "2",
@@ -97,6 +107,8 @@ const ServiceTable = () => {
   const [activeTab, setActiveTab] = useState("booked");
   const [tableData, setTableData] = useState(boookedData);
   const [editIcon, setEditIcon] = useState(false)
+  const [page, setPage] = useState(0)
+  const [total, setTotal] = useState(20)
   // const Username =  userCert?.user?.commonName;
 
   useEffect(() => {
@@ -118,7 +130,18 @@ const ServiceTable = () => {
     setActiveTab(key);
   };
 
+  const userOptions = [
+    { value: "jack", label: "Jack-user" },
+    { value: "lucy", label: "Lucy-user" },
+  ]
+
+  const providerOptions = [
+    { value: "jack", label: "Jack-provider" },
+    { value: "lucy", label: "Lucy-provider" },
+  ]
+
   const handleEditCancel = (key, bool, type) => {
+    // handling 3 functionality (i.e, edit, update & cancel) using its type
     setIsEdit(bool);
     const data = tableData.filter((item, index) => {
       if (item.key === key) {
@@ -188,6 +211,13 @@ const ServiceTable = () => {
     return false;
   };
 
+  const handleFilter = (type) => {
+
+  }
+
+  const onPageChange = (page) => {
+    setPage(page)
+  }
 
   const columns = [
     {
@@ -387,11 +417,7 @@ const ServiceTable = () => {
               onChange={(value) =>
                 handleInputChange(value, "status", record.key)
               }
-              options={[
-                { value: "requested", label: "Requested" },
-                { value: "cancelled", label: "Cancelled" },
-                { value: "completed", label: "Completed" },
-              ]}
+              options={statusOptions}
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>{text}</Typography>
@@ -513,24 +539,18 @@ const ServiceTable = () => {
           </Typography.Title>
           <span className="service-filter">
             <Select
-              placeholder="Provider"
+              placeholder={activeTab === 'booked' ? 'Provider' : 'User'}
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
-              options={[
-                { value: "jack", label: "Jack" },
-                { value: "lucy", label: "Lucy" },
-              ]}
+              onChange={() => { handleFilter(activeTab === 'booked' ? 'Provider' : 'User') }}
+              options={activeTab === 'booked' ? providerOptions : userOptions}
             />
             <Select
               placeholder="Status"
               className="ml-2"
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
-              options={[
-                { value: "requested", label: "Requested" },
-                { value: "cancelled", label: "Cancelled" },
-                { value: "completed", label: "Completed" },
-              ]}
+              options={statusOptions}
             />
           </span>
         </Col>
@@ -542,6 +562,12 @@ const ServiceTable = () => {
             dataSource={tableData}
             pagination={false}
             rowKey="key"
+          />
+          <Pagination
+            current={page}
+            onChange={onPageChange}
+            total={total}
+            className="flex justify-center my-5 "
           />
         </Col>
       </Row>
