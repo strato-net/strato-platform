@@ -1,4 +1,4 @@
-FROM node:18-buster-slim
+FROM node:18-bookworm-slim
 RUN apt-get update && \
     apt-get install -y postgresql-client curl && \
     apt-get clean && \

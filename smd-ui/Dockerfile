@@ -1,4 +1,4 @@
-FROM node:18-buster-slim
+FROM node:18-bookworm-slim
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
 RUN mkdir -p /usr/src/app && \
