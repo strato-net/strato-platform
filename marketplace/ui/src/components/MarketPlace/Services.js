@@ -32,7 +32,6 @@ import { useMembershipState } from "../../contexts/membership";
 import { useServiceDispatch, useServiceState } from "../../contexts/service";
 
 const { TabPane } = Tabs;
-const { Option } = Select;
 
 const newRowSchema = {
   user: "",
@@ -388,11 +387,12 @@ const ServiceTable = () => {
               onChange={(value) =>
                 handleInputChange(value, "status", record.key)
               }
-            >
-              <Option value="requested">Requested</Option>
-              <Option value="cancelled">Cancelled</Option>
-              <Option value="completed">Completed</Option>
-            </Select>
+              options={[
+                { value: "requested", label: "Requested" },
+                { value: "cancelled", label: "Cancelled" },
+                { value: "completed", label: "Completed" },
+              ]}
+            />
           ) : (
             <Typography style={{ color: "#061A6C" }}>{text}</Typography>
           )}
@@ -466,15 +466,22 @@ const ServiceTable = () => {
       setTableData(provideData);
     }
   }
+  const tabOptions = [
+    {
+      key: 'booked',
+      label: 'Booked',
+    },
+    {
+      key: 'provided',
+      label: 'Provided',
+    },
+  ]
 
   return (
     <>
       <Row className="mt-2">
         <Col span={22} className="m-auto">
-          <Tabs activeKey={activeTab} onChange={handleTabChange}>
-            <TabPane tab="Booked" key="booked"></TabPane>
-            <TabPane tab="Provided" key="provided" onClick={() => { handleChangeTab('provided') }}></TabPane>
-          </Tabs>
+          <Tabs activeKey={activeTab} items={tabOptions} onChange={handleTabChange} />
         </Col>
         <Col
           className="flex justify-between absolute right-20 mt-2 z-10"
@@ -504,7 +511,7 @@ const ServiceTable = () => {
           <Typography.Title level={4} style={{ color: "#061A6C" }}>
             Service Usage
           </Typography.Title>
-          <span>
+          <span className="service-filter">
             <Select
               placeholder="Provider"
               suffixIcon={<CaretDownOutlined />}

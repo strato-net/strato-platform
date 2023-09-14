@@ -3,9 +3,8 @@
   color: white !important;
 }
 
-.service-filter > span > div > .ant-select-selector {
+.service-filter > div > .ant-select-selector {
   background-color: transparent !important;
   border: none !important;
   background-color: #efefef !important;
-  /* box-shadow: 0px 1px 1px 1px grey; */
 }
