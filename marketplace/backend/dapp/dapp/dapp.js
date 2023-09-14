@@ -1108,20 +1108,30 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           const product = ownedProducts.find(p => p.address === item.productId);
           const memberships = ownedMemberships.filter(m => m.productId === item.productId);
           const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
-          const savings = membershipServices.filter(membershipService => membershipService.membershipId === memberships[0].address).map(membershipService => {
-            const matchingService = servicesAll.find(service => service.address === membershipService.serviceId);
-        
-            if (matchingService) {
-              return {
-                savings: membershipService.maxQuantity * (matchingService.price - membershipService.membershipPrice),
-              };
-            } else {
-              return " Not found";
-            }
-          });
+          const savings = membershipServices
+            .filter(
+              (membershipService) =>
+                membershipService.membershipId === memberships[0].address
+            )
+            .map((membershipService) => {
+              const matchingService = servicesAll.find(
+                (service) => service.address === membershipService.serviceId
+              );
+
+              if (matchingService) {
+                return {
+                  savings:
+                    membershipService.maxQuantity *
+                    (matchingService.price - membershipService.membershipPrice),
+                };
+              } else {
+                return " Not found";
+              }
+            });
           
           console.log("savings: ", savings)
           return {
+            itemAddress: item.address,
             itemNumber: item.itemNumber,
             productId: item.productId,
             fileLocation: productFiles[0].fileLocation,
