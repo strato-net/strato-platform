@@ -35,23 +35,6 @@ import { useServiceDispatch, useServiceState } from "../../contexts/service";
 import { useUsersState } from "../../contexts/users";
 
 
-
-const boookedData = [
-  {
-    key: "1",
-    user: "User 1",
-    provider: "Provider 1",
-    membershipId: "12345",
-    service: "Service A",
-    summary: "Summary 1",
-    serviceDate: "2023-09-12",
-    providerComment: "Comment 1",
-    status: "Status 1",
-    pricePaid: "100",
-    editable: false,
-  },
-];
-
 const statusOptions = [
   { value: 0, label: "Requested" },
   { value: 1, label: "Cancelled" },
@@ -61,21 +44,6 @@ const statusOptions = [
 // const providerOptions = 
 // const userOptions = 
 
-const provideData = [
-  {
-    key: "2",
-    user: "User 2",
-    provider: "Provider 2",
-    membershipId: "67890",
-    service: "Service B",
-    summary: "Summary 2",
-    serviceDate: "2023-09-13",
-    providerComment: "Comment 2",
-    status: "Status 2",
-    pricePaid: "200",
-    editable: false,
-  },
-];
 const limit = 10;
 const offset = 0;
 const query = {};
@@ -108,13 +76,18 @@ const ServiceTable = () => {
     return { value: item.address, label: item.name }
   })
   const [serviceList, setServiceList] = useState(serviceListData);
-  const [userList, setUserList] = useState(userCert?.users)
+  const [userList, setUserList] = useState([])
+
+  const userListData = userCert?.users?.map((item, index) => {
+    return { value: item.userAddress, label: item.commonName }
+  })
+
 
   useEffect(() => {
     setServiceList(serviceListData)
     setProviderList(providerData)
     setTableData(serviceUsageState?.servicesUsage)
-    // setUserList(userCert?.users)
+    setUserList(userListData)
   }, [servicesState, membership, serviceUsageState, userCert])
 
 
@@ -129,20 +102,20 @@ const ServiceTable = () => {
   const organization = userCert?.user?.organization;
 
   const newRowSchema = {
-    summary: "",
-    serviceDate: "",
-    providerComment: "",
-    status: 0,
-    pricePaid: "",
+    summary: '',
+    serviceDate: '',
+    providerComment: '',
+    status: 1,
+    pricePaid: '',
     editable: true,
-    itemId: "",
-    serviceId: "",
-    paymentStatus: 0,
+    itemId: '',
+    serviceId: '',
+    paymentStatus: 1,
 
-    providerLastUpdated: userCert?.user?.userAddress, //"user address",
-    providerLastUpdatedDate: new Date(),
+    providerLastUpdated: userCert?.user?.userAddress,
+    providerLastUpdatedDate: new Date().getTime().toString(),
   };
-
+  console.log("userCert?.user?.userAddress", userCert?.user?.userAddress);
   useEffect(() => {
     serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, 30, offset, query)
     servicesActions.fetchService(serviceDispatch, limit, offset, query)
@@ -272,13 +245,18 @@ const ServiceTable = () => {
               disabled={activeTab === "booked"}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(value, "user", record.key)
+                handleInputChange(value, "providerLastUpdated", record.key)
               }
               options={userList}
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>
-              {text}
+              {userList.reduce((label, item) => {
+                if (item.value === text) {
+                  return item.label;
+                }
+                return label;
+              }, null)}
             </Typography>
           )}
         </span>
@@ -303,7 +281,7 @@ const ServiceTable = () => {
               disabled={activeTab === "provided"}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(toString(value), "itemId", record.key)
+                handleInputChange(value.toString(), "itemId", record.key)
               }
               options={providerList}
             />
@@ -403,7 +381,7 @@ const ServiceTable = () => {
             <DatePicker
               // value={text ? moment(text, 'YYYY-MM-DD') : null}
               onChange={(serviceDate, dateString) =>
-                handleInputChange(toString(dateString), 'serviceDate', record.key)
+                handleInputChange(new Date(serviceDate).getTime().toString(), 'serviceDate', record.key)
               }
             />
           ) : (
@@ -475,9 +453,9 @@ const ServiceTable = () => {
               addonAfter={<EditOutlined />}
               min={0}
               controls={false}
-              value={text}
+              value={parseInt(text)}
               placeholder="Price Paid"
-              onChange={(value) => handleInputChange(toString(value), "pricePaid", record.key)}
+              onChange={(value) => handleInputChange(value.toString(), "pricePaid", record.key)}
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>{text}</Typography>

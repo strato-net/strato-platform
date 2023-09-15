@@ -11,7 +11,6 @@ const reducer = (state, action) => {
     case actionDescriptors.createServiceUsageSuccessful:
       return {
         ...state,
-        servicesUsage: action.payload,
         isCreateServiceUsageSubmitting: false
       };
     case actionDescriptors.createServiceUsageFailed:
