@@ -2773,12 +2773,14 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   when (contractName' == "" || contractSrc == "") 
     $ invalidArguments "The contract name and src arguments for the create function should not be empty" args
   creator <- getCurrentAccount
+  (_, parentCC) <- getCurrentCodeCollection
+  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
                           Right parsedArgs -> parsedArgs
                           _ -> internalError "Failed to parse constructor args in a create builtin call" argString
-  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   return $ ((flip SAccount) False) . accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $ erNewContractAccount execResults
@@ -2787,13 +2789,21 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   when (contractName' == "" || contractSrc == "") 
     $ invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
   creator <- getCurrentAccount
+  (_, parentCC) <- getCurrentCodeCollection
+  -- Because of the current testnet stateroot problem with contracts using an older version of
+  -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
+  -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
+  -- will still work but will have incorrect codeptrs. 
+  -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
+  -- testnet won't exist anymore and the stateroot mismatches will be corrected.
+  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
                           Right parsedArgs -> parsedArgs
                           _ -> internalError "Failed to parse constructor args in a create builtin call" argString
   constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
-  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   return $ ((flip SAccount) False) . accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $ erNewContractAccount execResults
