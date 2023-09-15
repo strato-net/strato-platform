@@ -7330,6 +7330,8 @@ contract qq {
 
   it "can use create and create2 built-in function calls" . runTest $ do
     runBS [r|
+pragma builtinCreates;
+
 contract qq {
   account a;
   account b;
@@ -7349,6 +7351,8 @@ contract qq {
 
   it "should throw an error when using create built-in function call while missing a parameter" $ runTest (
     runBS [r|
+pragma builtinCreates;
+
 contract qq {
   account a;
 
@@ -7359,6 +7363,8 @@ contract qq {
 
   it "should throw an error when using create built-in function call while contract name is empty " $ runTest (
     runBS [r|
+pragma builtinCreates;
+
 contract qq {
   account a;
 
@@ -7369,6 +7375,8 @@ contract qq {
 
   it "should throw an error when using create built-in function call while contract src is empty " $ runTest (
     runBS [r|
+pragma builtinCreates;
+
 contract qq {
   account a;
 
@@ -7379,6 +7387,8 @@ contract qq {
 
   it "should throw an error when using create built-in function call while contract name is not in the src " $ runTest (
     runBS [r|
+pragma builtinCreates;
+
 contract qq {
   account b;
 
@@ -7386,3 +7396,37 @@ contract qq {
     b = create("B", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3)");
   }
 }|]) `shouldThrow` anyMissingTypeError
+
+  it "should throw an error when using create built-in function call without the builtin-creates pragma " $ runTest (
+    runBS [r|
+
+contract qq {
+  account b;
+
+  constructor() {
+    b = create("B", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3)");
+  }
+}|]) `shouldThrow` anyTypeError
+
+  it "should be able to use a user defined create/create2 function when not using the builtin and pragma " . runTest $ do
+    runBS [r|
+
+contract qq {
+  uint x;
+  uint y;
+
+  constructor() {
+    x = create();
+    y = create2();
+  }
+
+  function create() returns (uint) {
+    return 1;
+  }
+
+  function create2() returns (uint) {
+    return 2;
+  }
+}|]
+    getFields ["x", "y"] `shouldReturn` [BInteger 1, BInteger 2]
+    

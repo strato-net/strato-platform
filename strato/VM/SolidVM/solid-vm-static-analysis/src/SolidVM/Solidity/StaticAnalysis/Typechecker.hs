@@ -14,7 +14,7 @@ import           Control.Lens      hiding (enum)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State
 import           Data.Bool (bool)
-import           Data.Foldable (traverse_)
+import           Data.Foldable (find, traverse_)
 -- import           Data.Functor.Identity (runIdentity)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -1145,8 +1145,53 @@ getVarType' "payable" ctx =  pure $ Function (payableArgs ctx) (Static (SVMType.
 getVarType' "blockhash" ctx = pure $ Function (blockhashArgs ctx) (stringType' ctx) ctx [] []
 getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' ctx) ctx [] []
 getVarType' "parseCert" ctx =  pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] []
-getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (accountType' ctx) ctx [] []
-getVarType' "create2" ctx = pure $ Function (saltCreateArgs ctx) (accountType' ctx) ctx [] []
+getVarType' name@("create") ctx = do
+  cc <- asks codeCollection
+  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ _pragmas cc
+  case pragmaCheck of
+    True -> pure $ Function (createFuncArgs ctx) (accountType' ctx) ctx [] []
+    False -> do
+      c <- asks contract
+      let varDefy =  M.lookup name (_storageDefs c)
+      case varDefy of
+        Just _ -> do
+          case _varType <$> varDefy of
+            Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
+            _ -> getVarTypeByName' (stringToLabel name) ctx
+        Nothing -> do
+          let ls = filter (userDefinedHelper name )  [ _varType x | x <- (M.elems (_storageDefs c)) ]
+          if  length ls > 0
+            then do
+              let ls2 = head (filter (userDefinedHelper name . _varType )  [  x | x <- (M.elems (_storageDefs c)) ])
+              case _varInitialVal ls2 of
+                Just _ -> pure $ (Static (head ls)  ctx)
+                _ -> pure $  (Static ( SVMType.actual (head ls) ) ctx)
+          else do
+            getVarTypeByName' (stringToLabel name) ctx
+getVarType' name@("create2") ctx = do
+  cc <- asks codeCollection
+  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ _pragmas cc
+  case pragmaCheck of
+    True -> pure $ Function (saltCreateArgs ctx) (accountType' ctx) ctx [] []
+    False -> do
+      c <- asks contract
+      let varDefy =  M.lookup name (_storageDefs c)
+      case varDefy of
+        Just _ -> do
+          case _varType <$> varDefy of
+            Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
+            _ -> getVarTypeByName' (stringToLabel name) ctx
+        Nothing -> do
+          let ls = filter (userDefinedHelper name )  [ _varType x | x <- (M.elems (_storageDefs c)) ]
+          if  length ls > 0
+            then do
+              let ls2 = head (filter (userDefinedHelper name . _varType )  [  x | x <- (M.elems (_storageDefs c)) ])
+              case _varInitialVal ls2 of
+                Just _ -> pure $ (Static (head ls)  ctx)
+                _ -> pure $  (Static ( SVMType.actual (head ls) ) ctx)
+          else do
+            getVarTypeByName' (stringToLabel name) ctx
+
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util" Nothing) ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg" Nothing) ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx" Nothing) ctx
