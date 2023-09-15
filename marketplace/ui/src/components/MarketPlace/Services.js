@@ -102,20 +102,20 @@ const ServiceTable = () => {
   const organization = userCert?.user?.organization;
 
   const newRowSchema = {
-    summary: '',
-    serviceDate: '',
-    providerComment: '',
+    summary: '', //summary
+    serviceDate: '', //Date
+    providerComment: '', //comment
     status: 1,
-    pricePaid: '',
+    pricePaid: '', //price paid
     editable: true,
-    itemId: '',
-    serviceId: '',
+    itemId: '', //provider
+    serviceId: '', //service
     paymentStatus: 1,
 
-    providerLastUpdated: userCert?.user?.userAddress,
+    providerLastUpdated: userCert?.user?.userAddress, //user-address
     providerLastUpdatedDate: new Date().getTime().toString(),
   };
-  console.log("userCert?.user?.userAddress", userCert?.user?.userAddress);
+
   useEffect(() => {
     serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, 30, offset, query)
     servicesActions.fetchService(serviceDispatch, limit, offset, query)
@@ -134,8 +134,24 @@ const ServiceTable = () => {
     { value: "lucy", label: "Lucy-user" },
   ]
 
-  const handleEditCancel = (key, bool, type) => {
+  const handleEditCancel = (key, bool, type, record) => {
     // handling 3 functionality (i.e, edit, update & cancel) using its type
+
+    const UpdatePayloadKeys = ['serviceDate', 'summary', 'status', 'paymentStatus', 'providerLastUpdated',
+      'providerComment', 'providerLastUpdatedDate', 'pricePaid']
+    let updatedDataObj = {}
+    UpdatePayloadKeys.forEach((item, index) => {
+      if (['serviceDate', 'providerLastUpdatedDate', 'pricePaid'].includes(item)) {
+        updatedDataObj[item] = record[item].toString()
+      } else {
+        updatedDataObj[item] = record[item]
+      }
+    })
+
+    let updatedPayload = {};
+    updatedPayload['address'] = record.address;
+    updatedPayload['updates'] = updatedDataObj;
+
     setIsEdit(bool);
     const data = tableData.filter((item, index) => {
       if (index === key) {
@@ -152,18 +168,19 @@ const ServiceTable = () => {
       if (isEdit) {
         // we have to use update api here
         // uncomment api call for updating service usage
-        // serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, tableData)
+        serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, updatedPayload)
       } else {
         // we have to use create api here
-        // serviceUsageActions.createServiceUsage(serviceUsageDispatch, tableData.at(-1))
+        updatedDataObj['itemId'] = record['itemId'];
+        updatedDataObj['serviceId'] = record['serviceId'];
+        serviceUsageActions.createServiceUsage(serviceUsageDispatch, updatedDataObj)
       }
     };
   }
 
   const handleInputChange = (value, field, key) => {
-    console.log("key--------->", key);
+
     let data = tableData.filter((item, index) => {
-      console.log("index----------------->", index, "itemmmmmmmmmmmmm", item);
       if (index === key) {
         item[field] = value ? value : ""
         return item;
@@ -209,7 +226,7 @@ const ServiceTable = () => {
 
   const handleValidation = (data) => {
     const requiredFields = ['summary', 'serviceDate', 'providerComment', 'status', 'pricePaid',
-      'itemId', 'serviceId', 'paymentStatus', 'providerLastUpdated', 'providerLastUpdatedDate',];
+      'serviceId', 'paymentStatus', 'providerLastUpdated', 'providerLastUpdatedDate',];
 
     if (activeTab === "booked" || activeTab === "provided") {
       if (requiredFields.every((field) => data[field] !== "")) {
@@ -230,8 +247,8 @@ const ServiceTable = () => {
   const columns = [
     {
       title: "User",
-      dataIndex: "user",
-      key: "user",
+      dataIndex: "providerLastUpdated",
+      key: "providerLastUpdated",
       render: (text, record, index) => (
         <span>
           {record.editable && !isEdit ? (
@@ -282,9 +299,9 @@ const ServiceTable = () => {
               }
               disabled={activeTab === "provided"}
               style={{ width: 120 }}
-              onChange={(value) =>
+              onChange={(value, obj) => {
                 handleInputChange(value.toString(), "itemId", index)
-              }
+              }}
               options={providerList}
             />
           ) : (
@@ -477,13 +494,13 @@ const ServiceTable = () => {
                 type="primary"
                 icon={<CheckOutlined />}
                 disabled={!handleValidation(record)}
-                onClick={() => handleEditCancel(index, false, "update")}
+                onClick={() => handleEditCancel(index, false, "update", record)}
               />
               {isEdit && (
                 <Button
                   type="default"
                   icon={<CloseOutlined />}
-                  onClick={() => handleEditCancel(index, false, "cancel")}
+                  onClick={() => handleEditCancel(index, false, "cancel", record)}
                 />
               )}
             </>
@@ -492,7 +509,7 @@ const ServiceTable = () => {
               type="primary"
               icon={<EditOutlined />}
               disabled={!handleValidation(record) || validationError}
-              onClick={() => handleEditCancel(index, true, "edit")}
+              onClick={() => handleEditCancel(index, true, "edit", record)}
             />
           )}
           {record.editable && !isEdit && <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(index)} />}
