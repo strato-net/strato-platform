@@ -17,6 +17,8 @@ export default {
   ConfirmOrder: { label: "Confirm Order", url: "/confirmOrder" },
   Products: { label: "Product", url: "/products" },
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
+  Memberships: { label: "Membership", url: "/memberships" },
+  MembershipDetail: { label: "Membership Detail", url: "/memberships/:id" },
   Inventories: { label: "Inventory", url: "/inventories" },
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id" },
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },
@@ -50,6 +52,6 @@ export default {
   EventSerialNumberList: { label: "Event Serial Numbers", url: "/events/serialNumbers" },
   ProcessingOrder: { label: "Processing Order", url: "/order/status" },
   Invoice: { label: "Invoice", url: "/orders/invoice/:id" },
-  OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/inventories/stripe/onboarding" },
+  OnboardingSellerToStripe: { label: "Onboarding Seller to Stripe", url: "/memberships/stripe/onboarding" },
   Storage: { label: "Storage", url: "/storage" },
 };

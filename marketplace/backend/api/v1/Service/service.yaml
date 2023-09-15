@@ -1,0 +1,169 @@
+paths:
+  /service/:
+    get:
+      security:              
+        - bearerAuth: []                    
+      tags:               
+        - Service        
+      summary: Retrieve service
+      produces:
+      - application/json
+      responses:         
+        200:
+          description: Array of services
+    post:  
+      security:              
+        - bearerAuth: []                  
+      tags:               
+        - Service        
+      summary: Create a service
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to create service
+        required: true
+        content:
+          'application/json': 
+            schema:       
+              $ref: '#/definitions/createService' 
+      responses:         
+        200:
+          description: Object of create service
+  /service/{address}/{chainId}:
+    get:                 
+      security:              
+        - bearerAuth: []   
+      tags:               
+        - Service        
+      summary: Retrieve a service
+      produces:
+      - application/json
+      parameters:         
+      - in: path          
+        name: address     
+        description: address to retrieve the service
+        required: true
+      - in: path          
+        name: chainId     
+        description: chainId corresponding to the address
+        required: true
+        schema:       
+          $ref: '#/definitions/fetchService' 
+      responses:         
+        200:
+          description: Retrieve a service
+  /service/update:
+    put:    
+      security:              
+        - bearerAuth: []                
+      tags:               
+        - Service        
+      summary: Update a service
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to update a service
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/updateService' 
+      responses:         
+        200:
+          description: Retrieve a updated service
+  /service/{address}/{chainId}/audit:
+    get:     
+      security:              
+        - bearerAuth: []               
+      tags:               
+        - Service        
+      summary: Audit service
+      produces:
+      - application/json
+      parameters:         
+      - in: path          
+        name: address     
+        description: address to retrieve the service
+        required: true
+      - in: path          
+        name: chainId     
+        description: chainId corresponding to the address
+        required: true
+        schema:       
+          $ref: '#/definitions/auditService' 
+      responses:         
+        200:
+          description: List of audit
+  /service/transferOwnership:
+    post:              
+      security:              
+        - bearerAuth: []      
+      tags:               
+        - Service        
+      summary: Transfer ownership
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to transfer ownership
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/transferOwnership' 
+      responses:         
+        200:
+          description: indicates success of transfer ownership
+definitions:        
+  fetchService:
+    address:
+      type: string
+    chainId:
+      type: string
+  createService:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          price:
+            type: number
+          createdDate:
+            type: number
+      isPublic:
+        type: boolean
+  updateService:
+    type: object
+    properties:
+      address:
+        type: string
+      chainId:
+        type: string
+      updates:
+        type: object
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          price:
+            type: number
+          createdDate:
+            type: number
+  auditService:
+    address:
+      type: string
+    chainId:
+      type: string
+  transferOwnership:
+    type: object
+    properties:
+      address:
+        type: string
+      chainId:
+        type: string
+      newOwner:
+        type: string

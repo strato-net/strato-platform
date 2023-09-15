@@ -98,6 +98,22 @@ export const EventType = {
   create: '/'
 }
 
+export const Service = {
+  prefix: '/service',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  update: '/update',
+}
+
+export const ProductFile = {
+  prefix: '/productFile',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  update: '/update',
+}
+
 export const Event = {
   prefix: '/event',
   getInventoryEventTypes: '/:inventoryId',
@@ -130,5 +146,24 @@ export const PaymentService = {
   stripeWebhook: '/stripe/webhook',
   stripeWebhookConnect: '/stripe/webhook/connect',
 }
+
+export const Membership = {
+  prefix: '/membership',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  purchased: '/purchased',
+  //update: '/update',
+  //transferOwnership: '/transferOwnership',
+}
+export const MembershipService = {
+  prefix: '/membershipService',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  update: '/update',
+  transferOwnership: '/transferOwnership',
+}
+
 
 

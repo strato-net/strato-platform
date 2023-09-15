@@ -19,7 +19,7 @@ import TagManager from "react-gtm-module";
 
 const CartComponent = ({ columns, data }) => {
     const navigate = useNavigate();
-    const [tax, setTax] = useState(0);
+    let [tax, setTax] = useState(0);
     const [shipping, setShipping] = useState(0);
     const [total, setTotal] = useState(0);
     const marketplaceDispatch = useMarketplaceDispatch();
@@ -32,16 +32,27 @@ const CartComponent = ({ columns, data }) => {
         let s = 0;
         let tot = 0;
         data.forEach(element => {
-            t += element.tax;
-            s += element.shippingCharges;
-            tot += element.amount;
+            t += ((parseFloat(element.tax) ));
+            s += (parseFloat(element.shippingCharges));
+            tot += element.isTaxPercentage ? parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2)) : parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2));
         });
         setTax(t);
         setShipping(s);
         setTotal(tot)
     }, [data])
+    let totalNew = 0;
+    data.forEach(element => { totalNew += (element.amount + element.tax); });
 
+    const finalTotal = ( total +tax +shipping ).toFixed(2);
+    //To future dev, amount_ is for the column amount in the table, it includes tax
+    //Why total uses amount
+    columns[8].dataIndex = "amount_";
+    
+    data.forEach(element => { 
+        element.amount_ =   !element.isTaxPercentage ? element.amount * (1 + parseFloat(element.tax)/10000) : element.amount + parseFloat(element.tax)
+    });
 
+      
     return (
         <Card className="my-4">
             <div>
@@ -79,9 +90,9 @@ const CartComponent = ({ columns, data }) => {
                             <Divider />
                             <Row className="justify-end">
                                 <p className="text-lg font-semibold w-36 mr-2">Total</p>
-                                <p className="text-lg font-semibold">-</p>
+                                <p className="text-lg font-semibold">:</p>
                                 <p className="text-lg font-semibold ml-2 w-20 text-right">
-                                    ${total + tax + shipping}
+                                    ${finalTotal}
                                 </p>
                             </Row>
                         </Col>
