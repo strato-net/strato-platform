@@ -7,7 +7,7 @@ import HFlags
 import           Data.ByteString.Internal
 import           Blockchain.Strato.Model.Util
 
-defineFlag "network" (""::String) "Choose a network to join"
+defineFlag "network" ("mercata"::String) "Choose a network to join"
 defineFlag "networkID" (-1::Integer) "set a custom network ID for the client"
 defineFlag "testnet" False "connect to testnet"
 
@@ -24,4 +24,5 @@ computeNetworkID =
     where newtorkToID :: String -> Integer
           newtorkToID network = case network of 
             "mercata-hydrogen" -> 7596898649924658542 -- mercata-hydrogen networkID was manually changed
+            "mercata" -> 6909499098523985262
             n -> bytes2Integer $ map c2w n

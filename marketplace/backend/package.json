@@ -61,6 +61,7 @@
     "is-subset": "^0.1.1",
     "jpeg-js": "^0.4.4",
     "jwt-decode": "^3.1.2",
+    "kafkajs": "^2.2.4",
     "mocha": "^10.2.0",
     "moment": "^2.29.4",
     "multer": "^1.4.5-lts.1",
@@ -68,7 +69,8 @@
     "stripe": "^11.10.0",
     "swagger-jsdoc": "^6.2.7",
     "swagger-ui-express": "^4.6.0",
-    "winston": "^3.8.2"
+    "winston": "^3.8.2",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.20.7",
