@@ -14,6 +14,7 @@ import authHandler from './api/middleware/authHandler'
 import swaggerUi from "swagger-ui-express";
 import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
+import websocket from "./websocket";
 
 if (
   !process.env.EXT_STORAGE_S3_ACCESS_KEY_ID ||
@@ -80,6 +81,7 @@ app.use(ErrorHandlers.commonErrorHandler);
 // Start the server
 const port = process.env.PORT || 3030;
 const server = app.listen(port, () => console.log(`Listening on ${port}`));
+websocket(server);
 
 app.use(
   "/docs",

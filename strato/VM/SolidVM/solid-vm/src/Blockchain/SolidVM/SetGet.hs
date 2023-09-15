@@ -95,17 +95,17 @@ findDefault = \case
   TComplex -> todo "finddefault/complex" TComplex
   Todo msg -> todo "findDefault/todo" msg
 
-toBasic :: Value -> MS.BasicValue
+toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
-  SInteger i -> MS.BInteger i
-  SString s -> MS.BString (BC.pack s)
-  SBool b -> MS.BBool b
-  SAccount a _ -> MS.BAccount a
-  SContract n a -> MS.BContract n a
-  SEnumVal k t num -> MS.BEnumVal k t num
-  SMappingSentinel -> MS.BMappingSentinel
+  SInteger i -> Just $ MS.BInteger i
+  SString s -> Just $ MS.BString (BC.pack s)
+  SBool b -> Just $ MS.BBool b
+  SAccount a _ -> Just $ MS.BAccount a
+  SContract n a -> Just $ MS.BContract n a
+  SEnumVal k t num -> Just $ MS.BEnumVal k t num
+  SMappingSentinel -> Just $ MS.BMappingSentinel
   SUserDefined  _ _  x -> toBasic x
-  x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
+  _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
@@ -166,11 +166,14 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
                             case t of   -- t is evaluated here because Haskell is lazy
                                         -- We ONLY want to evaluate it if we know src is a SString because
                                         -- in some non-SString cases getXabiValueType will throw an exception
-                                SVMType.String{} -> MS.BString . UTF8.fromString $ s 
+                                SVMType.String{} -> Just . MS.BString . UTF8.fromString $ s 
                                 _             -> toBasic src
                         _         -> toBasic src
-  markDiffForAction addr path basicSrc
-  putSolidStorageKeyVal' addr path basicSrc
+  case basicSrc of
+    Nothing -> typeError "non basic solidity type cannot be stored atomically" src
+    Just b -> do
+      markDiffForAction addr path b
+      putSolidStorageKeyVal' addr path b
 
 
 setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)

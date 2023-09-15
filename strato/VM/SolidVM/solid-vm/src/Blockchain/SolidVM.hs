@@ -44,6 +44,7 @@ import qualified Data.ByteString.UTF8                 as UTF8
 import qualified Numeric                              (readHex)
 import           Data.Char                            as CHAR
 import           Data.Either.Extra                    (eitherToMaybe)
+import           Data.Foldable                        (for_)
 import           Data.List
 import qualified Data.Map                             as M
 import qualified Data.Map.Merge.Lazy                  as M
@@ -994,8 +995,8 @@ runStatement (CC.RevertStatement mString theArgs pos) = do
             CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
             CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
           let listOfVals = case argVals of
-                OrderedVals ov -> map (\x -> toBasic x) ov
-                NamedVals nv -> map (\(_, y) -> toBasic y) nv
+                OrderedVals ov -> mapMaybe (\x -> toBasic x) ov
+                NamedVals nv -> mapMaybe (\(_, y) -> toBasic y) nv
 
           return $ customError "Reverting based on  Error Method:" name listOfVals
         Nothing -> do revertError "REVERT: to initial state" name
@@ -1006,8 +1007,8 @@ runStatement (CC.RevertStatement mString theArgs pos) = do
             CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
             CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
           let listOfVals = case argVals of
-                OrderedVals ov -> map (\x -> toBasic x) ov
-                NamedVals nv -> map (\(_, y) -> toBasic y) nv
+                OrderedVals ov -> mapMaybe (\x -> toBasic x) ov
+                NamedVals nv -> mapMaybe (\(_, y) -> toBasic y) nv
           return $ revertError "REVERT" listOfVals
 
 -- Assignment to an index into an array or mapping
@@ -1298,8 +1299,8 @@ runStatement (CC.Throw expr pos) = do
     CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< expToVar) as
     CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) ns
   let listOfVals = case argVals of
-        OrderedVals ov -> map (\x -> toBasic x) ov
-        NamedVals nv -> map (\(_, y) -> toBasic y) nv
+        OrderedVals ov -> mapMaybe (\x -> toBasic x) ov
+        NamedVals nv -> mapMaybe (\(_, y) -> toBasic y) nv
   customError "Custom user error thrown" name listOfVals
 
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
@@ -2942,7 +2943,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       SVMType.Array _ _-> return ()
       t -> do
         defVal <- createDefaultValue cc contract' t
-        markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ toBasic defVal
+        for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
       -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
   forM_ (reverse $ contract'^.CC.parents) $ \parent -> do

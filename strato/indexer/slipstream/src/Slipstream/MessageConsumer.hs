@@ -11,50 +11,55 @@ module Slipstream.MessageConsumer (
   getAndProcessMessages
   ) where
 
-import Prelude hiding (lookup)
-import Control.Monad.Change.Alter
-import Control.Monad.Change.Modify
-import Control.Monad.IO.Unlift
-import Data.IORef
-import Data.String
+import           Prelude hiding (lookup)
+import           Control.Monad.Change.Alter
+import           Control.Monad.Change.Modify
+import           Control.Monad.IO.Unlift
+import qualified Data.Aeson                  as JSON
+import qualified Data.ByteString.Lazy        as BL
+import           Data.IORef
+import           Data.String
 import qualified Data.Text as T
-import Database.PostgreSQL.Typed
-import qualified Network.Kafka.Protocol as K hiding (Message)
+import           Database.PostgreSQL.Typed
+import qualified Network.Kafka               as K
+import qualified Network.Kafka.Protocol      as KPrtcl hiding (Message)
+import qualified Network.Kafka.Producer      as KProd
 
-import Bloc.Monad (BlocEnv)
-import BlockApps.Logging
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.ChainInfo
-import Blockchain.DB.CodeDB
-import Blockchain.MilenaTools
-import Blockchain.Stream.VMEvent
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.ExtendedWord
+import           Bloc.Monad (BlocEnv)
+import           BlockApps.Logging
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.ChainInfo
+import           Blockchain.DB.CodeDB
+import           Blockchain.MilenaTools
+import           Blockchain.Stream.VMEvent
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.ExtendedWord
 
-import Control.Monad.Composable.Kafka
-import Control.Monad.Composable.SQL
+import           Control.Monad.Composable.Kafka
+import           Control.Monad.Composable.SQL
 
-import Slipstream.Globals
-import Slipstream.Metrics
-import Slipstream.Processor
-import SolidVM.Model.CodeCollection
+import           Slipstream.Data.Action     (AggregateEvent)
+import           Slipstream.Globals
+import           Slipstream.Metrics
+import           Slipstream.Processor
+import           SolidVM.Model.CodeCollection
 
-lookupTopic :: K.TopicName
+lookupTopic :: KPrtcl.TopicName
 lookupTopic = fromString "statediff"
 
-lookupPartition :: K.Partition
-lookupPartition = K.Partition 0
+lookupPartition :: KPrtcl.Partition
+lookupPartition = KPrtcl.Partition 0
 
-lookupGroup :: K.ConsumerGroup
+lookupGroup :: KPrtcl.ConsumerGroup
 lookupGroup = "slipstream"
 
 getStatediffOffset :: (MonadIO m, MonadLogger m, HasKafka m) =>
-                      m K.Offset
+                      m KPrtcl.Offset
 getStatediffOffset = do
   resp <- execKafka $ fetchSingleOffset lookupGroup lookupTopic lookupPartition
   $logDebugLS "getStateDiffOffset/resp" resp
   case resp of
-    Left K.UnknownTopicOrPartition -> do
+    Left KPrtcl.UnknownTopicOrPartition -> do
       $logInfoS "getStatediffOffset" "No offset found, creating one from 0"
       putStatediffOffset 0 >> getStatediffOffset
     Left err -> do
@@ -63,7 +68,7 @@ getStatediffOffset = do
     Right (off, _) -> return off
 
 putStatediffOffset :: (MonadIO m, MonadLogger m, HasKafka m) =>
-                      K.Offset -> m ()
+                      KPrtcl.Offset -> m ()
 putStatediffOffset off = do
     $logInfoLS "putStateDiffOffset/req" off
     resp <- execKafka $ commitSingleOffset lookupGroup lookupTopic lookupPartition off ""
@@ -87,6 +92,7 @@ getAndProcessMessages :: ( MonadLogger m
                       => BlocEnv -> PGConnection -> m ()
 getAndProcessMessages env conn = do
   let errorCount = 0
+  _ <- execKafka assertTopicCreation
   offset <- getStatediffOffset
   getAndProcessMessages' env conn offset errorCount
 
@@ -100,7 +106,7 @@ getAndProcessMessages' :: ( MonadLogger m
                           , Selectable Word256 ParentChainIds m
                           , HasCodeDB m
                           )
-                       => BlocEnv -> PGConnection -> K.Offset -> Int -> m ()
+                       => BlocEnv -> PGConnection -> KPrtcl.Offset -> Int -> m ()
 getAndProcessMessages' env conn offset errorCounter = do
   $logInfoS "getAndProcessMessages'" $ T.pack $ "#### fetching VMEvents: Offset=" ++ show offset
   recordOffset offset
@@ -108,7 +114,8 @@ getAndProcessMessages' env conn offset errorCounter = do
   recordKafkaMessages messages
   cache <- access (Proxy @(IORef Globals))
   forceGlobalEval cache
-  processTheMessages env conn messages
+  emittedEvents <- processTheMessages env conn messages
+  _ <- execKafka $ produceSolidVmEvents emittedEvents
   let newOffset = offset + fromIntegral (length messages)
   currentOffset <- getStatediffOffset
   offset' <- if currentOffset /= offset
@@ -121,3 +128,14 @@ getAndProcessMessages' env conn offset errorCounter = do
                return newOffset
 
   getAndProcessMessages' env conn offset' errorCounter
+
+------ solidvmevents indexer code here ------
+solidVmEventsTopicName :: KPrtcl.TopicName 
+solidVmEventsTopicName = fromString "solidvmevents"
+
+assertTopicCreation :: K.Kafka k => k ()
+assertTopicCreation = K.updateMetadata solidVmEventsTopicName
+
+produceSolidVmEvents :: K.Kafka k => [AggregateEvent] -> k [KPrtcl.ProduceResponse]
+produceSolidVmEvents es = KProd.produceMessagesAsSingletonSets $
+      K.TopicAndMessage solidVmEventsTopicName . KProd.makeMessage . BL.toStrict . JSON.encode <$> es

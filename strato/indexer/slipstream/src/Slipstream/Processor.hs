@@ -27,7 +27,7 @@ module Slipstream.Processor
 import Prelude hiding (lookup)
 import qualified Data.Aeson                           as Aeson
 import Control.Arrow ((&&&))
-import Control.Lens ((^.), (.~), (?~))
+import Control.Lens ((^.), (.~), (?~), at)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Except
@@ -36,7 +36,7 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
-import Data.Foldable (for_, toList)
+import Data.Foldable (fold, for_, toList)
 import Data.Function
 import Data.IORef
 import qualified Data.Set as S
@@ -94,6 +94,7 @@ import Slipstream.QueryFormatHelper
 
 import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
+import qualified SolidVM.Model.CodeCollection as CC (contractName)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
@@ -112,21 +113,30 @@ instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
 instance (MonadUnliftIO m, Mod.Accessible (IORef Globals) m) => Selectable Account CodeCollection (SQLM m) where
-  select _ a = do
+  select _ acct = do
     g <- lift $ Mod.access (Mod.Proxy @(IORef Globals))
-    mASR <- fmap listToMaybe
-          . Account.getAccount'
-          $ Account.accountsFilterParams
-          & Account.qaAddress ?~ (a ^. accountAddress)
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
-    let codePtr = fromMaybe (EVMCode emptyHash) $ (\(AddressStateRef' r _) -> addressStateRefCodePtr r) =<< mASR
-    unsafeResolveCodePtr codePtr >>= \case
-      Just (SolidVMCode _ ch) -> getCCFromGlobals g ch >>= \case
-        Just cc -> pure $ Just cc
-        Nothing -> do
-          mCC <- either (const Nothing) Just <$> getCodeCollectionByCodePtr codePtr
-          for_ mCC $ putCCIntoGlobals g ch
-          pure mCC
+    let getCCForAccount a = do
+          mASR <- fmap listToMaybe
+                . Account.getAccount'
+                $ Account.accountsFilterParams
+                & Account.qaAddress ?~ (a ^. accountAddress)
+                & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+          let codePtr = fromMaybe (EVMCode emptyHash) $
+                (\(AddressStateRef' r _) -> addressStateRefCodePtr r) =<< mASR
+              getContract n cc = (,cc) <$> Map.lookup n (cc ^. contracts)
+          unsafeResolveCodePtr codePtr >>= \case
+            Just (SolidVMCode n ch) -> getCCFromGlobals g ch >>= \case
+              Just cc -> pure $ getContract n cc
+              Nothing -> do
+                mCC <- either (const Nothing) Just <$> getCodeCollectionByCodePtr codePtr
+                for_ mCC $ putCCIntoGlobals g ch
+                pure $ mCC >>= getContract n
+            _ -> pure Nothing
+    getCCForAccount acct >>= \case
+      mCC@(Just _) -> do
+        ds <- getDelegates g acct
+        (c, cc) <- fold . catMaybes . (mCC:) <$> traverse getCCForAccount ds
+        pure . Just $ (contracts . at (c ^. CC.contractName) ?~ c) cc
       _ -> pure Nothing
 
 instance Monad m => Selectable Word256 ParentChainIds (SQLM m) where
@@ -407,7 +417,7 @@ processTheMessages :: ( MonadLogger m
                       , HasCodeDB m
                       , Mod.Accessible (IORef Globals) m
                       )
-                   => BlocEnv -> PGConnection -> [VMEvent] -> m ()
+                   => BlocEnv -> PGConnection -> [VMEvent] -> m [AggregateEvent]
 processTheMessages env conn messages = do
   g <- Mod.access (Mod.Proxy @(IORef Globals))
 
@@ -483,22 +493,31 @@ processTheMessages env conn messages = do
         pure $ Left cc -- Either String String
 
   dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
-    $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
-    mStorageContract <- select (Proxy @Contract) s
-    mCodeContract <- select (Proxy @Contract) c'
-    deferredForeignKeys <- case (,) <$> mStorageContract <*> mCodeContract of
-      Nothing -> pure []
-      Just (sc, cc) -> do
-        let c = cc{_contractName = _contractName sc}
-            mapNames = getMapNamesFromContract c
-        nameParts <- resolveNameParts o a c
-        forM_ mapNames $ outputData conn . createMappingTable g nameParts
-        deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
-        outputData' conn $ createExpandHistoryTable g c nameParts
-        outputData conn $ createExpandEventTables g c nameParts
-        pure deferredForeignKeys
-    forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
-    pure $ Right deferredForeignKeys
+    dels <- getDelegates g s
+    $logInfoS "processTheMessages" $ "Got delegates for " <> T.pack (format s) <> ": " <> T.pack (show dels)
+    if c' `elem` dels
+      then do
+        $logInfoS "processTheMessages" $ T.pack (format c') <> " was already seen as a delegate of " <> T.pack (format s)
+        pure $ Right []
+      else do
+        $logInfoS "processTheMessages" $ T.pack (format c') <> " was not a delegate of " <> T.pack (format s)
+        $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
+        mStorageContract <- select (Proxy @Contract) s
+        mCodeContract <- select (Proxy @Contract) c'
+        deferredForeignKeys <- case (,) <$> mStorageContract <*> mCodeContract of
+          Nothing -> pure []
+          Just (sc, cc) -> do
+            let c = cc{_contractName = _contractName sc}
+                mapNames = getMapNamesFromContract c
+            nameParts <- resolveNameParts o a c
+            forM_ mapNames $ outputData conn . createMappingTable g nameParts
+            deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+            outputData' conn $ createExpandHistoryTable g c nameParts
+            outputData conn $ createExpandEventTables g c nameParts
+            pure deferredForeignKeys
+        forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
+        addDelegate g s c'
+        pure $ Right deferredForeignKeys
 
   let fkeys = rights $ fkeys' ++ dfkeys'
 
@@ -581,6 +600,8 @@ processTheMessages env conn messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
+
+  return events'
 
 extractTextInsideQuotes :: T.Text -> T.Text
 extractTextInsideQuotes input =

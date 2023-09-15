@@ -52,4 +52,12 @@ getParams "mercata-hydrogen" = return $ Just -- to make network id: mercata-hydr
       identity = blockAppsIdentity
     }
   ]
+getParams "mercata" = return $ Just -- to make network id: mercata-hydrogen -> ascii to hex -> convert # to base10
+  [
+    NetworkParams {
+      ethAddress = Address 0x100, -- not important
+      webAddress = "44.209.149.47", -- prod node 1
+      identity = blockAppsIdentity
+    }
+  ]
 getParams _ = return Nothing
