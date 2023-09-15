@@ -115,7 +115,6 @@ const Membership = (user) => {
     navigate(routes.OnboardingSellerToStripe.url);
   };
 
-
   // useEffect(() => {
   //   if (isSearch) {
   //     setOffset(0);
@@ -278,10 +277,9 @@ const Membership = (user) => {
                   margin: "10px",
                 }}
                 className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                onClick={() => navigate("/memberships/services")}
               >
-                <Link to={'/memberships/services'}>
                 Services Usage
-                </Link>
               </Button>
               <Button
                 id="add-product-button"

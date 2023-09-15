@@ -1102,6 +1102,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
 
           return {
+            itemAddress: item.address,
             itemNumber: item.itemNumber,
             productId: item.productId,
             fileLocation: null,//productFiles[0].fileLocation,
