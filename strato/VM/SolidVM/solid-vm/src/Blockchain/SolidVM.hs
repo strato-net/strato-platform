@@ -2770,6 +2770,9 @@ callBuiltin "parseCert" [SString cert] _ = do
   return $ certificateMap (Just cert) curContract
 
 callBuiltin "create" args@[SString contractName', SString contractSrc, SString argString] _ = do
+  (_, parentCC) <- getCurrentCodeCollection
+  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
+  when (not pragmaCheck) $ unknownFunction "Unable to use the create built-in function without using pragma builtin-creates" args
   when (contractName' == "" || contractSrc == "") 
     $ invalidArguments "The contract name and src arguments for the create function should not be empty" args
   creator <- getCurrentAccount
@@ -2784,6 +2787,9 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
     $ erNewContractAccount execResults
   
 callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SString argString] _ = do
+  (_, parentCC) <- getCurrentCodeCollection
+  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
+  when (not pragmaCheck) $ unknownFunction "Unable to use the create2 built-in function without using pragma builtin-creates" args
   when (contractName' == "" || contractSrc == "") 
     $ invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
   creator <- getCurrentAccount
