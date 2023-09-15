@@ -138,7 +138,7 @@ const ServiceTable = () => {
     // handling 3 functionality (i.e, edit, update & cancel) using its type
     setIsEdit(bool);
     const data = tableData.filter((item, index) => {
-      if (item.key === key) {
+      if (index === key) {
         item['editable'] = bool;
         return item;
       } else if (type === 'edit') {
@@ -161,8 +161,10 @@ const ServiceTable = () => {
   }
 
   const handleInputChange = (value, field, key) => {
+    console.log("key--------->", key);
     let data = tableData.filter((item, index) => {
-      if (item.key === key) {
+      console.log("index----------------->", index, "itemmmmmmmmmmmmm", item);
+      if (index === key) {
         item[field] = value ? value : ""
         return item;
       } return item;
@@ -201,7 +203,7 @@ const ServiceTable = () => {
   };
 
   const handleDelete = (key) => {
-    let data = tableData.filter(item => item.key !== key)
+    let data = tableData.filter((item, index) => index !== key)
     setTableData(data)
   }
 
@@ -230,7 +232,7 @@ const ServiceTable = () => {
       title: "User",
       dataIndex: "user",
       key: "user",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable && !isEdit ? (
             <Select
@@ -245,7 +247,7 @@ const ServiceTable = () => {
               disabled={activeTab === "booked"}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(value, "providerLastUpdated", record.key)
+                handleInputChange(value, "providerLastUpdated", index)
               }
               options={userList}
             />
@@ -266,7 +268,7 @@ const ServiceTable = () => {
       title: "Provider",
       dataIndex: "itemId",
       key: "itemId",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable && !isEdit ? (
             <Select
@@ -281,7 +283,7 @@ const ServiceTable = () => {
               disabled={activeTab === "provided"}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(value.toString(), "itemId", record.key)
+                handleInputChange(value.toString(), "itemId", index)
               }
               options={providerList}
             />
@@ -302,7 +304,7 @@ const ServiceTable = () => {
       title: "Membership ID",
       dataIndex: "membershipId",
       key: "membershipId",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable && !isEdit ? (
             <Select
@@ -310,7 +312,7 @@ const ServiceTable = () => {
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(value, "membershipId", record.key)
+                handleInputChange(value, "membershipId", index)
               }
               options={[
                 { value: "AB1", label: "AB1" },
@@ -327,7 +329,7 @@ const ServiceTable = () => {
       title: "Service",
       dataIndex: "serviceId",
       key: "serviceId",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable && !isEdit ? (
             <Select
@@ -335,7 +337,7 @@ const ServiceTable = () => {
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(value, "serviceId", record.key)
+                handleInputChange(value, "serviceId", index)
               }
               options={serviceList}
             />
@@ -354,7 +356,7 @@ const ServiceTable = () => {
       title: "Summary",
       dataIndex: "summary",
       key: "summary",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable ? (
             <Input
@@ -362,7 +364,7 @@ const ServiceTable = () => {
               suffix={<EditOutlined />}
               placeholder="Summary"
               onChange={(e) =>
-                handleInputChange(e.target.value, "summary", record.key)
+                handleInputChange(e.target.value, "summary", index)
               }
             />
           ) : (
@@ -375,13 +377,13 @@ const ServiceTable = () => {
       title: "Date",
       dataIndex: "serviceDate",
       key: "serviceDate",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable && !isEdit ? (
             <DatePicker
               // value={text ? moment(text, 'YYYY-MM-DD') : null}
               onChange={(serviceDate, dateString) =>
-                handleInputChange(new Date(serviceDate).getTime().toString(), 'serviceDate', record.key)
+                handleInputChange(new Date(serviceDate).getTime().toString(), 'serviceDate', index)
               }
             />
           ) : (
@@ -394,7 +396,7 @@ const ServiceTable = () => {
       title: "Comments",
       dataIndex: "providerComment",
       key: "providerComment",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable ? (
             <Input
@@ -402,7 +404,7 @@ const ServiceTable = () => {
               suffix={<EditOutlined />}
               placeholder="Comments"
               onChange={(e) =>
-                handleInputChange(e.target.value, "providerComment", record.key)
+                handleInputChange(e.target.value, "providerComment", index)
               }
             />
           ) : (
@@ -415,7 +417,7 @@ const ServiceTable = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable ? (
             <Select
@@ -425,7 +427,7 @@ const ServiceTable = () => {
               // disabled={activeTab === "provided"}
               style={{ minWidth: "100px" }}
               onChange={(value) =>
-                handleInputChange(value, "status", record.key)
+                handleInputChange(value, "status", index)
               }
               options={statusOptions}
             />
@@ -444,7 +446,7 @@ const ServiceTable = () => {
       title: "Price Paid",
       dataIndex: "pricePaid",
       key: "pricePaid",
-      render: (text, record) => (
+      render: (text, record, index) => (
         <span>
           {record.editable && !isEdit ? (
             <InputNumber
@@ -455,7 +457,7 @@ const ServiceTable = () => {
               controls={false}
               value={parseInt(text)}
               placeholder="Price Paid"
-              onChange={(value) => handleInputChange(value.toString(), "pricePaid", record.key)}
+              onChange={(value) => handleInputChange(value.toString(), "pricePaid", index)}
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>{text}</Typography>
@@ -467,7 +469,7 @@ const ServiceTable = () => {
       title: "",
       dataIndex: "actions",
       key: "actions",
-      render: (_, record) => (
+      render: (_, record, index) => (
         <Space size="middle">
           {record.editable ? (
             <>
@@ -475,13 +477,13 @@ const ServiceTable = () => {
                 type="primary"
                 icon={<CheckOutlined />}
                 disabled={!handleValidation(record)}
-                onClick={() => handleEditCancel(record.key, false, "update")}
+                onClick={() => handleEditCancel(index, false, "update")}
               />
               {isEdit && (
                 <Button
                   type="default"
                   icon={<CloseOutlined />}
-                  onClick={() => handleEditCancel(record.key, false, "cancel")}
+                  onClick={() => handleEditCancel(index, false, "cancel")}
                 />
               )}
             </>
@@ -490,10 +492,10 @@ const ServiceTable = () => {
               type="primary"
               icon={<EditOutlined />}
               disabled={!handleValidation(record) || validationError}
-              onClick={() => handleEditCancel(record.key, true, "edit")}
+              onClick={() => handleEditCancel(index, true, "edit")}
             />
           )}
-          {record.editable && !isEdit && <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(record.key)} />}
+          {record.editable && !isEdit && <Button type="danger" icon={<DeleteOutlined />} onClick={() => handleDelete(index)} />}
         </Space>
       ),
     },
@@ -578,7 +580,7 @@ const ServiceTable = () => {
             <Table
               columns={columns}
               dataSource={tableData}
-              pagination={true}
+              pagination={false}
               rowKey="key"
             />
           </Col>
