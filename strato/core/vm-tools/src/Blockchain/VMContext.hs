@@ -138,6 +138,7 @@ import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 import           Blockchain.Strato.StateDiff        (StateDiff)
 import           Blockchain.Data.RLP
+import           Blockchain.Stream.VMEvent
 import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VM.SolidException
 import           Blockchain.VMOptions
@@ -225,7 +226,10 @@ instance Default ContextState where
     , _debugSettings     = Nothing
     }
 
-data QueueEvent = TXR TransactionResult | SD StateDiff | Flush
+data QueueEvent = TXR TransactionResult
+                | SD StateDiff
+                | VME [VMEvent]
+                | Flush
 
 data Context = Context
   { _dbs            :: ContextDBs
