@@ -71,7 +71,7 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchAllServicesUsage });
 
     try {
-      const response = await fetch(`${apiUrl}/serviceUsage?limit=${limit}&offset=${offset}`, {
+      const response = await fetch(`${apiUrl}/serviceUsage?limit=${limit}&offset=${offset}&${query}`, {
         method: HTTP_METHODS.GET
       });
 

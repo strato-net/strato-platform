@@ -83,12 +83,10 @@ const ServiceTable = () => {
   })
 
 
-  useEffect(() => {
-    setServiceList(serviceListData)
-    setProviderList(providerData)
-    setTableData(serviceUsageState?.servicesUsage)
-    setUserList(userListData)
-  }, [servicesState, membership, serviceUsageState, userCert])
+  useEffect(() => { setServiceList(serviceListData) }, [servicesState])
+  useEffect(() => { setProviderList(providerData) }, [membership])
+  useEffect(() => { setTableData(serviceUsageState?.servicesUsage) }, [serviceUsageState])
+  useEffect(() => { setUserList(userListData) }, [userCert])
 
 
   const [isEdit, setIsEdit] = useState(false);
@@ -241,7 +239,19 @@ const ServiceTable = () => {
   const handleFilter = (value, key) => {
     let data = { ...filterQuery }
     data[key] = value;
-    setFilterQuery(data)
+    setFilterQuery(data);
+    let data1 = {}
+    data1['status'] = data['status'];
+    data1['itemId'] = data['Provider']
+    let query1 = '';
+    if (data1['status']) {
+      query1 = `status=${data1['status']}`
+    }
+    if (data1['itemId']) {
+      query1 = `&itemId=${data1['itemId']}`
+    }
+    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, 30, offset, query1)
+
   }
 
   const columns = [
