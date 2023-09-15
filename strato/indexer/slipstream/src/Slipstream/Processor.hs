@@ -407,7 +407,7 @@ processTheMessages :: ( MonadLogger m
                       , HasCodeDB m
                       , Mod.Accessible (IORef Globals) m
                       )
-                   => BlocEnv -> PGConnection -> [VMEvent] -> m ()
+                   => BlocEnv -> PGConnection -> [VMEvent] -> m [AggregateEvent]
 processTheMessages env conn messages = do
   g <- Mod.access (Mod.Proxy @(IORef Globals))
 
@@ -581,6 +581,8 @@ processTheMessages env conn messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
+
+  return events'
 
 extractTextInsideQuotes :: T.Text -> T.Text
 extractTextInsideQuotes input =
