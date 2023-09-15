@@ -20,6 +20,8 @@ module Slipstream.Globals
     putCCIntoGlobals,
     forceGlobalEval,
     newGlobals,
+    getDelegates,
+    addDelegate,
     module Slipstream.Data.Globals
   ) where
 
@@ -50,8 +52,12 @@ import           Slipstream.Metrics
 import           Slipstream.QueryFormatHelper
 import           SolidVM.Model.CodeCollection
 
+{-# INLINE lru #-}
+lru :: Ord k => LRU.LRU k v
+lru = LRU.newLRU (Just 1024)
+
 newGlobals :: MonadIO m => Handle -> CirrusHandle -> m (IORef Globals)
-newGlobals h ch = newIORef $ Globals M.empty (LRU.newLRU (Just 1024)) (LRU.newLRU (Just 1024)) h ch
+newGlobals h ch = newIORef $ Globals M.empty lru lru lru h ch
 
 updateGlobals :: MonadIO m => IORef Globals -> Globals -> m ()
 updateGlobals gref g = do
@@ -177,6 +183,30 @@ putCCIntoGlobals :: MonadIO m => IORef Globals -> Keccak256 -> CodeCollection ->
 putCCIntoGlobals gref codeHash cc = do
   globals@Globals{..} <- readIORef gref
   updateGlobals gref globals{ccMap = LRU.insert codeHash cc ccMap}
+
+getDelegates :: MonadIO m => IORef Globals -> Account -> m [Account]
+getDelegates globalsIORef acct = do
+  g@Globals{..} <- readIORef globalsIORef
+  case LRU.lookup acct delegateMap of
+    (newCache, Just jv) -> do
+      recordCacheHit
+      writeIORef globalsIORef g{ delegateMap = newCache }
+      return $ reverse jv
+    (newCache, Nothing) -> do
+      recordCacheMiss
+      writeIORef globalsIORef g{ delegateMap = newCache }
+      return []
+
+addDelegate :: MonadIO m => IORef Globals -> Account -> Account -> m ()
+addDelegate gref acct delegate = do
+  g@Globals{..} <- readIORef gref
+  case LRU.lookup acct delegateMap of
+    (newCache, Just jv) -> do
+      recordCacheHit
+      writeIORef gref g{ delegateMap = LRU.insert acct (delegate:jv) newCache }
+    (newCache, Nothing) -> do
+      recordCacheMiss
+      writeIORef gref g{ delegateMap = LRU.insert acct [delegate] newCache }
 
 forceGlobalEval :: (MonadIO m) => IORef Globals -> m ()
 forceGlobalEval gref = liftIO $ modifyIORef' gref force

@@ -40,6 +40,7 @@ data CirrusHandle = CirrusHandle {cirrusConn :: PGConnection, queriedMaps ::S.Se
 data Globals = Globals { createdTables :: M.Map TableName TableColumns
                        , contractStates :: LRU Account [(T.Text, Value)]
                        , ccMap :: LRU Keccak256 CodeCollection
+                       , delegateMap :: LRU Account [Account]
                        , coldStorageHandle :: Handle
                        , cirrusHandle :: CirrusHandle
                        } deriving (Generic, NFData)

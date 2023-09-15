@@ -2774,6 +2774,12 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
     $ invalidArguments "The contract name and src arguments for the create function should not be empty" args
   creator <- getCurrentAccount
   (_, parentCC) <- getCurrentCodeCollection
+  -- Because of the current testnet stateroot problem with contracts using an older version of
+  -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
+  -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
+  -- will still work but will have incorrect codeptrs. 
+  -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
+  -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
@@ -2795,7 +2801,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
   -- will still work but will have incorrect codeptrs. 
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
-  -- testnet won't exist anymore and the stateroot mismatches will be corrected.
+  -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   let constructorArgs = case runParser parseArgs initialParserState "" argString of

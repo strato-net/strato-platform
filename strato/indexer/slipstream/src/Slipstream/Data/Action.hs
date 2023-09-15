@@ -15,6 +15,7 @@
 module Slipstream.Data.Action where
 
 import           Control.DeepSeq
+import           Data.Aeson
 import           Data.Map.Strict         (Map)
 import qualified Data.Map.Strict         as M
 import           Data.Maybe              (fromMaybe,listToMaybe)
@@ -53,7 +54,7 @@ data AggregateEvent = AggregateEvent
   , eventTxHash         :: Keccak256
   , eventTxSender       :: Account
   , eventEvent          :: Event
-  } deriving (Show, Generic, NFData)
+  } deriving (Show, Generic, NFData, ToJSON, FromJSON)
 
 
 flatten :: Action -> [AggregateAction]
