@@ -147,12 +147,6 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
   const queryOptionsArray = Array.isArray(_queryOptionsArray) ? _queryOptionsArray : [_queryOptionsArray]
   const queryOptions = queryOptionsArray.reduce((agg, cur) => {
     const { key, value, predicate = 'eq' } = cur
-    if (key === 'order') {
-      return {
-        ...agg,
-        order: value,
-      }
-    }
     if (!value && typeof value != 'boolean') {
       return agg
     }
@@ -229,7 +223,6 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       const { notEqualsField, notEqualsValue } = args
       result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
     }
-    
 
     if (key === 'sort') {
       result.push(args[key])

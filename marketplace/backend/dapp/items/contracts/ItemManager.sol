@@ -184,7 +184,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     ) public returns (address, address) {
         Item_3 item = Item_3(_itemAddress[0]);
         Product_3 product;
-        Inventory_2 inventory;
+        Inventory inventory;
 
         Product_3 oldProduct = Product_3(item.productId());
         address productAddress = _productManager.checkForProduct(
@@ -211,7 +211,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             )
             : Product_3(productAddress);
 
-        Inventory_2 oldInventory = Inventory_2(item.inventoryId());
+        Inventory oldInventory = Inventory(item.inventoryId());
 
         (uint status, address inventory) = product.addInventory(
             _itemAddress.length,
@@ -219,9 +219,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             oldInventory.batchId(),
             InventoryStatus.UNPUBLISHED,
             block.timestamp,
-            _newOwner,
-            oldInventory.taxPercentageAmount(),
-            oldInventory.taxDollarAmount() 
+            _newOwner
         );
 
         for (uint i = 0; i < _itemAddress.length; i++) {

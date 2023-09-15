@@ -11,8 +11,6 @@ import item from './Item'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
 import eventType from './EventType'
-import service from './Service'
-import productFile from './ProductFile'
 import event from './Event'
 import authentication from './authentication'
 import users from './users'
@@ -20,8 +18,6 @@ import image from './Image'
 import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import orderLine from "./OrderLine"
-import membership from "./Membership"
-import membershipService from "./MembershipService"
 
 import {
   Authentication,
@@ -34,15 +30,11 @@ import {
   Order,
   OrderLineItem,
   EventType,
-  Service,
-  ProductFile,
   Event,
   Image,
   Marketplace,
   OrderLine,
   PaymentService,
-  Membership,
-  MembershipService
 } from './endpoints'
 
 
@@ -58,15 +50,11 @@ router.use(Item.prefix, item)
 router.use(Order.prefix, order)
 router.use(OrderLineItem.prefix, orderLineItem)
 router.use(EventType.prefix, eventType)
-router.use(Service.prefix, service)
-router.use(ProductFile.prefix, productFile)
 router.use(Event.prefix, event)
 router.use(Image.prefix, image)
 router.use(Marketplace.prefix, marketplace)
 router.use(OrderLine.prefix, orderLine)
 router.use(PaymentService.prefix, paymentService)
-router.use(Membership.prefix, membership)
-router.use(MembershipService.prefix, membershipService)
 
 
 router.get(`/health`, (req, res) => {

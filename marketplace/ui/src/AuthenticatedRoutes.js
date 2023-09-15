@@ -21,15 +21,12 @@ import { EventTypesProvider } from "./contexts/eventType";
 import Event from "./components/Event";
 import EventDetails from "./components/Event/EventDetails";
 import { EventsProvider } from "./contexts/event";
-import { MembershipsProvider } from "./contexts/membership";
-import { ServicesProvider } from "./contexts/service";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
 import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
 import ProductDetails from "./components/MarketPlace/ProductDetail";
-import MembershipDetails from "./components/MarketPlace/MembershipDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
 import EventSerialNumberList from "./components/Event/EventSerialNumberList";
@@ -39,7 +36,6 @@ import { CertifiersProvider } from "./contexts/certifier";
 import { StorageProvider } from "./contexts/storage";
 import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
-import Membership from "./components/Membership";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -58,7 +54,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
       <Route
         exact
         path={routes.LoginRedirect.url}
-        element={<LoginRedirect />}
+        element={
+          <LoginRedirect/>
+        }
       />
       <Route
         exact
@@ -148,17 +146,15 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
-                    <InventoriesProvider>
-                      <ItemsProvider>
-                        <ProductDetails user={user} users={users} />
-                      </ItemsProvider>
-                    </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
+              <CategorysProvider>
+                <SubCategorysProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <ProductDetails user={user} users={users} />
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </SubCategorysProvider>
+              </CategorysProvider>
             </EventsProvider>
           </UsersProvider>
         }
@@ -172,27 +168,6 @@ const AuthenticatedRoutes = ({ user, users }) => {
               <SubCategorysProvider>
                 <ProductsProvider>
                   <Product user={user} users={users} />
-                </ProductsProvider>
-              </SubCategorysProvider>
-            </CategorysProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.Memberships.url}
-        element={
-          <UsersProvider>
-            <CategorysProvider>
-              <SubCategorysProvider>
-                <ProductsProvider>
-                  <InventoriesProvider>
-                    <ServicesProvider>
-                      <MembershipsProvider>
-                          <Membership user={user} users={users}/>
-                      </MembershipsProvider>  
-                    </ServicesProvider>  
-                  </InventoriesProvider>              
                 </ProductsProvider>
               </SubCategorysProvider>
             </CategorysProvider>
@@ -226,44 +201,19 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
-        path={routes.MembershipDetail.url}
-        element={
-          <UsersProvider>
-            <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
-                    <InventoriesProvider>
-                      <ProductsProvider>
-                        <ItemsProvider>
-                          <MembershipDetails user={user} users={users} />
-                        </ItemsProvider>
-                      </ProductsProvider>
-                    </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
-            </EventsProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
         path={routes.InventoryDetail.url}
         element={
           <UsersProvider>
             <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
-                    <InventoriesProvider>
-                      <ItemsProvider>
-                        <ProductDetails user={user} users={users} />
-                      </ItemsProvider>
-                    </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
+              <CategorysProvider>
+                <SubCategorysProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <ProductDetails user={user} users={users} />
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </SubCategorysProvider>
+              </CategorysProvider>
             </EventsProvider>
           </UsersProvider>
         }

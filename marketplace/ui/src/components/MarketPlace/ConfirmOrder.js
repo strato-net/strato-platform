@@ -38,7 +38,10 @@ import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
 
+
 const { TextArea } = Input;
+
+
 
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
@@ -74,6 +77,8 @@ const ShippingDetailsSchema = () => {
     }),
   });
 };
+
+
 
 const ConfirmOrder = () => {
   const { Text } = Typography;
@@ -119,17 +124,17 @@ const ConfirmOrder = () => {
     setData(cartData);
     let t = 0;
     confirmOrderList.forEach((item) => {
-      t += parseFloat(item.tax);
+      t += item.tax;
     });
     setTax(t);
     let s = 0;
     confirmOrderList.forEach((item) => {
-      s += parseFloat(item.shippingCharges);
+      s += item.shippingCharges;
     });
     setShipping(s);
     let sum = 0;
     confirmOrderList.forEach((item) => {
-      sum += parseFloat(item.amount);
+      sum += item.amount;
     });
     setTotal(sum);
   }, [marketplaceDispatch, confirmOrderList, storedData]);
@@ -240,6 +245,8 @@ const ConfirmOrder = () => {
     }
   };
 
+
+
   const columns = [
     {
       title: <Text className="text-primaryC text-[13px]"></Text>,
@@ -312,58 +319,12 @@ const ConfirmOrder = () => {
     },
   ];
 
+  
+
   const navigate = useNavigate();
-  
+
+
   const handleOrderConfirm = async () => {
-    let concatenatedOrderString = "";
-    let firstSellerOrg;
-    for (let i = 0; i < confirmOrderList.length; i++) {
-      if (i === 0) {
-        firstSellerOrg = confirmOrderList[i].sellerOrganization;
-      }
-      let orderItem = confirmOrderList[i];
-      let itemName = orderItem.item.name;
-      let itemPrice = orderItem.unitPrice;
-      let itemQty = orderItem.qty;
-      concatenatedOrderString += `\u2022 ${itemName}: ${itemPrice} x ${itemQty} <br>`;
-      if (i === (confirmOrderList.length - 1)) {
-        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `\u2022 Sales Tax: $${tax}.00 <br>`;
-        concatenatedOrderString += `\u2022 Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${total}.00 <br>`;
-      }
-    }
-
-    let selectedShippingAddr = userAddresses[selectedAddress];
-    let shippingName = selectedShippingAddr.shippingName.replace(/%20/g, ' ');
-    let shippingAddrLine1 = selectedShippingAddr.shippingAddressLine1.replace(/%20/g, ' ');
-    let shippingAddrLine2 = selectedShippingAddr.shippingAddressLine2.replace(/%20/g, ' ');
-    let shippingCity = selectedShippingAddr.shippingCity.replace(/%20/g, ' ');
-    let shippingState = selectedShippingAddr.shippingState.replace(/%20/g, ' ');
-    let shippingZipcode = selectedShippingAddr.shippingZipcode.replace(/%20/g, ' ');
-    let shippingAddr = `<strong>Ship to:</strong> <br> ${shippingName} <br> ${shippingAddrLine1} <br> ${shippingAddrLine2} <br> ${shippingCity}, ${shippingState} ${shippingZipcode} <br>`;
-    let customerFirstName = user.commonName.split(' ')[0];
-
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; margin-top: 20px; padding: 20px; background-color: #ffffff; border-radius: 10px; border: 1px solid #0A1B71; max-width: 600px; margin-left: 20px; margin-right: 0;">
-        <h2>Hi, <strong>${customerFirstName}</strong></h2>
-        <p>You just successfully placed an order on the BlockApps Marketplace for:</p>
-        <ul style="list-style-type: none; max-width: 90%; margin: auto;">${concatenatedOrderString}</ul>
-        <p>Thank you for shopping with us...</p>
-        <p style="text-align: left;">${shippingAddr}</p>
-        <p style="text-align: left;">Yours,</p>
-        <div style="display: flex; align-items: center;"><img style="margin-right: 10px; width: 60px; height: 60px;" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
-          <h3 style="color: #000; font-weight: 100; text-align: left;"><strong>${firstSellerOrg}</strong> <em><span style="text-decoration: underline;">powered by</span> the BlockApps Marketplace on </em><strong>Mercata&#8482;</strong><em><br /></em></h3>
-        </div>
-        <p style="font-size: 10px; margin-top: 20px;">This email was sent from a notification only address that cannot accept incoming email. Please do not reply to this message.</p>
-      </div>
-    `
-    try {
-      await orderActions.sendGridSendEmail(user.preferred_username, "New Membership Order", htmlContent);
-    } catch (error) {
-      console.error('Failed to send email:', error);
-    }
-  
     handleCancel();
     let orderList = [];
     let orderItemAddress = [];
@@ -442,14 +403,14 @@ const ConfirmOrder = () => {
       ) : (
         <div className="pb-20">
           <Breadcrumb>
-            {/* eslint-disable-next-line no-script-url */}
             <Breadcrumb.Item href="javascript:;">
               <ClickableCell href={routes.Marketplace.url}>
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
-            {/* eslint-disable-next-line no-script-url */}
-            <Breadcrumb.Item href="javascript:;">
+            <Breadcrumb.Item
+              href="javascript:;"
+            >
               <ClickableCell href={routes.Checkout.url}>
                 Checkout
               </ClickableCell>
@@ -800,5 +761,7 @@ const ConfirmOrder = () => {
     </div>
   );
 };
+
+
 
 export default ConfirmOrder;

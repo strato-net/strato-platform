@@ -31,9 +31,7 @@ class ImageController {
       );
       
       const result={
-        imageKey:fileKey,
-        docHash:fileHash,
-        originalName:req.file.originalname
+        imageKey:fileKey
       }
 
   

@@ -46,11 +46,7 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return item.product.taxes ? 
-    (item.product.isTaxPercentage ? 
-          (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)  
-          :  (item.product.taxes/100) * item.qty ) 
-    : 0;
+    return (item.product.pricePerUnit * item.qty * CHARGES.TAX) / 100;
   };
 
   const calculateShipping = (item) => {
@@ -90,11 +86,12 @@ const Checkout = ({ user }) => {
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.pricePerUnit,
           quantity: item.product.address,
-          isTaxPercentage: item.product.isTaxPercentage,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.pricePerUnit * item.qty ,
+            item.product.pricePerUnit * item.qty +
+            calculateShipping(item) +
+            calculateTax(item),
           action: item.product.address,
           qty: item.qty,
         });
@@ -347,8 +344,6 @@ const Checkout = ({ user }) => {
       buyerOrganization: user.organization,
       orderList,
       orderTotal: total + tax + shipping,
-      tax:tax,
-      shippingCharges:shipping,
     };
 
     let isDone = await orderActions.createOrder(orderDispatch, body);
