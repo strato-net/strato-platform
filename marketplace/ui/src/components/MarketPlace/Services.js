@@ -11,7 +11,7 @@ import {
   Row,
   Col,
   Typography,
-  Pagination,
+  Spin,
 } from "antd";
 import {
   EditOutlined,
@@ -26,24 +26,15 @@ import {
 import "./service.css";
 import { actions as serviceUsageActions } from "../../contexts/serviceUsage/actions";
 import { actions as servicesActions } from "../../contexts/service/actions"
-import { actions as userAuthActions } from "../../contexts/users/actions"
-import { useServiceUsageDispatch } from "../../contexts/serviceUsage";
+import { actions as userAuthActions } from "../../contexts/authentication/actions"
+import { actions as membershipActions } from "../../contexts/membership/actions"
+import { useServiceUsageDispatch, useServiceUsageState } from "../../contexts/serviceUsage";
 import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
-import { useMembershipState } from "../../contexts/membership";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
 import { useServiceDispatch, useServiceState } from "../../contexts/service";
+import { useUsersState } from "../../contexts/users";
 
-const newRowSchema = {
-  user: "",
-  provider: "",
-  membershipId: "",
-  service: "",
-  summary: "",
-  date: null,
-  comments: "",
-  status: "",
-  pricePaid: "",
-  editable: true,
-};
+
 
 const boookedData = [
   {
@@ -53,8 +44,8 @@ const boookedData = [
     membershipId: "12345",
     service: "Service A",
     summary: "Summary 1",
-    date: "2023-09-12",
-    comments: "Comment 1",
+    serviceDate: "2023-09-12",
+    providerComment: "Comment 1",
     status: "Status 1",
     pricePaid: "100",
     editable: false,
@@ -62,9 +53,9 @@ const boookedData = [
 ];
 
 const statusOptions = [
-  { value: "requested", label: "Requested" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "completed", label: "Completed" },
+  { value: 0, label: "Requested" },
+  { value: 1, label: "Cancelled" },
+  { value: 2, label: "Completed" },
 ]
 
 // const providerOptions = 
@@ -78,8 +69,8 @@ const provideData = [
     membershipId: "67890",
     service: "Service B",
     summary: "Summary 2",
-    date: "2023-09-13",
-    comments: "Comment 2",
+    serviceDate: "2023-09-13",
+    providerComment: "Comment 2",
     status: "Status 2",
     pricePaid: "200",
     editable: false,
@@ -93,35 +84,70 @@ const ServiceTable = () => {
   const serviceUsageDispatch = useServiceUsageDispatch();
   const serviceDispatch = useServiceDispatch();
   const authUserDispatch = useAuthenticateDispatch();
+  const membershipDispatch = useMembershipDispatch()
+
 
   // all api call states
   const userCert = useAuthenticateState();
-  const services = useServiceState();
+  // const userListState = useUsersState();
+  const servicesState = useServiceState();
   const membership = useMembershipState();
+  const serviceUsageState = useServiceUsageState();
+
+  const { isUsersLoading } = userCert;
+  const { isservicesLoading } = servicesState;
+  const { isPurchasedMembershipLoading } = membership;
+  const { isServicesUsageLoading } = serviceUsageState;
+  const checkIsLoading = (isservicesLoading || isPurchasedMembershipLoading || isServicesUsageLoading || isUsersLoading);
+  const providerData = membership?.purchasedMemberships.map((item, index) => {
+    return { value: item.itemNumber, label: item.manufacturer }
+  })
+  const [providerList, setProviderList] = useState(providerData)
+
+  const serviceListData = servicesState?.services?.map((item, index) => {
+    return { value: item.address, label: item.name }
+  })
+  const [serviceList, setServiceList] = useState(serviceListData);
+  const [userList, setUserList] = useState(userCert?.users)
+
+  useEffect(() => {
+    setServiceList(serviceListData)
+    setProviderList(providerData)
+    setTableData(serviceUsageState?.servicesUsage)
+    // setUserList(userCert?.users)
+  }, [servicesState, membership, serviceUsageState, userCert])
 
 
   const [isEdit, setIsEdit] = useState(false);
   const [validationError, setValidationError] = useState(false);
   const [activeTab, setActiveTab] = useState("booked");
-  const [tableData, setTableData] = useState(boookedData);
+  const [tableData, setTableData] = useState([]);
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(20)
   const [filterQuery, setFilterQuery] = useState({})
   const Username = userCert?.user?.commonName;
   const organization = userCert?.user?.organization;
 
-  useEffect(() => {
-    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query)
-    servicesActions.fetchService(serviceDispatch, limit, offset, query)
-    // userAuthActions.fetchUsers(authUserDispatch)
-  }, [])
+  const newRowSchema = {
+    summary: "",
+    serviceDate: "",
+    providerComment: "",
+    status: 0,
+    pricePaid: "",
+    editable: true,
+    itemId: "",
+    serviceId: "",
+    paymentStatus: 0,
+
+    providerLastUpdated: userCert?.user?.userAddress, //"user address",
+    providerLastUpdatedDate: new Date(),
+  };
 
   useEffect(() => {
-    if (activeTab === "booked") {
-      setTableData(boookedData);
-    } else {
-      setTableData(provideData);
-    }
+    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, 30, offset, query)
+    servicesActions.fetchService(serviceDispatch, limit, offset, query)
+    membershipActions.fetchPurchasedMemberships(membershipDispatch);
+    userAuthActions.fetchUsers(authUserDispatch)
   }, [activeTab])
 
   const handleTabChange = (key) => {
@@ -133,11 +159,6 @@ const ServiceTable = () => {
   const userOptions = [
     { value: "jack", label: "Jack-user" },
     { value: "lucy", label: "Lucy-user" },
-  ]
-
-  const providerOptions = [
-    { value: "jack", label: "Jack-provider" },
-    { value: "lucy", label: "Lucy-provider" },
   ]
 
   const handleEditCancel = (key, bool, type) => {
@@ -190,17 +211,19 @@ const ServiceTable = () => {
 
   const handleSave = () => {
     const data = tableData.map((item, index) => {
-      item["editable"] = false;
+      // item["editable"] = false;
+      delete item["editable"];
+      delete item["key"];
       return item;
     });
     setTableData(data);
     if (isEdit) {
       // we have to use update api here
       // uncomment api call for updating service usage
-      // serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, tableData)
+      serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, data)
     } else {
       // we have to use create api here
-      // serviceUsageActions.createServiceUsage(serviceUsageDispatch, tableData.at(-1))
+      serviceUsageActions.createServiceUsage(serviceUsageDispatch, data.at(-1))
     }
   };
 
@@ -210,7 +233,8 @@ const ServiceTable = () => {
   }
 
   const handleValidation = (data) => {
-    const requiredFields = ["membershipId", "service", "summary", "date", "comments", "status", "pricePaid",];
+    const requiredFields = ['summary', 'serviceDate', 'providerComment', 'status', 'pricePaid',
+      'itemId', 'serviceId', 'paymentStatus', 'providerLastUpdated', 'providerLastUpdatedDate',];
 
     if (activeTab === "booked" || activeTab === "provided") {
       if (requiredFields.every((field) => data[field] !== "")) {
@@ -226,10 +250,6 @@ const ServiceTable = () => {
     let data = { ...filterQuery }
     data[key] = value;
     setFilterQuery(data)
-  }
-
-  const onPageChange = (page) => {
-    setPage(page)
   }
 
   const columns = [
@@ -254,10 +274,7 @@ const ServiceTable = () => {
               onChange={(value) =>
                 handleInputChange(value, "user", record.key)
               }
-              options={[
-                { value: "jack", label: "Jack" },
-                { value: "lucy", label: "Lucy" },
-              ]}
+              options={userList}
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>
@@ -269,8 +286,8 @@ const ServiceTable = () => {
     },
     {
       title: "Provider",
-      dataIndex: "provider",
-      key: "provider",
+      dataIndex: "itemId",
+      key: "itemId",
       render: (text, record) => (
         <span>
           {record.editable && !isEdit ? (
@@ -286,16 +303,18 @@ const ServiceTable = () => {
               disabled={activeTab === "provided"}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(value, "provider", record.key)
+                handleInputChange(toString(value), "itemId", record.key)
               }
-              options={[
-                { value: "BOXR", label: "BOXR" },
-                { value: "Eqinox", label: "Eqinox" },
-              ]}
+              options={providerList}
             />
           ) : (
             <span>
-              {text}
+              {providerList.reduce((label, item) => {
+                if (item.value === text) {
+                  return item.label;
+                }
+                return label;
+              }, null)}
             </span>
           )}
         </span>
@@ -328,8 +347,8 @@ const ServiceTable = () => {
     },
     {
       title: "Service",
-      dataIndex: "service",
-      key: "service",
+      dataIndex: "serviceId",
+      key: "serviceId",
       render: (text, record) => (
         <span>
           {record.editable && !isEdit ? (
@@ -338,15 +357,17 @@ const ServiceTable = () => {
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               onChange={(value) =>
-                handleInputChange(value, "service", record.key)
+                handleInputChange(value, "serviceId", record.key)
               }
-              options={[
-                { value: "crossfit", label: "crossfit" },
-                { value: "personal training", label: "personal training" },
-              ]}
+              options={serviceList}
             />
           ) : (
-            <Typography style={{ color: "#061A6C" }}>{text}</Typography>
+            <Typography style={{ color: "#061A6C" }}>{serviceList.reduce((label, item) => {
+              if (item.value === text) {
+                return item.label;
+              }
+              return label;
+            }, null)}</Typography>
           )}
         </span>
       ),
@@ -374,15 +395,15 @@ const ServiceTable = () => {
     },
     {
       title: "Date",
-      dataIndex: "date",
-      key: "date",
+      dataIndex: "serviceDate",
+      key: "serviceDate",
       render: (text, record) => (
         <span>
           {record.editable && !isEdit ? (
             <DatePicker
               // value={text ? moment(text, 'YYYY-MM-DD') : null}
-              onChange={(date, dateString) =>
-                handleInputChange(dateString, 'date', record.key)
+              onChange={(serviceDate, dateString) =>
+                handleInputChange(toString(dateString), 'serviceDate', record.key)
               }
             />
           ) : (
@@ -393,8 +414,8 @@ const ServiceTable = () => {
     },
     {
       title: "Comments",
-      dataIndex: "comments",
-      key: "comments",
+      dataIndex: "providerComment",
+      key: "providerComment",
       render: (text, record) => (
         <span>
           {record.editable ? (
@@ -403,7 +424,7 @@ const ServiceTable = () => {
               suffix={<EditOutlined />}
               placeholder="Comments"
               onChange={(e) =>
-                handleInputChange(e.target.value, "comments", record.key)
+                handleInputChange(e.target.value, "providerComment", record.key)
               }
             />
           ) : (
@@ -431,7 +452,12 @@ const ServiceTable = () => {
               options={statusOptions}
             />
           ) : (
-            <Typography style={{ color: "#061A6C" }}>{text}</Typography>
+            <Typography style={{ color: "#061A6C" }}>{statusOptions.reduce((label, item) => {
+              if (item.value === text) {
+                return item.label;
+              }
+              return label;
+            }, null)}</Typography>
           )}
         </span>
       ),
@@ -451,7 +477,7 @@ const ServiceTable = () => {
               controls={false}
               value={text}
               placeholder="Price Paid"
-              onChange={(e) => handleInputChange(e, "pricePaid", record.key)}
+              onChange={(value) => handleInputChange(toString(value), "pricePaid", record.key)}
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>{text}</Typography>
@@ -509,77 +535,78 @@ const ServiceTable = () => {
   const activeTabCheck = activeTab === 'booked' ? 'Provider' : 'User';
 
   return (
-    <>
-      <Row className="mt-2">
-        <Col span={22} className="m-auto">
-          <Tabs activeKey={activeTab} items={tabOptions} onChange={handleTabChange} />
-        </Col>
-        <Col
-          className="flex justify-between absolute right-20 mt-2 z-10"
-          span={4}
-        >
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleAddRow}
-            disabled={validationError}
+    checkIsLoading
+      ?
+      <div className="h-96 flex justify-center items-center">
+        <Spin size="large" spinning={checkIsLoading} />
+      </div>
+      :
+      <>
+        <Row className="mt-2">
+          <Col span={22} className="m-auto">
+            <Tabs activeKey={activeTab} items={tabOptions} onChange={handleTabChange} />
+          </Col>
+          <Col
+            className="flex justify-between absolute right-20 mt-2 z-10"
+            span={4}
           >
-            Add Service Use
-          </Button>
-          <Button
-            className="ml-2"
-            style={{ backgroundColor: "green" }}
-            type="primary"
-            onClick={handleSave}
-            disabled={validationError}
-          >
-            Save
-          </Button>
-        </Col>
-      </Row>
-      <Row>
-        <Col span={22} className="m-auto flex justify-between">
-          <Typography.Title level={4} style={{ color: "#061A6C" }}>
-            Service Usage
-          </Typography.Title>
-          <span className="service-filter">
-            <Select
-              placeholder={activeTabCheck}
-              suffixIcon={<CaretDownOutlined />}
-              style={{ width: 120 }}
-              value={filterQuery[activeTabCheck]}
-              onChange={(value) => { handleFilter(value, activeTabCheck) }}
-              options={activeTab === 'booked' ? providerOptions : userOptions}
-            />
-            <Select
-              placeholder="Status"
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleAddRow}
+              disabled={validationError}
+            >
+              Add Service Use
+            </Button>
+            <Button
               className="ml-2"
-              suffixIcon={<CaretDownOutlined />}
-              style={{ width: 120 }}
-              value={filterQuery['status']}
-              onChange={(value) => { handleFilter(value, 'status') }}
-              options={statusOptions}
+              style={{ backgroundColor: "green" }}
+              type="primary"
+              onClick={handleSave}
+              disabled={validationError}
+            >
+              Save
+            </Button>
+          </Col>
+        </Row>
+        <Row>
+          <Col span={22} className="m-auto flex justify-between">
+            <Typography.Title level={4} style={{ color: "#061A6C" }}>
+              Service Usage
+            </Typography.Title>
+            <span className="service-filter">
+              <Select
+                placeholder={activeTabCheck}
+                suffixIcon={<CaretDownOutlined />}
+                style={{ width: 120 }}
+                value={filterQuery[activeTabCheck]}
+                onChange={(value) => { handleFilter(value, activeTabCheck) }}
+                options={activeTab === 'booked' ? providerList : userOptions}
+              />
+              <Select
+                placeholder="Status"
+                className="ml-2"
+                suffixIcon={<CaretDownOutlined />}
+                style={{ width: 120 }}
+                value={filterQuery['status']}
+                onChange={(value) => { handleFilter(value, 'status') }}
+                options={statusOptions}
+              />
+            </span>
+          </Col>
+        </Row>
+        <Row>
+          <Col span={22} className="m-auto">
+            <Table
+              columns={columns}
+              dataSource={tableData}
+              pagination={true}
+              rowKey="key"
             />
-          </span>
-        </Col>
-      </Row>
-      <Row>
-        <Col span={22} className="m-auto">
-          <Table
-            columns={columns}
-            dataSource={tableData}
-            pagination={false}
-            rowKey="key"
-          />
-          <Pagination
-            current={page}
-            onChange={onPageChange}
-            total={total}
-            className="flex justify-center my-5 "
-          />
-        </Col>
-      </Row>
-    </>
+          </Col>
+        </Row>
+      </>
+
   );
 };
 

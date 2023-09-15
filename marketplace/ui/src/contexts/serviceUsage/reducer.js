@@ -2,6 +2,25 @@ import { actionDescriptors } from "./actions";
 
 const reducer = (state, action) => {
   switch (action.type) {
+
+    case actionDescriptors.createServicesUsage:
+      return {
+        ...state,
+        isCreateServiceUsageSubmitting: true
+      };
+    case actionDescriptors.createServiceUsageSuccessful:
+      return {
+        ...state,
+        servicesUsage: action.payload,
+        isCreateServiceUsageSubmitting: false
+      };
+    case actionDescriptors.createServiceUsageFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateServiceUsageSubmitting: false
+      };
+
     // fetch all serviceUsage
     case actionDescriptors.fetchAllServicesUsage:
       return {
@@ -11,7 +30,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchAllServiceUsageSuccessful:
       return {
         ...state,
-        servicesUsage: action.payload.servicesUsage,
+        servicesUsage: action.payload,
         isServicesUsageLoading: false
       };
     case actionDescriptors.fetchAllServiceUsageFailed:
