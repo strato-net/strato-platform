@@ -4,7 +4,7 @@ import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 
 /// @title A representation of Item assets
-contract Item_3 is ItemStatus {
+contract Item_4 is ItemStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -15,7 +15,6 @@ contract Item_3 is ItemStatus {
     string public serialNumber;
     ItemStatus public status;
     string public comment; // to store remarks if the item is removed from the application.
-    // uint public itemNumber;
     uint public createdDate;
 
     /// @dev Events to add and remove members to this shard.
@@ -41,10 +40,6 @@ contract Item_3 is ItemStatus {
         string _serialNumber,
         ItemStatus _status,
         string _comment,
-        // string[] _rawMaterialProductName,
-        // string[] _rawMaterialSerialNumber,
-        // string[] _rawMaterialProductId,
-        // uint _itemNumber,
         uint _createdDate
     ) public {
         owner = tx.origin;
@@ -54,7 +49,6 @@ contract Item_3 is ItemStatus {
         serialNumber = _serialNumber;
         status = _status;
         comment = _comment;
-        // itemNumber = _itemNumber;
         createdDate = _createdDate;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -62,14 +56,6 @@ contract Item_3 is ItemStatus {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        // if (_rawMaterialSerialNumber.length > 0) {
-        //     addRawMaterials(
-        //         _uniqueProductCode,
-        //         _rawMaterialProductName,
-        //         _rawMaterialSerialNumber,
-        //         _rawMaterialProductId
-        //     );
-        // }
     }
 
     function update(

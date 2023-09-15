@@ -216,30 +216,6 @@ const BoughtOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      render: (text) => (
-        <div className="flex items-center justify-center">
-          <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
-          <p
-            onClick={() => {
-              navigate(
-                `${routes.BoughtOrderItemDetail.url
-                  .replace(":id", text.address)}`,
-                  // .replace(":chainId", text.chainId)}`,
-                { state: { orderId: details.orderId, address: Id } }
-              );
-            }}
-            className="hover:text-primaryHover cursor-pointer"
-          >
-            View
-          </p>
-        </div>
-      ),
-    },
-    {
       title: <Text className="text-primaryC text-[13px]">MANUFACTURER</Text>,
       dataIndex: "manufacturer",
       key: "manufacturer",

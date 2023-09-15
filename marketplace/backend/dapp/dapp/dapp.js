@@ -993,23 +993,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return { status };
       } else if (updates.status == ORDER_STATUS.CLOSED) {
 
-
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
-
-        // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: contractName }
 
         const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
         const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
-        let newOwner = orderLines[0].owner
         let result = []
+        const newOwner = orderLines[0].owner
+        const serialNumber = util.uid();
 
         for (let orderLineAddress of orderLinesAddresses) {
-          const orderLineProductId = orderLines[0].productId;
-          const orderLineInventoryId = orderLines[0].inventoryId;
-          // const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
-          // itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ productId: orderLineProductId, inventoryId: orderLineInventoryId, newOwner, newQuantity: orderLines[0].quantity, dappAddress });
+          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions);
+          const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLines[0].quantity, dappAddress, serialNumber });
           result.push({ status, productId, inventoryId });
         }
         return result;
@@ -1107,43 +1103,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createOrderLineItem = async function (args, options = defaultOptions) {
     try {
-      const { orderLineId, serialNumber } = args;
+      const { orderLineId } = args;
       const quantity = args.quantity || 0;
       const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
       const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
       const { productId, inventoryId } = orderLine
 
-      // If no serial numbers are passed, a quantity is passed from the front end. 
-      // This will allow us to get the first n items from the inventory
-      // quantity is set to 0 if serial numbers are provided, so we can get the items by serial number
-      let items;
-      if (quantity > 0) {
-        items = await managers.itemManager.getItems(
-          {
-            productId,
-            inventoryId,
-            offset: 0,
-            limit: quantity,
-            status: 1
-          },
-          chainOptions
-        );
-      } else {
-        items = await managers.itemManager.getItems(
-          {
-            productId,
-            inventoryId,
-            serialNumber: [...serialNumber]
-          },
-          chainOptions
-        );
-      }
-      if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
-        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different than the actual inventory");
-      }
-
-      const _contract = { name: orderLineJs.contractName, address: orderLineId };
+      const items = await managers.itemManager.getItems(
+        {
+          productId,
+          inventoryId,
+          offset: 0,
+          limit: quantity,
+          status: 1
+        },
+        chainOptions
+      );
 
       const itemsAddresses = items.map(_item => _item.address);
 
@@ -1153,20 +1129,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         items: itemsAddresses,
         createdDate: Math.floor(Date.now() / 1000),
       };
-      // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
-      // See orderLine.sol 
-      // Item_3 item = Item_3(account(address(_items[i]),"parent"));
 
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
-
-      const [soldStatus] = await managers.itemManager.updateItem({
-        itemsAddress: itemsAddresses,
-        status: ITEM_STATUS.SOLD,
-        comment: "",
-      });
-      if (soldStatus !== "200") {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
+      const inventory = await contract.getInventory({ address: items[0].inventoryId, });
+      if (inventory.inventoryType === "Individual") {
+        const [soldStatus] = await managers.itemManager.updateItem({
+          itemsAddress: itemsAddresses,
+          status: ITEM_STATUS.SOLD,
+          comment: "",
+        });
+        if (soldStatus !== "200") {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
+        }
       }
 
       return result;
