@@ -280,10 +280,10 @@ create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash
         !args = either (parseError "create arguments") CC.OrderedArgs maybeArgs
 
     (hsh, cc) <- codeCollectionFromSource True initCode
-    create' sender' newAddress hsh cc contractName' args False
+    create' sender' newAddress hsh cc contractName' args
 
-create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
-create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
+create' :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ExecResults
+create' creator newAccount ch cc contractName' argExps = do
   parentName <- fromMaybeM (return "") $ runMaybeT
      $   pure creator                                               -- Creator's address
      >>= MaybeT . A.lookup (A.Proxy @AddressState)                  -- Address's state
@@ -300,7 +300,7 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAccount $ \newAddressState ->
     pure newAddressState{ addressStateContractRoot = MP.emptyTriePtr
-                        , addressStateCodeHash = if (contractName' /= stringToLabel parentName && not (null parentName) && not createBuiltinCall) then CodeAtAccount creator (labelToString contractName') else SolidVMCode (labelToString contractName') ch
+                        , addressStateCodeHash = if (contractName' /= stringToLabel parentName && not (null parentName)) then CodeAtAccount creator (labelToString contractName') else SolidVMCode (labelToString contractName') ch
                         }
 
   -- get the gasLeft from the environment
@@ -1913,7 +1913,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   creator <- getCurrentAccount
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
-  execResults <- create' creator newAddress hsh cc contractName' args False
+  execResults <- create' creator newAddress hsh cc contractName' args
   return $ Constant $ SContract contractName' $ accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $  erNewContractAccount execResults
@@ -1929,7 +1929,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
             (CC.NamedArgs na) -> NamedVals <$> mapM (mapM $ getVar <=< expToVar) na
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
-  execResults <- create' creator newAddress hsh cc contractName' args False
+  execResults <- create' creator newAddress hsh cc contractName' args
   onTraced $ do
     liftIO $ putStrLn $ concat [
       C.cyan ">> Created salted contract:",
@@ -2781,7 +2781,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
                           Right parsedArgs -> parsedArgs
                           _ -> internalError "Failed to parse constructor args in a create builtin call" argString
-  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
   return $ ((flip SAccount) False) . accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $ erNewContractAccount execResults
@@ -2799,7 +2799,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
                           _ -> internalError "Failed to parse constructor args in a create builtin call" argString
   constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
-  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) True
+  execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs)
   return $ ((flip SAccount) False) . accountOnUnspecifiedChain
     $ fromMaybe (internalError "a call to create did not create an address" execResults)
     $ erNewContractAccount execResults
