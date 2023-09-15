@@ -75,7 +75,9 @@ library:
   - labeled-error
   - lens
   - merkle-patricia-db
+  - milena
   - monad-alter
+  - monad-logger
   - monadIO
   - mtl
   - network
@@ -83,6 +85,7 @@ library:
   - ordered-containers
   - Ranged-sets
   - raw-strings-qq
+  - resourcet
   - secp256k1-haskell
   - seqevents
   - stm-chans
@@ -145,11 +148,14 @@ tests:
       - labeled-error
       - lens
       - merkle-patricia-db
+      - milena
       - monad-alter
+      - monad-logger
       - mtl
       - nibblestring
       - ordered-containers
       - raw-strings-qq
+      - resourcet
       - secp256k1-haskell
       - seqevents
       - stm-chans

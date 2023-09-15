@@ -76,7 +76,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Concurrent.STM.TQueue
+import           Control.Concurrent.Chan.Unagi        as CCCU
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 -- import           Control.Arrow                         ( (***))
@@ -200,7 +200,7 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState     :: K.KafkaState
-  , contextKafkaMiddleman :: TQueue P2pEvent
+  , contextKafkaMiddleman :: (InChan P2pEvent, OutChan P2pEvent)
   , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
@@ -665,7 +665,7 @@ initConfig wireMessagesRef maxHeaders = do
 
 initContext :: IO Context
 initContext = do
-  initContextKafkaMiddleman <- atomically newTQueue :: IO (TQueue P2pEvent)
+  initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan P2pEvent, OutChan P2pEvent)
   return Context { actionTimestamp = emptyActionTimestamp
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextKafkaMiddleman = initContextKafkaMiddleman
@@ -674,7 +674,6 @@ initContext = do
                  , _blockstanbulPeerAddr = PeerAddress Nothing
                  , _outboundWireMessages = S.empty
                  }
-
 
 getPeerByIP :: A.Selectable IPAsText PPeer m
             => IPAsText

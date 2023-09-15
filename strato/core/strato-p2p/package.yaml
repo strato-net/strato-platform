@@ -23,9 +23,16 @@ executables:
       - ethereum-discovery
       - hflags
       - lifted-async
+      - milena
+      - monad-alter
+      - monad-control
+      - mtl
       - ordered-containers
       - strato-model
       - strato-p2p
+      - transformers
+      - unliftio
+      - unliftio-core
       - wai-middleware-prometheus
       - warp
       
@@ -79,7 +86,6 @@ library:
     - network
     - ordered-containers
     - persistent
-    - pooled-io
     - prometheus-client
     - random
     - Ranged-sets
@@ -97,6 +103,7 @@ library:
     - these
     - time
     - transformers
+    - unagi-chan
     - unliftio-core
     - unliftio 
     - warp
@@ -131,7 +138,10 @@ tests:
       - labeled-error
       - lens
       - merkle-patricia-db
+      - milena
       - monad-alter
+      - monad-control
+      - monad-logger
       - mtl
       - network
       - nibblestring

@@ -24,6 +24,7 @@ import           Control.Lens                          hiding (Context, view)
 import qualified Control.Lens                          as Lens
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Control.Monad.State                   as State
 import qualified Control.Monad.Trans.State             as StateT
@@ -125,10 +126,11 @@ import           Executable.StratoP2PServer
 import           Executable.StratoP2P
 
 import           Network.Socket
+import qualified Network.Kafka                         as K
 import           UnliftIO
 
-loggingFunc :: LoggingT m a -> m a
-loggingFunc = runNoLoggingT
+loggingFunc :: BlockApps.Logging.LoggingT m a -> m a
+loggingFunc = BlockApps.Logging.runNoLoggingT
 
 data VSocket = VSocket
   { _inbound :: TQueue B.ByteString
@@ -203,7 +205,7 @@ data TestContext = TestContext
 
 makeLenses ''TestContext
 
-type TestContextM = ReaderT P2PPeer (ResourceT (LoggingT IO))
+type TestContextM = ReaderT P2PPeer (ResourceT (BlockApps.Logging.LoggingT IO))
 
 type MonadTest m = ReaderT P2PPeer m
 
@@ -929,7 +931,7 @@ instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP
         atomically $ writeTQueue s (v, myIP)
         f $ P2pConduits pSource pSink sSource
 
-instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
+instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (BlockApps.Logging.LoggingT IO) where
   runServer tcpPort@(TCPPort p) runner f = runner $ \sSource -> do
     inet <- lift $ asks _p2pPeerInternet
     myIP@(IPAsText ip) <- lift $ asks _p2pMyIPAddress
@@ -1286,7 +1288,9 @@ runNodeWithoutP2P p = do
                      (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
       (loggingFunc . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
 
-runNode :: P2PPeer -> IO ()
+runNode :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
+           )
+        => P2PPeer -> IO ()
 runNode p = do
   chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
   let s = sourceTMChan chan .| (awaitForever $ either (const $ pure ()) yield)
@@ -1751,7 +1755,9 @@ createNode nodeLabel identity ipAddr tcpPort udpPort bootNodes inet = do
   pKey <- liftIO $ newPrivateKey
   liftIO $ createPeer pKey identity vals certs inet nodeLabel ipAddr tcpPort udpPort bootNodes True
 
-addNode :: Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> ReaderT NetworkManager IO Bool
+addNode :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
+           )
+        => Text -> ChainMemberParsedSet -> IPAsText -> TCPPort -> UDPPort -> [IPAsText] -> ReaderT NetworkManager IO Bool
 addNode nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
   mgr <- ask
   inet <- _internet <$> readTVarIO (mgr ^. network)
@@ -1816,7 +1822,9 @@ selfSignCert pk (CommonName o u c True) = flip runReaderT pk $ do
   makeSignedCert Nothing Nothing iss sub
 selfSignCert _ i = error $ "selfSignCert: could not sign cert for identity: " ++ show i
 
-runNetwork :: [(Text, (ChainMemberParsedSet, IPAsText, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
+runNetwork :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
+              )
+           => [(Text, (ChainMemberParsedSet, IPAsText, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> IO NetworkManager
 runNetwork nodesList validatorsFilter = do
   privKeys <- traverse (const newPrivateKey) nodesList
   let identities = (\(_,(c,_,_,_)) -> c) <$> nodesList
@@ -1860,7 +1868,9 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
     threadsTVar <- newTVarIO threadPool
     pure $ NetworkManager threadsTVar networkTVar certs validators'
 
-runNetworkOld :: [P2PPeer] -> [P2PConnection] -> IO ()
+runNetworkOld :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
+                 )
+              =>[P2PPeer] -> [P2PConnection] -> IO ()
 runNetworkOld nodes' connections' =
   concurrently_ (mapConcurrently runNode nodes')
                 (mapConcurrently runConnection connections')

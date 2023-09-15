@@ -19,13 +19,15 @@ module Executable.StratoP2PClient
 
 import           Blockchain.RLPx
 import qualified Control.Monad.Change.Alter            as A
+import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
 import           Control.Exception.Base                (ErrorCall(..))
 import           Control.Lens                          ((^.))
 import           Control.Monad
-import           Control.Monad.IO.Class
+import           Control.Monad.Except
+--import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader()
 import           Control.Monad.Trans.Resource
@@ -50,11 +52,13 @@ import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Metrics
 import           Blockchain.Options
+import           Blockchain.SeqEventNotify
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout
+import           Network.Kafka                         as K
 
 import qualified Text.Colors                           as C
 import           Text.Format
@@ -138,11 +142,12 @@ runPeerInList thePeer sSource = do
       liftIO $ threadDelay $ 10 * 1000 * 1000
   withAsync (runPeer thePeer sSource) $ \res -> waitCatch res
 
-stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+stratoP2PClient :: (Modifiable K.KafkaState m, MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
 stratoP2PClient runner = runner $ \sSource -> do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
-
   activePeersSem <- liftIO (SSem.new flags_maxConn)
+  initContextF <- liftIO initContext
+  _ <- withAsync (forever $ seqEventNotificationSourceChanFill (return $ contextKafkaState initContextF) (contextKafkaMiddleman initContextF)) $ \res -> waitCatch res
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
     ePeers <- getBondedPeers
