@@ -54,7 +54,7 @@ const actions = {
           payload: body.data,
         });
         actions.setMessage(dispatch, "Service usage created successfully", true)
-        // console.log("Service usage created successfully", body)
+        actions.fetchAllServicesUsage(dispatch, 10, 0, {});
         return body.data
       }
 
@@ -71,7 +71,7 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchAllServicesUsage });
 
     try {
-      const response = await fetch(`${apiUrl}/serviceUsage?limit=${limit}&offset=${offset}&${query}`, {
+      const response = await fetch(`${apiUrl}/serviceUsage?limit=${limit}&offset=${offset}${query}`, {
         method: HTTP_METHODS.GET
       });
 
@@ -135,6 +135,7 @@ const actions = {
           payload: body.data,
         });
         actions.setMessage(dispatch, "Service usage has been updated", true);
+        actions.fetchAllServicesUsage(dispatch, 10, 0, {})
         return true;
       }
 
