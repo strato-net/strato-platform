@@ -43,9 +43,9 @@ import { useServiceDispatch, useServiceState } from "../../contexts/service";
 import moment from "moment";
 
 const statusOptions = [
-  { value: 0, label: "Requested" },
-  { value: 1, label: "Cancelled" },
-  { value: 2, label: "Completed" },
+  { value: 1, label: "Requested" },
+  { value: 2, label: "Cancelled" },
+  { value: 3, label: "Completed" },
 ];
 
 const limit = 10;
@@ -276,18 +276,14 @@ const ServiceTable = () => {
 
   const handleSave = () => {
     const data = tableData.map((item, index) => {
-      // item["editable"] = false;
       delete item["editable"];
       delete item["key"];
       delete item['provider'];
       return item;
     });
     if (isEdit) {
-      // we have to use update api here
-      // uncomment api call for updating service usage
       serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, data);
     } else {
-      // we have to use create api here
       serviceUsageActions.createServiceUsage(serviceUsageDispatch, data.at(0));
     }
   };
@@ -311,7 +307,7 @@ const ServiceTable = () => {
     ];
 
     if (activeTab === "booked" || activeTab === "provided") {
-      if (requiredFields.every((field) => data[field] !== "")) {
+      if (requiredFields.every((field) => data[field] !== "" || null)) {
         setValidationError(false);
         return true;
       }
@@ -576,11 +572,12 @@ const ServiceTable = () => {
               className="w-36"
               addonAfter={<EditOutlined />}
               min={0}
+              type="number"
               controls={false}
               value={parseInt(text)}
               placeholder="Price Paid"
               onChange={(value) =>
-                handleInputChange(value.toString(), "pricePaid", index)
+                handleInputChange(value && value.toString(), "pricePaid", index)
               }
             />
           ) : (
