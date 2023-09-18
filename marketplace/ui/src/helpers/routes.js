@@ -19,7 +19,7 @@ export default {
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
   Memberships: { label: "Membership", url: "/memberships" },
   MembershipDetail: { label: "Membership Detail", url: "/memberships/:id" },
-  Services: { label: "Service", url: "/services" },
+  ServiceUsage: { label: "Service", url: "/serviceUsage" },
   Inventories: { label: "Inventory", url: "/inventories" },
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id" },
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },

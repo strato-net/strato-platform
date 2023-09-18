@@ -150,6 +150,8 @@ const ServiceTable = () => {
   const username = userCert?.user?.commonName;
   const organization = userCert?.user?.organization;
 
+  console.log('username', userCert?.user?.userAddress);
+
   const newRowSchema = {
     summary: "", //summary
     serviceDate: "", //Date
@@ -166,7 +168,10 @@ const ServiceTable = () => {
   };
 
   useEffect(() => {
-    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query);
+    if (userCert?.user?.userAddress) {
+      let serviceUsage = `&owner=${userCert?.user?.userAddress}`
+      serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, serviceUsage);
+    }
     servicesActions.fetchService(serviceDispatch, 10, offset, query);
     membershipActions.fetchPurchasedMemberships(membershipDispatch);
     userAuthActions.fetchUsers(authUserDispatch);

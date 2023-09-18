@@ -40,7 +40,7 @@ import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
 import Service from "./components/Membership/Service";
-import Services from "./components/MarketPlace/Services";
+import ServiceUsage from "./components/MarketPlace/ServiceUsage";
 import { ServiceUsageProvider } from "./contexts/serviceUsage";
 
 const AuthenticatedRoutes = ({ user, users }) => {
@@ -241,7 +241,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
                           <ProductsProvider>
                             <ItemsProvider>
                               {/* <MembershipDetails user={user} users={users} /> */}
-                              <Services user={user} users={users} />
+                              <ServiceUsage user={user} users={users} />
                             </ItemsProvider>
                           </ProductsProvider>
                         </InventoriesProvider>
@@ -256,7 +256,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
       />
       <Route
         exact
-        path={routes.Services.url}
+        path={routes.ServiceUsage.url}
         element={
           <UsersProvider>
             <CategorysProvider>

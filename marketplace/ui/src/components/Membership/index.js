@@ -277,7 +277,7 @@ const Membership = (user) => {
                   margin: "10px",
                 }}
                 className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                onClick={() => navigate("/memberships/services")}
+                onClick={() => navigate("/memberships/serviceUsage")}
               >
                 Services Usage
               </Button>
