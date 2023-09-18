@@ -1193,7 +1193,7 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
       # OAUTH_TOKEN_ENDPOINT=$(curl --fail -s $(<_oauth_discovery_url_tmp) | jq -r .token_endpoint)
       # USER_TOKEN=$(curl --fail -s -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(<_password_tmp)" | jq -r .access_token)
       # make sure user is created (now or earlier):
-      docker exec strato-nginx-1 curl --fail -H "Authorization: Bearer $USER_TOKEN" -X POST "localhost:80/strato/v2.3/key"
+      docker exec strato-nginx-1 curl --fail -H "Authorization: Bearer $(<_user_token_tmp)" -X POST "localhost:80/strato/v2.3/key"
       userPubKey=$(docker exec strato-nginx-1 curl --fail -s -H "Authorization: Bearer $(<_user_token_tmp)" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
       
       sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
