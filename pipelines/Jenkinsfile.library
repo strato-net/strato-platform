@@ -1173,8 +1173,9 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
   // sh "echo ${username} > _username_tmp"
   // sh "echo ${password} > _password_tmp"
   def oauth_token_endpoint = sh(returnStdout: true, script: "curl --fail -s ${OAuthDiscoveryUrl} | jq -r .token_endpoint ").trim()
+  sh "echo ${oauth_token_endpoint} > _oauth_token_endpoint_tmp"
   def client_b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${clientId}:${clientSecret}'))\"").trim()
-  def data_url_encoded = "--data-urlencode 'grant_type=password'"
+  def data_url_encoded = "--data-urlencode 'grant_type=client_credentials'"
   if (!username.isEmpty() && !password.isEmpty()) {
     data_url_encoded = "--data-urlencode 'grant_type=password' --data-urlencode 'username=${username}' --data-urlencode 'password=${password}'"
   }
@@ -1210,7 +1211,7 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
       # escaped cert is now saved as /x509-generator/certs.json inside the container
       CERT_ESCAPED=$(sudo docker exec strato-strato-1 cat /x509-generator/certs.json)
       CERT_ESCAPED=$(echo "${CERT_ESCAPED:2: -2}")
-      ADMIN_TOKEN=$(curl --fail -L -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_admin_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials' | jq -r .access_token)
+      ADMIN_TOKEN=$(curl --fail -L -X POST "$(<_oauth_token_endpoint_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_admin_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials' | jq -r .access_token)
       
       docker exec strato-nginx-1 curl --fail -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
         -H 'Accept: application/json' \\
