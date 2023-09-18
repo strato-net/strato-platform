@@ -27,6 +27,7 @@ dependencies:
 - http-conduit
 - HTTP
 - monad-logger
+- regex-compat
 - servant-client
 - servant-client-core
 - servant-subscriber
@@ -54,7 +55,6 @@ library:
     - monad-alter
     - monad-control
     - mtl
-    - opaleye
     - product-profunctors
     - profunctors
     - req
@@ -103,13 +103,18 @@ tests:
   vault-proxy-spec:
     source-dirs: test/
     main: Spec.hs
+    ghc-options: -dynamic
     dependencies:
+      - async
       - blockapps-data
       - blockapps-vault-proxy-server
       - bytestring
+      - cache
       - clockwork
       - cryptonite
       - hspec
       - labeled-error
+      - mtl
       - secp256k1-haskell
+      - stm
       - strato-model

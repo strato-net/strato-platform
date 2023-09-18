@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeApplications         #-}
 {-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE LambdaCase               #-}
 
 module Blockchain.Data.ChainInfoDB where
 
@@ -32,11 +33,14 @@ import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 
 
-getChainInfo :: HasSQLDB m => ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
-getChainInfo (ChainId chainId) = do
-  sqlQuery $ do
+getChainInfo :: HasSQLDB m =>  Maybe T.Text -> ChainId  -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
+getChainInfo mLabel (ChainId chainId)  = do
+  sqlQuery $ do 
     entChainInfos <- E.select . E.from $ \cRef -> do
-      E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+      case mLabel of 
+        Nothing -> E.where_ (cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
+        Just label -> E.where_ ((cRef E.^. ChainInfoRefChainLabel) E.==. E.val (T.unpack label)
+                E.&&. cRef E.^. ChainInfoRefChainId E.==. E.val chainId)
       return cRef
     case entChainInfos of
       []  -> return Nothing
@@ -114,19 +118,105 @@ getChainInfo (ChainId chainId) = do
                         let ChainMetadataRef{..} = entityVal metadata
                          in (T.pack chainMetadataRefKey, T.pack chainMetadataRefValue)
 
-getChainInfos :: HasSQLDB m => [ChainId] -> Integer -> Integer -> m (NamedMap "id" "info" ChainId ChainInfo)
-getChainInfos chainIds limit offset = do
-  cids <- case chainIds of
-    [] -> sqlQuery $ do
-      chains <- E.select . E.from $ \cRef -> do
-        E.offset $ fromInteger offset
-        E.limit $ fromInteger limit
-        return cRef
-      case chains of
-        [] -> return []
-        cs -> return $ map (ChainId . chainInfoRefChainId . E.entityVal) cs
-    cIds -> return cIds
-  chainInfos <- mapM getChainInfo cids
+getChainInfosByLabel :: HasSQLDB m => T.Text  -> m [(Maybe (NamedTuple "id" "info" ChainId ChainInfo))]
+getChainInfosByLabel  label = do
+  sqlQuery $ do
+    entChainInfos <- E.select . E.from $ \cRef -> do
+      E.where_ (cRef E.^. ChainInfoRefChainLabel E.==. E.val (T.unpack label))
+      return cRef
+    case entChainInfos of
+      []  -> return [Nothing]
+      (x:xs) -> sequence $ map mkMNamedTuple (x:xs)
+
+        where
+                mkMNamedTuple  = \cInf -> do
+                    let chainInfoRefId = entityKey cInf
+                    let ChainInfoRef{..} = entityVal cInf
+                    members <- E.select . E.from $ \mRef -> do
+                      E.where_ (mRef E.^. ChainMemberParsedRefChainInfoId E.==. E.val chainInfoRefId)
+                      return mRef
+                    parents <- E.select . E.from $ \mRef -> do
+                      E.where_ (mRef E.^. ParentChainRefChainInfoId E.==. E.val chainInfoRefId)
+                      return mRef
+                    aInfos <- E.select . E.from $ \aiRef -> do
+                      E.where_ (aiRef E.^. AccountInfoRefChainInfoId E.==. E.val chainInfoRefId)
+                      return aiRef
+                    cInfos <- E.select . E.from $ \ciRef -> do
+                      E.where_ (ciRef E.^. CodeInfoRefChainInfoId E.==. E.val chainInfoRefId)
+                      return ciRef
+                    mds <- E.select . E.from $ \cmdRef -> do
+                      E.where_ (cmdRef E.^. ChainMetadataRefChainInfoId E.==. E.val chainInfoRefId)
+                      return cmdRef
+                    return . Just . NamedTuple @"id" @"info" $
+                      ( ChainId chainInfoRefChainId
+                      , ChainInfo
+                        (UnsignedChainInfo
+                          (T.pack chainInfoRefChainLabel)
+                          (map ai aInfos)
+                          (map ci cInfos)
+                          (ChainMembers $ S.fromList (map cm members))
+                          --  (M.fromList (map makePairs members))
+                          (M.fromList $ (\(ParentChainRef _ n i) -> (T.pack n,i)) . entityVal <$> parents)
+                          chainInfoRefCreationBlock
+                          chainInfoRefChainNonce
+                          (M.fromList $ map md mds)
+                        )
+                        (ChainSignature
+                            (fromInteger chainInfoRefR)
+                            (fromInteger chainInfoRefS)
+                            chainInfoRefV
+                        )
+                      )
+
+                cm = \cmInfo -> 
+                              let ChainMemberParsedRef{..} = entityVal cmInfo
+                                in chainMemberParsedRefChainMember
+
+                ai = \aInfo ->
+                        let AccountInfoRef{..} = entityVal aInfo
+                            acc | isNothing accountInfoRefCodeHash
+                                    = NonContract
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                | isNothing accountInfoRefMap
+                                    = ContractNoStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                | otherwise
+                                    = SolidVMContractWithStorage
+                                        accountInfoRefAddress
+                                        accountInfoRefBalance
+                                        (fromJust accountInfoRefCodeHash)
+                                        (fromJust accountInfoRefMap)
+                         in acc
+                ci = \codeInfo ->
+                        let CodeInfoRef{..} = entityVal codeInfo
+                         in CodeInfo
+                              codeInfoRefEvmByteCode
+                              (T.pack codeInfoRefContractCode)
+                              (fmap T.pack codeInfoRefContractName)
+                md = \metadata ->
+                        let ChainMetadataRef{..} = entityVal metadata
+                         in (T.pack chainMetadataRefKey, T.pack chainMetadataRefValue)
+
+
+getChainInfos :: HasSQLDB m => [ChainId] -> Maybe T.Text -> Integer -> Integer -> m (NamedMap "id" "info" ChainId ChainInfo)
+getChainInfos chainIds mLabel limit offset = do
+  chainInfos <- case (chainIds , mLabel) of        
+      ([], Just label)  -> getChainInfosByLabel label
+      _ -> do
+        cids <- case chainIds of
+          [] -> sqlQuery $ do
+            chains <- E.select . E.from $ \cRef -> do
+              E.offset $ fromInteger offset
+              E.limit $ fromInteger limit
+              return cRef
+            case chains of
+              [] -> return []
+              cs -> return $ map (ChainId . chainInfoRefChainId . E.entityVal) cs
+          cIds -> return cIds
+        mapM (getChainInfo  mLabel) cids
   let cInfos = sequence $ filter isJust chainInfos
   case cInfos of
     Nothing -> return []

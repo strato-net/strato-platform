@@ -65,24 +65,25 @@ xabiTypeToSimpleType Xabi.Bool = TypeBool
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 
-xabiTypeToType::Xabi->Xabi.Type->Either String Type
-xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=(Just l)} =
-  TypeArrayFixed l <$> xabiTypeToType xabi var
-xabiTypeToType xabi Xabi.Array { Xabi.entry=var, Xabi.length=Nothing} =
-  TypeArrayDynamic <$> xabiTypeToType xabi var
-xabiTypeToType _ Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
-xabiTypeToType xabi (Xabi.UnknownLabel name) =
-  case Map.lookup (Text.pack name) (xabiTypes xabi) of
-   Nothing -> Left $ "Contract is using a label that has not been defined as an enum, struct, or contract: " ++ name ++ "\navailable names: " ++ show (map fst $ Map.toList $ xabiTypes xabi)
-   Just (XabiDef.Enum _ _) -> return $ TypeEnum $ Text.pack name
-   Just (XabiDef.Struct _ _) -> return $ TypeStruct $ Text.pack name
-   Just (XabiDef.Contract _) -> return $ TypeContract $ Text.pack name
-xabiTypeToType xabi Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
-  value <- xabiTypeToType xabi v
+xabiTypeToType::Xabi.Type->Either String Type
+xabiTypeToType Xabi.Array { Xabi.entry=var, Xabi.length=(Just l)} =
+  TypeArrayFixed l <$> xabiTypeToType var
+xabiTypeToType Xabi.Array { Xabi.entry=var, Xabi.length=Nothing} =
+  TypeArrayDynamic <$> xabiTypeToType var
+xabiTypeToType Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
+xabiTypeToType (Xabi.UnknownLabel name) = return $ TypeContract $ Text.pack name -- TODO: Add enums and structs back in
+--  case Map.lookup (Text.pack name) (xabiTypes xabi) of
+--   Nothing -> Left $ "Contract is using a label that has not been defined as an enum, struct, or contract: " ++ name ++ "\navailable names: " ++ show (map fst $ Map.toList $ xabiTypes xabi)
+--   Just (XabiDef.Enum _ _) -> return $ TypeEnum $ Text.pack name
+--   Just (XabiDef.Struct _ _) -> return $ TypeStruct $ Text.pack name
+--   Just (XabiDef.Contract _) -> return $ TypeContract $ Text.pack name
+xabiTypeToType Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
+  value <- xabiTypeToType v
   return $ TypeMapping (xabiTypeToSimpleType k) value
-xabiTypeToType _ Xabi.Enum { Xabi.typedef=enumName } = return $ TypeEnum enumName
-xabiTypeToType _ Xabi.Struct { Xabi.typedef=name } = return $ TypeStruct name
-xabiTypeToType _ v = return $ SimpleType $ xabiTypeToSimpleType v
+xabiTypeToType Xabi.Enum { Xabi.typedef=enumName } = return $ TypeEnum enumName
+xabiTypeToType Xabi.Struct { Xabi.typedef=name } = return $ TypeStruct name
+xabiTypeToType Xabi.Variadic{} = return $ TypeVariadic
+xabiTypeToType v = return $ SimpleType $ xabiTypeToSimpleType v
 
 
 funcToType::Xabi->Text->Func->Either String Type
@@ -91,11 +92,11 @@ funcToType xabi name Func{..} = do
   let orderedFuncArgs = sortOn (Xabi.indexedTypeIndex . snd) $ Map.toList funcArgs
 
   convertedFuncArgs <- for orderedFuncArgs $ \(name', theType) -> do
-    theType' <- xabiTypeToType xabi . Xabi.indexedTypeType $ theType
+    theType' <- xabiTypeToType . Xabi.indexedTypeType $ theType
     return (name', theType')
 
   convertedFuncVals <- for (Map.toList funcVals) $ \(name', val) -> do
-    val' <- xabiTypeToType xabi $ Xabi.indexedTypeType val
+    val' <- xabiTypeToType $ Xabi.indexedTypeType val
     return (Just name', val')
 
   let enumSizes =
@@ -143,8 +144,8 @@ data FieldType = FieldType
 -}
 
 xabiFieldsToFields::Xabi->[(Text, Xabi.FieldType)]->Either String [(Text, Type)]
-xabiFieldsToFields xabi xabifields = for xabifields $ \(name, field) -> do
-    theType <- xabiTypeToType xabi $ Xabi.fieldTypeType field
+xabiFieldsToFields _ xabifields = for xabifields $ \(name, field) -> do
+    theType <- xabiTypeToType $ Xabi.fieldTypeType field
     return (name, theType)
 
 
@@ -176,7 +177,7 @@ xAbiToContract contractXabi@Xabi{..} = mdo
   -- The contract datatype doesn't have a notion of constants, so it's ok to filter them out here
   let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
   vars <- for vars' $ \(name, var) -> do
-    var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
+    var' <- (xabiTypeToType . Xabi.varTypeType) var
     return ((name, var'), Text.pack <$> (Xabi.varTypeConstant var >>= \b -> if b then Xabi.varTypeInitialValue var else Nothing))
 
   let constrMap = constructorToFuncMap xabiConstr
@@ -265,6 +266,7 @@ typeToXabiType typeDefs (TypeEnum enumName) =
    Just x -> Xabi.Enum (Just 1) enumName $ Just $ map snd $ sortOn fst $ Bimap.toList x
 typeToXabiType _ (TypeContract contractName) = Xabi.Contract contractName
 typeToXabiType _ TypeFunction{} = error "typeToXabiType was called with function type, which isn't allowed"
+typeToXabiType _ TypeVariadic{} = Xabi.Variadic
 
 
 simpleTypeToXabiType::SimpleType->Xabi.Type

@@ -24,9 +24,11 @@ module Blockchain.VMContext
     , ContextDBs(..)
     , MemDBs(..)
     , ContextState(..)
+    , QueueEvent(..)
     , Context(..)
     , ContextBestBlockInfo(..)
     , ContextM
+    , GasCap(..)
     , stateDB
     , hashDB
     , codeDB
@@ -43,22 +45,27 @@ module Blockchain.VMContext
     , memDBs
     , baggerState
     , bestBlockInfo
+    , vmGasCap
     , hasBlockstanbul
     , blockRequested
-    , coinbaseQueue
     , txRunResultsCache
     , debugSettings
     , dbs
     , state
+    , stateDiffQueue
     , contextGet
     , contextGets
     , contextPut
     , contextModify
     , contextModify'
     , runTestContextM
+    , initContext
     , runContextM
+    , runContextM'
     , evalContextM
+    , evalContextM'
     , execContextM
+    , execContextM'
     , incrementNonce
     , getNewAddress
     , getNewAddressWithSalt
@@ -82,8 +89,6 @@ import           Data.Default
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromMaybe)
 import qualified Data.NibbleString                  as N
-import qualified Data.Sequence                      as Q
-import           Data.Word
 import qualified Data.Text                          as T
 import qualified Data.Text.Encoding                 as Text
 import           Data.Traversable                   (for)
@@ -124,11 +129,12 @@ import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr()
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Gas
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
+import           Blockchain.Strato.StateDiff        (StateDiff)
 import           Blockchain.Data.RLP
 import qualified Blockchain.TxRunResultCache        as TRC
 import           Blockchain.VM.SolidException
@@ -147,10 +153,13 @@ newtype CurrentBlockHash = CurrentBlockHash { unCurrentBlockHash :: Keccak256 }
 newtype IsBlockstanbul = IsBlockstanbul { unIsBlockstanbul :: Bool }
   deriving (Generic, NFData, Show, Eq)
 
+newtype GasCap = GasCap { unVmGasCap :: Gas }
+  deriving (Generic, NFData, Show, Eq)
+
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (Keccak256, BlockData, Integer, Int, Int)
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockData !Integer !Int !Int
     deriving (Eq, Read, Show, Generic, NFData)
 
 data ContextDBs = ContextDBs
@@ -165,12 +174,12 @@ data ContextDBs = ContextDBs
 makeLenses ''ContextDBs
 
 data MemDBs = MemDBs
-  { _stateTxMap      :: M.Map Account AddressStateModification
-  , _stateBlockMap   :: M.Map Account AddressStateModification
-  , _storageTxMap    :: M.Map (Account, B.ByteString) B.ByteString
-  , _storageBlockMap :: M.Map (Account, B.ByteString) B.ByteString
-  , _stateRoots      :: M.Map (Keccak256, Maybe Word256) MP.StateRoot
-  , _currentBlock    :: Maybe CurrentBlockHash
+  { _stateTxMap      :: !(M.Map Account AddressStateModification)
+  , _stateBlockMap   :: !(M.Map Account AddressStateModification)
+  , _storageTxMap    :: !(M.Map (Account, B.ByteString) B.ByteString)
+  , _storageBlockMap :: !(M.Map (Account, B.ByteString) B.ByteString)
+  , _stateRoots      :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot)
+  , _currentBlock    :: !(Maybe CurrentBlockHash)
   } deriving (Generic, NFData, Show)
 makeLenses ''MemDBs
 
@@ -185,14 +194,14 @@ instance Default MemDBs where
     }
 
 data ContextState = ContextState
-  { _memDBs            :: MemDBs
+  { _memDBs            :: !MemDBs
   , _baggerState       :: !BaggerState
-  , _bestBlockInfo     :: ContextBestBlockInfo
-  , _hasBlockstanbul   :: Bool
-  , _blockRequested    :: Bool
-  , _coinbaseQueue     :: Q.Seq ((ChainMemberParsedSet,Word64), ChainMemberParsedSet)
+  , _bestBlockInfo     :: !ContextBestBlockInfo
+  , _vmGasCap          :: !Gas
+  , _hasBlockstanbul   :: !Bool
+  , _blockRequested    :: !Bool
   , _txRunResultsCache :: TRC.Cache
-  , _debugSettings     :: Maybe DebugSettings
+  , _debugSettings     :: !(Maybe DebugSettings)
   } deriving (Generic, NFData)
 makeLenses ''ContextState
 
@@ -201,17 +210,20 @@ instance Default ContextState where
     { _memDBs            = def
     , _baggerState       = defaultBaggerState
     , _bestBlockInfo     = Unspecified
+    , _vmGasCap          = Gas flags_gasLimit
     , _hasBlockstanbul   = True
     , _blockRequested    = False
-    , _coinbaseQueue     = Q.empty
     , _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache"
     , _debugSettings     = Nothing
     }
 
+data QueueEvent = TXR TransactionResult | SD StateDiff | Flush
+
 data Context = Context
-  { _dbs   :: ContextDBs
-  , _state :: IORef ContextState
-  } deriving (Generic, NFData)
+  { _dbs            :: ContextDBs
+  , _state          :: IORef ContextState
+  , _stateDiffQueue :: (TQueue QueueEvent)
+  } deriving (Generic)
 makeLenses ''Context
 
 type ContextM = ReaderT Context (ResourceT (LoggingT IO))
@@ -229,8 +241,10 @@ type VMBase m = ( MonadIO m
                 , Mod.Modifiable GenesisRoot m
                 , Mod.Modifiable BestBlockRoot m
                 , Mod.Modifiable CurrentBlockHash m
+                , Mod.Modifiable GasCap m
                 , HasMemAddressStateDB m
                 , A.Selectable Word256 ParentChainIds m
+                , A.Selectable Account AddressState m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
@@ -414,6 +428,9 @@ instance (Account `A.Alters` AddressState) ContextM where
   insert _ = putAddressState
   delete _ = deleteAddressState
 
+instance A.Selectable Account AddressState ContextM where
+  select _ = getAddressStateMaybe
+
 instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
   lookup _ chainId = do
     mBH <- gets $ view $ memDBs . currentBlock
@@ -471,7 +488,7 @@ lookupX509AddrFromCBHash k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8 
         certRegistryKey = certKey (Address 0x509)
     mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
-    $logInfoS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
+    $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
     case mAccount of
         Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
         _ -> pure Nothing
@@ -510,8 +527,14 @@ instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
     for mRBB $ \(RedisBestBlock sha num diff) ->
       return . WorldBestBlock $ BestBlock sha num diff
 
-runTestContextM :: ( MonadIO m
-                   , MonadUnliftIO m
+instance Mod.Modifiable GasCap ContextM where
+  get _ = contextGets (GasCap . _vmGasCap)
+
+  put _ (GasCap g) = do 
+    contextModify (vmGasCap .~ g)
+    $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
+
+runTestContextM :: ( MonadUnliftIO m
                    , HasStateDB (ReaderT Context (ResourceT m))
                    )
                 => ReaderT Context (ResourceT m) a
@@ -564,15 +587,16 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
             , _baggerState       = defaultBaggerState
             , _bestBlockInfo     = Unspecified
             , _hasBlockstanbul   = False
+            , _vmGasCap          = 100000
             , _blockRequested    = False
-            , _coinbaseQueue     = Q.empty
             , _txRunResultsCache = cache
             , _debugSettings     = Nothing
             }
-
+      que <- newTQueueIO 
       let ctx = Context
             { _dbs   = cdbs
             , _state = cstate
+            , _stateDiffQueue = que
             }
       a <- flip runReaderT ctx $ do
         MP.initializeBlank
@@ -581,62 +605,89 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       cstate' <- readIORef cstate
       return (a, cstate')
 
-runContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
+initContext :: (MonadUnliftIO m, MonadLoggerIO m, MonadResource m)
+            => Maybe DebugSettings
+            -> m Context
+initContext dSettings = do
+  liftIO $ createDirectoryIfMissing False $ dbDir "h"
+  conn <- createPostgresqlPool connStr 20
+  let ldbOptions = DB.defaultOptions
+        { DB.createIfMissing = True
+        , DB.cacheSize       = flags_ldbCacheSize
+        , DB.blockSize       = flags_ldbBlockSize
+        }
+  sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
+  hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
+  cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+  blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
+  rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
+  kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
+  cache <- liftIO $ TRC.new 64
+
+  let cdbs = ContextDBs
+        { _stateDB        = MP.StateDB sdb
+        , _hashDB         = HashDB hdb
+        , _codeDB         = CodeDB cdb
+        , _blockSummaryDB = BlockSummaryDB blksumdb
+        , _kafkaState     = kafkaStateRef
+        , _redisPool      = RBDB.RedisConnection rPool
+        , _sqldb          = conn
+        }
+
+  cstate <- newIORef $ def
+                     & txRunResultsCache .~ cache
+                     & debugSettings .~ dSettings
+                     & hasBlockstanbul .~ flags_blockstanbul
+  que <- newTQueueIO
+  pure Context
+        { _dbs   = cdbs
+        , _state = cstate
+        , _stateDiffQueue = que
+        }
+
+runContextM :: (MonadUnliftIO m, MonadLoggerIO m)
             => Maybe DebugSettings
             -> ReaderT Context (ResourceT m) a
             -> m (a, ContextState)
 runContextM dSettings f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
-      conn <- createPostgresqlPool connStr 20
-      let ldbOptions = DB.defaultOptions
-            { DB.createIfMissing = True
-            , DB.cacheSize       = flags_ldbCacheSize
-            , DB.blockSize       = flags_ldbBlockSize
-            }
-      sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
-      hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
-      cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
-      blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-      rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-      kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
-      cache <- liftIO $ TRC.new 64
+      ctx <- initContext dSettings
+      runContextM' ctx f
 
-      let cdbs = ContextDBs
-            { _stateDB        = MP.StateDB sdb
-            , _hashDB         = HashDB hdb
-            , _codeDB         = CodeDB cdb
-            , _blockSummaryDB = BlockSummaryDB blksumdb
-            , _kafkaState     = kafkaStateRef
-            , _redisPool      = RBDB.RedisConnection rPool
-            , _sqldb          = conn
-            }
-
-      cstate <- newIORef $ def
-                         & txRunResultsCache .~ cache
-                         & debugSettings .~ dSettings
-                         & hasBlockstanbul .~ flags_blockstanbul
-
-      let ctx = Context
-            { _dbs   = cdbs
-            , _state = cstate
-            }
-      a <- runReaderT f ctx
-      cstate' <- readIORef cstate
-      return (a, cstate')
+runContextM' :: MonadUnliftIO m
+             => Context
+             -> ReaderT Context m a
+             -> m (a, ContextState)
+runContextM' ctx f = do
+  a <- runReaderT f ctx
+  cstate' <- readIORef $ ctx ^. state
+  return (a, cstate')
 
 
-evalContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
+evalContextM :: (MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m a
 evalContextM d f = fst <$> runContextM d f
 
-execContextM :: (MonadIO m, MonadUnliftIO m, MonadLoggerIO m)
+evalContextM' :: MonadUnliftIO m
+              => Context
+              -> ReaderT Context m a
+              -> m a
+evalContextM' ctx f = fst <$> runContextM' ctx f
+
+execContextM :: (MonadUnliftIO m, MonadLoggerIO m)
              => Maybe DebugSettings
              -> ReaderT Context (ResourceT m) a
              -> m ContextState
 execContextM d f = snd <$> runContextM d f
+
+execContextM' :: MonadUnliftIO m
+              => Context
+              -> ReaderT Context m a
+              -> m ContextState
+execContextM' ctx f = snd <$> runContextM' ctx f
 
 incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
 incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->
@@ -650,17 +701,21 @@ getNewAddress account = do
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 
-getNewAddressWithSalt :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> Value -> String -> Keccak256 -> m Account
-getNewAddressWithSalt account salt cname hsh = do
+getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
+getNewAddressWithSalt account salt hsh args = do
   nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty account) ++ ", nonce=" ++ show nonce
-  let rlpEncodedSalt = case salt of
-          (SInteger i) -> rlpEncode i
-          (SString s) -> rlpEncode s
+  let saltAsString = case salt of
+          (SString s) -> s
           _ -> invalidArguments "big major bad" salt
-  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) rlpEncodedSalt cname $ keccak256ToByteString hsh
-  incrementNonce account
-  return $ (accountAddress .~ newAddress) account
+  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) saltAsString (keccak256ToByteString hsh) args
+  $logDebugS "getNewAddressWithSalt" $ T.pack $ (show $ account ^. accountAddress) ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
+  doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) $ Account newAddress (_accountChainId account)
+  case doesAddressAlreadyExist of
+    Just _ -> duplicateContract $ "The address " ++ (show newAddress) ++ " already exists. Try using a different salt or constructor arguments."
+    Nothing ->  do
+      incrementNonce account
+      return $ (accountAddress .~ newAddress) account
 
 purgeStorageMap :: HasMemStorageDB m => Account -> m ()
 purgeStorageMap account = do

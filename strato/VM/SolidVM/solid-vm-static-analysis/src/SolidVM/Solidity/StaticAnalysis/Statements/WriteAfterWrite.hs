@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE LambdaCase        #-}
 module SolidVM.Solidity.StaticAnalysis.Statements.WriteAfterWrite
   ( detector
   ) where
@@ -115,7 +116,7 @@ simpleStatementHelper (VariableDefinition vs mExpr) = case mExpr of
   Nothing -> pure []
   Just expr -> do
     anns <- expressionHelper expr
-    for_ vs $ \VarDefEntry{..} -> modify $ M.insert vardefName vardefContext
+    for_ vs $ \case VarDefEntry{..} -> modify $ M.insert vardefName vardefContext; _ -> pure (); -- second case should be impossible?
     pure anns
 simpleStatementHelper (ExpressionStatement expr) =
   expressionHelper expr
@@ -190,6 +191,7 @@ expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b,
 expressionHelper (BoolLiteral _ _) = pure []
 expressionHelper (NumberLiteral _ _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
+expressionHelper (AccountLiteral _ _) = pure []
 expressionHelper (HexaLiteral _ _) = pure []
 expressionHelper (TupleExpression _ es) =
   concat <$> traverse (maybe (pure []) expressionHelper) es

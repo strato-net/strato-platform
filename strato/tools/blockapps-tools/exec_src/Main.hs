@@ -20,7 +20,6 @@ import           DumpKafkaVMEvents
 import           DumpKafkaRaw
 import           DumpKafkaSequencer
 import           DumpKafkaStateDiff
-import           DumpKafkaUnminedBlocks
 import           DumpKafkaUnSequencer
 import           DumpRedis
 import           FRawMP
@@ -61,7 +60,6 @@ data Options = State{root::String, db::String}
              | DumpKafkaSequencerVM{startingBlock::Int}
              | DumpKafkaSequencerP2P{startingBlock::Int}
              | DumpKafkaUnSequencer{startingBlock::Int}
-             | DumpKafkaUnminedBlocks{startingBlock::Int}
              | DumpKafkaRaw{streamName::String, startingBlock::Int}
              | DumpKafkaStateDiff{startingBlock::Int}
              | DumpRedis{databaseNumber::Integer}
@@ -87,6 +85,7 @@ data Options = State{root::String, db::String}
              | GetPrivacy { registry :: String, key :: String }
              | PutPrivacy { registry :: String, key :: String , value :: String }
              | ValidatorBehavior { valB :: Bool } 
+             | DeleteDepBlock { valK :: String } 
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
@@ -200,12 +199,6 @@ dumpKafkaVMEventsOptions =
     startingBlock := 0 += typ "INT"
     ]
 
-dumpKafkaUnminedBlocksOptions::Annotate Ann
-dumpKafkaUnminedBlocksOptions =
-  record DumpKafkaUnminedBlocks{startingBlock=undefined} [
-    startingBlock := 0 += typ "INT"
-    ]
-
 dumpKafkaRawOptions::Annotate Ann
 dumpKafkaRawOptions =
   record DumpKafkaRaw{startingBlock=undefined, streamName=undefined} [
@@ -300,6 +293,11 @@ validatorBehaviorOptions = record ValidatorBehavior{valB = undefined}
                         [ valB := error "valB" += typ "BOOL" += argPos 0
                         ]
 
+deleteDepBlockOptions :: Annotate Ann
+deleteDepBlockOptions = record DeleteDepBlock{valK = undefined} 
+                        [ valK := error "valK" += typ "STRING" += argPos 0
+                        ]
+
 saveKafkaOptions :: Annotate Ann
 saveKafkaOptions = record SaveKafka { filename = error "unused filename", topic = error "unused topic"}
                  [ filename := error "savekafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename"
@@ -361,7 +359,6 @@ options = modes_ [blockGoOptions
                 , dumpKafkaSequencerP2pOptions
                 , dumpKafkaStateDiffOptions
                 , dumpKafkaUnSequencerOptions
-                , dumpKafkaUnminedBlocksOptions
                 , dumpRedisOptions
                 , fRawMPOptions
                 , hashOptions
@@ -382,6 +379,7 @@ options = modes_ [blockGoOptions
                 , addGenesisFromFileOptions
                 , addTxsFromFileOptions
                 , validatorBehaviorOptions
+                , deleteDepBlockOptions
                 , saveKafkaOptions
                 , loadKafkaOptions
                 , verifyKafkaFileOptions
@@ -419,12 +417,12 @@ run DumpKafkaSequencerP2P{..}  = dumpKafkaSequencerP2P (fromIntegral startingBlo
 run DumpKafkaUnSequencer{..}   = dumpKafkaUnSequencer (fromIntegral startingBlock)
 run DumpKafkaBlocks{..}        = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaVMEvents{..}      = dumpKafkaVMEvents (fromIntegral startingBlock)
-run DumpKafkaUnminedBlocks{..} = dumpKafkaUnminedBlocks (fromIntegral startingBlock)
 run DumpKafkaRaw{..}           = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql
 run InsertTX{}                 = insertTX
 run ValidatorBehavior{..}      = validatorBehavior valB
+run DeleteDepBlock{..}         = deleteDepBlock valK
 run Checkpoints{..}            = case operation of
       Get           -> doCheckpointGet service
       Put           -> doCheckpointPut service (fromIntegral <$> offset) cp

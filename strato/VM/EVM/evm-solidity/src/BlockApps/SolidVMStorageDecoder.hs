@@ -7,6 +7,7 @@
 module BlockApps.SolidVMStorageDecoder
   ( decodeSolidVMValues
   , decodeCacheValues
+  , decodeCacheValuesForMapping
   , replayDeltas -- Testing only
   , ReplayFailure(..)
   , synthesize -- Testing only
@@ -52,13 +53,25 @@ decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T
 decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _]) = True
-      isBasic _ = False
+      isBasic _= False
   pathValues <- mapM parseM $ M.toList hxs
   let pathValues' = filter (isBasic . fst) pathValues
   finalState <- bimap show HM.toList $ case prevState of
     [] -> synthesize pathValues'
     tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
+  
   mapM (bimapM bsToText return) finalState
+
+decodeCacheValuesForMapping :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValuesForMapping hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForMapping: %s" . show) id $ do
+  let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
+      isBasic (StoragePath [Field _, MapIndex _]) = True
+      isBasic _= False
+  pathValues <- mapM parseM $ M.toList hxs
+  let pathValues' = filter (isBasic . fst) pathValues
+  finalState <- bimap show HM.toList $ synthesize pathValues'
+  mapM (bimapM bsToText return) finalState
+
 
 bsToText :: B.ByteString -> Either String T.Text
 bsToText = first show . decodeUtf8'
@@ -84,7 +97,7 @@ valueToSolidityValue = \case
   ValueArrayDynamic ivs -> Just . SolidityArray <$> mapMaybeM valueToSolidityValue (unsparse ivs)
   ValueArrayFixed{} -> Left "internal error: SolidVM generate state for static arrays"
   ValueFunction{} -> Left "internal error: SolidVM generating state for functions"
-
+  ValueVariadic{} -> Left "internal error: SolidVM generating state for variadic"
 
   where fromShowable :: (Show a) => a -> Either String (Maybe SolidityValue)
         fromShowable = Right . Just . SolidityValueAsString . T.pack . show

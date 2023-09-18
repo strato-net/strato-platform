@@ -5,6 +5,8 @@ module Slipstream.Metrics
   , recordAction
   , recordCombinedAction
   , incNumTables
+  , incNumMappingTables
+  , incNumAbstractRowTables
   , incNumHistoryTables
   , incNumBloomWrites
   , recordStackDepth
@@ -19,7 +21,6 @@ module Slipstream.Metrics
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.Cache.LRU as LRU
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Network.Kafka.Protocol (Offset)
@@ -75,8 +76,6 @@ recordGlobals g = liftIO $ do
   let rec  :: T.Text -> (Globals -> Int) -> IO ()
       rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
   rec "created_tables" (M.size . createdTables)
-  rec "history_list" (M.size . historyList)
-  rec "solidVM_info" (HM.size . solidVMInfo)
   rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
@@ -99,6 +98,12 @@ recordCombinedAction = recordActionOn "combined"
 
 incNumTables :: MonadIO m => m ()
 incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter
+
+incNumMappingTables :: MonadIO m => m ()
+incNumMappingTables = liftIO $ withLabel tablesCreated "mapping" incCounter
+
+incNumAbstractRowTables :: MonadIO m => m ()
+incNumAbstractRowTables = liftIO $ withLabel tablesCreated "abstract" incCounter
 
 incNumHistoryTables :: MonadIO m => m ()
 incNumHistoryTables = liftIO $ withLabel tablesCreated "history" incCounter

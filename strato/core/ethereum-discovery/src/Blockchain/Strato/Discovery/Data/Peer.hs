@@ -66,7 +66,9 @@ PPeer
     bondState Int
     activeState Int
     version T.Text
+    disableException T.Text
     nextDisableWindowSeconds Int default=5
+    nextUdpDisableWindowSeconds Int default=5
     disableExpiration UTCTime default=now()
     ~enode Enode Maybe
     deriving Show Read Eq
@@ -82,7 +84,7 @@ newtype BondedPeers = BondedPeers { unBondedPeers :: [PPeer] }
 newtype BondedPeersForUDP = BondedPeersForUDP { unBondedPeersForUDP :: [PPeer] }
 newtype UnbondedPeers = UnbondedPeers { unUnbondedPeers :: [PPeer] }
 newtype ClosestPeers = ClosestPeers { unClosestPeers :: [PPeer] }
-newtype UdpEnableTime = UdpEnableTime UTCTime
+newtype UdpEnableTime = UdpEnableTime UTCTime deriving (Eq, Ord)
 newtype TcpEnableTime = TcpEnableTime UTCTime deriving (Eq, Ord)
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 
@@ -98,6 +100,19 @@ data PeerDisable =
     }
   deriving (Eq, Ord)
 
+data PeerUdpDisable =
+  ExtendPeerUdpDisableTime
+    { epdtUdpDisableTime :: UdpEnableTime
+    , epdtNextUdpDisableWindowFactor :: Int
+    }
+  | SetPeerUdpDisableTime
+    { epdtUdpDisableTime :: UdpEnableTime
+    , spdtNextUdpDisableWindowSeconds :: Int
+    , spdtUdpDisableExpiration :: UTCTime
+    }
+  | ResetPeerUdpDisable
+  deriving (Eq, Ord)
+
 instance RLPSerializable NodeID where
   rlpEncode (NodeID x) = RLPString x
   rlpDecode (RLPString x) = NodeID x
@@ -110,7 +125,7 @@ instance Mod.Accessible AvailablePeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- liftIO getCurrentTime
     fmap (AvailablePeers . map SQL.entityVal) $ flip runSqlPool sqldb $
-      SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
+      SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
 instance (A.Replaceable (IPAsText, TCPPort) ActivityState) IO where
   replace _ (IPAsText ip, TCPPort port) state = withGlobalSQLPool . runSqlPool $ do
@@ -128,6 +143,11 @@ instance (A.Replaceable (IPAsText, UDPPort) PeerBondingState) IO where
     flip runSqlPool sqldb $
       SQL.updateWhere [PPeerIp SQL.==. ip, PPeerUdpPort SQL.==. port] [PPeerBondState SQL.=. state]
 
+instance (A.Replaceable (IPAsText, TCPPort) PeerBondingState) IO where
+  replace _ (IPAsText ip, TCPPort port) (PeerBondingState state) = withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port] [PPeerBondState SQL.=. state]
+
 instance Mod.Accessible BondedPeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
@@ -144,7 +164,7 @@ instance Mod.Accessible UnbondedPeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
     fmap (UnbondedPeers . map SQL.entityVal) $ flip runSqlPool sqldb $
-      SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
+      SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime, PPeerEnableTime SQL.<. currentTime] []
 
 instance A.Selectable IPAsText ClosestPeers IO where
   select _ (IPAsText requesterIP) = withGlobalSQLPool $ \sqldb ->
@@ -181,6 +201,37 @@ instance A.Replaceable PPeer PeerDisable IO where
                                  , PPeerDisableExpiration SQL.=. disableExpiration
                                  ]
 
+instance A.Replaceable PPeer PeerUdpDisable IO where
+  replace _ peer d = withGlobalSQLPool $ \sqldb -> do
+    let selector = thisPeer peer
+    currentTime <- liftIO getCurrentTime
+    flip runSqlPool sqldb $ case d of
+      ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
+        SQL.updateWhere selector [ PPeerUdpEnableTime SQL.=. enableTime
+                                 , PPeerNextUdpDisableWindowSeconds SQL.*=. nextDisableWindowFactor
+                                 ]
+      SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
+        SQL.updateWhere selector [ PPeerUdpEnableTime SQL.=. enableTime
+                                 , PPeerNextUdpDisableWindowSeconds SQL.=. nextDisableWindow
+                                 , PPeerDisableExpiration SQL.=. disableExpiration
+                                 ]
+      ResetPeerUdpDisable ->
+        SQL.updateWhere selector [ PPeerUdpEnableTime SQL.=. currentTime
+                                 , PPeerNextUdpDisableWindowSeconds SQL.=. 5
+                                 , PPeerDisableExpiration SQL.=. currentTime
+                                 ]
+
+instance A.Replaceable PPeer T.Text IO where
+  replace _ peer' exception = withGlobalSQLPool $ \sqldb -> do
+    let peer = peer'{pPeerTcpPort=30303}
+    flip runSqlPool sqldb $
+      SQL.updateWhere (thisPeer peer) [PPeerDisableException SQL.=. exception]
+
+instance A.Replaceable T.Text PPeer IO where
+  replace _ message peer = withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message]
+
 pPeerString :: PPeer -> String
 pPeerString PPeer{..} = T.unpack pPeerIp ++ ":" ++ show pPeerTcpPort
 
@@ -211,7 +262,9 @@ buildPeerPoint (pubkeyMaybe, ip, _) =
         pPeerBondState=0,
         pPeerActiveState = 0,
         pPeerVersion = T.pack "61", -- fix
+        pPeerDisableException = T.pack "None",
         pPeerNextDisableWindowSeconds = 5,
+        pPeerNextUdpDisableWindowSeconds = 5,
         pPeerDisableExpiration = jamshidBirth,
         pPeerEnode = peerToEnode peer
         }
@@ -297,13 +350,32 @@ nonviolentDisable peer' = try $ do
 -- by the end of the month it would be disabled for years.
 lengthenPeerDisable :: (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m)
                     => PPeer -> m (Either SomeException ())
-lengthenPeerDisable peer' = try $ do
+lengthenPeerDisable = lengthenPeerDisableBy (24 * 60 * 60)
+
+lengthenPeerDisableBy :: (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m)
+                    => NominalDiffTime -> PPeer -> m (Either SomeException ())
+lengthenPeerDisableBy secs peer' = try $ do
+  currentTime <- liftIO getCurrentTime
+  let peer = peer'{pPeerTcpPort=30303}
+      disable = SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
+  A.replace (A.Proxy @PeerDisable) peer disable
+
+-- A variation of 'lengthenPeerDisable' but for UDP instead, currently used for ethereum-discovery.
+lengthenPeerDisable' :: (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m)
+                    => PPeer -> m (Either SomeException ())
+lengthenPeerDisable' peer' = try $ do
   currentTime <- liftIO getCurrentTime
   let peer = peer'{pPeerTcpPort=30303}
       disable = if (currentTime < pPeerDisableExpiration peer)
-                  then ExtendPeerDisableTime (TcpEnableTime $ fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime) 2
-                  else SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
-  A.replace (A.Proxy @PeerDisable) peer disable
+                  then ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral (pPeerNextUdpDisableWindowSeconds peer) `addUTCTime` currentTime) 2
+                  else SetPeerUdpDisableTime (UdpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
+  A.replace (A.Proxy @PeerUdpDisable) peer disable
+
+storeDisableException :: (MonadUnliftIO m, A.Replaceable PPeer T.Text m)
+                      => PPeer -> T.Text -> m (Either SomeException ())
+storeDisableException peer' e = try $ do
+  let peer = peer'{pPeerTcpPort=30303}
+  A.replace (A.Proxy) peer e               
 
 -- TODO: Allow an empty public key in the Enode type
 peerToEnode :: PPeer -> Maybe Enode
@@ -316,6 +388,18 @@ getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m 
 getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT
 
 -- todo: respect the requester's target. also is this basically getClosePeers?s
-getPeersClosestTo :: (MonadUnliftIO m, A.Selectable IPAsText ClosestPeers m)
+getPeersClosestTo :: (A.Selectable IPAsText ClosestPeers m)
                   => NodeID -> T.Text -> Point -> m [PPeer]
 getPeersClosestTo _ requesterIP _ = take 20 . maybe [] unClosestPeers <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)
+
+updateLastMessage :: (A.Replaceable T.Text PPeer m)
+                  => T.Text
+                  -> PPeer
+                  -> m ()
+updateLastMessage message peer = A.replace (A.Proxy @PPeer) message peer
+
+resetPeerUdp :: (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m)
+             => PPeer -> m (Either SomeException ())
+resetPeerUdp peer' = try $ do
+  let peer = peer'{pPeerTcpPort=30303}
+  A.replace (A.Proxy @PeerUdpDisable) peer ResetPeerUdpDisable

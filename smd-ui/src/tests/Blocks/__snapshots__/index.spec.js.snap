@@ -1,10 +1,94 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Blocks: index render stateless component 1`] = `
+exports[`Blocks: index render component With values 1`] = `
 ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
-  Symbol(enzyme.__unrendered__): <Blocks />,
+  Symbol(enzyme.__unrendered__): <Blocks
+    anyTouched={false}
+    array={
+      Object {
+        "insert": [Function],
+        "move": [Function],
+        "pop": [Function],
+        "push": [Function],
+        "remove": [Function],
+        "removeAll": [Function],
+        "shift": [Function],
+        "splice": [Function],
+        "swap": [Function],
+        "unshift": [Function],
+      }
+    }
+    asyncValidate={[Function]}
+    asyncValidating={false}
+    autofill={[Function]}
+    blur={[Function]}
+    chainIds={
+      Array [
+        Object {
+          "id": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+          "label": "mock-label",
+        },
+      ]
+    }
+    change={[Function]}
+    clearAsyncError={[Function]}
+    clearSubmit={[Function]}
+    clearSubmitErrors={[Function]}
+    destroy={[Function]}
+    dirty={false}
+    dispatch={[Function]}
+    error={undefined}
+    fetchChainIds={[Function]}
+    form="Blocks"
+    handleSubmit={[Function]}
+    initialValues={undefined}
+    initialize={[Function]}
+    initialized={false}
+    invalid={false}
+    pristine={true}
+    pure={true}
+    reset={[Function]}
+    selectChain={[Function]}
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+    storeSubscription={
+      Subscription {
+        "listeners": Object {
+          "clear": [Function],
+          "notify": [Function],
+          "subscribe": [Function],
+        },
+        "onStateChange": [Function],
+        "parentSub": undefined,
+        "store": Object {
+          "dispatch": [Function],
+          "getState": [Function],
+          "replaceReducer": [Function],
+          "subscribe": [Function],
+          Symbol(observable): [Function],
+        },
+        "unsubscribe": [Function],
+      }
+    }
+    submit={[Function]}
+    submitFailed={false}
+    submitSucceeded={false}
+    submitting={false}
+    touch={[Function]}
+    triggerSubmit={undefined}
+    untouch={[Function]}
+    valid={true}
+    warning={undefined}
+  />,
   Symbol(enzyme.__renderer__): Object {
     "batchedUpdates": [Function],
     "getNode": [Function],
@@ -22,7 +106,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-3"
+            className="col-sm-6"
           >
             <h3>
               Blocks
@@ -41,7 +125,7 @@ ShallowWrapper {
         "nodeType": "host",
         "props": Object {
           "children": <div
-            className="col-sm-3"
+            className="col-sm-6"
           >
             <h3>
               Blocks
@@ -58,7 +142,7 @@ ShallowWrapper {
             "children": <h3>
               Blocks
             </h3>,
-            "className": "col-sm-3",
+            "className": "col-sm-6",
           },
           "ref": null,
           "rendered": Object {
@@ -99,7 +183,7 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-3"
+              className="col-sm-6"
             >
               <h3>
                 Blocks
@@ -118,7 +202,7 @@ ShallowWrapper {
           "nodeType": "host",
           "props": Object {
             "children": <div
-              className="col-sm-3"
+              className="col-sm-6"
             >
               <h3>
                 Blocks
@@ -135,7 +219,260 @@ ShallowWrapper {
               "children": <h3>
                 Blocks
               </h3>,
-              "className": "col-sm-3",
+              "className": "col-sm-6",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": "Blocks",
+              },
+              "ref": null,
+              "rendered": "Blocks",
+              "type": "h3",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
+      ],
+      "type": "div",
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;
+
+exports[`Blocks: index render component without values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Blocks
+    anyTouched={false}
+    array={
+      Object {
+        "insert": [Function],
+        "move": [Function],
+        "pop": [Function],
+        "push": [Function],
+        "remove": [Function],
+        "removeAll": [Function],
+        "shift": [Function],
+        "splice": [Function],
+        "swap": [Function],
+        "unshift": [Function],
+      }
+    }
+    asyncValidate={[Function]}
+    asyncValidating={false}
+    autofill={[Function]}
+    blur={[Function]}
+    chainIds={Array []}
+    change={[Function]}
+    clearAsyncError={[Function]}
+    clearSubmit={[Function]}
+    clearSubmitErrors={[Function]}
+    destroy={[Function]}
+    dirty={false}
+    dispatch={[Function]}
+    error={undefined}
+    fetchChainIds={[Function]}
+    form="Blocks"
+    handleSubmit={[Function]}
+    initialValues={undefined}
+    initialize={[Function]}
+    initialized={false}
+    invalid={false}
+    pristine={true}
+    pure={true}
+    reset={[Function]}
+    selectChain={[Function]}
+    store={
+      Object {
+        "dispatch": [Function],
+        "getState": [Function],
+        "replaceReducer": [Function],
+        "subscribe": [Function],
+        Symbol(observable): [Function],
+      }
+    }
+    storeSubscription={
+      Subscription {
+        "listeners": Object {
+          "clear": [Function],
+          "notify": [Function],
+          "subscribe": [Function],
+        },
+        "onStateChange": [Function],
+        "parentSub": undefined,
+        "store": Object {
+          "dispatch": [Function],
+          "getState": [Function],
+          "replaceReducer": [Function],
+          "subscribe": [Function],
+          Symbol(observable): [Function],
+        },
+        "unsubscribe": [Function],
+      }
+    }
+    submit={[Function]}
+    submitFailed={false}
+    submitSucceeded={false}
+    submitting={false}
+    touch={[Function]}
+    triggerSubmit={undefined}
+    untouch={[Function]}
+    valid={true}
+    warning={undefined}
+  />,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "host",
+    "props": Object {
+      "children": Array [
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-6"
+          >
+            <h3>
+              Blocks
+            </h3>
+          </div>
+        </div>,
+        <withRouter(Connect(ReduxForm)) />,
+      ],
+      "className": "container-fluid pt-dark",
+    },
+    "ref": null,
+    "rendered": Array [
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="col-sm-6"
+          >
+            <h3>
+              Blocks
+            </h3>
+          </div>,
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <h3>
+              Blocks
+            </h3>,
+            "className": "col-sm-6",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": "Blocks",
+            },
+            "ref": null,
+            "rendered": "Blocks",
+            "type": "h3",
+          },
+          "type": "div",
+        },
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
+    ],
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": Array [
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-6"
+            >
+              <h3>
+                Blocks
+              </h3>
+            </div>
+          </div>,
+          <withRouter(Connect(ReduxForm)) />,
+        ],
+        "className": "container-fluid pt-dark",
+      },
+      "ref": null,
+      "rendered": Array [
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="col-sm-6"
+            >
+              <h3>
+                Blocks
+              </h3>
+            </div>,
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <h3>
+                Blocks
+              </h3>,
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {

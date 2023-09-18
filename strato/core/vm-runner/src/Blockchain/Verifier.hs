@@ -17,19 +17,19 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Blockchain.Database.MerklePatricia          as MP
 import           Blockchain.DB.StateDB
-import           Blockchain.Mining
-import           Blockchain.Mining.Instant
-import           Blockchain.Mining.Normal
-import           Blockchain.Mining.SHA
+-- import           Blockchain.Mining
+-- import           Blockchain.Mining.Instant
+-- import           Blockchain.Mining.Normal
+-- import           Blockchain.Mining.SHA
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Util
 import           Blockchain.Verification
 import           Blockchain.VMOptions
+import           Blockchain.Strato.Model.Options
 
 {-
 nextGasLimit::Integer->Integer->Integer
@@ -39,9 +39,9 @@ nextGasLimit oldGasLimit oldGasUsed = max (max 125000 3141592) ((oldGasLimit * 1
 nextGasLimitDelta::Integer->Integer
 nextGasLimitDelta oldGasLimit  = oldGasLimit `div` 1024
 
-checkUnclesHash::OutputBlock->Bool
-checkUnclesHash OutputBlock{obBlockData=bd,obBlockUncles=bus} =
-    blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray (rlpEncode <$> bus))
+-- checkUnclesHash::OutputBlock->Bool
+-- checkUnclesHash OutputBlock{obBlockData=bd,obBlockUncles=bus} =
+--     blockDataUnclesHash bd == hash (rlpSerialize $ RLPArray (rlpEncode <$> bus))
 
 --data BlockValidityError = BlockDifficultyWrong Integer Integer | BlockNumberWrong Integer Integer | BlockGasLimitWrong Integer Integer | BlockNonceWrong | BlockUnclesHashWrong
 {-
@@ -65,15 +65,8 @@ checkParentChildValidity _ OutputBlock{obBlockData=c} parentBSum = do
              $ fail $ "Block gasLimit is lower than minGasLimit: got " ++ show (blockDataGasLimit c) ++ ", should be larger than " ++ show (minGasLimit flags_testnet::Integer)
     return ()
 
-verifier::Miner
-verifier = (if (flags_miner == Normal) then normalMiner else if(flags_miner == Instant) then instantMiner else shaMiner)
-
-addAllKVs :: (RLPSerializable obj, (MP.StateRoot `A.Alters` MP.NodeData) m)
-          => MP.StateRoot -> [(Integer, obj)] -> m MP.StateRoot
-addAllKVs x [] = return x
-addAllKVs sr (x:rest) = do
-  sr' <- MP.unsafePutKeyVal sr (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
-  addAllKVs sr' rest
+-- verifier::Miner
+-- verifier = (if (flags_miner == Normal) then normalMiner else if(flags_miner == Instant) then instantMiner else shaMiner)
 
 verifyTransactionRoot'::OutputBlock -> (Bool,MP.StateRoot)
 verifyTransactionRoot' OutputBlock{obBlockData=bd,obReceiptTransactions=txs} =
@@ -81,7 +74,7 @@ verifyTransactionRoot' OutputBlock{obBlockData=bd,obReceiptTransactions=txs} =
 
 verifyTransactionRoot::HasStateDB m=>OutputBlock->m (Bool,MP.StateRoot)
 verifyTransactionRoot OutputBlock{obBlockData=bd,obReceiptTransactions=txs} = do
-  sr <- addAllKVs MP.emptyTriePtr $ zip [0..] $ (otBaseTx <$> txs)
+  sr <- MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer)..] $ (otBaseTx <$> txs)
   return (blockDataTransactionsRoot bd == sr, sr)
 
 verifyOmmersRoot::HasStateDB m=>OutputBlock->m Bool
@@ -100,20 +93,7 @@ checkValidity isHomestead parentBSum b = do
   ommersVerified <- verifyOmmersRoot b
   when (not ommersVerified) $ error "ommersRoot doesn't match uncles"
   checkParentChildValidity isHomestead b parentBSum
-  mErr <- if flags_miningVerification
-    then do
-      let miningVerified = (verify verifier) (outputBlockToBlock b) -- todo: dont wanna rewrite adit just yet
-      if miningVerified
-        then pure Nothing
-        else pure $ Just "block falsely mined, verification failed"
-    else pure Nothing
-  --nIsValid <- nonceIsValid' b
-  --unless nIsValid $ fail $ "Block nonce is wrong: " ++ format b
-  case mErr of
-    Just err -> pure $ Just err
-    Nothing -> if checkUnclesHash b
-                 then pure Nothing
-                 else pure $ Just "Block unclesHash is wrong"
+  pure Nothing
 
 {-
                     coinbase=prvKey2Address prvKey,

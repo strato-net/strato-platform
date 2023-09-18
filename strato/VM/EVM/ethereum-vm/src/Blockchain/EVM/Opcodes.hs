@@ -14,7 +14,8 @@ import           Data.Primitive.ByteArray
 import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Exts
-import           GHC.Integer.GMP.Internals (Integer(..), BigNat(..))
+import           GHC.Num.BigNat
+import           GHC.Num.Integer
 import           GHC.Word
 import           System.Endian
 import           System.IO.Unsafe
@@ -224,8 +225,10 @@ defaultExtract bs off len = let slice = B.take len . B.drop off $ bs
 
 -- Used to push 1 byte
 fastExtractByte :: B.ByteString-> Int -> Word256
-fastExtractByte !code !off = let !(W8# b#) = BU.unsafeIndex code off
-                             in BigWord (S# (word2Int# b#))
+fastExtractByte !code !off = let !byte = BU.unsafeIndex code off
+                             in BigWord (fromIntegral byte)
+
+
 
 -- Used to push 2-7 bytes
 fastExtractSingle :: B.ByteString-> Int -> Int -> Word256
@@ -236,7 +239,7 @@ fastExtractSingle !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code
   -- those garbage bytes are truncated by the shift.
   !rawBits <- peekByteOff offPtr off
   let !(W64# w#) = toBE64 rawBits `shiftR` delta
-  return $! BigWord (S# (word2Int# w#))
+  return $! BigWord (IS (word2Int# w#))
 
 -- Used to push 25-32 bytes
 fastExtractQuad :: B.ByteString -> Int -> Int -> Word256
@@ -257,4 +260,4 @@ fastExtractQuad !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code $
   let !mask = bit (8 * (len - 24)) - 1
   writeByteArray dst 3 $! toBE64 hh .&. mask
   !(ByteArray ba#) <- unsafeFreezeByteArray dst
-  return (BigWord (Jp# (BN# ba#)))
+  return (BigWord (IP (unBigNat (BN# ba#))))

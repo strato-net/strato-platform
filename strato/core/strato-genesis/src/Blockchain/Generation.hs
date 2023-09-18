@@ -14,6 +14,7 @@ module Blockchain.Generation (
   insertContractsJSONHashMaps,
   insertContracts,
   insertCertRegistryContract,
+  insertUserRegistryContract,
   insertMercataGovernanceContract,
   readCertsFromGenesisInfo,
   readValidatorsFromGenesisInfo,
@@ -24,15 +25,17 @@ module Blockchain.Generation (
 ) where
 
 import qualified Data.Aeson as Ae
+import qualified Data.Aeson.KeyMap as KM
+import qualified Data.Aeson.Key as DAK
 import qualified Data.JsonStream.Parser as JS
 import Data.Bits
 import Data.Maybe
+import qualified Data.Bifunctor as BF
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.List as List
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map.Strict as M
 import Data.Scientific (floatingOrInteger)
 import           Data.Text (Text)
@@ -60,7 +63,7 @@ data Type = Number Integer
           | List (V.Vector Type)
           | Struct [Type]
           -- TODO(tim): Make the key type generic over hashable things.
-          | Mapping (HM.HashMap Text Type)
+          | Mapping (KM.KeyMap Type)
   deriving (Eq, Show, Generic)
 
 instance Ae.FromJSON Type where
@@ -70,7 +73,7 @@ instance Ae.FromJSON Type where
                                 Right n -> return . Number $ n
   parseJSON (Ae.Array as) = List <$> V.mapM Ae.parseJSON as
   parseJSON (Ae.Object ss) = let a `cmp` b = fst a `compare` fst b
-                             in Struct <$> (mapM (Ae.parseJSON . snd) . List.sortBy cmp . HM.toList $ ss)
+                             in Struct <$> (mapM (Ae.parseJSON . snd) . List.sortBy cmp . KM.toList $ ss)
   parseJSON (Ae.Bool b) = return . Number $ if b then 1 else 0
   parseJSON _ = fail "unknown aeson type"
 
@@ -78,7 +81,7 @@ instance Ae.FromJSON Type where
 -- and probably needs to be replaced with something more generic.
 -- For example, this prohibits mapping(address => mapping(address => bool)),
 -- both because it only uses a string key and because the values is not Type2
-data TypeHashMap = Type Type | MappingHashMap (HM.HashMap Text Type) deriving (Eq, Show, Generic)
+data TypeHashMap = Type Type | MappingHashMap (KM.KeyMap Type) deriving (Eq, Show, Generic)
 
 toType :: TypeHashMap -> Type
 toType (Type t) = t
@@ -150,7 +153,7 @@ encodeType p (Mapping hm) =
       -- the slot is keccak256(s <> p)
       trieKey s = mapHash (bytesToWord256 . payload $ s) p
       place (s, v) = fst . encodeType (trieKey s) $ v
-  in (pointer:(concatMap place . HM.toList $ hm), p+1)
+  in (pointer:(concatMap place . fmap (BF.first DAK.toText) . KM.toList $ hm), p+1)
 
 encodeRecord :: Word256 -> [Type] -> [(Word256, Word256)]
 encodeRecord k = fst . encodeSequentially k
@@ -439,28 +442,37 @@ insertMercataGovernanceContract validators admins gi =
           [ (".owner", rootAddress),
             (".validatorCount", rlpWrap . BInteger . toInteger $ length validators),
             (".adminCount", rlpWrap . BInteger . toInteger $ length admins)
-          ] ++ map (\(i, CommonName o u c True) ->
-                     ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-                     , addrToCertIdx . show $ validatorAddr i)) valIx
-            ++ map (\(i, CommonName o u c True) ->
-                     ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-                     , addrToCertIdx . show $ adminAddr i)) adminIx
-        validatorAccts = map (\(i, CommonName o u c True) ->
-          SolidVMContractWithStorage (validatorAddr i) 0 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance)) [
-            (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-            (".org", rlpWrap . BString $ encodeUtf8 o),
-            (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-            (".commonName", rlpWrap . BString $ encodeUtf8 c),
-            (".isActive", rlpWrap $ BBool True)]
-          ) valIx
-        adminAccts = map (\(i, CommonName o u c True) ->
-          SolidVMContractWithStorage (adminAddr i) 0 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance)) [
-            (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-            (".org", rlpWrap . BString $ encodeUtf8 o),
-            (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-            (".commonName", rlpWrap . BString $ encodeUtf8 c),
-            (".isActive", rlpWrap $ BBool True)]
-          ) adminIx
+          ] 
+            -- ++ map (\(i, CommonName o u c True) ->
+            --          ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+            --          , addrToCertIdx . show $ validatorAddr i)) valIx
+            -- ++ map (\(i, CommonName o u c True) ->
+            --          ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+            --          , addrToCertIdx . show $ adminAddr i)) adminIx
+            ++ map (\case
+                        (i, CommonName o u c True) -> ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+                                                    , addrToCertIdx . show $ validatorAddr i)
+                        _ -> error "Invalid validator cert") valIx
+            ++ map (\case
+                        (i, CommonName o u c True) -> ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+                                                    , addrToCertIdx . show $ adminAddr i)
+                        _ -> error "Invalid admin cert") adminIx
+        validatorAccts = map (\case 
+                                (i, CommonName o u c True) -> SolidVMContractWithStorage (validatorAddr i) 0 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance)) [
+                                    (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                                    (".org", rlpWrap . BString $ encodeUtf8 o),
+                                    (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
+                                    (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                                    (".isActive", rlpWrap $ BBool True)]
+                                _ -> error "Invalid validator cert") valIx
+        adminAccts = map (\case
+                                (i, CommonName o u c True) -> SolidVMContractWithStorage (adminAddr i) 0 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance)) [
+                                    (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                                    (".org", rlpWrap . BString $ encodeUtf8 o),
+                                    (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
+                                    (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                                    (".isActive", rlpWrap $ BBool True)]
+                                _ -> error "Invalid admin cert") adminIx
 
 mercataGovernanceContract :: Text
 mercataGovernanceContract = [r|
@@ -818,3 +830,137 @@ contract MercataGovernance {
         }
     }
 }|]
+
+userRegistryContract :: Text
+userRegistryContract = [r|
+contract UserRegistry {
+    // The UserRegistry is responsible for creating User contracts for each user.
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createUser(string _commonName, string _userAddress, address _certificateAddress) public returns (address) { 
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        User newUser = new User{salt: _commonName}();
+        newUser.initializeUser(_commonName, address(_userAddress), _certificateAddress);
+        return address(newUser);
+    }
+
+    function addCertificateToUser(address _userContractAddress, address _certificateAddress) public {
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        User targetUser = User(_userContractAddress);
+        targetUser.addCertificate(_userContractAddress, _certificateAddress);
+    }
+
+    function toggleUserActiveStatus(address _userContractAddress) public {
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        User targetUser = User(_userContractAddress);
+        targetUser.toggleUserActiveStatus();
+    }
+}
+
+contract User {
+    address public owner;
+
+    mapping(address => address) userCertificates;     // Data structure subject to change
+    string public commonName;
+    bool isActive;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function initializeUser(string _commonName, address _userAddress, address _certificateAddress) {
+        // Only UserRegistry can add new certificates.
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        commonName = _commonName;
+        userCertificates[_userAddress] = _certificateAddress;
+        isActive = true;
+    }
+
+    function addCertificate(address _userAddress, address _certificateAddress) public {
+        // Only UserRegistry can add new certificates.
+        require((msg.sender == owner), "You don't have permission to use this function!");
+        
+        userCertificates[_userAddress] = _certificateAddress;
+    }
+
+    function toggleUserActiveStatus() public {
+        require((msg.sender == owner), "You don't have permission to use this function!");
+
+        isActive = !isActive;
+    }
+
+    // Checks if the caller is indeed the user the wallet belongs to.
+    function authenticate() public returns (bool) {
+        return userCertificates[msg.sender] != address(0);
+    }
+
+    function callContract(address contractToCall, string functionName, variadic args) public returns (variadic) {
+        // Only the user that this contract is associated with, can use this function.
+        require((authenticate() && isActive), "You don't have permission to use this function!");
+
+        variadic result = address(contractToCall).call(functionName, args);
+        return result;
+    }
+} 
+|]
+
+-- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
+insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
+insertUserRegistryContract certs gi =
+    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
+        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry contractSrc (Just "UserRegistry")]}
+    where 
+        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+        initialAccounts = genesisInfoAccountInfo gi
+        initialCode     = genesisInfoCodeInfo gi
+
+        rlpWrap         = rlpSerialize . rlpEncode
+        contractSrc     = certificateRegistryContract <> "\n\n" <> userRegistryContract
+        encodedRegistry = encodeUtf8 contractSrc
+
+        rootAddress'    = fromPublicKey rootPubKey
+        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
+        rootSub         = fromJust $ getCertSubject rootCert
+        rootAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing Nothing) 123
+            (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
+                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+                (".isActive", rlpWrap $ BBool True),
+                (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
+            ]
+
+        userAccts = map (\cert -> do
+                let certSub' crt =
+                        case getCertSubject crt of
+                            Just s -> s
+                            Nothing -> error "Certificate requires a subject"
+                    certUserAddress = fromPublicKey . subPub . certSub'
+                    certSub = certSub' cert
+                    reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
+                SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing Nothing) 0 
+                    (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+                        (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
+                        (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
+                        (".isActive", rlpWrap $ BBool True),
+                        (BC.pack $ ".userCertificates<a:" ++ (show $ certUserAddress cert) ++ ">", addrToCertIdx . show . reverseAddr $ cert)]
+            ) certs
+
+        -- testAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing "Jin Huai Xuan" Nothing Nothing) 0
+        --     (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
+        --         (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
+        --         (".commonName", rlpWrap $ BString $ BC.pack $ "Jin Huai Xuan"),
+        --         (".isActive", rlpWrap $ BBool True),
+        --         (BC.pack $ ".userCertificates<a:a13bf5afbd9e23e92568b546880b55d8ee0d54a5>", addrToCertIdx "a5540deed8550b8846b56825e9239ebdaff53ba1")
+        --     ]
+
+        registryAcct = SolidVMContractWithStorage 0x720 720
+            (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry)) $
+            [(".owner", rootAddress)]

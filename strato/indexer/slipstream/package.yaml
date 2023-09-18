@@ -13,10 +13,13 @@ dependencies:
   - base
   - base16-bytestring
   - bytestring
+  - containers
   - common-log
+  - evm-solidity
   - hflags
   - kafka-monad
   - raw-strings-qq
+  - utf8-string
   - resourcet
   - sql-monad
   - text
@@ -27,7 +30,6 @@ library:
   dependencies: 
     - aeson
     - binary
-    - bloc-sql-monad
     - bloc2
     - blockapps-data
     - blockapps-datadefs
@@ -36,11 +38,10 @@ library:
     - classy-prelude
     - conduit
     - containers
-    - core-api-monad
     - core-api2
     - cross-monitoring
     - deepseq
-    - evm-solidity
+    - ethereum-rlp
     - extra
     - format
     - lens
@@ -49,10 +50,12 @@ library:
     - milena-tools
     - monad-alter
     - mtl
+    - path-pieces
     - persistent
     - postgresql-typed
     - prometheus-client
     - QuickCheck
+    - servant
     - solid-vm
     - solid-vm-model
     - scientific
@@ -70,9 +73,9 @@ executables:
     main: Main.hs
     dependencies:
       - base
-      - bloc-sql-monad
       - bloc2
       - blockapps-init
+      - blockapps-mpdbs
       - cache
       - clock
       - hflags
@@ -80,6 +83,7 @@ executables:
       - persistent-postgresql
       - postgresql-typed
       - slipstream
+      - transformers
       - wai-middleware-prometheus
       - warp
 
@@ -87,6 +91,7 @@ tests:
   slipstream-test:
     main: Main.hs
     source-dirs: tests/
+    ghc-options: -dynamic
     dependencies:
       - base
       - aeson
@@ -96,7 +101,6 @@ tests:
       - classy-prelude
       - conduit
       - containers
-      - evm-solidity
       - hflags
       - hspec
       - hspec-expectations-lifted

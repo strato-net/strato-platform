@@ -1,0 +1,31 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ContractCard: reducer get contract info on failure 1`] = `
+Object {
+  "contractInfos": Object {
+    "data-card-1234567-": Object {
+      "error": Object {
+        "message": "some error",
+      },
+    },
+  },
+}
+`;
+
+exports[`ContractCard: reducer get contract info on success 1`] = `
+Object {
+  "contractInfos": Object {
+    "data-card-1234567-": Object {
+      "address": "1234567",
+      "chainId": "123456756789876789876543345678",
+      "xabi": Object {},
+    },
+  },
+}
+`;
+
+exports[`ContractCard: reducer set initial state 1`] = `
+Object {
+  "contractInfos": Object {},
+}
+`;

@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeOperators              #-}
 
@@ -34,13 +35,15 @@ import           Control.Monad.Change.Alter           hiding (lookup)
 import           Control.Monad.Change.Modify
 
 import           Data.Foldable                        (for_)
-import           Data.Maybe                           (fromMaybe)
+import           Data.Maybe                           (fromMaybe, isNothing)
 import           Data.Map.Strict                      (Map)
 import qualified Data.Map.Strict                      as M
 import qualified Data.NibbleString                    as N
+import qualified Data.Text                            as T
 import           Data.Text                            (Text)
 import           Data.Traversable                     (for)
 
+import           BlockApps.Logging
 import qualified Blockchain.Database.MerklePatricia   as MP
 import           Blockchain.Data.RLP
 
@@ -126,6 +129,18 @@ instance RLPSerializable GenesisData where
   rlpEncode (GenesisData (cBlock, genSR, pChain)) = RLPArray [rlpEncode cBlock, rlpEncode genSR, rlpEncode pChain]
   rlpDecode (RLPArray [cBlock, genSR, pChain]) = GenesisData (rlpDecode cBlock, rlpDecode genSR, rlpDecode pChain)
   rlpDecode o = error ("Error in rlpDecode for GenesisData: bad RLPObject: " ++ show o)
+
+newtype ChainStateInfo = ChainStateInfo (Maybe Word256, Maybe Keccak256, MP.StateRoot)
+
+instance Format ChainStateInfo where
+  format (ChainStateInfo x) = format x
+
+instance RLPSerializable ChainStateInfo where
+  rlpEncode (ChainStateInfo (cId, Just bHash, sRoot)) = RLPArray [rlpEncode cId, rlpEncode bHash, rlpEncode sRoot]
+  rlpEncode (ChainStateInfo (cId, Nothing, sRoot)) = RLPArray [rlpEncode cId, rlpEncode sRoot]
+  rlpDecode (RLPArray [cId, bHash, sRoot]) = ChainStateInfo (rlpDecode cId, Just (rlpDecode bHash), rlpDecode sRoot)
+  rlpDecode (RLPArray [cId, sRoot]) = ChainStateInfo (rlpDecode cId, Nothing, rlpDecode sRoot)
+  rlpDecode o = error ("Error in rlpDecode for ChainStateInfo: bad RLPObject: " ++ show o)
 
 word256ToMPKey :: Maybe Word256 -> N.NibbleString
 word256ToMPKey Nothing    = N.EvenNibbleString ""
@@ -239,21 +254,26 @@ deleteChainGenesisInfo chainId = do
   newGenesisRoot <- MP.deleteKey gr (word256ToMPKey chainId)
   put Proxy $ GenesisRoot newGenesisRoot
 
-getChainStateRoot :: ( Modifiable BlockHashRoot m
+getChainStateRoot :: ( MonadLogger m
+                     , Modifiable BlockHashRoot m
                      , Modifiable GenesisRoot m
                      , (MP.StateRoot `Alters` MP.NodeData) m
                      )
                   => Maybe Word256 -> Keccak256 -> m (Maybe MP.StateRoot)
 getChainStateRoot chainId bh = do
   mGenStateRoot <- getChainGenesisInfo chainId
+  $logDebugS "getChainStateRoot" . T.pack $ "Genesis state root for chain " ++ format chainId ++ ": " ++ format ((\(a,b,_) -> (a,b)) <$> mGenStateRoot)
   fmap join . for mGenStateRoot $ \(cb, gsr, _) -> go bh cb gsr
   where go bHash creationBlock genStateRoot = do
           mChainRoot <- getChainBlockHashInfo bHash
+          $logDebugS "getChainStateRoot" . T.pack $ "Chain root for block " ++ format bHash ++ ": " ++ format mChainRoot
           fmap join . for mChainRoot $ \(parentHash, chainRoot) -> do
             mStateRoot <- getkv chainRoot (word256ToMPKey chainId)
+            $logDebugS "getChainStateRoot" . T.pack $ "State root for chain " ++ format chainId ++ ": " ++ format mStateRoot
             case mStateRoot of
-              Just (_ :: Word256, stateRoot) -> return $ Just stateRoot
-              Nothing -> do
+              Just (ChainStateInfo (_, Just bHash', stateRoot)) | isNothing chainId || bHash == bHash' -> return $ Just stateRoot
+              Just (ChainStateInfo (_, Nothing, stateRoot)) -> return $ Just stateRoot
+              _ -> do
                 mStateRoot' <- if parentHash == creationBlock
                   then return $ Just genStateRoot
                   else go parentHash creationBlock genStateRoot
@@ -270,7 +290,7 @@ putChainStateRoot chainId bHash stateRoot = do
   case mChainRoot of
     Nothing -> pure ()
     Just (parentHash, chainRoot) -> do
-      newChainRoot <- putkv chainRoot (word256ToMPKey chainId) (chainId, stateRoot)
+      newChainRoot <- putkv chainRoot (word256ToMPKey chainId) $ ChainStateInfo (chainId, Just bHash, stateRoot)
       putChainBlockHashInfo bHash parentHash newChainRoot
 
 deleteChainStateRoot :: ( Modifiable BlockHashRoot m

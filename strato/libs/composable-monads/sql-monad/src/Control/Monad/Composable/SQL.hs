@@ -11,27 +11,20 @@ import           Control.Monad.Reader
 import           Blockchain.DB.SQLDB
 
 import           Blockchain.EthConf
+import           qualified Database.Persist.Postgresql as PSQL
 
 type SQLM = ReaderT SQLDB
 
 type HasSQL m = HasSQLDB m
 
-data SQLEnv =
-  SQLEnv {
-    pool :: SQLDB
-  }
+type CirrusM = ReaderT CirrusDB
 
-createSQLEnv :: MonadUnliftIO m =>
-                m SQLEnv
-createSQLEnv = 
-  fmap SQLEnv $ runNoLoggingT $ createPostgresqlPool connStr 20  
+type HasCirrus m = HasCirrusDB m
 
+runSQLM :: (MonadUnliftIO m, MonadLoggerIO m) => SQLM m a -> m a
+runSQLM f =
+  PSQL.withPostgresqlPool connStr 20 (\ppool -> runReaderT f $ SQLDB ppool)
 
-runSQLMUsingEnv :: SQLEnv -> SQLM m a -> m a
-runSQLMUsingEnv env f = 
-  runReaderT f $ pool env
-
-
-
-runSQLM :: MonadUnliftIO m => SQLM m a -> m a
-runSQLM f = flip runSQLMUsingEnv f =<< createSQLEnv
+runCirrusM :: (MonadUnliftIO m, MonadLoggerIO m) => CirrusM m a -> m a 
+runCirrusM f =
+  PSQL.withPostgresqlPool cirrusConnStr 20 (\ppool -> runReaderT f $ CirrusDB ppool)

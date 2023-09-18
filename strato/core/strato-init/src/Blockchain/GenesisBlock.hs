@@ -12,7 +12,7 @@ module Blockchain.GenesisBlock (
 ) where
 
 import           Control.Monad
-import           Control.Monad.Change.Alter                   (Alters)
+import           Control.Monad.Change.Alter                   (Alters, Selectable)
 import           Control.Monad.Change.Modify                  (Accessible)
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16                       as B16
@@ -49,6 +49,7 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.Generation                       ( insertCertRegistryContract
                                                              , insertMercataGovernanceContract
+                                                             , insertUserRegistryContract
                                                              , readCertsFromGenesisInfo
                                                              , readValidatorsFromGenesisInfo
                                                              )
@@ -109,7 +110,8 @@ buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] 
 buildGenesisInfo extraFaucets extraCerts validators admins gi =
   let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
       faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-   in insertMercataGovernanceContract validators admins
+   in insertUserRegistryContract extraCerts
+      . insertMercataGovernanceContract validators admins
       . insertCertRegistryContract extraCerts
       $ gi{genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}
 
@@ -163,6 +165,7 @@ initializeGenesisBlock :: ( HasCodeDB m
                           , HasMemStorageDB m
                           , MonadLogger m
                           , (Ac.Account `Alters` AddressState) m
+                          , Selectable Ac.Account AddressState m
                           )
                        => String
                        -> m ()
@@ -204,7 +207,7 @@ populateStorageDBs :: ( MonadLogger m
                       , HasCodeDB m
                       , HasStateDB m
                       , HasHashDB m
-                      , (Ac.Account `Alters` AddressState) m
+                      , Selectable Ac.Account AddressState m
                       )
                    => (Keccak256 -> Maybe (Map Text Text))
                    -> Block 
@@ -284,7 +287,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
       forM_ (map (fromMaybe Map.empty . A._metadata) filteredActions) $ \md ->
         case (Map.lookup "src" md, Map.lookup "name" md) of
           (Just src, Just n) -> 
-            void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" []]
+            void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode (T.unpack n) $ hash $ BC.pack $ T.unpack src) "" "" [] [] ]
           _ -> return ()
 
       _ <- produceVMEvents $ map NewAction filteredActions

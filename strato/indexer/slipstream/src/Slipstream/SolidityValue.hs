@@ -18,6 +18,8 @@ module Slipstream.SolidityValue (
   ) where
 
 import           Data.Aeson               hiding (Value)
+import qualified Data.Aeson.Key           as DAK
+import qualified Data.Bifunctor           as BF 
 import qualified Data.ByteString          as B
 import           Data.Foldable            (toList)
 import           Data.List
@@ -52,7 +54,7 @@ instance ToJSON SolidityValue where
     , "data" .= B.unpack bytes
     ]
   toJSON (SolidityObject namedItems) =
-    object $ uncurry (.=) <$> namedItems
+    object $ uncurry (.=) . BF.first DAK.fromText <$> namedItems
 
 instance FromJSON SolidityValue where
   parseJSON (String str) = return $ SolidityValueAsString str
@@ -111,6 +113,7 @@ valueToSolidityValue' = \case
   ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue' namedItems
   ValueMapping ms -> Just . SolidityObject $ mapMaybe convertBoth (M.toList ms)
   ValueArraySentinel{} -> Nothing
+  ValueVariadic values -> Just . SolidityArray . mapMaybe valueToSolidityValue' $ values
 
  where convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
        convertBoth (sv, v) = (simpleValueToText sv, ) <$> valueToSolidityValue' v

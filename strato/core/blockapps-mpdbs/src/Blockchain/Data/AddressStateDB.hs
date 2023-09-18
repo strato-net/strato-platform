@@ -1,20 +1,26 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Data.AddressStateDB (
   AddressState(..),
+  MainChainT(..),
   CodePtr(..),
   blankAddressState,
   resolveCodePtr,
   unsafeResolveCodePtr,
-  unsafeResolveCodePtrSelect,
   resolveCodePtrParent,
   codePtrToSHA,
   resolvedCodePtrToSHA,
@@ -27,6 +33,8 @@ import           Prelude hiding (lookup)
 import           Control.Lens                       ((^.))
 import           Control.Monad
 import           Control.Monad.Change.Alter
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Data.Default
 import           Data.Maybe                         (maybeToList)
 import qualified Data.Set                           as Set
@@ -57,6 +65,23 @@ data AddressState =
     } deriving (Eq, Generic, Read, Show)
 
 instance NFData AddressState
+
+newtype MainChainT m a = MainChainT { runMainChainT :: m a }
+  deriving (Eq, Show, Functor, Applicative, Monad, MonadIO)
+
+instance MonadTrans MainChainT where
+  lift = MainChainT
+
+instance (Account `Alters` AddressState) m => (Account `Alters` AddressState) (MainChainT m) where
+  lookup p   = lift . lookup p
+  insert p k = lift . insert p k
+  delete p   = lift . delete p
+
+instance Selectable Account AddressState m => Selectable Account AddressState (MainChainT m) where
+  select p = lift . select p
+
+instance Monad m => Selectable Word256 ParentChainIds (MainChainT m) where
+  select _ _ = pure Nothing 
 
 blankAddressState:: AddressState
 blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=EVMCode $ hash "" , addressStateChainId = Nothing}
@@ -104,11 +129,11 @@ instance RLPSerializable AddressState where
     possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
 --}
 resolveCodePtr' :: ( Selectable Word256 ParentChainIds m
-                  , (Account `Alters` AddressState) m
-                  )
+                   , Selectable Account AddressState m
+                   )
                => Set.Set CodePtr -> Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
 resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
-  lookup Proxy acct >>= \case
+  select Proxy acct >>= \case
     Nothing -> pure Nothing
     Just AddressState{..} -> do
       let codeAccountChainId = (acct ^. accountChainId)
@@ -122,7 +147,7 @@ resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
 resolveCodePtr' _ cid cp = resolveCodePtr cid cp
    
 resolveCodePtr :: ( Selectable Word256 ParentChainIds m
-                  , (Account `Alters` AddressState) m
+                  , Selectable Account AddressState m
                   )
                => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
 resolveCodePtr chainId coa@(CodeAtAccount _ _) = resolveCodePtr' Set.empty chainId coa
@@ -130,8 +155,8 @@ resolveCodePtr chainId coa@(CodeAtAccount _ _) = resolveCodePtr' Set.empty chain
 -- for solidVM/EVM code
 resolveCodePtr _ cp = pure $ Just cp
 
-unsafeResolveCodePtr :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
+unsafeResolveCodePtr :: Selectable Account AddressState m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtr (CodeAtAccount acct name) = select Proxy acct >>= \case
   Nothing -> pure Nothing
   Just AddressState{..} -> unsafeResolveCodePtr addressStateCodeHash >>= \case
     Just e@(EVMCode _) -> pure $ Just e
@@ -139,18 +164,8 @@ unsafeResolveCodePtr (CodeAtAccount acct name) = lookup Proxy acct >>= \case
     _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
 
--- TODO: Remove this when Selectable is a superclass of Alters
-unsafeResolveCodePtrSelect :: Selectable Account AddressState m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtrSelect (CodeAtAccount acct name) = select Proxy acct >>= \case
-  Nothing -> pure Nothing
-  Just AddressState{..} -> unsafeResolveCodePtrSelect addressStateCodeHash >>= \case
-    Just e@(EVMCode _) -> pure $ Just e
-    Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
-    _ -> pure Nothing
-unsafeResolveCodePtrSelect codePtr = pure $ Just codePtr
-
 resolveCodePtrParent :: ( Selectable Word256 ParentChainIds m
-                        , (Account `Alters` AddressState) m
+                        , Selectable Account AddressState m
                         )
                         => Maybe Word256 -> CodePtr -> m (Maybe CodePtr)
 resolveCodePtrParent chainId cp@(CodeAtAccount acct _) = do
@@ -160,8 +175,8 @@ resolveCodePtrParent chainId cp@(CodeAtAccount acct _) = do
     else pure Nothing
 resolveCodePtrParent _ cp = unsafeResolveCodePtrParent cp
 
-unsafeResolveCodePtrParent :: (Account `Alters` AddressState) m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtrParent (CodeAtAccount acct _) = lookup Proxy acct >>= \case
+unsafeResolveCodePtrParent :: Selectable Account AddressState m => CodePtr -> m (Maybe CodePtr)
+unsafeResolveCodePtrParent (CodeAtAccount acct _) = select Proxy acct >>= \case
   Nothing -> pure Nothing
   Just AddressState{..} -> unsafeResolveCodePtrParent addressStateCodeHash >>= \case
     Just e@(EVMCode _) -> pure $ Just e
@@ -170,7 +185,7 @@ unsafeResolveCodePtrParent (CodeAtAccount acct _) = lookup Proxy acct >>= \case
 unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
 
 codePtrToSHA :: ( Selectable Word256 ParentChainIds m
-                , (Account `Alters` AddressState) m
+                , Selectable Account AddressState m
                 )
              => Maybe Word256 -> CodePtr -> m (Maybe Keccak256)
 codePtrToSHA chainId = resolveCodePtr chainId >=> \case
@@ -184,25 +199,25 @@ resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
 codePtrToCodeKind :: ( Selectable Word256 ParentChainIds m
-                     , (Account `Alters` AddressState) m
+                     , Selectable Account AddressState m
                      )
                   => Maybe Word256 -> CodePtr -> m CodeKind
 codePtrToCodeKind chainId = resolveCodePtr chainId >=> \case
   Just (SolidVMCode _ _) -> pure SolidVM
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
 
-unsafeCodePtrToCodeKind :: (Account `Alters` AddressState) m => CodePtr -> m CodeKind
+unsafeCodePtrToCodeKind :: Selectable Account AddressState m => CodePtr -> m CodeKind
 unsafeCodePtrToCodeKind = unsafeResolveCodePtr >=> \case
   Just (SolidVMCode _ _) -> pure SolidVM
   _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
 
 
 getAppAccount :: ( Selectable Word256 ParentChainIds m
-                 , (Account `Alters` AddressState) m
+                 , Selectable Account AddressState m
                  )
               => Maybe Word256 -> Account -> m (Maybe Account)
 getAppAccount chainId acct = do
-  lookup Proxy acct >>= \case
+  select Proxy acct >>= \case
     Nothing -> pure Nothing
     Just AddressState{..} -> do
       let codeAccountChainId = (acct ^. accountChainId)

@@ -1,19 +1,20 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE NoDeriveAnyClass           #-}
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE ForeignFunctionInterface   #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# OPTIONS_GHC -fno-warn-orphans       #-}
+{-# LANGUAGE DataKinds                   #-}
+{-# LANGUAGE DeriveDataTypeable          #-}
+{-# LANGUAGE DeriveGeneric               #-}
+{-# LANGUAGE NoDeriveAnyClass            #-}
+{-# LANGUAGE EmptyDataDecls              #-}
+{-# LANGUAGE FlexibleContexts            #-}
+{-# LANGUAGE FlexibleInstances           #-}
+{-# LANGUAGE ForeignFunctionInterface    #-}
+{-# LANGUAGE GADTs                       #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving  #-}
+{-# LANGUAGE MultiParamTypeClasses       #-}
+{-# LANGUAGE OverloadedStrings           #-}
+{-# LANGUAGE QuasiQuotes                 #-}
+{-# LANGUAGE TemplateHaskell             #-}
+{-# LANGUAGE TypeFamilies                #-}
+{-# OPTIONS_GHC -fno-warn-orphans        #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 
 {-# LANGUAGE DerivingStrategies #-}
@@ -46,7 +47,7 @@ import           Numeric
 import           Text.Format
 import           Text.PrettyPrint.ANSI.Leijen            hiding ((<$>))
 
-
+import           BlockApps.Solidity.Xabi
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember (ChainMemberParsedSet)
 import           Blockchain.Strato.Model.Class

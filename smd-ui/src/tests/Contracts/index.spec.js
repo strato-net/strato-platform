@@ -1,8 +1,17 @@
 import React from 'react';
 import Contracts, { mapStateToProps } from '../../components/Contracts/index';
-import { contracts } from './contractsMock';
+import { chainIds, contracts } from './contractsMock';
+import { Provider } from 'react-redux';
+import { createStore, combineReducers } from 'redux';
+import { reducer as formReducer } from 'redux-form';
 
 describe('Contracts: index', () => {
+
+  let store;
+
+  beforeEach(() => {
+    store = createStore(combineReducers({ form: formReducer }));
+  });
 
   describe('render contracts with', () => {
 
@@ -10,6 +19,7 @@ describe('Contracts: index', () => {
       const props = {
         filter: '',
         contracts: {},
+        chainIds: [],
         fetchContracts: jest.fn(),
         changeContractFilter: jest.fn()
       }
@@ -23,6 +33,7 @@ describe('Contracts: index', () => {
       const props = {
         filter: 'Greeter',
         contracts: contracts,
+        chainIds: chainIds,
         fetchContracts: jest.fn(),
         changeContractFilter: jest.fn()
       }
@@ -80,14 +91,19 @@ describe('Contracts: index', () => {
     const props = {
       filter: 'Greeter',
       contracts: {},
+      chainIds: [],
+      store: store,
       fetchContracts: jest.fn(),
-      changeContractFilter: jest.fn()
+      changeContractFilter: jest.fn(),
+      fetchChainIds: jest.fn()
     }
     const wrapper = shallow(
-      <Contracts.WrappedComponent {...props} />
-    );
+      <Provider store={store}>
+        <Contracts.WrappedComponent {...props} />
+      </Provider>
+    ).dive().dive().dive().dive();
 
-    wrapper.find('input').simulate('change', { target: { value: "UPDATE" } });
+    wrapper.find('input').at(0).simulate('change', { target: { value: "UPDATE" } });
     expect(props.changeContractFilter).toHaveBeenCalled();
     expect(props.changeContractFilter.mock.calls.length).toBe(2);
     expect(props.changeContractFilter.mock.calls).toMatchSnapshot();
@@ -100,8 +116,9 @@ describe('Contracts: index', () => {
         filter: 'Time'
       },
       chains: {
-        selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9"
-      }
+        selectedChain: "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+        chainIds: chainIds
+      },
     }
     expect(mapStateToProps(state)).toMatchSnapshot();
   });

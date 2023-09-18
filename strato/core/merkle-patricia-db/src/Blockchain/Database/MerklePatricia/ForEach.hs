@@ -13,7 +13,7 @@ import           Blockchain.Database.MerklePatricia.NodeData
 
 forEach :: (StateRoot `Alters` NodeData) m
         => StateRoot -> (Key -> Val -> m ()) -> m ()
-forEach sr = forEach_NodeRef (PtrRef sr) N.empty
+forEach sr = forEach_NodeRef (ptrRef sr) N.empty
 
 forEach_NodeData :: (StateRoot `Alters` NodeData) m
                  => NodeData -> NibbleString -> (Key -> Val -> m ()) -> m ()

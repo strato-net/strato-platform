@@ -16,6 +16,9 @@ module SolidVM.Model.CodeCollection.Function (
   Visibility(..),
   ModifierF(..),
   Modifier,
+  UsingF(..),
+  Using,
+  FunctionCallType(..),
   tShow,
   tShow',
   tRead,
@@ -32,7 +35,10 @@ module SolidVM.Model.CodeCollection.Function (
   modifierArgs,
   modifierSelector,
   modifierContents,
-  modifierContext
+  modifierContext,
+  usingContract,
+  usingType,
+  usingContext
   ) where
 
 import           Control.Lens                 (mapped, (&), (?~), makeLenses)
@@ -48,6 +54,8 @@ import qualified Generic.Random               as GR
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
+
+import           Blockchain.Strato.Model.Account (Account)
 import           SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
 import           SolidVM.Model.SolidString
@@ -144,7 +152,7 @@ makeLenses ''FuncF
 instance ToJSON a => ToJSON (FuncF a)
 instance FromJSON a => FromJSON (FuncF a)
 
-type Func = Positioned FuncF 
+type Func = Positioned FuncF
 
 data ModifierF a = Modifier
   { _modifierArgs     :: Map Text SolidVM.IndexedType
@@ -167,7 +175,45 @@ instance FromJSON a => FromJSON (ModifierF a) where
 instance Arbitrary a => Arbitrary (ModifierF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
+data UsingF a = Using
+  { _usingContract :: SolidString
+  , _usingType     :: SolidString -- TODO: Use Type here
+  , _usingContext  :: a
+  } deriving (Eq,Show,Generic, Functor, NFData, Traversable, Foldable)
+
+makeLenses ''UsingF
+
+type Using = Positioned UsingF
+
+instance ToJSON a => ToJSON (UsingF a) where
+  toJSON (Using dec typ ctx) = object
+    [ "using" .= dec
+    , "for" .= typ
+    , "context" .= ctx
+    ]
+
+instance FromJSON a => FromJSON (UsingF a) where
+  parseJSON (Object o) = Using
+                     <$> (o .: "using")
+                     <*> (o .: "for")
+                     <*> (o .: "context")
+  parseJSON o = fail $ "SolidVM.Using: Expected Object, got " ++ show o
+
+instance Arbitrary a => Arbitrary (UsingF a) where
+  arbitrary = Using <$> arbitrary <*> arbitrary <*> arbitrary
+
+instance ToSchema Using where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+     & mapped.name ?~ "Using schema"
+     & mapped.schema.description ?~ "Xabi of a `using` declaration"
+     & mapped.schema.example ?~ toJSON sampleUsing
+     where sampleUsing :: UsingF ()
+           sampleUsing = Using "SafeMath" "uint256" ()
+
 instance Arbitrary a => Arbitrary (FuncF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
-  
+
+data FunctionCallType = DefaultCall
+                      | RawCall
+                      | DelegateCall Account

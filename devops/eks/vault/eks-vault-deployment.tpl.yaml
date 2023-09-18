@@ -27,8 +27,8 @@ spec:
           value: "api"
         volumeMounts:
           - mountPath: /var/lib/postgresql/data/
-            name: vault-postgres-data-volume
-      - image: <REPO_URL>nginx:<VERSION>
+            name: vault-postgres-data
+      - image: <REPO_URL>vault-nginx:<VERSION>
         name: nginx
         ports:
           - containerPort: 80
@@ -48,7 +48,7 @@ spec:
           value: "localhost:8000"
         volumeMounts:
           - mountPath: /config
-            name: vault-idpconfig-volume
+            name: vault-idpconfig-data
       - image: <REPO_URL>vault-wrapper:<VERSION>
         name: vault-wrapper
         env:
@@ -67,9 +67,11 @@ spec:
         - name: VAULTWRAPPER_DEBUG
           value: "true"
       volumes:
-        - name: vault-idpconfig-volume
-          persistentVolumeClaim:
-            claimName: vault-idpconfig-pvc
-        - name: vault-postgres-data-volume
-          persistentVolumeClaim:
-            claimName: vault-postgres-data-pvc
+        - name: vault-idpconfig-data
+          awsElasticBlockStore:
+            volumeID: vol-0b4772e3dfa5ead6d
+            fsType: ext4
+        - name: vault-postgres-data
+          awsElasticBlockStore:
+            volumeID: vol-0c7bf0878de7863d8
+            fsType: ext4

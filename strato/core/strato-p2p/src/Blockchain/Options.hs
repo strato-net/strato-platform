@@ -2,12 +2,9 @@
 
 module Blockchain.Options where
 
-import           Data.ByteString.Internal
 import           HFlags
 
-import           Blockchain.CoreFlags
 import           Blockchain.Participation (ParticipationMode(..))
-import           Blockchain.Strato.Model.Util
 
 data P2PClientMode = SingleThreaded | MultiThreaded
         deriving (Eq, Ord, Read, Show)
@@ -17,9 +14,9 @@ defineFlag "l:listen" (30303 :: Int) "Listen on port"
 defineFlag "sqlPeers" False "Choose peers from the SQL DB, not the config file"
 defineFlag "syncBacktrackNumber" (10::Integer) "block number to go back when syncing"
 defineFlag "debugFail" True "Fail on errors we're not supposed to reach. If false, just log insteand and go on"
-defineFlag "maxConn" (1000::Int) "Maximum number of client connections."
-defineFlag "connectionTimeout" (300 :: Int) "Number of seconds to tolerate a useless peer"
-defineFlag "maxReturnedHeaders" (1000 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
+defineFlag "maxConn" (20::Int) "Maximum number of client connections."
+defineFlag "connectionTimeout" (30 :: Int) "Number of seconds to tolerate a useless peer"
+defineFlag "maxReturnedHeaders" (200 :: Int) "Number of headers to return from a GetBlockHeaders request" -- todo: seriously???
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
 defineFlag "wireMessageCacheSize" (2000 :: Int) "Number of wire messages to cache for network performance"
@@ -32,13 +29,3 @@ defineFlag "useNodeCerts" (False :: Bool) "Use new node certificate checking pro
 
 defineEQFlag "participationMode" [| Full :: ParticipationMode |] "PARTICIPATIONMODE"
   "Whether to send all mesages to peers (Full), no messages to peers (None), or everything except PBFT (NoConsensus)"
-
-computeNetworkID :: Integer
-computeNetworkID =
-  case (flags_network, flags_networkID) of
-    ("", -1) ->
-      if flags_testnet
-      then 0
-      else 1
-    (network, -1) -> bytes2Integer $ map c2w network
-    (_, _) -> toInteger flags_networkID

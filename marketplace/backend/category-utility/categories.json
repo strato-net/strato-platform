@@ -1,0 +1,37 @@
+{
+    "categories": [
+        {
+            "name": "Art",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Art"
+                }
+            ]
+        },
+        {
+            "name": "Carbon",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Carbon Credit"
+                }
+            ]
+        },
+        {
+            "name": "Real Estate",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "House"
+                },
+                {
+                    "name": "Apartment"
+                },
+                {
+                    "name": "Townhouse"
+                }
+            ]
+        }
+    ]
+}

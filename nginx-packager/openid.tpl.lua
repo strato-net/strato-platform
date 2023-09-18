@@ -5,26 +5,21 @@
 
 -- This Lua script supports two request types:
 -- 1. access_token provided directly in Authorization header (OAuth2 authorization flow happens on the third-party application side) -
---    the token is being verified and either authorizes the request or exits with 403
+--    the token is being verified and we either authorize the request or exit with 403
 -- 2. Nginx session-based OAuth2 (for SMD and API calls from browser; uses STRATO client id and secret):
 --    if no session provided in request OR session is expired OR access token in session is expired on invalid:
 --      - if UI call (SMD, i.e. "/dashboard/..") - redirect to OAuth2 provider sign-in page, then redirect back to the requested page (without hash part of url);
---      - if API call - return 401 Unauthorized
+--      - if API call - return 401 Unauthorized with WWW-Authenticate header
 --    if valid session is in request and has valid access token - request is authorized
--- Flow (1) is used when Authorization header is provided in the request.
--- Access token has a slack time of 120 sec (default) after access token or session is expired (see for `iat_slack` param in opts)
+--
+-- Note Access token has a "slack" time of 120 sec (default) after access token or session is expired (see for `iat_slack` param in opts)
 
-
---TODO: clean up user_access_token code
 
 local openidc = require("resty.openidc")
 
 local function isEmpty(s)
   return s == nil or s == ''
 end
-
--- Which property of access token payload to use as STRATO account name
-local username_property = "<OAUTH_JWT_USER_ID_CLAIM_PLACEHOLDER>"
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
@@ -48,7 +43,7 @@ local authenticate_opts = {
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
   -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
-  --session_contents = {id_token=true, enc_id_token=true, user=true, access_token=true}, -- comment out to keep everything
+  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
   renew_access_token_on_expiry = true,
   access_token_expires_in = 300,
   logout_path = "/auth/logout",
@@ -70,21 +65,9 @@ if ngx.req.get_headers()["Authorization"] then
   -- Token from Authorization header is verified at this point - can blindly get raw token from header by dropping "Bearer " prefix
   local header = ngx.req.get_headers()["Authorization"]
   local divider = header:find(' ')
- user_access_token = header:sub(divider + 1)
-
-  if not isEmpty(verify_res[username_property]) then
-    unique_name = verify_res[username_property]
-  else
-    unique_name = verify_res.appid
-  end
-
+  user_access_token = header:sub(divider + 1)
 else
   -- Else - use the openidc authenticate flow
-
-  -- If it's the logout request - unset custom cookies. All the rest is handled by .authenticate()
-  if ngx.var.request_uri == authenticate_opts.logout_path then
-    ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-  end
 
   local authenticate_res, authenticate_err
   -- if requested_uri is the UI page (like SMD) or the API call
@@ -95,46 +78,26 @@ else
   else
     -- only validate the session, do not redirect, respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
     authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "pass")
-    if (authenticate_res == authenticate_err and authenticate_res == nil) then
+    if (authenticate_res == authenticate_err and authenticate_res == nil and ngx.var.allow_optional_anon_access ~= "true") then
       ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
       ngx.exit(ngx.HTTP_UNAUTHORIZED)
     end
   end
 
-  -- in case of internal server error
-  if authenticate_err then
+  -- in case if authentication failed (case unhandled - server error)
+  if (authenticate_err) then
     ngx.status = 500
-    ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
     ngx.say(authenticate_err)
     ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
   end
 
-  -- Request is authorized at this point - prepare data
-  if not isEmpty(authenticate_res.id_token[username_property]) then
-    unique_name = authenticate_res.id_token[username_property]
+  if authenticate_res ~= nil and authenticate_res.access_token then
     user_access_token = authenticate_res.access_token
-  else
-    if not isEmpty(authenticate_res.id_token.appid) then
-      -- todo:
-      unique_name = authenticate_res.id_token.appid
-    else
-      -- None of the two expected properties found in id_token
-      ngx.status = 500
-      ngx.header['Set-Cookie'] = 'strato_user_name=""; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      user_err_msg = 'Could not authenticate the request. STRATO nginx is likely misconfigured.'
-      ngx.log(ngx.STDERR, user_err_msg .. ' Error details: Failed to find claims \''..username_property..'\' and \'appid\' in payload of id_token obtained with openidc.authenticate(). Possible reason: OAUTH_SCOPE does not have the required scope for \''..username_property..'\' claim (current scope value: \''..authenticate_opts.scope..'\')')
-      ngx.say(user_err_msg..' Please contact STRATO node administrator.')
-      ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
-    end
-  end
-
-  -- set the username cookie on client
-  if not ngx.var['cookie_strato_user_name'] or ngx.var['cookie_strato_user_name'] ~= unique_name then
-    ngx.header['Set-Cookie'] = string.format('strato_user_name=%s; path=/', unique_name)
   end
 end
 
-
-ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
--- removing the Authorization header FROM REQUEST to prevent Postgrest's built-in JWT permissioning to trigger
+if user_access_token ~= '' then
+  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+end
+-- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")

@@ -36,6 +36,9 @@ ethConf = unsafePerformIO $ do
 connStr :: B.ByteString
 connStr = postgreSQLConnectionString . sqlConfig $ ethConf
 
+cirrusConnStr :: B.ByteString
+cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
+
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
 

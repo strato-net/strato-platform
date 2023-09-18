@@ -11,7 +11,8 @@ module Blockchain.DB.SolidStorageDB (
   getAllSolidStorageKeyVals',
   flushMemSolidStorageTxDBToBlockDB,
   flushMemSolidStorageDB,
-  FullSolidStorage
+  FullSolidStorage,
+  fromVal
   ) where
 
 import           Control.Monad.Change.Alter                  (Alters)

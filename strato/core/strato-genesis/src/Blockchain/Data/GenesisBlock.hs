@@ -285,7 +285,7 @@ initializeChainDBs :: ( MonadLogger m
                       , HasHashDB m
                       , HasSQLDB m
                       , HasStateDB m
-                      , (Account `A.Alters` AddressState) m
+                      , A.Selectable Account AddressState m
                       , A.Selectable Word256 ParentChainIds m
                       )
                    => Maybe Word256
@@ -310,7 +310,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo{..} _) org app = do
 
   let resolveAndProduce cp = resolveCodePtr chainId cp >>= \case
         Just (SolidVMCode name ch) -> fmap (T.decodeUtf8' . snd) <$> getCode ch >>= \case
-          Just (Right src) -> void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode name ch) org app []]
+          Just (Right src) -> void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode name ch) org app [] [] ]
           _ -> pure ()
         _ -> pure ()
   forM_ accountInfo $ \case

@@ -24,11 +24,12 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
-import Slipstream.Events
+import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
+-- import Slipstream.Processor
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
@@ -49,19 +50,18 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => IORef Globals
-              -> [Text]
-              -> [(ProcessedContract, Contract)]
+              -> [(SE.ProcessedContract, Contract)]
               -> ConduitM () Text m ()
-createInserts globalsIORef historyList' contracts = do
+createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-        hasHistory = contractName (fst contract) `elem` historyList'
-    _ <- createIndexTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
-    when hasHistory $ createHistoryTable globalsIORef (snd contract) (organization $ fst contract, application $ fst contract, contractName $ fst contract)
+    _ <- createIndexTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
+    createHistoryTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
     insertIndexTable $ map fst contracts
-    insertHistoryTable globalsIORef $ map fst contracts
+    insertHistoryTable $ map fst contracts
 
-
+fakeCirrusHandle :: CirrusHandle
+fakeCirrusHandle = FakeCirrusHandle
 
 spec :: Spec
 spec = do
@@ -73,19 +73,19 @@ spec = do
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [(ProcessedContract {
-            address = testAdd,
-            codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
-            organization = "",
-            application = "",
-            contractName = "Vehicle",
-            chain = "<CHAIN>",
-            blockHash = hash "<BLOCKHASH>",
-            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-            blockNumber = 123,
-            transactionHash = hash "<TRANSACTIONHASH>",
-            transactionSender = testAdd,
-            contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
+      let input = [(SE.ProcessedContract {
+            SE.address = testAdd,
+            SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
+            SE.organization = "",
+            SE.application = "",
+            SE.contractName = "Vehicle",
+            SE.chain = "<CHAIN>",
+            SE.blockHash = hash "<BLOCKHASH>",
+            SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            SE.blockNumber = 123,
+            SE.transactionHash = hash "<TRANSACTIONHASH>",
+            SE.transactionSender = testAdd,
+            SE.contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
@@ -93,8 +93,8 @@ spec = do
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
 
-      g <- newGlobals fakeHandle
-      [vehicleCreate, vehicleInsert] <- runLoggingT . runConduit $ createInserts g [] input .| sinkList
+      g <- newGlobals fakeHandle fakeCirrusHandle
+      [vehicleCreate, _ , _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
       
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
@@ -138,31 +138,29 @@ spec = do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
           cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
-      let input = [(ProcessedContract {
-             address = testAdd,
-             codehash = cHash,
-             organization = "",
-             application = "",
-             contractName = "Vehicle2",
-             chain = "<CHAIN>",
-             blockHash = hash "<BLOCKHASH>",
-             blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-             blockNumber = 123,
-             transactionHash = hash "<TRANSACTIONHASH>",
-             transactionSender = testAdd,
-             contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
+      let input = [(SE.ProcessedContract {
+             SE.address = testAdd,
+             SE.codehash = cHash,
+             SE.organization = "",
+             SE.application = "",
+             SE.contractName = "Vehicle2",
+             SE.chain = "<CHAIN>",
+             SE.blockHash = hash "<BLOCKHASH>",
+             SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+             SE.blockNumber = 123,
+             SE.transactionHash = hash "<TRANSACTIONHASH>",
+             SE.transactionSender = testAdd,
+             SE.contractData = M.singleton "owners" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("hash", V.SimpleValue $ V.ValueString "Owner_hash_181999847806006")]]
             }, createDummyContract [
                   ("owners", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                   ])]
-      g <- newGlobals fakeHandle
-      runLoggingT $ setHistoryTable g (HistoryTableName "" "" "Vehicle2") True
-      let hl = ["Vehicle2"]
+      g <- newGlobals fakeHandle fakeCirrusHandle
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert]
-        <- runLoggingT . runConduit $ createInserts g hl input .| sinkList
+        <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (record_id text,
@@ -240,19 +238,19 @@ spec = do
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-      let input = [(ProcessedContract {
-            address = testAdd,
-            codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
-            organization = "",
-            application = "",
-            contractName = "\"Vehicle''",
-            chain = "<CHAIN>",
-            blockHash = hash "<BLOCKHASH>",
-            blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-            blockNumber = 123,
-            transactionHash = hash "<TRANSACTIONHASH>",
-            transactionSender = testAdd,
-            contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic $ V.tosparse [
+      let input = [(SE.ProcessedContract {
+            SE.address = testAdd,
+            SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
+            SE.organization = "",
+            SE.application = "",
+            SE.contractName = "\"Vehicle''",
+            SE.chain = "<CHAIN>",
+            SE.blockHash = hash "<BLOCKHASH>",
+            SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+            SE.blockNumber = 123,
+            SE.transactionHash = hash "<TRANSACTIONHASH>",
+            SE.transactionSender = testAdd,
+            SE.contractData = M.singleton "\"owners\"" . V.ValueArrayDynamic $ V.tosparse [
                 V.ValueStruct $ M.fromList [
                   ("number\"", V.SimpleValue $ V.valueUInt 18199984780605),
                   ("h'a\"'sh", V.SimpleValue $ V.ValueString "''Owner_hash_181999847806006")]]
@@ -260,10 +258,9 @@ spec = do
                        ("\"owners\"", SVMType.Array (SVMType.Struct Nothing "") Nothing)
                        ])]
 
-      g <- newGlobals fakeHandle
-      [vehicleCreate, vehicleInsert] <-
-          runLoggingT . runConduit $ createInserts g [] input .| sinkList
-
+      g <- newGlobals fakeHandle fakeCirrusHandle
+      [vehicleCreate, _, _, _, vehicleInsert, _] <-
+          runLoggingT . runConduit $ createInserts g input .| sinkList
       vehicleCreate `shouldBe`
           [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (record_id text,
     address text,
@@ -304,19 +301,19 @@ spec = do
 
   it "can unparse all solidvm value types" $ do
     let testAdd = Address 0x98eaddede
-        input = [(ProcessedContract {
-          address = testAdd,
-          codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-          organization = "MyOrg",
-          application = "MyApp",
-          contractName = "SwissArmy",
-          chain = "<CHAIN>",
-          blockHash = hash "<BLOCKHASH>",
-          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          blockNumber = 123,
-          transactionHash = hash "<TRANSACTIONHASH>",
-          transactionSender = testAdd,
-          contractData = M.fromList
+        input = [(SE.ProcessedContract {
+          SE.address = testAdd,
+          SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+          SE.organization = "MyOrg",
+          SE.application = "MyApp",
+          SE.contractName = "SwissArmy",
+          SE.chain = "<CHAIN>",
+          SE.blockHash = hash "<BLOCKHASH>",
+          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          SE.blockNumber = 123,
+          SE.transactionHash = hash "<TRANSACTIONHASH>",
+          SE.transactionSender = testAdd,
+          SE.contractData = M.fromList
             [ ("addr", addr 0xdeadbeef)
             , ("boolean", bool True)
             , ("contract", V.ValueContract $ unspecifiedChain 0x999)
@@ -347,9 +344,9 @@ spec = do
                    , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
                    ])]
 
-    g <- newGlobals fakeHandle
-    [swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g [] input .| sinkList
+    g <- newGlobals fakeHandle fakeCirrusHandle
+    [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (record_id text,
     address text,
@@ -434,7 +431,7 @@ spec = do
           }, createDummyContract [
                      ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                      ])]
-    g <- newGlobals fakeHandle
+    g <- newGlobals M.empty fakeHandle
 
     [_, swissArmyCreate, swissArmyInsert] <-
         runLoggingT . runConduit $ createInserts g [] input .| sinkList
@@ -444,19 +441,19 @@ spec = do
 -}
   it "can createInsertsIndexTable an empty array" $ do
     let testAdd = Address 0x22222222
-        input = (ProcessedContract {
-                    address = testAdd,
-                    codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
-                    organization = "MyOrg",
-                    application = "MyApp",
-                    contractName = "SwissArmy",
-                    chain = "<CHAIN>",
-                    blockHash = hash "<BLOCKHASH>",
-                    blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-                    blockNumber = 146,
-                    transactionHash = hash "<TRANSACTIONHASH>",
-                    transactionSender = testAdd,
-                    contractData = M.fromList [ ("isIterable", bool False)
+        input = (SE.ProcessedContract {
+                    SE.address = testAdd,
+                    SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                    SE.organization = "MyOrg",
+                    SE.application = "MyApp",
+                    SE.contractName = "SwissArmy",
+                    SE.chain = "<CHAIN>",
+                    SE.blockHash = hash "<BLOCKHASH>",
+                    SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+                    SE.blockNumber = 146,
+                    SE.transactionHash = hash "<TRANSACTIONHASH>",
+                    SE.transactionSender = testAdd,
+                    SE.contractData = M.fromList [ ("isIterable", bool False)
                                     , ("keyMap", V.ValueMapping $ M.fromList [
                                           (V.valueBytes "4517546854860", int 1)])
                                     , ("keys", V.ValueArraySentinel 1)
@@ -475,27 +472,27 @@ spec = do
                    ("values", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                  ]
                 )
-    g <- newGlobals fakeHandle
+    g <- newGlobals fakeHandle fakeCirrusHandle
 
-    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (organization $ fst input, application $ fst input, contractName $ fst input) `fuseBoth` sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do
     let testAdd = Address 0x98eaddede
-        input = [(ProcessedContract {
-          address = testAdd,
-          codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
-          organization = "",
-          application = "",
-          contractName = "SwissArmy",
-          chain = "<CHAIN>",
-          blockHash = hash "<BLOCKHASH>",
-          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          blockNumber = 123,
-          transactionHash = hash "<TRANSACTIONHASH>",
-          transactionSender = testAdd,
-          contractData = M.fromList
+        input = [(SE.ProcessedContract {
+          SE.address = testAdd,
+          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          SE.organization = "",
+          SE.application = "",
+          SE.contractName = "SwissArmy",
+          SE.chain = "<CHAIN>",
+          SE.blockHash = hash "<BLOCKHASH>",
+          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          SE.blockNumber = 123,
+          SE.transactionHash = hash "<TRANSACTIONHASH>",
+          SE.transactionSender = testAdd,
+          SE.contractData = M.fromList
             [ ("addr", addr 0xdeadbeef)
             , ("boolean", bool True)
             , ("contract", V.ValueContract $ unspecifiedChain 0x999)
@@ -526,9 +523,9 @@ spec = do
              , ("set", SVMType.Mapping Nothing (SVMType.Int Nothing Nothing) (SVMType.Bool))
             ])]
 
-    g <- newGlobals fakeHandle
-    [swissArmyCreate, swissArmyInsert] <-
-        runLoggingT . runConduit $ createInserts g [] input .| sinkList
+    g <- newGlobals fakeHandle fakeCirrusHandle
+    [swissArmyCreate, _, _,_, swissArmyInsert, _] <-
+        runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
     address text,
@@ -595,8 +592,6 @@ spec = do
     "strukt" = excluded."strukt";|]
 
 
-
-
 createDummyContract :: [(Text, SVMType.Type)] -> Contract
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
@@ -604,7 +599,8 @@ createDummyContract v =
         _varIsPublic=True,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
-        _isImmutable = False
+        _isImmutable = False,
+        _isRecord = True
         }
   in
     Contract{
@@ -620,5 +616,8 @@ createDummyContract v =
       _functions=undefined,
       _constructor=undefined,
       _modifiers=undefined,
+      _usings=undefined,
+      _contractType=undefined,
+      _importedFrom=undefined,
       _contractContext=undefined
     }

@@ -18,7 +18,7 @@ import           Test.QuickCheck.Instances ()
 import           SolidVM.Model.SolidString
 
 typeAesonOptions::Options
-typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
+typeAesonOptions=defaultOptions
 
 
 data Type
@@ -37,6 +37,7 @@ data Type
   | Array { entry:: Type, length :: Maybe Word }
   | Contract {typedef::SolidString}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type}
+  | Variadic
   deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Type where

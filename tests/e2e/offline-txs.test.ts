@@ -14,7 +14,7 @@ describe('Test Offline Transactions', async function () {
   let nonceCounter = 0
 
   const getSimpleStorageCountFromCirrus = async function () {
-    const cirrusResp = await exec(dockerPrefix + 'docker exec strato_postgrest_1 curl localhost:3001/SimpleStorageTest')
+    const cirrusResp = await exec(dockerPrefix + 'docker exec strato-postgrest-1 curl localhost:3001/SimpleStorageTest')
     return cirrusResp.stdout.split('transaction_hash').length - 1
   }
 
@@ -26,19 +26,19 @@ describe('Test Offline Transactions', async function () {
       // TODO: make sure if the error is actually due to the sudo required
       dockerPrefix = 'sudo ';
     }
-    const keygenRes = await exec(dockerPrefix + 'docker exec strato_strato_1 bash -c "x509-keygen"');
+    const keygenRes = await exec(dockerPrefix + 'docker exec strato-strato-1 bash -c "x509-keygen"');
     const keygenResJson = '{' + keygenRes.stdout.trim().split('{').pop().split('}')[0] + '}';
     x509UserData = JSON.parse(keygenResJson)
     
-    const gasOn = await exec(dockerPrefix + 'docker exec strato_strato_1 env | grep gasOn');
+    const gasOn = await exec(dockerPrefix + 'docker exec strato-strato-1 env | grep gasOn');
     if (gasOn.stdout.split('=')[1] === 'true') {
-      await exec(dockerPrefix + `docker exec strato_strato_1 bash -c "curl -s -X POST 'http://localhost:3000/bloc/v2.2/users/user/${x509UserData.address}/fill?resolve=true'"`)
+      await exec(dockerPrefix + `docker exec strato-strato-1 bash -c "curl -s -X POST 'http://localhost:3000/bloc/v2.2/users/user/${x509UserData.address}/fill?resolve=true'"`)
     }
     // Create SimpleStorageN.sol files inside container
     await fsPromises.writeFile('SimpleStorage1.sol', 'contract SimpleStorageTest {uint storedData; function SimpleStorageTest() {storedData = 1;} function set(uint x) {storedData = x;} function get() constant returns (uint) {return storedData;}}')
     await fsPromises.writeFile('SimpleStorage2.sol', 'contract SimpleStorageTest {uint storedData2; function SimpleStorageTest() {storedData2 = 2;} function set(uint x) {storedData2 = x;} function get() constant returns (uint) {return storedData2;}}')
-    await exec(dockerPrefix + 'docker cp SimpleStorage1.sol strato_strato_1:/var/lib/strato/');
-    await exec(dockerPrefix + 'docker cp SimpleStorage2.sol strato_strato_1:/var/lib/strato/');
+    await exec(dockerPrefix + 'docker cp SimpleStorage1.sol strato-strato-1:/var/lib/strato/');
+    await exec(dockerPrefix + 'docker cp SimpleStorage2.sol strato-strato-1:/var/lib/strato/');
   });
 
   it('should create the x509 certificate using x509-keygen in "before" script', async function () {
@@ -53,7 +53,7 @@ describe('Test Offline Transactions', async function () {
   it ('should create contract using offline tx', async function () {
     const ssCount1 = await getSimpleStorageCountFromCirrus()
     let ssCount2
-    const ss1Resp = await exec(dockerPrefix + `docker exec strato_strato_1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage1.sol --key=priv.pem --nonce=${nonceCounter}`)
+    const ss1Resp = await exec(dockerPrefix + `docker exec strato-strato-1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage1.sol --key=priv.pem --nonce=${nonceCounter}`)
     nonceCounter+=1
     const startTimestamp = +new Date()
     do {
@@ -68,9 +68,9 @@ describe('Test Offline Transactions', async function () {
   it ('should create different contracts without collisions under same name using offline tx', async function () {
     const ssCount1 = await getSimpleStorageCountFromCirrus()
     let ssCount2
-    const ss1Resp = await exec(dockerPrefix + `docker exec strato_strato_1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage1.sol --key=priv.pem --nonce=${nonceCounter}`)
+    const ss1Resp = await exec(dockerPrefix + `docker exec strato-strato-1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage1.sol --key=priv.pem --nonce=${nonceCounter}`)
     nonceCounter+=1
-    const ss2Resp = await exec(dockerPrefix + `docker exec strato_strato_1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage2.sol --key=priv.pem --nonce=${nonceCounter}`)
+    const ss2Resp = await exec(dockerPrefix + `docker exec strato-strato-1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage2.sol --key=priv.pem --nonce=${nonceCounter}`)
     nonceCounter+=1
 
     const startTimestamp = +new Date()
@@ -86,7 +86,7 @@ describe('Test Offline Transactions', async function () {
   it ('should make function call using offline tx', async function () {
     const ssCount1 = await getSimpleStorageCountFromCirrus()
     let ssCount2
-    const ss1Resp = await exec(dockerPrefix + `docker exec strato_strato_1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage1.sol --key=priv.pem --nonce=${nonceCounter}`)
+    const ss1Resp = await exec(dockerPrefix + `docker exec strato-strato-1 post-raw-transaction --contract=SimpleStorageTest --source=SimpleStorage1.sol --key=priv.pem --nonce=${nonceCounter}`)
     nonceCounter+=1
     const startTimestamp = +new Date()
     do {
@@ -97,12 +97,12 @@ describe('Test Offline Transactions', async function () {
     // Get address from post-raw-transaction response:
     const ss1Addr = ss1Resp.stdout.split('transactionResultContractsCreated = "')[1].split(',')[0].split('"')[0] // possible trailing quote (find a better parsing method?)
     const valueToSet = 123
-    const funcCallResp = await exec(dockerPrefix + `docker exec strato_strato_1 post-raw-transaction -f --funcName=set --args='${valueToSet}' --key=priv.pem --address=${ss1Addr} --nonce=${nonceCounter}`)
+    const funcCallResp = await exec(dockerPrefix + `docker exec strato-strato-1 post-raw-transaction -f --funcName=set --args='${valueToSet}' --key=priv.pem --address=${ss1Addr} --nonce=${nonceCounter}`)
     nonceCounter+=1
     const startTimestamp2 = +new Date()
     let ssVarVal
     do {
-      const ssCirrusResp = await exec(dockerPrefix + 'docker exec strato_postgrest_1 curl localhost:3001/SimpleStorageTest')
+      const ssCirrusResp = await exec(dockerPrefix + 'docker exec strato-postgrest-1 curl localhost:3001/SimpleStorageTest')
       const ssCirrusRespSplit = ssCirrusResp.stdout.split('"storedData":')
       ssVarVal = ssCirrusRespSplit[ssCirrusRespSplit.length - 1].split(',')[0]
       console.log('ssVarVal=' + ssVarVal)

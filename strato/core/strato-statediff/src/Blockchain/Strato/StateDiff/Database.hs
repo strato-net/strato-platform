@@ -30,7 +30,7 @@ import           Control.Lens ((^.))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString                             as BS
-import           Data.Foldable                               (for_)
+import           Data.Foldable                               (for_, traverse_)
 import qualified Data.Map                                    as Map
 import           Data.Maybe
 import qualified Data.Text                                   as T
@@ -41,9 +41,9 @@ import           UnliftIO
 
 type SqlDbM m = SQL.SqlPersistT m
 
-commitSqlDiffs :: (MonadLogger m, MonadUnliftIO m, HasSQLDB m) => StateDiff -> m ()
+commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => StateDiff -> m ()
 commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
-  sqlQuery $ do
+  sqlQueryNoTransaction $ do
     createAccount blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
@@ -66,15 +66,15 @@ codePtrChainId :: CodePtr -> Maybe Word256
 codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
 codePtrChainId _ = Nothing
 
-createAccount :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
+createAccount :: (MonadUnliftIO m, MonadLogger m) =>
                  Integer -> [(Account, AccountDiff 'Eventual)] -> SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs =
   catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
   where
     tryCreates = do
       let newAccounts = map (uncurry addrRef) accountDiffs
-      $logInfoS "commitSqlDiffs/createAccount" . T.pack $ "Creating accounts: " ++ (unlines $ map show newAccounts)
-      addrIDs <- SQL.insertMany newAccounts
+      $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Creating accounts: " ++ (unlines $ map show newAccounts)
+      addrIDs <- map SQL.entityKey <$> traverse (`SQL.upsert` []) newAccounts
 
       newStorage <-
         forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
@@ -85,14 +85,21 @@ createAccount blockNumber accountDiffs =
             SolidVMDiff m -> return [Storage addrID SolidVM (HexStorage k) (HexStorage v)
                                     | (k, Value v) <- Map.toList m]
 
-      $logInfoS "commitSqlDiffs/createAccount" . T.pack $ "Inserting storage: " ++ (unlines $ map show (concat newStorage))
+      $logDebugS "commitSqlDiffs/createAccount" . T.pack $ "Inserting storage: " ++ (unlines $ map show (concat newStorage))
       SQL.insertMany_ (concat newStorage)
+      traverse_ (`SQL.upsert` []) (uncurry codeRef <$> accountDiffs) `catch` (\(e :: SomeException) -> do
+        $logWarnS "commitSqlDiffs/createAccount" . T.pack $ "Error inserting code: " ++ show e)
+    code' account diff = getField (theError account "code") $ code diff
+    codeRef account diff = CodeRef {
+      codeRefCodeHash = hash $ code' account diff,
+      codeRefCode     = code' account diff
+    }
     addrRef account diff = AddressStateRef{
       addressStateRefAddress = account ^. accountAddress,
       addressStateRefNonce = getField (theError account "nonce") $ nonce diff,
       addressStateRefBalance = getField (theError account "balance") $ balance diff,
       addressStateRefContractRoot = getField (theError account "contractRoot") $ contractRoot diff,
-      addressStateRefCode = getField (theError account "code") $ code diff,
+      -- addressStateRefCode = getField (theError account "code") $ code diff,
       addressStateRefCodeHash = codePtrHash $ codeHash diff,
       addressStateRefContractName = codePtrName $ codeHash diff,
       addressStateRefCodePtrAddress = codePtrAddress $ codeHash diff,
@@ -118,7 +125,7 @@ deleteAccount account = do
     SQL.deleteWhere [ StorageAddressStateRefId SQL.==. addrID ]
     SQL.delete addrID
 
-updateAccount :: (MonadIO m, MonadUnliftIO m, MonadLogger m) =>
+updateAccount :: (MonadUnliftIO m, MonadLogger m) =>
                  Integer -> Account -> AccountDiff 'Incremental -> SQL.SqlPersistT m ()
 updateAccount blockNumber account diff = do
   mAddrID <- getAddressStateSQL account

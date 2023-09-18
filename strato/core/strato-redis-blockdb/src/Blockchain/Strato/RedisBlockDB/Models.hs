@@ -144,6 +144,14 @@ instance RedisDBKeyable RedisValidator where
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
 
+instance RedisDBValuable Integer where
+    fromValue v =
+        case S8.readInt v of
+            Just (num, _) -> toInteger num
+            Nothing       -> error "Invalid number format"
+
+    toValue = S8.pack . show
+
 instance RedisDBValuable RedisHeader where
     toValue   = rlpSerialize . rlpEncode
     fromValue = RedisHeader . rlpDecode . rlpDeserialize
@@ -154,11 +162,23 @@ instance RedisDBValuable RedisTx where
 
 instance (RLPSerializable a) => RedisDBValuable [a] where
     toValue         = rlpSerialize . RLPArray . fmap rlpEncode
-    fromValue bytes = let (RLPArray elems) = rlpDeserialize bytes in rlpDecode <$> elems
+    -- (RLPArray elems)
+    fromValue bytes = 
+        let elems = case rlpDeserialize bytes of 
+                (RLPArray elems') -> elems'
+                _                 -> error "fromValue: not an RLPArray"
+        in rlpDecode <$> elems
 
 instance (RLPSerializable a, RLPSerializable b) => RedisDBValuable (a,b) where
     toValue (a,b)   = rlpSerialize $ RLPArray [rlpEncode a, rlpEncode b]
-    fromValue bytes = let (RLPArray [a,b]) = rlpDeserialize bytes in (rlpDecode a, rlpDecode b)
+    -- fromValue bytes = let (RLPArray [a,b]) = rlpDeserialize bytes in (rlpDecode a, rlpDecode b)
+    fromValue bytes = 
+        let elems = case rlpDeserialize bytes of 
+                (RLPArray elems') -> elems'
+                _                 -> error "fromValue: not an RLPArray"
+        in case elems of
+            [a,b] -> (rlpDecode a, rlpDecode b)
+            _     -> error "fromValue: not a pair"
 
 newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving newtype (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
 newtype RedisTx        = RedisTx       TXD.Transaction deriving newtype (Eq, Read, Show, RLPSerializable, TransactionLike)

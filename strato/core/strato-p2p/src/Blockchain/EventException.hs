@@ -12,8 +12,8 @@ data EventException =
   | EventBeforeHandshake Message
   | WrongGenesisBlock
   | NetworkIDMismatch
-  | PeerDisabled
   | RootCertificateMismatch
-  | NoPeerPubKey deriving (Show)
+  | NoPeerPubKey
+  | NoPeerCertificate deriving (Show)
 
 instance Exception EventException where

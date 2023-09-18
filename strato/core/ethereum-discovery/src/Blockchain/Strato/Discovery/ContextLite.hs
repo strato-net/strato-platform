@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts               #-}
 {-# LANGUAGE FlexibleInstances              #-}
 {-# LANGUAGE GADTs                          #-}
+{-# LANGUAGE LambdaCase                     #-}
 {-# LANGUAGE MultiParamTypeClasses          #-}
 {-# LANGUAGE TypeApplications               #-}
 {-# LANGUAGE TypeOperators                  #-}
@@ -18,6 +19,9 @@ module Blockchain.Strato.Discovery.ContextLite
   , addPeer
   , DiscoveryRunner
   , MonadDiscovery
+  , doPeersExist
+  , getPeerByIP'
+  , lengthenPeerDisable'
   ) where
 
 
@@ -89,6 +93,23 @@ instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m)
           getPeerByIP ipStr = listToMaybe <$> sqlQuery actions'
             where actions' = SQL.selectList [ PPeerIp SQL.==. T.pack ipStr ] []
 
+instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) where
+  select _ ip = getPeerByIP ip
+
+    where
+      getPeerByIP :: HasSQLDB m => String -> m (Maybe PPeer)
+      getPeerByIP ipStr = sqlQuery actions >>= \case
+        [] -> return Nothing
+        lst -> return . Just . SQL.entityVal $ head lst
+
+        where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ipStr ] []
+
+instance MonadIO m => A.Replaceable T.Text PPeer (ReaderT ContextLite m) where
+  replace p k = liftIO . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (ReaderT ContextLite m) where
+  replace p k = liftIO . A.replace p k
+
 instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
   replace _ addr packet = do
     sock' <- asks sock
@@ -141,6 +162,9 @@ instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT ContextLite m) w
 instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT ContextLite m) where
   replace p k = liftIO . A.replace p k
 
+instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT ContextLite m) where
+  replace p k = liftIO . A.replace p k
+
 instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT ContextLite m) where
   access = liftIO . Mod.access
 
@@ -169,6 +193,10 @@ type MonadDiscovery m = ( HasVault m
                         , MonadLogger m
                         , MonadUnliftIO m
                         , A.Selectable IPAsText ClosestPeers m
+                        , A.Selectable String PPeer m
+                        , A.Replaceable PPeer PeerUdpDisable m
+                        , A.Replaceable PPeer T.Text m
+                        , A.Replaceable T.Text PPeer m
                         , A.Selectable () (B.ByteString, SockAddr) m
                         , A.Replaceable IPAsText PPeer m
                         , A.Replaceable SockAddr B.ByteString m
@@ -206,3 +234,24 @@ initContextLite vaultUrl udpPort tcpPort = do
 
 addPeer :: A.Replaceable IPAsText PPeer m => PPeer -> m ()
 addPeer peer = A.replace (A.Proxy @PPeer) (IPAsText $ pPeerIp peer) peer
+
+getPeerByIP' :: (A.Selectable String PPeer m)
+            => String
+            -> m (Maybe PPeer)
+getPeerByIP' ip = A.select (A.Proxy @PPeer) ip
+
+doPeersExist :: (A.Selectable String PPeer m)
+              => [String]
+              -> m (Bool)
+doPeersExist peers = do
+  maybePeer <- traverse doesPeerExist peers
+  pure $ all (== True) maybePeer
+
+doesPeerExist :: (A.Selectable String PPeer m)
+              => String
+              -> m (Bool)
+doesPeerExist peer = do
+  maybePeer <- A.select (A.Proxy @PPeer) peer
+  case maybePeer of
+    Nothing -> pure False
+    Just _ -> pure True

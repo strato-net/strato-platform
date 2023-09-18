@@ -33,11 +33,14 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 
+import           Conduit
 import           Control.Applicative
-import           Control.Monad                               (when)
-import           Control.Monad.Change                        as A
+import           Control.Monad                               (when, unless)
+import           Control.Monad.Change                        (Alters, Modifiable, Selectable)
+import qualified Control.Monad.Change                        as A
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString                             as B
+import           Data.Kind                                   (Type)
 import           Data.Function
 import           Data.Maybe
 import           Data.String
@@ -125,7 +128,7 @@ newtype instance Diff a 'Eventual = Value a
 data Detail = Incremental | Eventual
 
 -- | A class for condensing information in a diff
-class Detailed (t :: Detail -> *) where
+class Detailed (t :: Detail -> Type) where
   incrementalToEventual :: t 'Incremental -> t 'Eventual
 
 instance Detailed AccountDiff where
@@ -171,34 +174,51 @@ chainDiff :: ( MonadLogger m
              , Modifiable BlockHashRoot m
              , Modifiable GenesisRoot m
              , Modifiable BestBlockRoot m
-             , (Account `Alters` AddressState) m
+             , Selectable Account AddressState m
              )
-          => Maybe Word256 -> Integer -> Keccak256 -> m (Maybe StateDiff)
+          => Maybe Word256 -> Integer -> Keccak256 -> ConduitT i StateDiff m ()
 chainDiff chainId newBlockNum newBlockHash = do
-  newSR <- fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
-  ~(bHash, bNum) <- fromMaybe (unsafeCreateKeccak256FromWord256 0, 0) <$> getChainBestBlock chainId
-  if newBlockNum < bNum
-    then return Nothing
-    else do
-      mSR <- liftA2 (<|>) (getChainStateRoot chainId bHash) (getGenesisStateRoot chainId)
-      let sr = fromMaybe emptyTriePtr mSR
-      Just <$> stateDiff chainId newBlockNum newBlockHash sr newSR
+  newSR <- lift $ fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
+  ~(bHash, bNum) <- lift $ fromMaybe (unsafeCreateKeccak256FromWord256 0, 0) <$> getChainBestBlock chainId
+  unless (newBlockNum < bNum) $ do
+    mSR <- lift $ liftA2 (<|>) (getChainStateRoot chainId bHash) (getGenesisStateRoot chainId)
+    let sr = fromMaybe emptyTriePtr mSR
+    stateDiff chainId newBlockNum newBlockHash sr newSR
 
 stateDiff :: ( MonadLogger m
              , HasCodeDB m
              , HasHashDB m
              , HasStateDB m
              , Modifiable BestBlockRoot m
-             , (Account `Alters` AddressState) m
+             , Selectable Account AddressState m
              ) 
-          => Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> m StateDiff
+          => Maybe Word256 -> Integer -> Keccak256 -> StateRoot -> StateRoot -> ConduitT i StateDiff m ()
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
-  putChainBestBlock chainId blockHash blockNumber
-  diffs <- Diff.dbDiff oldRoot newRoot
-  mOldSR <- A.lookup (A.Proxy @MP.StateRoot) chainId
-  A.insert (A.Proxy @MP.StateRoot) chainId newRoot
-  diff <- collectModes diffs $
-    \createdAccounts deletedAccounts updatedAccounts ->
+  lift $ putChainBestBlock chainId blockHash blockNumber
+  mOldSR <- lift $ A.lookup (A.Proxy @MP.StateRoot) chainId
+  lift $ A.insert (A.Proxy @MP.StateRoot) chainId newRoot
+  let go _   diffs Nothing  = yield $ reverse diffs
+      go 100 diffs d        = yield (reverse diffs) >> go 0 [] d
+      go n   diffs (Just d) = await >>= go (n+1) (d:diffs)
+  Diff.dbDiff oldRoot newRoot
+    .| (await >>= go (0 :: Integer) [])
+    .| awaitForever (\i -> collectModes i emitDiff)
+  lift $ A.alter_ (A.Proxy @MP.StateRoot) chainId $ pure . const mOldSR
+  where
+    collectModes diffs f = do
+      (c, d, u) <- coll [] [] [] diffs
+      f c d u
+    coll c d u [] = return (Map.fromList c, Map.fromList d, Map.fromList u)
+    coll c d u (Diff.Create k v : rest) = do
+      createDiff <- lift $ accountEnd chainId k v
+      coll (createDiff : c) d u rest
+    coll c d u (Diff.Delete k v : rest) = do
+      deleteDiff <- lift $ accountEnd chainId k v
+      coll c (deleteDiff : d) u rest
+    coll c d u (Diff.Update k v1 v2 : rest) = do
+      updateDiff <- lift $ accountUpdate chainId k v1 v2
+      coll c d (updateDiff : u) rest
+    emitDiff createdAccounts deletedAccounts updatedAccounts = yield $
       StateDiff
         chainId
         blockNumber
@@ -207,28 +227,12 @@ stateDiff chainId blockNumber blockHash oldRoot newRoot = do
         createdAccounts
         deletedAccounts
         updatedAccounts
-  A.alter_ (A.Proxy @MP.StateRoot) chainId $ pure . const mOldSR
-  pure diff
-  where
-    collectModes diffs f = do
-      (c, d, u) <- coll [] [] [] diffs
-      return $ f c d u
-    coll c d u [] = return (Map.fromList c, Map.fromList d, Map.fromList u)
-    coll c d u (Diff.Create k v : rest) = do
-      createDiff <- accountEnd chainId k v
-      coll (createDiff : c) d u rest
-    coll c d u (Diff.Delete k v : rest) = do
-      deleteDiff <- accountEnd chainId k v
-      coll c (deleteDiff : d) u rest
-    coll c d u (Diff.Update k v1 v2 : rest) = do
-      updateDiff <- accountUpdate chainId k v1 v2
-      coll c d (updateDiff : u) rest
 
 accountEnd :: ( MonadLogger m
               , HasHashDB m
               , HasCodeDB m
               , (MP.StateRoot `Alters` MP.NodeData) m
-              , (Account `Alters` AddressState) m
+              , Selectable Account AddressState m
               )
            => Maybe Word256 -> [N.Nibble] -> Val -> m (Account, AccountDiff 'Eventual)
 accountEnd chainId k v = do
@@ -242,7 +246,7 @@ accountUpdate :: ( MonadLogger m
                  , HasHashDB m
                  , HasCodeDB m
                  , (MP.StateRoot `Alters` MP.NodeData) m
-                 , (Account `Alters` AddressState) m
+                 , Selectable Account AddressState m
                  ) 
               => Maybe Word256 -> [N.Nibble] -> Val -> Val -> m (Account, AccountDiff 'Incremental)
 accountUpdate chainId k vOld vNew = do
@@ -258,7 +262,7 @@ eventualAccountState :: ( MonadLogger m
                         , HasHashDB m
                         , HasCodeDB m
                         , (MP.StateRoot `Alters` MP.NodeData) m
-                        , (Account `Alters` AddressState) m
+                        , Selectable Account AddressState m
                         )
                      => AddressState -> m (AccountDiff 'Eventual)
 eventualAccountState
@@ -286,7 +290,7 @@ incrementalAccountState :: ( MonadLogger m
                            , HasHashDB m
                            , HasCodeDB m
                            , (MP.StateRoot `Alters` MP.NodeData) m
-                           , (Account `Alters` AddressState) m
+                           , Selectable Account AddressState m
                            ) 
                         => AddressState -> AddressState -> m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
@@ -326,7 +330,7 @@ incrementalStorage :: ( MonadLogger m
                       )
                    => CodeKind -> StateRoot -> StateRoot -> m (StorageDiff 'Incremental)
 incrementalStorage kind oldRoot newRoot = do
-  storageDiffs <- Diff.dbDiff oldRoot newRoot
+  storageDiffs <- runConduit $ Diff.dbDiff oldRoot newRoot .| sinkList
   let decodeAll = fmap Map.fromList . mapM decodeDiffKV
   (case kind of
     EVM -> fmap EVMDiff . decodeAll
@@ -368,7 +372,7 @@ decodeStorageKV k v = do
 lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = fromMaybe (Address 0) <$> lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, (Account `Alters` AddressState) m) => CodePtr -> m (CodeKind, ByteString)
+lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Account AddressState m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (EVMCode ch) = fromMaybe (EVM, "") <$> lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = fromMaybe (SolidVM, "") <$> lookupInMPDB "contract code" getCode ch
 lookupCode cp@(CodeAtAccount _ _) = maybe (pure (EVM, "")) lookupCode =<< unsafeResolveCodePtr cp

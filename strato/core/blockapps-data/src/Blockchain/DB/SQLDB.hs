@@ -7,8 +7,12 @@
 module Blockchain.DB.SQLDB
   ( HasSQLDB
   , SQLDB(..)
+  , HasCirrusDB
+  , CirrusDB(..)
   , sqlQuery
+  , sqlQueryNoTransaction
   , runSqlPool
+  , cirrusQuery
   , runPostgresConn
   , createPostgresqlPool
   , withGlobalSQLPool
@@ -37,8 +41,21 @@ instance NFData SQLDB where
 
 type HasSQLDB m = (MonadIO m, MonadUnliftIO m, Accessible SQLDB m)
 
+newtype CirrusDB = CirrusDB { unCirrusDB :: SQL.ConnectionPool }
+
+instance NFData CirrusDB where
+  rnf (CirrusDB db) = db `seq` ()
+
+type HasCirrusDB m = (MonadIO m, MonadUnliftIO m, Accessible CirrusDB m)
+
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
 sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< access Proxy
+
+cirrusQuery :: HasCirrusDB m => SQL.SqlPersistT (ResourceT m) a -> m a 
+cirrusQuery q = runResourceT . SQL.runSqlPool q . unCirrusDB =<< access Proxy
+
+sqlQueryNoTransaction :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
+sqlQueryNoTransaction q = runResourceT . flip (SQL.runSqlPoolNoTransaction q) Nothing . unSQLDB =<< access Proxy
 
 runSqlPool :: MonadUnliftIO m => SQL.SqlPersistT (ResourceT m) a -> SQLDB -> m a
 runSqlPool q = runResourceT . SQL.runSqlPool q . unSQLDB

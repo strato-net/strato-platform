@@ -10,9 +10,13 @@ description:
 
 dependencies:
   - base
+  - bytestring
+  - containers
+  - data-fix
   - ethereum-rlp
   - leveldb-haskell
   - monad-alter
+  - mtl
   - nibblestring
   - resourcet
   - strato-model
@@ -24,17 +28,18 @@ library:
   - ansi-wl-pprint
   - base16-bytestring
   - binary
-  - bytestring
-  - containers
+  - conduit
   - data-default
   - deepseq
   - format
+  - Ranged-sets
 
 
 tests:
   test-merkle-patricia-db:
     source-dirs: test
     main:        MerklePatriciaSpec.hs
+    ghc-options: -dynamic
     dependencies:
       - HUnit
       - hspec
@@ -46,8 +51,9 @@ benchmarks:
   mpbench:
     main: MPBench.hs
     source-dirs: bench/
+    ghc-options: -dynamic
     dependencies:
-      - bytestring
+      - criterion
       - deepseq
       - directory
       - merkle-patricia-db

@@ -1,110 +1,84 @@
-# STRATO VS Code
+# STRATO VS Code Extension
 
-This extension interfaces with a running STRATO node using STRATO's API and a debugging API.
+This extension interfaces with a running STRATO node using STRATO's API and a debugging API. The extension allows developers to interact with the STRATO blockchain and manage their STRATO dApp from a VS Code workspace.
 
-## Customize Commands in Extension Settings
-The scripts run for various commands (such as **Create Project**, **Deploy Project**, etc.) can be found and modified by clicking **File -> Preferences -> Settings** and then navigating to **Extensions -> STRATO**.  
 
-![Navigate to settings](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/vscode-settings.png)
-![Navigate to extension](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/vscode-extension.png)
-
-Below is a list of the default scripts for each command:  
-**Create Project**
-```
-git clone https://github.com/blockapps/traceability-framework $1 
-cd $1
-cd server
-yarn install
-yarn build
-cd ../ui
-yarn install
-yarn build
-cd ..
-```
-**Deploy Project**
-```
-pushd server
-yarn install
-yarn build
-touch .env
-yarn deploy
-popd
-```
-**Run Project**
-```
-pushd server
-yarn install
-yarn build
-touch .env
-MOCK_INT_SERVER=true yarn start:prod
-popd
-```
-
-**Test Project**
-```
-pushd server
-yarn install
-yarn build
-touch .env
-yarn test
-popd
-```
 ## Project Management
-The following lists the project commands available to use in the extension.
-### Create Project 
-When a user clicks **Create Project**, a text box will appear at the top of the window asking the user to input the URL of the STRATO Test Node.
+The following commands can be used when there is an existing STRATO project in your VS Code workspace. This could be done either through `Open Folder` or by using `Import Project` command. The extension assumes that your project has a `backend/config` directory that contains a `mercata.config.yaml` file (but these can be changed in the `Extension Settings`).
 
-After that is entered, the user will be asked to input the URL of the STRATO Production Node. Following that, the user will be asked where they would like the cloned repository to be placed in their file system.
+![image](https://github.com/blockapps/strato-platform/assets/35979292/e28cc74d-1163-4b13-b518-6f3f96a23371)
 
-Once that is selected, the commands specified in the Settings of the extension will be run. These commands can be changed by the user following the steps in **Customize Commands in Extension Settings**.
+### Import Project 
+When a user clicks **Import Project**, they will be prompted to select their STRATO project directory. This will bring the project into the VS Code workspace and allow the other functions to interact with it.
+
+### Build Project
+When a user clicks **Build Project**, they will be prompted to select their `backend` and `frontend` directories in their project structures. The extension will build the `npm` package dependencies in the selected directories.
 
 ### Deploy Project
-When a user clicks **Deploy Project**, the Dapp will be deployed to the local STRATO node. The commands run during this process are the ones specified in the Settings of the extension. The commands can be changed by the user following the steps in **Customize Commands in Extension Settings**.
+When a user clicks **Deploy Project**, the Dapp will be deployed to the STRATO node specified in the default `backend/config/mercata.config.yaml` file. The command uses (by default) `CONFIG=mercata yarn deploy` but this can be configured in `Extension Settings` (more in `Configuring Extension Scripts & Settings`).
 
-Once the deployment is complete, the **Deployments** section in the extension's sidebar should display a dropdown that shows information of the deployment.
+### Run Servers
+When a user clicks **Run Server** or **Run UI**, this will run the scripts that make the service available. These functions use the directories selected in **Build Project**.
 
-### Run Project
-When a user clicks on **Run Project**, the steps to start the server for the Dapp will be exectuted following the commands specified in the **Extension Settings**. The commands can be changed by the user following the steps in **Customize Commands in Extension Settings**.
+### Run Tests
+When a user clicks **Test Server** or **Test UI**, this will run the test suites in their respective directories. These functions use the directories selected in **Build Project**.
 
-### Test Project
-When a user clicks **Test Project**, the test suite of the Dapp will be run using the commands specified in the Settings of the extension. The commands to run the test are specified in the Settings of the extension and can be changed following the steps in **Customize Commands in Extension Settings**.
 
 ## Nodes
-Under the list of commands in **Project Management** is **Nodes**. This will list STRATO nodes and information about those nodes. In order for the nodes to be listed, the extension looks for a `config.yaml` file found in the `server` directory of the project.  
-
-The path of the `config.yaml` file that the extension searches for can be modified by clicking  **File -> Preferences -> Settings** and then navigating to **Extensions -> STRATO**. Once there, the path can be changed under **Config Path**.    
-
-The `config.yaml` should contain the information about the node(s) to be displayed.
-Example:
+The default `backend/config/mercata.config.yaml` in your project should contain the information about the node(s) to be displayed:
 ```
-apiDebug: false
-restVersion: 6
-timeout: 120000
-dappPath: ./dapp
-libPath: blockapps-sol/dist
-apiUrl: /api/v1
-deployFilename: ./config/localhost.deploy.yaml
-dappContractName: [NAME_OF_DAPP]
+apiDebug: true
+timeout: 600000
+VM: SolidVM
+configDirPath: ./config
+deployFilename: localhost.deploy.yaml
+orgDeployFilename: org.deploy.yaml
+serverHost:
+serverIP:
+orgName: BlockApps
+bootMembersFilename: boot_members.yaml
+cacheNonce: true
 
 nodes:
   - id: 0
-    url: "http://localhost:8080"
-    publicKey: "6d8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0"
+    label: mercata-testnet-node1
+    url: https://node1.mercata-testnet.blockapps.net
     port: 30303
     oauth:
-      appTokenCookieName: "tt_session"
-      scope: "email openid"
-      appTokenCookieMaxAge: 7776000000 # 90 days: 90 * 24 * 60 * 60 * 1000
-      clientId: "[CLIENT_ID_GOES_HERE]"
-      clientSecret: "[CLIENT_SECRET_GOES_HERE]"
-      openIdDiscoveryUrl: "[OPEN_ID_DISCOVERY_URL_GOES_HERE]"
-      redirectUri: "http://localhost/api/v1/authentication/callback"
-      logoutRedirectUri: "http://localhost"
-```
+      appTokenCookieName: asset_framework_session
+      appTokenCookieMaxAge: 7776000000
+      openIdDiscoveryUrl: <openIdDiscoveryUrl>
+      clientId: localhost
+      clientSecret: <clientSecret>
+      scope: email openid
+      serviceOAuthFlow:
+      redirectUri: http://localhost/api/v1/authentication/callback
+      logoutRedirectUri: http://localhost
+      tokenField:
+      tokenUsernameProperty:
+      tokenUsernamePropertyServiceFlow:
 
-## Deployment
-This will list the Deployments of the Dapp and give information about the Dapp such as the `address`, `chainID`, `block_hash`, etc.
-![Deployments Tree View](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/deployments.png)
+```
+**Configuring Extension Scripts & Settings** will contain more information on how to change the default configuration file and scripts if your project does not use this file path.
+
+## Contracts
+You can view the contracts stored on a STRATO node, sorted by their contract name and their addresses:
+
+![image](https://github.com/blockapps/strato-platform/assets/35979292/a25cbe08-40a8-4e63-95fe-330c8fc43e07)
+
+Clicking an address will open the contract's state and allowing you to interact with the contract's functions and copy contract state values to your clipboard:
+
+![image](https://github.com/blockapps/strato-platform/assets/35979292/de384fc7-fcd1-49cd-baac-5a2f69e53606)
+
+
+## Cirrus
+Cirrus can be used to query data in specific contracts based on their state data:
+![image](https://github.com/blockapps/strato-platform/assets/35979292/d106cdc0-c904-48cd-8754-4a084bbd74d3)
+
+The above queries the endpoint `STRATO_NODE/cirrus/search/Certificate`, essentially all the `Certificate` contracts.
+![image](https://github.com/blockapps/strato-platform/assets/35979292/579c600c-59d2-47ba-8a5f-2d1e5a97de44)
+
+[More information about to use Cirrus can be found in our API docs.](https://docs.blockapps.net/app-design-patterns/cirrus/)
 
 ## Debugger Setup
 **NOTE: The following are required in order to use the debugger:**
@@ -112,7 +86,6 @@ This will list the Deployments of the Dapp and give information about the Dapp s
 - The version of STRATO must be 7.0 or higher  
 
 To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow. 
-
 
 In the dropdown, select **Add Configuration...**, which will open the `launch.json` file with a dropdown.   
 ![Add confugration](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/add_configuration.png)
@@ -125,66 +98,19 @@ Go to the box with the green arrow once again and make sure **Debug SolidVM** is
 ![Run and Debug SolidVM](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/debug_solidvm.png)
 ![Press Play](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/press_play.png)
 
-## Extension Settings
-Below is an explanation of each setting for the STRATO VSCode extension. To change the settings for the STRATO VSCode extension, navigate to File > Preferences > Settings, and select Extensions > STRATO.
-![File > Preferences > Settings](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/file_preferences_settings.png)
-![Extensions > STRATO](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/extensions_strato.png)
+## Configuring Extension Scripts & Settings
+The scripts used for the various commands in the extension can be found by clicking the `Settings` icon in the `Project Management` view:
 
-### Auto Fuzz
-![Auto Fuzz](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/auto_fuzz.png)
+![image](https://github.com/blockapps/strato-platform/assets/35979292/a2253973-fc0b-428b-8180-dfc0b2e5c64e)
 
-The `Auto Fuzz` setting tells the extension whether to automatically run the SolidVM code fuzzing tool after the user stops typing. Since the tool can take a long time to complete, disabling this option may be desirable in projects with many unit and/or property tests.
+The scripts use the bare-minimum defaults to run a STRATO project but they can be changed to fit your project's structure and requirements. 
 
-### Config File
-![Config File](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/config_file.png)
-
-The `Config File` setting is the filename of the YAML file used to store the current project's configuration. The YAML file includes information such as a list of node URLs, OAuth credentials, and project preferences. Most of the STRATO extension's functionality depends on this value being set correctly. Typically, the project's YAML configuration is stored at "server/config.yaml", so the `Config File` setting should be "config.yaml".
-
-### Config Path
-![Config Path](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/config_path.png)
-
-The `Config Path` setting is the directory path of the YAML file used to store the current project's configuration. The YAML file includes information such as a list of node URLs, OAuth credentials, and project preferences. Most of the STRATO extension's functionality depends on this value being set correctly. Typically, the project's YAML configuration is stored at "server/config.yaml", so the `Config Path` setting should be "server". The extension automatically adds the "/" between "server" and "config.yaml" when creating the full filepath of the config file.
-
-### Create Project Command
-![Create Project Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/create_project_command.png)
-
-The `Create Project Command` setting is a shell script that is responsible for cloning and installing a new project in a given directory. The script takes a single parameter, a directory path, which can be accessed using "$1" in the script. The directory path is entered by the user when creating a new project, along with a test node URL and production node URL. By default, the script clones the traceability-framework repo from BlockApps' GitHub, and installs both the server and ui projects from yarn.
-
-### Deploy Project Command
-![Deploy Project Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/deploy_project_command.png)
-
-The `Deploy Project Command` setting is a shell script that is responsible for deploying a new instance of a project to a running STRATO network. The script takes no parameters.
-
-### Run Server Command
-![Run Server Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/run_server_command.png)
-
-The `Run Server Command` setting is a shell script that is responsible for running an instance of the project's server, connected to a running STRATO network. The script takes no parameters.
-
-### Run UI Command
-![Run UI Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/run_ui_command.png)
-
-The `Run Server Command` setting is a shell script that is responsible for running an instance of the project's UI, connected to a running STRATO network. The script takes no parameters.
-
-### Server Path
-![Server Path](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/server_path.png)
-
-The `Server Path` setting is the path to the directory containing the project's server code. This setting is used by the test tools to combine Solidity files together to send to STRATO.
-
-### Test Server Command
-![Test Server Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/test_server_command.png)
-
-The `Test Server Command` setting is a shell script that is responsible for running project's server test suite. The script takes no parameters.
-
-### Test UI Command
-![Test UI Command](https://raw.githubusercontent.com/blockapps/strato-vscode-images/main/test_ui_command.png)
-
-The `Test UI Command` setting is a shell script that is responsible for running project's UI test suite. The script takes no parameters.
+![image](https://github.com/blockapps/strato-platform/assets/35979292/713c6e06-2a9a-4fbb-8e1f-79680806eed6)
 
 ## Troubleshooting
 **I pressed step in/over/out while debugging, and the debugger appears to have resumed execution unexpectedly.**
 
-Try pressing the pause button in the debugger control panel again.
-
+Try pressing the pause button in the debugger control panel again
 
 **I have configured my extension correctly, but I am still not able to connect to my node.**
 

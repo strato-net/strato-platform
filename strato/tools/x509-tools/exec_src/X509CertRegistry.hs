@@ -20,7 +20,7 @@ import           Servant.Client
 import           Text.RawString.QQ
 import qualified Data.Aeson                           as Ae
 
-import           BlockApps.Bloc22.API
+import           Bloc.API
 import           BlockApps.X509
 import           Blockchain.Data.AlternateTransaction
 import qualified Blockchain.Data.DataDefs             as DD
@@ -94,7 +94,7 @@ entryPoint (Options privPath certPaths nonce) = do
             let clientEnv = mkClientEnv mgr stratoURL
 
             -- post it
-            result <- runClientM (postRawTransaction Nothing Nothing True request) clientEnv
+            result <- runClientM (postRawTransaction Nothing Nothing False True request) clientEnv
             putStrLn $ "\n\nTransaction result: " <> show result
 
             let oops = error "We did not successfully post the CertificateRegistry!"
@@ -108,13 +108,13 @@ entryPoint (Options privPath certPaths nonce) = do
             BL.putStr $ Ae.encode request'
 
             -- post initializeCertificateRegistry
-            result' <- runClientM (postRawTransaction Nothing Nothing True request') clientEnv
+            result' <- runClientM (postRawTransaction Nothing Nothing False True request') clientEnv
             putStrLn $ "\n\nTransaction result: " <> show result'
 
 -- servant client for the endpoint
-postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> PostBlocTransactionRawRequest
+postRawTransaction :: Maybe T.Text -> Maybe ChainId -> Bool -> Bool -> PostBlocTransactionRawRequest
                    -> ClientM BlocChainOrTransactionResult
-postRawTransaction = client (Proxy @ PostBlocTransactionRaw)
+postRawTransaction = client (Proxy @PostBlocTransactionRaw)
 
 
 -- Convert the parsed and retrieved options into a raw transaction request
@@ -185,7 +185,7 @@ contract Certificate {
     address public parent;
     address[] public children;
 
-    
+
     // Store all the fields of a certificate in a Cirrus record
     string commonName;
     string country;
@@ -215,23 +215,23 @@ contract Certificate {
         parent = address(parsedCert["parent"]);
         children = [];
     }
-    
+
     function addChild(address _child) public {
         require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
 
         children.push(_child);
     }
-    
+
     function revoke() public returns (int){
         require(msg.sender == owner,"You don't have permission to CALL revoke!");
 
         isValid = false;
         return children.length;
     }
-    
+
     function getChild(int index) public returns (address){
         require(msg.sender == owner,"You don't have permission to get children!");
-        
+
         return children[index];
     }
 }
@@ -257,43 +257,43 @@ contract CertificateRegistry {
     }
 
     function initializeCertificateRegistry(string[] _rootCerts) returns (int) {
-        require(!initialized, "The CertificateRegistry has already been initialized!");        
-        
+        require(!initialized, "The CertificateRegistry has already been initialized!");
+
         for (uint i=0; i < _rootCerts.length; i += 1) {
             // Create the Certificate record
             Certificate c = new Certificate(_rootCerts[i]);
             // Register the root certificates and emit event
             addressToCertMap[c.userAddress()] = c;
-            
+
             emit CertificateRegistered(_rootCerts[i]);
         }
-        
+
         initialized = true;
         emit CertificateRegistryInitialized();
-        
+
         return 200;
     }
-    
+
     function registerCertificate(string newCertificateString) returns (int) {
         require(initialized, "You must first initialize with initializeCertificateRegistry!");
-        
+
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
         Certificate parentContract = addressToCertMap[account(parentUserAddress)];
-        
+
         if (parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())){
             // Create the new Certificate record
             Certificate c = new Certificate(newCertificateString);
 
             if (parentUserAddress != address(0x0)){
-                parentContract.addChild(c.userAddress());    
+                parentContract.addChild(c.userAddress());
             }
 
             addressToCertMap[c.userAddress()] = c;
-            
-            
+
+
             emit CertificateRegistered(newCertificateString);
-    
+
             return 200; // 200 = HTTP Status OK
         }
         return 400;
@@ -302,15 +302,15 @@ contract CertificateRegistry {
     function getUserCert(address _address) returns (Certificate) {
         return addressToCertMap[account(_address)];
     }
-    
+
     function getCertByAddress(address _address) returns (Certificate) {
         return getCertByAccount(account(_address));
     }
-    
+
     function getCertByAccount(address _account) returns (Certificate) {
         return addressToCertMap[account(_account)];
     }
-    
+
     function revokeCert(address userAddress){
         Certificate myCert = addressToCertMap[account(userAddress)];
         require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
@@ -319,21 +319,21 @@ contract CertificateRegistry {
         for (int i = 0; i < childrenLength; i += 1) {
             revokeCert(myCert.getChild(i));
         }
-        
+
         emit CertificateRevoked(userAddress);
     }
-    
+
     function isChild(string pCert, address certUserAddress) returns (bool) {
         Certificate myCert = addressToCertMap[account(certUserAddress)];
         address parentUserAddress = myCert.parent();
         if(myCert.parent() != address(0x0) && pCert ==  addressToCertMap[account(parentUserAddress)].certificateString()){
             return true;
         }
-        
+
         if(myCert.parent() != address(0x0)){
             return isChild(pCert, parentUserAddress);
         }
-        
+
         return false;
     }
 }|]

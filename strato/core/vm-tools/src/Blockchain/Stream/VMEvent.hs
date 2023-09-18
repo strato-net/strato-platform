@@ -43,7 +43,6 @@ import           BlockApps.Logging
 import           Blockchain.Data.TransactionResult
 import           Blockchain.EthConf
 import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Event
 import           Blockchain.Stream.Action (Action)
 import           Blockchain.KafkaTopics
 import           Blockchain.MilenaTools
@@ -54,13 +53,13 @@ import           Text.Tools
 
 data VMEvent =
   NewAction Action |
-  EventEmitted Event |
   CodeCollectionAdded {
     ccString :: Text,
     codePtr :: CodePtr,
     organization :: Text,
     application :: Text,
-    historyList :: [Text]
+    historyList :: [Text],
+    recordMappings :: [Text]
     } |
   NewTransactionResult TransactionResult deriving (Show, Generic)
 
@@ -76,10 +75,11 @@ vmType (CodeAtAccount _ _) = "CodeAtAccount"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (EventEmitted e) = "EventEmitted:\n" ++ tab (format e)
-  format (CodeCollectionAdded c cp o a hl) =
+  format (CodeCollectionAdded c cp o a hl rm) =
     "CodeCollectionAdded: (" ++ show o ++ "/" ++ show a ++ ") " ++ vmType cp
-    ++ (if (not $ null hl) then " " ++ show hl else "") ++ "\n    "
+    ++ (if (not $ null hl) then " " ++ show hl else "")
+    ++ (if (not $ null rm) then " " ++ show rm else "")
+    ++ "\n    "
     ++ show (shorten 120 (T.unpack c))
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
@@ -91,7 +91,11 @@ produceVMEventsM vmEvents = do
     x <- withKafkaRetry1s . produceMessagesAsSingletonSets $
         map (TopicAndMessage (lookupTopic "vmevents") . makeMessage . BL.toStrict . JSON.encode) vmEvents
 
-    let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+    -- let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+    let offset = case concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x of 
+          [theOffset] -> theOffset
+          _ -> error "produceVMEventsM: unexpected response from Kafka"
+          
     return offset
 
 -- todo: refactor this to consume produceVMEventsM
@@ -105,7 +109,10 @@ produceVMEvents vmEvents = do
     Right res -> do -- [ProduceResponse]
       liftIO $ mapM_ parseKafkaResponse res
       return offset
-      where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
+      -- where [offset] = concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res
+      where offset = case concatMap (map (\(_, _, x') -> x') . concatMap snd . _produceResponseFields) res of 
+              [theOffset] -> theOffset
+              _ -> error "produceVMEvents: unexpected response from Kafka"
             -- parsedResults = map parseKafkaResponse res
 
 

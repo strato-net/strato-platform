@@ -46,17 +46,17 @@ library:
   - prometheus-client
   - seqevents
   - solid-vm
-  - strato-adit
+  - stm
   - strato-conf
   - strato-genesis
   - strato-index
   - strato-model
   - strato-statediff
+  - strato-redis-blockdb
   - text
   - time
   - transformers
   - unliftio
-  - util
   - vm-tools
   - x509-certs
 
@@ -75,6 +75,7 @@ executables:
       - solid-vm
       - solid-vm-fuzzer
       - strato-conf
+      - strato-model
       - text
       - transformers
       - unliftio
@@ -82,7 +83,7 @@ executables:
       - vm-tools
       - wai-middleware-prometheus
       - warp
-    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
+    ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto 
 
 tests:
   ethereum-vm-test:
@@ -106,13 +107,14 @@ tests:
       - strato-model
       - vm-runner
       - vm-tools
-    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic
 
 benchmarks:
   microbench:
     source-dirs: bench/
     main: Microbench.hs
     other-modules: []
+    ghc-options: -dynamic
     dependencies:
       - bytestring
       - containers
@@ -125,6 +127,7 @@ benchmarks:
   extractbench:
     source-dirs: bench/
     main: ExtractBench.hs
+    ghc-options: -dynamic
     other-modules: []
     dependencies:
       - bytestring

@@ -24,6 +24,7 @@ executables:
       - hflags
       - lifted-async
       - ordered-containers
+      - strato-model
       - strato-p2p
       - wai-middleware-prometheus
       - warp
@@ -34,6 +35,7 @@ library:
   dependencies:
     - SafeSemaphore
     - aeson
+    - async
     - alarmclock
     - ansi-wl-pprint
     - base16-bytestring
@@ -60,6 +62,7 @@ library:
     - hflags
     - http-client
     - iproute
+    # - json-rpc
     - json-rpc-server
     - json-rpc-client
     - lens
@@ -91,7 +94,6 @@ library:
     - transformers
     - unliftio-core
     - unliftio
-    - vm-tools
     - warp
     - x509-certs
 
@@ -139,6 +141,7 @@ tests:
       - strato-model
       - strato-p2p
       - strato-sequencer
+      - strato-redis-blockdb
       - text
       - time
       - unliftio

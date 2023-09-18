@@ -42,7 +42,7 @@
 
 ### Run tests
 1. ```
-   docker exec -t -e NODE_ENV=test strato_apex_1 ./run-tests.sh
+   docker exec -t -e NODE_ENV=test strato-apex-1 ./run-tests.sh
    ```
    
 ### Run server (production mode)

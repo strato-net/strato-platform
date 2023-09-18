@@ -27,6 +27,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
       let currentConvertedChild = this.toChild(i, currentChild);
       childrenArray.push(currentConvertedChild);
     }
+    console.debug(`NodesProvider/getNodesFromParent/childrenArray: ${childrenArray}`)
     return childrenArray;
   }
   getMenu(element?: any) {
@@ -38,9 +39,10 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
         menus.push(new Node({label: `${element[i][0]}`, tooltip: `${JSON.stringify(element[i][1])}`, description: `${JSON.stringify(element[i][1])}`}, vscode.TreeItemCollapsibleState.None))
       }
     }
-    
+
+    console.debug(`NodesProvider/getMenu/menus: ${menus}`)
     return menus;
-    
+
   }
 
   async getChildren(element?: Node): Promise<Node[]> {
@@ -48,7 +50,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
 
       if(element.collapsibleState != 2) {
         const node = await this.getNodeVersion(element);
-        
+
         if (!node) return []
 
         const entries = Object.entries(node);
@@ -63,13 +65,12 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     }
   }
 
-  async getNodeVersion(node): Promise<any> {    
+  async getNodeVersion(node): Promise<any> {
     const config = getConfig() || {}
     const options = { config };
     try {
-      const results:any[] = []
       const user = await getApplicationUser(node.id)
-      const res = await rest.getStatus(user, { ...options, node: node.id })       
+      const res = await rest.getStatus(user, { ...options, node: node.id })
       return res;
     } catch(e) {
       return undefined
@@ -79,6 +80,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
   async getNodesInternal(): Promise<any[]> {
     const config = getConfig() || {}
     const nodes = config.nodes || []
+    console.debug(`NodesProvider/getNodesInternal/nodes: ${nodes}`)
     const filledNodes = await Promise.all(nodes.map(async (element) => {
       try {
         const node = await this.getNodeVersion(element);
@@ -87,6 +89,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
         return element
       }
     }));
+
     return filledNodes
   }
 
@@ -110,12 +113,8 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
     return nodes.map((a: any) => toDep(a));
   }
 
-  private _onDidChangeTreeData: vscode.EventEmitter<
-    Node | undefined
-  > = new vscode.EventEmitter<Node | undefined>();
-
-  readonly onDidChangeTreeData: vscode.Event<Node | undefined> = this
-    ._onDidChangeTreeData.event;
+  private _onDidChangeTreeData: vscode.EventEmitter<Node | undefined> = new vscode.EventEmitter<Node | undefined>();
+  readonly onDidChangeTreeData: vscode.Event<Node | undefined> = this._onDidChangeTreeData.event;
 
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined);

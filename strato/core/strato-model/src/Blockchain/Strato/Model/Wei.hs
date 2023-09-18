@@ -28,7 +28,7 @@ newtype Wei = Wei Word256
 instance Arbitrary Wei where arbitrary = Wei . fromInteger <$> arbitrary
 
 instance ToParamSchema Wei where
-  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
+  toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @Word256
 
 instance ToSchema Wei where
   declareNamedSchema _ = return $

@@ -27,6 +27,7 @@ import           Blockchain.MiscJSON    ()
 import           Blockchain.Strato.Model.Keccak256
 import qualified Text.Colors as CL
 import           Text.Format
+import           Text.PrettyPrint.ANSI.Leijen      hiding ((<$>))
 
 import           GHC.Generics
 
@@ -43,6 +44,9 @@ newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generi
 instance Format StateRoot where
   format x             | x == emptyTriePtr = CL.yellow "<empty>"
   format (StateRoot x) = CL.yellow $ BC.unpack $ B16.encode x
+
+instance Pretty StateRoot where
+  pretty (StateRoot sr) = green . text . BC.unpack $ B16.encode sr
 
 instance NFData StateRoot
 

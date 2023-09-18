@@ -9,8 +9,11 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-missing-fields #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE BangPatterns      #-}
 module SolidVMSpec where
 
+import qualified Data.Aeson                         as Ae
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.DeepSeq
@@ -18,17 +21,20 @@ import Control.Exception
 import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.Binary (encode, decode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8   as UTF8
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as Char8
 import Data.Coerce
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
-import qualified Data.Text as T
+import qualified Data.Text                          as T
+import qualified Data.Text.Encoding                 as Text
 import qualified Data.List as L
 import Data.Char
 import Data.Text.Encoding
@@ -40,6 +46,21 @@ import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
 
+import Blockchain.Data.ChainInfo
+import Blockchain.Data.GenesisBlock as GB
+import Blockchain.GenesisBlock
+import  Blockchain.Data.GenesisInfo
+import Blockchain.Data.Block
+import qualified Handlers.AccountInfo
+import Blockchain.DB.CodeDB
+import qualified Control.Monad.Change.Alter           as A
+import Blockchain.Strato.Model.Keccak256  hiding (rlpHash)
+import           Blockchain.DB.HashDB
+import qualified Blockchain.DB.MemAddressStateDB      as Mem
+import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
+import qualified Data.JsonStream.Parser as JS
+import           Crypto.Util                          (i2bs_unsized)
 import Control.Monad.Change.Alter
 import BlockApps.Logging
 import Blockchain.SolidVM.CodeCollectionDB as CCDB
@@ -54,7 +75,7 @@ import Blockchain.DB.StateDB
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Address as MA
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -72,6 +93,19 @@ import qualified LabeledError
 import Blockchain.Strato.Model.Gas
 import BlockApps.X509.Keys as X509
 import BlockApps.X509.Certificate
+import qualified Control.Monad.Change.Modify  as Mod
+import Blockchain.DB.ChainDB
+-- import Executable.EthereumVM (writeBlockSummary)
+import Blockchain.DB.BlockSummaryDB
+import Blockchain.Data.BlockSummary
+import Data.Foldable (for_)
+import Blockchain.Bagger (processNewBestBlock)
+import Blockchain.Sequencer.Event
+import qualified Control.Monad.State                   as State
+import Data.Map.Strict (Map)
+import qualified Blockchain.Data.TXOrigin as TXO
+import Data.Either                     (fromRight)
+import Debug.Trace
 
 -- The newtype distinguishes uncaught SolidExceptions and
 -- those that are returned in ExecResults
@@ -165,6 +199,10 @@ anyReservedWordError :: Selector HandledException
 anyReservedWordError (HE Blockchain.SolidVM.Exception.ReservedWordError{}) = True
 anyReservedWordError _ = False
 
+anyDuplicateContractError :: Selector HandledException
+anyDuplicateContractError (HE Blockchain.SolidVM.Exception.DuplicateContract{}) = True
+anyDuplicateContractError _ = False
+
 anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError{}) = True
 anyImmutableError _ = False
@@ -188,14 +226,43 @@ failedAssertion _ = False
 sender :: Account
 sender = Account 0xdeadbeef Nothing
 
-privateChainAcc :: Account 
+privateChainAcc :: Account
 privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
 
-rootAcc :: Account 
+rootAcc :: Account
 rootAcc = Account (fromPublicKey X509.rootPubKey) Nothing
 
+getCert :: X509Certificate
+getCert = fromMaybe (error $ "no idea what's happening" ) $ either (const Nothing) Just . bsToCert . BC.pack $ myCertString
+
+myCertString :: String
+myCertString =  unlines
+            [ "-----BEGIN CERTIFICATE-----"
+            , "MIIBmzCCAT+gAwIBAgIRANb5NRwudlj4jP0tr0HzN1MwDAYIKoZIzj0EAwIFADBI"
+            , "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+            , "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIzMDExODIyMzczMVoXDTI0MDEx"
+            , "ODIyMzczMVowVTEYMBYGA1UEAwwPQmVuamFtaW4gUHJldm9yMRIwEAYDVQQKDAlC"
+            , "bG9ja0FwcHMxFDASBgNVBAsMC0VuZ2luZWVyaW5nMQ8wDQYDVQQGDAZCb3NuaWEw"
+            , "VjAQBgcqhkjOPQIBBgUrgQQACgNCAASp0wOm0j7rUI5iND920n8W0Tr+xzvXUQAR"
+            , "awtjibPT2lWg6nXSHSg4U/NZrDJb57BJdlPQFOTlIrzz/T+beXFoMAwGCCqGSM49"
+            , "BAMCBQADSAAwRQIhAMkrvSxLDSBpxh9hQfSQNQOuYDB8kqO6nYJMPOb9XN1LAiAE"
+            , "oWRBt6vwZLbHy5GTLH1+QtzeePss8Mo7w7ed0C08vQ=="
+            , "-----END CERTIFICATE-----"
+            , "-----BEGIN CERTIFICATE-----"
+            , "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI"
+            , "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF"
+            , "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy"
+            , "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU"
+            , "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG"
+            , "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs"
+            , "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8"
+            , "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n"
+            , "N8txKc8G9R27ZYAUuz15zF0="
+            , "-----END CERTIFICATE-----"
+            ]
+
 origin :: Account
-origin = Account 0x8341 Nothing
+origin = Account (userAddress $ x509CertToCertInfoState getCert) Nothing
 
 uploadAddress :: Account
 uploadAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 0) Nothing
@@ -207,8 +274,8 @@ recursiveAddr :: Account
 recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
 
 -- makeStrArgs :: [T.Text] -> T.Text
--- makeStrArgs xs = 
---   let 
+-- makeStrArgs xs =
+--   let
 --     escp :: T.Text -> T.Text
 --     escp s = "\"" <> s <> "\""
 --     repl = map escp
@@ -220,18 +287,94 @@ devNull _ _ _ _ = return ()
 runTest :: ContextM a -> IO ()
 runTest = runTestWithTimeout 5000000
 
+generateGBlock :: ( MonadLogger m, HasStateDB m) => GenesisInfo -> m (Block,OutputBlock)
+generateGBlock gi = do
+    sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
+    let bData = BlockData {
+            blockDataParentHash = genesisInfoParentHash gi,
+            blockDataUnclesHash = genesisInfoUnclesHash gi,
+            blockDataCoinbase = genesisInfoCoinbase gi,
+            blockDataStateRoot = sr,
+            blockDataTransactionsRoot = genesisInfoTransactionRoot gi,
+            blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
+            blockDataLogBloom = genesisInfoLogBloom gi,
+            blockDataDifficulty = genesisInfoDifficulty gi,
+            blockDataNumber = genesisInfoNumber gi,
+            blockDataGasLimit = genesisInfoGasLimit gi,
+            blockDataGasUsed = genesisInfoGasUsed gi,
+            blockDataTimestamp = genesisInfoTimestamp gi,
+            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
+            blockDataMixHash = genesisInfoMixHash gi,
+            blockDataNonce = genesisInfoNonce gi
+          }
+    return (Block {
+            blockBlockData = bData,
+            blockReceiptTransactions = [],
+            blockBlockUncles         = []
+          },
+          OutputBlock {
+            obOrigin = TXO.Direct
+          , obTotalDifficulty     = 0
+          , obBlockData           = bData
+          , obReceiptTransactions =[]
+          , obBlockUncles         = []
+          })
+
+
+writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
+writeBlockSummary block =
+    let sha    = outputBlockHash block
+        header = obBlockData block
+        td     = obTotalDifficulty block
+        txCnt  = fromIntegral $ length (obReceiptTransactions block)
+    in
+      putBSum sha (blockHeaderToBSum header td txCnt)
+
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $ runLoggingT . runTestContextM $ do
-    withCurrentBlockHash zeroHash $ do
-      let certKey addr = ((Account addr Nothing),) . encodeUtf8 
+    let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [ChainMemberParsedSet]
+        !admins = either error id eAdmins
+        eVals   = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [ChainMemberParsedSet]
+        !vals   = either error id eVals
+        gi      = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
+        eInput  = Ae.eitherDecodeStrict (BC.pack gi)
+        !input  = either error id eInput
+        cert = getCert
+        gi'  = buildGenesisInfo [] [cert] vals admins input
+
+    (blockCreated,outputBlock) <- generateGBlock gi'
+    MP.initializeBlank
+    setStateDBStateRoot Nothing $ blockDataStateRoot $ blockBlockData $ blockCreated
+    writeBlockSummary outputBlock
+    let genHash = rlpHash $ (blockCreated)
+    bhr <- bootstrapChainDB  genHash [(Nothing, (blockDataStateRoot $ blockBlockData $ blockCreated))]
+    putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0 0 0
+    Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
+    processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
+    withCurrentBlockHash genHash $ do
+      let certKey addr    = ((Account addr Nothing),) . encodeUtf8
           certRegistryKey = certKey (Address 0x509)
-      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ "addressToCertMap[" <> formatAddressWithoutColor (Address 0x74f014fef932d2728c6c7e2b4d3b88ac37a7e1d0) <> "]") (encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
-      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) "certificateString") (encodeUtf8 "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----")
+          rlpWrap         = rlpSerialize . rlpEncode
+          ua              = userAddress $ x509CertToCertInfoState getCert
+          certsub         = fromJust $ getCertSubject cert
+      insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor ua <> ">") ((rlpWrap $ BAccount $ NamedAccount (Address 0xdeadbeef) MainChain)) --(encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (rlpWrap $ BString $ BC.pack myCertString)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".userAddress") ((rlpWrap $ BAccount $ NamedAccount ua MainChain))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".owner") (rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".commonName") (rlpWrap . BString . BC.pack . subCommonName $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".country") (rlpWrap . BString . BC.pack . fromJust . subCountry $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organization") (rlpWrap . BString . BC.pack . subOrg $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organizationalUnit") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".isValid") (rlpWrap (BBool True))
+      insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
       f
   case result of
     Left{} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
     Right{} -> return ()
+
 
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (readFile fp)
@@ -387,30 +530,30 @@ contract CertificateRegistry {
     }
 
     function initializeCertificateRegistry(string _rootCert) returns () {
-        require(!initialized, "The CertificateRegistry has already been initialized!");        
-        
+        require(!initialized, "The CertificateRegistry has already been initialized!");
+
         // Create the Certificate record
         Certificate c = new Certificate(_rootCert);
 
         // Register the root certificates and emit event
         addressToCertMap[c.userAddress()] = address(c);
         emit CertificateRegistered(_rootCert);
-        
+
 
         initialized = true;
-        emit CertificateRegistryInitialized(); 
+        emit CertificateRegistryInitialized();
 
-        
-        
+
+
     }
-    
+
     function registerCertificate(string newCertificateString) returns (address) {
         // Create the new Certificate record
         Certificate c = new Certificate(newCertificateString);
         addressToCertMap[c.userAddress()] = address(c);
         emit CertificateRegistered(newCertificateString);
         return c.userAddress();
-        
+
     }
 
     function getUserCert(address _address) returns (Certificate) {
@@ -1292,14 +1435,14 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BInteger 12345]
-  
+
   it "can throw exception if omitted parameter name and types are different" $ runTest (do
     runBS [r|
 contract qq {
   uint x = 0;
 
   constructor() {
-    x = f(6,5);   
+    x = f(6,5);
   }
   function f(string, uint) public returns (uint) {
     return 7;
@@ -1312,12 +1455,12 @@ contract qq {
   uint x = 0;
 
   constructor() {
-    x = f(6,5);   
+    x = f(6,5);
   }
   function f(uint, uint) public returns (uint) {
     return 7;
   }
-}|] 
+}|]
     getFields ["x"] `shouldReturn` [BInteger 7]
 
   it "can unpack tuples" . runTest $ do
@@ -1598,7 +1741,7 @@ contract qq {
     myS = new S();
     local_s = myS.s();
   }
-}|] 
+}|]
     getFields ["local_s"] `shouldReturn` [BString "Blockapps"]
 
   it "can cast address to contract" . runTest $ do
@@ -1620,7 +1763,7 @@ contract qq {
   account y;
   account payable x;
   bool z;
-  
+
   constructor() public {
     y = msg.sender;
     x = payable(y);
@@ -1737,10 +1880,10 @@ contract qq {
   uint x;
   function pushMem(uint[] memory ts) public {
     ts.push(7);
-    uint[] cpy = ts; 
+    uint[] cpy = ts;
     x = cpy[2];
   }
-}|] `shouldReturn` Just "()" 
+}|] `shouldReturn` Just "()"
     getFields ["x"] `shouldReturn` [BInteger 7]
 
   it "can store array literals" . runTest $ do
@@ -1924,7 +2067,7 @@ contract qq {
   }
 }|]
     --let dec =  show $ Numeric.readHex "0123456789abcdef0123456789abcdef"
-    
+
     let dec = case Numeric.readHex "0123456789abcdef0123456789abcdef" of
           [(n, "")] -> show (n :: Integer)
           _ -> error "Error parsing Hex: 0123456789abcdef0123456789abcdef"
@@ -2056,7 +2199,7 @@ contract qq is A, B {
     function value() public returns (uint) {
         return super.value();
     }
-}|] `shouldReturn` Just ("("++show (parseHex "b")++")")
+}|] `shouldReturn` Just ("("++show (MA.parseHex "b")++")")
 
   it "selects the correct super when parents are missing methods" . runTest $ do
     runCall' "value" "()" [r|
@@ -2070,7 +2213,7 @@ contract qq is A, B {
   function value() public returns (uint) {
     return super.value();
   }
-}|] `shouldReturn` Just ("("++show (parseHex "a")++")")
+}|] `shouldReturn` Just ("("++show (MA.parseHex "a")++")")
 
   it "can determine super instance by function name" . runTest $ do
     runBS [r|
@@ -2113,7 +2256,7 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [BString "\194\175\&2"]
-  
+
   it "can use hexadecimal string literals double quotes" . runTest $ do
     runBS [r|
 contract qq {
@@ -2186,7 +2329,7 @@ contract string_test {
 }
 contract qq {
   bool test;
-  constructor(){ 
+  constructor(){
     test = it_getsTrueAndThisDotV();
   }
   function it_getsTrueAndThisDotV() external returns (bool) { // fails
@@ -2194,7 +2337,7 @@ contract qq {
     (bool b, string v) = y.getTrueAndThisDotV();
     return b && v == "test string" && (false == (v != "test string"));
   }
-}|] 
+}|]
     getFields ["test"] `shouldReturn` [BBool True]
 
   it "can initialize from constants" . runTest $ do
@@ -2632,11 +2775,11 @@ contract qq {
     getFields ["i"] `shouldReturn` [BInteger 8]
 
   it "can accept modifiers" $ runTest (do
-      runBS [r| 
-  contract qq { 
+      runBS [r|
+  contract qq {
     modifier m() {
-       _; 
-      } 
+       _;
+      }
 }|]) `shouldReturn` ()
 
   it "catches parse errors" $ (runTest $ runBS [r| contract { |]) `shouldThrow` anyParseError
@@ -3011,14 +3154,14 @@ contract Bite_Test {
 contract qq {
   Bite_Test bContract;
   bytes c;
-  bytes d;  
+  bytes d;
   int  e;
   constructor (){
     bContract = new Bite_Test();
     d = 'ab';
     bContract.set(d);
     c = bContract.b();
-    e = int(c) + int(d);  
+    e = int(c) + int(d);
     }
 } |]
     getFields ["e"] `shouldReturn` [BInteger 342]
@@ -3088,7 +3231,7 @@ contract qq {
   it "throws array index out of bounds exception" $ (runTest (runBS [r|
 contract qq {
    uint x;
-    
+
    constructor()
    {
       uint[] arr = [42, 2020];
@@ -3106,7 +3249,7 @@ contract qq {
       x = arr[true];
    }
 }|])) `shouldThrow` anyTypeError
- 
+
   it "type checks the index value in array index assignment" $ (runTest (runBS [r|
 contract qq {
    uint x;
@@ -3117,7 +3260,7 @@ contract qq {
       arr[true] = 2112;
    }
 }|])) `shouldThrow` anyTypeError
- 
+
   it "rejects empty index value on array index access" $ (runTest (runBS [r|
 contract qq {
    uint x;
@@ -3128,7 +3271,7 @@ contract qq {
       x = arr[];
    }
 }|])) `shouldThrow` anyTypeError
- 
+
   it "rejects empty index value on mapping index access" $ (runTest (runBS [r|
 contract qq {
    mapping(bool => uint) bs;
@@ -3139,7 +3282,7 @@ contract qq {
       x = bs[];
    }
 }|])) `shouldThrow` anyTypeError
- 
+
   it "rejects empty index value on array index assignment" $ (runTest (runBS [r|
 contract qq {
    uint x;
@@ -3269,7 +3412,7 @@ contract qq {
   it "rejects declared but undefined function" $ (runTest (runBS [r|
 contract qq {
    function f();
-   
+
    constructor()
    {
       f();
@@ -3295,7 +3438,7 @@ contract qq {
 
   it "catches division by zero error" $ (runTest (runBS [r|
 contract qq {
-  
+
    uint x = 42;
    uint y = 0;
    uint z;
@@ -3304,19 +3447,19 @@ contract qq {
    {
       z = 42/0;
    }
-}|])) `shouldThrow` anyDivideByZeroError 
+}|])) `shouldThrow` anyDivideByZeroError
 
   it "supports ternary operations" . runTest $ do
     runBS [r|
 contract qq {
-  
+
   uint x;
   uint y;
 
   constructor() {
     x = true == true ? 100 : 42;
     y = true == false ? 100 : 42;
-  
+
   }
 }|]
     getFields ["x", "y"] `shouldReturn` [BInteger 100, BInteger 42]
@@ -3324,7 +3467,7 @@ contract qq {
 
   it "rejects illegal enum access" $ (runTest (runBS [r|
 contract qq {
-  
+
   enum Role { ADMIN, USER }
   uint[] perms;
 
@@ -3421,21 +3564,21 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu", "sde", "sdm", "sdu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) 
-      , BAccount (NamedAccount 0xdeadbeef MainChain) 
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
-      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain) 
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
+      , BAccount (NamedAccount 0xdeadbeef MainChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
+      , BAccount (NamedAccount 0xdeadbeef UnspecifiedChain)
       ]
-  
+
   it "can cast strings to chainIds" . runTest $ do
     runBS [r|
 contract qq {
   account sce;
   account scm;
   account scu;
-  
+
   constructor() public {
     sce = account("deadbeef:feedbeef");
     scm = account(address("deadbeef"), "0xfeedb33f");
@@ -3443,9 +3586,9 @@ contract qq {
   }
 }|]
     getFields ["sce", "scm", "scu"] `shouldReturn`
-      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef)) 
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f)) 
-      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef)) 
+      [ BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedbeef))
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xfeedb33f))
+      , BAccount (NamedAccount 0xdeadbeef (ExplicitChain 0xf33dbeef))
       ]
 
   it "can cast strings to bool" . runTest $ do
@@ -3488,7 +3631,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a)
     getFields ["bal"] `shouldReturn` [ BInteger 13 ]
 
   it "will not over send (send when there is not enough gas)" . runTest $ do
@@ -3514,7 +3657,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 7 })
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
     getFields ["success", "bal"] `shouldReturn` [ BDefault, BInteger 7 ]
 
   it "will allow for sending to self" . runTest $ do
@@ -3540,7 +3683,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
     getFields ["success", "bal"] `shouldReturn` [ BBool True, BInteger 13 ]
 
   it "will not send when there is not anything to send between account" . runTest $ do
@@ -3566,7 +3709,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 0 })
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
     getFields ["success", "bal"] `shouldReturn` [ BDefault, BDefault ]
 
   it "cannot send to a non account payable type" $ runTest (do
@@ -3590,7 +3733,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 26 })
     -- Check return of balance
-    (void $ call2 "mySend" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTypeError 
+    (void $ call2 "mySend" "()" (namedAccountToAccount Nothing a))) `shouldThrow` anyTypeError
 
   it "cannot transfer for non account payable types" $ runTest (do
     runBS [r|
@@ -3655,8 +3798,8 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a) 
-    getFields ["bala", "balb", "balc"] `shouldReturn` 
+    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a)
+    getFields ["bala", "balb", "balc"] `shouldReturn`
       [ BInteger 1,
         BInteger 26,
         BInteger 13 ]
@@ -3702,7 +3845,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs { addressStateBalance = 13 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
     getFields ["success", "bala", "balb", "balc"] `shouldReturn` [ BBool True, BInteger 1, BInteger 26, BInteger 13 ]
 
   it "cannot over transfer from an account." $ runTest (do
@@ -3789,9 +3932,9 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 13 })
     -- Check return of balance
     void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
-    getFields [ "success", "bala", "balb", "balc"] `shouldReturn` 
+    getFields [ "success", "bala", "balb", "balc"] `shouldReturn`
       [ BDefault,
-        BInteger 14, 
+        BInteger 14,
         BInteger 13,
         BInteger 13 ]
 
@@ -3808,7 +3951,7 @@ contract qq {
   uint cid4;
   constructor() public {
     a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");    
+    a2 = account(0x123, "main");
     a3 = account(0x124);
     a4 = account(0xdeadbeef, "0xdeadbeef");
     cid1 = a1.chainId;
@@ -3860,7 +4003,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as { addressStateBalance = 13 })
     -- Check return of balance
-    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a)
     getFields ["bal"] `shouldReturn` [ BInteger 13 ]
   it "can get the codehash from an address" . runTest $ do
     let contract = [r|
@@ -3890,7 +4033,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeHashTest", "codeHashTest"] `shouldReturn`
-      [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract 
+      [ BString $ BC.pack $  keccak256ToHex $ hash $ UTF8.fromString contract
       , BString "bd03e87420032a4d4ac1653f8af8f4c42ae85bf8d07d02ff2433c7052d6d4fbb" ]
 
   it "can get structs from the '.code' function" . runTest $ do
@@ -4020,7 +4163,7 @@ contract qq{
 
 contract anotherThing {
   uint x = 3;
-  modifier myModifier() {  
+  modifier myModifier() {
     require(x == 3 , string.concat('x is not 3 : ', string(x)));
     x = 4;
     _;
@@ -4054,7 +4197,7 @@ contract qq{
   it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  
+
   constructor () public {
     }
 }
@@ -4387,7 +4530,7 @@ contract qq {
   it "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  
+
   constructor () public {
     }
 }
@@ -4487,7 +4630,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs { addressStateBalance = 0 })
 
     -- Check return of balance
-    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a) 
+    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a)
     getFields ["bala", "balb"] `shouldReturn` [ BInteger 1, BInteger 13  ]
 
   it "can't assign a value to an unallocated index in an array" $ (runTest (runBS [r|
@@ -4569,7 +4712,7 @@ contract qq {
 
 --   it "only a contract posted by the root user can call registerCert" $ (runTest $ do
 --     runBS [r|
--- 
+--
 -- contract qq {
 --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
 --     constructor() {
@@ -4582,7 +4725,7 @@ contract qq {
 
 contract Certificate {
     address public userAddress;
-    
+
     // Store all the fields of a certificate in a Cirrus record
     string public commonName;
     string public organization;
@@ -4619,7 +4762,7 @@ contract qq is CertificateRegistry{
 
 --   it "cannot post X509 certificates not signed by the BlockApps private key" $ (runTest $ do
 --     void $ runArgsWithOrigin rootAcc sender "()" [r|
--- 
+--
 -- contract qq {
 --     account public certAddr = account(0xe79beda3078bcb66524f91f74de982d2fcc89287);
 --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjjCCATKgAwIBAgIRANJH2FERGO/3JvoPHo52I3IwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyNTE0NTIwMloXDTIzMDQy\nNTE0NTIwMlowSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANIADBFAiEA\n9sjaARt+VEUCjZv3NAuEENoD744fZIuuUTt6qwM7fKQCIDLp02y/lSHtLfOOgCW5\n40qEIDYu2UO1JqSuyGvIUOoc\n-----END CERTIFICATE-----";
@@ -4634,20 +4777,20 @@ contract qq is CertificateRegistry{
 
 --   it "cannot register a x509 certificate on a private chain" $ (runTest $ do
 --     void $ runArgsWithOrigin rootAcc privateChainAcc "()" [r|
--- 
+--
 -- contract qq {
 --     account myAccount = account("deadbeef:feedbeef");
-    
+
 --     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBiDCCAS2gAwIBAgIQCgO76hC29iXEFXJNco5ekjAMBggqhkjOPQQDAgUAMEYx\nDDAKBgNVBAMMA2RhbjEMMAoGA1UEBgwDVVNBMRIwEAYDVQQKDAlibG9ja2FwcHMx\nFDASBgNVBAsMC2VuZ2luZWVyaW5nMB4XDTIxMDMxODE1NDgwN1oXDTIyMDMxODE1\nNDgwN1owRjEMMAoGA1UEAwwDZGFuMQwwCgYDVQQGDANVU0ExEjAQBgNVBAoMCWJs\nb2NrYXBwczEUMBIGA1UECwwLZW5naW5lZXJpbmcwVjAQBgcqhkjOPQIBBgUrgQQA\nCgNCAAQY4p67l1IIEUdVC7L+rUDwF5Nv30bze0NV5y8ced7qwp+YFk3UAiOGkcYo\n7ba8F92rd0yf9AGpvZN1H3Dda8xdMAwGCCqGSM49BAMCBQADRwAwRAIgbKXO8tZ5\noPhBusPQFkNEQDnLO/MRru4KjtCpPnVb5sACIE0TwBJ7yeIGuPc/8G50/858Pf3a\n0t1hHbhYnJarPkNA\n-----END CERTIFICATE-----";
 
 --     constructor() {
---         registerCert(myNewCertificate); 
+--         registerCert(myNewCertificate);
 --     }
 -- }|]) `shouldThrow` anyInvalidWriteError
 
   -- it "cannot use old registerCert on solidvm 3.2" $ (runTest $ do
   --     (runBS [r|
-  -- 
+  --
   -- contract qq {
   --     account public certAddr = account(0x622EB3792DaA3d3770E3D27D02e53755408aE00b);
   --     string public myCertificate = "-----BEGIN CERTIFICATE-----\nMIIBizCCAS+gAwIBAgIQejfmUC0VeygSTQ0htwpDbzAMBggqhkjOPQQDAgUAMEcx\nDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIGA1UECwwLRW5n\naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTAeFw0yMjA0MTQyMTI4NDdaFw0yMzA0MTQy\nMTI4NDdaMEcxDTALBgNVBAMMBFRyb3kxEjAQBgNVBAoMCUJsb2NrYXBwczEUMBIG\nA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEGBSuB\nBAAKA0IABCSwiVfrLj1MCa+1bcBXOnGhnLxS5DYo3/1udE/LYFi2hFgDCPQxKYqP\n7LmHV2W35B3ZZw5SQVf1FxjWE0tZqswwDAYIKoZIzj0EAwIFAANIADBFAiEAvbGZ\nqma5fKnHnzpGCI5lc4VYdHBfgqfG7CwqJ5ii66YCIFUT+eXA1fS9q4/jJ+eULQwH\neXbEHHtO6nBOorRsoG3H\n-----END CERTIFICATE-----";
@@ -4669,7 +4812,7 @@ contract qq is CertificateRegistry{
   --         certPubKey = getUserCert(certAddr)["publicKey"];
   --     }
   -- }|])) `shouldThrow` anyUnknownFunc
-  
+
   -- it "cannot use new registerCert(string _cert, Certificate c) on solidvm < 3.2" $ (runTest $ do
   --     (runBS [r|
   -- contract Certificate {
@@ -4688,13 +4831,13 @@ contract qq is CertificateRegistry{
   --         certPubKey = getUserCert(certAddr)["publicKey"];
   --     }
   -- }|])) `shouldThrow` anyInvalidWriteError
-  
+
   xit "can only post X509 certificates to the address of the public key" . runTest $ do
     void $ runArgsWithCertificateRegistry [r|
 
 contract Certificate {
     address public userAddress;
-    
+
     // Store all the fields of a certificate in a Cirrus record
     string public commonName;
     string public organization;
@@ -4729,12 +4872,12 @@ contract qq is CertificateRegistry{
       [ BString "Admin",
         BString "BlockApps"
       ]
---   fit "can get a users cert" . runTest $ do
+--   it "can get a users cert" . runTest $ do
 --     void $ runArgsWithCertificateRegistry [r|
 
 -- contract Certificate {
 --     address public userAddress;
-    
+
 --     // Store all the fields of a certificate in a Cirrus record
 --     string public commonName;
 --     string public organization;
@@ -4760,7 +4903,7 @@ contract qq is CertificateRegistry{
 -- }
 -- contract qq is CertificateRegistry{
 --     account myAccount = account(0x74f014FEF932D2728c6c7E2B4d3B88ac37A7E1d0);
-    
+
 --     string myNewCertificate = "-----BEGIN CERTIFICATE-----\nMIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI\nMQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF\nbmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy\nMDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU\nMBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG\nBSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs\n9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8\nR0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n\nN8txKc8G9R27ZYAUuz15zF0=\n-----END CERTIFICATE-----";
 
 --     address public certRegAddr;
@@ -4783,13 +4926,13 @@ contract qq is CertificateRegistry{
 --     constructor() {
 --         certReg = new CertificateRegistry();
 --         certRegAddr = certReg.registerCertificate(myNewCertificate);
---         userCert = certReg.getUserCert(certRegAddr); 
+--         userCert = certReg.getUserCert(certRegAddr);
 
 --         myUsername     = tx.username;
 --         myOrganization = tx.organization;
 --         myGroup        = tx.group;
 --         myOrganizationalUnit = tx.organizationalUnit;
- 
+
 --         certificate    = tx.certificate;
 --         myCommonName   = userCert.commonName();
 --         myCountry      = userCert.country();
@@ -4837,7 +4980,7 @@ contract qq {
       string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
       isValid = verifyCert(cert, pubkey);
     }
-}|] 
+}|]
     getFields ["isValid"] `shouldReturn` [ BBool True ]
 
   it "verifyCert fails for hex-encoded public keys" $ (runTest $ do
@@ -4878,7 +5021,7 @@ contract qq {
       string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
       isValid = verifyCert(cert, pubkey);
     }
-}|] 
+}|]
     runBS contract
     getFields ["isValid"] `shouldReturn` [ BBool True ]
 
@@ -4908,11 +5051,11 @@ contract qq {
       string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEAlGfMOmhI+AjQlfxve8YoEXhZErFdkCx\nc8OkTB1TP6giwof4fWG+Fua8b2W0YjOQkrQojwnKbBDt3CQeqU+bPA==\n-----END PUBLIC KEY-----";
       isValid = verifyCert(cert, pubkey);
     }
-}|] 
+}|]
     runBS contract
     getFields ["isValid"] `shouldReturn` [ BDefault ]
-      
-    
+
+
   it "can call builtin function verifyCertSignedBy" . runTest $ do
     runBS [r|
 
@@ -4923,9 +5066,9 @@ contract qq {
       string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
       isValid = verifyCertSignedBy(cert, pubkey);
     }
-}|] 
+}|]
     getFields ["isValid"] `shouldReturn` [ BBool True ]
-    
+
   it "verifyCertSignedBy fails for hex-encoded public keys" $ (runTest $ do
     (runBS [r|
 
@@ -4966,11 +5109,11 @@ contract qq {
     string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEWgaGAD+EzRzA+zZILPDzRzDJiURfTYYZ\n/PYjx26acOAKKHjX6HkNUlVgJ0N/1oeMPYRhXm2tDGgZt6VbS1if8w==\n-----END PUBLIC KEY-----";
     isValid = verifyCertSignedBy(cert, pubkey);
   }
-}|] 
+}|]
     runBS contract
     getFields ["isValid"] `shouldReturn` [ BBool True ]
-  
-  
+
+
   it "verifyCertSignedBy fails with a chained cert and the wrong public key" . runTest $ do
     let cert = T.pack $ filter (\c -> not (isSpace c) || c == ' ') [r|-----BEGIN CERTIFICATE-----\nMIIBgzCCASegAwIBAgIQ
 JN1cZoLJ4yhjGrEHRxzPNDAMBggqhkjOPQQDAgUAMEMx\nDjAMBgNVBAMMBUNOT25lMREwDwYDVQQKDAhDTk9uZU9yZzEQMA4GA1UECwwHT25l\nVW5pdDE
@@ -4997,7 +5140,7 @@ contract qq {
       string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEAlGfMOmhI+AjQlfxve8YoEXhZErFdkCx\nc8OkTB1TP6giwof4fWG+Fua8b2W0YjOQkrQojwnKbBDt3CQeqU+bPA==\n-----END PUBLIC KEY-----";
       isValid = verifyCertSignedBy(cert, pubkey);
     }
-}|] 
+}|]
     runBS contract
     getFields ["isValid"] `shouldReturn` [ BDefault ]
 
@@ -5012,9 +5155,9 @@ contract qq {
     string pubkey = "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEUhJR4x+wZiX+xZK2m/pwN40cvCS0UA7Z\n0DB7sny5ZnNLw43JgKz0URDY2yYOPkhoIApxFK9UU3Bc4BRANDWmdQ==\n-----END PUBLIC KEY-----";
     isValid = verifySignature(msgHash, signature, pubkey);
   }
-}|]  
+}|]
     getFields ["isValid"] `shouldReturn` [ BBool True ]
-  
+
   it "verifySignature fails for an incorrect message hash" $ (runTest $ do
     runBS [r|
 
@@ -5040,7 +5183,7 @@ contract qq {
     isValid = verifySignature(msgHash, signature, pubkey);
   }
 }|]) `shouldThrow` anyMalformedDataError
-  
+
   it "verifySignature fails for a hex-encoded public key" $ (runTest $ do
     runBS [r|
 
@@ -5094,7 +5237,7 @@ contract qq{
     timestamp = block.timestamp;
     gaslimit = block.gaslimit;
     diff = block.difficulty;
-    return;        
+    return;
   }
 }|]
     getFields ["blockNumber", "a1", "timestamp", "gaslimit", "diff"] `shouldReturn` [BInteger 8033, BDefault, BInteger 16384, BInteger 1000000, BInteger 900]
@@ -5170,14 +5313,14 @@ contract qq {
     assert(s == "helloworld");
     assert(w == "helloworld and friends");
   }
-}|] 
+}|]
 
   it "can use the builtin keccak256 function with any amount of string arguments" . runTest $ do
     runCall' "a" "()" [r|
 
 contract qq {
   function a() public returns (bytes32) {
-    return keccak256("hello", "world"); 
+    return keccak256("hello", "world");
   }
 }|] `shouldReturn` Just ("(\"\\250&\\219|\\168^\\173\\&9\\146\\SYN\\231\\198\\&1k\\197\\SO\\210C\\147\\195\\DC2+X'5\\231\\243\\176\\249\\ESC\\147\\240\")")
 --keccak256ToByteString function implementation wrong
@@ -5283,7 +5426,7 @@ contract qq {
 
 contract qq {
   uint x = 3;
-  modifier myModifier() {  
+  modifier myModifier() {
     require(x == 3 , string.concat('x is not 3 : ', string(x)));
     x = 4;
     _;
@@ -5302,7 +5445,7 @@ contract qq {
 
 contract qq {
   uint x = 3;
-  modifier myModifier() {  
+  modifier myModifier() {
     require(x == 3 , string.concat('x is not 3 : ', string(x)));
     x = 4;
     _;
@@ -5328,7 +5471,7 @@ contract qq {
 
 contract qq {
   uint x = 3;
-  modifier myModifier(uint _x) {  
+  modifier myModifier(uint _x) {
     require(_x == 3 , string.concat('x is not 3 : ', string(_x)));
     x = 4;
     _;
@@ -5403,7 +5546,7 @@ contract qq {
     runBS [r|
 
 contract qq {
-  
+
   address addr;
   constructor() {
   addr = ecrecover("ca678fcee68aa0b4b1e0bf01b24a0beff75133284f0ad84f1e8cc70d5a9959bc",27,"c99b861c7a2d47bcf5a8423b94cc962b585f340a53e88c91b86a53effd10dc58","3dfd7acaf4625c69df55a2f4cf4f7d63da25bb495abd8dfcc9bd53481c0ccaeb");
@@ -5413,9 +5556,9 @@ contract qq {
 
 --   it "returns 0  for invalid ecrecover call" . runTest $ do
 --     runBS [r|
--- 
+--
 -- contract qq {
-  
+
 --   address addr;
 --   constructor() {
 --   addr = ecrecover("ca678fcee68aa0b4b1e0bf01b24a0beff75133284f0ad84f1e8cc70d5a9959bc",27,"efd16e46ceb4851861b89aa5fddb18e18a70bdaf029d77482bdd9b2242854b59","3dfd7acaf4625c69df55a2f4cf4f7d63da25bb495abd8dfcc9bd53481c0ccaeb");
@@ -5466,7 +5609,7 @@ contract qq {
 
   function selfDestructThis() internal {
     selfdestruct(ownerPay);
-  } 
+  }
 }|]
     runBS contract
     -- Get the contract's accounts
@@ -5475,14 +5618,14 @@ contract qq {
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as { addressStateBalance = 14 })
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs { addressStateBalance = 10 })
     -- Check return of balance
-    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract') 
-    getFields ["contract'", "contractPay", "owner", "ownerPay"] `shouldReturn` 
+    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract')
+    getFields ["contract'", "contractPay", "owner", "ownerPay"] `shouldReturn`
       [ BDefault
       , BDefault
       , BDefault
       , BDefault
       ]
-  
+
   it "throw an error when the 'account' reserved word is for a variable name." $ runTest (do
       runBS [r|
 
@@ -5538,7 +5681,7 @@ contract qq {
   uint constant c = 2022;
   constructor() public {
   }
-}|] 
+}|]
     getFields ["c"] `shouldReturn` [BDefault] --- Wait does this return BDefault or Int?
 
   it "an assign an immutable" . runTest $ do
@@ -5564,8 +5707,8 @@ contract qq {
 }|]
     getFields ["t2a", "t2x"] `shouldReturn` [BInteger 2022, BInteger 2022]
 
-  it "can create salted contract" . runTest $ do
-    runBS [r|
+  it "can deterministically create multiple salted contracts with no args" . runTest $ do
+    let src = [r|
 
 contract X {
   string public xNum;
@@ -5583,17 +5726,99 @@ contract qq {
   constructor() public {
     salt' = "salt";
     x = new X{salt: salt'}();
-    y = new Y{salt: salt'}();
-    z = new X{salt: "something"}();
+    y = new Y{salt: "something"}();
 
   }
 }|]
-    getFields ["x", "y", "z"] `shouldReturn` 
-      [ bContract "X" 0x6532c90691674287ccc10aeb251e0a0f7439073e
-      , bContract "Y" 0xfa29c1031db9942202c710ed85879c3d3e9f7110
-      , bContract "X" 0x898eabafbe40a722b6393ff16c9166e75e519b8f
+    runBS src
+    getFields ["x", "y"] `shouldReturn` 
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) Nothing
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "something" (Just $ BC.pack src) Nothing
       ]
-      
+
+  it "can deterministically create multiple salted contract with args" . runTest $ do
+    let src = [r|
+
+contract X {
+  string public xNum;
+  constructor(string _xNum) public {
+    xNum = _xNum;
+  }
+}
+
+contract Y {
+  uint public yNum;
+  constructor(uint _yNum) public {
+    yNum = _yNum;
+  }
+}
+
+contract qq {
+  X public x;
+  Y public y;
+  X public z;
+  bytes32 salt';
+  constructor() public {
+    salt' = "salt";
+    x = new X{salt: salt'}("xNum");
+    y = new Y{salt: salt'}(100);
+
+  }
+}|]
+    runBS src
+    getFields ["x", "y"] `shouldReturn` 
+      [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]")
+      , bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just $ BC.pack src) (Just "OrderedVals [SInteger 100]")
+      ]
+    [BContract "X" x] <- getFields ["x"]
+    [BContract "Y" y] <- getFields ["y"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "xNum") `shouldReturn` BString "xNum"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing y) (singleton "yNum") `shouldReturn` BInteger 100
+
+
+  it "can deterministically create salted contract with multiple args" . runTest $ do
+    let src = [r|
+contract User {
+  string commonName;
+  string cert;
+  constructor(string _commonName, string _cert) {
+    commonName = _commonName;
+    cert = _cert;
+  }
+}
+
+contract qq {
+  User public x;
+  constructor() public {
+    x = new User{salt: "Dustin Norwood"}("Dustin Norwood", "Thebestcertyoucangetfor$99.99");
+  }
+}|]
+    runBS src
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
+    [BContract "User" x] <- getFields["x"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
+
+  it "should fail when trying to create salted contract to the same address" $ runTest (do
+    runBS [r|
+contract User {
+  string commonName;
+  string cert;
+  constructor(string _commonName, string _cert) {
+    commonName = _commonName;
+    cert = _cert;
+  }
+}
+
+contract qq {
+  User public x;
+  User public y;
+  constructor() public {
+    x = new User{salt: "Dustin Norwood"}("Dustin Norwood", "Thebestcertyoucangetfor$99.99");
+    y = new User{salt: "Dustin Norwood"}("Dustin Norwood", "Thebestcertyoucangetfor$99.99");
+  }
+}|]) `shouldThrow` anyDuplicateContractError
+
   it "can use a try catch statment to catch a divide by zero error the SolidVM Way (trademark pending)" . runTest $ do
     runBS [r|
 
@@ -5625,7 +5850,7 @@ contract qq{
     getFields ["mynum"] `shouldReturn` [BInteger 3]
 
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect)" . runTest $ do
-    runBS [r| 
+    runBS [r|
 
 contract Divisor {
   function doTheDivide() public returns (uint) {
@@ -5641,7 +5866,7 @@ contract qq {
     Divisor d =  new Divisor();
     try d.doTheDivide() returns (uint v) {
           return (v, true);
-        } catch Error(string memory amsg) { 
+        } catch Error(string memory amsg) {
             // This is executed in case
             // revert was called inside getData
             // and a reason string was provided.
@@ -5683,7 +5908,7 @@ contract qq {
   function tryTheDivide() returns (uint, bool) {
     try d.doTheDivide() returns (uint v) {
         return (v, true);
-    } catch Error(string memory itsamessage) { 
+    } catch Error(string memory itsamessage) {
         // This is executed in case
         // revert was called inside doTheDivide()
         // and a reason string was provided.
@@ -5705,7 +5930,7 @@ contract qq {
   }
 }|] `shouldReturn` (Just "(12,false)")
 
-    getFields ["errCount", "theError"] `shouldReturn` [BInteger 1, BInteger 12] 
+    getFields ["errCount", "theError"] `shouldReturn` [BInteger 1, BInteger 12]
 
 
   it "allows overloading functions with different number of parameters" . runTest $ do
@@ -5783,7 +6008,7 @@ contract qq{
   }
 }|]
     getFields ["myNum", "myStatus"] `shouldReturn` [BInteger 3, BBool True]
-    
+
 
   it "can use randomly ordered named argument function calls with overloading" . runTest $ do
     runBS [r|
@@ -5809,8 +6034,8 @@ contract qq{
   }
 }|]
     getFields ["myNum", "myStatus", "myString"] `shouldReturn` [BInteger 9, BBool True, BString "hi world"]
-    
-    
+
+
   it "should catch invalid function overloads" $ runTest (do
     runBS [r|
 
@@ -6090,8 +6315,8 @@ contract qq{
     myNum = sum(myArr);
   }
 }|]) `shouldThrow` anyParseError
-    
-  
+
+
   it "can declare a constant at the file level and use it" . runTest $ do
     runBS [r|
 
@@ -6172,12 +6397,12 @@ contract qq {
   int result1 = 0;
   int result2 = 0;
   int result3 = -2;
-  int result4 = 24; 
+  int result4 = 24;
   constructor() {
     result1 += -2 >>> 254;
     result2 += 12 >>> 1;
     result3 >>>= 255;
-    result4 >>>= 1; 
+    result4 >>>= 1;
   }
 }|]
     getFields ["result1", "result2", "result3", "result4"] `shouldReturn` [BInteger 3, BInteger 6, BInteger 1, BInteger 12]
@@ -6219,7 +6444,7 @@ contract qq {
   constructor() {
     throwsError();
   }
-  
+
   function throwsError() {
     throw myError("lmao pranked");
   }
@@ -6242,7 +6467,7 @@ contract qq {
 
   function checkTen(int _val) returns (int) {
      if (_val == 10) {
-        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen");
      }
      return _val;
   }
@@ -6254,7 +6479,7 @@ contract qq {
   function setVal(int _val) returns (int) {
      try {
         val = checkTen(_val);
-     } catch IsTen(vall, mes) { 
+     } catch IsTen(vall, mes) {
         val = vall + 1;
         errorMsg = mes;
      }
@@ -6276,7 +6501,7 @@ contract qq {
 
   function checkTen(int _val) returns (int) {
      if (_val == 10) {
-        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen");
      }
      return _val;
   }
@@ -6284,7 +6509,7 @@ contract qq {
   function setVal(int _val) returns (int) {
      try {
         val = checkTen(_val);
-     } catch IsTen(vall) { 
+     } catch IsTen(vall) {
         val = vall + 1;
      }
   }
@@ -6307,7 +6532,7 @@ contract qq {
 
   function checkTen(int _val) returns (int) {
      if (_val == 10) {
-        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen"); 
+        throw IsTen(_val, "Stop trying to make ten happen, its not going to happen");
      }
      return _val;
   }
@@ -6319,7 +6544,7 @@ contract qq {
   function setVal(int _val) returns (int) {
      try {
         val = checkTen(_val);
-     } catch IsTen(vall, mes, bad) { 
+     } catch IsTen(vall, mes, bad) {
         val = vall + 1;
         myString = bad;
      }
@@ -6330,9 +6555,9 @@ contract qq {
     runBS [r|
 
 contract qq {
-  
+
   uint a;
-  
+
   constructor()
   {
     a=1;
@@ -6342,17 +6567,17 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert(); 
-  } 
+      revert();
+  }
 }|]) `shouldThrow` anyRevertError
 
   it "revert sucessfully when invoked with arguments" $ runTest (do
     runBS [r|
 
 contract qq {
-  
+
   uint a;
-  
+
   constructor()
   {
     a=1;
@@ -6362,17 +6587,17 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert("logic flag"); 
-  } 
+      revert("logic flag");
+  }
 }|]) `shouldThrow` anyRevertError
 
   it "revert sucessfully when invoked with namedargs" $ runTest (do
     runBS [r|
 
 contract qq {
-  
+
   uint a;
-  
+
   constructor()
   {
     a=1;
@@ -6382,15 +6607,15 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert({x:"logic flag"}); 
-  } 
+      revert({x:"logic flag"});
+  }
 }|]) `shouldThrow` anyRevertError
 
   it "Revert customError" $ runTest (do
     runBS [r|
 
 contract qq {
-  
+
   uint a;
   error f (string message);
   constructor()
@@ -6402,15 +6627,15 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert f("ERROR"); 
-  } 
+      revert f("ERROR");
+  }
 }|]) `shouldThrow` anyCustomError
 
   it "Revert customError  namedargs" $ runTest (do
     runBS [r|
 
 contract qq {
-  
+
   uint a;
   error f(string x,string y);
   constructor()
@@ -6422,8 +6647,8 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert f({x:'a',y:'b'}); 
-  } 
+      revert f({x:'a',y:'b'});
+  }
 }|]) `shouldThrow` anyCustomError
 
   it "Supports pure functions in 3.3" . runTest $ do
@@ -6435,7 +6660,7 @@ contract qq {
     }
 }
 |]
-    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault] 
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
 
 
@@ -6448,7 +6673,7 @@ contract qq {
     }
 }
 |]
-    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault] 
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
 
   it "can write pure and view functions" .runTest $ do
@@ -6464,7 +6689,7 @@ contract qq {
   }
 }
 |]
-    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault] 
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
   it "error when reading from contract state in a pure function" $ (runTest $
     runBS [r|
@@ -6475,7 +6700,7 @@ contract qq {
     return (x * y) / 6;
   }
 }
-|]) `shouldThrow` anyTypeError 
+|]) `shouldThrow` anyTypeError
 
   it "error when writing to contract state from a pure or view function" $ (runTest $
     runBS [r|
@@ -6524,7 +6749,7 @@ contract qq is A {
   }
 }
 |]
-    getAll [[Field "x"]]`shouldReturn` [BInteger 7] 
+    getAll [[Field "x"]]`shouldReturn` [BInteger 7]
 
   it "can resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
@@ -6540,7 +6765,7 @@ contract qq is B {
   }
 }
 |]
-    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7]
 
   it "can inherit from multiple contracts" . runTest $ do
     runBS [r|
@@ -6588,7 +6813,7 @@ contract qq {
   }
 }
 |]
-    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault]
 
   it "Warns when reading from contract state in a pure function" $ (runTest $ do
     runBS [r|
@@ -6651,7 +6876,7 @@ contract qq is A {
   }
 }
 |]
-    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7]
 
   it "can resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
@@ -6667,7 +6892,7 @@ contract qq is B {
   }
 }
 |]
-    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7]
 
   it "can inherit from multiple contracts" . runTest $ do
     runBS [r|
@@ -6685,7 +6910,7 @@ contract qq is A, B {
   }
 }
 |]
-    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9] 
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9]
 
   it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
@@ -6698,7 +6923,7 @@ contract B {
     x = 8;
   }
 }
-|]) `shouldThrow` anyTypeError  
+|]) `shouldThrow` anyTypeError
 
 
   it "can't write pure and view functions in solidvm 3.2" . runTest $ do
@@ -6714,7 +6939,7 @@ contract qq {
   }
 }
 |]
-    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault] 
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 5,BDefault]
 
   it "Warns when reading from contract state in a pure function" $ (runTest $ do
     runBS [r|
@@ -6777,7 +7002,7 @@ contract qq is A {
   }
 }
 |]
-    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7]
 
   it "Can't resolve state variables from multiple layers of inheritance" . runTest $ do
     runBS [r|
@@ -6793,7 +7018,7 @@ contract qq is B {
   }
 }
 |]
-    getAll [[Field "x"]] `shouldReturn` [BInteger 7] 
+    getAll [[Field "x"]] `shouldReturn` [BInteger 7]
 
   it "Can't inherit from multiple contracts" . runTest $ do
     runBS [r|
@@ -6811,7 +7036,7 @@ contract qq is A, B {
   }
 }
 |]
-    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9] 
+    getAll [[Field "x"], [Field "y"]] `shouldReturn` [BInteger 7,BInteger 9]
 
   it "can detect when referencing a state variable from a non-inherited contract" $ (runTest $
     runBS [r|
@@ -6849,7 +7074,7 @@ contract qq {
     }
 }
 |]
-    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]  
+    getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault,BDefault]
 
   it "can return chainIdString in a simple manner" . runTest $ do
     runBS [r|
@@ -6859,7 +7084,7 @@ contract qq {
     x = this.chainIdString;
   }
 }
-|] 
+|]
     getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
 
   it "View functions enforced in 3.4" $ (runTest $
@@ -6887,7 +7112,7 @@ contract qq {
         uint ggg =  NagicIn.unwrap(NagicIn.wrap(3));
         MagicInt myInt;
         int public regularInt;
-        
+
         constructor() {
             myInt = MagicInt.wrap( 1+ 1+ 1); //creates defined type using wrap function
             regularInt = MagicInt.unwrap(myInt); // turn userDefined type back into underlying type
@@ -6907,14 +7132,14 @@ contract qq {
         a = b.regularInt();
         funcB = MagicInt.unwrap(b.foo()) + MagicInt.unwrap(b.foo());
         temp = b.foo();
-        temp2 =  MagicInt.unwrap( MagicInt.wrap( MagicInt.unwrap(b.foo()) + MagicInt.unwrap(b.foo())  ));   
+        temp2 =  MagicInt.unwrap( MagicInt.wrap( MagicInt.unwrap(b.foo()) + MagicInt.unwrap(b.foo())  ));
     }
   }
 
 |]
     getFields ["funcB", "temp2", "a", "temp"] `shouldReturn` [BInteger 4, BInteger 4, BInteger 3, BInteger 2]
 
-  xit "cant infinite loop" $ (runTestWithTimeout 20000000 $
+  it "cant infinite loop" $ (runTestWithTimeout 60000000 $
     runBS [r|
 
 contract qq {
@@ -6926,7 +7151,7 @@ contract qq {
   }
 }   |]) `shouldThrow` anyTooMuchGasError
 
-  xit "cant infinite loop through a different contract" $ (runTestWithTimeout 20000000 $
+  it "cant infinite loop through a different contract" $ (runTestWithTimeout 60000000 $
     runBS [r|
 
 
@@ -6946,3 +7171,97 @@ contract qq {
     return;
   }
 }   |]) `shouldThrow` anyTooMuchGasError
+
+  it "can use the record identifier to signify this mapping should be indexed in cirrus" . runTest $ do
+    runBS [r|
+contract qq {
+  string x;
+  mapping(string => uint) record myMap;
+  constructor() {
+    x = this.chainIdString;
+    myMap["seven"] = 7;
+  }
+}
+|]
+    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
+
+  it "can use using statement" . runTest $ do
+    runBS [r|
+
+library SafeMath {
+  function add(uint a, uint b) returns (uint) {
+    return a + b;
+  }
+}
+contract qq {
+  using SafeMath for uint;
+  function useUsing(uint _x) returns (uint) {
+    return _x.add(1);
+  }
+  uint x = useUsing(3);
+}
+|]
+    getFields ["x"] `shouldReturn` [BInteger 4]
+
+
+  it "can use libraries" . runTest $ do
+    runBS [r|
+
+library SafeMath {
+  function add(uint a, uint b) returns (uint) {
+    return a + b;
+  }
+}
+contract qq is SafeMath {
+  function useUsing(uint _x) returns (uint) {
+    return add(_x,1);
+  }
+  uint x = useUsing(3);
+}
+|]
+    getFields ["x"] `shouldReturn` [BInteger 4]
+
+
+  it "can parse variadic arguments" . runTest $ do
+    runBS [r|
+contract qq {
+  uint x = 1;
+  uint y = 2;
+  string z = "hi";
+  uint zz = 3;
+
+  function myVariadic(variadic args) {
+    x = 2;
+  }
+
+  function myVariadic2(variadic args) {
+    y = 3;
+  }
+
+  function myVariadic3(string f, uint i, variadic args) {
+    z = f;
+    zz = i;
+  }
+
+  constructor() {
+    myVariadic();
+    myVariadic2(1, 2, 3, 4, 5);
+    myVariadic3("bye", 10, 55, 66, 77);
+  }
+}|]
+    getFields ["x", "y", "z", "zz"] `shouldReturn` [BInteger 2, BInteger 3, BString "bye", BInteger 10]
+
+
+  it "can handle parsing invalid variadic signatures - more than 1 variadic parameter" $ runTest (
+    runBS [r|
+contract qq {
+    function badVariadic (uint a, variadic b, variadic c) {}
+}|]) `shouldThrow` anyParseError
+
+
+
+  it "can handle parsing invalid variadic signatures - misplaced variadic parameter" $ runTest (
+    runBS [r|
+contract qq {
+  function badVariadic (uint a, variadic b, string c) {}
+}|]) `shouldThrow` anyParseError

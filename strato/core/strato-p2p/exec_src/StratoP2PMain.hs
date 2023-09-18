@@ -2,12 +2,15 @@
 {-# LANGUAGE OverloadedStrings     #-}
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
+import           Blockchain.VMOptions       ()
+
 import           HFlags
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Prometheus
 
 import           Blockchain.Context
 import           Blockchain.Options
+import           Blockchain.Strato.Model.Options()
 import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)

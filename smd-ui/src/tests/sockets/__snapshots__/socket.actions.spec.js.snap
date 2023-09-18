@@ -56,6 +56,13 @@ Object {
 }
 `;
 
+exports[`Socket: action subscribe shard count 1`] = `
+Object {
+  "name": "SUBSCRIBE/GET_SHARD_COUNT",
+  "type": "SOCKET_SUBSCRIBE_ROOM",
+}
+`;
+
 exports[`Socket: action subscribe transactions 1`] = `
 Object {
   "name": "SUBSCRIBE/GET_TRANSACTIONS",
@@ -143,6 +150,13 @@ Object {
 exports[`Socket: action unsubscribe peers 1`] = `
 Object {
   "name": "UNSUBSCRIBE/GET_PEERS",
+  "type": "SOCKET_UNSUBSCRIBE_ROOM",
+}
+`;
+
+exports[`Socket: action unsubscribe shard count 1`] = `
+Object {
+  "name": "UNSUBSCRIBE/GET_SHARD_COUNT",
   "type": "SOCKET_UNSUBSCRIBE_ROOM",
 }
 `;

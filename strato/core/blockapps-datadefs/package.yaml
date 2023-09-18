@@ -10,6 +10,8 @@ dependencies:
   - crypto-pubkey-types
   - deepseq
   - ethereum-rlp
+  - evm-solidity
+  - source-tools
   - format
   - generic-arbitrary
   - generic-random
@@ -23,7 +25,7 @@ dependencies:
   - time
   - transformers
 
-ghc-options: -Wall -O2
+ghc-options: -Wall -O2 -fconstraint-solver-iterations=20
 
 library:
   source-dirs: src/

@@ -91,8 +91,9 @@ handleEvents ev sSource runner = do
                   Just pub -> return pub
 
                 peerX509 <- getPeerX509 peer
+                myX509 <- getMyX509
                 orgChains <- selectWithDefault (Proxy @ChainMemberRSet) cId
-                let peerCheck = checkPeerIsMember peerX509 orgChains
+                let peerCheck = checkPeerIsMember myX509 peerX509 orgChains
 
                 $logDebugS "stratoP2PClientDirect/handleEvents" . T.pack . C.red $ show peerCheck
                 
@@ -104,7 +105,7 @@ handleEvents ev sSource runner = do
                   $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
                   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
                     let pStr = pPeerString peer -- display string will show up as dns name
-                    attempt :: Maybe SomeException <- withActivePeer peer $
+                    attempt :: Maybe SomeException <- withCertifiedPeer peer . withActivePeer peer $
                       runEthClientConduit peer{pPeerPubkey=Just otherPubKey}
                                           (c ^. peerSource)
                                           (c ^. peerSink)

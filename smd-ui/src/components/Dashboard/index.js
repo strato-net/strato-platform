@@ -28,9 +28,13 @@ import {
   TRANSACTIONS_TYPE,
   GET_NODE_UPTIME,
   GET_HEALTH,
-  GET_SYSTEM_INFO
+  GET_SYSTEM_INFO,
+  GET_SHARD_COUNT,
 } from '../../sockets/rooms'
-import {sec2Date} from "../../lib/formatSeconds";
+import { sec2Date } from "../../lib/formatSeconds";
+import ReactGA from "react-ga4";
+import { Popover, PopoverInteractionKind, Position } from '@blueprintjs/core';
+import ValidatorsCard from '../ValidatorsCard';
 
 const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] });
 // TODO: these should be part of a reducer state. Do the same for other global variables.
@@ -55,7 +59,6 @@ class Dashboard extends Component {
 
   constructor(props) {
     super(props);
-    this.handleMouseHover = this.handleMouseHover.bind(this);
     this.state = {
       isHovering: false,
     }
@@ -69,22 +72,11 @@ class Dashboard extends Component {
     this.props.subscribeRoom(BLOCKS_DIFFICULTY)
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
-    this.props.subscribeRoom(GET_HEALTH)
-    this.props.subscribeRoom(GET_NODE_UPTIME)
-    this.props.subscribeRoom(GET_SYSTEM_INFO)
+    this.props.subscribeRoom(GET_SHARD_COUNT)
 
     mixpanelWrapper.track('dashboard_page_load');
+    ReactGA.send({hitType: "pageview", page: "/dashboard", title: "Dashboard"});
 
-    socket.on('disconnect', () => {
-      this.props.changeHealthStatus(false);
-    });
-
-    socket.on('reconnect', () => {
-      this.props.changeHealthStatus(true);
-      this.props.subscribeRoom(GET_HEALTH)
-      this.props.subscribeRoom(GET_NODE_UPTIME)
-      this.props.subscribeRoom(GET_SYSTEM_INFO)
-    });
   }
 
   componentWillUnmount() {
@@ -99,54 +91,64 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(GET_HEALTH)
     this.props.unSubscribeRoom(GET_NODE_UPTIME)
     this.props.unSubscribeRoom(GET_SYSTEM_INFO)
+    this.props.unSubscribeRoom(GET_SHARD_COUNT)
   }
-
-  handleMouseHover (){
-    this.setState({
-      isHovering: !this.state.isHovering
-    });
-  };
 
   render() {
     const difficultyData = this.props.dashboard.blockDifficulty;
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
-    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
-    const uptime = this.props.dashboard.uptime;
+    const { usersCount, contractsCount, lastBlockNumber, shardCount } = this.props.dashboard;
+    const uptime = this.props.dashboard.uptime
     const health = this.props.dashboard.healthStatus;
     const systemHealth = this.props.dashboard.systemStatus;
     const systemWarnings = this.props.dashboard.systemWarnings;
+    const synced = this.props.appMetadata.metadata ? this.props.appMetadata.metadata.isSynced : false
+    const metadata = this.props.appMetadata.metadata
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
         <div className="row">
           <div className="col-sm-9 text-left">
-            <h3>Network</h3>
+            <h3>Node Stats</h3>
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3"
-               onMouseEnter={this.handleMouseHover}
-               onMouseLeave={this.handleMouseHover}
-          >
-            <NumberCard
-              number={health ? 'HEALTHY' : 'UNHEALTHY'}
-              description= {sec2Date(uptime)}
-              mode={(health && systemHealth) ? 'success':'warning' }
-              iconClass={(health && systemHealth) ? 'fa-check-circle' : 'fa-exclamation-circle'}
-            />
-            {(this.state.isHovering && !systemHealth) && <div> Warnings: {systemWarnings} </div>}
+          <div className="col-sm-12">
+            <br />
           </div>
+        </div>
+        <div className="row">
           <div className="col-sm-3">
-            <Link to="/blocks">
+
+            <Popover
+              isDisabled={synced && health}
+              interactionKind={PopoverInteractionKind.HOVER}
+              position={Position.BOTTOM}
+              className={'full-width'}
+              content={
+                <div className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${!metadata ? 'danger' : ((!health || !synced) ? 'warning' : 'success')}`}>
+                  <h5 className="pt-callout-title">{
+                    !metadata ? 'API Disconnected' : !(health) ? 'Warning' : !synced ? 'Node Syncing' : 'Healthy'
+                    }</h5>
+                  {
+                    !metadata ? 'Cannot connect to the Node\'s API' 
+                    : !(health) ? (systemWarnings || 'Reason currently unknown') 
+                    : !synced ? 'This Node is currently syncing with the network' 
+                    : 'Connected to STRATO Mercata'
+                  }
+            </div>}
+            >
               <NumberCard
-                number={lastBlockNumber}
-                description="Last Block"
-                iconClass="fa-link"
-              />
-            </Link>
-          </div>
+                number={!metadata ? 'DISCONNECTED' : (health && !systemHealth ? 'UNHEALTHY' : !synced ? 'SYNCING' : 'HEALTHY')}
+                description= {sec2Date(uptime)}
+                mode={!metadata ? 'danger' : ((!health || !synced) ? 'warning' : 'success')}
+                
+                iconClass={!metadata ? 'fa-triangle-exclamation' : (!health ? 'fa-exclamation-circle' : !synced ? 'fa-rotate' : 'fa-check-circle')}
+                />
+              </Popover>
+            </div>
           <div className="col-sm-3">
             <Link to="/accounts">
               <NumberCard
@@ -157,12 +159,23 @@ class Dashboard extends Component {
               />
             </Link>
           </div>
+          
           <div className="col-sm-3">
             <Link to="/contracts">
               <NumberCard
                 number={contractsCount}
                 description="Contracts"
-                iconClass="fa-gavel"
+                iconClass="fa-file-contract"
+                className="smd-pointer"
+              />
+            </Link>
+          </div>
+          <div className="col-sm-3">
+            <Link to="/shards">
+              <NumberCard
+                number={shardCount}
+                description="Shards"
+                iconClass="fa-diagram-project"
                 className="smd-pointer"
               />
             </Link>
@@ -175,33 +188,81 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
-
+            <NumberCard
+                number={
+                  this.props.appMetadata && this.props.appMetadata.nodeInfo ?
+                  <div>
+                    <p>
+                      {this.props.appMetadata.nodeInfo.organization} {this.props.appMetadata.nodeInfo.organizationalUnit} 
+                    </p>
+                    <p>
+                      {this.props.appMetadata.nodeInfo.commonName}
+                    </p> 
+                  </div>
+                  : 'No Identity'}
+                description="Node ID"
+                iconClass={this.props.appMetadata && this.props.appMetadata.nodeInfo ? 'fa-id-card' : 'fa-exclamation-circle' }
+                className={`smd-pointer`}
+                mode={this.props.appMetadata && this.props.appMetadata.nodeInfo ? '' : 'pt-intent-warning'}
+                textSize='h4'
+              />
           </div>
-          <div className="col-sm-3">
-            <BarGraph data={txCount} number={txCount[0]} label={"Transaction Count"} identifier={"TxCount"} />
-
+          <div className="col-sm-6">
+            <NodeCard />
           </div>
-          <div className="col-sm-3">
-            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"} />
-
+          
+        </div>
+        
+        <div className="row">
+          <div className="col-sm-12">
+            <hr />
           </div>
-          <div className="col-sm-3">
-            <PieChart data={txTypeData} />
-
+        </div>
+        <div className="row">
+          <div className="col-sm-9 text-left">
+            <h3>Network Stats</h3>
           </div>
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <h3>Nodes</h3>
-            <NodeCard />
+            <Link to="/blocks">
+              <NumberCard
+                number={lastBlockNumber}
+                description="Blocks"
+                iconClass="fa-cube"
+              />
+            </Link>
           </div>
-          <div className="col-sm-9">
-            <h3>Recent Transactions</h3>
+          <div className="col-sm-3">
+            <ValidatorsCard />
+          </div>
+          <div className="col-sm-6">
             <TransactionList />
           </div>
         </div>
-      </div>
+
+        <div className="row">
+          <div className="col-sm-12">
+            <hr />
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-sm-9 text-left">
+            <h3>Historical Stats</h3>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-sm-3">
+            <BarGraph data={txCount} number={txCount[0]} label={"Transactions per Last 15 Blocks"} identifier={"TxCount"} />
+          </div>
+          <div className="col-sm-3">
+            <PieChart data={txTypeData} />
+          </div>
+          <div className="col-sm-3">
+            <BarGraph data={blockPropData} units="s" label={"Block Interval Last 15 Blocks"} identifier={"BlockProp"} />
+          </div>
+        </div>
+    </div>
     );
   }
 }
@@ -209,7 +270,8 @@ class Dashboard extends Component {
 export function mapStateToProps(state) {
   return {
     node: state.node,
-    dashboard: state.dashboard
+    dashboard: state.dashboard,
+    appMetadata: state.appMetadata,
   };
 }
 

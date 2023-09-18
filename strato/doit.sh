@@ -9,6 +9,8 @@ Yellow='\033[0;33m'
 BYellow='\033[1;33m'
 NC='\033[0m'
 
+STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-"8013"}
+
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
@@ -50,19 +52,19 @@ fi
 
 
 function newnode {
-  
+
   # if alternative log in methods are provided then use them
   mkdir -p logs
-  
+
   VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}}
   VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}}
 
   echo "trying to see if the alternative OAUTH parameters are available"
 
-  if [[ -z ${VPACI} || -z ${VPACS} ]]; then 
+  if [[ -z ${VPACI} || -z ${VPACS} ]]; then
     echo "Could not obtain OAUTH parameters for Vault Proxy"
     exit 2
-  else 
+  else
     echo "OAUTH parameters for Vault Proxy are available"
   fi
 
@@ -111,15 +113,6 @@ function newnode {
 
 
 
-  if $mineBlocks
-  then echo "Starting strato-adit"
-      aMiner=$miningAlgorithm
-      if [ $blockstanbul = true ]; then
-        aMiner=Instant
-      fi
-      export miningThreads=${miningThreads:-1}
-      runBackgroundProcess strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$aMiner >> logs/strato-adit 2>&1
-  fi
 
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
@@ -218,32 +211,38 @@ function newnode {
   if [ -n "${seqEventsBatchSize}" ]; then
     sebFlag="--seqEventsBatchSize=${seqEventsBatchSize}"
   fi
-  if [-n "${seqEventsCostHeuristic}" ]; then
+  if [ -n "${seqEventsCostHeuristic}" ]; then
       sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
   fi
-  if [-n "${cacheTransactionResults}"] ; then
+  if [ -n "${cacheTransactionResults}" ]; then
       ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
   fi
+  if [ -n "${accountNonceLimit}" ]; then
+      aclFlag="--accountNonceLimit=${accountNonceLimit}"
+  fi
+  if [ -n "${txSizeLimit}" ]; then
+      txsFlag="--txSizeLimit=${txSizeLimit}"
+  fi
+  if [ -n "${gasLimit}" ]; then
+      gasFlag="--gasLimit=${gasLimit}"
+  fi
+  if [ -n "${idServerUrl}" ]; then
+      idServer="--identityServerUrl=${idServerUrl}"
+  fi
+
   echo "Starting vm-runner"
-  runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --miner=$miningAlgorithm --maxTxsPerBlock=$maxTxsPerBlock \
+  runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
                          --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
-                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --debugEnabled=$vmDebug --wsDebug=$wsDebug \
-                         --debugPort=$debugPort --debugWSPort=$debugWSPort \
+                         --debugPort=$debugPort --debugWSHost=$debugWSHost --debugWSPort=$debugWSPort \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
                          ${networkFlag} --networkID=$networkID --requireCerts=$requireCerts \
-                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" \
+                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" "${aclFlag}" "${txsFlag}" "${gasFlag}" \
                          --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible +RTS -N1 >> logs/strato-api 2>&1 
-
-  if [ "${START_EXPERIMENTAL_STRATO_API}" = true ]; then
-      echo "Starting strato-api2"
-      # Leave the +RTS -N1, it is important
-      runBackgroundProcess strato-api2 --gasOn=$gasOn +RTS -N1 >> logs/strato-api2 2>&1
-  fi
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible --networkID=$networkID "${aclFlag}" "${txsFlag}" "${gasFlag}" "${idServer}" "${networkFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
@@ -366,12 +365,6 @@ function doInit {
     fi
   fi
 
-  if [ "${USE_OLD_STRATO_API}" != "true" ]; then
-      echo "initializing bloc database"
-      strato-api-init
-  fi
-
-
   #we need to create the private key for the faucet
   mkdir config
 
@@ -430,7 +423,7 @@ fi
 setEnv requireCerts true
 setEnv genesisBlock ""
 setEnv bootnode ""
-setEnv maxReturnedHeaders 1000
+setEnv maxReturnedHeaders 500
 
 setEnv mineBlocks true
 setEnv verifyBlocks false
@@ -441,7 +434,7 @@ setEnv numMinPeers 100
 setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 1000
-setEnv difficultyBomb false
+
 
 setEnv sqlDiff ${sqlDiff:-true}
 setEnv svmTrace ${svmTrace:-false}
@@ -456,6 +449,7 @@ setEnv evmTraceMode false
 setEnv vmDebug ${vmDebug:-false}
 setEnv wsDebug ${wsDebug:-false}
 setEnv debugPort ${debugPort:-8051}
+setEnv debugWSHost ${debugWSHost:-strato}
 setEnv debugWSPort ${debugWSPort:-8052}
 setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-false}
 
@@ -473,7 +467,7 @@ fi
 #else
 #    if [[ "$VAULT_URL" == *"172.17.0.1"* ]]; then
 #        echo "VAULT_URL provided is http with local docker ip for debugging."
-#    else 
+#    else
 #        echo "VAULT_URL provided is not valid, expected the value starting with 'https://' or 'http://172.17.0.1'"
 #        exit 3
 #    fi

@@ -28,7 +28,6 @@ instance Monad m => Modifiable K.KafkaState (State.StateT K.KafkaState m) where
   put _ = State.put
 
 seqEventNotificationSource :: ( MonadIO m
-                              , MonadResource m
                               , MonadLogger m
                               )
                            => K.KafkaState -> ConduitM () P2pEvent m ()

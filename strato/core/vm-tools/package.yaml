@@ -18,6 +18,8 @@ dependencies:
   - milena-tools
   - strato-conf
   - strato-model
+  - strato-statediff
+  - vector
 
 library:
   source-dirs: src/
@@ -76,7 +78,6 @@ library:
     - resourcet
     - seqevents
     - solid-vm-model
-    - strato-adit
     - strato-redis-blockdb
     - text
     - time
@@ -91,6 +92,7 @@ tests:
   contextm-test:
     source-dirs: test/
     main: Spec.hs
+    ghc-options: -Wall -O2 -dynamic
     dependencies:
       - bytestring
       - common-log

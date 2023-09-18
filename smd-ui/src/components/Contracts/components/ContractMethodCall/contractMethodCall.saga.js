@@ -7,9 +7,6 @@ import {
   METHOD_CALL_REQUEST,
   methodCallSuccess,
   methodCallFailure,
-  METHOD_CALL_FETCH_ARGS_REQUEST,
-  methodCallFetchArgsSuccess,
-  methodCallFetchArgsFailure
 } from './contractMethodCall.actions';
 import { fetchState } from '../ContractCard/contractCard.actions';
 import { env } from '../../../../env.js'
@@ -17,31 +14,9 @@ import { handleErrors } from '../../../../lib/handleErrors';
 import { createUrl } from '../../../../lib/url';
 import { isOauthEnabled } from '../../../../lib/checkMode';
 
-export function getArgs(contractName, contractAddress, symbol, chainid) {
-  const options = { params: { contractName, contractAddress }, query: { chainid } };
-  const url = env.BLOC_URL + createUrl("/contracts/::contractName/::contractAddress", options);
-
-  return fetch(
-    url,
-    {
-      method: 'GET',
-      credentials: "include",
-      headers: {
-        'Accept': 'application/json'
-      },
-    })
-    .then(handleErrors)
-    .then(function (response) {
-      return response.json();
-    })
-    .catch(function (error) {
-      throw error;
-    });
-}
-
 export function postMethodCall(payload) {
   const isModeOauth = isOauthEnabled();
-  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainId } } :
+  const options = isModeOauth ? { query: { resolve: true, chainid: payload.chainId, use_wallet: payload.useWallet } } :
     {
       params: {
         username: payload.username,
@@ -103,29 +78,13 @@ export function* methodCall(action) {
   try {
     const response = yield call(postMethodCall, action.payload);
     yield put(fetchState(action.payload.contractName, action.payload.contractAddress, action.payload.chainId));
-    yield put(methodCallSuccess(action.key, JSON.stringify(response, null, 2)));
+    yield put(methodCallSuccess(action.key, response));
   }
   catch (err) {
     yield put(methodCallFailure(action.key, err));
   }
 }
 
-export function* fetchArgs(action) {
-  try {
-    const response = yield call(getArgs, action.name, action.address, action.symbol, action.chainId);
-    const args = response.xabi.funcs[action.symbol].args;
-    const isPayable = response.xabi.funcs[action.symbol].payable;
-    yield put(methodCallFetchArgsSuccess(action.key, args, isPayable));
-  }
-  catch (err) {
-    yield put(methodCallFetchArgsFailure(action.key, err));
-  }
-}
-
 export function* watchMethodCall() {
   yield takeEvery(METHOD_CALL_REQUEST, methodCall);
-}
-
-export function* watchFetchArgs() {
-  yield takeEvery(METHOD_CALL_FETCH_ARGS_REQUEST, fetchArgs);
 }

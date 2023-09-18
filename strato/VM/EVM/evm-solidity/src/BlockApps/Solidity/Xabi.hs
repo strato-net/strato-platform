@@ -14,52 +14,47 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import           Data.Aeson.Types
-import qualified Data.HashMap.Strict          as Hash
+import           Data.Aeson.KeyMap            as KeyMap
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
-import           Data.Maybe                   (fromMaybe, listToMaybe, maybeToList)
+import           Data.Maybe                   (listToMaybe, maybeToList)
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import qualified Generic.Random               as GR
 import           GHC.Generics
-import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances    ()
 
 import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256
-import           Data.Source.Map
 
 data XabiKind = ContractKind
               | InterfaceKind
+              | AbstractKind
               | LibraryKind deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON XabiKind where
 instance FromJSON XabiKind where
 instance Arbitrary XabiKind where
-  arbitrary = elements [ContractKind, InterfaceKind, LibraryKind]
+  arbitrary = elements [ContractKind, AbstractKind, InterfaceKind, LibraryKind]
 
 instance ToSchema XabiKind where
   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
     & mapped.name ?~ "Xabi Kind Schema"
-    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, or an interface"
+    & mapped.schema.description ?~ "Whether this xabi is a contract, a library, an abstract contract or an interface"
     & mapped.schema.example ?~ toJSON ContractKind
 
 data Xabi = Xabi
-  { xabiFuncs     :: Map Text Func
+  { xabiFuncs     :: !(Map Text Func)
   , xabiConstr    :: Maybe Func
-  , xabiVars      :: Map Text Xabi.VarType
-  , xabiTypes     :: Map Text Xabi.Def
-  , xabiModifiers :: Map Text Modifier
-  , xabiEvents    :: Map Text Event
+  , xabiVars      :: !(Map Text Xabi.VarType)
+  , xabiTypes     :: !(Map Text Xabi.Def)
+  , xabiModifiers :: !(Map Text Modifier)
+  , xabiEvents    :: !(Map Text Event)
   , xabiKind      :: XabiKind
-  , xabiUsing     :: Map Text Using
-  } deriving (Eq,Show,Generic,NFData)
+  , xabiUsing     :: !(Map Text Using)
+  } deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -156,8 +151,8 @@ instance ToSchema StateMutability where
     & mapped.schema.example ?~ toJSON View
 
 data Func = Func
-  { funcArgs :: Map Text Xabi.IndexedType
-  , funcVals :: Map Text Xabi.IndexedType
+  { funcArgs :: !(Map Text Xabi.IndexedType)
+  , funcVals :: !(Map Text Xabi.IndexedType)
   , funcStateMutability :: Maybe StateMutability
 
   -- These Values are only used for parsing and unparsing solidity.
@@ -180,16 +175,16 @@ funcConstant _ = True
 instance ToJSON Func where
   toJSON f = case genericToJSON (aesonPrefix camelCase) f of
                  Object o -> Object
-                        . Hash.insert "payable" (Bool . funcPayable $ f)
-                        . Hash.insert "constant" (Bool . funcConstant $ f)
+                        . KeyMap.insert "payable" (Bool . funcPayable $ f)
+                        . KeyMap.insert "constant" (Bool . funcConstant $ f)
                         $ o
                  x -> x
 
 -- constant and payable are a deprecated way of specifying state mutability
 fallbackConstantPayable :: Value -> Parser (Maybe StateMutability)
 fallbackConstantPayable = withObject "fallbackConstantPayable" $ \obj ->
-    let constant = Hash.lookup "constant" obj
-        payable = Hash.lookup "payable" obj
+    let constant = KeyMap.lookup "constant" obj
+        payable = KeyMap.lookup "payable" obj
     in case (constant, payable) of
            (Just (Bool True), Just (Bool True)) -> fail "functions cannot be constant and payable"
            (Just (Bool True), _) -> pure . Just $ Constant
@@ -227,7 +222,7 @@ data Visibility = Private
                 | Public
                 | Internal
                 | External
-  deriving (Eq,Show,Generic,NFData)
+  deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Visibility
 instance FromJSON Visibility
@@ -242,11 +237,11 @@ instance ToSchema Visibility where
       ex = Public
 
 data Modifier = Modifier
-  { modifierArgs     :: Map Text Xabi.IndexedType
+  { modifierArgs     :: !(Map Text Xabi.IndexedType)
   , modifierSelector :: Text
-  , modifierVals     :: Map Text Xabi.IndexedType
+  , modifierVals     :: !(Map Text Xabi.IndexedType)
   , modifierContents :: Maybe Text
-  } deriving (Eq,Show,Generic,NFData)
+  } deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Modifier where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -273,7 +268,7 @@ instance ToSchema Modifier where
 data Event = Event { eventAnonymous :: Bool
                    , eventLogs :: [(Text, Xabi.IndexedType)]
                    }
-              deriving (Eq,Show,Generic,NFData)
+              deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Event where
   toJSON e = object [
@@ -304,7 +299,7 @@ instance ToSchema Event where
           ]
         }
 
-newtype Using = Using String deriving (Eq,Show,Generic,NFData)
+newtype Using = Using String deriving (Eq, Show, Generic, NFData)
 
 instance ToJSON Using where
   toJSON (Using dec) = String . Text.pack $ dec
@@ -323,66 +318,6 @@ instance ToSchema Using where
      & mapped.schema.example ?~ toJSON sampleUsing
      where sampleUsing :: Using
            sampleUsing = Using "for uint[]"
-
-
-data ContractDetails = ContractDetails
-  { contractdetailsBin        :: Text
-  , contractdetailsAccount    :: Maybe Account
-  , contractdetailsBinRuntime :: Text
-  , contractdetailsCodeHash   :: CodePtr
-  , contractdetailsName       :: Text
-  , contractdetailsSrc        :: SourceMap
-  , contractdetailsXabi       :: Xabi
-  } deriving (Show,Eq,Generic,NFData)
-
-instance ToJSON ContractDetails where
-  toJSON ContractDetails{..} = object $
-    [ "bin" .= contractdetailsBin
-    , "address" .= fmap _accountAddress contractdetailsAccount
-    , "chainId" .= fmap _accountChainId contractdetailsAccount
-    , "bin-runtime" .= contractdetailsBinRuntime
-    , "codeHash" .= contractdetailsCodeHash
-    , "name" .= contractdetailsName
-    , "src" .= contractdetailsSrc
-    , "xabi" .= contractdetailsXabi
-    ]
-
-instance FromJSON ContractDetails where
-  parseJSON = withObject "ContractDetails" $ \obj ->
-    ContractDetails
-      <$> obj .: "bin"
-      <*> (do
-        mAddr <- obj .:? "address"
-        case mAddr of
-          Nothing -> pure Nothing
-          Just addr -> Just . Account addr <$> (obj .:? "chainId"))
-      <*> obj .: "bin-runtime"
-      <*> obj .: "codeHash"
-      <*> obj .: "name"
-      <*> (fromMaybe mempty <$> obj .:? "src")
-      <*> obj .: "xabi"
-
-instance ToSample ContractDetails where toSamples _ = noSamples
-
-instance Arbitrary ContractDetails where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToSchema ContractDetails where
-  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
-    & mapped.name ?~ "ContractDetails"
-    & mapped.schema.description ?~ "Returned data from contract creation."
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: ContractDetails
-      ex = ContractDetails
-        { contractdetailsBin = "ContractBin"
-        , contractdetailsAccount = Just $ Account (Address 0xdeadbeef) Nothing
-        , contractdetailsBinRuntime = "ContractRuntime"
-        , contractdetailsCodeHash = EVMCode $ unsafeCreateKeccak256FromWord256 0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365
-        , contractdetailsName = "DetailsName"
-        , contractdetailsSrc = namedSource "DetailsName.sol" "contract DetailsName { }"
-        , contractdetailsXabi = sampleXabi
-        }
 
 --------------------------------------------------------------------------------
 

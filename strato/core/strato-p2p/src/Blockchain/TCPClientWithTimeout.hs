@@ -22,7 +22,7 @@ threadDelaySeconds :: Double -> IO ()
 threadDelaySeconds secs =
   threadDelay (ceiling $ secs * 1e6)
 
-runTCPClientWithConnectTimeout::(MonadIO m, MonadUnliftIO m)
+runTCPClientWithConnectTimeout::(MonadUnliftIO m)
                               => ClientSettings->Double->(AppData->m ())->m ()
 runTCPClientWithConnectTimeout settings secs cont = do
   race <- liftIO newChan
@@ -51,5 +51,5 @@ runTCPClientWithConnectTimeout settings secs cont = do
        Left e  -> throw (e::SomeException)
        Right x -> return x
     else do
-      _ <- throwIO $ TimeoutException
       liftIO $ killThread clientThreadID
+      throwIO $ TimeoutException

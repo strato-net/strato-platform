@@ -16,6 +16,7 @@ module Blockchain.Strato.Model.Address
       stringAddress,
       getNewAddress_unsafe,
       getNewAddressWithSalt_unsafe,
+      deriveAddressWithSalt,
       addressAsNibbleString, addressFromNibbleString,
       addressToHex, addressFromHex,
       unAddress,
@@ -28,6 +29,7 @@ import           Control.Monad
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
+import qualified Data.Aeson.Key                       as DAK 
 import           Data.Binary
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
@@ -35,6 +37,7 @@ import qualified Data.ByteString.Char8                as BC
 import qualified Data.ByteString.Lazy                 as BL
 import           Data.Data
 import           Data.Hashable
+import           Data.Maybe                           (fromJust, fromMaybe)
 import           Data.Swagger                         hiding (Format, format, get, put)
 import qualified Data.Swagger                         as Sw
 import qualified Data.Text                            as T
@@ -54,7 +57,7 @@ import           Web.PathPieces
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256)
+import qualified Blockchain.Strato.Model.Keccak256    as SHA (hash, keccak256ToWord256, keccak256ToByteString)
 import           Blockchain.Strato.Model.Secp256k1
 import           Blockchain.Strato.Model.Util
 import qualified Data.NibbleString                    as N
@@ -100,10 +103,11 @@ fromPublicKey = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.d
 -}
 instance PathPiece Address where
   toPathPiece (Address x) = T.pack $ showHex  (fromIntegral $ x :: Integer) ""
-  fromPathPiece t = Just (Address wd160)
-    where
-      ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
+  fromPathPiece t = case readHex (T.unpack t) of
+    ((wd160, _):_) -> Just (Address wd160)
+    [] -> Nothing
 
+      
 {-
  make into a string rather than an object
 -}
@@ -111,8 +115,9 @@ instance AS.ToJSON Address where
   toJSON = String . T.pack . formatAddressWithoutColor
 
 instance AS.ToJSONKey Address where
-  toJSONKey = ToJSONKeyText f (Enc.text . f)
-          where f = T.pack . formatAddressWithoutColor
+  toJSONKey = ToJSONKeyText f (Enc.text . t)
+          where f = DAK.fromText . T.pack . formatAddressWithoutColor
+                t = T.pack . formatAddressWithoutColor
 
 instance AS.FromJSON Address where
   parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ drop0x $ T.unpack s
@@ -237,12 +242,25 @@ getNewAddress_unsafe a n =
     in decode $ BL.drop 12 $ encode theHash
 
 -- Construct salted contract addresses using a version of the solidity CREATE2 method:
--- Original -> new_address = hash(0xFF, sender, salt, bytecode) 
--- Current  -> new_address = hash(0xFF, sender, salt, contract_name, codecollection_hash)
-getNewAddressWithSalt_unsafe :: Address -> RLPObject -> String -> B.ByteString -> Address
-getNewAddressWithSalt_unsafe a s c h =
-  let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (255 :: Integer), rlpEncode a, s, rlpEncode c, rlpEncode h]
+-- Original -> new_address = hash(0xFF, sender, salt, bytecode)[12::]
+-- Current  -> new_address = hash(0xFF, sender, salt, codecollection_hash, args)[12::]
+getNewAddressWithSalt_unsafe :: Address -> String -> B.ByteString -> String -> Address
+getNewAddressWithSalt_unsafe creator salt codeHash args =
+  let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (0xFF :: Integer), rlpEncode creator, rlpEncode salt, rlpEncode codeHash, rlpEncode args]
   in decode $ BL.drop 12 $ encode theHash
+
+-- Default values are for the UserRegistry/User contract. Salt should be the userAddress.
+deriveAddressWithSalt :: Maybe Address -> String -> Maybe BC.ByteString -> Maybe String -> Address
+deriveAddressWithSalt sender salt src args = do
+  let theAddress = fromMaybe (fromJust $ stringAddress "0000000000000000000000000000000000000720") sender -- UserRegistry address
+      theHash = SHA.hash $ rlpSerialize $ RLPArray [ rlpEncode (0xFF :: Integer)
+                                                   , rlpEncode theAddress
+                                                   , rlpEncode salt
+                                                   , rlpEncode $ maybe ("2_\156\246X\192\246\237<\n\142FF\244\SI\132\&6Q^=\DC1z#\159O?n\DEL\"\nF*" :: BC.ByteString) (SHA.keccak256ToByteString . SHA.hash) src 
+                                                   , rlpEncode $ fromMaybe "OrderedVals []" args
+                                                   ]
+  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
+  (decode $ BL.drop 12 $ encode theHash)
 
 addressAsNibbleString::Address->N.NibbleString
 addressAsNibbleString (Address s) =

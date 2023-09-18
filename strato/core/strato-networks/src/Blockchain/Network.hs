@@ -44,4 +44,12 @@ getParams "mercata-testnet" = return $ Just
 --      webAddress = "engineering.stratoid.blockapps.net"
       }
   ]
+getParams "mercata-hydrogen" = return $ Just -- to make network id: mercata-hydrogen -> ascii to hex -> convert # to base10
+  [
+    NetworkParams {
+      ethAddress = Address 0x100, -- not important
+      webAddress = "52.4.166.179", -- testnet2 node 1
+      identity = blockAppsIdentity
+    }
+  ]
 getParams _ = return Nothing

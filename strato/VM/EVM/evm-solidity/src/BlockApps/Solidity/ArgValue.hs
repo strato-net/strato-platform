@@ -9,13 +9,16 @@ import           BlockApps.Solidity.Value
 import           Control.Lens                 ((&), (?~))
 import           Control.Monad
 import qualified Data.Aeson                   as A
+import qualified Data.Aeson.KeyMap            as KM
+import qualified Data.Aeson.Key               as DAK
 import qualified Data.Bimap                   as Bimap
+import qualified Data.Bifunctor               as BF
 import           Data.Either
 import           Data.ByteString              (ByteString)
 import qualified Data.ByteString              as ByteString
 import qualified Data.ByteString.Base16       as Base16
 import qualified Data.Map.Strict              as Map
-import qualified Data.HashMap.Strict          as HM
+-- import qualified Data.HashMap.Strict          as HM
 import           Data.Swagger
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
@@ -31,7 +34,7 @@ data ArgValue
   | ArgBool Bool
   | ArgString Text
   | ArgArray (V.Vector ArgValue)
-  | ArgObject (HM.HashMap Text ArgValue)
+  | ArgObject (KM.KeyMap ArgValue)
   deriving (Eq,Show)
 
 instance Arbitrary ArgValue where
@@ -94,14 +97,14 @@ argValueToValue defs theType argVal = case theType of
               value = argValueToValue defs inferredType v
           return value
           ) hm
-        let initialValueType = argValueToType $ snd . head $ HM.toList hm
+        let initialValueType = argValueToType $ snd . head $ KM.toList hm
             isUniform = foldl (\b av -> b && argValueToType av == initialValueType) True hm
         when (any isLeft mp) $ do
           Left "argValueToValue: Could not parse object into a Mapping"
         when (not isUniform) $ do
           Left "argValueToValue: Mapping object does not contain uniform values"
           -- Use a struct because it is parsed in the VM as different types once it has the correct type info for args
-        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- HM.toList mp]
+        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- BF.first DAK.toText <$> KM.toList mp]
       a ->  Left $ Text.pack $ "argValueToValue: Expected TypeMapping to be a object, but got a" ++ show a
   TypeFunction{} -> Left "argValueToValue TODO: TypeFunction not yet implemented"
   TypeContract{} -> case argVal of
@@ -130,8 +133,20 @@ argValueToValue defs theType argVal = case theType of
           ) hm
         when (any isLeft mp) $ do
           Left "argValueToValue: Could not parse object into a Struct"
-        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- HM.toList mp]
+        Right $ ValueStruct $ Map.fromList $ [(k, v) | (k, Right v) <- BF.first DAK.toText <$> KM.toList mp]
       a ->  Left $ Text.pack $ "argValueToValue: Expected TypeStruct to be a object, but got a" ++ show a
+  TypeVariadic -> do
+    case argVal of
+      ArgArray xs -> do
+        listOfVals <- mapM (\v -> do
+            let inferredType = argValueToType v
+                value = argValueToValue defs inferredType v
+            case value of
+              Right v' -> return v'
+              _ -> Left $ "argValueToValue: Could not parse array into a Variadic"
+          ) $ V.toList xs
+        Right $ ValueVariadic listOfVals
+      o -> Left . Text.pack $ "argValueToValue: Expected TypeVariadic to be an array, but got: " ++ show o
 
 argValueToSimpleValue :: SimpleType -> ArgValue -> Either Text SimpleValue
 argValueToSimpleValue theType argVal = case theType of

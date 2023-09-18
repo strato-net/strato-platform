@@ -12,7 +12,10 @@ import {
   fetchCirrusInstancesSuccess,
   fetchCirrusInstancesFailure,
   fetchAccountSuccess,
-  fetchAccountFailure
+  fetchAccountFailure,
+  FETCH_CONTRACT_INFO_REQUEST,
+  fetchContractInfoSuccess,
+  fetchContractInfoFailure
 } from './contractCard.actions';
 import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
@@ -87,6 +90,28 @@ export function getAccount(address) {
     });
 }
 
+export function getContract(contractName, contractAddress, chainid) {
+  const options = { params: { contractName, contractAddress }, query: { chainid } };
+  const url = env.BLOC_URL + createUrl("/contracts/::contractName/::contractAddress", options);
+
+  return fetch(
+    url,
+    {
+      method: 'GET',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json'
+      },
+    })
+    .then(handleErrors)
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
 export function* fetchState(action) {
   try {
     let response = yield call(getState, action.name, action.address, action.chainId);
@@ -117,6 +142,17 @@ export function* fetchAccount(action) {
   }
 }
 
+export function* fetchContractInfo(action) {
+  try {
+    const response = yield call(getContract, action.contractName, action.contractAddress, action.chainId);
+    const data = { contract: response, name: action.contractName, address: action.contractAddress, chainId: action.chainId };
+    yield put(fetchContractInfoSuccess(action.key, data));
+  }
+  catch (err) {
+    yield put(fetchContractInfoFailure(action.key, err));
+  }
+}
+
 export function* watchFetchCirrusContracts() {
   yield takeEvery(FETCH_CIRRUS_INSTANCES_REQUEST, fetchCirrusInstances);
 }
@@ -127,4 +163,8 @@ export function* watchFetchState() {
 
 export function* watchAccount() {
   yield takeEvery(FETCH_ACCOUNT_REQUEST, fetchAccount);
+}
+
+export function* watchFetchInfo() {
+  yield takeEvery(FETCH_CONTRACT_INFO_REQUEST, fetchContractInfo);
 }

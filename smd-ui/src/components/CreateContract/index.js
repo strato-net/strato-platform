@@ -7,11 +7,12 @@ import {
   contractFormChange,
   usernameChange,
   contractNameChange,
-  resetError
+  resetError,
+  updateUsingSampleContract
 } from './createContract.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button, Dialog, Popover, PopoverInteractionKind, Position, AnchorButton } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -21,7 +22,9 @@ import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
 import { isOauthEnabled } from '../../lib/checkMode';
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
+import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
+import HexText from '../HexText';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -47,7 +50,7 @@ class CreateContract extends Component {
             if (isDragActive) {
               return (<p className="pt-intent-success">Drop to Upload!</p>);
             }
-            return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
+            return (<p className="pt-intent-success">{acceptedFiles.length > 0 && !this.props.usingSampleContract ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
           }}
         </Dropzone>
         {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
@@ -88,14 +91,35 @@ class CreateContract extends Component {
       );
     };
     reader.readAsText(contract);
+    if (this.props.usingSampleContract) {
+      this.props.updateUsingSampleContract(false);
+    }
   };
 
+  handleSampleContract = (contractName) => {
+    this.props.touch('contract');
+    let contractSrc = SampleContracts[contractName];
+    const self = this;
+    mixpanelWrapper.track("sample_contract_select");
+    self.props.contractFormChange(contractSrc);
+    self.props.compileContract(
+      contractName,
+      contractSrc,
+      self.props.solidvm
+    );
+    if (!this.props.usingSampleContract) {
+      this.props.updateUsingSampleContract(true);
+    }
+  }
+
   isValidFileType = (files) => {
-    if (!files || !files[0])
-      return 'Please add contract source file'
-    const contractSource = files[0];
-    if (!contractSource.name.includes('.sol'))
-      return 'It should be an .sol extention file';
+    if (files && !this.props.usingSampleContract) {
+      if (!files || !files[0])
+        return 'Please add contract source file'
+      const contractSource = files[0];
+      if (!contractSource.name.includes('.sol'))
+        return 'It should be an .sol extention file';
+    }
   };
 
   submit = (values) => {
@@ -149,7 +173,7 @@ class CreateContract extends Component {
       solidvm: values.solidvm,
       fileText: fileText,
       arguments: args,
-      chainId: values.chainId,
+      chainId: this.props.selectedChain ? this.props.selectedChain : undefined,
       metadata: metadata
     };
 
@@ -258,71 +282,6 @@ class CreateContract extends Component {
     }
   }
 
-  renderChainFields() {
-    const chainLabel = Object.getOwnPropertyNames(this.props.chainLabel);
-
-    if (chainLabel.length) {
-      return (
-        <div>
-          <div className="row">
-            <div className="col-sm-3 text-right">
-              <label className="pt-label smd-pad-4">
-                Chain
-              </label>
-            </div>
-            <div className="col-sm-9 smd-pad-4">
-              <div className="pt-select">
-                <Field
-                  className="pt-input chain-field"
-                  component="select"
-                  name="chainLabel"
-                  onChange={
-                    (e) => this.props.getLabelIds(e.target.value)
-                  }
-                >
-                  <option />
-                  {
-                    chainLabel.map((label, i) => {
-                      return (
-                        <option key={label + i} value={label}>{label}</option>
-                      )
-                    })
-                  }
-                </Field>
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="col-sm-3 text-right">
-              <label className="pt-label smd-pad-4">
-                Chain IDs
-              </label>
-            </div>
-            <div className="col-sm-9 smd-pad-4">
-              <div className="pt-select smd-max-width">
-                <Field
-                  className="pt-input smd-max-width"
-                  component="select"
-                  name="chainId"
-                >
-                  <option />
-                  {
-                    this.props.chainLabelIds && Object.getOwnPropertyNames(this.props.chainLabelIds).map((id, i) => {
-                      return (
-                        <option key={id + i} value={id}>{id}</option>
-                      )
-                    })
-                  }
-                </Field>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-    }
-  }
-
   render() {
     const { handleSubmit, pristine, submitting, valid, toastsError } = this.props;
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
@@ -330,18 +289,30 @@ class CreateContract extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <Button onClick={() => {
+        <Popover 
+          isDisabled={!!this.props.userCertificate}
+          interactionKind={PopoverInteractionKind.HOVER}
+          position={Position.LEFT}
+          content={
+            <div className='pt-dark pt-callout pt-icon-info-sign pt-intent-warning'>
+              <h5 className="pt-callout-title">Verification Required</h5>
+                Your identity must be verified before you can do this action.
+            </div>
+          }
+        >
+
+        <AnchorButton onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
-          this.props.fetchChainIds();
           this.props.contractOpenModal();
           this.props.initialize(this.props.initialValues);
           this.props.getLabelIds(this.props.initialValues.chainLabel)
         }}
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
-          text="Create Contract"
-          disabled={(this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) ? true : false}
+          text={"Create Contract"}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
         />
+        </Popover>
         <form>
           <Dialog
             iconName="inbox"
@@ -351,7 +322,16 @@ class CreateContract extends Component {
             className="pt-dark create-contract-dialog"
           >
             <div className="pt-dialog-body">
-              {this.renderChainFields()}
+              <div className='row'>
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Shard
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  {this.props.selectedChain ? <HexText value={this.props.selectedChain}/> : "Main Chain"}
+                </div>
+              </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -393,24 +373,50 @@ class CreateContract extends Component {
                   />
                 </div>
               </div>}
-              {!this.props.sourceFromEditor &&
-                <div className="row">
+              {!this.props.sourceFromEditor && <div className="row">
                   <div className="col-sm-3 text-right">
                     <label className="pt-label smd-pad-4" style={{ margin: 0 }}>
-                      Source file
+                      Source files
                     </label>
                   </div>
-                  <div className="col-sm-9 smd-pad-4">
-                    <Field
-                      id="input-b"
-                      className="form-width pt-input"
-                      name="contract"
-                      component={this.renderDropzoneInput}
-                      dir="auto"
-                      title="Contract Source"
-                      validate={this.isValidFileType}
-                      required
-                    />
+                  <div className="col-sm-9 smd-scrollable smd-pad-4">
+                    <div className='pt-select'>
+                      <Field
+                        className="pt-select"
+                        component="select"
+                        name="sampleContract"
+                        onChange={(e) => {
+                          if (e.target.value !== "default")
+                            this.handleSampleContract(e.target.value);
+                        }}
+                      >
+                        <option key={0} value="default">Choose a sample contract to upload.</option>
+                        <option key={1} value="HelloWorld">Hello World</option>
+                        <option key={2} value="SimpleStorage">Simple Storage</option>
+                        <option key={3} value="ERC20">ERC20 - Tokens</option>
+                        <option key={4} value="ERC721">ERC721 - NFT</option>
+                        <option key={5} value="PermissionManager">Permission Manager</option>
+                      </Field>
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="text-center smd-pad-4">
+                      Or
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="col-sm-12 smd-pad-4">
+                      <Field
+                        id="input-b"
+                        className="form-width pt-input"
+                        name="contract"
+                        component={this.renderDropzoneInput}
+                        dir="auto"
+                        title="Contract Source"
+                        validate={this.isValidFileType}
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
               }
@@ -542,15 +548,18 @@ export function mapStateToProps(state) {
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
     toastsError: state.createContract.error,
+    usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
     initialValues: {
-      commonName: state.user.oauthUser ? state.user.oauthUser.commonName : 'Certification Pending',
-      address: state.user.oauthUser ? state.user.oauthUser.address : 'Certification Pending',
+      commonName: state.user.userCertificate ? state.user.userCertificate.commonName : 'Verification Pending',
+      address: state.user.userCertificate ? state.user.userCertificate.userAddress : 'Verification Pending',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
     chainLabel: state.chains.listChain,
-    chainLabelIds: state.chains.listLabelIds
+    chainLabelIds: state.chains.listLabelIds,
+    selectedChain: state.chains.selectedChain,
+    userCertificate: state.user.userCertificate,
   };
 }
 
@@ -568,7 +577,8 @@ const connected = connect(mapStateToProps, {
   contractNameChange,
   resetError,
   fetchChainIds,
-  getLabelIds
+  getLabelIds,
+  updateUsingSampleContract
 })(formed);
 
 export default withRouter(connected);

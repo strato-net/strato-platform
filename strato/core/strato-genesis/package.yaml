@@ -35,7 +35,6 @@ library:
       - unordered-containers
       - vector
       - vm-tools
-
       - aeson
       - bytestring
       - merkle-patricia-db
@@ -45,6 +44,7 @@ library:
       - solid-vm-model
       - ethereum-rlp
       - x509-certs
+      - lens
 
 
 executables:

@@ -78,6 +78,7 @@ solidityLanguage = javaStyle {
      "block", --"coinbase", "difficulty", "gaslimit", "number", "blockhash", "timestamp", "now"
      "msg", --"data", "gas", "sender", "value",
      "tx", --"gasprice", "origin",
+     "record",
      "wei", "finney", "szabo", "ether",
      "seconds", "minutes", "hours", "days", "weeks", "years",
      --The following are protected as they are also names for cirrus columns
@@ -135,7 +136,9 @@ hexChar = do
   _ <- char 'x'
   d1 <- hexDigit
   d2 <- hexDigit
-  let ((d, _):_) = readHex [d1,d2]
+  let d = case readHex [d1,d2] of 
+            ((d', _):_) -> d'
+            _ -> error "hexChar"
   return $ w2c d
 
 unicodeChar :: SolidityParser Char
@@ -145,7 +148,10 @@ unicodeChar = do
   d2 <- digit
   d3 <- digit
   d4 <- digit
-  let ((d, _):_) = readHex [d1,d2,d3,d4]
+  -- let ((d, _):_) = readHex [d1,d2,d3,d4]
+  let d = case readHex [d1,d2,d3,d4] of 
+            ((d', _):_) -> d'
+            _ -> error "unicodeChar"
   return $ toEnum d
 
 charEsc :: SolidityParser Char

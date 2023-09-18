@@ -60,6 +60,7 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Options
+import           Blockchain.Strato.Model.Options       (computeNetworkID)
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -90,8 +91,8 @@ mkEthP2PEventSource :: ( MonadResource m
                     -> m (ConduitM () Event m ())
 mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
---  tid <- myThreadId
---  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
+  tid <- myThreadId
+  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
   merged <- mergeSourcesByForce (
     [ peerSourceConduit
         .| ethDecrypt inCtx
@@ -99,7 +100,7 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
         .| bytesToMessages
         .| CL.iterM (displayMessage Inbound peerStr)
         .| CL.map MsgEvt
---        .| CL.iterM (const $ petWatchdog recvWatchdog)
+        .| CL.iterM (const $ petWatchdog recvWatchdog)
     , seqEventSource
         .| CL.map NewSeqEvent
     , canarySource .| CL.map absurd
@@ -252,6 +253,12 @@ handleMsgServerConduit myPubkey peer = do
                   genesisHash = genHash,
                   rootCerts= rootCerts'
               }
+              (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+              mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+              yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+              yield . Right $ GetChainDetails []
+              handleGetChainDetails peer S.empty
+              lift stampActionTimestamp
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash, networkID=networkID'} -> do
             $logInfoS "serverHandshake/Status{}" "received status"
             yield =<< lift (Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
@@ -265,6 +272,12 @@ handleMsgServerConduit myPubkey peer = do
                   latestHash = bHash,
                   genesisHash = genHash
               })
+            (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+            mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
+            yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
+            yield . Right $ GetChainDetails []
+            handleGetChainDetails peer S.empty
+            lift stampActionTimestamp
         other -> assertHandshake other
     handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
 
@@ -308,7 +321,7 @@ bytesToMessages = forever $ do
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
 maxMessageSize :: Int
-maxMessageSize = 1 `shiftL` 24
+maxMessageSize = 1 `shiftL` 25
 
 messageToBytes :: Monad m => ConduitM Message B.ByteString m ()
 messageToBytes = mapC $ \msg ->

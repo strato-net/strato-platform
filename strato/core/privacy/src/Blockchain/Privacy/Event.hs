@@ -298,8 +298,10 @@ runBlocks chainId = go Nothing
                                . S.fromList
                                . (Just chainId :) -- It's possible that there aren't any transactions with this chainId in the block
                                $ txChainId <$> obReceiptTransactions b
-                  for_ chainIds $ \(Just cId) -> forAncestorChains cId . flip (adjustStatefully_ (Proxy @ChainIdEntry)) $
-                    blocksToRun %= S.delete b0
+                  for_ chainIds $ \case { 
+                    (Just cId) -> forAncestorChains cId . flip (adjustStatefully_ (Proxy @ChainIdEntry)) $ blocksToRun %= S.delete b0;
+                    Nothing -> pure [()] -- maybe error here? unsure if this is possible;
+                  }
                   (b:) <$> go (Just b0)
 
 hasAllAncestorChains :: (Word256 `Alters` ChainIdEntry) m => Maybe Word256 -> m Bool

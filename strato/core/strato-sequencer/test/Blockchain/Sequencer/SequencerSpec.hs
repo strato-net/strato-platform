@@ -1,9 +1,10 @@
-{-# OPTIONS -fno-warn-unused-imports #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
+{-# OPTIONS -fno-warn-unused-imports              #-}
+{-# LANGUAGE OverloadedStrings                    #-}
+{-# LANGUAGE RecordWildCards                      #-}
+{-# LANGUAGE ScopedTypeVariables                  #-}
+{-# LANGUAGE TemplateHaskell                      #-}
+{-# LANGUAGE TypeApplications                     #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 
 module Blockchain.Sequencer.SequencerSpec where
 
@@ -142,7 +143,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
         myAddr = fromPrivateKey myPriv
         myCM = CommonName "BlockApps" "Engineering" "Admin" True
         vals = [myCM]
-        ctx = newContext (Checkpoint (View 0 0) vals) myCM
+        ctx = newContext (Checkpoint (View 0 0) vals) myCM True
         mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
         difficulty = blockHeaderDifficulty . ibBlockData $ genesisBlock

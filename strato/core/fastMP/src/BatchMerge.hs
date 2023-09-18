@@ -11,6 +11,7 @@ import           Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.Loops
 import           Data.Maybe
+import qualified Data.Bifunctor as BF
 import qualified Data.NibbleString as N
 
 import           BlockApps.Logging
@@ -26,17 +27,17 @@ import ReverseOrderedKVs
 putManyKeyVal :: (MonadLogger m, (MP.StateRoot `A.Alters` MP.NodeData) m)
               => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
 putManyKeyVal sr listOfInserts = do
-  let listOfInserts' = map (\(k, v) -> (MP.keyToSafeKey k, v)) listOfInserts
+  let listOfInserts' = map (BF.first MP.keyToSafeKey) listOfInserts
 
-  nd <- MP.getNodeData $ MP.PtrRef sr
+  nd <- MP.getNodeData $ MP.ptrRef sr
 
   finalNd <- putManyKeyVal_nodeData nd $ orderTheKVs $ map (uncurry createKV) listOfInserts'
 
   nr <- MP.nodeData2NodeRef finalNd
 
   case nr of
-    MP.PtrRef sr' -> return sr'
-    MP.SmallRef v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
+    Right sr' -> return sr'
+    Left v -> do -- The whole trie is too small to fit in a level db key, just create a stateroot from the full data....
       let newSR = MP.StateRoot $ keccak256ToByteString $ hash v
       A.insert (A.Proxy @MP.NodeData) newSR finalNd
       return newSR
@@ -90,7 +91,13 @@ putManyKeyVal_nodeData (nd@(MP.ShortcutNodeData _ (Left _))) listOfInserts = do
   --now....
 
 
-  concatM (map (\(KV k (Right v)) -> MP.putKV_NodeData (N.pack k) v) $ getTheKVs listOfInserts) nd
+  -- concatM (map (\(KV k (Right v)) -> MP.putKV_NodeData (N.pack k) v) $ getTheKVs listOfInserts) nd
+  concatM (map (\(KV k v) -> case v of
+                      Right v' -> MP.putKV_NodeData (N.pack k) v'
+                      Left _ -> error "Unsupported case: KV with Left value") $ getTheKVs listOfInserts) nd
+
+
+
 
 
 

@@ -32,10 +32,12 @@ import           Control.Lens.Operators
 import           Control.Monad
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
-import qualified Control.Monad.State                     as State
+import qualified Control.Monad.Trans.State.Strict        as State
 import           Control.Monad.Trans.Except
 import           Data.Bifunctor                          (bimap)
+import qualified Data.Binary                             as Bin
 import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Lazy                    as BL
 import qualified Data.DList                              as DL
 import           Data.Either.Extra
 import           Data.Foldable                           (traverse_)
@@ -126,7 +128,7 @@ instance (Monad m, HasMemAddressStateDB m) => HasMemAddressStateDB (ConduitT i o
   getAddressStateBlockDBMap = lift getAddressStateBlockDBMap
   putAddressStateBlockDBMap = lift . putAddressStateBlockDBMap 
 
-instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
+instance (HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
   getMemRawStorageTxDB     = lift getMemRawStorageTxDB
   putMemRawStorageTxMap    = lift . putMemRawStorageTxMap
   getMemRawStorageBlockDB  = lift getMemRawStorageBlockDB
@@ -135,7 +137,7 @@ instance (Monad m, HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) 
 
 -- todo: lovely!
 
-addBlocks :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
+addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . blockDataNumber . obBlockData) unfiltered
       timerToUse = Just vmBlockInsertionMined
@@ -146,15 +148,15 @@ addBlocks unfiltered = do
   case (filtered, bbi) of
     ([], _) -> return ()
     (_, Unspecified) -> return ()
-    (firstBlock:_, ContextBestBlockInfo (_, oldHeader, _, _, _)) -> do
+    (firstBlock:_, ContextBestBlockInfo _ oldHeader _ _ _) -> do
       $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length filtered) ++ " blocks(s) starting with " ++
                                              (show . blockDataNumber . obBlockData $ firstBlock))
       didReplaceBest   <- newIORef False
       ranPrivateTxs    <- newIORef M.empty
       replacedBest     <- newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!")
-      srLog <- fmap DL.toList . flip State.execStateT DL.empty $ forM_ filtered $ \block -> do
-        let blockNo = blockDataNumber $! obBlockData block
-            txCount = length $! obReceiptTransactions block
+      srLog <- flip State.execStateT Nothing $ forM_ filtered $ \block -> do
+        let !blockNo = blockDataNumber $ obBlockData block
+            !txCount = length $ obReceiptTransactions block
         timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
           lift $ addBlock block
           (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
@@ -165,7 +167,7 @@ addBlocks unfiltered = do
             -- and the intermediate ones increase the granularity at which we can compute a sequence
             -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
             -- the diff between them, which is estimated by the number of transactions.
-            id %= (`DL.snoc` (blockDataStateRoot $ obBlockData block, hsh, num, txCount))
+            State.put $! Just (blockDataStateRoot $ obBlockData block, hsh, num)
           unless (M.null ranPriv) $
             modifyIORef' ranPrivateTxs $ flip M.unionWith ranPriv $
               \(n1,s1) (n2,s2) -> if n1 > n2 then (n1,s1) else (n2,s2)
@@ -176,7 +178,7 @@ addBlocks unfiltered = do
         $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
         nbb <- readIORef replacedBest
         yield . OutIndexEvent $ NewBestBlock nbb
-        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs " timerToUse $
+        when flags_sqlDiff $ timeit "calculateAndEmitStateDiffs" timerToUse $
           calculateAndEmitStateDiffs srLog oldHeader
       when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
@@ -186,7 +188,7 @@ setParentStateRoot OutputBlock{..} = do
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber obBlockData)
     BSDB.getBSum (blockDataParentHash obBlockData)
 
-addBlock :: (MonadFail m, VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b in withCurrentBlockHash obh $ do
     $logInfoS "addBlocks" . T.pack $
@@ -242,7 +244,7 @@ addBlock b@OutputBlock{obBlockData = bd, obReceiptTransactions = otxs} =
     lift $ P.incCounter vmBlocksProcessed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b) ++ " (" ++ format obh ++ ")."
 
-addBlockTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
 addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   let txs = filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t))
@@ -253,7 +255,7 @@ addBlockTransactions OutputBlock{obBlockData = bd, obReceiptTransactions = trans
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
 
-addTransactions :: (VMBase m, Bagger.MonadBagger m, MonadMonitor m)
+addTransactions :: (VMBase m, MonadMonitor m)
                 => BlockData
                 -> [OutputTx]
                 -> ConduitT a VmOutEvent m ()
@@ -361,6 +363,10 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
     when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
     unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
+    when (acctNonce >= flags_accountNonceLimit) $ throwE $ TFNonceLimitExceeded flags_accountNonceLimit acctNonce t
+    let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t 
+    when (txSize >= flags_txSizeLimit) .
+       throwE $ TFTXSizeLimitExceeded txSize flags_txSizeLimit t 
 
     let availableGas = transactionGasLimit bt - fromIntegral intrinsicGas'
 
@@ -420,7 +426,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
                 case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
                   Just "EVM" -> EVM.create
                   Just "SolidVM" -> SolidVM.create
-                  Nothing -> EVM.create --EVM is the default
+                  Nothing -> EVM.create
                   Just vmName -> -- Return a dummy VM that just complains that the requested VM doesn't exist
                     \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
                                  return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
@@ -597,12 +603,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx{otHash=theHash} 
   when flags_diffPublish $ do
     traverse_ (yield . OutAction) $ either (const Nothing) erAction result
 
-multilineLog :: MonadLogger m =>
-                T.Text -> String -> m ()
-multilineLog source theLines = do
-  forM_ (lines theLines) $ \theLine ->
-    $logInfoS source $ T.pack theLine
-
 printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->Maybe Word256 ->  m ()
 printTransactionMessage ot@OutputTx{otSigner=tAddr, otHash=theHash} (Left errMsg) deltaT cid = do
@@ -642,23 +642,23 @@ indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 ----------------
 
-replaceBestIfBetter :: (VMBase m, Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
+replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     let txPayloads = (\t -> fromMaybe (otBaseTx t) (otPrivatePayload t)) <$> txs
     bbi <- getContextBestBlockInfo
 
     case bbi of
       Unspecified -> error $ "Trying to replace an Unspecified Best Block"
-      ContextBestBlockInfo (oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) -> do
+      ContextBestBlockInfo oldBestSha oldBestBlock oldBestDifficulty oldTxCount _ -> do
 
-        let newNumber     = blockDataNumber bd
-            newStateRoot  = blockDataStateRoot bd
-            newTxCount    = fromIntegral $ length txs
-            newUncleCount = fromIntegral $ length uncles
-            oldNumber     = blockDataNumber oldBestBlock
-            oldStateRoot  = blockDataStateRoot oldBestBlock
-            bH            = outputBlockHash b
-            bTHs          = otHash <$> txs
+        let !newNumber     = blockDataNumber bd
+            !newStateRoot  = blockDataStateRoot bd
+            !newTxCount    = fromIntegral $ length txs
+            !newUncleCount = fromIntegral $ length uncles
+            !oldNumber     = blockDataNumber oldBestBlock
+            !oldStateRoot  = blockDataStateRoot oldBestBlock
+            !bH            = outputBlockHash b
+            !bTHs          = otHash <$> txs
 
         let shouldReplace =     newNumber == 0
                             || (newNumber > oldNumber)
@@ -670,7 +670,19 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
 
         when shouldReplace $ do
             Bagger.processNewBestBlock bH bd bTHs
-            putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount)
+            putContextBestBlockInfo $! ContextBestBlockInfo bH bd td newTxCount newUncleCount
+            cbbi <- getContextBestBlockInfo
+            case cbbi of
+              Unspecified -> $logInfoS "replaceBestIfBetter" "ContextBestBlockInfo is Unspecified"
+              ContextBestBlockInfo h _ d t u -> $logInfoS "ContextBestBlockInfo" . T.pack $ concat
+                [ format h
+                , " "
+                , show d
+                , " "
+                , show t
+                , " "
+                , show u
+                ]
 
         -- we're replaying SeqEvents, and need to notify the mempool
         when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
@@ -684,24 +696,22 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
         return (shouldReplace, ranPriv, bbi')
 
 calculateAndEmitStateDiffs :: VMBase m
-                           => [(MP.StateRoot, Keccak256, Integer, Int)]
+                           => Maybe (MP.StateRoot, Keccak256, Integer)
                            -> BlockData
                            -> ConduitT a VmOutEvent m ()
-calculateAndEmitStateDiffs srLog oldHeader = do
+calculateAndEmitStateDiffs Nothing _ = pure ()
+calculateAndEmitStateDiffs (Just (next, hsh, num)) oldHeader =
   let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
-      diffLog = compactDiffs base srLog
-  runConduit $ yieldMany diffLog
-            .| mapMC completeDiff
-            .| mapM_C (yield . OutStateDiff)
+   in completeDiff base next hsh num
 
 calculateAndEmitChainDiffs :: VMBase m => M.Map Word256 (Integer, Keccak256) -> ConduitT a VmOutEvent m ()
 calculateAndEmitChainDiffs chainMap = do
   let chainList = M.toList chainMap
       chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
-  $logInfoS "calculateAndEmitChainDiffs" . T.pack $ "Calculating ChainDiffs for: " ++ show chainIds
+  multilineLog "calculateAndEmitChainDiffs" $ "Calculating ChainDiffs for:\n" ++ boringBox chainIds
   runConduit $ yieldMany chainList
-            .| mapMC (\(cId, (newNumber, newHash)) -> withCurrentBlockHash newHash $ SD.chainDiff (Just cId) newNumber newHash)
-            .| mapM_C (traverse_ $ yield . OutStateDiff)
+            .| awaitForever (\(cId, (newNumber, newHash)) -> withCurrentBlockHash newHash $ SD.chainDiff (Just cId) newNumber newHash)
+            .| mapM_C (yield . OutStateDiff)
 
 diffMaxCost :: Int
 diffMaxCost = 500
@@ -736,12 +746,13 @@ completeDiff :: ( MonadLogger m
                 , HasMemAddressStateDB m
                 , (MP.StateRoot `A.Alters` MP.NodeData) m
                 , (Account `A.Alters` AddressState) m
+                , A.Selectable Account AddressState m
                 , (Maybe Word256 `A.Alters` MP.StateRoot) m
                 , HasMemRawStorageDB m
                 , (RawStorageKey `A.Alters` RawStorageValue) m
                 )
-             => ToDiff -> m SD.StateDiff
-completeDiff (src, dst, hsh, num) = withCurrentBlockHash hsh $ do
-  $logInfoS "calculateAndEmitStateDiffs" . T.pack $
-      "Calculating StateDiff from: " ++ format src ++ "\nto: " ++ format dst
-  SD.stateDiff Nothing num hsh src dst
+             => MP.StateRoot -> MP.StateRoot -> Keccak256 -> Integer -> ConduitT a VmOutEvent m ()
+completeDiff src dst hsh num = withCurrentBlockHash hsh $ do
+  multilineLog "calculateAndEmiteStateDiffs" $ boringBox ["Calculating StateDiff from", format src, "to", format dst]
+  runConduit $ SD.stateDiff Nothing num hsh src dst
+            .| mapM_C (yield . OutStateDiff)

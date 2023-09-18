@@ -72,6 +72,8 @@ Object {
 
 exports[`Chains: action chain ids request 1`] = `
 Object {
+  "limit": undefined,
+  "offset": undefined,
   "type": "FETCH_CHAIN_IDS_REQUEST",
 }
 `;
@@ -216,6 +218,7 @@ Object {
 
 exports[`Chains: action chain request 1`] = `
 Object {
+  "chainid": undefined,
   "limit": 10,
   "offset": 0,
   "type": "FETCH_CHAINS_REQUEST",

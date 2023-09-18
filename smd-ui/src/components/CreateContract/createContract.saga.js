@@ -134,7 +134,7 @@ export function* createContract(action) {
     } else {
       yield put(createContractSuccess(response[0] || response));
       yield put(updateToast());
-      yield put(fetchContracts());
+      yield put(fetchContracts(action.payload.chainId, 10, 0));
       yield put(fetchCirrusInstances(action.payload.contract, action.payload.chainId));
     }
   } catch (err) {

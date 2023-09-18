@@ -6,6 +6,7 @@ module Blockchain.Database.MerklePatricia.Diff (dbDiff, DiffOp(..)) where
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.NodeData
 
+import           Conduit
 import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Data.Function
@@ -43,39 +44,39 @@ data DiffOp =
   deriving (Show, Eq)
 
 diffChoice :: (StateRoot `Alters` NodeData) m
-           => Maybe N.Nibble -> MPChoice -> MPChoice -> m [DiffOp]
+           => Maybe N.Nibble -> MPChoice -> MPChoice -> ConduitT i DiffOp m ()
 diffChoice n ch1 ch2 = case (ch1, ch2) of
-  (None, Value v) -> return [Create sn v]
-  (Value v, None) -> return [Delete sn v]
+  (None, Value v) -> yield $ Create sn v
+  (Value v, None) -> yield $ Delete sn v
   (Value v1, Value v2)
-    | v1 /= v2     -> return [Update sn v1 v2]
-  _ | ch1 == ch2   -> return []
+    | v1 /= v2     -> yield $ Update sn v1 v2
+  _ | ch1 == ch2   -> return ()
     | otherwise   -> pRecurse ch1 ch2
   where
     sn = maybe [] (:[]) n
     prefix =
       let prepend n' op = op{key = n':(key op)}
-      in map (maybe id prepend n)
-    pRecurse = liftM prefix .* recurse
+      in maybe id prepend n
+    pRecurse = (.| awaitForever (yield . prefix)) .* recurse
 
 diffChoices :: (StateRoot `Alters` NodeData) m
-            => [MPChoice] -> [MPChoice] -> m [DiffOp]
+            => [MPChoice] -> [MPChoice] -> ConduitT i DiffOp m ()
 diffChoices =
-  liftM concat .* sequence .* zipWith3 diffChoice maybeNums
+  void .* sequence .* zipWith3 diffChoice maybeNums
   where maybeNums = Nothing : map Just [0..]
 
 recurse :: (StateRoot `Alters` NodeData) m
-        => MPChoice -> MPChoice -> m [DiffOp]
-recurse = join .* (liftM2 diffChoices `on` enter)
+        => MPChoice -> MPChoice -> ConduitT i DiffOp m ()
+recurse = join .* (liftM2 diffChoices `on` (lift . enter))
 
 infixr 9 .*
 (.*) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
 (.*) = (.) . (.)
 
 diff :: (StateRoot `Alters` NodeData) m
-     => NodeRef -> NodeRef -> m [DiffOp]
+     => NodeRef -> NodeRef -> ConduitT i DiffOp m ()
 diff = recurse `on` Ref
 
 dbDiff :: (StateRoot `Alters` NodeData) m
-       => StateRoot -> StateRoot -> m [DiffOp]
-dbDiff = diff `on` PtrRef
+       => StateRoot -> StateRoot -> ConduitT i DiffOp m ()
+dbDiff = diff `on` ptrRef

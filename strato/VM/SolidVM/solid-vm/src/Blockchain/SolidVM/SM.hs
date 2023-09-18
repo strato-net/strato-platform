@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE BangPatterns          #-}
 
 
 module Blockchain.SolidVM.SM (
@@ -28,6 +29,8 @@ module Blockchain.SolidVM.SM (
   popCallInfo,
   withTempCallInfo,
   withUncheckedCallInfo,
+  pushLocalVars,
+  popLocalVars,
   getLocal,
   setLocal,
   getCurrentCallInfo,
@@ -36,6 +39,8 @@ module Blockchain.SolidVM.SM (
   getCurrentChainId,
   getCurrentFunctionName,
   getCurrentCodeCollection,
+  addFunctionToCurrentContractInCurrentCallInfo,
+  removeFunctionFromCurrentContractInCurrentCallInfo, 
   getEnv,
   getGasInfo,
   getVariableOfName,
@@ -58,9 +63,9 @@ import           Control.Lens hiding (Context)
 import           Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.State
+import           Control.Monad.Trans.Reader
+import           Control.DeepSeq (($!!), force)
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -106,8 +111,9 @@ import           Blockchain.SolidVM.GasInfo
 import           BlockApps.X509.Certificate
 
 import qualified SolidVM.Model.CodeCollection as CC
-import           Blockchain.Data.BlockSummary 
+import           Blockchain.Data.BlockSummary
 import           Text.Format
+import qualified Text.Colors                  as CL
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import qualified SolidVM.Model.Storable as MS
@@ -123,6 +129,7 @@ data CallInfo = CallInfo
   , codeCollection      :: CC.CodeCollection
   , collectionHash      :: Keccak256
   , localVariables      :: Map SolidString (SVMType.Type, Variable)
+  , variableStack       :: [Map SolidString (SVMType.Type, Variable)]
   , readOnly            :: Bool
   , isUncheckedSection  :: Bool -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
   , currentSourcePos    :: Maybe SourcePosition
@@ -152,22 +159,23 @@ BlockData
 data SState = SState
   { env             :: Env.Environment
   , callStack       :: [CallInfo]
-  , ssEvents        :: Q.Seq Event
   , _ssMemDBs       :: MemDBs
   , _action         :: Action
   , _gasInfo        :: GasInfo
   }
 makeLenses ''SState
 
-type SM m = StateT SState m
+type SM m = ReaderT (IORef SState) m
 
 type MonadSM m = ( (Account `A.Alters` AddressState) m
+                 , A.Selectable Account AddressState m
                  , HasStateDB m
                  , (Keccak256 `A.Alters` DBCode) m
                  , (Keccak256 `A.Alters` BlockSummary) m
                  , HasSelectX509CertDB m
                  , HasSelectX509FieldDB m
                  , A.Selectable Word256 ParentChainIds m
+                 , A.Selectable (Address,T.Text) X509CertificateField m
                  , HasRawStorageDB m
                  , HasMemAddressStateDB m
                  , HasMemRawStorageDB m
@@ -179,24 +187,37 @@ type MonadSM m = ( (Account `A.Alters` AddressState) m
                  , Mod.Modifiable Action m
                  , Mod.Modifiable (Q.Seq Event) m
                  , Mod.Modifiable (Maybe DebugSettings) m
-                 , MonadIO m --todo: remove
+                 , MonadUnliftIO m --todo: remove
                  , MonadCatch m
                  , MonadLogger m
                  )
 
-instance Monad m => HasMemAddressStateDB (SM m) where
+get :: MonadUnliftIO m => SM m SState
+get = readIORef =<< ask
+{-# INLINE get #-}
+
+gets :: MonadUnliftIO m => (SState -> a) -> SM m a
+gets f = f <$> get
+{-# INLINE gets #-}
+
+modify :: MonadUnliftIO m => (SState -> SState) -> SM m ()
+modify f = ask >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+{-# INLINE modify #-}
+
+instance MonadUnliftIO m => HasMemAddressStateDB (SM m) where
   getAddressStateTxDBMap      = gets $ _stateTxMap . _ssMemDBs
   putAddressStateTxDBMap    m = modify $ ssMemDBs . stateTxMap .~ m
   getAddressStateBlockDBMap   = gets $ _stateBlockMap . _ssMemDBs
   putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
 
-instance Monad m => HasMemRawStorageDB (SM m) where
+instance MonadUnliftIO m => HasMemRawStorageDB (SM m) where
   getMemRawStorageTxDB       = gets $ _storageTxMap . _ssMemDBs
   putMemRawStorageTxMap    m = modify $ ssMemDBs . storageTxMap .~ m
   getMemRawStorageBlockDB    = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
-instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+instance ( MonadUnliftIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -206,7 +227,8 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   delete _ = genericDeleteRawStorageDB
   lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
 
-instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
+instance ( MonadUnliftIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
          , MonadLogger m
          , (MP.StateRoot `A.Alters` MP.NodeData) m
          , (N.NibbleString `A.Alters` N.NibbleString) m
@@ -215,7 +237,15 @@ instance ( (Maybe Word256 `A.Alters` MP.StateRoot) m
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) m
+instance ( MonadUnliftIO m
+         , (Maybe Word256 `A.Alters` MP.StateRoot) m
+         , MonadLogger m
+         , (MP.StateRoot `A.Alters` MP.NodeData) m
+         , (N.NibbleString `A.Alters` N.NibbleString) m
+         ) => A.Selectable Account AddressState (SM m) where
+  select _ = getAddressStateMaybe
+
+instance (MonadUnliftIO m, (Maybe Word256 `A.Alters` MP.StateRoot) m)
          => (Maybe Word256 `A.Alters` MP.StateRoot) (SM m) where
   lookup p chainId = do
     (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
@@ -232,7 +262,7 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) m
     Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.delete (bh, chainId)
     lift $ A.delete p chainId
 
-instance Monad m => Mod.Modifiable CurrentBlockHash (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _    = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
 
@@ -265,47 +295,42 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance Monad m => Mod.Accessible Env.Environment (SM m) where
+instance MonadUnliftIO m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
 
-instance (Monad m, Mod.Modifiable (Maybe DebugSettings) m)
+instance (Mod.Modifiable (Maybe DebugSettings) m)
   => Mod.Modifiable (Maybe DebugSettings) (SM m) where
   get _ = lift $ Mod.get (Mod.Proxy @(Maybe DebugSettings))
   put _ = lift . Mod.put (Mod.Proxy @(Maybe DebugSettings))
 
-instance Monad m => Mod.Modifiable Env.Sender (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable Env.Sender (SM m) where
   get _ = Env.Sender . Env.sender <$> gets env
   put _ (Env.Sender s) = modify $ \ss@SState{env=e} -> ss{env = e{Env.sender = s}}
 
-instance Monad m => Mod.Modifiable [CallInfo] (SM m) where
+instance MonadUnliftIO m => Mod.Modifiable [CallInfo] (SM m) where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss{callStack = cs}
 
-instance Monad m => Mod.Modifiable MemDBs (SM m) where
-  get _    = gets $ _ssMemDBs
+instance MonadUnliftIO m => Mod.Modifiable MemDBs (SM m) where
+  get _    = gets _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
 
-instance Monad m => Mod.Modifiable GasInfo (SM m) where
-  get _ = use gasInfo
-  put _ = assign gasInfo 
+instance MonadUnliftIO m => Mod.Modifiable GasInfo (SM m) where
+  get _   = gets _gasInfo
+  put _ g = modify $ gasInfo .~ g
 
-instance Monad m => Mod.Modifiable Action (SM m) where
-  get _ = use action
-  put _ = assign action
+instance MonadUnliftIO m => Mod.Modifiable Action (SM m) where
+  get _   = gets _action
+  put _ a = modify $ action .~ a
 
-instance Monad m => Mod.Modifiable (Q.Seq Event) (SM m) where
-  -- adding events to the action so that slipstream gets them,
-  --   and also to the events field of the sstate, so that they get sent to
-  --    TxrIndexer for governance updates
-  get    _   = gets ssEvents    -- This will get (Q.Seq Event)
-  put    _ q = do               -- This will replace (Q.Seq Event)
-    action . Action.events .= q
-    modify $ \sstate -> sstate { ssEvents = q }
+instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Event) (SM m) where
+  get _   = gets (Action._events . _action)
+  put _ q = modify $ action . Action.events .~ q
 
-runSM :: ( MonadIO m
-         , MonadUnliftIO m
+runSM :: ( MonadUnliftIO m
          , MonadLogger m
          , Mod.Modifiable ContextState m
+         , Mod.Modifiable GasCap m
          )
       => (Maybe ByteString)
       -> Env.Environment
@@ -315,19 +340,20 @@ runSM :: ( MonadIO m
       -> m (Either SolidException a)
 runSM maybeCode env gi chainId' f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
-
-  let startingState =
+  GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
+  $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
+  let !startingState =
         SState {
         env = env,
         callStack = [],
-        ssEvents = Q.empty,
         _ssMemDBs = csMemDBs,
         _action = startingAction maybeCode env chainId',
-        _gasInfo = gi
+        _gasInfo = gi{_gasLeft=min (_gasLeft gi) gasCap} -- capping the transaction gas limit 
         }
-
-  eValState <- try $ runStateT f startingState
-  case eValState of
+  startingStateRef <- newIORef startingState
+  eVal <- try $ runReaderT f startingStateRef
+  sstateAfter <- readIORef startingStateRef
+  case eVal of
     -- NO errors will crash the VM.
     -- InternalError should *never* happen.
     -- TODO should also not happen, but since this is a work in progress they
@@ -340,10 +366,9 @@ runSM maybeCode env gi chainId' f = do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se
         else return $ Left se
-    Right (value, sstateAfter) -> do
+    Right value -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
       return $ Right value
-
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
@@ -403,6 +428,9 @@ getVariableOfName name = do
                                                 ,  CC._functions = M.empty
                                                 ,  CC._constructor = currentContract x^.CC.constructor
                                                 ,  CC._modifiers = M.empty
+                                                ,  CC._usings = M.empty
+                                                ,  CC._contractType = currentContract x^.CC.contractType
+                                                ,  CC._importedFrom = Nothing
                                                 ,  CC._contractContext = currentContract x^.CC.contractContext
                                                 } 
                               }
@@ -423,7 +451,7 @@ getVariableOfName name = do
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction = toMaybe (name `elem` ["address", "account", "uint", "int", "bool", "byte", "bytes"
                                                   , "string", "keccak256", "ripemd160", "payable"
-                                                  , "require", "revert", "assert", "sha3"
+                                                  , "require", "revert", "assert", "sha3"  , "delegatecall"
                                                   , "sha256", "ecrecover", "blockhash","addmod", "mulmod"
                                                   , "selfdestruct", "suicide", "bytes32ToString"
                                                   , "getUserCert", "parseCert", "verifyCert", "verifyCertSignedBy", "verifySignature"]) $
@@ -497,11 +525,11 @@ getVariableOfName name = do
       , maybeThis
       , maybeConstant
       --, maybeUserDefined
-      , unknownVariable ("getVariableOfName" ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
+      , unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo^.CC.storageDefs)) )name
       ]
 
 getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _) =
+getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
   let lookInContract :: CC.Contract -> [Typo]
       lookInContract (CC.Contract{..}) = catMaybes
         [ fmap StructTypo (fmap (\(a,b,_) -> (a,b)) <$> M.lookup s _structs)
@@ -538,6 +566,7 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
           codeCollection=cc,
           collectionHash=hsh,
           localVariables=initialLocalVariables,
+          variableStack=[initialLocalVariables],
           readOnly=ro,
           isUncheckedSection=False, -- The rationale here is that unchecked sections only apply to the current stack frame
           currentSourcePos=Nothing,
@@ -560,6 +589,31 @@ popCallInfo :: MonadSM m => m ()
 popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_:rest) -> pure rest
+
+pushLocalVars :: MonadSM m => m ()
+pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  []      -> internalError "pushLocalVars was called with an empty stack" ()
+  (curFrame:rest) -> do
+    let localVariables' = localVariables curFrame
+        variableStack'  = variableStack curFrame
+    {-- We save the local variables available in this scope to the 'stack', 
+    which is simply a list of mappings from name to type/values
+    --}
+    pure $ curFrame{variableStack = (localVariables':variableStack')} : rest
+
+-- The inverse operation as above, called when exiting a statement block and those declared variables need to be destroyed
+popLocalVars :: MonadSM m => m ()
+popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+  []      -> internalError "popLocalVars was called with an empty stack" ()
+  (curFrame:rest) -> do
+    let (varFrame, st) = case variableStack curFrame of
+          (varFrame': st') -> (varFrame', st')
+          [] -> (M.empty, [])
+    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars), 
+    we simply reassign the local variables to the top frame of the stack
+    and the new stack's value is the rest of the frames
+    --}
+    pure $ (curFrame {localVariables = varFrame, variableStack = st} : rest)
 
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
@@ -632,6 +686,31 @@ setLocal name val = do
       newVariables = M.insert name (theType, val) locals
   Mod.put (Mod.Proxy @[CallInfo]) $ info{localVariables=newVariables} : rest
 
+addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
+addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
+    cs <- Mod.get (Mod.Proxy @[CallInfo])
+    case cs of
+        (currentCallInfo:_) -> do
+            let contract = currentContract currentCallInfo
+            -- _functions :: Map SolidString (FuncF a),
+                newContract = contract{CC._functions = M.insert funcName funcObject $ CC._functions contract} 
+            Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+                [] -> internalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack" ()
+                (ci:rest) -> pure $ ci{currentContract=newContract} : rest
+        _ -> internalError "addFunctionToCurrentContractInCurrentCallInfo called with an empty stack" ()
+
+removeFunctionFromCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> m ()
+removeFunctionFromCurrentContractInCurrentCallInfo funcName = do
+    cs <- Mod.get (Mod.Proxy @[CallInfo])
+    case cs of
+        (currentCallInfo:_) -> do
+            let contract = currentContract currentCallInfo
+            -- _functions :: Map SolidString (FuncF a),
+                newContract = contract{CC._functions = M.delete funcName $ CC._functions contract} 
+            Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+                [] -> internalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack" ()
+                (ci:rest) -> pure $ ci{currentContract=newContract} : rest
+        _ -> internalError "removeFunctionFromCurrentContractInCurrentCallInfo called with an empty stack" ()
 
 getCurrentCodeCollection :: MonadSM m => m (Keccak256, CC.CodeCollection)
 getCurrentCodeCollection = do
@@ -689,7 +768,7 @@ getXabiValueType (AccountPath loc path) = do
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
-    Just v -> return $ loop ccs' (tail $ MS.toList path) v
+    Just v -> return $!! loop ccs' (tail $ MS.toList path) v
  where loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
        loop _ [] = id
        loop ccs [x] = \case
@@ -702,7 +781,7 @@ getXabiValueType (AccountPath loc path) = do
            _ -> typeError "non-length or array index attribute of array" x
          SVMType.String{} -> case x of
            MS.Field "length" -> SVMType.Int{signed=Just True, bytes=Nothing}
-           _ -> typeError "non-length attribute of string" x
+           _ -> force (typeError "non-length attribute of string" x)
          SVMType.UnknownLabel s _->
            let t' = getTypeOfName' s ccs
             in case (x, t') of

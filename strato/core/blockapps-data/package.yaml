@@ -97,4 +97,4 @@ tests:
       - unordered-containers
       - vector
       - QuickCheck
-    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+    ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic

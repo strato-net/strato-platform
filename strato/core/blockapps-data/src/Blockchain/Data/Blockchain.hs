@@ -16,6 +16,7 @@
 {-# LANGUAGE UndecidableInstances       #-}
 
 {-# OPTIONS_GHC -fno-warn-unused-binds  #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 module Blockchain.Data.Blockchain
     (

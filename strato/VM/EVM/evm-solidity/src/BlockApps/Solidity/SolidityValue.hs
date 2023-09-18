@@ -5,11 +5,13 @@ module BlockApps.Solidity.SolidityValue where
 
 import           Control.Lens              ((&), (?~))
 import           Data.Aeson
+import qualified Data.Aeson.Key            as DAK
 import           Data.ByteString           (ByteString)
 import qualified Data.ByteString           as ByteString
 import           Data.Foldable
 import           Data.Swagger
 import           Data.Text                 (Text)
+import qualified Data.Bifunctor            as BF
 import           GHC.Generics
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances ()
@@ -32,7 +34,7 @@ instance ToJSON SolidityValue where
     , "data" .= ByteString.unpack bytes
     ]
   toJSON (SolidityObject namedItems) =
-    object $ uncurry (.=) <$> namedItems
+    object $ uncurry (.=) <$> map (BF.first DAK.fromText) namedItems
 
 instance FromJSON SolidityValue where
   parseJSON (String str) = return $ SolidityValueAsString str

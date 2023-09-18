@@ -11,6 +11,7 @@ export const CONTRACT_FORM_CHANGE = "CONTRACT_UPLOAD_FORM_CHANGE";
 export const CONTRACT_NAME_CHANGE = "CONTRACT_NAME_CHANGE";
 export const UPDATE_TOAST = "UPDATE_TOAST";
 export const RESET_ERROR = "RESET_ERROR";
+export const UPDATE_USING_SAMPLE_CONTRACT = "UPDATE_USING_SAMPLE_CONTRACT"
 
 export const contractFormChange = function(contract) {
   return {
@@ -115,5 +116,12 @@ export const compileContractFailure = function(error) {
 export const resetError = function() {
   return {
     type: RESET_ERROR
+  }
+}
+
+export const updateUsingSampleContract = function(status) {
+  return {
+    type: UPDATE_USING_SAMPLE_CONTRACT,
+    usingSampleContract: status,
   }
 }

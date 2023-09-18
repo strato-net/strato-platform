@@ -17,6 +17,8 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 {-# OPTIONS -fno-warn-missing-methods #-}
+
+
 module Blockchain.Context
     ( All
     , All2
@@ -62,7 +64,9 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
+    , withCertifiedPeer
     , getPeerX509
+    , getMyX509
     , getPeerByParsedSet
     , getPeersByParsedSets
     , toMaybe
@@ -72,6 +76,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
+import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 -- import           Control.Arrow                         ( (***))
 import qualified Control.Monad.Change.Alter            as A
@@ -82,6 +87,7 @@ import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.Network
 import           Data.Default
+import qualified Data.Kind                             as DK
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
@@ -140,19 +146,19 @@ import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
 --       but merging in the latest monad-alter will take some additional work
-type family All' (k :: * -> (* -> *) -> Constraint) (ts :: [*]) (m :: * -> *) :: Constraint where
+type family All' (k :: DK.Type -> (DK.Type -> DK.Type) -> Constraint) (ts :: [DK.Type]) (m :: DK.Type -> DK.Type) :: Constraint where
   All' k (t : '[]) m = k t m
   All' k (t ': ts) m = (k t m, All' k ts m)
 
-type family All (ks :: [* -> (* -> *) -> Constraint]) (ts :: [*]) (m :: * -> *) :: Constraint where
+type family All (ks :: [DK.Type -> (DK.Type -> DK.Type) -> Constraint]) (ts :: [DK.Type]) (m :: DK.Type -> DK.Type) :: Constraint where
   All (k ': '[]) ts m = All' k ts m
   All (k ': ks) ts m = (All' k ts m, All ks ts m)
 
-type family All2' (k :: * -> * -> (* -> *) -> Constraint) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
+type family All2' (k :: DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constraint) (ts :: [(DK.Type,DK.Type)]) (m :: DK.Type -> DK.Type) :: Constraint where
   All2' k ('(t1, t2) : '[]) m = k t1 t2 m
   All2' k ('(t1, t2) ': ts) m = (k t1 t2 m, All2' k ts m)
 
-type family All2 (ks :: [* -> * -> (* -> *) -> Constraint]) (ts :: [(*,*)]) (m :: * -> *) :: Constraint where
+type family All2 (ks :: [DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constraint]) (ts :: [(DK.Type,DK.Type)]) (m :: DK.Type -> DK.Type) :: Constraint where
   All2 (k ': '[]) ts m = All2' k ts m
   All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
 
@@ -193,8 +199,8 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState     :: K.KafkaState
-  , blockHeaders          :: [BlockData]
-  , remainingBlockHeaders :: RemainingBlockHeaders
+  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
   , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
@@ -242,6 +248,9 @@ instance RunsServer ContextM (LoggingT IO) where
           conduits = P2pConduits pSource pSink sSource
           ip = IPAsText . T.pack . sockAddrToIP $ appSockAddr app
       handler conduits ip
+
+instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
+  access _ = asks configPubKey
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockData) (ReaderT Config m) where
   lookup _     = RBDB.withRedisBlockDB . RBDB.getHeader
@@ -370,8 +379,7 @@ instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessa
   delete _ k = Mod.modifyStatefully_ (Mod.Proxy @Context) $
     outboundWireMessages %= S.delete k
 
-instance ( MonadIO m
-         , MonadUnliftIO m
+instance ( MonadUnliftIO m
          ) => Mod.Accessible GenesisBlockHash (ReaderT Config m) where
   access _ = GenesisBlockHash <$> getGenesisBlockHash
 
@@ -394,15 +402,38 @@ instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable [BlockData] (ReaderT Config m) where
-  get _   = blockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = k},()))
+  get _   = do
+    (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      Mod.put (Proxy @[BlockData]) []
+      pure []
+    else 
+      pure bHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks configContext >>= flip atomicModifyIORef' (\c -> (c{blockHeaders = (k, now)},()))
 
 instance MonadIO m => Mod.Accessible [BlockData] (ReaderT Config m) where
   access _ = Mod.get (Proxy @[BlockData])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
-  get _   = remainingBlockHeaders <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = k},()))
+  get _   = do
+    (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
+    now <- liftIO getCurrentTime
+    let diffTime = now `diffUTCTime` lastUpdateTS
+    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
+    if diffTime > maxTime then do -- stale cache; override it
+      let emptyRBH = RemainingBlockHeaders []
+      Mod.put (Proxy @RemainingBlockHeaders) emptyRBH
+      pure emptyRBH
+    else 
+      pure remBHeaders
+  put _ k = do
+    now <- liftIO getCurrentTime
+    asks configContext >>= flip atomicModifyIORef' (\c -> (c{remainingBlockHeaders = (k, now)},()))
 
 instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
@@ -460,7 +491,7 @@ instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
 instance (MonadIO m, MonadLogger m) => Mod.Outputs (ReaderT Config m) [IngestEvent] where
   output = void . K.withKafkaRetry1s . SK.writeUnseqEvents
 
-instance (MonadIO m, Monad m, MonadLogger m) => HasVault (ReaderT Config m) where
+instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
     vc <- asks configVaultClient 
     $logInfoS "HasVault" "Calling vault-wrapper for a signature"
@@ -497,7 +528,13 @@ instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT Config m) where
 instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT Config m) where
   replace p k = liftIO . A.replace p k
 
+instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
 instance MonadIO m => A.Replaceable PPeer PeerDisable (ReaderT Config m) where
+  replace p k = liftIO . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT Config m) where
   replace p k = liftIO . A.replace p k
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
@@ -529,6 +566,8 @@ type MonadP2P m = ( MonadIO m
                        , GenesisBlockHash
                        , BestBlockNumber
                        , AvailablePeers
+                       , BondedPeers
+                       , PublicKey
                        ] m
                   , All '[Mod.Modifiable]
                       '[ BestBlock
@@ -554,6 +593,8 @@ type MonadP2P m = ( MonadIO m
                       '[ '(PPeer, TcpEnableTime)
                        , '(PPeer, UdpEnableTime)
                        , '(PPeer, PeerDisable)
+                       , '(PPeer, T.Text)
+                       , '((IPAsText, TCPPort), PeerBondingState)
                        ] m
                   , All2 '[A.Alters]
                       '[ '(Keccak256, BlockData)
@@ -623,8 +664,8 @@ initContext :: Context
 initContext = Context
   { actionTimestamp = emptyActionTimestamp
   , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-  , blockHeaders = []
-  , remainingBlockHeaders = RemainingBlockHeaders []
+  , blockHeaders = ([], jamshidBirth)
+  , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
   , _blockstanbulPeerAddr = PeerAddress Nothing
   , _outboundWireMessages = S.empty
   }
@@ -641,6 +682,10 @@ getPeerX509 :: A.Selectable Address X509CertInfoState m
 getPeerX509 peer = case pPeerPubkey peer of
   Nothing -> pure Nothing
   Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
+
+getMyX509 :: (A.Selectable Address X509CertInfoState m, Mod.Accessible PublicKey m)
+          => m (Maybe X509CertInfoState)
+getMyX509 = Mod.access (Mod.Proxy @PublicKey) >>= A.select (Proxy @X509CertInfoState) . fromPublicKey
 
 getPeersByParsedSets :: (MonadP2P m) => ChainMemberParsedSet -> m [Maybe PPeer]
 getPeersByParsedSets org = do
@@ -680,6 +725,9 @@ withActivePeer :: ( MonadUnliftIO m
 withActivePeer p = bracket a b . const
   where a   = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
         b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
+
+withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
+withCertifiedPeer = flip const
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b

@@ -19,7 +19,6 @@ library:
   - aeson
   - base16-bytestring
   - binary
-  - bloc2
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
@@ -77,7 +76,18 @@ tests:
   solid-vm-spec:
     source-dirs: tests/
     main: Main.hs
+    ghc-options: -dynamic
     dependencies:
+      - strato-init
+      - aeson
+      - json-stream
+      - seqevents
+      - mtl
+      - crypto-api
+      - binary
+      - blockapps-data
+      - core-api2
+      - strato-genesis
       - async
       - base16-bytestring
       - blockapps-datadefs
@@ -113,6 +123,7 @@ benchmarks:
     codebench:
       source-dirs: bench/
       main: CodeBench.hs
+      ghc-options: -dynamic
       dependencies:
         - file-embed
         - solid-vm

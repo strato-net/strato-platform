@@ -31,7 +31,7 @@ initializeDebugger restServer = if not flags_debugEnabled
     let debuggerRunner =
           let rest = run flags_debugPort $ restServer dSettings
            in if flags_wsDebug
-                then race_ rest $ wsDebugger flags_debugWSPort dSettings
+                then race_ rest $ wsDebugger flags_debugWSHost flags_debugWSPort dSettings
                 else rest
     pure $ Just (dSettings, debuggerRunner)
 

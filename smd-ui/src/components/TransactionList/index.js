@@ -51,6 +51,8 @@ class TransactionList extends Component {
 
     return (
       <div className="pt-card pt-dark pt-elevation-2">
+
+        <h4>Recent Transactions (Main Chain)</h4>
         <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed', width: '100%'}}>
           <thead>
           <tr>

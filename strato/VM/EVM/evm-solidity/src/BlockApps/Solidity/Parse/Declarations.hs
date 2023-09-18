@@ -31,6 +31,7 @@ solidityContract :: SolidityParser SourceUnit
 solidityContract = do
   kind <- (reserved "contract" >> return Xabi.ContractKind)
         <|> (reserved "interface" >> return Xabi.InterfaceKind)
+        <|> (reserved "abstract" >> return Xabi.AbstractKind)
         <|> (reserved "library" >> return Xabi.LibraryKind)
   contractName' <- identifier
   setContractName contractName'
@@ -76,11 +77,14 @@ solidityContract = do
         mapVarTypes (v, isPub, isConst, val) i =
           fmap (Xabitype.VarType i (visibility isPub) (Just isConst) val) v
 
-        varTypesOf isConstant = map (\(n, VariableDeclaration v isPub isConst val) ->
-                                   ((Text.pack n, v), isPub, isConst, val))
+        varTypesOf isConstant = map (\(n, decl) -> case decl of
+                                   (VariableDeclaration v isPub isConst val) -> ((Text.pack n, v), isPub, isConst, val)
+                                   _ -> error "varTypesOf: not a variable declaration Should've been filtered out"
+                                   )
                            . filter (\(_, decl) -> case decl of
                                         (VariableDeclaration _ _ c _) -> isConstant == c
                                         _ -> False)
+
 
         visibility isPub = if isPub then Just True else Nothing
 

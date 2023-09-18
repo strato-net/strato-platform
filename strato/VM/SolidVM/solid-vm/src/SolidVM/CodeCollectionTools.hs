@@ -48,7 +48,14 @@ xabiToContract contractName' parents' userDefinedTypes xabi = do
   _events = Xabi._xabiEvents xabi,
   _functions = Xabi._xabiFuncs xabi,
   _modifiers = Xabi._xabiModifiers xabi,
+  _usings = Xabi._xabiUsing xabi,
   _constructor = constr,
+  _contractType = case (Xabi._xabiKind xabi) of
+    Xabi.ContractKind -> ContractType
+    Xabi.LibraryKind  -> LibraryType
+    Xabi.AbstractKind  -> AbstractType
+    Xabi.InterfaceKind -> InterfaceType,
+  _importedFrom = Nothing,
   _contractContext = Xabi._xabiContext xabi
   }
 
@@ -82,6 +89,7 @@ addInheritedObjects cc c = do
   st <- toUnionMaker _structs cc c
   ev <- toUnionMaker _events cc c
   co <- toUnionMaker _constants cc c
+  mo <- toUnionMaker _modifiers cc c
   pure $ c{
   _functions=fu,
   _storageDefs=sd,
@@ -89,7 +97,8 @@ addInheritedObjects cc c = do
   _enums=en,
   _structs=st,
   _events = ev,
-  _constants=co
+  _constants=co,
+  _modifiers=mo
   }
 
 toUnionMaker :: (Ord a) => (Contract -> M.Map a b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)

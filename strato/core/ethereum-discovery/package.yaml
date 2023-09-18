@@ -79,7 +79,7 @@ tests:
   ethereum-discover-test:
     source-dirs: test/
     main: Spec.hs
-    ghc-options: -Wall -Werror
+    ghc-options: -Wall -Werror -dynamic
     dependencies:
       - ethereum-discovery
       - format

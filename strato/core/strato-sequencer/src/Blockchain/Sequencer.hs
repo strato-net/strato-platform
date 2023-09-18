@@ -1,17 +1,18 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE ConstraintKinds                      #-}
+{-# LANGUAGE DataKinds                            #-}
+{-# LANGUAGE FlexibleContexts                     #-}
+{-# LANGUAGE FlexibleInstances                    #-}
+{-# LANGUAGE LambdaCase                           #-}
+{-# LANGUAGE MultiParamTypeClasses                #-}
+{-# LANGUAGE OverloadedStrings                    #-}
+{-# LANGUAGE RecordWildCards                      #-}
+{-# LANGUAGE ScopedTypeVariables                  #-}
+{-# LANGUAGE TemplateHaskell                      #-}
+{-# LANGUAGE TupleSections                        #-}
+{-# LANGUAGE TypeApplications                     #-}
+{-# LANGUAGE TypeOperators                        #-}
+{-# OPTIONS_GHC -fno-warn-orphans                 #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 module Blockchain.Sequencer where
 
 import           ClassyPrelude                             (atomically)
@@ -79,7 +80,7 @@ instance (k `A.Alters` v) m => (k `A.Alters` v) (ConduitT i o m) where
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance (Monad m, A.Selectable k v m) => A.Selectable k v (ConduitT i o m) where
+instance (A.Selectable k v m) => A.Selectable k v (ConduitT i o m) where
   select p = lift . A.select p
 
 instance HasBlockstanbulContext m => HasBlockstanbulContext (ConduitT i o m) where
@@ -641,6 +642,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
     IETValidatorBehavior  -> do
       record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
       blockstanbulSend $ map (\(IEValidatorBehavior vc) -> ValidatorBehaviorChange vc) events
+    IETDeleteDepBlock  -> do
+      record "inevent_type_delete_dep_block" "DeleteDepBlock"
+      traverse_ (\(IEDeleteDepBlock k) -> A.delete (A.Proxy @DependentBlockEntry) k) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"

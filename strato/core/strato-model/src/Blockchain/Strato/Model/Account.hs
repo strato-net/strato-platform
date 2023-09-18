@@ -31,6 +31,8 @@ import           Control.Lens
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
 import qualified Data.Aeson.Encoding                  as Enc
+import qualified Data.Aeson.Key                       as DAK 
+
 import           Data.Binary
 import           Data.Data
 import           Data.Hashable
@@ -92,8 +94,9 @@ instance AS.ToJSON Account where
   toJSON = String . T.pack . show
 
 instance AS.ToJSONKey Account where
-  toJSONKey = ToJSONKeyText f (Enc.text . f)
-          where f = T.pack . show
+  toJSONKey = ToJSONKeyText f (Enc.text . t)
+          where f = DAK.fromText . T.pack . show
+                t = T.pack . show
 
 instance AS.FromJSON Account where
   parseJSON (String s) = case readMaybe (T.unpack s) of
@@ -235,8 +238,9 @@ instance AS.ToJSON NamedAccount where
   toJSON = String . T.pack . show
 
 instance AS.ToJSONKey NamedAccount where
-  toJSONKey = ToJSONKeyText f (Enc.text . f)
-          where f = T.pack . show
+  toJSONKey = ToJSONKeyText f (Enc.text . t)
+          where f = DAK.fromText . T.pack . show
+                t = T.pack . show
 
 instance AS.FromJSON NamedAccount where
   parseJSON (String s) = case readMaybe (T.unpack s) of
