@@ -96,6 +96,30 @@ seqEventNotificationSourceChanFill ks p2peventchan = do
     Left  e -> error $ show e
     Right _ -> return ()
 
+{-
+seqEventNotificationSourceChanFill :: ( MonadIO (t IO)
+                                      , MonadLogger (t IO)
+                                      , Modifiable K.KafkaState (t IO)
+                                      , Show a
+                                      , Monad m
+                                      )
+                                   => State.StateT (t IO ()) (ExceptT e (Either a)) a -> (InChan P2pEvent, OutChan P2pEvent) -> m ()
+seqEventNotificationSourceChanFill ks p2peventchan = do
+  let res = runExceptT $ State.evalStateT ks $ do
+              ofs' <- K.withKafkaRetry1s $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
+              loop ofs'
+              where loop nextOffset = do
+                        events <- K.withKafkaRetry1s $ readSeqP2pEvents nextOffset
+                        unless (null events) $ do -- stop bloating the logs
+                          $logInfoS "seqEventNotifyChanFill" . T.pack $ "filling kakfa middleman of kafka seqevents @ " ++ show nextOffset
+                          forM_ events $ \e -> do
+                            liftIO $ writeChan ((\(a,_) -> a) p2peventchan) e
+                          loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
+  case res of
+    Left  e -> error $ show e
+    Right _ -> return ()
+-}
+
 seqEventNotificationSource :: ( MonadIO m
                               , MonadLogger m
                               )

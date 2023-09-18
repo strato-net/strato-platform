@@ -13,11 +13,8 @@ module Strato.Lite.Rest.Server where
 
 import qualified Control.Concurrent.STM.MonadIO    as CCS
 import           Control.Lens
-import qualified Control.Monad.Change.Modify       as Mod
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Resource
 import           Data.Bifunctor                    (first)
 import           Data.Foldable                     (for_, traverse_)
 import           Data.Traversable                  (for)
@@ -32,7 +29,6 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.MicroTime
 import           Servant
 import           UnliftIO                          hiding (Handler)
-import qualified Network.Kafka                     as K
 
 getNodes :: NetworkManager -> Handler ThreadResultMap
 getNodes mgr = liftIO . atomically $ do
@@ -65,9 +61,7 @@ getPeers mgr label = do
   let peers = maybe [] (map T.pack . M.keys . _stringPPeerMap) mCtx
   pure peers
 
-postAddNode :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
-               )
-            => NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
+postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
 postAddNode mgr label (AddNodeParams ip identity bootNodes) =
   liftIO $ runReaderT (addNode label identity (IPAsText ip) (TCPPort 30303) (UDPPort 30303) (IPAsText <$> bootNodes)) mgr
 
@@ -95,9 +89,7 @@ postTx mgr nodeLabel (PostTxParams tx md) = do
         ev = UnseqEvent . IETx ts $ IngestTx Origin.API signedTx
     postEvent ev peer  
 
-stratoLiteRestServer :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
-                        )
-                     => NetworkManager -> Server StratoLiteRestAPI
+stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
        getNodes mgr
   :<|> getConnections mgr
@@ -110,7 +102,5 @@ stratoLiteRestServer mgr =
   :<|> postTimeout mgr
   :<|> postTx mgr
 
-stratoLiteRestApp :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
-                     )
-                  => NetworkManager -> Application
+stratoLiteRestApp :: NetworkManager -> Application
 stratoLiteRestApp = serve stratoLiteRestAPI . stratoLiteRestServer

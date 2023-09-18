@@ -11,7 +11,6 @@ import           Data.Aeson
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy  as BL
 
-
 main :: IO ()
 main = do
   _ <- $initHFlags "Strato Lite"

@@ -8,7 +8,6 @@ module Executable.StratoP2P where
 import           Control.Concurrent.Async.Lifted.Safe(Concurrently(..),runConcurrently)
 import           Control.Exception hiding (catch)
 import           Control.Exception.Lifted (catch)
-import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad.Logger
 import           Data.Foldable            (asum)
 import qualified Data.Text as T
@@ -19,8 +18,6 @@ import           Executable.StratoP2PClient
 import           Executable.StratoP2PServer
 import           Executable.StratoP2PLoopback
 
-import           Network.Kafka as K
-
 raceAll :: [BL.LoggingT IO a]
         -> BL.LoggingT IO a
 raceAll = runConcurrently . asum . map Concurrently
@@ -28,7 +25,6 @@ raceAll = runConcurrently . asum . map Concurrently
 stratoP2P :: ( MonadP2P n
              , RunsClient n
              , RunsServer n (BL.LoggingT IO)
-             , Modifiable K.KafkaState n
              )
           => PeerRunner n (BL.LoggingT IO) () -> BL.LoggingT IO ()
 stratoP2P runner =

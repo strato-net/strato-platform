@@ -18,8 +18,6 @@ module SimulatorSpec where
 import           Prelude hiding (round)
 import           Conduit
 import           Control.Concurrent.STM.TMChan
-import qualified Control.Monad.Change.Modify           as Mod
-import           Control.Monad.Logger
 import           Control.Lens                          hiding (Context, view)
 import           Control.Monad.Reader
 import qualified Control.Monad.Change.Alter            as A
@@ -67,8 +65,6 @@ import           Blockchain.Strato.Model.Wei
 
 import qualified Blockchain.VMContext  as VMC
 
-import qualified Network.Kafka         as K
-
 import           SolidVM.Model.Storable
 
 import           Strato.Lite
@@ -85,9 +81,7 @@ import           UnliftIO.Concurrent                   (threadDelay)
 instance Eq SomeException where
   _ == _ = True -- for the purpose of my test, all exceptions are equal
 
-spec :: ( Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
-        )
-     => Spec
+spec :: Spec
 spec = do
   describe "network simulation" $ do
     it "should send a transaction from server to client" $ do
@@ -1000,7 +994,7 @@ contract C {
         
         bHash <- fmap (bestBlockHash . _bestBlock) . readTVarIO . _p2pTestContext $ peers !! 1
         let varsToLookUp =[".powPow", ".getMoney", ".y"]
-        (contractA'sStateVars, contractB'sStateVars) <- BlockApps.Logging.runNoLoggingT . runResourceT . flip runReaderT (peers !! 1) $ do
+        (contractA'sStateVars, contractB'sStateVars) <- runNoLoggingT . runResourceT . flip runReaderT (peers !! 1) $ do
           let contractALookup = map (( Account  (getNewAddress_unsafe (fromPrivateKey ( privKeys !! 1)) 1) Nothing), ) varsToLookUp :: [(Account, BC.ByteString)]
           let contractBLookup = map (( Account  (getNewAddress_unsafe (fromPrivateKey ( privKeys !! 1)) 2) Nothing), ) varsToLookUp :: [(Account, BC.ByteString)]
           valsOfA <- sequence $ map (\accountAndVarName -> (VMC.withCurrentBlockHash bHash $ do  A.lookup (A.Proxy @RawStorageValue) accountAndVarName)) contractALookup

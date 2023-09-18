@@ -24,12 +24,8 @@ import           Control.Lens                          hiding (Context, view)
 import qualified Control.Lens                          as Lens
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
-import           Control.Monad.Error.Class             as ME
-import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Control.Monad.State                   as State
-import           Control.Monad.State.Class             as StateC
-import           Control.Monad.Trans.Control
 import           Crypto.Types.PubKey.ECC
 import           Data.Bits
 import qualified Data.ByteString                       as B
@@ -127,7 +123,6 @@ import           Executable.StratoP2PServer
 import           Executable.StratoP2P
 
 import           Network.Socket
-import qualified Network.Kafka                       as K
 import           UnliftIO
 
 data VSocket = VSocket
@@ -202,7 +197,7 @@ data TestContext = TestContext
 
 makeLenses ''TestContext
 
-type TestContextM = ReaderT P2PPeer (ResourceT (BlockApps.Logging.LoggingT IO))
+type TestContextM = ReaderT P2PPeer (ResourceT (LoggingT IO))
 
 type MonadTest m = ReaderT P2PPeer m
 
@@ -590,19 +585,19 @@ get = _state <$> getMemContext
 {-# INLINE get #-}
 
 gets :: MonadIO m => (ContextState -> a) -> MonadTest m a
-gets f = f <$> EventSpec.get
+gets f = f <$> get
 {-# INLINE gets #-}
 
 put :: MonadIO m => ContextState -> MonadTest m ()
-put c = asks _p2pTestContext >>= \i -> atomically . modifyTVar' i $ vmContext . Blockchain.MemVMContext.state .~ c
+put c = asks _p2pTestContext >>= \i -> atomically . modifyTVar' i $ vmContext . state .~ c
 {-# INLINE put #-}
 
 modify :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
-modify f = asks _p2pTestContext >>= \i -> atomically . modifyTVar' i $ vmContext . Blockchain.MemVMContext.state %~ f
+modify f = asks _p2pTestContext >>= \i -> atomically . modifyTVar' i $ vmContext . state %~ f
 {-# INLINE modify #-}
 
 modify' :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
-modify' f = asks _p2pTestContext >>= \i -> atomically . modifyTVar' i $ vmContext . Blockchain.MemVMContext.state %~ f
+modify' f = asks _p2pTestContext >>= \i -> atomically . modifyTVar' i $ vmContext . state %~ f
 {-# INLINE modify' #-}
 
 dbsGet :: MonadIO m => MonadTest m MemContextDBs
@@ -626,49 +621,49 @@ dbsModify' f = asks _p2pTestContext >>= \i -> atomically . modifyTVar' i $ vmCon
 {-# INLINE dbsModify' #-}
 
 contextGet :: MonadIO m => MonadTest m ContextState
-contextGet = EventSpec.get
+contextGet = get
 {-# INLINE contextGet #-}
 
 contextGets :: MonadIO m => (ContextState -> a) -> MonadTest m a
-contextGets = EventSpec.gets
+contextGets = gets
 {-# INLINE contextGets #-}
 
 contextPut :: MonadIO m => ContextState -> MonadTest m ()
-contextPut = EventSpec.put
+contextPut = put
 {-# INLINE contextPut #-}
 
 contextModify :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
-contextModify = EventSpec.modify
+contextModify = modify
 {-# INLINE contextModify #-}
 
 contextModify' :: MonadIO m => (ContextState -> ContextState) -> MonadTest m ()
-contextModify' = EventSpec.modify'
+contextModify' = modify'
 {-# INLINE contextModify' #-}
 
 instance MonadIO m => Mod.Modifiable ContextState (MonadTest m) where
-  get _ = EventSpec.get
-  put _ = EventSpec.put
+  get _ = get
+  put _ = put
 
 instance MonadIO m => Mod.Accessible MemContext (MonadTest m) where
   access _ = getMemContext
 
 instance MonadIO m => Mod.Modifiable (Maybe DebugSettings) (MonadTest m) where
-  get _    = EventSpec.gets $ Lens.view debugSettings
-  put _ ds = EventSpec.modify $ debugSettings .~ ds
+  get _    = gets $ Lens.view debugSettings
+  put _ ds = modify $ debugSettings .~ ds
 
 instance MonadIO m => Mod.Modifiable GasCap (MonadTest m) where
-  get _ = GasCap <$> EventSpec.gets (Lens.view vmGasCap)
-  put _ (GasCap g) = EventSpec.modify $ vmGasCap .~ g
+  get _ = GasCap <$> gets (Lens.view vmGasCap)
+  put _ (GasCap g) = modify $ vmGasCap .~ g
 
 instance MonadIO m => Mod.Accessible ContextState (MonadTest m) where
-  access _ = EventSpec.get
+  access _ = get
 
 instance MonadIO m => Mod.Accessible MemDBs (MonadTest m) where
-  access _ = EventSpec.gets $ Lens.view memDBs
+  access _ = gets $ Lens.view memDBs
 
 instance MonadIO m => Mod.Modifiable MemDBs (MonadTest m) where
-  get _    = EventSpec.gets $ Lens.view memDBs
-  put _ md = EventSpec.modify $ memDBs .~ md
+  get _    = gets $ Lens.view memDBs
+  put _ md = modify $ memDBs .~ md
 
 instance MonadIO m => Mod.Modifiable BlockHashRoot (MonadTest m) where
   get _     = dbsGets $ Lens.view blockHashRoot
@@ -683,14 +678,14 @@ instance MonadIO m => Mod.Modifiable BestBlockRoot (MonadTest m) where
   put _ bbr = dbsModify' $ bestBlockRoot .~ bbr
 
 instance MonadIO m => Mod.Modifiable CurrentBlockHash (MonadTest m) where
-  get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . EventSpec.gets $ Lens.view $ memDBs . currentBlock
-  put _ bh = EventSpec.modify $ memDBs . currentBlock ?~ bh
+  get _    = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ Lens.view $ memDBs . currentBlock
+  put _ bh = modify $ memDBs . currentBlock ?~ bh
 
 instance MonadIO m => HasMemAddressStateDB (MonadTest m) where
-  getAddressStateTxDBMap = EventSpec.gets $ Lens.view $ memDBs . stateTxMap
-  putAddressStateTxDBMap theMap = EventSpec.modify $ memDBs . stateTxMap .~ theMap
-  getAddressStateBlockDBMap = EventSpec.gets $ Lens.view $ memDBs . stateBlockMap
-  putAddressStateBlockDBMap theMap = EventSpec.modify $ memDBs . stateBlockMap .~ theMap
+  getAddressStateTxDBMap = gets $ Lens.view $ memDBs . stateTxMap
+  putAddressStateTxDBMap theMap = modify $ memDBs . stateTxMap .~ theMap
+  getAddressStateBlockDBMap = gets $ Lens.view $ memDBs . stateBlockMap
+  putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
 
 instance MonadIO m => (MP.StateRoot `A.Alters` MP.NodeData) (MonadTest m) where
@@ -708,25 +703,25 @@ instance (MonadIO m, MonadLogger m) => A.Selectable Account AddressState (MonadT
 
 instance (MonadIO m, MonadLogger m) => (Maybe Word256 `A.Alters` MP.StateRoot) (MonadTest m) where
   lookup _ chainId = do
-    mBH <- EventSpec.gets $ Lens.view $ memDBs . currentBlock
+    mBH <- gets $ Lens.view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> do
-      mSR <- EventSpec.gets $ Lens.view $ memDBs . stateRoots . at (bh, chainId)
+      mSR <- gets $ Lens.view $ memDBs . stateRoots . at (bh, chainId)
       case mSR of
         Just sr -> pure $ Just sr
         Nothing -> getChainStateRoot chainId bh
   insert _ chainId sr = do
-    mBH <- EventSpec.gets $ Lens.view $ memDBs . currentBlock
+    mBH <- gets $ Lens.view $ memDBs . currentBlock
     case mBH of
       Nothing -> pure ()
       Just (CurrentBlockHash bh) -> do
-        EventSpec.modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
+        modify $ memDBs . stateRoots %~ M.insert (bh, chainId) sr
         putChainStateRoot chainId bh sr
   delete _ chainId = do
-    mBH <- EventSpec.gets $ Lens.view $ memDBs . currentBlock
+    mBH <- gets $ Lens.view $ memDBs . currentBlock
     case mBH of
       Nothing -> pure ()
       Just (CurrentBlockHash bh) -> do
-        EventSpec.modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
+        modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
 
 instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
@@ -755,10 +750,10 @@ instance MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MonadTest m) w
   delete _ n1    = dbsModify' $ hashDB . at n1 .~ Nothing
 
 instance MonadIO m => HasMemRawStorageDB (MonadTest m) where
-  getMemRawStorageTxDB = EventSpec.gets $ Lens.view $ memDBs . storageTxMap
-  putMemRawStorageTxMap theMap = EventSpec.modify $ memDBs . storageTxMap .~ theMap
-  getMemRawStorageBlockDB = EventSpec.gets $ Lens.view $ memDBs . storageBlockMap
-  putMemRawStorageBlockMap theMap = EventSpec.modify $ memDBs . storageBlockMap .~ theMap
+  getMemRawStorageTxDB = gets $ Lens.view $ memDBs . storageTxMap
+  putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
+  getMemRawStorageBlockDB = gets $ Lens.view $ memDBs . storageBlockMap
+  putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
 instance (MonadIO m, MonadLogger m) => (RawStorageKey `A.Alters` RawStorageValue) (MonadTest m) where
   lookup _ = genericLookupRawStorageDB
@@ -888,7 +883,7 @@ instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP
         atomically $ writeTQueue s (v, myIP)
         f $ P2pConduits pSource pSink sSource
 
-instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (BlockApps.Logging.LoggingT IO) where
+instance (MonadUnliftIO m, MonadLogger m, MonadReader P2PPeer m) => RunsServer (MonadP2PTest m) (LoggingT IO) where
   runServer tcpPort@(TCPPort p) runner f = runner $ \sSource -> do
     inet <- lift $ asks _p2pPeerInternet
     myIP@(IPAsText ip) <- lift $ asks _p2pMyIPAddress
@@ -1148,7 +1143,7 @@ newSequencerContext bc = do
   -- loopCh <- atomically newTMChan
   latestRound <- newIORef 0
   pure $ SequencerContext
-      { _dependentBlockDB    = error "EventSpec: Evaluating dependentBlockDB"
+      { _dependentBlockDB    = error " Evaluating dependentBlockDB"
       , _seenTransactionDB   = mkSeenTxDB 1024
       , _dbeRegistry         = M.empty
       , _blockHashRegistry   = M.empty
@@ -1236,20 +1231,15 @@ makeLenses ''P2PPeer
 runNodeWithoutP2P :: P2PPeer -> IO ()
 runNodeWithoutP2P p = do
   concurrently_
-    (concurrently_ (concurrently_ (BlockApps.Logging.runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
-                                  (BlockApps.Logging.runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
-                   (BlockApps.Logging.runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
+    (concurrently_ (concurrently_ (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSequencer))
+                                  (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerSeqTimerSource)))
+                   (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerVm)))
     (concurrently_
-      (concurrently_ (BlockApps.Logging.runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
-                     (BlockApps.Logging.runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
-      (BlockApps.Logging.runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
+      (concurrently_ (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerApiIndexer))
+                     (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerP2pIndexer)))
+      (runNoLoggingT . runResourceT $ flip runReaderT p (p ^. p2pPeerTxrIndexer)))
 
-runNode :: ( Control.Monad.Trans.Control.MonadBaseControl IO (ResourceT (Control.Monad.Logger.LoggingT IO))
-           , MonadState K.KafkaState IO
-           , ME.MonadError K.KafkaClientError IO
-           , Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
-           )
-        => P2PPeer -> IO ()
+runNode :: P2PPeer -> IO ()
 runNode p = do
   chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
   let s = sourceTMChan chan .| (awaitForever $ either (const $ pure ()) yield)
@@ -1257,8 +1247,8 @@ runNode p = do
   concurrently_
     (runNodeWithoutP2P p)
     (concurrently_
-      (BlockApps.Logging.runNoLoggingT $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
-      (BlockApps.Logging.runNoLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
+      (runNoLoggingT $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
+      (runNoLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx)))
 
 postEvent :: SeqLoopEvent -> P2PPeer -> IO ()
 postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
@@ -1568,20 +1558,14 @@ runConnection :: P2PConnection
               -> IO ()
 runConnection connection = do
   let rServer = do
-        mEx <- BlockApps.Logging.runNoLoggingT . runResourceT . flip runReaderT (connection ^. serverP2PPeer) $ connection ^. server
+        mEx <- runNoLoggingT . runResourceT . flip runReaderT (connection ^. serverP2PPeer) $ connection ^. server
         atomically $ writeTVar (connection ^. serverException) mEx
       rClient = do
-        mEx <- BlockApps.Logging.runNoLoggingT . runResourceT . flip runReaderT (connection ^. clientP2PPeer) $ connection ^. client
+        mEx <- runNoLoggingT . runResourceT . flip runReaderT (connection ^. clientP2PPeer) $ connection ^. client
         atomically $ writeTVar (connection ^. clientException) mEx
   concurrently_ rServer rClient
 
-runNetwork :: ( MonadBaseControl IO (ResourceT (Control.Monad.Logger.LoggingT IO))
-              , Mod.Modifiable K.KafkaState (ReaderT (IORef P2PContext) (ReaderT P2PPeer (ResourceT (Control.Monad.Logger.LoggingT IO))))
-              , ME.MonadError K.KafkaClientError IO
-              , StateC.MonadState K.KafkaState IO
-              , MonadLogger IO
-              )
-           => [P2PPeer] -> [P2PConnection] -> IO ()
+runNetwork :: [P2PPeer] -> [P2PConnection] -> IO ()
 runNetwork nodes connections =
   concurrently_ (mapConcurrently runNode nodes)
                 (mapConcurrently runConnection connections)

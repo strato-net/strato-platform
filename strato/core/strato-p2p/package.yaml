@@ -23,16 +23,9 @@ executables:
       - ethereum-discovery
       - hflags
       - lifted-async
-      - milena
-      - monad-alter
-      - monad-control
-      - mtl
       - ordered-containers
       - strato-model
       - strato-p2p
-      - transformers
-      - unliftio
-      - unliftio-core
       - wai-middleware-prometheus
       - warp
       
@@ -138,10 +131,7 @@ tests:
       - labeled-error
       - lens
       - merkle-patricia-db
-      - milena
       - monad-alter
-      - monad-control
-      - monad-logger
       - mtl
       - network
       - nibblestring
