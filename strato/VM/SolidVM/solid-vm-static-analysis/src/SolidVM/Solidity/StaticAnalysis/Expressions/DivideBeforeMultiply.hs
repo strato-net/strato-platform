@@ -1,25 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+
 module SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply
-  ( detector
-  ) where
+  ( detector,
+  )
+where
 
 import qualified Data.Map.Strict as M
-import           Data.Maybe      (maybeToList)
-import           Data.Source
-import           Data.Text       (Text)
-import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.StaticAnalysis.Types
+import Data.Maybe (maybeToList)
+import Data.Source
+import Data.Text (Text)
+import SolidVM.Model.CodeCollection
+import SolidVM.Solidity.StaticAnalysis.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
-detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
+detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
+contractHelper Contract {..} = concat $ functionHelper <$> maybeToList _constructor ++ M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case _funcContents of
+functionHelper Func {..} = case _funcContents of
   Nothing -> []
   Just stmts -> concat $ statementHelper <$> stmts
 
@@ -96,8 +98,8 @@ expressionHelper (MemberAccess _ e _) = expressionHelper e
 expressionHelper (FunctionCall _ e args) =
   let as = expressionHelper e
       bs = case args of
-             OrderedArgs es -> concat $ expressionHelper <$> es
-             NamedArgs nes -> concat $ expressionHelper . snd <$> nes
+        OrderedArgs es -> concat $ expressionHelper <$> es
+        NamedArgs nes -> concat $ expressionHelper . snd <$> nes
    in concat [as, bs]
 expressionHelper (Unitary _ _ a) = expressionHelper a
 expressionHelper (Ternary _ a b c) =

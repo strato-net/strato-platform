@@ -5,9 +5,9 @@
 
 module SelectAccessible where
 
-import           Control.Monad.Change.Modify
-import           Control.Monad.Reader            (MonadTrans, lift)
-import           Control.Monad.Trans.Reader
+import Control.Monad.Change.Modify
+import Control.Monad.Reader (MonadTrans, lift)
+import Control.Monad.Trans.Reader
 
 instance {-# OVERLAPPING #-} (Monad m) => Accessible a (ReaderT a m) where
   access _ = ask

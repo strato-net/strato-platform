@@ -1,23 +1,22 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 -- |
 -- Module: Imports
 -- Description: Parsers for Solidity imports
 -- Maintainer: Dustin Norwood <dustin@blockapps.net>
-{-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module SolidVM.Solidity.Parse.Imports (solidityImport) where
 
-import           Data.Maybe (isJust)
 import qualified Data.Map.Strict as M
-import           Data.Source
-import qualified Data.Text   as T
-
-import           SolidVM.Model.CodeCollection.Import
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.Lexer
-import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.Statement
-
-import           Text.Parsec
+import Data.Maybe (isJust)
+import Data.Source
+import qualified Data.Text as T
+import SolidVM.Model.CodeCollection.Import
+import SolidVM.Solidity.Parse.Declarations
+import SolidVM.Solidity.Parse.Lexer
+import SolidVM.Solidity.Parse.ParserTypes
+import SolidVM.Solidity.Parse.Statement
+import Text.Parsec
 
 solidityImport :: SolidityParser SourceUnit
 solidityImport = do
@@ -34,9 +33,9 @@ fileImport es6 = do
   if es6
     then pure i
     else case i of
-      Simple{} -> pure i
-      Qualified{} -> fail "Please add `pragma es6;` to the top of the file to enable support for qualified imports."
-      Braced{} -> fail "Please add `pragma es6;` to the top of the file to enable support for braced imports."
+      Simple {} -> pure i
+      Qualified {} -> fail "Please add `pragma es6;` to the top of the file to enable support for qualified imports."
+      Braced {} -> fail "Please add `pragma es6;` to the top of the file to enable support for braced imports."
 
 simpleImport :: SolidityParser FileImport
 simpleImport = do

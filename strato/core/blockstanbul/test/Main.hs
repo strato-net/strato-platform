@@ -1,13 +1,15 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
+
 module Main where
 
+import BlockApps.Logging ()
 import Control.Monad
 import HFlags
-import Test.Hspec.Runner
 import qualified Spec
+import Test.Hspec.Runner
 
-import BlockApps.Logging() -- For --minLogLevel
+-- For --minLogLevel
 
 predicate :: Path -> Bool
 predicate (_, _) = True

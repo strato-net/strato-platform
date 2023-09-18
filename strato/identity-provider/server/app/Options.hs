@@ -2,10 +2,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Options
-    ( flags_port
-    , flags_vaultProxyUrl
-    , flags_SENDGRID_APIKEY
-    ) where
+  ( flags_port,
+    flags_vaultProxyUrl,
+    flags_SENDGRID_APIKEY,
+  )
+where
 
 import HFlags
 

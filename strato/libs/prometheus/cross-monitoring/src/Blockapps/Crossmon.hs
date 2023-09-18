@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Blockapps.Crossmon (recordMaxBlockNumber, initializeHealthChecks) where
 
 import Control.Monad
@@ -8,19 +9,24 @@ import Prometheus
 
 {-# NOINLINE maxBlockNumberSeen #-}
 maxBlockNumberSeen :: Vector Text Gauge
-maxBlockNumberSeen = unsafeRegister
-                   . vector "location"
-                   . gauge
-                   $ Info "max_block_number_seen"
-                         "Maximum of block numbers seen. This is most useful in\
-                         \ consensus algorithms with a linear sequence of blocks"
+maxBlockNumberSeen =
+  unsafeRegister
+    . vector "location"
+    . gauge
+    $ Info
+      "max_block_number_seen"
+      "Maximum of block numbers seen. This is most useful in\
+      \ consensus algorithms with a linear sequence of blocks"
 
 healthCheck :: Vector Text Gauge
-healthCheck = unsafeRegister
-                   . vector "location"
-                   . gauge
-                   $ Info "health_check"
-                         "Check if processes are running in the last 1 minute"
+healthCheck =
+  unsafeRegister
+    . vector "location"
+    . gauge
+    $ Info
+      "health_check"
+      "Check if processes are running in the last 1 minute"
+
 reportOne :: Integer
 reportOne = 1
 

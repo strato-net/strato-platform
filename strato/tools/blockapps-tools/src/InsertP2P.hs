@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
-module InsertP2P where
 
-import Text.Printf
+module InsertP2P where
 
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Text.Printf
 
 insertP2P :: P2pEvent -> IO ()
 insertP2P oev = do

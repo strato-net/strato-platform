@@ -1,50 +1,55 @@
-{-# LANGUAGE DataKinds         #-} -- DEBUGGING
-{-# LANGUAGE LambdaCase        #-} -- DEBUGGING
-{-# LANGUAGE RecordWildCards   #-} -- DEBUGGING
-{-# LANGUAGE TypeOperators     #-} -- DEBUGGING
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleContexts  #-}
+-- DEBUGGING
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+-- DEBUGGING
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+-- DEBUGGING
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+-- DEBUGGING
+{-# LANGUAGE TypeOperators #-}
 
 module Debugger.WebSocket.Server
-  ( wsDebugger
-  ) where
+  ( wsDebugger,
+  )
+where
 
-import           Control.Monad
-import           Control.Concurrent.Async as Async
-import           Control.Exception        hiding (Handler)
-import           Control.Monad.IO.Class
-import           Data.Aeson
-import qualified Data.Text                as T
-import           Data.Foldable            (for_)
-import qualified Network.WebSockets       as WS
-import           UnliftIO.STM
-import           Debugger.Server
-import           Debugger.Types
-import           Debugger.WebSocket.Api
+import Control.Concurrent.Async as Async
+import Control.Exception hiding (Handler)
+import Control.Monad
+import Control.Monad.IO.Class
+import Data.Aeson
+import Data.Foldable (for_)
+import qualified Data.Text as T
+import Debugger.Server
+import Debugger.Types
+import Debugger.WebSocket.Api
+import qualified Network.WebSockets as WS
+import UnliftIO.STM
 
 wsDebuggerServer :: TVar Bool -> DebugSettings -> WS.ServerApp
 wsDebuggerServer inUse dSettings pending = do
-    putStrLn "Accepting WS Connection"
-    conn <- WS.acceptRequest pending
-    WS.withPingThread conn 30 (return ()) $ do
-        occupied <- atomically $ do
-          alreadyOccupied <- readTVar inUse
-          if alreadyOccupied
-            then pure True
-            else False <$ writeTVar inUse True
-        putStrLn $ "Is WS Connection occupied: " ++ show occupied
-        if occupied
-          then broadcast "Debugger in use. Please try again later." conn
-          else flip finally disconnect $ talk conn dSettings
-        putStrLn "WS Connection disconnected"
-        where
-          disconnect = do
-            atomically $ writeTVar inUse False
-            void $ removeBreakpoints [] dSettings
-            void $ resume dSettings
+  putStrLn "Accepting WS Connection"
+  conn <- WS.acceptRequest pending
+  WS.withPingThread conn 30 (return ()) $ do
+    occupied <- atomically $ do
+      alreadyOccupied <- readTVar inUse
+      if alreadyOccupied
+        then pure True
+        else False <$ writeTVar inUse True
+    putStrLn $ "Is WS Connection occupied: " ++ show occupied
+    if occupied
+      then broadcast "Debugger in use. Please try again later." conn
+      else flip finally disconnect $ talk conn dSettings
+    putStrLn "WS Connection disconnected"
+  where
+    disconnect = do
+      atomically $ writeTVar inUse False
+      void $ removeBreakpoints [] dSettings
+      void $ resume dSettings
 
 wsDebuggerController :: MonadIO m => WSDebuggerInput -> DebugSettings -> m (Maybe WSDebuggerOutput)
 wsDebuggerController = \case
@@ -65,18 +70,20 @@ wsDebuggerController = \case
   WSIAddWatches w -> fmap (const Nothing) . addWatches w
   WSIRemoveWatches w -> fmap (const Nothing) . removeWatches w
   WSIClearWatches -> fmap (const Nothing) . removeWatches []
-  where f g m = case m of
-          Paused dbgst -> Just $ g dbgst
-          _ -> Nothing
+  where
+    f g m = case m of
+      Paused dbgst -> Just $ g dbgst
+      _ -> Nothing
 
 wsUpdateThread :: WS.Connection -> DebugSettings -> IO ()
-wsUpdateThread conn DebugSettings{..} = go
-  where go = do
-          cur <- atomically $ do
-            _ <- takeTMVar ping
-            readTVar current
-          WS.sendBinaryData conn . encode $ WSOStatus cur
-          go
+wsUpdateThread conn DebugSettings {..} = go
+  where
+    go = do
+      cur <- atomically $ do
+        _ <- takeTMVar ping
+        readTVar current
+      WS.sendBinaryData conn . encode $ WSOStatus cur
+      go
 
 -- it's ok to spawn an update thread per connection, since we're currently only supporting one WS connection at a time
 talk :: WS.Connection -> DebugSettings -> IO ()
