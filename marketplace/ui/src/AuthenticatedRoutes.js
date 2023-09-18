@@ -27,7 +27,7 @@ import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
-import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
+import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
@@ -39,8 +39,8 @@ import { StorageProvider } from "./contexts/storage";
 import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
-import Service from "./components/Membership/Service";
-import ServiceUsage from "./components/MarketPlace/ServiceUsage";
+import MembershipDetails from "./components/MarketPlace/MembershipDetail";
+import ServiceUsage from "./components/Membership/ServiceUsage";
 import { ServiceUsageProvider } from "./contexts/serviceUsage";
 
 const AuthenticatedRoutes = ({ user, users }) => {
@@ -232,7 +232,6 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <ServicesProvider>
-              <ServiceUsageProvider>
                 <EventsProvider>
                   <MembershipsProvider>
                     <CategorysProvider>
@@ -240,8 +239,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
                         <InventoriesProvider>
                           <ProductsProvider>
                             <ItemsProvider>
-                              {/* <MembershipDetails user={user} users={users} /> */}
-                              <ServiceUsage user={user} users={users} />
+                              <MembershipDetails user={user} users={users} />
                             </ItemsProvider>
                           </ProductsProvider>
                         </InventoriesProvider>
@@ -249,7 +247,6 @@ const AuthenticatedRoutes = ({ user, users }) => {
                     </CategorysProvider>
                   </MembershipsProvider>
                 </EventsProvider>
-              </ServiceUsageProvider>
             </ServicesProvider>
           </UsersProvider>
         }
@@ -262,13 +259,15 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <CategorysProvider>
               <SubCategorysProvider>
                 <ProductsProvider>
-                  <InventoriesProvider>
-                    <MembershipsProvider>
-                      <ServicesProvider>
-                        <Service user={user} users={users} />
-                      </ServicesProvider>
-                    </MembershipsProvider>
-                  </InventoriesProvider>
+                  <ServiceUsageProvider>
+                    <InventoriesProvider>
+                      <MembershipsProvider>
+                        <ServicesProvider>
+                          <ServiceUsage user={user} users={users} />
+                        </ServicesProvider>
+                      </MembershipsProvider>
+                    </InventoriesProvider>
+                  </ServiceUsageProvider>
                 </ProductsProvider>
               </SubCategorysProvider>
             </CategorysProvider>
@@ -473,20 +472,11 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <StorageProvider>
               <Storage user={user} users={users} />
             </StorageProvider>
-          </UsersProvider>}
+          </UsersProvider>
+        }
       />
-      <Route
-        path="/"
-        element={<Navigate
-          to={"/marketplace"}
-          replace />}
-      />
-      <Route
-        path="*"
-        element={<Navigate
-          to={"/"}
-          replace />}
-      />
+      <Route path="/" element={<Navigate to={"/marketplace"} replace />} />
+      <Route path="*" element={<Navigate to={"/"} replace />} />
     </Routes>
   );
 };

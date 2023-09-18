@@ -279,7 +279,7 @@ const Membership = (user) => {
                 className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
                 onClick={() => navigate("/memberships/serviceUsage")}
               >
-                Services Usage
+                Service Usage
               </Button>
               <Button
                 id="add-product-button"

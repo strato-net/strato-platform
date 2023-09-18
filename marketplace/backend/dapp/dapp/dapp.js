@@ -1761,10 +1761,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   
   contract.getServiceUsage = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    return serviceUsageJs.get(rawAdmin, { ...args, ownerOrganization: userOrganization }, getOptions)
+    return serviceUsageJs.get(rawAdmin, { ...args }, getOptions)
   };
 
-  contract.getServiceUsages = async function (args = {}, options = optionsNoChainIds) {
+  contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
+    return serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
+  };
+
+  contract.getProvidedServiceUsages = async function (args = {}, options = optionsNoChainIds) {
+
+    // product table where category = membership, manufacturer = loggedin user organization currntly blockapps
+    // Items productId and ownerAddress = loggedin user address
+    
+
+
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     return serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions)
   };
