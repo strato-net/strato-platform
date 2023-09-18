@@ -33,26 +33,6 @@ instance Monad m => Modifiable K.KafkaState (State.StateT K.KafkaState m) where
   put _ = State.put
 
 {-
-seqEventNotificationSourceTQueueFill :: ( K.Kafka (m IO),
-                                          --MonadState K.KafkaState (m IO),
-                                          --MonadError K.KafkaClientError (m IO), 
-                                          --MonadIO (m IO),
-                                          --MonadBaseControl IO (m IO),
-                                          MonadTrans m
-                                        )
-                                     => TQueue P2pEvent -> m IO ()
-seqEventNotificationSourceTQueueFill p2peventtqueue = do
-  ofs' <- K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
-  loop ofs'
-    where loop nextOffset = do
-            events <- readSeqP2pEvents nextOffset
-            unless (null events) $ do -- stop bloating the logs
-              forM_ events $ \e -> do
-                lift $ atomically $ writeTQueue p2peventtqueue e
-            loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
--}
-
-{-
 seqEventNotificationSourceTQueueFill :: ( Modifiable K.KafkaState m
                                         , MonadLogger m
                                         , MonadIO m
@@ -73,6 +53,19 @@ seqEventNotificationSourceTQueueFill ks p2peventtqueue = do
   case res of
     Left  e -> error $ show e
     Right _ -> return ()
+-}
+
+{-
+seqEventNotificationSourceTQueuePour :: ( MonadIO m
+                                        , MonadLogger m 
+                                        )
+                                     => USTM.TQueue P2pEvent -> ConduitT () P2pEvent m ()
+seqEventNotificationSourceTQueuePour p2peventtqueue = do
+  event <- liftIO $ USTM.atomically $ USTM.tryReadTQueue p2peventtqueue
+  case event of
+    Nothing -> $logInfoS "seqEventNotifyTQueuePour" . T.pack $ "nothing to pour from kakfa middleman" 
+    Just e  -> do $logInfoS "seqEventNotifyTQueuePour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ " ++ show e
+                  yield e
 -}
 
 seqEventNotificationSourceChanFill :: ( Modifiable K.KafkaState m
@@ -96,29 +89,14 @@ seqEventNotificationSourceChanFill ks p2peventchan = do
     Left  e -> error $ show e
     Right _ -> return ()
 
-{-
-seqEventNotificationSourceChanFill :: ( MonadIO (t IO)
-                                      , MonadLogger (t IO)
-                                      , Modifiable K.KafkaState (t IO)
-                                      , Show a
-                                      , Monad m
+seqEventNotificationSourceChanPour :: ( MonadIO m
+                                      , MonadLogger m 
                                       )
-                                   => State.StateT (t IO ()) (ExceptT e (Either a)) a -> (InChan P2pEvent, OutChan P2pEvent) -> m ()
-seqEventNotificationSourceChanFill ks p2peventchan = do
-  let res = runExceptT $ State.evalStateT ks $ do
-              ofs' <- K.withKafkaRetry1s $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
-              loop ofs'
-              where loop nextOffset = do
-                        events <- K.withKafkaRetry1s $ readSeqP2pEvents nextOffset
-                        unless (null events) $ do -- stop bloating the logs
-                          $logInfoS "seqEventNotifyChanFill" . T.pack $ "filling kakfa middleman of kafka seqevents @ " ++ show nextOffset
-                          forM_ events $ \e -> do
-                            liftIO $ writeChan ((\(a,_) -> a) p2peventchan) e
-                          loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
-  case res of
-    Left  e -> error $ show e
-    Right _ -> return ()
--}
+                                   => (InChan P2pEvent,OutChan P2pEvent) -> ConduitT () P2pEvent m ()
+seqEventNotificationSourceChanPour p2peventchan = do
+  event <- liftIO $ readChan $ (\(_,b) -> b) p2peventchan
+  $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ " ++ show event
+  yield event
 
 seqEventNotificationSource :: ( MonadIO m
                               , MonadLogger m
@@ -134,25 +112,3 @@ seqEventNotificationSource ks = evalStateC ks $ do
                 forM_ events $ \e -> do
                     yield $ e
               loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
-
-{-
-seqEventNotificationSourceTQueuePour :: ( MonadIO m
-                                        , MonadLogger m 
-                                        )
-                                     => USTM.TQueue P2pEvent -> ConduitT () P2pEvent m ()
-seqEventNotificationSourceTQueuePour p2peventtqueue = do
-  event <- liftIO $ USTM.atomically $ USTM.tryReadTQueue p2peventtqueue
-  case event of
-    Nothing -> $logInfoS "seqEventNotifyTQueuePour" . T.pack $ "nothing to pour from kakfa middleman" 
-    Just e  -> do $logInfoS "seqEventNotifyTQueuePour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ " ++ show e
-                  yield e
--}
-
-seqEventNotificationSourceChanPour :: ( MonadIO m
-                                      , MonadLogger m 
-                                      )
-                                   => (InChan P2pEvent,OutChan P2pEvent) -> ConduitT () P2pEvent m ()
-seqEventNotificationSourceChanPour p2peventchan = do
-  event <- liftIO $ readChan $ (\(_,b) -> b) p2peventchan
-  $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ " ++ show event
-  yield event
