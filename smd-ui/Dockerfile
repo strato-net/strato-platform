@@ -1,4 +1,4 @@
-FROM node:18-bookworm-slim as base
+FROM node:14-bullseye-slim as base
 RUN mkdir -p /usr/src/app && \
     npm install -g serve@11.3.2
 WORKDIR /usr/src/app
@@ -27,6 +27,6 @@ CMD [ "sh", "/usr/src/app/docker-run.sh" ]
 ### Test
 FROM base as test
 COPY . /usr/src/app
-COPY --from=npminstaller /usr/src/app/node_modules /usr/src/app
+COPY --from=npminstaller /usr/src/app/node_modules /usr/src/app/node_modules/
 RUN npm install
 RUN npm test
