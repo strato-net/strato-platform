@@ -1169,9 +1169,7 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
 def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, clientSecret, username='', password='', adminClientId='', adminClientSecret='') {
   // (using tmp files to avoid replacing quotes with double-quotes which makes escapes even worse)
   sh "echo ${stratoPlatformPath} > _platform_path_tmp"
-  // sh "echo ${OAuthDiscoveryUrl} > _oauth_discovery_url_tmp"
-  // sh "echo ${username} > _username_tmp"
-  // sh "echo ${password} > _password_tmp"
+  
   def oauth_token_endpoint = sh(returnStdout: true, script: "curl --fail -s ${OAuthDiscoveryUrl} | jq -r .token_endpoint ").trim()
   sh "echo ${oauth_token_endpoint} > _oauth_token_endpoint_tmp"
   def client_b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${clientId}:${clientSecret}'))\"").trim()
@@ -1181,7 +1179,7 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
   }
   def user_token = sh(returnStdout: true, script: "curl --fail -s -X POST ${oauth_token_endpoint} -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic ${client_b64string}' ${data_url_encoded} | jq -r .access_token ").trim()
   sh "echo ${user_token} > _user_token_tmp"
-  // sh "echo ${client_b64string} > _client_b64string_tmp"
+  
   if (adminClientId.isEmpty() || adminClientSecret.isEmpty()){
     sh "echo ${client_b64string} > _admin_client_b64string_tmp"
   } else {
@@ -1191,8 +1189,6 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
   
   sh '''#!/bin/bash -le
       set -xe
-      # OAUTH_TOKEN_ENDPOINT=$(curl --fail -s $(<_oauth_discovery_url_tmp) | jq -r .token_endpoint)
-      # USER_TOKEN=$(curl --fail -s -X POST "${OAUTH_TOKEN_ENDPOINT}" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_client_b64string_tmp)" --data-urlencode 'grant_type=password' --data-urlencode "username=$(<_username_tmp)" --data-urlencode "password=$(<_password_tmp)" | jq -r .access_token)
       # make sure user is created (now or earlier):
       docker exec strato-nginx-1 curl --fail -H "Authorization: Bearer $(<_user_token_tmp)" -X POST "localhost:80/strato/v2.3/key"
       userPubKey=$(docker exec strato-nginx-1 curl --fail -s -H "Authorization: Bearer $(<_user_token_tmp)" -H "Accept: application/json" "localhost:80/strato/v2.3/key" | jq -r .pubkey)
