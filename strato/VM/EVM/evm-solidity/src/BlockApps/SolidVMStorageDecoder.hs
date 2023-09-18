@@ -83,7 +83,7 @@ bsToText = first show . decodeUtf8'
 valueToSolidityValue :: V.Value -> Either String (Maybe SolidityValue)
 valueToSolidityValue = \case
   SimpleValue sv -> case sv of
-    ValueBytes _ b -> Just . SolidityValueAsString <$> (first show . decodeUtf8') b
+    ValueBytes _ b -> Right . Just $ SolidityBytes b
     ValueBool b -> Right . Just $ SolidityBool b
     ValueInt _ _ n -> fromShowable n
     ValueAddress a -> fromShowable a
