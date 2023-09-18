@@ -254,7 +254,7 @@ const ServiceTable = () => {
         return item;
       });
       setTableData(data);
-      servicesActions.fetchService(serviceDispatch, 10, offset, 'BlockApps') //value.organization);
+      servicesActions.fetchService(serviceDispatch, 10, offset, value.organization)
     }
     let data = tableData.filter((item, index) => {
       if (index === key) {

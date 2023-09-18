@@ -1687,12 +1687,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   
   contract.getService = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.serviceManager.get({ ...args, ownerOrganization: userOrganization }, getOptions);
+    return managers.serviceManager.get({ ...args }, getOptions);
   };
 
   contract.getServices = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.serviceManager.getAll({ ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+    return managers.serviceManager.getAll({ ...args, sort: '-createdDate' }, getOptions);
   };
   
   contract.updateService = async function (args, options = defaultOptions) {
