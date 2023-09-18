@@ -29,6 +29,7 @@ module SolidVM.Model.CodeCollection.Contract (
   contractContext
   ) where
 
+import Control.Applicative ((<|>))
 import Control.Lens
 import Control.DeepSeq
 import Data.Aeson as A
@@ -74,6 +75,29 @@ data ContractF a =
     _importedFrom :: Maybe Account,
     _contractContext :: a
   } deriving (Show, Generic, NFData, Functor, Foldable, Traversable)
+ 
+instance Semigroup (ContractF a) where
+  c1 <> c2 = Contract {
+    _contractName = _contractName c1,
+    _parents = _parents c1 <> _parents c2,
+    _constants = _constants c1 <> _constants c2,
+    _storageDefs = _storageDefs c1 <> _storageDefs c2,
+    _userDefined = _userDefined c1 <> _userDefined c2,
+    _enums = _enums c1 <> _enums c2,
+    _structs = _structs c1 <> _structs c2,
+    _errors = _errors c1 <> _errors c2,
+    _events = _events c1 <> _events c2,
+    _functions = _functions c1 <> _functions c2,
+    _constructor = _constructor c1 <|> _constructor c2,
+    _modifiers = _modifiers c1 <> _modifiers c2,
+    _usings = _usings c1 <> _usings c2,
+    _contractType = _contractType c1,
+    _importedFrom = _importedFrom c1 <|> _importedFrom c2,
+    _contractContext = _contractContext c1
+  }
+
+instance Default a => Monoid (ContractF a) where
+  mempty = def
 
 instance ToJSON a => ToJSON (ContractF a)
 instance FromJSON a => FromJSON (ContractF a)
