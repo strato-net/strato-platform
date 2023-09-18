@@ -1,6 +1,5 @@
 /* jshint esnext: true */
 
-require('co-mocha')
 const assert = require('chai').assert;
 const models = require('../models');
 const nodeHealthCheckJs = require('../daemons/node-health-check-utils')
@@ -179,7 +178,7 @@ describe('Tests - Node-level Health Check', function () {
   })
 
 
-  it('Websocket Emission', function* () {
+  it('Websocket Emission', async function () {
 
 
   })
