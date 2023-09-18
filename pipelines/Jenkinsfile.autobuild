@@ -245,7 +245,7 @@ pipeline {
               set -x
               echo 'Running SMD tests'
               cd smd-ui
-              docker build -f Dockerfile.test .
+              docker build --target test .
             '''
           },
 
