@@ -50,7 +50,7 @@ const statusOptions = [
 
 const limit = 10;
 const offset = 0;
-const query = {};
+const query = '';
 
 const ServiceTable = () => {
   const serviceUsageDispatch = useServiceUsageDispatch();
@@ -144,7 +144,7 @@ const ServiceTable = () => {
   const [validationError, setValidationError] = useState(false);
   const [activeTab, setActiveTab] = useState("booked");
   const [tableData, setTableData] = useState([]);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(20);
   const [filterQuery, setFilterQuery] = useState({});
   const username = userCert?.user?.commonName;
@@ -166,8 +166,8 @@ const ServiceTable = () => {
   };
 
   useEffect(() => {
-    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, 10, offset, query);
-    servicesActions.fetchService(serviceDispatch, limit, offset, query);
+    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query);
+    servicesActions.fetchService(serviceDispatch, '', offset, query);
     membershipActions.fetchPurchasedMemberships(membershipDispatch);
     userAuthActions.fetchUsers(authUserDispatch);
   }, [activeTab]);
@@ -227,18 +227,12 @@ const ServiceTable = () => {
       if (isEdit) {
         // we have to use update api here
         // uncomment api call for updating service usage
-        serviceUsageActions.UpdateServiceUsage(
-          serviceUsageDispatch,
-          updatedPayload
-        );
+        serviceUsageActions.UpdateServiceUsage(serviceUsageDispatch, updatedPayload);
       } else {
         // we have to use create api here
         updatedDataObj["itemId"] = record["itemId"];
         updatedDataObj["serviceId"] = record["serviceId"];
-        serviceUsageActions.createServiceUsage(
-          serviceUsageDispatch,
-          updatedDataObj
-        );
+        serviceUsageActions.createServiceUsage(serviceUsageDispatch, updatedDataObj);
       }
     }
   };
@@ -328,12 +322,13 @@ const ServiceTable = () => {
       query1 = `&status=${data1["status"]}`;
     }
     if (data1["itemId"]) {
-      let itemQuery = membership?.purchasedMemberships.filter((item) => item.productId == data1["itemId"]).map(item => item.itemAddress)
-      console.log("itemQuery", itemQuery);
-      return itemQuery?.itemAddress
-      // query1 = `&itemId=${data1["itemId"]}`;
+      let queryValue = membership?.purchasedMemberships.filter((item) => item.productId == data1["itemId"]).map(item => item.itemAddress)
+      // return itemQuery?.itemAddress
+      // query1 = `&queryValue=${data1["itemId"]}`;
+      query1 = `&queryFields[]=${queryValue}&queryValue=itemId`
     }
-    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, 30, offset, query1);
+    setPage(1);
+    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query1);
   };
 
   const columns = [
@@ -383,6 +378,7 @@ const ServiceTable = () => {
           {record.editable && !isEdit ? (
             <Select
               placeholder="Provider"
+              defaultValue={activeTab === "provided" && organization}
               suffixIcon={
                 activeTab === "provided" ? (
                   <LockOutlined />
@@ -641,6 +637,23 @@ const ServiceTable = () => {
     },
   ];
 
+  const dataLen = serviceUsageState?.servicesUsage?.length;
+  const paginationConfig = {
+    current: page,
+    pageSize: 10, // Number of items to display per page
+    total: (dataLen == 10
+      ? (((page + 1) * limit) + 1)
+      : ((page) * limit)
+    ), // Total number of items
+    showSizeChanger: false, // Allow users to change the page size
+    position: ['bottomCenter']
+  };
+
+  const handlePaginationChange = (CPage) => {
+    setPage(CPage.current)
+    serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, (CPage.current - 1) * limit, query);
+  }
+
   const activeTabCheck = activeTab === "booked" ? "Provider" : "User";
 
   return IsLoading ? (
@@ -715,8 +728,9 @@ const ServiceTable = () => {
           <Table
             columns={columns}
             dataSource={tableData}
-            pagination
+            pagination={(dataLen <= 10 && page == 0) ? false : paginationConfig}
             rowKey="key"
+            onChange={handlePaginationChange} // Add this line to handle pagination changes
           />
         </Col>
       </Row>

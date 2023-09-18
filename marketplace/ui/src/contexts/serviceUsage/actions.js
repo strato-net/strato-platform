@@ -54,7 +54,7 @@ const actions = {
           payload: body.data,
         });
         actions.setMessage(dispatch, "Service usage created successfully", true)
-        actions.fetchAllServicesUsage(dispatch, 10, 0, {});
+        actions.fetchAllServicesUsage(dispatch, 10, 0, '');
         return body.data
       }
 
@@ -135,7 +135,7 @@ const actions = {
           payload: body.data,
         });
         actions.setMessage(dispatch, "Service usage has been updated", true);
-        actions.fetchAllServicesUsage(dispatch, 10, 0, {})
+        actions.fetchAllServicesUsage(dispatch, 10, 0, '')
         return true;
       }
 
