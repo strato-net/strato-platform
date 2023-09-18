@@ -41,6 +41,7 @@ import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
 import Service from "./components/Membership/Service";
 import Services from "./components/MarketPlace/Services";
+import { ServiceUsageProvider } from "./contexts/serviceUsage";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -230,22 +231,26 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={routes.MembershipDetail.url}
         element={
           <UsersProvider>
-            <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
-                    <InventoriesProvider>
-                      <ProductsProvider>
-                        <ItemsProvider>
-                          {/* <MembershipDetails user={user} users={users} /> */}
-                          <Services user={user} users={users} />
-                        </ItemsProvider>
-                      </ProductsProvider>
-                    </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
-            </EventsProvider>
+            <ServicesProvider>
+              <ServiceUsageProvider>
+                <EventsProvider>
+                  <MembershipsProvider>
+                    <CategorysProvider>
+                      <SubCategorysProvider>
+                        <InventoriesProvider>
+                          <ProductsProvider>
+                            <ItemsProvider>
+                              {/* <MembershipDetails user={user} users={users} /> */}
+                              <Services user={user} users={users} />
+                            </ItemsProvider>
+                          </ProductsProvider>
+                        </InventoriesProvider>
+                      </SubCategorysProvider>
+                    </CategorysProvider>
+                  </MembershipsProvider>
+                </EventsProvider>
+              </ServiceUsageProvider>
+            </ServicesProvider>
           </UsersProvider>
         }
       />

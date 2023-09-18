@@ -106,6 +106,14 @@ export const Service = {
   update: '/update',
 }
 
+export const ServiceUsage = {
+  prefix: '/serviceUsage',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  update: '/update',
+}
+
 export const ProductFile = {
   prefix: '/productFile',
   get: '/:address',
