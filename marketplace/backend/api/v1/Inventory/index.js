@@ -27,6 +27,13 @@ router.post(
   InventoryController.create
 );
 
+router.post(
+  Inventory.resell,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.resell
+);
+
 router.put(
   Inventory.update,
   authHandler.authorizeRequest(),

@@ -5,7 +5,7 @@ import "/dapp/dapp/contracts/Dapp.sol"
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory is InventoryStatus{
+contract Inventory_12 is InventoryStatus{
 
     address public owner;
     string public ownerOrganization;
@@ -78,11 +78,12 @@ contract Inventory is InventoryStatus{
     }    
 
     function updateQuantity(int _quantity) returns(uint){
-      // if (tx.origin != owner) { return RestStatus.FORBIDDEN; }
-      // if(_quantity > quantity){
-      //   return RestStatus.BAD_REQUEST;
-      // }
       availableQuantity = _quantity;
+      return RestStatus.OK;
+    }
+
+    function updateQuantityForResell(int _quantity) returns (uint256) {
+      availableQuantity = availableQuantity - _quantity;
       return RestStatus.OK;
     }
 

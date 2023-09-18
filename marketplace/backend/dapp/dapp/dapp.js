@@ -522,6 +522,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
     return await managers.itemManager.updateItem(itemParams);
   };
+  contract.resellInventory = async function (args, options = defaultOptions) {
+    const { inventoryId, quantity, price, itemsAddress } = args;
+    const newBatchId = util.uid();
+    const newSerialNumber = util.uid();
+    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price, batchId: newBatchId, serialNumber: newSerialNumber, itemsAddress: itemsAddress });
+  };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
