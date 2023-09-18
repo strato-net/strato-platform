@@ -66,11 +66,11 @@ const ServiceTable = () => {
   const serviceUsageState = useServiceUsageState();
 
   const { isUsersLoading } = userCert;
-  const { isServicesLoading } = servicesState;
+  // const { isServicesLoading } = servicesState;
   const { isPurchasedMembershipLoading } = membership;
   const { isServicesUsageLoading, isCreateServiceUsageSubmitting, isUpdateServicesUsageLoading } = serviceUsageState;
   const IsLoading =
-    isServicesLoading ||
+    // isServicesLoading ||
     isPurchasedMembershipLoading ||
     isServicesUsageLoading ||
     isUsersLoading ||
@@ -85,8 +85,8 @@ const ServiceTable = () => {
       const manufacturer = item.manufacturer;
 
       // Check if the product ID is not already in the uniqueProducts object
-      if (!uniqueProducts[productId]) {
-        uniqueProducts[productId] = true; // Mark this product ID as seen
+      if (!uniqueProducts[manufacturer]) {
+        uniqueProducts[manufacturer] = true; // Mark this product ID as seen
         resultArray.push({ value: productId, label: manufacturer });
       }
     });
@@ -167,7 +167,7 @@ const ServiceTable = () => {
 
   useEffect(() => {
     serviceUsageActions.fetchAllServicesUsage(serviceUsageDispatch, limit, offset, query);
-    servicesActions.fetchService(serviceDispatch, '', offset, query);
+    servicesActions.fetchService(serviceDispatch, 10, offset, query);
     membershipActions.fetchPurchasedMemberships(membershipDispatch);
     userAuthActions.fetchUsers(authUserDispatch);
   }, [activeTab]);
@@ -239,12 +239,22 @@ const ServiceTable = () => {
 
   const handleInputChange = (value, field, key) => {
     if (field === "provider") {
-      let membershipData = membership?.purchasedMemberships.filter(({ productId }) => {
-        return productId === value;
-      }).map(({ itemAddress, itemNumber }) => {
-        return { value: itemAddress, label: itemNumber };
+      let membershipData = membership?.purchasedMemberships.filter(({ manufacturer }) => {
+        return manufacturer === value;
+      }).map(({ itemAddress, itemNumber, manufacturer }) => {
+        return { value: itemAddress, label: itemNumber, organization: manufacturer };
       });
       setMembershipList(membershipData);
+    } else if (field === "itemId") {
+      let data = tableData.filter((item, index) => {
+        if (index === key) {
+          item[field] = value ? value : "";
+          return item;
+        }
+        return item;
+      });
+      setTableData(data);
+      servicesActions.fetchService(serviceDispatch, 10, offset, 'BlockApps') //value.organization);
     }
     let data = tableData.filter((item, index) => {
       if (index === key) {
@@ -389,7 +399,7 @@ const ServiceTable = () => {
               disabled={activeTab === "provided"}
               style={{ width: 120 }}
               onChange={(value, obj) => {
-                handleInputChange(value.toString(), "provider", index);
+                handleInputChange(obj.label.toString(), "provider", index);
               }}
               options={transformData(membership?.purchasedMemberships)}
             />
@@ -417,8 +427,8 @@ const ServiceTable = () => {
               placeholder="Membership ID"
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
-              onChange={(value) =>
-                handleInputChange(value, "itemId", index)
+              onChange={(value, obj) =>
+                handleInputChange(obj, "itemId", index)
               }
               options={membershipList}
             />
