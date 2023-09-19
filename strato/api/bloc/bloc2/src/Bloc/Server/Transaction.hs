@@ -12,6 +12,7 @@
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
+{-# LANGUAGE BlockArguments #-}
 
 module Bloc.Server.Transaction
   ( postBlocTransaction,
@@ -322,52 +323,52 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
-            let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
-            tx <- lift . signAndPrepare jwt addr metadata' $
-                TransactionHeader
-                  Nothing
-                  addr
-                  (fromMaybe emptyTxParams params)
-                  (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                  (Code $ Text.encodeUtf8 $ serializeSourceMap src)
-                  cid'
-            return $ BlocTransactionBodyResult (hash' tx) (Just tx)
-      FUNCTION -> do
-        p <- mapM fromFunction txs
-        let mapMethodCalls = map (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
-            txsWithChainids = map (methodcallChainid %~ (<|> cid)) mapMethodCalls
-        txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
-        forStateT Map.empty txsWithParams $
-          \MethodCall{..} -> do
-            let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-            mContract <- use $ at theAccount
-            contract <- case mContract of
-              Just x -> pure x
-              Nothing -> do
-                mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
-                x <- case mContract' of
-                  Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
-                  Just x -> pure x
-                at theAccount <?= x
-            sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
-              Just _ -> return $ Text.encodeUtf8 methodcallMethodName
-              Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-
-            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
-            (argsBin, argsAsSource) <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
-            let methodcallMetadataWithCallInfo = Just $
-                  Map.insert "funcName" methodcallMethodName
-                  $ Map.insert "args" argsAsSource
-                  $ fromMaybe Map.empty methodcallMetadata
-            tx <- lift . signAndPrepare jwt addr methodcallMetadataWithCallInfo $
+          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+          tx <- lift . signAndPrepare jwt addr metadata' $
               TransactionHeader
-                (Just methodcallContractAddress)
+                Nothing
                 addr
-                (fromMaybe emptyTxParams _methodcallTxParams)
-                (Wei (fromIntegral $ unStrung methodcallValue))
-                (Code $ sel <> argsBin)
-                _methodcallChainid
+                (fromMaybe emptyTxParams params)
+                (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                cid'
+          return $ BlocTransactionBodyResult (hash' tx) (Just tx)
+    FUNCTION -> do
+      p <- mapM fromFunction txs
+      let mapMethodCalls = map (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
+          txsWithChainids = map (methodcallChainid %~ (<|> cid)) mapMethodCalls
+      txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
+      forStateT Map.empty txsWithParams $
+        \MethodCall{..} -> do
+          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
+          mContract <- use $ at theAccount
+          contract <- case mContract of
+            Just x -> pure x
+            Nothing -> do
+              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              x <- case mContract' of
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Just x -> pure x
+              at theAccount <?= x
+          sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+            Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+            Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+
+          let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+              xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
+          (argsBin, argsAsSource) <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "args" argsAsSource
+                $ fromMaybe Map.empty methodcallMetadata
+          tx <- lift . signAndPrepare jwt addr methodcallMetadataWithCallInfo $
+            TransactionHeader
+              (Just methodcallContractAddress)
+              addr
+              (fromMaybe emptyTxParams _methodcallTxParams)
+              (Wei (fromIntegral $ unStrung methodcallValue))
+              (Code $ sel <> argsBin)
+              _methodcallChainid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where
@@ -467,53 +468,53 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
-            let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
-            lift . prepareUnsignedRawTx metadata' $
-                TransactionHeader
-                  Nothing
-                  addr
-                  (fromMaybe emptyTxParams params)
-                  (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                  (Code $ Text.encodeUtf8 $ serializeSourceMap src)
-                  cid'
-      FUNCTION -> do
-        p <- fromFunction tx
-        let mapMethodCalls = (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
-            txWithChainids = (methodcallChainid %~ (<|> cid)) mapMethodCalls
-        txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
-        forStateT Map.empty txsWithParams $
-          \MethodCall{..} -> do
-            let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-            mContract <- use $ at theAccount
-            contract <- case mContract of
-              Just x -> pure x
-              Nothing -> do
-                mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
-                x <- case mContract' of
-                  Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
-                  Just x -> pure x
-                at theAccount <?= x
-            sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
-              Just _ -> return $ Text.encodeUtf8 methodcallMethodName
-              Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
-            
-            let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
-                xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
-            (argsBin, argsAsSource) <-
-              lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
-            let methodcallMetadataWithCallInfo = Just $
-                  Map.insert "funcName" methodcallMethodName
-                  $ Map.insert "args" argsAsSource
-                  $ fromMaybe Map.empty methodcallMetadata
-            lift . prepareUnsignedRawTx methodcallMetadataWithCallInfo $
+          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+          lift . prepareUnsignedRawTx metadata' $
               TransactionHeader
-                (Just methodcallContractAddress)
+                Nothing
                 addr
-                (fromMaybe emptyTxParams _methodcallTxParams)
-                (Wei (fromIntegral $ unStrung methodcallValue))
-                (Code $ sel <> argsBin)
-                _methodcallChainid
-      GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
+                (fromMaybe emptyTxParams params)
+                (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                cid'
+    FUNCTION -> do
+      p <- fromFunction tx
+      let mapMethodCalls = (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
+          txWithChainids = (methodcallChainid %~ (<|> cid)) mapMethodCalls
+      txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
+      forStateT Map.empty txsWithParams $
+        \MethodCall{..} -> do
+          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
+          mContract <- use $ at theAccount
+          contract <- case mContract of
+            Just x -> pure x
+            Nothing -> do
+              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              x <- case mContract' of
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Just x -> pure x
+              at theAccount <?= x
+          sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+            Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+            Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+          
+          let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+              xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
+          (argsBin, argsAsSource) <-
+            lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "args" argsAsSource
+                $ fromMaybe Map.empty methodcallMetadata
+          lift . prepareUnsignedRawTx methodcallMetadataWithCallInfo $
+            TransactionHeader
+              (Just methodcallContractAddress)
+              addr
+              (fromMaybe emptyTxParams _methodcallTxParams)
+              (Wei (fromIntegral $ unStrung methodcallValue))
+              (Code $ sel <> argsBin)
+              _methodcallChainid
+    GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
@@ -1072,9 +1073,9 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
       =<< A.select
         (A.Proxy @Contract)
         (Account contractAddr (unChainId <$> chainId))
-    sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
-      Just _ -> return $ Text.encodeUtf8 funcName
-      Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
+  sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
+    Just _ -> return $ Text.encodeUtf8 funcName
+    Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
   let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
       xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack funcName) $ contract ^. functions
