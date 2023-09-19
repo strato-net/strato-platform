@@ -2,7 +2,7 @@ FROM node:18-bookworm-slim
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
 RUN apt-get update && \
-    apt-get install -y postgresql-client curl && \
+    apt-get install -y postgresql-client curl lsof && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/src/app
