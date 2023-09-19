@@ -246,7 +246,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
     for (let i = 0; i < productsWithMembershipsMap.size; i += batchSize) {
         const batch = Array.from(productsWithMembershipsMap.keys()).slice(i, i + batchSize);
         inventoryWithMembershipPromises.push(
-            inventoryJs.getAll(admin, {
+            await inventoryJs.getAll(admin, {
                 appChainId: args.appChainId,
                 status: inventoryStatus.PUBLISHED,
                 productId: batch,
@@ -263,7 +263,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
     for (let i = 0; i < productsWithoutMembershipsMap.size; i += batchSize) {
         const batch = Array.from(productsWithoutMembershipsMap.keys()).slice(i, i + batchSize);
         inventoryWithoutMembershipPromises.push(
-            inventoryJs.getAll(admin, {
+            await inventoryJs.getAll(admin, {
                 appChainId: args.appChainId,
                 status: inventoryStatus.PUBLISHED,
                 productId: batch,
@@ -276,8 +276,8 @@ async function getTopSellingProducts(admin, args = {}, options) {
         );
     }
 
-    const inventoryWithMembershipResults = await Promise.all(inventoryWithMembershipPromises);
-    const inventoryWithoutMembershipResults = await Promise.all(inventoryWithoutMembershipPromises);
+    const inventoryWithMembershipResults = inventoryWithMembershipPromises // await Promise.all(inventoryWithMembershipPromises);
+    const inventoryWithoutMembershipResults = inventoryWithoutMembershipPromises // await Promise.all(inventoryWithoutMembershipPromises);
 
     // Combine inventory and products for non membership products
     const productWithoutMembership = [];
