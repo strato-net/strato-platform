@@ -1,22 +1,20 @@
 module Network.Kafka.Producer where
 
-import Data.Bits ((.&.))
-import Data.ByteString.Char8 (ByteString)
-import qualified Data.Digest.Murmur32 as Murmur32
 import Control.Applicative
 import Control.Lens
 import Control.Monad (join)
 import Control.Monad.Trans (liftIO)
+import Data.Bits ((.&.))
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.Digest.Murmur32 as Murmur32
+import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as Set
-import System.IO
-import qualified Data.Map as M
-import System.Random (getStdRandom, randomR)
-
-import Prelude
-
 import Network.Kafka
 import Network.Kafka.Protocol
+import System.IO
+import System.Random (getStdRandom, randomR)
+import Prelude
 
 -- * Producing
 
@@ -27,8 +25,9 @@ produce handle request = makeRequest handle $ ProduceRR request
 -- | Construct a produce request with explicit arguments.
 produceRequest :: RequiredAcks -> Timeout -> [(TopicAndPartition, MessageSet)] -> ProduceRequest
 produceRequest ra ti ts =
-    ProduceReq (ra, ti, M.toList . M.unionsWith (<>) $ fmap f ts)
-        where f (TopicAndPartition t p, i) = M.singleton t [(p, i)]
+  ProduceReq (ra, ti, M.toList . M.unionsWith (<>) $ fmap f ts)
+  where
+    f (TopicAndPartition t p, i) = M.singleton t [(p, i)]
 
 -- | Send messages to partition calculated by 'partitionAndCollate'.
 produceMessages :: Kafka m => [TopicAndMessage] -> m [ProduceResponse]
@@ -50,33 +49,36 @@ prod g tams = do
 -- | Create a protocol message set from a list of messages.
 groupMessagesToSet :: CompressionCodec -> [TopicAndMessage] -> MessageSet
 groupMessagesToSet c xs = MessageSet c $ msm <$> xs
-    where msm = MessageSetMember (Offset (-1)) . _tamMessage
+  where
+    msm = MessageSetMember (Offset (-1)) . _tamMessage
 
 -- | Group messages together with the leader they should be sent to.
 partitionAndCollate :: Kafka m => [TopicAndMessage] -> m (M.Map Leader (M.Map TopicAndPartition [TopicAndMessage]))
 partitionAndCollate ks = recurse ks M.empty
-      where recurse [] accum = return accum
-            recurse (x:xs) accum = do
-              topicPartitionsList <- brokerPartitionInfo $ _tamTopic x
-              let maybeKey = x ^. tamMessage . messageKey . keyBytes
-              pal <- case maybeKey of
-                Nothing -> getRandPartition topicPartitionsList
-                Just key -> return $ getPartitionByKey (_kafkaByteString key) topicPartitionsList
-              let leader = maybe (Leader Nothing) _palLeader pal
-                  tp = TopicAndPartition <$> pal ^? folded . palTopic <*> pal ^? folded . palPartition
-                  b = M.singleton leader $ maybe M.empty (`M.singleton` [x]) tp
-                  accum' = M.unionWith (M.unionWith (<>)) accum b
-              recurse xs accum'
+  where
+    recurse [] accum = return accum
+    recurse (x : xs) accum = do
+      topicPartitionsList <- brokerPartitionInfo $ _tamTopic x
+      let maybeKey = x ^. tamMessage . messageKey . keyBytes
+      pal <- case maybeKey of
+        Nothing -> getRandPartition topicPartitionsList
+        Just key -> return $ getPartitionByKey (_kafkaByteString key) topicPartitionsList
+      let leader = maybe (Leader Nothing) _palLeader pal
+          tp = TopicAndPartition <$> pal ^? folded . palTopic <*> pal ^? folded . palPartition
+          b = M.singleton leader $ maybe M.empty (`M.singleton` [x]) tp
+          accum' = M.unionWith (M.unionWith (<>)) accum b
+      recurse xs accum'
 
 -- | Compute the partition for a record. This matches the way the official
 -- | clients compute the partition.
 getPartitionByKey :: ByteString -> Set PartitionAndLeader -> Maybe PartitionAndLeader
 getPartitionByKey key ps = Set.toAscList ps ^? ix i
-  where murmur = Murmur32.asWord32 . Murmur32.hash32WithSeed 0x9747b28c
-        toPositive = (.&. 0x7fffffff)
-        numPartitions = length ps
-        x = fromIntegral $ toPositive $ murmur key
-        i = x `mod` numPartitions
+  where
+    murmur = Murmur32.asWord32 . Murmur32.hash32WithSeed 0x9747b28c
+    toPositive = (.&. 0x7fffffff)
+    numPartitions = length ps
+    x = fromIntegral $ toPositive $ murmur key
+    i = x `mod` numPartitions
 
 -- | Execute a produce request using the values in the state.
 send :: Kafka m => Leader -> [(TopicAndPartition, MessageSet)] -> m ProduceResponse
@@ -90,8 +92,9 @@ send l ts = do
 
 getRandPartition :: Kafka m => Set PartitionAndLeader -> m (Maybe PartitionAndLeader)
 getRandPartition ps =
-    liftIO $ (ps' ^?) . element <$> getStdRandom (randomR (0, length ps' - 1))
-        where ps' = ps ^.. folded . filtered (has $ palLeader . leaderId . _Just)
+  liftIO $ (ps' ^?) . element <$> getStdRandom (randomR (0, length ps' - 1))
+  where
+    ps' = ps ^.. folded . filtered (has $ palLeader . leaderId . _Just)
 
 -- * Messages
 

@@ -21,8 +21,6 @@ import { EventTypesProvider } from "./contexts/eventType";
 import Event from "./components/Event";
 import EventDetails from "./components/Event/EventDetails";
 import { EventsProvider } from "./contexts/event";
-import { MembershipsProvider } from "./contexts/membership";
-import { ServicesProvider } from "./contexts/service";
 import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
@@ -60,7 +58,9 @@ const AuthenticatedRoutes = ({ user, users }) => {
       <Route
         exact
         path={routes.LoginRedirect.url}
-        element={<LoginRedirect />}
+        element={
+          <LoginRedirect/>
+        }
       />
       <Route
         exact
@@ -150,17 +150,15 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
-                    <InventoriesProvider>
-                      <ItemsProvider>
-                        <ProductDetails user={user} users={users} />
-                      </ItemsProvider>
-                    </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
+              <CategorysProvider>
+                <SubCategorysProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <ProductDetails user={user} users={users} />
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </SubCategorysProvider>
+              </CategorysProvider>
             </EventsProvider>
           </UsersProvider>
         }
@@ -280,17 +278,15 @@ const AuthenticatedRoutes = ({ user, users }) => {
         element={
           <UsersProvider>
             <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
-                    <InventoriesProvider>
-                      <ItemsProvider>
-                        <ProductDetails user={user} users={users} />
-                      </ItemsProvider>
-                    </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
+              <CategorysProvider>
+                <SubCategorysProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <ProductDetails user={user} users={users} />
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </SubCategorysProvider>
+              </CategorysProvider>
             </EventsProvider>
           </UsersProvider>
         }

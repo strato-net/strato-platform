@@ -1,16 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-import           Blockchain.Options ()
-import           Blockchain.VMOptions ()
-import           Executable.EVMFlags ()
-import           HFlags
-import           Strato.Lite
-import           Strato.Lite.Options
-import           Data.Aeson
+import Blockchain.Options ()
+import Blockchain.VMOptions ()
+import Data.Aeson
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy  as BL
-
+import qualified Data.ByteString.Lazy as BL
+import Executable.EVMFlags ()
+import HFlags
+import Strato.Lite
+import Strato.Lite.Options
 
 main :: IO ()
 main = do

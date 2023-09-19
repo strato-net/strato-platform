@@ -3,13 +3,12 @@
 import Control.Monad
 import qualified Data.ByteString as B
 import Data.ByteString.Arbitrary (fastRandBs)
+import Kafka
 import System.IO
 import System.IO.Temp
 import Test.Hspec
 import Test.QuickCheck
 import Text.Printf
-
-import Kafka
 
 testMessages :: [B.ByteString] -> SpecWith ()
 testMessages msgs = it (take 70 $ printf "should be able to encode and decode %s" (show $ map B.length msgs)) $ testMessages' msgs
@@ -25,7 +24,7 @@ testMessages' msgs =
             mMsg <- readMsg r
             case mMsg of
               Nothing -> return []
-              Just msg -> (msg:) <$> loop
+              Just msg -> (msg :) <$> loop
       got <- loop
       got `shouldBe` msgs
 

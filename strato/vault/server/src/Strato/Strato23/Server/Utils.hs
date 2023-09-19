@@ -1,7 +1,7 @@
 module Strato.Strato23.Server.Utils where
 
-import           Data.ByteString                       (ByteString)
-import           Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.ExtendedWord
+import Data.ByteString (ByteString)
 
 word256ToByteString :: Word256 -> ByteString
 word256ToByteString = word256ToBytes

@@ -1,73 +1,164 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MagicHash #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
+
 module Blockchain.EVM.Opcodes where
 
-import           Prelude                      hiding (EQ, GT, LT)
-
-import           Data.Bits
-import qualified Data.ByteString              as B
-import qualified Data.ByteString.Unsafe       as BU
-import           Data.Data
-import           Data.Primitive.ByteArray
-import           Foreign.Ptr
-import           Foreign.Storable
-import           GHC.Exts
-import           GHC.Num.BigNat
-import           GHC.Num.Integer
-import           GHC.Word
-import           System.Endian
-import           System.IO.Unsafe
-import qualified Data.Map                     as M
-import           Data.Maybe
-import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
-
-import           Blockchain.Strato.Model.ExtendedWord
-
-import           Network.Haskoin.Crypto.BigWord     (BigWord(..))
+import Blockchain.Strato.Model.ExtendedWord
+import Data.Bits
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Unsafe as BU
+import Data.Data
+import qualified Data.Map as M
+import Data.Maybe
+import Data.Primitive.ByteArray
+import Foreign.Ptr
+import Foreign.Storable
+import GHC.Exts
+import GHC.Num.BigNat
+import GHC.Num.Integer
+import GHC.Word
+import Network.Haskoin.Crypto.BigWord (BigWord (..))
+import System.Endian
+import System.IO.Unsafe
+import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import Prelude hiding (EQ, GT, LT)
 
 type CodePointer = Int
 
-data Operation =
-    STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG |
-    LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE | SHL | SHR | SAR |
-    SHA3 |
-    ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY | RETURNDATASIZE | RETURNDATACOPY |
-    BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT |
-    POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE | JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
-    PUSH Word256 |
-    DUP1 | DUP2 | DUP3 | DUP4 |
-    DUP5 | DUP6 | DUP7 | DUP8 |
-    DUP9 | DUP10 | DUP11 | DUP12 |
-    DUP13 | DUP14 | DUP15 | DUP16 |
-    SWAP1 | SWAP2 | SWAP3 | SWAP4 |
-    SWAP5 | SWAP6 | SWAP7 | SWAP8 |
-    SWAP9 | SWAP10 | SWAP11 | SWAP12 |
-    SWAP13 | SWAP14 | SWAP15 | SWAP16 |
-    LOG0 | LOG1 | LOG2 | LOG3 | LOG4 |
-    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | STATICCALL | REVERT | INVALID | SUICIDE |
-    --Pseudo Opcodes
-    LABEL String | PUSHLABEL String |
-    PUSHDIFF String String | DATA B.ByteString |
-    MalformedOpcode Word8 deriving (Show, Eq, Ord, Typeable, Data)
+data Operation
+  = STOP
+  | ADD
+  | MUL
+  | SUB
+  | DIV
+  | SDIV
+  | MOD
+  | SMOD
+  | ADDMOD
+  | MULMOD
+  | EXP
+  | SIGNEXTEND
+  | NEG
+  | LT
+  | GT
+  | SLT
+  | SGT
+  | EQ
+  | ISZERO
+  | NOT
+  | AND
+  | OR
+  | XOR
+  | BYTE
+  | SHL
+  | SHR
+  | SAR
+  | SHA3
+  | ADDRESS
+  | BALANCE
+  | ORIGIN
+  | CALLER
+  | CALLVALUE
+  | CALLDATALOAD
+  | CALLDATASIZE
+  | CALLDATACOPY
+  | CODESIZE
+  | CODECOPY
+  | GASPRICE
+  | EXTCODESIZE
+  | EXTCODECOPY
+  | RETURNDATASIZE
+  | RETURNDATACOPY
+  | BLOCKHASH
+  | COINBASE
+  | TIMESTAMP
+  | NUMBER
+  | DIFFICULTY
+  | GASLIMIT
+  | POP
+  | MLOAD
+  | MSTORE
+  | MSTORE8
+  | SLOAD
+  | SSTORE
+  | JUMP
+  | JUMPI
+  | PC
+  | MSIZE
+  | GAS
+  | JUMPDEST
+  | PUSH Word256
+  | DUP1
+  | DUP2
+  | DUP3
+  | DUP4
+  | DUP5
+  | DUP6
+  | DUP7
+  | DUP8
+  | DUP9
+  | DUP10
+  | DUP11
+  | DUP12
+  | DUP13
+  | DUP14
+  | DUP15
+  | DUP16
+  | SWAP1
+  | SWAP2
+  | SWAP3
+  | SWAP4
+  | SWAP5
+  | SWAP6
+  | SWAP7
+  | SWAP8
+  | SWAP9
+  | SWAP10
+  | SWAP11
+  | SWAP12
+  | SWAP13
+  | SWAP14
+  | SWAP15
+  | SWAP16
+  | LOG0
+  | LOG1
+  | LOG2
+  | LOG3
+  | LOG4
+  | CREATE
+  | CALL
+  | CALLCODE
+  | RETURN
+  | DELEGATECALL
+  | STATICCALL
+  | REVERT
+  | INVALID
+  | SUICIDE
+  | --Pseudo Opcodes
+    LABEL String
+  | PUSHLABEL String
+  | PUSHDIFF String String
+  | DATA B.ByteString
+  | MalformedOpcode Word8
+  deriving (Show, Eq, Ord, Typeable, Data)
 
 instance Pretty Operation where
-  pretty x@JUMPDEST    = text $ "------" ++ show x
-  pretty (PUSH v)      = text $ "PUSH " ++ show v
-  pretty x             = text $ show x
+  pretty x@JUMPDEST = text $ "------" ++ show x
+  pretty (PUSH v) = text $ "PUSH " ++ show v
+  pretty x = text $ show x
 
 data OPData = OPData Word8 Operation Int Int String
 
 type EthCode = [Operation]
 
-singleOp::Operation->([Word8]->Operation, Int)
+singleOp :: Operation -> ([Word8] -> Operation, Int)
 singleOp o = (const o, 1)
 
-opDatas::[OPData]
+opDatas :: [OPData]
 opDatas =
-  [
-    OPData 0x00 STOP 0 0 "Halts execution.",
+  [ OPData 0x00 STOP 0 0 "Halts execution.",
     OPData 0x01 ADD 2 1 "Addition operation.",
     OPData 0x02 MUL 2 1 "Multiplication operation.",
     OPData 0x03 SUB 2 1 "Subtraction operation.",
@@ -79,7 +170,6 @@ opDatas =
     OPData 0x09 MULMOD 2 1 "unsigned modular multiplication",
     OPData 0x0a EXP 2 1 "Exponential operation.",
     OPData 0x0b SIGNEXTEND 2 1 "Extend length of two’s complement signed integer.",
-
     OPData 0x10 LT 2 1 "Less-than comparision.",
     OPData 0x11 GT 2 1 "Greater-than comparision.",
     OPData 0x12 SLT 2 1 "Signed less-than comparision.",
@@ -94,9 +184,7 @@ opDatas =
     OPData 0x1b SHL 2 1 "Bitwise left shift.",
     OPData 0x1c SHR 2 1 "Logical bitwise right shift.",
     OPData 0x1d SAR 2 1 "Arithmetic bitwise right shift.",
-
     OPData 0x20 SHA3 2 1 "Compute SHA3-256 hash.",
-
     OPData 0x30 ADDRESS 0 1 "Get address of currently executing account.",
     OPData 0x31 BALANCE 1 1 "Get balance of the given account.",
     OPData 0x32 ORIGIN 0 1 "Get execution origination address.",
@@ -110,17 +198,20 @@ opDatas =
     OPData 0x3a GASPRICE 0 1 "Get price of gas in current environment.",
     OPData 0x3b EXTCODESIZE 0 1 "Get size of an account's code.",
     OPData 0x3c EXTCODECOPY 0 4 "Copy an account’s code to memory",
-    OPData 0x3d RETURNDATASIZE 0 1 "Get size of output data from previous call\
-                                   \ from the current environment",
+    OPData
+      0x3d
+      RETURNDATASIZE
+      0
+      1
+      "Get size of output data from previous call\
+      \ from the current environment",
     OPData 0x3e RETURNDATACOPY 3 0 "Copy output data from the previous call to memory.",
-
     OPData 0x40 BLOCKHASH 0 1 "Get hash of most recent complete block.",
     OPData 0x41 COINBASE 0 1 "Get the block’s coinbase address.",
     OPData 0x42 TIMESTAMP 0 1 "Get the block’s timestamp.",
     OPData 0x43 NUMBER 0 1 "Get the block’s number.",
     OPData 0x44 DIFFICULTY 0 1 "Get the block’s difficulty.",
     OPData 0x45 GASLIMIT 0 1 "Get the block’s gas limit.",
-
     OPData 0x50 POP 1 0 "Remove item from stack.",
     OPData 0x51 MLOAD 1 1 "Load word from memory.",
     OPData 0x52 MSTORE 2 0 "Save word to memory.",
@@ -133,7 +224,6 @@ opDatas =
     OPData 0x59 MSIZE 0 1 "Get the size of active memory in bytes.",
     OPData 0x5a GAS 0 1 "Get the amount of available gas.",
     OPData 0x5b JUMPDEST 0 0 "set a potential jump destination",
-
     OPData 0x80 DUP1 1 2 "Duplicate 1st stack item.",
     OPData 0x81 DUP2 2 3 "Duplicate 2nd stack item.",
     OPData 0x82 DUP3 3 4 "Duplicate 3rd stack item.",
@@ -150,7 +240,6 @@ opDatas =
     OPData 0x8d DUP14 14 15 "Duplicate 14th stack item.",
     OPData 0x8e DUP15 15 16 "Duplicate 15th stack item.",
     OPData 0x8f DUP16 16 17 "Duplicate 16th stack item.",
-
     OPData 0x90 SWAP1 2 2 "Exchange 1st and 2nd stack items.",
     OPData 0x91 SWAP2 3 3 "Exchange 1st and 3nd stack items.",
     OPData 0x92 SWAP3 4 4 "Exchange 1st and 4nd stack items.",
@@ -167,71 +256,79 @@ opDatas =
     OPData 0x9d SWAP14 15 15 "Exchange 1st and 15nd stack items.",
     OPData 0x9e SWAP15 16 16 "Exchange 1st and 16nd stack items.",
     OPData 0x9f SWAP16 17 17 "Exchange 1st and 17nd stack items.",
-
     OPData 0xa0 LOG0 2 0 "Append log record with no topics.",
     OPData 0xa1 LOG1 3 0 "Append log record with one topic.",
     OPData 0xa2 LOG2 4 0 "Append log record with two topics.",
     OPData 0xa3 LOG3 5 0 "Append log record with three topics.",
     OPData 0xa4 LOG4 6 0 "Append log record with four topics.",
-
     OPData 0xf0 CREATE 3 1 "Create a new account with associated code.",
     OPData 0xf1 CALL 7 1 "Message-call into an account.",
     OPData 0xf2 CALLCODE 7 1 "Message-call into this account with alternate account's code.",
     OPData 0xf3 RETURN 2 0 "Halt execution returning output data.",
     OPData 0xf4 DELEGATECALL 6 1 "Message-call into this account with an alternative account’s code, but persisting the current values for sender and value.",
-    OPData 0xfa STATICCALL 6 1 "Static message-call into an account. Attempted storage writes\
-                               \ will throw an exception.",
-    OPData 0xfd REVERT 2 0 "Halt execution reverting state changes but returning data and\
-                           \ remaining gas.",
+    OPData
+      0xfa
+      STATICCALL
+      6
+      1
+      "Static message-call into an account. Attempted storage writes\
+      \ will throw an exception.",
+    OPData
+      0xfd
+      REVERT
+      2
+      0
+      "Halt execution reverting state changes but returning data and\
+      \ remaining gas.",
     -- These α and δ are technically ∅, but rather than risk an undefined exception set to 0.
     OPData 0xfe INVALID 0 0 "Designated invalid instruction",
     OPData 0xff SUICIDE 1 0 "Halt execution and register account for later deletion."
   ]
 
+op2CodeMap :: M.Map Operation Word8
+op2CodeMap = M.fromList $ (\(OPData code op _ _ _) -> (op, code)) <$> opDatas
 
-op2CodeMap::M.Map Operation Word8
-op2CodeMap=M.fromList $ (\(OPData code op _ _ _) -> (op, code)) <$> opDatas
+code2OpMap :: M.Map Word8 Operation
+code2OpMap = M.fromList $ (\(OPData opcode op _ _ _) -> (opcode, op)) <$> opDatas
 
-code2OpMap::M.Map Word8 Operation
-code2OpMap=M.fromList $ (\(OPData opcode op _ _ _) -> (opcode, op)) <$> opDatas
-
-op2OpCode::Operation->[Word8]
+op2OpCode :: Operation -> [Word8]
 -- This preserves semantics, but it will print a different opcode than was actually in the code
-op2OpCode (PUSH v) = 0x7f:B.unpack (word256ToBytes v)
+op2OpCode (PUSH v) = 0x7f : B.unpack (word256ToBytes v)
 op2OpCode (DATA bytes) = B.unpack bytes
 op2OpCode (MalformedOpcode byte) = [byte]
 op2OpCode op =
   case M.lookup op op2CodeMap of
-    Just x  -> [x]
+    Just x -> [x]
     Nothing -> error $ "op is missing in op2CodeMap: " ++ show op
 
-opCode2Op::B.ByteString -> Int -> (Operation, CodePointer)
+opCode2Op :: B.ByteString -> Int -> (Operation, CodePointer)
 opCode2Op rom !idx | idx >= B.length rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring
 opCode2Op rom !idx =
-  let opcode = BU.unsafeIndex rom idx in
-  if opcode < 0x60 || opcode > 0x7f
-    then (,1) . fromMaybe (MalformedOpcode opcode) . M.lookup opcode $ code2OpMap
-    else case fromIntegral (opcode - 0x5f) of
+  let opcode = BU.unsafeIndex rom idx
+   in if opcode < 0x60 || opcode > 0x7f
+        then (,1) . fromMaybe (MalformedOpcode opcode) . M.lookup opcode $ code2OpMap
+        else case fromIntegral (opcode - 0x5f) of
           1 -> (PUSH $! fastExtractByte rom (idx + 1), 2)
-          len | len <= 7 -> (PUSH $! fastExtractSingle rom (idx+1) len, len+1)
-              | len >= 25 -> (PUSH $! fastExtractQuad rom (idx+1) len, len+1)
-              | otherwise -> (PUSH $! defaultExtract rom (idx+1) len, len+1)
+          len
+            | len <= 7 -> (PUSH $! fastExtractSingle rom (idx + 1) len, len + 1)
+            | len >= 25 -> (PUSH $! fastExtractQuad rom (idx + 1) len, len + 1)
+            | otherwise -> (PUSH $! defaultExtract rom (idx + 1) len, len + 1)
 
 -- Unoptimized extraction, for 8-24 bytes that are too infrequently seen
 -- to bother writing a specialization.
 defaultExtract :: B.ByteString -> Int -> Int -> Word256
-defaultExtract bs off len = let slice = B.take len . B.drop off $ bs
-                            in bytesToWord256 $ B.replicate (32 - B.length slice) 0x0 <> slice
+defaultExtract bs off len =
+  let slice = B.take len . B.drop off $ bs
+   in bytesToWord256 $ B.replicate (32 - B.length slice) 0x0 <> slice
 
 -- Used to push 1 byte
-fastExtractByte :: B.ByteString-> Int -> Word256
-fastExtractByte !code !off = let !byte = BU.unsafeIndex code off
-                             in BigWord (fromIntegral byte)
-
-
+fastExtractByte :: B.ByteString -> Int -> Word256
+fastExtractByte !code !off =
+  let !byte = BU.unsafeIndex code off
+   in BigWord (fromIntegral byte)
 
 -- Used to push 2-7 bytes
-fastExtractSingle :: B.ByteString-> Int -> Int -> Word256
+fastExtractSingle :: B.ByteString -> Int -> Int -> Word256
 fastExtractSingle !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code $ \ptr -> do
   let !offPtr = castPtr ptr :: Ptr Word64
       !delta = 64 - (8 * len)
