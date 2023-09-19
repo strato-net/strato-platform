@@ -368,11 +368,10 @@ const ServiceTable = () => {
     }
     if (data1["itemId"]) {
       let queryValue = membership?.purchasedMemberships
-        .filter((item) => item.productId == data1["itemId"])
+        .filter((item) => item.manufacturer == value)
         .map((item) => item.itemAddress);
-      // return itemQuery?.itemAddress
-      // query1 = `&queryValue=${data1["itemId"]}`;
-      query1 = `&queryFields[]=${queryValue}&queryValue=itemId`;
+      query1 = `&queryFields[]=[${queryValue}]&queryValue=itemId`;
+      // query1 = `&ownerOrganization=${value}`
     }
     setPage(1);
     serviceUsageActions.fetchAllServicesUsage(
@@ -744,8 +743,8 @@ const ServiceTable = () => {
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
               value={filterQuery[activeTabCheck]}
-              onChange={(value) => {
-                handleFilter(value, activeTabCheck);
+              onChange={(value, obj) => {
+                handleFilter(obj.label.toString(), activeTabCheck);
               }}
               options={
                 activeTab === "booked"

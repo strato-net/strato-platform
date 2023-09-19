@@ -1793,9 +1793,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     // product table where category = membership, manufacturer = loggedin user organization currntly blockapps
     // Items productId and ownerAddress = loggedin user address
+    const getOptions1 = { ...options, org: managers.cirrusOrg, app: contractName, };
+    let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
+
+    const arrayOfAddresses = ownedProducts.map(obj => obj.address);
+
+    const arg = {
+      ownerOrganization: userOrganization,
+      productId: arrayOfAddresses
+    }
+
+    let ownedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
 
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    return serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions)
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
+    const memberships = await contract.getPurchasedMemberships();
+    const data = serviceUsage.map((item, index) => {
+      let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
+      return { ...item, provider: result.manufacturer }
+    })
+    return { 'ownedProducts': ownedProducts, 'ownedItems': ownedItems }
   };
 
   contract.updateServiceUsage = async function (args, options = defaultOptions) {
