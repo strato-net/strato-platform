@@ -92,9 +92,11 @@ seqEventNotificationSourceChanFill ks p2peventchan = do
 seqEventNotificationSourceChanPour :: ( MonadIO m
                                       , MonadLogger m 
                                       )
-                                   => (InChan P2pEvent,OutChan P2pEvent) -> ConduitT () P2pEvent m ()
+                                   => OutChan P2pEvent -> ConduitT () P2pEvent m ()
+--                                   => (InChan P2pEvent,OutChan P2pEvent) -> ConduitT () P2pEvent m ()
 seqEventNotificationSourceChanPour p2peventchan = do
-  event <- liftIO $ readChan $ (\(_,b) -> b) p2peventchan
+--  event <- liftIO $ readChan $ (\(_,b) -> b) p2peventchan
+  event <- liftIO $ readChan p2peventchan
   $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ " ++ show event
   yield event
 

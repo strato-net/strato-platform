@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 
 import           Control.Concurrent (threadDelay)
+import           Control.Concurrent.Chan.Unagi
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
@@ -41,8 +42,9 @@ initP2P = do
   context <- liftIO $ readIORef $ configContext cfg
   let contextkafkastate = contextKafkaState context
   let contextkafkamiddleman = contextKafkaMiddleman context
+  contextkafkamiddlemanbroadcast <- liftIO $ dupChan $ (\(a,_) -> a) contextkafkamiddleman
   _ <- async (runContextM cfg $ (forever $ do _ <- seqEventNotificationSourceChanFill (return contextkafkastate) contextkafkamiddleman; liftIO $ threadDelay 50))
-  let sSource = seqEventNotificationSourceChanPour contextkafkamiddleman
+  let sSource = seqEventNotificationSourceChanPour contextkafkamiddlemanbroadcast
       runner f = runContextM cfg $ f sSource
   liftIO $ race_
     (run 10248 $ prometheus def p2pApp)
