@@ -368,7 +368,7 @@ const ServiceTable = () => {
     let data1 = {};
     data1["status"] = data["status"];
     data1["itemId"] = data["Provider"];
-    let query1 = "";
+    let query1 = `&owner=${userAddress}`;
     if (data1["status"]) {
       query1 = `&status=${data1["status"]}`;
     }

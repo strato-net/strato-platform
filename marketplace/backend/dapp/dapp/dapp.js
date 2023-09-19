@@ -1779,18 +1779,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    // const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    // const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
-    // const memberships = await contract.getPurchasedMemberships();
-    // const data = serviceUsage.map((item, index) => {
-    //   let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-    //   return { ...item, provider: result.manufacturer }
-    // })
-    // // return { 'serviceUsage': serviceUsage, 'memberships': memberships };
-    // return data
-
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args }, getOptions)
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
     const memberships = await contract.getPurchasedMemberships();
     const data = serviceUsage.map((item, index) => {
       let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';

@@ -59,7 +59,7 @@ class ServiceUsageController {
     try {
       const { dapp, query } = req;
 
-      const providedServiceUsages = await dapp.getAllProvided({ ...query });
+      const providedServiceUsages = await dapp.getProvidedServiceUsages({ ...query });
       rest.response.status200(res, providedServiceUsages);
 
       return next();
