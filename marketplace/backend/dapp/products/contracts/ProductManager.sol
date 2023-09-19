@@ -204,13 +204,17 @@ contract ProductManager is
                 block.timestamp,
                 tx.origin
             );
-            Item_4 itemAddr = new Item_4(
+            Item_3 itemAddr = new Item_3(
                 address(product),
                 product.uniqueProductCode(),
                 address(inventoryAddress),
                 _serialNumber,
                 ItemStatus.PUBLISHED,
                 "",
+                [""],
+                [""],
+                [""],
+                0,
                 block.timestamp
             );
             return (status, inventoryAddress);
@@ -225,7 +229,7 @@ contract ProductManager is
                 tx.origin
             );
             for (int i = 0; i < _quantity; i++) {
-                Item_4 _item = Item_4(_itemsAddress[i]);
+                Item_3 _item = Item_3(_itemsAddress[i]);
                 _item.transferOwnership(
                     tx.origin,
                     address(product),

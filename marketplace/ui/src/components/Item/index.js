@@ -65,11 +65,11 @@ const Item = () => {
       dataIndex: "serialNumber",
       align: "center",
     },
-    {
-      title: "Item Number".toUpperCase(),
-      dataIndex: "itemNumber",
-      align: "center",
-    },
+    // {
+    //   title: "Item Number".toUpperCase(),
+    //   dataIndex: "itemNumber",
+    //   align: "center",
+    // },
   ];
 
   useEffect(() => {

@@ -30,13 +30,17 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string repeatedSerialNumbers = "";
 
         for (uint256 i = 0; i < _itemObject.length; i++) {
-            Item_4 itemAddr = new Item_4(
+            Item_3 itemAddr = new Item_3(
                 _productId,
                 _uniqueProductCode,
                 _inventoryId,
                 _itemObject[i].serialNumber,
                 _status,
                 _comment,
+                [""],
+                [""],
+                [""],
+                0,
                 _createdDate
             );
         }
@@ -51,7 +55,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         uint _scheme
     ) public returns (uint) {
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
-            Item_4 item = Item_4(_itemsAddress[i]);
+            Item_3 item = Item_3(_itemsAddress[i]);
             item.update(_status, _comment, _scheme);
         }
         return (RestStatus.OK);
@@ -70,7 +74,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
             address _itemAddress = _itemsAddress[i];
-            Item_4 item = Item_4(_itemAddress);
+            Item_3 item = Item_3(_itemAddress);
             string _itemSerialNumber = item.serialNumber();
 
             Event_1 eventAddr = new Event_1(
@@ -122,7 +126,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
     ) public returns (uint, address, address) {
         Product_3 product;
         Inventory_12 inventory;
-        Item_4 item = Item_4(_itemsAddress[0]);
+        Item_3 item = Item_3(_itemsAddress[0]);
 
         // get Dapp contract from dapp chain
         Dapp dapp = Dapp(address(_dappAddress));
@@ -165,13 +169,17 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             );
-            Item_4 itemAddr = new Item_4(
+            Item_3 itemAddr = new Item_3(
                 address(product),
                 oldProduct.uniqueProductCode(),
                 address(inventory),
                 _serialNumber,
                 ItemStatus.UNPUBLISHED,
                 "",
+                [""],
+                [""],
+                [""],
+                0,
                 block.timestamp
             );
         } else {
@@ -185,7 +193,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 _newOwner
             );
             for (uint i = 0; i < _itemsAddress.length; i++) {
-                Item_4 _item = Item_4(_itemsAddress[i]);
+                Item_3 _item = Item_3(_itemsAddress[i]);
                 _item.transferOwnership(
                     _newOwner,
                     address(product),

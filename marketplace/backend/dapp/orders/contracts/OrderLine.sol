@@ -83,7 +83,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
         }
 
-        Item_4 item = Item_4(address(_items[i]));
+        Item_3 item = Item_3(address(_items[i]));
 
         // check published status of items
         if(item.status() != ItemStatus.PUBLISHED){
