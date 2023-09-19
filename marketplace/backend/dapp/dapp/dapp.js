@@ -18,6 +18,7 @@ import eventTypeManagerJs from "/dapp/eventType/eventTypeManager";
 import serviceJs from "dapp/service/service";
 import serviceManagerJS from "/dapp/service/serviceManager";
 import productFileJs from "/dapp/productFile/productFile";
+import serviceUsageJs from "/dapp/serviceUsage/serviceUsage";
 import itemManagerJs from "/dapp/items/itemManager";
 import productManagerJs from "/dapp/products/productManager";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
@@ -37,6 +38,7 @@ const allAssetNames = [
   serviceJs.contractName,
   serviceManagerJS.contractName,
   productFileJs.contractName,
+  serviceUsageJs.contractName,
   membershipJs.contractName,
   membershipServiceJs.contractName,
   membershipManagerJs.contractName,
@@ -1740,7 +1742,44 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     // const chainOptions = { chainIds: [chainId], ...options };
 
     return productFileJs.update(rawAdmin, contract, updates, options);
-  }
+  };
+  
+  //----------------------------- ServiceUsage (Start ->) -------------------------------
+  contract.createServiceUsage = async function (args, options = defaultOptions) {
+    try {
+      const createdDate = Math.floor(Date.now() / 1000);
+      const createOptions = {...options, org: managers.cirrusOrg, app: contractName };
+      return serviceUsageJs.uploadContract(rawAdmin, { ...args, createdDate, }, createOptions);
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while createServiceUsage");
+    }
+  };
+  
+  contract.getServiceUsage = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
+    return serviceUsageJs.get(rawAdmin, { ...args, ownerOrganization: userOrganization }, getOptions)
+  };
+
+  contract.getServiceUsages = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
+    return serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions)
+  };
+  
+  contract.updateServiceUsage = async function (args, options = defaultOptions) {
+    const { address, updates } = args;
+    
+    const contract = {
+      name: serviceUsageJs.contractName,
+      address: address,
+    };
+
+    // const chainOptions = { chainIds: [chainId], ...options };
+
+    return serviceUsageJs.update(rawAdmin, contract, updates, options);
+  };
   
   return contract;
 }
