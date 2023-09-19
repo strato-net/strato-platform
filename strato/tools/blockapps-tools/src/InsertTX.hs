@@ -2,26 +2,25 @@
 
 module InsertTX where
 
-import           Control.Monad
-import qualified Data.Binary                  as BN
-import qualified Data.ByteString              as B
-import qualified Data.ByteString.Lazy         as BL
-import           Data.Time.Clock
-import qualified Database.Persist.Postgresql  as SQL
-import           System.FilePath
-
-import           BlockApps.Logging
-import           Blockchain.Data.Transaction
-import           Blockchain.Data.TXOrigin
-import           Blockchain.DB.SQLDB          (runSqlPool, createPostgresqlPool)
-import           Blockchain.EthConf
-import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.Secp256k1
+import BlockApps.Logging
+import Blockchain.DB.SQLDB (createPostgresqlPool, runSqlPool)
+import Blockchain.Data.TXOrigin
+import Blockchain.Data.Transaction
+import Blockchain.EthConf
+import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Secp256k1
+import Control.Monad
+import qualified Data.Binary as BN
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Data.Time.Clock
+import qualified Database.Persist.Postgresql as SQL
+import System.FilePath
 
 retrievePrvKey :: FilePath -> IO (Maybe PrivateKey)
 retrievePrvKey filePath = do
-    keyBytes <- BL.readFile filePath
-    return $ importPrivateKey $ BN.decode keyBytes
+  keyBytes <- BL.readFile filePath
+  return $ importPrivateKey $ BN.decode keyBytes
 
 insertTX :: IO ()
 insertTX = do

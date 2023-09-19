@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
+
 module Main where
 
-import   HFlags
-import   Test.Hspec.Runner
-
-import   qualified Spec
+import HFlags
+import qualified Spec
+import Test.Hspec.Runner
 
 predicate :: Path -> Bool
 predicate _ = True

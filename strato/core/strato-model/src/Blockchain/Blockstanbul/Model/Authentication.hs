@@ -1,43 +1,50 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Blockchain.Blockstanbul.Model.Authentication where
 
-import Control.Lens
-import qualified Data.ByteString as B
+module Blockchain.Blockstanbul.Model.Authentication where
 
 import Blockchain.Data.RLP
 -- import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Secp256k1
+
 import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Secp256k1
+import Control.Lens
+import qualified Data.ByteString as B
 
 type RawExtraData = B.ByteString
 
-data IstanbulExtra = IstanbulExtra {
-  _validatorList :: ChainMembers,
-  _proposedSig :: Maybe Signature,
-  _commitment :: [Signature]
-} deriving (Eq, Show)
+data IstanbulExtra = IstanbulExtra
+  { _validatorList :: ChainMembers,
+    _proposedSig :: Maybe Signature,
+    _commitment :: [Signature]
+  }
+  deriving (Eq, Show)
+
 makeLenses ''IstanbulExtra
 
-data ExtraData = ExtraData {
-  _vanity :: B.ByteString,
-  _istanbul :: Maybe IstanbulExtra
-} deriving (Eq, Show)
+data ExtraData = ExtraData
+  { _vanity :: B.ByteString,
+    _istanbul :: Maybe IstanbulExtra
+  }
+  deriving (Eq, Show)
+
 makeLenses ''ExtraData
 
 instance RLPSerializable IstanbulExtra where
   rlpEncode (IstanbulExtra vls mp cs) =
-      RLPArray [rlpEncode $ vls,
-                maybe (RLPScalar 0) rlpEncode mp,
-                RLPArray . map rlpEncode $ cs]
+    RLPArray
+      [ rlpEncode $ vls,
+        maybe (RLPScalar 0) rlpEncode mp,
+        RLPArray . map rlpEncode $ cs
+      ]
   rlpDecode (RLPArray [rvls, rp, RLPArray rcs]) =
-      IstanbulExtra (rlpDecode rvls)
-                    (case rp of
-                        RLPScalar _ -> Nothing
-                        _ -> Just . rlpDecode $ rp)
-                    (map rlpDecode rcs)
+    IstanbulExtra
+      (rlpDecode rvls)
+      ( case rp of
+          RLPScalar _ -> Nothing
+          _ -> Just . rlpDecode $ rp
+      )
+      (map rlpDecode rcs)
   rlpDecode x = error $ "invalid rlp for istanbul extra: " ++ show x
-
-
 
 uncookRawExtra :: ExtraData -> RawExtraData
 uncookRawExtra (ExtraData vn ist') =
@@ -48,14 +55,16 @@ uncookRawExtra (ExtraData vn ist') =
 cookRawExtra :: RawExtraData -> ExtraData
 cookRawExtra bs =
   let (vn, rest) = B.splitAt 32 bs
-  in ExtraData vn $ if B.null rest
-                      then Nothing
-                      else Just . rlpDecode . rlpDeserialize $ rest
+   in ExtraData vn $
+        if B.null rest
+          then Nothing
+          else Just . rlpDecode . rlpDeserialize $ rest
 
 scrubCommitmentSeals :: RawExtraData -> RawExtraData
-scrubCommitmentSeals = uncookRawExtra
-                     . set (istanbul . _Just . commitment) []
-                     . cookRawExtra
+scrubCommitmentSeals =
+  uncookRawExtra
+    . set (istanbul . _Just . commitment) []
+    . cookRawExtra
 
 scrubConsensus :: RawExtraData -> RawExtraData
 scrubConsensus = B.take 32

@@ -13,7 +13,8 @@ module AuthenticationSpec where
 -- import qualified Data.Map.Strict            as M
 -- import qualified Data.Set                   as S
 -- import           Data.Time.Clock.POSIX
-import           Test.Hspec                 hiding (shouldBe, shouldSatisfy)
+import Test.Hspec hiding (shouldBe, shouldSatisfy)
+
 -- import           Test.Hspec.Expectations.Lifted
 -- import           Test.QuickCheck
 
@@ -55,7 +56,7 @@ import           Test.Hspec                 hiding (shouldBe, shouldSatisfy)
 -- testValidators = ChainMembers $ S.fromList [CommonName "BlockApps" "Engineering" "Admin" True, CommonName "Microsoft" "Sales" "Steve Ballmer" True]
 
 -- private :: PrivateKey
--- private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866")) 
+-- private = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "private" $ C8.pack "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 -- valX509Info :: X509CertInfoState
 -- valX509Info = X509CertInfoState
@@ -73,7 +74,7 @@ import           Test.Hspec                 hiding (shouldBe, shouldSatisfy)
 --    in runReaderT f r
 
 -- instance HasVault IO where
---   sign bs = return $ signMsg private bs 
+--   sign bs = return $ signMsg private bs
 --   getPub = error "called getPub, but this should never happen"
 --   getShared _ = error "called getShared, but this should never happen"
 
@@ -86,7 +87,8 @@ import           Test.Hspec                 hiding (shouldBe, shouldSatisfy)
 -- -- instance  (A.Selectable Address X509CertInfoState (ReaderT (Map Address X509CertInfoState) IO))
 
 spec :: Spec
-spec = return()
+spec = return ()
+
 --   describe "Commitment seals" $ do
 --     it "verifies the signatures" $ runTest $ do
 --       let digest = unsafeCreateKeccak256FromWord256 0x1234
@@ -182,12 +184,12 @@ spec = return()
 --           fakeKey = fromMaybe (error "could not import fake key") mFakeKey
 --           vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]
 --           blk'' = addValidators vals testBlock
---       pSeal <- proposerSeal blk'' 
+--       pSeal <- proposerSeal blk''
 --       let blk' = addProposerSeal pSeal blk''
 --           cSeal = signMsg (fakeKey) (keccak256ToByteString $ blockHash blk')
 --           blk = addCommitmentSeals [cSeal] blk'
 --       got <- replayHistoricBlock vals 39 blk
---       got `shouldBe` Left "unknown signers: 9a4a1b2b0e0d2b5d378ecc392d337a6557602559" 
+--       got `shouldBe` Left "unknown signers: 9a4a1b2b0e0d2b5d378ecc392d337a6557602559"
 
 --     it "Accepts a block with 1 validator" $ runTest $ do
 --       let vals = ChainMembers . S.fromList $ [CommonName "BlockApps" "Engineering" "Admin" True]

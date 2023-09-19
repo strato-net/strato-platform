@@ -1,10 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
+
+import BlockApps.Logging ()
 import HFlags
 import Spec (spec)
 import Test.Hspec.Runner
 
-import BlockApps.Logging () -- For HFlags
+-- For HFlags
 
 predicate :: Path -> Bool
 predicate (_, _) = True
