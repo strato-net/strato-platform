@@ -172,27 +172,21 @@ const ServiceTable = () => {
   useEffect(() => {
     let queryOwner = `&owner=${userAddress}`;
     if (userAddress) {
-      // if (activeTab === 'booked') {
-      //   serviceUsageActions.fetchBookedServicesUsage(
-      //     serviceUsageDispatch,
-      //     limit,
-      //     offset,
-      //     queryOwner
-      //   );
-      // } else {
-      //   serviceUsageActions.fetchProvidedServicesUsage(
-      //     serviceUsageDispatch,
-      //     limit,
-      //     offset,
-      //     queryOwner
-      //   );
-      // }
-      serviceUsageActions.fetchAllServicesUsage(
-        serviceUsageDispatch,
-        limit,
-        offset,
-        queryOwner
-      );
+      if (activeTab === 'booked') {
+        serviceUsageActions.fetchBookedServicesUsage(
+          serviceUsageDispatch,
+          limit,
+          offset,
+          queryOwner
+        );
+      } else {
+        serviceUsageActions.fetchProvidedServicesUsage(
+          serviceUsageDispatch,
+          limit,
+          offset,
+          queryOwner
+        );
+      }
     }
     servicesActions.fetchService(serviceDispatch, 10, offset, query);
     membershipActions.fetchPurchasedMemberships(membershipDispatch);
@@ -704,11 +698,12 @@ const ServiceTable = () => {
 
   const handlePaginationChange = (CPage) => {
     setPage(CPage.current);
+    let query1 = `&owner=${userAddress}`;
     serviceUsageActions.fetchAllServicesUsage(
       serviceUsageDispatch,
       limit,
       (CPage.current - 1) * limit,
-      query
+      query1
     );
   };
 

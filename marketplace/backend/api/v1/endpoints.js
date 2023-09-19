@@ -108,7 +108,6 @@ export const Service = {
 
 export const ServiceUsage = {
   prefix: '/serviceUsage',
-  get: '/:address',
   getAll: '/',
   getBooked: '/booked',
   getProvided: '/provided',

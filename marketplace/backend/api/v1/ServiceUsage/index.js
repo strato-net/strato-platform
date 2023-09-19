@@ -7,13 +7,6 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
-  ServiceUsage.get,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ServiceUsageController.get
-);
-
-router.get(
   ServiceUsage.getAll,
   authHandler.authorizeRequest(),
   loadDapp,
