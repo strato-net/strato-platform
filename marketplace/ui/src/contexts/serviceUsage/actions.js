@@ -11,6 +11,14 @@ const actionDescriptors = {
   fetchAllServiceUsageSuccessful: "fetch_all_service_usage_successful",
   fetchAllServiceUsageFailed: "fetch_all_service_usage_failed",
 
+  fetchBookedServicesUsage: "fetch_booked_service_usage",
+  fetchBookedServiceUsageSuccessful: "fetch_booked_service_usage_successful",
+  fetchBookedServiceUsageFailed: "fetch_booked_service_usage_failed",
+
+  fetchProvidedServicesUsage: "fetch_provided_service_usage",
+  fetchProvidedServiceUsageSuccessful: "fetch_provided_service_usage_successful",
+  fetchProvidedServiceUsageFailed: "fetch_provided_service_usage_failed",
+
   fetchServicesUsage: "fetch_service_usage",
   fetchServiceUsageSuccessful: "fetch_service_usage_successful",
   fetchServiceUsageFailed: "fetch_service_usage_failed",
@@ -88,6 +96,52 @@ const actions = {
 
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchAllServiceUsageFailed, error: "Error while fetching all Service Usage" });
+    }
+  },
+  fetchBookedServicesUsage: async (dispatch, limit, offset, query) => {
+    dispatch({ type: actionDescriptors.fetchBookedServicesUsage });
+
+    try {
+      const response = await fetch(`${apiUrl}/serviceUsage/booked?limit=${limit}&offset=${offset}${query}`, {
+        method: HTTP_METHODS.GET
+      });
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchBookedServiceUsageSuccessful,
+          payload: body.data,
+        });
+        return body.data;
+      }
+      dispatch({ type: actionDescriptors.fetchBookedServiceUsageFailed, error: 'Error while fetching all Booked Service Usage' });
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchBookedServiceUsageFailed, error: "Error while fetching all Booked Service Usage" });
+    }
+  },
+  fetchProvidedServicesUsage: async (dispatch, limit, offset, query) => {
+    dispatch({ type: actionDescriptors.fetchProvidedServicesUsage });
+
+    try {
+      const response = await fetch(`${apiUrl}/serviceUsage/provided?limit=${limit}&offset=${offset}${query}`, {
+        method: HTTP_METHODS.GET
+      });
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchProvidedServiceUsageSuccessful,
+          payload: body.data,
+        });
+        return body.data;
+      }
+      dispatch({ type: actionDescriptors.fetchProvidedServiceUsageFailed, error: 'Error while fetching all Booked Service Usage' });
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchProvidedServiceUsageFailed, error: "Error while fetching all Booked Service Usage" });
     }
   },
   fetchServicesUsage: async (dispatch, id) => {

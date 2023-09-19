@@ -98,18 +98,7 @@ const ServiceTable = () => {
     return resultArray;
   }
 
-  const serviceUsageData = serviceUsageState?.servicesUsage?.map(
-    (item, index) => {
-      const productId =
-        membership?.purchasedMemberships.find(
-          (item1) => item1?.itemAddress === item?.itemId
-        ) ?? "";
-      return {
-        ...item,
-        provider: productId["productId"] ? productId["productId"] : "",
-      };
-    }
-  );
+  const serviceUsageData = serviceUsageState?.servicesUsage;
 
   const providerData = membership?.purchasedMemberships.map((item, index) => {
     return { value: item.manufacturer, label: item.manufacturer };
@@ -183,6 +172,21 @@ const ServiceTable = () => {
   useEffect(() => {
     let queryOwner = `&owner=${userAddress}`;
     if (userAddress) {
+      // if (activeTab === 'booked') {
+      //   serviceUsageActions.fetchBookedServicesUsage(
+      //     serviceUsageDispatch,
+      //     limit,
+      //     offset,
+      //     queryOwner
+      //   );
+      // } else {
+      //   serviceUsageActions.fetchProvidedServicesUsage(
+      //     serviceUsageDispatch,
+      //     limit,
+      //     offset,
+      //     queryOwner
+      //   );
+      // }
       serviceUsageActions.fetchAllServicesUsage(
         serviceUsageDispatch,
         limit,
@@ -280,6 +284,8 @@ const ServiceTable = () => {
           };
         });
       setMembershipList(membershipData);
+      let serviceQuery = `&ownerOrganization=${value}`
+      servicesActions.fetchService(serviceDispatch, 10, offset, serviceQuery);
     } else if (field === "itemId") {
       let data = tableData.filter((item, index) => {
         if (index === key) {
@@ -289,12 +295,6 @@ const ServiceTable = () => {
         return item;
       });
       setTableData(data);
-      servicesActions.fetchService(
-        serviceDispatch,
-        10,
-        offset,
-        value.organization
-      );
     }
     let data = tableData.filter((item, index) => {
       if (index === key) {
@@ -454,14 +454,7 @@ const ServiceTable = () => {
             />
           ) : (
             <span>
-              {/* {console.log("record, record", record)}
-              {providerList.reduce((label, item) => {
-                if (item.value === text) {
-                  return item.label;
-                }
-                return label;
-              }, null)} */}
-              {record.ownerOrganization}
+              {text}
             </span>
           )}
         </span>
@@ -475,11 +468,11 @@ const ServiceTable = () => {
         <span>
           {record.editable && !isEdit ? (
             <Select
-              disabled={!!!providerState}
+              disabled={!record.provider}
               placeholder="Membership ID"
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
-              onChange={(value, obj) => handleInputChange(obj, "itemId", index)}
+              onChange={(value, obj) => handleInputChange(obj.value, "itemId", index)}
               options={membershipList}
             />
           ) : (
@@ -563,7 +556,7 @@ const ServiceTable = () => {
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>
-              {moment.unix(text).format("MM-DD-YYYY")}
+              {moment(text).format("MM-DD-YYYY")}
             </Typography>
           )}
         </span>
@@ -742,15 +735,6 @@ const ServiceTable = () => {
             disabled={validationError}
           >
             Add Service Use
-          </Button>
-          <Button
-            className="ml-2"
-            style={{ backgroundColor: "green" }}
-            type="primary"
-            onClick={handleSave}
-            disabled={validationError}
-          >
-            Save
           </Button>
         </Col>
       </Row>

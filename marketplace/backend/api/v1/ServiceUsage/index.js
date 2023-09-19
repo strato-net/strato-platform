@@ -20,6 +20,20 @@ router.get(
   ServiceUsageController.getAll
 );
 
+router.get(
+  ServiceUsage.getBooked,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ServiceUsageController.getAllBooked
+);
+
+router.get(
+  ServiceUsage.getProvided,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ServiceUsageController.getAllProvided
+);
+
 router.post(
   ServiceUsage.create,
   authHandler.authorizeRequest(),

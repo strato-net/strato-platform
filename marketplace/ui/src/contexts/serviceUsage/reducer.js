@@ -38,6 +38,42 @@ const reducer = (state, action) => {
         error: action.error,
         isServicesUsageLoading: false
       };
+    // fetch booked serviceUsage detail
+    case actionDescriptors.fetchBookedServicesUsage:
+      return {
+        ...state,
+        isServicesUsageLoading: true
+      };
+    case actionDescriptors.fetchBookedServiceUsageSuccessful:
+      return {
+        ...state,
+        servicesUsage: action.payload,
+        isServicesUsageLoading: false
+      };
+    case actionDescriptors.fetchBookedServiceUsageFailed:
+      return {
+        ...state,
+        error: action.error,
+        isServicesUsageLoading: false
+      };
+    // fetch provided serviceUsage detail
+    case actionDescriptors.fetchProvidedServicesUsage:
+      return {
+        ...state,
+        isServicesUsageLoading: true
+      };
+    case actionDescriptors.fetchProvidedServiceUsageSuccessful:
+      return {
+        ...state,
+        servicesUsage: action.payload,
+        isServicesUsageLoading: false
+      };
+    case actionDescriptors.fetchProvidedServiceUsageFailed:
+      return {
+        ...state,
+        error: action.error,
+        isServicesUsageLoading: false
+      };
     // fetch serviceUsage detail
     case actionDescriptors.fetchServicesUsage:
       return {
