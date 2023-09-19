@@ -1,32 +1,33 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators #-}
 
 ---This file gets all of the Oauth information from the OpenId Connect server
 module Strato.VaultProxy.RawOauth where
 
-import           Data.Cache               as C
-import           Data.Proxy
-import qualified Data.Text               as T
-import           Servant.API             as SA
-import           Servant.Client
-
+import Data.Cache as C
+import Data.Proxy
+import qualified Data.Text as T
+import Servant.API as SA
+import Servant.Client
 import Strato.VaultProxy.DataTypes
 
 type ContentType' = T.Text
+
 type Authorization = T.Text
+
 type BlockAppsTokenRequest = [(T.Text, T.Text)]
 
 type InitialCallForTokenLinkAPI =
-    Get '[SA.JSON] RawOauth
+  Get '[SA.JSON] RawOauth
 
-type BlockAppsTokenAPI = 
+type BlockAppsTokenAPI =
   SA.Header "Content-Type" ContentType'
-  :> SA.Header "Authorization" Authorization
-  :> ReqBody '[SA.JSON] BlockAppsTokenRequest
-  :> Get '[SA.JSON] VaultToken
+    :> SA.Header "Authorization" Authorization
+    :> ReqBody '[SA.JSON] BlockAppsTokenRequest
+    :> Get '[SA.JSON] VaultToken
 
 type VaultCache = Cache T.Text VaultToken
 

@@ -1,18 +1,26 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Convenience function for creating server-side methods from
 --   'Signature's with the package
 --   <http://hackage.haskell.org/package/json-rpc-server json-rpc-server>.
-module Network.JsonRpc.ServerAdapter ( -- * Server Methods
-                                       toServerMethod
-                                     , ConvertParams ) where
+module Network.JsonRpc.ServerAdapter
+  ( -- * Server Methods
+    toServerMethod,
+    ConvertParams,
+  )
+where
 
-import Network.JsonRpc.Client( Signature (..), (:::) (..))
-import Network.JsonRpc.Server( Method, MethodParams
-                             , Parameter (..), toMethod, (:+:) (..))
+import Network.JsonRpc.Client (Signature (..), (:::) (..))
+import Network.JsonRpc.Server
+  ( Method,
+    MethodParams,
+    Parameter (..),
+    toMethod,
+    (:+:) (..),
+  )
 
 -- | Creates a method from the given signature and function.
 --   The parameters of the resulting method match the order
@@ -24,10 +32,10 @@ toServerMethod (Signature name ps) f = toMethod name f $ _toServerParams ps
 --   and the parameters expected by 'toMethod' ('ps2') for a given
 --   RPC method.
 class ConvertParams ps1 ps2 | ps1 -> ps2, ps2 -> ps1 where
-    _toServerParams :: ps1 -> ps2
+  _toServerParams :: ps1 -> ps2
 
 instance ConvertParams () () where
-    _toServerParams = id
+  _toServerParams = id
 
 instance ConvertParams ps1 ps2 => ConvertParams (p ::: ps1) (p :+: ps2) where
-    _toServerParams (name ::: ps1) = Required name :+: _toServerParams ps1
+  _toServerParams (name ::: ps1) = Required name :+: _toServerParams ps1

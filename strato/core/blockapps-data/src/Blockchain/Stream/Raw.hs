@@ -1,26 +1,24 @@
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.Stream.Raw (
-  produceBytes,
-  fetchBytes,
-  fetchBytesIO,
-  fetchBytesOneIO,
-  setDefaultKafkaState
-  ) where
+module Blockchain.Stream.Raw
+  ( produceBytes,
+    fetchBytes,
+    fetchBytesIO,
+    fetchBytesOneIO,
+    setDefaultKafkaState,
+  )
+where
 
-import           Control.Lens
-import qualified Data.ByteString        as B
-import qualified Data.ByteString.Char8  as BC
-import           Data.List
-
-import           Network.Kafka
-import           Network.Kafka.Consumer
-import           Network.Kafka.Producer
-import           Network.Kafka.Protocol hiding (Message)
-
-import           Blockchain.EthConf
-
+import Blockchain.EthConf
+import Control.Lens
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
+import Data.List
+import Network.Kafka
+import Network.Kafka.Consumer
+import Network.Kafka.Producer
+import Network.Kafka.Protocol hiding (Message)
 
 produceBytes :: (Kafka k) => TopicName -> [B.ByteString] -> k [ProduceResponse]
 produceBytes topic = produceMessages . fmap (TopicAndMessage topic . makeMessage)
@@ -37,15 +35,15 @@ fetchBytes' topic offset = do
   --Also, since the Kafka fetch is typically in a loop, by not halting, we will often create a
   --fast infinite loop that will eat 100% of the CPU and quickly fill up the logs.
   case find (/= NoError) errorStatuses of
-   Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
-   _ -> return ()
+    Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
+    _ -> return ()
 
-  return $ zip [offset..] $ fetchResponseToPayload [offset] fetched
+  return $ zip [offset ..] $ fetchResponseToPayload [offset] fetched
 
-fetchBytesIO::TopicName->Offset->IO (Maybe [B.ByteString])
+fetchBytesIO :: TopicName -> Offset -> IO (Maybe [B.ByteString])
 fetchBytesIO topic offset = do
   ret <-
-      runKafkaConfigured "blockapps-data" $ do
+    runKafkaConfigured "blockapps-data" $ do
       lastOffset <- getLastOffset LatestTime 0 topic
 
       if offset > lastOffset
@@ -53,19 +51,19 @@ fetchBytesIO topic offset = do
         else setDefaultKafkaState >> Just <$> fetchBytes topic offset
 
   case ret of
-   Left e  -> error $ show e
-   Right v -> return v
+    Left e -> error $ show e
+    Right v -> return v
 
-fetchBytesOneIO::TopicName->Offset->IO (Maybe B.ByteString)
+fetchBytesOneIO :: TopicName -> Offset -> IO (Maybe B.ByteString)
 fetchBytesOneIO topic offset = do
   res <- fetchBytesIO topic offset
   case res of
-   Nothing    -> return Nothing
-   Just (x:_) -> return $ Just x
-   Just []    -> error "something impossible happened in fetchBytesOneIO"
+    Nothing -> return Nothing
+    Just (x : _) -> return $ Just x
+    Just [] -> error "something impossible happened in fetchBytesOneIO"
 
 setDefaultKafkaState :: Kafka k => k ()
 setDefaultKafkaState = do
-    stateRequiredAcks .= -1
-    stateWaitSize     .= 1
-    stateWaitTime     .= 100000
+  stateRequiredAcks .= -1
+  stateWaitSize .= 1
+  stateWaitTime .= 100000

@@ -1,17 +1,13 @@
-import           Test.Hspec
-import           Test.QuickCheck
-
-
-import qualified Data.ByteString          as B
-import qualified Data.ByteString.Base16   as B16
-import qualified Data.ByteString.Char8    as C8
-import           Data.Maybe
-
-import           Blockchain.Data.RLP
-import           Blockchain.Data.PubKey
-import           Blockchain.ExtendedECDSA.Model.ExtendedSignature
-
-import qualified Blockchain.Strato.Model.Secp256k1         as NEW
+import Blockchain.Data.PubKey
+import Blockchain.Data.RLP
+import Blockchain.ExtendedECDSA.Model.ExtendedSignature
+import qualified Blockchain.Strato.Model.Secp256k1 as NEW
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as C8
+import Data.Maybe
+import Test.Hspec
+import Test.QuickCheck
 
 main :: IO ()
 main = hspec spec
@@ -19,7 +15,8 @@ main = hspec spec
 spec :: Spec
 spec = do
   describe "basic test" $ do
-    it "encode and decode signatures" $ property $ \extsig ->
+    it "encode and decode signatures" $
+      property $ \extsig ->
         rlpDecode (rlpEncode extsig) `shouldBe` (extsig :: ExtendedSignature)
   describe "secp256k1-haskell/cryptonite regressions" $ do
     it "can cross-convert public keys" $ do

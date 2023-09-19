@@ -8,15 +8,13 @@
 -- imports.
 module BlockApps.Solidity.Parse.File (solidityFile) where
 
-import           Text.Parsec
-
-import           Prelude                               hiding (lookup)
-
-import           BlockApps.Solidity.Parse.Declarations
-import           BlockApps.Solidity.Parse.Imports
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
-import           BlockApps.Solidity.Parse.Pragmas
+import BlockApps.Solidity.Parse.Declarations
+import BlockApps.Solidity.Parse.Imports
+import BlockApps.Solidity.Parse.Lexer
+import BlockApps.Solidity.Parse.ParserTypes
+import BlockApps.Solidity.Parse.Pragmas
+import Text.Parsec
+import Prelude hiding (lookup)
 
 solidityFile :: SolidityParser File
 solidityFile = do

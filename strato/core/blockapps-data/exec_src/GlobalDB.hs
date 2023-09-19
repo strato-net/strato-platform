@@ -1,9 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
+
 module Main where
 
-import           Blockchain.Data.Blockchain
-import           Blockchain.EthConf
-import           HFlags
+import Blockchain.Data.Blockchain
+import Blockchain.EthConf
+import HFlags
 
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
@@ -12,16 +13,17 @@ $(return [])
 
 main :: IO ()
 main = do
-    s <- $initHFlags "Migrate global blockchain database"
-    putStrLn $ "global-db with args: " ++ unlines s
-    let cfg = SqlConf {
-      user = flags_pguser,
-      password = flags_password,
-      host = flags_pghost,
-      port = 5432,
-      database = "blockchain",
-      poolsize = 1
-    }
+  s <- $initHFlags "Migrate global blockchain database"
+  putStrLn $ "global-db with args: " ++ unlines s
+  let cfg =
+        SqlConf
+          { user = flags_pguser,
+            password = flags_password,
+            host = flags_pghost,
+            port = 5432,
+            database = "blockchain",
+            poolsize = 1
+          }
 
-    createDB $ postgreSQLConnectionString cfg{database = "postgres"}
-    migrateDB $ postgreSQLConnectionString cfg
+  createDB $ postgreSQLConnectionString cfg {database = "postgres"}
+  migrateDB $ postgreSQLConnectionString cfg

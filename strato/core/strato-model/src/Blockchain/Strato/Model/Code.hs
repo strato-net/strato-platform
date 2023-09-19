@@ -2,32 +2,34 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Blockchain.Strato.Model.Code where
 
-import           Control.Lens.Operators
-import           Control.DeepSeq
-import           Data.Binary
-import qualified Data.ByteString     as B
-import qualified Data.ByteString.Base16     as B16
-import           Data.Data
+import Blockchain.Data.RLP
+import Blockchain.Strato.Model.CodePtr
+import Control.DeepSeq
+import Control.Lens.Operators
+import Data.Aeson
+import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
+import Data.Data
+import Data.Swagger
 import qualified Data.Text as T
-import           Data.Text.Encoding  (encodeUtf8, decodeUtf8)
-import           Data.Swagger
-import           Database.Persist.TH
-import           GHC.Generics
-import           Data.Aeson
-
-import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.CodePtr
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Database.Persist.TH
+import GHC.Generics
 import qualified LabeledError
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances()
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 
-data Code = Code { codeBytes :: B.ByteString }
-          | PtrToCode { ptrToCode :: CodePtr } 
+data Code
+  = Code {codeBytes :: B.ByteString}
+  | PtrToCode {ptrToCode :: CodePtr}
   deriving (Show, Eq, Read, Ord, Generic, Data)
 
-instance Binary Code where
+instance Binary Code
+
 instance NFData Code
 
 instance Arbitrary Code where
@@ -36,18 +38,21 @@ instance Arbitrary Code where
 derivePersistField "Code"
 
 instance RLPSerializable Code where
-    rlpEncode (Code bytes) = rlpEncode bytes
-    rlpEncode (PtrToCode codePtr) = RLPArray [rlpEncode codePtr]
-    rlpDecode (RLPArray [x]) = PtrToCode $ rlpDecode x
-    rlpDecode x = Code $ rlpDecode x
+  rlpEncode (Code bytes) = rlpEncode bytes
+  rlpEncode (PtrToCode codePtr) = RLPArray [rlpEncode codePtr]
+  rlpDecode (RLPArray [x]) = PtrToCode $ rlpDecode x
+  rlpDecode x = Code $ rlpDecode x
 
 instance ToSchema Code where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "Code")
-      ( mempty
-        & type_ ?~ SwaggerString
-        & example ?~ toJSON (Code (B.singleton 1))
-        & description ?~ "Code Bytestring" )
+  declareNamedSchema _ =
+    return $
+      NamedSchema
+        (Just "Code")
+        ( mempty
+            & type_ ?~ SwaggerString
+            & example ?~ toJSON (Code (B.singleton 1))
+            & description ?~ "Code Bytestring"
+        )
 
 instance ToJSON Code where
   toJSON (Code bytes) = String . decodeUtf8 . B16.encode $ bytes
@@ -55,18 +60,21 @@ instance ToJSON Code where
 
 instance FromJSON Code where
   parseJSON (String text) = return . Code . LabeledError.b16Decode "FromJSON<Code>" . encodeUtf8 . drop0x $ text
-    where drop0x :: T.Text -> T.Text
-          drop0x t = if "0x" `T.isPrefixOf` t
-                       then T.drop 2 t
-                       else t
+    where
+      drop0x :: T.Text -> T.Text
+      drop0x t =
+        if "0x" `T.isPrefixOf` t
+          then T.drop 2 t
+          else t
   parseJSON x = PtrToCode <$> parseJSON x
 
-data PrecompiledCode = NullContract
-                     | ECRecover
-                     | SHA256
-                     | RIPEMD160
-                     | IdentityContract
-          deriving (Show, Eq, Enum, Bounded, Read, Ord, Generic, Data)
+data PrecompiledCode
+  = NullContract
+  | ECRecover
+  | SHA256
+  | RIPEMD160
+  | IdentityContract
+  deriving (Show, Eq, Enum, Bounded, Read, Ord, Generic, Data)
 
 precompiledCodeNumber :: PrecompiledCode -> Int
 precompiledCodeNumber = fromEnum

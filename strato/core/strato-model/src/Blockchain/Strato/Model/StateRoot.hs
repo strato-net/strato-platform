@@ -1,35 +1,34 @@
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.Strato.Model.StateRoot (
-  StateRoot(..),
-  emptyTriePtr,
-  sha2StateRoot,
-  unboxStateRoot
-  ) where
+module Blockchain.Strato.Model.StateRoot
+  ( StateRoot (..),
+    emptyTriePtr,
+    sha2StateRoot,
+    unboxStateRoot,
+  )
+where
 
-import           Control.DeepSeq
-import           Control.Monad
-import           Data.Aeson
-import           Data.Binary
-import qualified Data.ByteString        as B
+import Blockchain.Data.RLP
+import Blockchain.MiscJSON ()
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import Control.Monad
+import Data.Aeson
+import Data.Binary
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8  as BC
-import           Data.Data
-import           Data.Default
-import           Data.String
-
-import           Blockchain.Data.RLP
-import           Blockchain.MiscJSON    ()
-import           Blockchain.Strato.Model.Keccak256
+import qualified Data.ByteString.Char8 as BC
+import Data.Data
+import Data.Default
+import Data.String
+import GHC.Generics
 import qualified Text.Colors as CL
-import           Text.Format
-import           Text.PrettyPrint.ANSI.Leijen      hiding ((<$>))
-
-import           GHC.Generics
+import Text.Format
+import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 -- | Internal nodes are indexed in the underlying database by their keccak256-bit hash.
 -- This types represents said hash.
@@ -37,12 +36,12 @@ import           GHC.Generics
 -- The stateRoot is of this type,
 -- (ie- the pointer to the full set of key/value pairs at a particular time in history), and
 -- will be of interest if you need to refer to older or parallel version of the data.
-
-newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Ord, Read, Generic, Data)
-                                           deriving newtype (IsString)
+newtype StateRoot = StateRoot B.ByteString
+  deriving (Show, Eq, Ord, Read, Generic, Data)
+  deriving newtype (IsString)
 
 instance Format StateRoot where
-  format x             | x == emptyTriePtr = CL.yellow "<empty>"
+  format x | x == emptyTriePtr = CL.yellow "<empty>"
   format (StateRoot x) = CL.yellow $ BC.unpack $ B16.encode x
 
 instance Pretty StateRoot where
@@ -51,6 +50,7 @@ instance Pretty StateRoot where
 instance NFData StateRoot
 
 instance FromJSON StateRoot
+
 instance ToJSON StateRoot
 
 instance Binary StateRoot where
@@ -58,17 +58,17 @@ instance Binary StateRoot where
   get = StateRoot <$> B.pack <$> replicateM 32 get
 
 instance RLPSerializable StateRoot where
-    rlpEncode (StateRoot x) = rlpEncode x
-    rlpDecode x = StateRoot $ rlpDecode x
+  rlpEncode (StateRoot x) = rlpEncode x
+  rlpDecode x = StateRoot $ rlpDecode x
 
 instance Default StateRoot where
   def = emptyTriePtr
 
 -- | The stateRoot of the empty database.
-emptyTriePtr::StateRoot
-emptyTriePtr = StateRoot $ keccak256ToByteString $ hash $ rlpSerialize $ rlpEncode (0::Integer)
+emptyTriePtr :: StateRoot
+emptyTriePtr = StateRoot $ keccak256ToByteString $ hash $ rlpSerialize $ rlpEncode (0 :: Integer)
 
-sha2StateRoot::Keccak256->StateRoot
+sha2StateRoot :: Keccak256 -> StateRoot
 sha2StateRoot x = StateRoot $ keccak256ToByteString x
 
 unboxStateRoot :: StateRoot -> B.ByteString

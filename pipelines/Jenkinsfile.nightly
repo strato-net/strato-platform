@@ -53,7 +53,7 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-      
+
           writeFile file: "run-vault.sh", text: """#!/bin/bash
             sudo \\
               ssl=true \\
@@ -65,9 +65,9 @@ pipeline {
               ./vault
           """
           sh 'chmod +x run-vault.sh'
-      
+
           sh './run-vault.sh'
-  
+
           // TODO: run node on https (also update check_availability function)
           withCredentials([
               usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
@@ -99,11 +99,11 @@ pipeline {
             """
           }
           sh 'chmod +x run.sh'
-      
+
           sh './run.sh'
-      
+
           sh 'docker ps'
-      
+
           // Few quick tests
           sh '''#!/bin/bash -le
             check_availability() {
@@ -120,11 +120,11 @@ pipeline {
               done
               echo "STRATO health endpoint is available through nginx - node is running"
             }
-            
+
             check_availability
           '''
         }
-  
+
         script {
           lib.generateGenesisBlock('strato-worktree', 'strato-getting-started', null)
         }
@@ -154,15 +154,15 @@ pipeline {
             }
 
             check_availability
-            
+
             echo "Restarting docker containers to simulate computer restart..."
             docker compose -p strato stop
             docker compose -p strato start
-            
+
             check_availability
           '''
         }
-  
+
         script {
           // TODO: replace with jenkins credentials here and in other places in pipelines
           lib.registerTestUserCert(
@@ -212,7 +212,7 @@ pipeline {
               dir ('strato-worktree') {
                 sh '''#!/bin/bash -le
                   set -x
-                  version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)     
+                  version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
                   AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
                   aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
                   aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
@@ -240,6 +240,8 @@ pipeline {
               echo "Running unit tests"
               cd strato-worktree
               ./run_unit_tests.sh
+              cd strato
+              archiveArtifacts artifacts: "${sh(returnStdout: true, script: 'stack path --local-hpc-root').trim()}", fingerprint: true
             '''
           },
 
@@ -306,7 +308,7 @@ pipeline {
           sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b develop'
           dir('docs-website/') {
             sh 'npm i'
-            
+
             writeFile file: "test-utility/config.js", text: """
 module.exports = {
   stratoConfig: {
@@ -334,7 +336,7 @@ module.exports = {
                 currentBuild.result = 'UNSTABLE'
               }
             }
-            
+
           }
         }
       }
@@ -368,7 +370,7 @@ module.exports = {
           message: "Nightly develop build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
       )
     }
-    
+
     unstable {
       slackSend (
           color: 'warning',
@@ -380,7 +382,7 @@ module.exports = {
           message: "Nightly develop build is unstable: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
       )
     }
-    
+
     fixed {
       slackSend(
           channel: '#engineering',

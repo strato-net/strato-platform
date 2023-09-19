@@ -1,233 +1,245 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Commands (
-  methods
-  ) where
+module Commands
+  ( methods,
+  )
+where
 
-import           Control.Monad.Except
-import qualified Data.Aeson                  as JSON
-import qualified Data.Aeson.KeyMap           as KM
-import           Data.Binary
-import qualified Data.ByteString             as B
-import qualified Data.ByteString.Base16      as B16
-import qualified Data.ByteString.Char8       as BC
-import qualified Data.ByteString.Lazy.Char8  as BLC
-import qualified Data.Map                    as M
-import qualified Data.Text                   as T
-import qualified Data.Vector                 as V
-import           Network.JsonRpc.Server
-import           Network.Kafka
-import           Network.Kafka.Protocol
-import           System.Random
-
-import           Blockchain.Constants
-import           Blockchain.Data.Transaction
-import           Blockchain.EthConf
-import           Blockchain.KafkaTopics
-import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Kafka
-import           Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
-import           Blockchain.Stream.Raw
-
-import qualified APIProxy                    as API
-import           Binary
-import           Prelude                     hiding (id)
+import qualified APIProxy as API
+import Binary
+import Blockchain.Constants
+import Blockchain.Data.Transaction
+import Blockchain.EthConf
+import Blockchain.KafkaTopics
+import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Kafka
+import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
+import Blockchain.Stream.Raw
+import Control.Monad.Except
+import qualified Data.Aeson as JSON
+import qualified Data.Aeson.KeyMap as KM
+import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Data.Vector as V
+import Network.JsonRpc.Server
+import Network.Kafka
+import Network.Kafka.Protocol
+import System.Random
+import Prelude hiding (id)
 
 type Server = IO
 
 methods :: [Method Server]
-methods = [
-  rpc_modules,
-  web3_clientVersion,
-  web3_sha3,
-  net_version,
-  net_peerCount,
-  net_listening,
-  eth_protocolVersion,
-  eth_syncing,
-  eth_coinbase,
-  eth_mining,
-  eth_hashrate,
-  eth_gasPrice,
-  eth_accounts,
-  eth_blockNumber,
-  eth_getBalance,
-  eth_getStorageAt,
-  eth_getTransactionCount,
-  eth_getBlockTransactionCountByHash,
-  eth_getBlockTransactionCountByNumber,
-  eth_getUncleCountByBlockHash,
-  eth_getUncleCountByBlockNumber,
-  eth_getCode,
-  eth_sign,
-  eth_sendTransaction,
-  eth_sendRawTransaction,
-  eth_call,
-  eth_estimateGas,
-  eth_getBlockByHash,
-  eth_getBlockByNumber,
-  eth_getTransactionByHash,
-  eth_getTransactionByBlockHashAndIndex,
-  eth_getTransactionByBlockNumberAndIndex,
-  eth_getTransactionReceipt,
-  eth_getUncleByBlockHashAndIndex,
-  eth_getUncleByBlockNumberAndIndex,
-  eth_getCompilers,
-  eth_compileLLL,
-  eth_compileSolidity,
-  eth_compileSerpent,
-  eth_newFilter,
-  eth_newBlockFilter,
-  eth_newPendingTransactionFilter,
-  eth_uninstallFilter,
-  eth_getFilterChanges,
-  eth_getFilterLogs,
-  eth_getLogs,
-  eth_getWork,
-  eth_submitWork,
-  eth_submitHashrate,
-  db_putString,
-  db_getString,
-  db_putHex,
-  db_getHex,
-  shh_post,
-  shh_version,
-  shh_newIdentity,
-  shh_hasIdentity,
-  shh_newGroup,
-  shh_addToGroup,
-  shh_newFilter,
-  shh_uninstallFilter,
-  shh_getFilterChanges,
-  shh_getMessages
+methods =
+  [ rpc_modules,
+    web3_clientVersion,
+    web3_sha3,
+    net_version,
+    net_peerCount,
+    net_listening,
+    eth_protocolVersion,
+    eth_syncing,
+    eth_coinbase,
+    eth_mining,
+    eth_hashrate,
+    eth_gasPrice,
+    eth_accounts,
+    eth_blockNumber,
+    eth_getBalance,
+    eth_getStorageAt,
+    eth_getTransactionCount,
+    eth_getBlockTransactionCountByHash,
+    eth_getBlockTransactionCountByNumber,
+    eth_getUncleCountByBlockHash,
+    eth_getUncleCountByBlockNumber,
+    eth_getCode,
+    eth_sign,
+    eth_sendTransaction,
+    eth_sendRawTransaction,
+    eth_call,
+    eth_estimateGas,
+    eth_getBlockByHash,
+    eth_getBlockByNumber,
+    eth_getTransactionByHash,
+    eth_getTransactionByBlockHashAndIndex,
+    eth_getTransactionByBlockNumberAndIndex,
+    eth_getTransactionReceipt,
+    eth_getUncleByBlockHashAndIndex,
+    eth_getUncleByBlockNumberAndIndex,
+    eth_getCompilers,
+    eth_compileLLL,
+    eth_compileSolidity,
+    eth_compileSerpent,
+    eth_newFilter,
+    eth_newBlockFilter,
+    eth_newPendingTransactionFilter,
+    eth_uninstallFilter,
+    eth_getFilterChanges,
+    eth_getFilterLogs,
+    eth_getLogs,
+    eth_getWork,
+    eth_submitWork,
+    eth_submitHashrate,
+    db_putString,
+    db_getString,
+    db_putHex,
+    db_getHex,
+    shh_post,
+    shh_version,
+    shh_newIdentity,
+    shh_hasIdentity,
+    shh_newGroup,
+    shh_addToGroup,
+    shh_newFilter,
+    shh_uninstallFilter,
+    shh_getFilterChanges,
+    shh_getMessages
   ]
 
-rpc_modules::Method Server
+rpc_modules :: Method Server
 rpc_modules = flip (toMethod "rpc_modules") () $ do
-  liftIO $ return $ M.fromList [
-    ("admin"::String, "1.0"::String),
-    ("debug", "1.0"),
-    ("eth", "1.0"),
-    ("miner", "1.0"),
-    ("net", "1.0"),
-    ("personal", "1.0"),
-    ("rpc", "1.0"),
-    ("txpool", "1.0"),
-    ("web3", "1.0")
-    ]
+  liftIO $
+    return $
+      M.fromList
+        [ ("admin" :: String, "1.0" :: String),
+          ("debug", "1.0"),
+          ("eth", "1.0"),
+          ("miner", "1.0"),
+          ("net", "1.0"),
+          ("personal", "1.0"),
+          ("rpc", "1.0"),
+          ("txpool", "1.0"),
+          ("web3", "1.0")
+        ]
 
-web3_clientVersion::Method Server
+web3_clientVersion :: Method Server
 web3_clientVersion = flip (toMethod "web3_clientVersion") () $ do
   liftIO $ return stratoVersionString
 
-net_version::Method Server
+net_version :: Method Server
 net_version = flip (toMethod "net_version") () $ do
   liftIO $ return $ show ethVersion
 
-web3_sha3::Method Server
+web3_sha3 :: Method Server
 web3_sha3 = toMethod "web3_sha3" f (Required "value" :+: ())
-  where f::String->RpcResult Server String
-        f val = do
-          case strToByteString val of
-           Left err -> throwError $ rpcError (-32602) $ T.pack err
-           Right bytes ->
-             return $ "0x" ++ BC.unpack (B16.encode $ keccak256ToByteString $ hash bytes)
+  where
+    f :: String -> RpcResult Server String
+    f val = do
+      case strToByteString val of
+        Left err -> throwError $ rpcError (-32602) $ T.pack err
+        Right bytes ->
+          return $ "0x" ++ BC.unpack (B16.encode $ keccak256ToByteString $ hash bytes)
 
-net_peerCount::Method Server
+net_peerCount :: Method Server
 net_peerCount = toMethod "net_peerCount" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-net_listening::Method Server
+net_listening :: Method Server
 net_listening = toMethod "net_listening" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_protocolVersion::Method Server
+eth_protocolVersion :: Method Server
 eth_protocolVersion = toMethod "eth_protocolVersion" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_syncing::Method Server
+eth_syncing :: Method Server
 eth_syncing = toMethod "eth_syncing" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_coinbase::Method Server
+eth_coinbase :: Method Server
 eth_coinbase = toMethod "eth_coinbase" f ()
-  where f::RpcResult Server String
-        f = do
-          return $ coinbaseAddress $ quarryConfig ethConf
+  where
+    f :: RpcResult Server String
+    f = do
+      return $ coinbaseAddress $ quarryConfig ethConf
 
-eth_mining::Method Server
+eth_mining :: Method Server
 eth_mining = toMethod "eth_mining" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_hashrate::Method Server
+eth_hashrate :: Method Server
 eth_hashrate = toMethod "eth_hashrate" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_gasPrice::Method Server
+eth_gasPrice :: Method Server
 eth_gasPrice = toMethod "eth_gasPrice" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_accounts::Method Server
+eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
 ----------------
 
-getBlockNumber::JSON.Value->Maybe Integer
+getBlockNumber :: JSON.Value -> Maybe Integer
 getBlockNumber (JSON.Array val) =
   case V.toList val of
-   [JSON.Object o] ->
-     case KM.lookup "blockData" o of
-      Just (JSON.Object v) ->
-        case KM.lookup "number" v of
-         Just (JSON.Number n) -> Just $ round n
-         _                    -> Nothing
-      _ -> Nothing
-   _ -> Nothing
+    [JSON.Object o] ->
+      case KM.lookup "blockData" o of
+        Just (JSON.Object v) ->
+          case KM.lookup "number" v of
+            Just (JSON.Number n) -> Just $ round n
+            _ -> Nothing
+        _ -> Nothing
+    _ -> Nothing
 getBlockNumber _ = Nothing
 
-
-eth_blockNumber::Method Server
+eth_blockNumber :: Method Server
 eth_blockNumber = toMethod "eth_blockNumber" f ()
-  where f::RpcResult Server String
-        f = do
-          response <- liftIO $ API.call "block/last/1"
-          case JSON.decode $ BLC.pack response::Maybe JSON.Value of
-           Just v ->
-             case getBlockNumber v of
-              Just n ->
-                return $ "0x" ++ show n
-              Nothing -> throwError $ rpcError (-1) (T.pack $ "bad response from server")
-           v -> throwError $ rpcError (-1) (T.pack $ "bad response from server: " ++ show v)
+  where
+    f :: RpcResult Server String
+    f = do
+      response <- liftIO $ API.call "block/last/1"
+      case JSON.decode $ BLC.pack response :: Maybe JSON.Value of
+        Just v ->
+          case getBlockNumber v of
+            Just n ->
+              return $ "0x" ++ show n
+            Nothing -> throwError $ rpcError (-1) (T.pack $ "bad response from server")
+        v -> throwError $ rpcError (-1) (T.pack $ "bad response from server: " ++ show v)
 
 ----------------
 
-emitKafkaJsonRlpCommand::JsonRpcCommand->IO ()
+emitKafkaJsonRlpCommand :: JsonRpcCommand -> IO ()
 emitKafkaJsonRlpCommand c = do
-    rets <-
-      liftIO $ runKafkaConfigured "strato-api" $
-      writeSeqVmEvents [VmJsonRpcCommand c]
-    case rets of
-        Left e      -> error $ "Could not write txs to Kafka: " ++ show e
-        Right _ -> return ()
+  rets <-
+    liftIO $
+      runKafkaConfigured "strato-api" $
+        writeSeqVmEvents [VmJsonRpcCommand c]
+  case rets of
+    Left e -> error $ "Could not write txs to Kafka: " ++ show e
+    Right _ -> return ()
 
-waitForResponse::String->Offset->IO B.ByteString
+waitForResponse :: String -> Offset -> IO B.ByteString
 waitForResponse id offset = do
   putStrLn $ "before wait: " ++ show offset
   maybeResponses <- fetchBytesIO (lookupTopic "jsonrpcresponse") offset
@@ -236,396 +248,437 @@ waitForResponse id offset = do
 
   let responses = map (decode . BLC.fromStrict) $
         case maybeResponses of
-         Nothing -> error "can't connect to Kafka"
-         Just v  -> v
+          Nothing -> error "can't connect to Kafka"
+          Just v -> v
 
   putStrLn $ "fetched " ++ show responses
 
   case filter ((id ==) . fst) responses of
-   []         -> waitForResponse id (offset + fromIntegral (length responses))
-   [(_, val)] -> return val
-   _          -> error "you should not have more than one response with the same id"
+    [] -> waitForResponse id (offset + fromIntegral (length responses))
+    [(_, val)] -> return val
+    _ -> error "you should not have more than one response with the same id"
 
-callVM::JsonRpcCommand->IO B.ByteString
+callVM :: JsonRpcCommand -> IO B.ByteString
 callVM c = do
-  lastOffsetOrError <- liftIO $ runKafkaConfigured "ethereum-jsonrpc" $
-                       getLastOffset LatestTime 0 (lookupTopic "jsonrpcresponse")
+  lastOffsetOrError <-
+    liftIO $
+      runKafkaConfigured "ethereum-jsonrpc" $
+        getLastOffset LatestTime 0 (lookupTopic "jsonrpcresponse")
   let lastOffset =
         case lastOffsetOrError of
-         Left e    -> error $ show e
-         Right val -> val
+          Left e -> error $ show e
+          Right val -> val
 
   emitKafkaJsonRlpCommand c
 
   waitForResponse (jrcId c) lastOffset
 
-eth_getBalance::Method Server
+eth_getBalance :: Method Server
 eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "blockString" :+: ())
-  where f::String->String->RpcResult Server String
-        f addressString blockString = do
-          id <- liftIO $ fmap (take 10 . randomRs ('a','z')) newStdGen
-          case strToAddress addressString of
-           Left err -> throwError $ rpcError (-32602) $ T.pack err
-           Right address -> do
-             result <- liftIO $ callVM
-               JRCGetBalance {
-                 jrcAddress=address,
-                 jrcBlockString=blockString,
-                 jrcId=id
-                 }
-             return $ BC.unpack result
+  where
+    f :: String -> String -> RpcResult Server String
+    f addressString blockString = do
+      id <- liftIO $ fmap (take 10 . randomRs ('a', 'z')) newStdGen
+      case strToAddress addressString of
+        Left err -> throwError $ rpcError (-32602) $ T.pack err
+        Right address -> do
+          result <-
+            liftIO $
+              callVM
+                JRCGetBalance
+                  { jrcAddress = address,
+                    jrcBlockString = blockString,
+                    jrcId = id
+                  }
+          return $ BC.unpack result
 
-eth_getCode::Method Server
+eth_getCode :: Method Server
 eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" :+: ())
-  where f::String->String->RpcResult Server String
-        f addressString blockString = do
-          id <- liftIO $ fmap (take 10 . randomRs ('a','z')) newStdGen
-          case strToAddress addressString of
-           Left err -> throwError $ rpcError (-32602) $ T.pack err
-           Right address -> do
-             result <- liftIO $ callVM
-                       JRCGetCode {
-                         jrcAddress=address,
-                         jrcBlockString=blockString,
-                         jrcId=id
-                         }
-             return $ BC.unpack result
+  where
+    f :: String -> String -> RpcResult Server String
+    f addressString blockString = do
+      id <- liftIO $ fmap (take 10 . randomRs ('a', 'z')) newStdGen
+      case strToAddress addressString of
+        Left err -> throwError $ rpcError (-32602) $ T.pack err
+        Right address -> do
+          result <-
+            liftIO $
+              callVM
+                JRCGetCode
+                  { jrcAddress = address,
+                    jrcBlockString = blockString,
+                    jrcId = id
+                  }
+          return $ BC.unpack result
 
-
-eth_getTransactionCount::Method Server
+eth_getTransactionCount :: Method Server
 eth_getTransactionCount = toMethod "eth_getTransactionCount" f (Required "address" :+: Required "block" :+: ())
-  where f::String->String->RpcResult Server String
-        f addressString blockString = do
-          id <- liftIO $ fmap (take 10 . randomRs ('a','z')) newStdGen
-          case strToAddress addressString of
-           Left err -> throwError $ rpcError (-32602) $ T.pack err
-           Right address -> do
-             result <- liftIO $ callVM
-                       JRCGetTransactionCount {
-                         jrcAddress=address,
-                         jrcBlockString=blockString,
-                         jrcId=id
-                         }
-             return $ BC.unpack result
+  where
+    f :: String -> String -> RpcResult Server String
+    f addressString blockString = do
+      id <- liftIO $ fmap (take 10 . randomRs ('a', 'z')) newStdGen
+      case strToAddress addressString of
+        Left err -> throwError $ rpcError (-32602) $ T.pack err
+        Right address -> do
+          result <-
+            liftIO $
+              callVM
+                JRCGetTransactionCount
+                  { jrcAddress = address,
+                    jrcBlockString = blockString,
+                    jrcId = id
+                  }
+          return $ BC.unpack result
 
-
-eth_getStorageAt::Method Server
+eth_getStorageAt :: Method Server
 eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Required "key" :+: Required "block" :+: ())
-  where f::String->String->String->RpcResult Server String
-        f addressString _ blockString = do
-          id <- liftIO $ fmap (take 10 . randomRs ('a','z')) newStdGen
-          case strToAddress addressString of
-           Left err -> throwError $ rpcError (-32602) $ T.pack err
-           Right address -> do
-             result <- liftIO $ callVM
-                       JRCGetStorageAt {
-                         jrcAddress=address,
-                         jrcBlockString=blockString,
-                         jrcId=id,
-                         jrcKey=""
-                         }
-             return $ BC.unpack result
+  where
+    f :: String -> String -> String -> RpcResult Server String
+    f addressString _ blockString = do
+      id <- liftIO $ fmap (take 10 . randomRs ('a', 'z')) newStdGen
+      case strToAddress addressString of
+        Left err -> throwError $ rpcError (-32602) $ T.pack err
+        Right address -> do
+          result <-
+            liftIO $
+              callVM
+                JRCGetStorageAt
+                  { jrcAddress = address,
+                    jrcBlockString = blockString,
+                    jrcId = id,
+                    jrcKey = ""
+                  }
+          return $ BC.unpack result
 
-
-eth_call::Method Server
+eth_call :: Method Server
 eth_call = toMethod "eth_call" f (Required "codeString" :+: Required "blockString" :+: ())
-  where f::String->String->RpcResult Server String
-        f codeString blockString = do
-          let id = "qqqq"
-          let nope = error "jsonrpc.eth_call.createMessageTX"
-          _ <- liftIO $ createMessageTX nope nope nope nope nope nope nope nope
-          case strToByteString codeString of
-           Left err -> throwError $ rpcError (-32602) $ T.pack err
-           Right codeBytes -> do
-             liftIO $ emitKafkaJsonRlpCommand
-               JRCCall {
-                 jrcCode=codeBytes,
-                 jrcBlockString=blockString,
-                 jrcId=id
-                 }
-             return "qqqq"
-
-
-
-
-
-
-
-
-
-
-
-
+  where
+    f :: String -> String -> RpcResult Server String
+    f codeString blockString = do
+      let id = "qqqq"
+      let nope = error "jsonrpc.eth_call.createMessageTX"
+      _ <- liftIO $ createMessageTX nope nope nope nope nope nope nope nope
+      case strToByteString codeString of
+        Left err -> throwError $ rpcError (-32602) $ T.pack err
+        Right codeBytes -> do
+          liftIO $
+            emitKafkaJsonRlpCommand
+              JRCCall
+                { jrcCode = codeBytes,
+                  jrcBlockString = blockString,
+                  jrcId = id
+                }
+          return "qqqq"
 
 -------------------
 
-
-
-eth_getBlockTransactionCountByHash::Method Server
+eth_getBlockTransactionCountByHash :: Method Server
 eth_getBlockTransactionCountByHash = toMethod "eth_getBlockTransactionCountByHash" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getBlockTransactionCountByNumber::Method Server
+eth_getBlockTransactionCountByNumber :: Method Server
 eth_getBlockTransactionCountByNumber = toMethod "eth_getBlockTransactionCountByNumber" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getUncleCountByBlockHash::Method Server
+eth_getUncleCountByBlockHash :: Method Server
 eth_getUncleCountByBlockHash = toMethod "eth_getUncleCountByBlockHash" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getUncleCountByBlockNumber::Method Server
+eth_getUncleCountByBlockNumber :: Method Server
 eth_getUncleCountByBlockNumber = toMethod "eth_getUncleCountByBlockNumber" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_sign::Method Server
+eth_sign :: Method Server
 eth_sign = toMethod "eth_sign" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_sendTransaction::Method Server
+eth_sendTransaction :: Method Server
 eth_sendTransaction = toMethod "eth_sendTransaction" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_sendRawTransaction::Method Server
+eth_sendRawTransaction :: Method Server
 eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_estimateGas::Method Server
+eth_estimateGas :: Method Server
 eth_estimateGas = toMethod "eth_estimateGas" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getBlockByHash::Method Server
+eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getBlockByNumber::Method Server
+eth_getBlockByNumber :: Method Server
 eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getTransactionByHash::Method Server
+eth_getTransactionByHash :: Method Server
 eth_getTransactionByHash = toMethod "eth_getTransactionByHash" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getTransactionByBlockHashAndIndex::Method Server
+eth_getTransactionByBlockHashAndIndex :: Method Server
 eth_getTransactionByBlockHashAndIndex = toMethod "eth_getTransactionByBlockHashAndIndex" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getTransactionByBlockNumberAndIndex::Method Server
+eth_getTransactionByBlockNumberAndIndex :: Method Server
 eth_getTransactionByBlockNumberAndIndex = toMethod "eth_getTransactionByBlockNumberAndIndex" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getTransactionReceipt::Method Server
+eth_getTransactionReceipt :: Method Server
 eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getUncleByBlockHashAndIndex::Method Server
+eth_getUncleByBlockHashAndIndex :: Method Server
 eth_getUncleByBlockHashAndIndex = toMethod "eth_getUncleByBlockHashAndIndex" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getUncleByBlockNumberAndIndex::Method Server
+eth_getUncleByBlockNumberAndIndex :: Method Server
 eth_getUncleByBlockNumberAndIndex = toMethod "eth_getUncleByBlockNumberAndIndex" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getCompilers::Method Server
+eth_getCompilers :: Method Server
 eth_getCompilers = toMethod "eth_getCompilers" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_compileLLL::Method Server
+eth_compileLLL :: Method Server
 eth_compileLLL = toMethod "eth_compileLLL" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_compileSolidity::Method Server
+eth_compileSolidity :: Method Server
 eth_compileSolidity = toMethod "eth_compileSolidity" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_compileSerpent::Method Server
+eth_compileSerpent :: Method Server
 eth_compileSerpent = toMethod "eth_compileSerpent" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_newFilter::Method Server
+eth_newFilter :: Method Server
 eth_newFilter = toMethod "eth_newFilter" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_newBlockFilter::Method Server
+eth_newBlockFilter :: Method Server
 eth_newBlockFilter = toMethod "eth_newBlockFilter" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_newPendingTransactionFilter::Method Server
+eth_newPendingTransactionFilter :: Method Server
 eth_newPendingTransactionFilter = toMethod "eth_newPendingTransactionFilter" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_uninstallFilter::Method Server
+eth_uninstallFilter :: Method Server
 eth_uninstallFilter = toMethod "eth_uninstallFilter" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getFilterChanges::Method Server
+eth_getFilterChanges :: Method Server
 eth_getFilterChanges = toMethod "eth_getFilterChanges" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getFilterLogs::Method Server
+eth_getFilterLogs :: Method Server
 eth_getFilterLogs = toMethod "eth_getFilterLogs" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getLogs::Method Server
+eth_getLogs :: Method Server
 eth_getLogs = toMethod "eth_getLogs" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_getWork::Method Server
+eth_getWork :: Method Server
 eth_getWork = toMethod "eth_getWork" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_submitWork::Method Server
+eth_submitWork :: Method Server
 eth_submitWork = toMethod "eth_submitWork" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-eth_submitHashrate::Method Server
+eth_submitHashrate :: Method Server
 eth_submitHashrate = toMethod "eth_submitHashrate" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-db_putString::Method Server
+db_putString :: Method Server
 db_putString = toMethod "db_putString" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-db_getString::Method Server
+db_getString :: Method Server
 db_getString = toMethod "db_getString" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-db_putHex::Method Server
+db_putHex :: Method Server
 db_putHex = toMethod "db_putHex" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-db_getHex::Method Server
+db_getHex :: Method Server
 db_getHex = toMethod "db_getHex" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_post::Method Server
+shh_post :: Method Server
 shh_post = toMethod "shh_post" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_version::Method Server
+shh_version :: Method Server
 shh_version = toMethod "shh_version" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_newIdentity::Method Server
+shh_newIdentity :: Method Server
 shh_newIdentity = toMethod "shh_newIdentity" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_hasIdentity::Method Server
+shh_hasIdentity :: Method Server
 shh_hasIdentity = toMethod "shh_hasIdentity" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_newGroup::Method Server
+shh_newGroup :: Method Server
 shh_newGroup = toMethod "shh_newGroup" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_addToGroup::Method Server
+shh_addToGroup :: Method Server
 shh_addToGroup = toMethod "shh_addToGroup" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_newFilter::Method Server
+shh_newFilter :: Method Server
 shh_newFilter = toMethod "shh_newFilter" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_uninstallFilter::Method Server
+shh_uninstallFilter :: Method Server
 shh_uninstallFilter = toMethod "shh_uninstallFilter" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_getFilterChanges::Method Server
+shh_getFilterChanges :: Method Server
 shh_getFilterChanges = toMethod "shh_getFilterChanges" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
-shh_getMessages::Method Server
+shh_getMessages :: Method Server
 shh_getMessages = toMethod "shh_getMessages" f ()
-  where f::RpcResult Server String
-        f = do
-          undefined
-
-
+  where
+    f :: RpcResult Server String
+    f = do
+      undefined
 
 {-
 
@@ -637,8 +690,6 @@ curl -X POST --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],
   "jsonrpc":"2.0",
   "result": "Mist/v0.9.3/darwin/go1.4.1"
 }
-
-
 
 curl -X POST --data '{"jsonrpc":"2.0","method":"web3_sha3","params":["0x68656c6c6f20776f726c64"],"id":64}'
 {
@@ -754,7 +805,6 @@ curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getTransactionCount","params
   "jsonrpc": "2.0",
   "result": "0x1" // 1
 }
-
 
 curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getBlockTransactionCountByHash","params":["0xb903239f8543d04b5dc1ba6579132b143087c68db1b2168786408fcbce568238"],"id":1}'
 {
@@ -1146,90 +1196,7 @@ curl -X POST --data '{"jsonrpc":"2.0","method":"shh_getFilterChanges","params":[
 curl -X POST --data '{"jsonrpc":"2.0","method":"shh_getMessages","params":["0x7"],"id":73}'
 Result see shh_getFilterChanges
 
-
-
-
 -}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 {-
   web3_clientVersion,
@@ -1284,7 +1251,6 @@ Result see shh_getFilterChanges
   eth_submitWork,
   eth_submitHashrate,
 
-
   db_putString,
   db_getString,
   db_putHex,
@@ -1300,4 +1266,3 @@ Result see shh_getFilterChanges
   shh_getFilterChanges,
   shh_getMessages
 -}
-

@@ -1,30 +1,31 @@
-{-# LANGUAGE ConstraintKinds  #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MonoLocalBinds   #-}
-{-# LANGUAGE TypeOperators    #-}
-module Blockchain.DB.StorageDB (
-  HasStorageDB,
-  HasMemStorageDB,
-  putStorageKeyVal',
-  getStorageKeyVal',
-  getAllStorageKeyVals',
-  flushMemStorageTxDBToBlockDB,
-  flushMemStorageDB
-  ) where
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE TypeOperators #-}
 
-import           Control.Monad.Change.Alter                  (Alters)
-import           Data.Bifunctor                              (second)
+module Blockchain.DB.StorageDB
+  ( HasStorageDB,
+    HasMemStorageDB,
+    putStorageKeyVal',
+    getStorageKeyVal',
+    getAllStorageKeyVals',
+    flushMemStorageTxDBToBlockDB,
+    flushMemStorageDB,
+  )
+where
 
-import           BlockApps.Logging
-import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia          as MP
-import           Blockchain.DB.HashDB
-import           Blockchain.DB.MemAddressStateDB
-import           Blockchain.DB.RawStorageDB
-import           Blockchain.DB.StateDB
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.ExtendedWord
+import BlockApps.Logging
+import Blockchain.DB.HashDB
+import Blockchain.DB.MemAddressStateDB
+import Blockchain.DB.RawStorageDB
+import Blockchain.DB.StateDB
+import Blockchain.Data.AddressStateDB
+import Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.ExtendedWord
+import Control.Monad.Change.Alter (Alters)
+import Data.Bifunctor (second)
 
 -- A thin layer around raw storage db for clients who expect to work on
 -- keys and values of Word256
@@ -32,19 +33,20 @@ type HasStorageDB m = HasRawStorageDB m
 
 type HasMemStorageDB m = HasMemRawStorageDB m
 
-type FullStorage m = ( HasMemAddressStateDB m
-                     , HasStorageDB m
-                     , HasMemStorageDB m
-                     , HasStateDB m
-                     , HasHashDB m
-                     , (Account `Alters` AddressState) m
-                     )
+type FullStorage m =
+  ( HasMemAddressStateDB m,
+    HasStorageDB m,
+    HasMemStorageDB m,
+    HasStateDB m,
+    HasHashDB m,
+    (Account `Alters` AddressState) m
+  )
 
 toKey :: Account -> Word256 -> RawStorageKey
 toKey = curry $ fmap word256ToBytes
 
 toVal :: Word256 -> RawStorageValue
-toVal = rlpSerialize  . rlpEncode
+toVal = rlpSerialize . rlpEncode
 
 fromVal :: RawStorageValue -> Word256
 fromVal = rlpDecode . rlpDeserialize
