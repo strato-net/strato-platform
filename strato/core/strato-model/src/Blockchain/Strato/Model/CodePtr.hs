@@ -1,50 +1,47 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Strato.Model.CodePtr
-  ( CodePtr(..)
-  , CodeKind(..)
-  ) where
+  ( CodePtr (..),
+    CodeKind (..),
+  )
+where
 
-import              Control.DeepSeq
-import              Control.Lens                         ((?~), (&))
-import qualified    Data.Aeson                           as Ae
-import qualified    Data.Aeson.Types                     as Ae
-import              Data.Bifunctor                       (bimap, first)
-import              Data.Binary
-import              Data.Data
-import              Data.Hashable                        (Hashable)
-import qualified    Data.Swagger                         as S 
-import              Data.Swagger.Internal.Schema (named)
-import qualified    Data.Text                            as T
-import              Database.Persist.Sql
-import              GHC.Generics
-import              Servant.API
-import              Test.QuickCheck
-import              Text.Format
-import              Text.Read (readEither)
+import Blockchain.Data.RLP
+import Blockchain.SolidVM.Model (CodeKind (..))
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import Control.Lens ((&), (?~))
+import qualified Data.Aeson as Ae
+import qualified Data.Aeson.Types as Ae
+import Data.Bifunctor (bimap, first)
+import Data.Binary
+import Data.Data
+import Data.Hashable (Hashable)
+import qualified Data.Swagger as S
+import Data.Swagger.Internal.Schema (named)
+import qualified Data.Text as T
+import Database.Persist.Sql
+import GHC.Generics
+import Servant.API
+import Test.QuickCheck
+import Text.Format
+import Text.Read (readEither)
 
-import              Blockchain.Data.RLP
-import              Blockchain.SolidVM.Model             (CodeKind(..))
-import              Blockchain.Strato.Model.Account
-import              Blockchain.Strato.Model.Keccak256
+data CodePtr
+  = EVMCode Keccak256
+  | SolidVMCode String Keccak256
+  | CodeAtAccount Account String
+  deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
 
-
-data CodePtr = EVMCode Keccak256
-             | SolidVMCode String Keccak256
-             | CodeAtAccount Account String
-             deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
-
-
-  
 instance S.ToSchema CodePtr where
-  declareNamedSchema _ = return $ named "Code Pointer"  S.binarySchema
-
+  declareNamedSchema _ = return $ named "Code Pointer" S.binarySchema
 
 instance RLPSerializable CodePtr where
   rlpEncode (EVMCode codeHash) = rlpEncode codeHash
@@ -65,16 +62,20 @@ instance Show CodePtr where
 
 instance Ae.ToJSON CodePtr where
   toJSON (EVMCode hsh) = Ae.object [("kind", Ae.toJSON EVM), ("digest", Ae.toJSON hsh)]
-  toJSON (SolidVMCode name hsh) = Ae.object [ ("kind", Ae.toJSON SolidVM)
-                                            , ("name", Ae.toJSON name)
-                                            , ("digest", Ae.toJSON hsh)
-                                            ]
-  toJSON (CodeAtAccount acct name) = Ae.object [ ("account", Ae.toJSON acct)
-                                               , ("name", Ae.toJSON name)
-                                               ]
+  toJSON (SolidVMCode name hsh) =
+    Ae.object
+      [ ("kind", Ae.toJSON SolidVM),
+        ("name", Ae.toJSON name),
+        ("digest", Ae.toJSON hsh)
+      ]
+  toJSON (CodeAtAccount acct name) =
+    Ae.object
+      [ ("account", Ae.toJSON acct),
+        ("name", Ae.toJSON name)
+      ]
 
 instance Ae.FromJSON CodePtr where
-  parseJSON (st@Ae.String{}) = EVMCode <$> Ae.parseJSON st
+  parseJSON (st@Ae.String {}) = EVMCode <$> Ae.parseJSON st
   parseJSON (Ae.Object o) = do
     kind <- o Ae..:? "kind"
     case kind of
@@ -103,10 +104,12 @@ instance PersistField CodePtr where
      in case readEither s of
           Right r -> Right r
           Left _ -> case span (/= '@') s of
-            (name, '@':acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
-            (_,_) -> bimap T.pack
-                           (EVMCode . unsafeCreateKeccak256FromWord256)
-                           $ readEither ("0x" ++ s) -- the node has been upgraded and contains legacy code hashes
+            (name, '@' : acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
+            (_, _) ->
+              bimap
+                T.pack
+                (EVMCode . unsafeCreateKeccak256FromWord256)
+                $ readEither ("0x" ++ s) -- the node has been upgraded and contains legacy code hashes
   fromPersistValue x = Left $ T.pack $ "PersistField CodePtr: expected text: " ++ (show x)
 
 instance PersistFieldSql CodePtr where
@@ -125,13 +128,14 @@ instance ToHttpApiData CodePtr where
 instance FromHttpApiData CodePtr where
   parseQueryParam x = case parseQueryParam x of
     Right hsh -> Right $ EVMCode hsh
-    _ -> case T.split (=='@') x of
-           [acct, name] -> flip CodeAtAccount (T.unpack name) <$> parseQueryParam acct
-           _ -> case T.split (==':') x of
-             [name, hsh] -> SolidVMCode (T.unpack name) <$> parseQueryParam hsh
-             _ -> Left $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " `T.append` x
+    _ -> case T.split (== '@') x of
+      [acct, name] -> flip CodeAtAccount (T.unpack name) <$> parseQueryParam acct
+      _ -> case T.split (== ':') x of
+        [name, hsh] -> SolidVMCode (T.unpack name) <$> parseQueryParam hsh
+        _ -> Left $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " `T.append` x
 
 instance S.ToParamSchema CodePtr where
-  toParamSchema _ = mempty
-    & S.type_ ?~ S.SwaggerString
-    & S.format ?~ "hex string"
+  toParamSchema _ =
+    mempty
+      & S.type_ ?~ S.SwaggerString
+      & S.format ?~ "hex string"

@@ -1,54 +1,57 @@
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module SolidVM.Model.CodeCollection.Event
-  (
-    EventF(..),
+  ( EventF (..),
     Event,
     eventAnonymous,
     eventLogs,
-    eventContext
-  ) where
+    eventContext,
+  )
+where
 
-import           Control.Lens                hiding ((.=))
-import           Data.Aeson
-import           Data.Aeson.Types
-import           Control.DeepSeq
-import           Data.Source
-import           Data.Text                    (Text)
-import qualified Generic.Random               as GR
-import           GHC.Generics
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances    ()
-
-import qualified SolidVM.Model.CodeCollection.VarDef  as SolidVM
+import Control.DeepSeq
+import Control.Lens hiding ((.=))
+import Data.Aeson
+import Data.Aeson.Types
+import Data.Source
+import Data.Text (Text)
+import GHC.Generics
+import qualified Generic.Random as GR
+import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 
 --Changes to this structure should make a change to the unparser :)
 data EventF a = Event
-  { _eventAnonymous :: Bool
-  , _eventLogs :: [(Text, SolidVM.IndexedType)]
-  , _eventContext :: a
-  } deriving (Eq,Show,Generic, NFData, Functor, Foldable, Traversable)
+  { _eventAnonymous :: Bool,
+    _eventLogs :: [(Text, SolidVM.IndexedType)],
+    _eventContext :: a
+  }
+  deriving (Eq, Show, Generic, NFData, Functor, Foldable, Traversable)
+
 makeLenses ''EventF
 
 type Event = Positioned EventF
 
 instance ToJSON a => ToJSON (EventF a) where
-  toJSON e = object [
-      "anonymous" .= _eventAnonymous e
-    , "logs" .= _eventLogs e
-    , "context" .= _eventContext e
-    ]
+  toJSON e =
+    object
+      [ "anonymous" .= _eventAnonymous e,
+        "logs" .= _eventLogs e,
+        "context" .= _eventContext e
+      ]
 
 instance FromJSON a => FromJSON (EventF a) where
-  parseJSON (Object o) = Event
-                     <$> (o .: "anonymous")
-                     <*> (o .: "logs")
-                     <*> (o .: "context")
+  parseJSON (Object o) =
+    Event
+      <$> (o .: "anonymous")
+      <*> (o .: "logs")
+      <*> (o .: "context")
   parseJSON o = typeMismatch "SolidVM.Event: Expected Object" o
 
 instance Arbitrary a => Arbitrary (EventF a) where

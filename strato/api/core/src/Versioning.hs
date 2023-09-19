@@ -1,33 +1,38 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-module Versioning (
-  gitBranchMonostrato,
-  gitHashMonostrato
-  ) where
+module Versioning
+  ( gitBranchMonostrato,
+    gitHashMonostrato,
+  )
+where
 
-import           Control.Exception
-import           Control.Monad
+import Control.Exception
+import Control.Monad
 --import           Control.Monad.IO.Class
-import           Data.Aeson
+import Data.Aeson
 --import qualified Data.ByteString.Char8      as BS
-import           Data.Maybe
-import           GHC.Generics
-import           Language.Haskell.TH
-import           Language.Haskell.TH.Syntax
-import           System.Directory
-import           System.Exit
-import           System.FilePath
-import           System.Process
+import Data.Maybe
+import GHC.Generics
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax
+import System.Directory
+import System.Exit
+import System.FilePath
+import System.Process
 
 --import qualified Data.Yaml                  as Y
 
-data StackRepo = StackRepo { package :: Package } deriving (Show, Generic)
+data StackRepo = StackRepo {package :: Package} deriving (Show, Generic)
+
 data Package = Package {location :: String} deriving (Show, Generic)
 
 instance FromJSON StackRepo
+
 instance ToJSON StackRepo
+
 instance FromJSON Package
+
 instance ToJSON Package
 
 {-
@@ -44,7 +49,6 @@ getStackInfo = runIO $ do
           Right r -> return . show . toJSON $ r
 -}
 
-
 -- | Run git with the given arguments and no stdin, returning the
 -- stdout output. If git isn't available or something goes wrong,
 -- return the second argument.
@@ -59,10 +63,10 @@ runGit args def = do
       -- a lot of bookkeeping to record the right dependencies
       pwd <- runIO getCurrentDirectory
 
-      let hd         = pwd </> ".git" </> "HEAD"
-          index      = pwd </> ".git" </> "index"
+      let hd = pwd </> ".git" </> "HEAD"
+          index = pwd </> ".git" </> "index"
           packedRefs = pwd </> ".git" </> "packed-refs"
-      hdExists  <- runIO $ doesFileExist hd
+      hdExists <- runIO $ doesFileExist hd
       when hdExists $ do
         -- the HEAD file either contains the hash of a detached head
         -- or a pointer to the file that contains the hash of the head
@@ -86,7 +90,7 @@ runGit args def = do
       runIO $ do
         (code, out, _err) <- readProcessWithExitCode "git" args "" `catch` oops
         case code of
-          ExitSuccess   -> return (takeWhile (/= '\n') out)
+          ExitSuccess -> return (takeWhile (/= '\n') out)
           ExitFailure _ -> return def
     else return def
 

@@ -1,96 +1,99 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+
 module Blockchain.VM.SolidException
-  ( SolidException(..)
-  , showSolidException
-  , typeError
-  , todo
-  , indexOutOfBounds
-  , checkArity
-  , arityMismatch
-  , internalError
-  , invalidArguments
-  , missingField
-  , customError
-  , missingType
-  , duplicateDefinition
-  , duplicateContract
-  , parseError
-  , require
-  , assert
-  , modifierError
-  , unknownFunction
-  , unknownConstant
-  , unknownVariable
-  , unknownStatement
-  , divideByZero
-  , missingCodeCollection
-  , inaccessibleChain
-  , invalidChain
-  , invalidWrite
-  , invalidCertificate
-  , malformedData
-  , tooMuchGas
-  , paymentError
-  , reservedWordError
-  , revertError
-  , immutableError
-  , getRunTimeCodeError
-  , tooManyResultsError
-  , tooManyCooks
-  , generalMetaProgrammingError
-  , oldForeignPragmaError
-  , userDefinedError
-  , missingCertificate
-  ) where
+  ( SolidException (..),
+    showSolidException,
+    typeError,
+    todo,
+    indexOutOfBounds,
+    checkArity,
+    arityMismatch,
+    internalError,
+    invalidArguments,
+    missingField,
+    customError,
+    missingType,
+    duplicateDefinition,
+    duplicateContract,
+    parseError,
+    require,
+    assert,
+    modifierError,
+    unknownFunction,
+    unknownConstant,
+    unknownVariable,
+    unknownStatement,
+    divideByZero,
+    missingCodeCollection,
+    inaccessibleChain,
+    invalidChain,
+    invalidWrite,
+    invalidCertificate,
+    malformedData,
+    tooMuchGas,
+    paymentError,
+    reservedWordError,
+    revertError,
+    immutableError,
+    getRunTimeCodeError,
+    tooManyResultsError,
+    tooManyCooks,
+    generalMetaProgrammingError,
+    oldForeignPragmaError,
+    userDefinedError,
+    missingCertificate,
+  )
+where
 
 import Control.DeepSeq
-import Control.Exception (throw, throwIO, Exception)
+import Control.Exception (Exception, throw, throwIO)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import GHC.Generics
-import Text.Printf (printf)
 import qualified SolidVM.Model.Storable as B
+import Text.Printf (printf)
 
-data SolidException = TypeError String String
-                    | InternalError String String
-                    | InvalidArguments String String
-                    | IndexOutOfBounds String String
-                    | TODO String String
-                    | MissingField String String
-                    | RevertError String String
-                    | CustomError String String [B.BasicValue]
-                    | MissingType String String
-                    | DuplicateDefinition String String
-                    | DuplicateContract String
-                    | ArityMismatch String Int Int
-                    | ParseError String String
-                    | Require (Maybe String)
-                    | ModifierError String String
-                    | Assert
-                    | UnknownFunction String String
-                    | UnknownConstant String String
-                    | UnknownVariable String String
-                    | UnknownStatement String String
-                    | DivideByZero String 
-                    | MissingCodeCollection String String
-                    | InaccessibleChain String String
-                    | InvalidChain String String
-                    | InvalidWrite String String
-                    | InvalidCertificate String String
-                    | MalformedData String String
-                    | TooMuchGas String String
-                    | PaymentError String String
-                    | ReservedWordError String String
-                    | ImmutableError String String
-                    | FailedToAttainRunTimCode String String
-                    | TooManyResultsError String Int
-                    | TooManyCooks Int Int
-                    | GeneralMetaProgrammingError String String
-                    | OldForeignPragmaError String String
-                    | UserDefinedError String String
-                    | MissingCertificate String String
-                    deriving (Eq, Exception, Generic, NFData)
+data SolidException
+  = TypeError String String
+  | InternalError String String
+  | InvalidArguments String String
+  | IndexOutOfBounds String String
+  | TODO String String
+  | MissingField String String
+  | RevertError String String
+  | CustomError String String [B.BasicValue]
+  | MissingType String String
+  | DuplicateDefinition String String
+  | DuplicateContract String
+  | ArityMismatch String Int Int
+  | ParseError String String
+  | Require (Maybe String)
+  | ModifierError String String
+  | Assert
+  | UnknownFunction String String
+  | UnknownConstant String String
+  | UnknownVariable String String
+  | UnknownStatement String String
+  | DivideByZero String
+  | MissingCodeCollection String String
+  | InaccessibleChain String String
+  | InvalidChain String String
+  | InvalidWrite String String
+  | InvalidCertificate String String
+  | MalformedData String String
+  | TooMuchGas String String
+  | PaymentError String String
+  | ReservedWordError String String
+  | ImmutableError String String
+  | FailedToAttainRunTimCode String String
+  | TooManyResultsError String Int
+  | TooManyCooks Int Int
+  | GeneralMetaProgrammingError String String
+  | OldForeignPragmaError String String
+  | UserDefinedError String String
+  | MissingCertificate String String
+  deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
   show = showSolidException
@@ -99,7 +102,7 @@ showSolidException :: SolidException -> String
 showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
 showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
 showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
-showSolidException (IndexOutOfBounds a b)= printf "index out of bounds: %s: %s" a b
+showSolidException (IndexOutOfBounds a b) = printf "index out of bounds: %s: %s" a b
 showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
 showSolidException (MissingType m v) = printf "missing type: %s: %s" m v
 showSolidException (RevertError m v) = printf "revert: %s %s:" m v
@@ -157,7 +160,7 @@ indexOutOfBounds = toThrower IndexOutOfBounds
 missingField :: (Show v) => String -> v -> a
 missingField = toThrower MissingField
 
-revertError :: (Show v) =>  String -> v -> a
+revertError :: (Show v) => String -> v -> a
 revertError = toThrower RevertError
 
 customError :: String -> String -> [B.BasicValue] -> a
@@ -169,7 +172,7 @@ missingType = toThrower MissingType
 duplicateDefinition :: (Show v) => String -> v -> a
 duplicateDefinition = toThrower DuplicateDefinition
 
-duplicateContract :: (Show v) => v -> a 
+duplicateContract :: (Show v) => v -> a
 duplicateContract x = throw $ DuplicateContract (show x)
 
 checkArity :: (MonadIO m) => String -> Int -> Int -> m ()
@@ -218,10 +221,10 @@ invalidWrite :: (Show v) => String -> v -> a
 invalidWrite = toThrower InvalidWrite
 
 invalidCertificate :: (Show v) => String -> v -> a
-invalidCertificate = toThrower InvalidCertificate 
+invalidCertificate = toThrower InvalidCertificate
 
 malformedData :: (Show v) => String -> v -> a
-malformedData = toThrower MalformedData 
+malformedData = toThrower MalformedData
 
 tooMuchGas :: (Show v) => String -> v -> a
 tooMuchGas = toThrower TooMuchGas
@@ -254,4 +257,4 @@ userDefinedError :: (Show v) => String -> v -> a
 userDefinedError = toThrower UserDefinedError
 
 missingCertificate :: (Show v) => String -> v -> a
-missingCertificate = toThrower MissingCertificate 
+missingCertificate = toThrower MissingCertificate

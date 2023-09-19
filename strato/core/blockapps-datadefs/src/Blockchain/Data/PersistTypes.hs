@@ -1,25 +1,24 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Data.PersistTypes where
 
-import           Crypto.Types.PubKey.ECC
-import qualified Data.ByteString.Base16             as B16
-import qualified Data.ByteString.Short              as BSS
-import qualified Data.Text                          as T
-import           Data.Text.Encoding
-import           Database.Persist
-import           Database.Persist.Sql
-import           Database.Persist.TH
-import           Numeric
-
-import           BlockApps.Solidity.Xabi
-import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.StateRoot
-import           Blockchain.SolidVM.Model
+import BlockApps.Solidity.Xabi
+import Blockchain.SolidVM.Model
+import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.StateRoot
+import Crypto.Types.PubKey.ECC
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Short as BSS
+import qualified Data.Text as T
+import Data.Text.Encoding
+import Database.Persist
+import Database.Persist.Sql
+import Database.Persist.TH
 import qualified LabeledError
+import Numeric
 
 derivePersistField "Integer"
 derivePersistField "Point"
@@ -30,7 +29,8 @@ integerCap = 1000
 
 showHexFixed :: (Integral a, Show a) => Int -> a -> String
 showHexFixed len val = pad $ showHex val ""
-    where pad s = if length s >= len then s else pad ('0' : s)
+  where
+    pad s = if length s >= len then s else pad ('0' : s)
 
 {-
 instance PersistField Integer where
@@ -48,7 +48,7 @@ instance PersistField CodeKind where
   fromPersistValue x = Left . T.pack $ "PersistField CodeKind: expected int: " ++ show x
 
 instance PersistFieldSql CodeKind where
-  sqlType _  = SqlString
+  sqlType _ = SqlString
 
 instance PersistField HexStorage where
   toPersistValue (HexStorage hs) = PersistText . decodeUtf8 . B16.encode $ hs
@@ -62,7 +62,7 @@ instance PersistFieldSql HexStorage where
 
 instance PersistField Word256 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 64 (fromIntegral i :: Integer)
-  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head .  readHex $ T.unpack s) :: Integer) :: Word256)
+  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head . readHex $ T.unpack s) :: Integer) :: Word256)
   fromPersistValue x = Left $ T.pack $ "PersistField Word256: expected integer: " ++ (show x)
 
 instance PersistFieldSql Word256 where
@@ -70,7 +70,7 @@ instance PersistFieldSql Word256 where
 
 instance PersistField Word512 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 128 (fromIntegral i :: Integer)
-  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head .  readHex $ T.unpack s) :: Integer) :: Word512)
+  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head . readHex $ T.unpack s) :: Integer) :: Word512)
   fromPersistValue x = Left $ T.pack $ "PersistField Word512: expected integer: " ++ (show x)
 
 instance PersistFieldSql Word512 where
@@ -79,7 +79,7 @@ instance PersistFieldSql Word512 where
 instance PersistField StateRoot where
   toPersistValue (StateRoot s) = PersistText . decodeUtf8 . B16.encode $ s
   fromPersistValue (PersistText s) = Right . StateRoot . LabeledError.b16Decode "PersistField<StateRoot>" . encodeUtf8 $ s
-  fromPersistValue _               = Left $ "StateRoot must be persisted as PersistText"
+  fromPersistValue _ = Left $ "StateRoot must be persisted as PersistText"
 
 instance PersistFieldSql StateRoot where
   sqlType _ = SqlOther $ T.pack "varchar(64)"
@@ -90,14 +90,13 @@ instance PersistField Point where
   fromPersistValue (PersistText s) = Right . bytesToPoint . B.unpack . fst . B16.decode . encodeUtf8 $ s
   fromPersistValue _ = Left $ "Point must be persisted as PersistText"
 
-
 instance PersistFieldSql Point where
   sqlType _ = SqlOther $ T.pack "varchar"
 -}
 
 instance PersistField BSS.ShortByteString where
-    toPersistValue = toPersistValue . BSS.fromShort
-    fromPersistValue = fmap BSS.toShort . fromPersistValue
+  toPersistValue = toPersistValue . BSS.fromShort
+  fromPersistValue = fmap BSS.toShort . fromPersistValue
 
 instance PersistFieldSql BSS.ShortByteString where
-    sqlType _ = SqlBlob
+  sqlType _ = SqlBlob

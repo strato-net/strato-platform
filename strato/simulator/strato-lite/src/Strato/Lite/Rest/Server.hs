@@ -1,34 +1,34 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE QuasiQuotes         #-}
-{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Strato.Lite.Rest.Server where
 
-import qualified Control.Concurrent.STM.MonadIO    as CCS
-import           Control.Lens
-import           Control.Monad.IO.Class
-import           Control.Monad.Reader
-import           Data.Bifunctor                    (first)
-import           Data.Foldable                     (for_, traverse_)
-import           Data.Traversable                  (for)
-import qualified Data.Map.Strict                   as M
-import           Data.Maybe                        (fromMaybe)
-import qualified Data.Text                         as T
-import qualified Blockchain.Data.TXOrigin          as Origin
-import           Blockchain.Sequencer.Event
-import           Strato.Lite.Rest.Api
-import           Strato.Lite.Monad
-import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.MicroTime
-import           Servant
-import           UnliftIO                          hiding (Handler)
+import qualified Blockchain.Data.TXOrigin as Origin
+import Blockchain.Sequencer.Event
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Model.MicroTime
+import qualified Control.Concurrent.STM.MonadIO as CCS
+import Control.Lens
+import Control.Monad.IO.Class
+import Control.Monad.Reader
+import Data.Bifunctor (first)
+import Data.Foldable (for_, traverse_)
+import qualified Data.Map.Strict as M
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
+import Data.Traversable (for)
+import Servant
+import Strato.Lite.Monad
+import Strato.Lite.Rest.Api
+import UnliftIO hiding (Handler)
 
 getNodes :: NetworkManager -> Handler ThreadResultMap
 getNodes mgr = liftIO . atomically $ do
@@ -40,7 +40,7 @@ getNodes mgr = liftIO . atomically $ do
 getConnections :: NetworkManager -> Handler ThreadResultMap
 getConnections mgr = liftIO . atomically $ do
   ths <- readTVar $ mgr ^. threads
-  let f (s,c) = "(" <> s <> "," <> c <> ")"
+  let f (s, c) = "(" <> s <> "," <> c <> ")"
   fmap (M.mapKeys f) . for (ths ^. connectionThreads) $ \a -> do
     mExp <- pollSTM a
     pure $ fmap (first show) mExp
@@ -76,7 +76,7 @@ postRemoveConnection mgr s c = liftIO $ runReaderT (removeConnection s c) mgr
 
 postTimeout :: NetworkManager -> Int -> Handler ()
 postTimeout mgr rn = do
-  let ev = TimerFire $ fromIntegral rn 
+  let ev = TimerFire $ fromIntegral rn
   peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
   liftIO $ traverse_ (postEvent ev) peers
 
@@ -87,20 +87,20 @@ postTx mgr nodeLabel (PostTxParams tx md) = do
     ts <- liftIO $ getCurrentMicrotime
     let signedTx = mkSignedTx (peer ^. p2pPeerPrivKey) tx md
         ev = UnseqEvent . IETx ts $ IngestTx Origin.API signedTx
-    postEvent ev peer  
+    postEvent ev peer
 
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
-       getNodes mgr
-  :<|> getConnections mgr
-  :<|> getChainInfo mgr
-  :<|> getPeers mgr
-  :<|> postAddNode mgr
-  :<|> postRemoveNode mgr
-  :<|> postAddConnection mgr
-  :<|> postRemoveConnection mgr
-  :<|> postTimeout mgr
-  :<|> postTx mgr
+  getNodes mgr
+    :<|> getConnections mgr
+    :<|> getChainInfo mgr
+    :<|> getPeers mgr
+    :<|> postAddNode mgr
+    :<|> postRemoveNode mgr
+    :<|> postAddConnection mgr
+    :<|> postRemoveConnection mgr
+    :<|> postTimeout mgr
+    :<|> postTx mgr
 
 stratoLiteRestApp :: NetworkManager -> Application
 stratoLiteRestApp = serve stratoLiteRestAPI . stratoLiteRestServer

@@ -1,18 +1,36 @@
-FROM node:14-buster-slim
+FROM node:14-bullseye-slim as base
 RUN apt-get update && \
-    apt-get install -y git postgresql-client python build-essential && \
+    apt-get install -y lsof && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    mkdir -p /usr/src/app \
-    # Layer is shared with Apex. TODO: use shared base
-ARG STRATO_VERSION
-ENV STRATO_VERSION=${STRATO_VERSION}
-RUN mkdir -p /usr/src/app && \
+    mkdir -p /usr/src/app && \
     npm install -g serve@11.3.2
 WORKDIR /usr/src/app
+
+FROM base as npminstaller
+COPY package*.json /usr/src/app
+RUN npm install
+
+### Builder
+FROM npminstaller as builder
 COPY . /usr/src/app
-RUN npm install && \
-    npm run build && \
-    rm -rf node_modules public src
+RUN npm run build
+
+### Prod
+FROM base as prod
+ARG STRATO_VERSION
+ENV STRATO_VERSION=${STRATO_VERSION}
+COPY docker-run.sh /usr/src/app
+COPY --from=builder /usr/src/app/build build/
 EXPOSE 3002
+HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
+  CMD lsof -i :3002 || \
+    exit 1
 CMD [ "sh", "/usr/src/app/docker-run.sh" ]
+
+### Test
+FROM base as test
+COPY . /usr/src/app
+COPY --from=npminstaller /usr/src/app/node_modules /usr/src/app/node_modules/
+RUN npm install
+RUN npm test

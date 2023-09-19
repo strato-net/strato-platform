@@ -1,14 +1,14 @@
+import Blockchain.Strato.Model.ExtendedWord
 import Criterion.Main
 import Data.Bits
 import qualified Data.ByteString as B
 import Data.Word
 
-import Blockchain.Strato.Model.ExtendedWord
-
 benchLSBSlow :: Word256 -> Benchmark
 benchLSBSlow w = bench ("least significant byte slow: " ++ show w) $ nf g w
- where g :: Word256 -> Word8
-       g v = fromIntegral $! v .&. 0xff
+  where
+    g :: Word256 -> Word8
+    g v = fromIntegral $! v .&. 0xff
 
 benchLSBFast :: Word256 -> Benchmark
 benchLSBFast w = bench ("least significant byte fast: " ++ show w) $ nf fastWord256LSB w
@@ -27,14 +27,18 @@ benchDeserializeFast w = bench ("deserializing fast: " ++ show w) $ nf bytesToWo
 
 main :: IO ()
 main = do
-  let input = [0
-              , 0xff
-              , 0xffffffff
-              , 0xffeeddccbbaa99887766554433221100
-              , 0xffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100] :: [Word256]
-  defaultMain $ map benchLSBSlow input
-             ++ map benchLSBFast input
-             ++ map benchSerializeSlow input
-             ++ map benchSerializeFast input
-             ++ map benchDeserializeSlow input
-             ++ map benchDeserializeFast input
+  let input =
+        [ 0,
+          0xff,
+          0xffffffff,
+          0xffeeddccbbaa99887766554433221100,
+          0xffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100
+        ] ::
+          [Word256]
+  defaultMain $
+    map benchLSBSlow input
+      ++ map benchLSBFast input
+      ++ map benchSerializeSlow input
+      ++ map benchSerializeFast input
+      ++ map benchDeserializeSlow input
+      ++ map benchDeserializeFast input

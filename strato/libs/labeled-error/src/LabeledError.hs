@@ -1,14 +1,12 @@
-
 module LabeledError where
 
-import           Data.Bifunctor (first)
-import           Prelude hiding (head, tail)
-import qualified Prelude
-
+import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as B16
 import Data.Maybe
 import Text.Read
+import Prelude hiding (head, tail)
+import qualified Prelude
 
 read :: Read a => String -> String -> a
 read s x = fromMaybe (error $ "[" ++ s ++ "] read parse error: can't parse '" ++ x ++ "'") . readMaybe $ x

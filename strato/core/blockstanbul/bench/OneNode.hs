@@ -1,12 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-import Control.Monad.Trans.State.Lazy
 
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Blockstanbul.BenchmarkLib
-
+import Control.Monad.Trans.State.Lazy
 import Criterion.Main
 
 -- Note: it may be worthwhile to add more layers so that it resembles
@@ -32,8 +31,9 @@ shebangTest :: Int -> Benchmark
 shebangTest n = bench (show n ++ "x1GB") . nfIO . sendAllMessagesBench n $ 4 * 1028 * 1028 * 1028
 
 main :: IO ()
-main = defaultMain $
-     [ bench "0x0" . nfIO . sendAllMessagesBench 0 $ 0]
-    ++ map pageTest [10, 20, 40, 80, 160, 320, 640, 1280]
-    ++ map slabTest [10, 20, 40, 80, 160, 320, 640, 1280]
-    ++ map shebangTest [1, 2, 4, 8, 16, 32]
+main =
+  defaultMain $
+    [bench "0x0" . nfIO . sendAllMessagesBench 0 $ 0]
+      ++ map pageTest [10, 20, 40, 80, 160, 320, 640, 1280]
+      ++ map slabTest [10, 20, 40, 80, 160, 320, 640, 1280]
+      ++ map shebangTest [1, 2, 4, 8, 16, 32]
