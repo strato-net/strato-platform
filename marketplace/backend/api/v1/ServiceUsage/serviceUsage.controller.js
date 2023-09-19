@@ -34,8 +34,33 @@ class ServiceUsageController {
     try {
       const { dapp, query } = req;
 
-      const serviceUsages = await dapp.getServiceUsages({ ...query });
+      const serviceUsages = await dapp.getServiceUsage({ ...query });
       rest.response.status200(res, serviceUsages);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getAllBooked(req, res, next) {
+    try {
+      const { dapp, query } = req;
+      const bookedServiceUsages = await dapp.getBookedServiceUsage({ ...query });
+      rest.response.status200(res, bookedServiceUsages);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getAllProvided(req, res, next) {
+    try {
+      const { dapp, query } = req;
+
+      const providedServiceUsages = await dapp.getProvidedServiceUsages({ ...query });
+      rest.response.status200(res, providedServiceUsages);
 
       return next();
     } catch (e) {
@@ -96,7 +121,7 @@ class ServiceUsageController {
       console.log("validation.error: ", validation.error);
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
-        "Create ServiceUsage Argument Validation Error",
+        `Create ServiceUsage Argument Validation Error`,
         {
           message: `Missing args or bad format: ${validation.error.message}`,
         }
@@ -124,7 +149,7 @@ class ServiceUsageController {
     if (validation.error) {
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
-        "Update ServiceUsage Argument Validation Error",
+        `Update ServiceUsage Argument Validation Error`,
         {
           message: `Missing args or bad format: ${validation.error.message}`,
         }

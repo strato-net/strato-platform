@@ -32,7 +32,7 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
 import ListNowIndex from "./ListNowIndex";
@@ -116,7 +116,6 @@ const Membership = (user) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url);
   };
-
 
   // useEffect(() => {
   //   if (isSearch) {
@@ -287,6 +286,19 @@ const Membership = (user) => {
                 }}
               >
                 Sell Existing Membership{" "}
+              </Button>
+              <Button
+                id="add-product-button"
+                type="primary"
+                style={{
+                  backgroundColor: "orange",
+                  color: "white",
+                  margin: "10px",
+                }}
+                className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                onClick={() => navigate("/memberships/serviceUsage")}
+              >
+                Service Usage
               </Button>
               <Button
                 id="add-product-button"
