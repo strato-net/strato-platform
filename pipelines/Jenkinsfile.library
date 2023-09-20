@@ -5,6 +5,46 @@ def cleanNode(wipeVault = null) {
   sh 'sudo docker volume prune -fa || true'
 }
 
+def deployStratoWithS3(nodeData, versionTag) {
+  sh "sudo rm -rf strato-getting-started"
+  sh "git clone https://github.com/blockapps/strato-getting-started"
+  dir("strato-getting-started") {
+    sh "sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/"
+    sh "sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/"
+    sh "aws s3 cp s3://blockapps-build-artifacts/${versionTag}/docker-compose.yml ."
+    sh "sudo ./strato --pull"
+
+    withCredentials([
+      usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
+      usernamePassword(credentialsId: 'marketplace-testnet2-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID')
+    ]) {
+      writeFile file: "run.sh", text: """#!/bin/bash
+        sudo \\
+          NODE_HOST="${nodeData.STRATO_HOSTNAME}" \\
+          HTTPS_PORT="443" \\
+          OAUTH_DISCOVERY_URL="${nodeData.OAUTH_DISCOVERY_URL}" \\
+          OAUTH_CLIENT_ID="${nodeData.OAUTH_CLIENT_ID}" \\
+          OAUTH_CLIENT_SECRET="${nodeData.OAUTH_CLIENT_SECRET}" \\
+          VAULT_URL="https://vault.blockapps.net:8093" \\
+          certInfo='{"orgName":"BlockApps","orgUnit":"Mercata","commonName":"${nodeData.commonName}","access":true}' \\
+          EXT_STORAGE_S3_ACCESS_KEY_ID='${AWS_IAM_USER_KEY_ID}' \\
+          EXT_STORAGE_S3_SECRET_ACCESS_KEY='${AWS_IAM_USER_ACCESS_KEY}' \\
+          EXT_STORAGE_S3_BUCKET='mercata-testnet2' \\
+          STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
+          STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
+          CLIENT_URL="https://${nodeData.STRATO_HOSTNAME}" \\
+          ssl="true" \\
+          connectionTimeout=300 \\
+          ./strato
+      """
+      sh "chmod +x run.sh"
+      sh "sudo ./run.sh"
+
+    }
+  }
+}
+
+
 def deployStrato(nodeData) {
   sh "sudo rm -rf strato-getting-started"
   unstash 'stratoGettingStarted'
