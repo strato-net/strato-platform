@@ -226,14 +226,14 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, queryValue, organization) => {
+  fetchOrder: async (dispatch, limit, offset, queryValue, organization, order) => {
     const query = queryValue ? `&orderId=${queryValue}` : "";
 
     dispatch({ type: actionDescriptors.fetchOrder });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&order=createdDate.desc&buyerOrganization=${organization}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&order=${order}&buyerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -254,14 +254,14 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization) => {
+  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order) => {
     const query = queryValue ? `&orderId=${queryValue}` : "";
 
     dispatch({ type: actionDescriptors.fetchOrderSold });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=createdDate.desc${query}&sellerOrganization=${organization}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}${query}&sellerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
