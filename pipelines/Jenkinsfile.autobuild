@@ -255,8 +255,8 @@ pipeline {
               echo "Running unit tests"
               ./run_unit_tests.sh
               cd strato
-              archiveArtifacts artifacts: "${sh(returnStdout: true, script: 'stack path --local-hpc-root').trim()}", fingerprint: true
             '''
+            archiveArtifacts artifacts: "${sh(returnStdout: true, script: 'stack path --local-hpc-root').trim()}", fingerprint: true
           },
 
           'SMD tests': {
