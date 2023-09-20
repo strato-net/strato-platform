@@ -560,7 +560,7 @@ syncFetch d num = do
         yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
         lift stampActionTimestamp
       else $logInfoS "syncFetch" $ T.unlines [
-        "Tried to request more block headers but it seems the block headers cache is currenlty being used.",
+        "Tried to request more block headers but it seems the block headers cache is currently being used.",
         "If this message shows up a lot but the node's best block # doesn't increase,",
         "there might be something wrong with the cache."
       ]
