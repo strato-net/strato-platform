@@ -363,6 +363,8 @@ const MembershipCard = ({
           user={user}
           onClick={openListNowModal}
           formik={formik}
+          type="New"
+          id="None"
           getIn={getIn}
           inventory={formik.values.tempInv}
         />
