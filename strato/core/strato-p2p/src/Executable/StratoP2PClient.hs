@@ -157,16 +157,14 @@ stratoP2PClient runner = runner $ \sSource -> do
         $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
         liftIO $ threadDelay 10000000
       multiThreadedClient peers sem sSource = void . forConcurrently peers $ \p -> do
-      --multiThreadedClient peers sem sSource = mapM_ (\p -> do let isRunning = pPeerActiveState p == 1
-                                                              let isRunning = pPeerActiveState p == 1
-                                                              unless isRunning $ do
-                                                                (liftIO (SSem.tryWait sem)) >>= \case
-                                                                  Nothing -> return ()
-                                                                  Just _  -> do
-                                                                    result <- runPeerInList p sSource
-                                                                    handleRunPeerResult p result
-                                                                    liftIO (SSem.signal sem)
-                                                    --) peers
+        let isRunning = pPeerActiveState p == 1
+        unless isRunning $ do
+          (liftIO (SSem.tryWait sem)) >>= \case
+            Nothing -> return ()
+            Just _  -> do
+              result <- runPeerInList p sSource
+              handleRunPeerResult p result
+              liftIO (SSem.signal sem)
       handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException a -> m ()
       handleRunPeerResult thePeer = \case
         Left e | Just (ErrorCall x) <- fromException e -> error x
