@@ -88,6 +88,7 @@ import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.Network
 import           Data.Default
+import           Data.Int                              (Int64)
 import qualified Data.Kind                             as DK
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
@@ -200,7 +201,7 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState     :: K.KafkaState
-  , contextKafkaMiddleman :: (InChan P2pEvent, OutChan P2pEvent)
+  , contextKafkaMiddleman :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
   , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp       :: ActionTimestamp
@@ -665,7 +666,7 @@ initConfig wireMessagesRef maxHeaders = do
 
 initContext :: IO Context
 initContext = do
-  initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan P2pEvent, OutChan P2pEvent)
+  initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
   return Context { actionTimestamp = emptyActionTimestamp
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextKafkaMiddleman = initContextKafkaMiddleman

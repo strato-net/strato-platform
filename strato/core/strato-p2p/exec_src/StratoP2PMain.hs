@@ -4,9 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
-import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.Chan.Unagi
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
 import           Blockchain.VMOptions       ()
@@ -42,9 +40,9 @@ initP2P = do
   context <- liftIO $ readIORef $ configContext cfg
   let contextkafkastate = contextKafkaState context
   let contextkafkamiddleman = contextKafkaMiddleman context
-  contextkafkamiddlemanbroadcast <- liftIO $ dupChan $ (\(a,_) -> a) contextkafkamiddleman
-  _ <- async (runContextM cfg $ (forever $ do _ <- seqEventNotificationSourceChanFill (return contextkafkastate) ((\(a,_) -> a) contextkafkamiddleman); liftIO $ threadDelay 50))
-  let sSource = seqEventNotificationSourceChanPour contextkafkamiddlemanbroadcast
+  _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate ((\(a,_) -> a) contextkafkamiddleman)
+  let sSource = seqEventNotificationSourceChanPour ((\(a,_) -> a) contextkafkamiddleman)
+                                                   dupChan
       runner f = runContextM cfg $ f sSource
   liftIO $ race_
     (run 10248 $ prometheus def p2pApp)
