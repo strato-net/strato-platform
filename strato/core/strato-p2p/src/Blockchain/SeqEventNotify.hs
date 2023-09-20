@@ -73,7 +73,7 @@ seqEventNotificationSourceChanFill :: ( Modifiable K.KafkaState m
                                       , MonadIO m
                                       , Show a
                                       )
-                                     => State.StateT (m ()) (ExceptT e (Either a)) a -> (InChan P2pEvent,OutChan P2pEvent) -> m ()
+                                     => State.StateT (m ()) (ExceptT e (Either a)) a -> InChan P2pEvent -> m ()
 seqEventNotificationSourceChanFill ks p2peventchan = do
   let res = runExceptT $ State.evalStateT ks $ do
               ofs' <- K.withKafkaRetry1s $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
@@ -83,7 +83,7 @@ seqEventNotificationSourceChanFill ks p2peventchan = do
                         unless (null events) $ do -- stop bloating the logs
                           $logInfoS "seqEventNotifyChanFill" . T.pack $ "filling kakfa middleman of kafka seqevents @ " ++ show nextOffset
                           forM_ events $ \e -> do
-                            liftIO $ writeChan ((\(a,_) -> a) p2peventchan) e
+                            liftIO $ writeChan p2peventchan e
                           loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
   case res of
     Left  e -> error $ show e

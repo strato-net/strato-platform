@@ -43,7 +43,7 @@ initP2P = do
   let contextkafkastate = contextKafkaState context
   let contextkafkamiddleman = contextKafkaMiddleman context
   contextkafkamiddlemanbroadcast <- liftIO $ dupChan $ (\(a,_) -> a) contextkafkamiddleman
-  _ <- async (runContextM cfg $ (forever $ do _ <- seqEventNotificationSourceChanFill (return contextkafkastate) contextkafkamiddleman; liftIO $ threadDelay 50))
+  _ <- async (runContextM cfg $ (forever $ do _ <- seqEventNotificationSourceChanFill (return contextkafkastate) ((\(a,_) -> a) contextkafkamiddleman); liftIO $ threadDelay 50))
   let sSource = seqEventNotificationSourceChanPour contextkafkamiddlemanbroadcast
       runner f = runContextM cfg $ f sSource
   liftIO $ race_
