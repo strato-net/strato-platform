@@ -14,7 +14,6 @@ import qualified Data.ByteString as B
 import qualified Data.IntSet as I
 import qualified Data.Set as S
 import qualified Data.Vector as V
-import Data.Word
 import GHC.Generics
 
 -- JumpDest benchmarks
