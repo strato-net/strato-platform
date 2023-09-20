@@ -1782,9 +1782,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
     const memberships = await contract.getPurchasedMemberships();
+    const services = await contract.getServices()
     const data = serviceUsage.map((item, index) => {
       let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-      return { ...item, provider: result.manufacturer }
+      let serviceResult = services.find((sId) => sId.address === item.serviceId) ?? '';
+      return { ...item, provider: result.manufacturer, serviceName: serviceResult.name, membershipNumber: result.itemNumber }
     })
     return data
   };

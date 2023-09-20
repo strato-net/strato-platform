@@ -124,6 +124,7 @@ const ServiceTable = () => {
   const [serviceList, setServiceList] = useState(serviceListData);
   const [userList, setUserList] = useState(userListData);
   const [providerState, setProviderState] = useState("");
+  const [isAddRow, setIsAddRow] = useState(false)
 
   useEffect(() => {
     setServiceList(serviceListData);
@@ -138,6 +139,14 @@ const ServiceTable = () => {
   useEffect(() => {
     setTableData(serviceUsageData);
   }, [serviceUsageState]);
+
+  useEffect(() => {
+    if (isAddRow) {
+      setTimeout(() => {
+        addRow()
+      }, 5000)
+    }
+  }, [isServicesUsageLoading])
 
   useEffect(() => {
     setUserList(userListData);
@@ -168,8 +177,8 @@ const ServiceTable = () => {
     providerLastUpdatedDate: new Date().getTime().toString(),
   };
 
+  const queryOwner = `&owner=${userAddress}`;
   useEffect(() => {
-    let queryOwner = `&owner=${userAddress}`;
     if (userAddress) {
       if (activeTab === 'booked') {
         serviceUsageActions.fetchBookedServicesUsage(
@@ -294,8 +303,7 @@ const ServiceTable = () => {
     setTableData(data);
   };
 
-  const handleAddRow = () => {
-    // just add a new empty row in the tableData
+  const addRow = () => {
     setIsEdit(false);
     let tableCopy = tableData.map((item, index) => {
       item["editable"] = false;
@@ -304,6 +312,19 @@ const ServiceTable = () => {
     let data = { ...newRowSchema };
     data["key"] = tableCopy.length + 1;
     setTableData([data, ...tableCopy]);
+    setIsAddRow(false);
+  }
+
+  const handleAddRow = () => {
+    // just add a new empty row in the tableData
+    if (page == 1) {
+      addRow();
+    } else {
+      setPage(1)
+      setIsAddRow(true)
+      serviceUsageActions.fetchBookedServicesUsage(serviceUsageDispatch, limit, offset, queryOwner);
+    }
+
   };
 
   const handleSave = () => {
@@ -465,12 +486,7 @@ const ServiceTable = () => {
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>
-              {membership?.purchasedMemberships.reduce((label, item) => {
-                if (item.itemAddress === text) {
-                  return item.itemNumber;
-                }
-                return label;
-              }, null)}
+              {record.membershipNumber}
             </Typography>
           )}
         </span>
@@ -493,12 +509,7 @@ const ServiceTable = () => {
             />
           ) : (
             <Typography style={{ color: "#061A6C" }}>
-              {serviceList.reduce((label, item) => {
-                if (item.value === text) {
-                  return item.label;
-                }
-                return label;
-              }, null)}
+              {record.serviceName}
             </Typography>
           )}
         </span>
@@ -720,7 +731,7 @@ const ServiceTable = () => {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAddRow}
-            disabled={validationError || IsLoading}
+            disabled={validationError || IsLoading || (!tableData[0]?.address && tableData.length>0)}
           >
             Add Service Use
           </Button>
