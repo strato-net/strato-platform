@@ -1779,16 +1779,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
+    const getOptions = { ...options, org: managers.cirrusOrg, app: "" };
+    
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
+      ...args,
+      sort: '-createdDate',
+      owner: userAddress
+    }, getOptions);
+  
     const memberships = await contract.getPurchasedMemberships();
-    const services = await contract.getServices()
-    const data = serviceUsage.map((item, index) => {
-      let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-      let serviceResult = services.find((sId) => sId.address === item.serviceId) ?? '';
-      return { ...item, provider: result.manufacturer, serviceName: serviceResult.name, membershipNumber: result.itemNumber }
-    })
-    return data
+    const services = await contract.getServices();
+  
+    const data = serviceUsage.map((item) => ({
+      ...item,
+      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+    }));
+  
+    return data;
   };
 
   contract.getProvidedServiceUsages = async function (args = {}, options = optionsNoChainIds) {
