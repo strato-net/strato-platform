@@ -1,10 +1,7 @@
-FROM node:18-bookworm-slim
+FROM node:18.18-alpine3.18
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
-RUN apt-get update && \
-    apt-get install -y postgresql-client curl lsof && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+RUN apk add --no-cache postgresql-client curl lsof && \
     mkdir -p /usr/src/app
     # postgres-client is required for pgtools module
 WORKDIR /usr/src/app
@@ -15,4 +12,4 @@ HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
 COPY package*.json  /usr/src/app/
 RUN npm install
 COPY . /usr/src/app
-CMD [ "bash", "-c", "/usr/src/app/docker-run.sh" ]
+CMD [ "sh", "-c", "/usr/src/app/docker-run.sh" ]
