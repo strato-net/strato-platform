@@ -98,11 +98,11 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchAllServiceUsageFailed, error: "Error while fetching all Service Usage" });
     }
   },
-  fetchBookedServicesUsage: async (dispatch, limit, offset, query) => {
+  fetchBookedServicesUsage: async (dispatch, limit, offset) => {
     dispatch({ type: actionDescriptors.fetchBookedServicesUsage });
 
     try {
-      const response = await fetch(`${apiUrl}/serviceUsage/booked?limit=${limit}&offset=${offset}${query}`, {
+      const response = await fetch(`${apiUrl}/serviceUsage/booked?limit=${limit}&offset=${offset}`, {
         method: HTTP_METHODS.GET
       });
 
