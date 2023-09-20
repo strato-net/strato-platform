@@ -97,9 +97,10 @@ seqEventNotificationSourceChanPour p2peventchan = do
   (event,_) <- liftIO $ tryReadChan p2peventchan
   readevent <- liftIO $ tryRead event
   case readevent of
-    Nothing -> $logInfoS "seqEventNotifyChanPour" . T.pack $ "nothing to pour from kakfa middleman"
+    Nothing -> seqEventNotificationSourceChanPour p2peventchan
     Just e  -> do $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ " ++ show e
-                  yield e
+                  _ <- yield e
+                  seqEventNotificationSourceChanPour p2peventchan
 
 seqEventNotificationSource :: ( MonadIO m
                               , MonadLogger m
