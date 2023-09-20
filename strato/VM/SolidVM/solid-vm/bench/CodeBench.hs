@@ -15,7 +15,6 @@ import Blockchain.MemVMContext
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Simple
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMOptions ()
 import Control.DeepSeq
 import Control.Lens
