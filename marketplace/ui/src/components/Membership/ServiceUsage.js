@@ -78,7 +78,8 @@ const ServiceTable = () => {
     isPurchasedMembershipLoading ||
     isServicesUsageLoading ||
     isUsersLoading ||
-    isCreateServiceUsageSubmitting;
+    isCreateServiceUsageSubmitting ||
+    isUpdateServicesUsageLoading;
 
   function transformData(data) {
     const uniqueProducts = {};
@@ -731,7 +732,7 @@ const ServiceTable = () => {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAddRow}
-            disabled={validationError || IsLoading || (!tableData[0]?.address && tableData.length>0)}
+            disabled={validationError || IsLoading || (tableData && !tableData[0]?.address)}
           >
             Add Service Use
           </Button>
