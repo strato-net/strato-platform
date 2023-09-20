@@ -66,7 +66,7 @@ const ServiceTable = () => {
   const serviceUsageState = useServiceUsageState();
 
   const { isUsersLoading } = userCert;
-  // const { isServicesLoading } = servicesState;
+  const { isServicesLoading } = servicesState;
   const { isPurchasedMembershipLoading } = membership;
   const {
     isServicesUsageLoading,
@@ -148,7 +148,6 @@ const ServiceTable = () => {
   const [activeTab, setActiveTab] = useState("booked");
   const [tableData, setTableData] = useState([]);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(20);
   const [filterQuery, setFilterQuery] = useState({});
   const username = userCert?.user?.commonName;
   const organization = userCert?.user?.organization;
@@ -198,11 +197,6 @@ const ServiceTable = () => {
     setPage(0);
     setActiveTab(key);
   };
-
-  const userOptions = [
-    { value: "jack", label: "Jack-user" },
-    { value: "lucy", label: "Lucy-user" },
-  ];
 
   const handleEditCancel = (key, bool, type, record) => {
     // handling 3 functionality (i.e, edit, update & cancel) using its type
@@ -278,8 +272,8 @@ const ServiceTable = () => {
           };
         });
       setMembershipList(membershipData);
-      let serviceQuery = `&ownerOrganization=${value}`
-      servicesActions.fetchService(serviceDispatch, 10, offset, serviceQuery);
+      // let serviceQuery = `&ownerOrganization=${value}`
+      servicesActions.fetchService(serviceDispatch, 10, offset, value);
     } else if (field === "itemId") {
       let data = tableData.filter((item, index) => {
         if (index === key) {
@@ -355,31 +349,32 @@ const ServiceTable = () => {
     return false;
   };
 
-  const handleFilter = (value, key) => {
-    let data = { ...filterQuery };
-    data[key] = value;
-    setFilterQuery(data);
-    let data1 = {};
-    data1["status"] = data["status"];
-    data1["itemId"] = data["Provider"];
+  const handleQuery = (data, page) => {
     let query1 = `&owner=${userAddress}`;
-    if (data1["status"]) {
-      query1 = `&status=${data1["status"]}`;
-    }
-    if (data1["itemId"]) {
-      let queryValue = membership?.purchasedMemberships
-        .filter((item) => item.manufacturer == value)
+    if (data.status) query1 += `&status=${data.status}`;
+
+    if (data?.Provider) {
+      const itemIds = membership?.purchasedMemberships
+        .filter((item) => item.manufacturer === data.Provider)
         .map((item) => item.itemAddress);
-      query1 = `&queryFields[]=[${queryValue}]&queryValue=itemId`;
-      // query1 = `&ownerOrganization=${value}`
+      if (itemIds.length > 0) {
+        query1 += `&itemId[]=${itemIds}`;
+      }
+    } else if (data?.User) {
+      query1 += `&providerLastUpdated=${data?.User}`
     }
+    if (activeTab === 'booked') {
+      serviceUsageActions.fetchBookedServicesUsage(serviceUsageDispatch, limit, (page - 1) * limit, query1);
+    } else {
+      serviceUsageActions.fetchProvidedServicesUsage(serviceUsageDispatch, limit, (page - 1) * limit, query1);
+    }
+  }
+
+  const handleFilter = (value, key) => {
+    const data = { ...filterQuery, [key]: value };
+    setFilterQuery(data);
+    handleQuery(data, page)
     setPage(1);
-    serviceUsageActions.fetchAllServicesUsage(
-      serviceUsageDispatch,
-      limit,
-      offset,
-      query1
-    );
   };
 
   const columns = [
@@ -489,7 +484,7 @@ const ServiceTable = () => {
         <span>
           {record.editable && !isEdit ? (
             <Select
-              disabled={!!!providerState}
+              disabled={!!!providerState || isServicesLoading}
               placeholder="Service"
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
@@ -697,13 +692,12 @@ const ServiceTable = () => {
 
   const handlePaginationChange = (CPage) => {
     setPage(CPage.current);
-    let query1 = `&owner=${userAddress}`;
-    serviceUsageActions.fetchAllServicesUsage(
-      serviceUsageDispatch,
-      limit,
-      (CPage.current - 1) * limit,
-      query1
-    );
+    let page = CPage.current;
+    if (activeTab === 'booked') {
+      handleQuery(filterQuery, page)
+    } else {
+      handleQuery(filterQuery, page)
+    }
   };
 
   const activeTabCheck = activeTab === "booked" ? "Provider" : "User";
@@ -726,7 +720,7 @@ const ServiceTable = () => {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAddRow}
-            disabled={validationError}
+            disabled={validationError || IsLoading}
           >
             Add Service Use
           </Button>
@@ -742,20 +736,22 @@ const ServiceTable = () => {
               placeholder={activeTabCheck}
               suffixIcon={<CaretDownOutlined />}
               style={{ width: 120 }}
+              disabled={IsLoading}
               value={filterQuery[activeTabCheck]}
               onChange={(value, obj) => {
-                handleFilter(obj.label.toString(), activeTabCheck);
+                handleFilter(activeTab == 'booked' ? obj.label : value, activeTabCheck);
               }}
               options={
                 activeTab === "booked"
                   ? transformData(membership?.purchasedMemberships)
-                  : userOptions
+                  : userList
               }
             />
             <Select
               placeholder="Status"
               className="ml-2"
               suffixIcon={<CaretDownOutlined />}
+              disabled={IsLoading}
               style={{ width: 120 }}
               value={filterQuery["status"]}
               onChange={(value) => {

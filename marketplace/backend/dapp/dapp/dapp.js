@@ -1808,11 +1808,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
     const memberships = await contract.getPurchasedMemberships();
-    const data = serviceUsage.map((item, index) => {
-      let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-      return { ...item, provider: result.manufacturer }
+    const ProvidedService = serviceUsage.map((item, index) => {
+      let result = ownedItems.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
+      return { ...item, itemId: result.itemNumber }
     })
-    return { 'ownedProducts': ownedProducts, 'ownedItems': ownedItems }
+    // return { 'ownedProducts': ownedProducts, 'ownedItems': ownedItems }
+    return ProvidedService;
   };
 
   contract.updateServiceUsage = async function (args, options = defaultOptions) {
