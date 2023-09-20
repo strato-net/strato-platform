@@ -1,4 +1,4 @@
-module Util where
+module BlockApps.Tools.Util where
 
 import Control.Monad.IO.Class
 import Control.Monad.Loops

@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module FRawMP where
+module BlockApps.Tools.FRawMP where
 
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP

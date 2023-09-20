@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module CanonRedis where
+module BlockApps.Tools.CanonRedis where
 
 -- import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
 import Blockchain.Data.DataDefs

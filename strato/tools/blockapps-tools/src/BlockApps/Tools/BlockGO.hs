@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module BlockGO where
+module BlockApps.Tools.BlockGO where
 
+import BlockApps.Tools.DumpLevelDB ()
 import Blockchain.Constants
 import Control.Monad
 import Control.Monad.IO.Class
@@ -10,7 +11,6 @@ import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
 import Data.Default
 import qualified Database.LevelDB as DB
-import DumpLevelDB ()
 import System.FilePath
 import Text.Format
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))

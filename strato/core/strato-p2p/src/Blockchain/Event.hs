@@ -19,9 +19,9 @@ module Blockchain.Event
   )
 where
 
+import BlockApps.Crossmon (recordMaxBlockNumber)
 import BlockApps.Logging
 import BlockApps.X509.Certificate as XC
-import Blockapps.Crossmon (recordMaxBlockNumber)
 import Blockchain.Blockstanbul (WireMessage, blockstanbulSender)
 import Blockchain.Context
 import Blockchain.Data.Block

@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Psql where
+module BlockApps.Tools.Psql where
 
 import BlockApps.Logging
 import qualified Blockchain.Data.Blockchain as DataBlock

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module InsertTX where
+module BlockApps.Tools.InsertTX where
 
 import BlockApps.Logging
 import Blockchain.DB.SQLDB (createPostgresqlPool, runSqlPool)

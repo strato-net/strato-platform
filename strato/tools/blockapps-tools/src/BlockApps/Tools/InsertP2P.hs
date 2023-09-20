@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module InsertP2P where
+module BlockApps.Tools.InsertP2P where
 
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event

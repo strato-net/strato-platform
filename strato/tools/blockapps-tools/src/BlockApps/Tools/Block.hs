@@ -1,6 +1,6 @@
-module Block where
+module BlockApps.Tools.Block where
 
-import DumpLevelDB
+import BlockApps.Tools.DumpLevelDB
 import Text.Format
 
 doit :: String -> String -> IO ()

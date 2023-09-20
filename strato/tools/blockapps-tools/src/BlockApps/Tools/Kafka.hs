@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
-module Kafka (saveKafka, loadKafka, verifyKafkaFile, compressRoundChanges, readMsg, writeMsg) where
+module BlockApps.Tools.Kafka (saveKafka, loadKafka, verifyKafkaFile, compressRoundChanges, readMsg, writeMsg) where
 
 import Blockchain.Blockstanbul.Messages
 import Blockchain.EthConf

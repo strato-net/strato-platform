@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Checkpoints
+module BlockApps.Tools.Checkpoints
   ( doCheckpointPut,
     doCheckpointGet,
     doCheckpointUsage,

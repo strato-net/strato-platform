@@ -1,9 +1,9 @@
-module Raw where
+module BlockApps.Tools.Raw where
 
-import DumpLevelDB ()
+import BlockApps.Tools.DumpLevelDB ()
+import BlockApps.Tools.Util
 import Text.Format
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
-import Util
 
 doit :: String -> IO ()
 doit filename = ldbForEach filename $ \key val ->

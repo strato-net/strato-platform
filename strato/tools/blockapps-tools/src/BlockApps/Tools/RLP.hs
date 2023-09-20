@@ -1,8 +1,8 @@
-module RLP where
+module BlockApps.Tools.RLP where
 
+import BlockApps.Tools.Util
 import Blockchain.Data.RLP
 import Text.Format
-import Util
 
 doit :: String -> IO ()
 doit filename = ldbForEach filename $ \key val -> do

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module DumpKafkaRaw where
+module BlockApps.Tools.DumpKafkaRaw where
 
 import Blockchain.EthConf
 import Blockchain.KafkaTopics

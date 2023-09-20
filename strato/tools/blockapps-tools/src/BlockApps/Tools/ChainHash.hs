@@ -1,4 +1,4 @@
-module ChainHash where
+module BlockApps.Tools.ChainHash where
 
 import Blockchain.Data.ChainInfo
 import Blockchain.Strato.Model.Keccak256
