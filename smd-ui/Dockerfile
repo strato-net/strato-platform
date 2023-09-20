@@ -1,7 +1,7 @@
 FROM node:14.21.3-alpine3.17 as base
 RUN apk add --no-cache lsof && \
     mkdir -p /usr/src/app && \
-    npm install -g serve@11.3.2
+    npm install -g serve@13.0.2
 WORKDIR /usr/src/app
 
 FROM base as npminstaller
