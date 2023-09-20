@@ -1,8 +1,5 @@
-FROM node:14-bullseye-slim as base
-RUN apt-get update && \
-    apt-get install -y lsof && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+FROM node:14.21.3-alpine3.17 as base
+RUN apk add --no-cache lsof && \
     mkdir -p /usr/src/app && \
     npm install -g serve@11.3.2
 WORKDIR /usr/src/app
