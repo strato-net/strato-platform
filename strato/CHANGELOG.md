@@ -35,7 +35,7 @@ so that they could be properly moved to their respective version's subsection.
 - SolidVM built-in `create` and `create2` functions which allows for the explicit creation of contracts within SolidVM contracts
 - new `solidvmevents` kafka topic for emitted solidvm events
 - `pretty` Makefile command that triggers the `ormolu` code formatter
-- `haddock` Makefile command that generates haddock documentation for STRATO
+- `hoogle` Makefile command that generates Haddock documentation and serves through local Hoogle instance
 
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
