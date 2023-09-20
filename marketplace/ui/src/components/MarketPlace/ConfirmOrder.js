@@ -46,7 +46,7 @@ const { TextArea } = Input;
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
     name: yup.string().required("Name is required"),
-    zipcode: yup.string().matches(/^\d+$/, "Must contain only numbers").length(5, "Must be exactly 5 digits")
+    zipcode: yup.string().max(15).required("Zipcode is required")
       .required("Zipcode is required"),
     addressLine1: yup.string().required("Address Line 1 is required"),
     addressLine2: yup.string().notRequired(),
@@ -55,12 +55,11 @@ const ShippingDetailsSchema = () => {
     sameAddress: yup.boolean(),
     name_b: yup.string().when("sameAddress", {
       is: false,
-      then: yup.string().required("Billing Name is required"),
+      then: yup.string().required("Name is required"),
     }),
     zipcode_b: yup.number().when("sameAddress", {
       is: false,
-      then: yup.number().required("Zipcode is required")
-        .test('len', 'Must be exactly 5 digits', val => val && val.toString().length === 5),
+      then: yup.string().max(15).required("Zipcode is required"),
     }),
     addressLine1_b: yup.string().when("sameAddress", {
       is: false,
@@ -498,6 +497,7 @@ const ConfirmOrder = () => {
                         label="zipcode"
                         name="zipcode"
                         placeholder="Enter Zipcode"
+                        maxLength={15}
                         value={formik.values.zipcode}
                         onChange={formik.handleChange}
                       />
@@ -638,6 +638,7 @@ const ConfirmOrder = () => {
                                 placeholder="Enter Zipcode"
                                 value={formik.values.zipcode}
                                 onChange={formik.handleChange}
+                                maxLength={15}
                               />
                               {formik.touched.zipcode && formik.errors.zipcode && (
                                 <span className="text-error text-xs">
