@@ -91,7 +91,7 @@ const ServiceTable = () => {
     isCreateServiceUsageSubmitting ||
     isUpdateServicesUsageLoading;
 
-  const serviceUsageData = serviceUsageState?.servicesUsage;
+  const serviceUsageData = serviceUsageState?.servicesUsage?.result;
 
   const defaultMembership = membership?.purchasedMemberships.map(
     ({ itemAddress, itemNumber }) => {
@@ -364,11 +364,11 @@ const ServiceTable = () => {
     isServicesLoading,
   });
 
-  const dataLen = serviceUsageState?.servicesUsage?.length;
+  const dataLen = serviceUsageState?.servicesUsage?.total;
   const paginationConfig = {
     current: page,
     pageSize: 10, // Number of items to display per page
-    total: dataLen == 10 ? (page + 1) * limit + 1 : page * limit, // Total number of items
+    total: dataLen, // Total number of items
     showSizeChanger: false, // Allow users to change the page size
     position: ["bottomCenter"],
   };
@@ -406,7 +406,7 @@ const ServiceTable = () => {
             disabled={
               validationError ||
               IsLoading ||
-              (tableData && !tableData[0]?.address)
+              (tableData && tableData?.length != 0 && !tableData[0]?.address)
             }
           >
             Add Service Use
@@ -457,7 +457,7 @@ const ServiceTable = () => {
           <Table
             columns={columns}
             dataSource={tableData}
-            pagination={dataLen <= 10 && page == 0 ? false : paginationConfig}
+            pagination={paginationConfig}
             loading={IsLoading}
             rowKey="key"
             onChange={handlePaginationChange} // Add this line to handle pagination changes

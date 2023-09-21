@@ -7,6 +7,7 @@ import {
   InputNumber,
   Button,
   Space,
+  Spin,
 } from "antd";
 import {
   LockOutlined,
@@ -167,7 +168,7 @@ export function generateTableColumns({
           <Select
             disabled={!!!providerState || isServicesLoading}
             placeholder="Service"
-            suffixIcon={<CaretDownOutlined />}
+            suffixIcon={isServicesLoading ? <Spin size='small' /> : <CaretDownOutlined />}
             style={{ width: 120 }}
             onChange={(value) => handleInputChange(value, "serviceId", index)}
             options={serviceList}

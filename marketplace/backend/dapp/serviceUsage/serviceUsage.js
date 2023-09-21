@@ -16,29 +16,29 @@ const contractFilename = `${util.cwd}/dapp/serviceUsage/contracts/ServiceUsage.s
  * @returns Contract object
  * */
 async function uploadContract(user, _constructorArgs, options) {
-    const constructorArgs = marshalIn(_constructorArgs);
+  const constructorArgs = marshalIn(_constructorArgs);
 
-    const contractArgs = {
-        name: contractName,
-        source: await importer.combine(contractFilename),
-        args: util.usc(constructorArgs),
-    };
+  const contractArgs = {
+    name: contractName,
+    source: await importer.combine(contractFilename),
+    args: util.usc(constructorArgs),
+  };
 
-    let error = [];
+  let error = [];
 
-    if (error.length) {
-        throw new Error(error.join('\n'));
-    }
+  if (error.length) {
+    throw new Error(error.join('\n'));
+  }
 
-    const copyOfOptions = {
-        ...options,
-        history: contractName
-      }
+  const copyOfOptions = {
+    ...options,
+    history: contractName
+  }
 
-    const contract = await rest.createContract(user, contractArgs, copyOfOptions);
-    contract.src = 'removed';
+  const contract = await rest.createContract(user, contractArgs, copyOfOptions);
+  contract.src = 'removed';
 
-    return bind(user, contract, copyOfOptions);
+  return bind(user, contract, copyOfOptions);
 }
 
 /**
@@ -53,35 +53,35 @@ async function uploadContract(user, _constructorArgs, options) {
  * @param args - Contract state 
  */
 function marshalIn(_args) {
-    const defaultArgs = {
-        itemId: '0',
-        serviceId: '0',
-        summary: '',
-        providerComment: '',
-    };
-    
-    const args = {
-        ...defaultArgs,
-        ..._args,
-    };
-    return args;
+  const defaultArgs = {
+    itemId: '0',
+    serviceId: '0',
+    summary: '',
+    providerComment: '',
+  };
+
+  const args = {
+    ...defaultArgs,
+    ..._args,
+  };
+  return args;
 }
 
 async function getHistory(user, chainId, address, options) {
-    const contractArgs = {
-        name: `history@${contractName}`,
-    }
+  const contractArgs = {
+    name: `history@${contractName}`,
+  }
 
-    const copyOfOptions = {
-        ...options,
-        query: {
-            address: `eq.${address}`,
-        },
-        chainIds: [chainId]
-    }
+  const copyOfOptions = {
+    ...options,
+    query: {
+      address: `eq.${address}`,
+    },
+    chainIds: [chainId]
+  }
 
-    const history = await rest.search(user, contractArgs, copyOfOptions)
-    return history
+  const history = await rest.search(user, contractArgs, copyOfOptions)
+  return history
 }
 
 /**
@@ -96,10 +96,10 @@ async function getHistory(user, chainId, address, options) {
  * @param _args - Contract state
  */
 function marshalOut(_args) {
-    const args = {
-        ..._args,
-    };
-    return args;
+  const args = {
+    ..._args,
+  };
+  return args;
 }
 
 /**
@@ -111,29 +111,29 @@ function marshalOut(_args) {
 
 
 function bind(user, _contract, options) {
-    const contract = { ..._contract };
+  const contract = { ..._contract };
 
-    contract.get = async (args = { address: contract.address, }) => get(user, args, options);
-    contract.getState = async () => getState(user, contract, options);
-    contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
-    contract.update = async (args) => update(user, contract, args, options);
-    contract.addOrg = async  (orgName) => addOrg(user, contract, options, orgName);
-    contract.addOrgUnit = async  (orgName, orgUnit) => addOrgUnit(user, contract, options, orgName, orgUnit);
-    contract.addMember = async  (orgName, orgUnit, commonName) => addMember(user, contract, options, orgName, orgUnit, commonName);
-    contract.removeOrg = async  (orgName) => removeOrg(user, contract, options, orgName);
-    contract.removeOrgUnit = async  (orgName, orgUnit) => removeOrgUnit(user, contract, options, orgName, orgUnit);
-    contract.removeMember = async (orgName, orgUnit, commonName) => removeMember(user, contract, options, orgName, orgUnit, commonName);
-    contract.addOrgs = async (orgNames) => addOrgs(user, contract, options, orgNames);
-    contract.addOrgUnits = async (orgNames, orgUnits) => addOrgUnits(user, contract, options, orgNames, orgUnits);
-    contract.addMembers = async (orgNames, orgUnits, commonNames) => addMembers(user, contract, options, orgNames, orgUnits, commonNames);
-    contract.removeOrgs = async (orgNames) => removeOrgs(user, contract, options, orgNames);
-    contract.removeOrgUnits = async (orgNames, orgUnits) => removeOrgUnits(user, contract, options, orgNames, orgUnits);
-    contract.removeMembers = async (orgNames, orgUnits, commonNames) => removeMembers(user, contract, options, orgNames, orgUnits, commonNames);
-    contract.getMembers = async () => getMembers(user, contract, options);
-    contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
-    contract.chainIds = options.chainIds;
+  contract.get = async (args = { address: contract.address, }) => get(user, args, options);
+  contract.getState = async () => getState(user, contract, options);
+  contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
+  contract.update = async (args) => update(user, contract, args, options);
+  contract.addOrg = async (orgName) => addOrg(user, contract, options, orgName);
+  contract.addOrgUnit = async (orgName, orgUnit) => addOrgUnit(user, contract, options, orgName, orgUnit);
+  contract.addMember = async (orgName, orgUnit, commonName) => addMember(user, contract, options, orgName, orgUnit, commonName);
+  contract.removeOrg = async (orgName) => removeOrg(user, contract, options, orgName);
+  contract.removeOrgUnit = async (orgName, orgUnit) => removeOrgUnit(user, contract, options, orgName, orgUnit);
+  contract.removeMember = async (orgName, orgUnit, commonName) => removeMember(user, contract, options, orgName, orgUnit, commonName);
+  contract.addOrgs = async (orgNames) => addOrgs(user, contract, options, orgNames);
+  contract.addOrgUnits = async (orgNames, orgUnits) => addOrgUnits(user, contract, options, orgNames, orgUnits);
+  contract.addMembers = async (orgNames, orgUnits, commonNames) => addMembers(user, contract, options, orgNames, orgUnits, commonNames);
+  contract.removeOrgs = async (orgNames) => removeOrgs(user, contract, options, orgNames);
+  contract.removeOrgUnits = async (orgNames, orgUnits) => removeOrgUnits(user, contract, options, orgNames, orgUnits);
+  contract.removeMembers = async (orgNames, orgUnits, commonNames) => removeMembers(user, contract, options, orgNames, orgUnits, commonNames);
+  contract.getMembers = async () => getMembers(user, contract, options);
+  contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
+  contract.chainIds = options.chainIds;
 
-    return contract;
+  return contract;
 }
 
 /** 
@@ -147,11 +147,11 @@ function bind(user, _contract, options) {
  * @param options ServiceUsage deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 function bindAddress(user, address, options) {
-    const contract = {
-        name: contractName,
-        address,
-    };
-    return bind(user, contract, options);
+  const contract = {
+    name: contractName,
+    address,
+  };
+  return bind(user, contract, options);
 }
 
 /**
@@ -163,28 +163,36 @@ function bindAddress(user, address, options) {
 
 
 async function get(user, args, options) {
-    const { uniqueServiceUsageID, address, ...restArgs } = args;
-    let serviceUsage;
+  const { uniqueServiceUsageID, address, ...restArgs } = args;
+  let serviceUsage;
 
-    if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        serviceUsage = await searchOne(contractName, searchArgs, options, user);
-    } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueServiceUsageID', value: uniqueServiceUsageID });
-        serviceUsage = await searchOne(contractName, searchArgs, options, user);
-    }
-    if (!serviceUsage) {
-        return undefined;
-    }
+  if (address) {
+    const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
+    serviceUsage = await searchOne(contractName, searchArgs, options, user);
+  } else {
+    const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueServiceUsageID', value: uniqueServiceUsageID });
+    serviceUsage = await searchOne(contractName, searchArgs, options, user);
+  }
+  if (!serviceUsage) {
+    return undefined;
+  }
 
 
-    return marshalOut({ ...serviceUsage, 
-    });
+  return marshalOut({
+    ...serviceUsage,
+  });
 }
 
 async function getAll(admin, args = {}, options) {
-    const serviceUsages = await searchAllWithQueryArgs(contractName, args, options, admin)
-    return serviceUsages.map((serviceUsage) => marshalOut(serviceUsage))
+  let arg = { ...args }
+  arg['limit'] = ''
+  arg['offset'] = 0
+  const serviceUsages = await searchAllWithQueryArgs(contractName, args, options, admin)
+  const serviceCount = await searchAllWithQueryArgs(contractName, arg, options, admin)
+
+  return { serviceUsage: serviceUsages.map((serviceUsage) => marshalOut(serviceUsage)), total: serviceCount.length }
+
+
 }
 
 /**
@@ -192,67 +200,67 @@ async function getAll(admin, args = {}, options) {
  * @deprecated Use {@link get `get`} instead.
  */
 async function getState(user, contract, options) {
-    const state = await rest.getState(user, contract, options);
-    return marshalOut(state);
+  const state = await rest.getState(user, contract, options);
+  return marshalOut(state);
 }
 
 /**
  * Update ServiceUsage
  */
 async function update(admin, contract, _args, baseOptions) {
-    const args = marshalIn(_args)
-  
-    const scheme = Object.keys(_args).reduce((agg, key) => {
-      const base = 1
-      switch (key) {
-        case 'serviceDate':
-          return agg | (base << 0)
-        case 'summary':
-          return agg | (base << 1)
-        case 'status':
-          return agg | (base << 2)
-        case 'paymentStatus':
-          return agg | (base << 3)
-        case 'providerLastUpdated':
-          return agg | (base << 4)
-        case 'providerComment':
-          return agg | (base << 5)
-        case 'providerLastUpdatedDate':
-          return agg | (base << 6)
-        case 'pricePaid':
-          return agg | (base << 7)
-        default:
-          return agg
-      }
-    }, 0)
-  
-    const callArgs = {
-      contract,
-      method: 'update',
-      args: util.usc({
-        scheme,
-        ...args
-      }),
+  const args = marshalIn(_args)
+
+  const scheme = Object.keys(_args).reduce((agg, key) => {
+    const base = 1
+    switch (key) {
+      case 'serviceDate':
+        return agg | (base << 0)
+      case 'summary':
+        return agg | (base << 1)
+      case 'status':
+        return agg | (base << 2)
+      case 'paymentStatus':
+        return agg | (base << 3)
+      case 'providerLastUpdated':
+        return agg | (base << 4)
+      case 'providerComment':
+        return agg | (base << 5)
+      case 'providerLastUpdatedDate':
+        return agg | (base << 6)
+      case 'pricePaid':
+        return agg | (base << 7)
+      default:
+        return agg
     }
-  
-    const options = {
-      ...baseOptions,
-      history: [contractName],
-    }
-  
-    const [restStatus, ServiceUsageAddress] = await rest.call(admin, callArgs, options)
-  
-    if (parseInt(restStatus, 10) !== RestStatus.OK) throw new rest.RestError(restStatus, 0, { callArgs })
-  
-    return [restStatus, ServiceUsageAddress];
+  }, 0)
+
+  const callArgs = {
+    contract,
+    method: 'update',
+    args: util.usc({
+      scheme,
+      ...args
+    }),
   }
 
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  }
+
+  const [restStatus, ServiceUsageAddress] = await rest.call(admin, callArgs, options)
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK) throw new rest.RestError(restStatus, 0, { callArgs })
+
+  return [restStatus, ServiceUsageAddress];
+}
+
 export default {
-    uploadContract,
-    contractName,
-    contractFilename,
-    bindAddress,
-    get,
-    getAll,
-    update
+  uploadContract,
+  contractName,
+  contractFilename,
+  bindAddress,
+  get,
+  getAll,
+  update
 }
