@@ -44,6 +44,7 @@ initP2P = do
   let sSource = seqEventNotificationSourceChanPour ((\(a,_) -> a) contextkafkamiddleman)
                                                    dupChan
       runner f = runContextM cfg $ f sSource
-  liftIO $ race_
-    (run 10248 $ prometheus def p2pApp)
-    (runLoggingT $ stratoP2P runner)
+  liftIO $
+    race_
+      (run 10248 $ prometheus def p2pApp)
+      (runLoggingT $ stratoP2P runner)

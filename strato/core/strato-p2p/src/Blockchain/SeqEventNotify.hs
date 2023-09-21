@@ -51,7 +51,6 @@ seqEventNotificationSourceChanFill ks p2peventchan = do
                             liftIO $ writeChan p2peventchan (e,(\(KP.Offset o) -> o) nextOffset)
                         loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
 
-
 seqEventNotificationSourceChanPour :: ( MonadIO m
                                       , MonadLogger m 
                                       )

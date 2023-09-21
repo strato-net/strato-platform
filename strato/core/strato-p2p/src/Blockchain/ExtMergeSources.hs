@@ -6,9 +6,10 @@
 {-# LANGUAGE RankNTypes                #-}
 {-# LANGUAGE TemplateHaskell           #-}
 
-module Blockchain.ExtMergeSources (
-  mergeSourcesByForce
-  ) where
+module Blockchain.ExtMergeSources
+  ( mergeSourcesByForce
+  )
+where
 
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -23,8 +24,6 @@ import           Data.Kind
 import           UnliftIO.Concurrent
 import           UnliftIO.Exception
 import           UnliftIO.STM
-
-import           BlockApps.Logging
 
 -- | Modifies a TVar, returning its new value.
 modifyTVar'' :: TVar a

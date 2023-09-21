@@ -7,53 +7,48 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
-module Blockchain.SolidVM.SetGet (
-  setVar,
+module Blockchain.SolidVM.SetGet
+  ( setVar,
+    weakGetVar,
+    getVar,
+    getInt,
+    getBool,
+    getAccount,
+    getString,
+    {-
+      getSolid,
+    -}
+    deleteVar,
+    toBasic,
+    fromBasic,
+    showSM,
+  )
+where
 
-  weakGetVar,
-  getVar,
-
-  getInt,
-  getBool,
-  getAccount,
-  getString,
-{-
-  getSolid,
--}
-  deleteVar,
-
-  toBasic,
-  fromBasic,
-    
-  showSM
-  ) where
-
-import           Control.Monad
-import           Control.Monad.IO.Class
+import Blockchain.DB.SolidStorageDB
+import Blockchain.SolidVM.Exception
+import Blockchain.SolidVM.SM
+import Blockchain.Strato.Model.Account
+import Control.Monad
+import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.UTF8  as UTF8
-import           Data.Foldable (for_)
-import           Data.List
+import qualified Data.ByteString.UTF8 as UTF8
+import Data.Foldable (for_)
+import Data.List
 import qualified Data.Map as M
 import qualified Data.Vector as V
-import           Text.Printf
-
-import           Blockchain.DB.SolidStorageDB
-import           Blockchain.SolidVM.Exception
-import           Blockchain.SolidVM.SM
-import           Blockchain.Strato.Model.Account
 import qualified SolidVM.Model.CodeCollection as CC
-import           SolidVM.Model.SolidString
-import qualified SolidVM.Model.Type as SVMType
+import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
-import           SolidVM.Model.Value
-import           Text.Format
-import           UnliftIO
+import qualified SolidVM.Model.Type as SVMType
+import SolidVM.Model.Value
+import Text.Format
+import Text.Printf
+import UnliftIO
 
 --import Debug.Trace
-
 
 {-
 {-# INLINE putSolid #-}
@@ -95,17 +90,17 @@ findDefault = \case
   TComplex -> todo "finddefault/complex" TComplex
   Todo msg -> todo "findDefault/todo" msg
 
-toBasic :: Value -> MS.BasicValue
+toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
-  SInteger i -> MS.BInteger i
-  SString s -> MS.BString (BC.pack s)
-  SBool b -> MS.BBool b
-  SAccount a _ -> MS.BAccount a
-  SContract n a -> MS.BContract n a
-  SEnumVal k t num -> MS.BEnumVal k t num
-  SMappingSentinel -> MS.BMappingSentinel
-  SUserDefined  _ _  x -> toBasic x
-  x -> typeError "non basic solidity type cannot be stored atomically: " (show x)
+  SInteger i -> Just $ MS.BInteger i
+  SString s -> Just $ MS.BString (BC.pack s)
+  SBool b -> Just $ MS.BBool b
+  SAccount a _ -> Just $ MS.BAccount a
+  SContract n a -> Just $ MS.BContract n a
+  SEnumVal k t num -> Just $ MS.BEnumVal k t num
+  SMappingSentinel -> Just $ MS.BMappingSentinel
+  SUserDefined _ _ x -> toBasic x
+  _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()
 setVar (Constant dst) src = setVal dst src
@@ -115,75 +110,62 @@ setVal :: MonadSM m => Value -> Value -> m ()
 -- If val is a simple value, assign it. If it
 -- is deeper, read the subfields and assign to their adjustment
 
-setVal (SUserDefined a _ _) (SUserDefined _ _ _) = 
-  when (True) (internalError "Unimplemented feature user defined types" (a ))
-
+setVal (SUserDefined a _ _) (SUserDefined _ _ _) =
+  when (True) (internalError "Unimplemented feature user defined types" (a))
 setVal (SReference dst) (SReference src) = do
   t <- getXabiValueType src
   case t of
-    SVMType.Array{} -> do
+    SVMType.Array {} -> do
       len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
       setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger len
-      forM_ [0..len-1] $ \i -> do
+      forM_ [0 .. len - 1] $ \i -> do
         let i' = fromIntegral i
-        setVal (SReference $ dst `apSnoc` MS.ArrayIndex i') =<<
-          getVar (Constant $ SReference $ src `apSnoc` MS.ArrayIndex i')
+        setVal (SReference $ dst `apSnoc` MS.ArrayIndex i')
+          =<< getVar (Constant $ SReference $ src `apSnoc` MS.ArrayIndex i')
     _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
-
-
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
     setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
-
 setVal (SReference dst) (SArray _ fs) = do
   let len = length fs
   setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
-  forM_ [0..len-1] $ \i -> do
+  forM_ [0 .. len - 1] $ \i -> do
     let i' = fromIntegral i
     elementVal <- getVar $ fs V.! i
     setVal (SReference $ dst `apSnoc` MS.ArrayIndex i') elementVal
-
-
-
-setVal (STuple dstVector) (STuple srcVector) = 
+setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
-  then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
-  else do
-    let zipped = V.zip dstVector srcVector
-    --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
-    zipped' <- forM zipped $ \(dstItem, srcItemVar) -> do
-      srcItemVal <- getVar srcItemVar
-      return (dstItem, srcItemVal)
-    forM_ zipped' $ \(dstItem, srcItemVal) -> do
-      setVar dstItem srcItemVal
-   
+    then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
+    else do
+      let zipped = V.zip dstVector srcVector
+      --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
+      zipped' <- forM zipped $ \(dstItem, srcItemVar) -> do
+        srcItemVal <- getVar srcItemVar
+        return (dstItem, srcItemVal)
+      forM_ zipped' $ \(dstItem, srcItemVal) -> do
+        setVar dstItem srcItemVal
 setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
-  !t <- getXabiValueType addressedPath   -- IMPORTANT: t is not evaulated until it is used, so we use bang pattern to force it to WHNF
+  !t <- getXabiValueType addressedPath -- IMPORTANT: t is not evaulated until it is used, so we use bang pattern to force it to WHNF
   let basicSrc = case src of
-                        SString s ->
-                            case t of   -- t is evaluated here because Haskell is lazy
-                                        -- We ONLY want to evaluate it if we know src is a SString because
-                                        -- in some non-SString cases getXabiValueType will throw an exception
-                                SVMType.String{} -> MS.BString . UTF8.fromString $ s 
-                                _             -> toBasic src
-                        _         -> toBasic src
-  markDiffForAction addr path basicSrc
-  putSolidStorageKeyVal' addr path basicSrc
-
-
+        SString s ->
+          case t of -- t is evaluated here because Haskell is lazy
+          -- We ONLY want to evaluate it if we know src is a SString because
+          -- in some non-SString cases getXabiValueType will throw an exception
+            SVMType.String {} -> Just . MS.BString . UTF8.fromString $ s
+            _ -> toBasic src
+        _ -> toBasic src
+  case basicSrc of
+    Nothing -> typeError "non basic solidity type cannot be stored atomically" src
+    Just b -> do
+      markDiffForAction addr path b
+      putSolidStorageKeyVal' addr path b
 setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
-
 setVal (SNULL) _ = return ()
-
-
-
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
 
-  
 {-
-
 
 getInt :: Variable -> SM Integer
 getInt p = do
@@ -202,7 +184,6 @@ getBool p = do
 
 getAccount :: MonadSM m => Variable -> m Value
 getAccount = getVar
-
 
 getString :: MonadSM m => Variable -> m Value
 getString = getVar
@@ -234,48 +215,52 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
         TComplex -> return $ SReference addressedPath
         _ -> return $ findDefault typeHint
     MS.BString bs -> do
-        t <- getXabiValueType addressedPath
-        case t of
-                SVMType.String{} -> return . SString $ UTF8.toString bs
-                _             -> return $ fromBasic theValue
+      t <- getXabiValueType addressedPath
+      case t of
+        SVMType.String {} -> return . SString $ UTF8.toString bs
+        _ -> return $ fromBasic theValue
     _ -> return $ fromBasic theValue
-
 getVar (Constant (SStruct s ma)) = do
-  resolved <- mapM (\var -> do
-      v <- getVar var
-      return $ Constant v
-    ) ma
+  resolved <-
+    mapM
+      ( \var -> do
+          v <- getVar var
+          return $ Constant v
+      )
+      ma
   return $ SStruct s resolved
-
 getVar (Constant (SArray typ vc)) = do
-  resolved <- V.mapM (\var -> do
-      v <- getVar var
-      return $ Constant v
-    ) vc
+  resolved <-
+    V.mapM
+      ( \var -> do
+          v <- getVar var
+          return $ Constant v
+      )
+      vc
   return $ SArray typ resolved
-
 getVar (Constant (STuple vct)) = do
-  resolved <- V.mapM (\var -> do
-      v <- getVar var
-      return $ Constant v
-    ) vct
+  resolved <-
+    V.mapM
+      ( \var -> do
+          v <- getVar var
+          return $ Constant v
+      )
+      vct
   return $ STuple resolved
-  
 getVar (Constant (SMap ty mp)) = do
-  resolved <- mapM (\var -> do
-      v <- getVar var
-      return $ Constant v
-    ) mp
+  resolved <-
+    mapM
+      ( \var -> do
+          v <- getVar var
+          return $ Constant v
+      )
+      mp
   return $ SMap ty resolved
-
 getVar (Constant (SPush v (Just var))) = do
   resolved <- getVar var
   return $ SPush v (Just $ Constant resolved)
-
 getVar (Constant v) = return v
-
 getVar (Variable v) = liftIO $ readIORef v
-
 
 getInt :: MonadSM m => Variable -> m Integer
 getInt p = do
@@ -295,21 +280,20 @@ deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference a@(AccountPath addr path))) = do
   xType <- getXabiValueType a
   case xType of
-    SVMType.Array{} -> do
+    SVMType.Array {} -> do
       let lengthVar = Constant . SReference $ a `apSnoc` MS.Field "length"
       len <- fromInteger <$> getInt lengthVar
       deleteVar lengthVar
-      unless (len <= 0) . for_ [0..(len - 1)] $ \i -> do
+      unless (len <= 0) . for_ [0 .. (len - 1)] $ \i -> do
         let elemPath = a `apSnoc` MS.ArrayIndex i
         deleteVar . Constant $ SReference elemPath
-    _ -> do -- TODO: handle other types
+    _ -> do
+      -- TODO: handle other types
       ro <- readOnly <$> getCurrentCallInfo
       when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
       markDiffForAction addr path $ MS.BDefault
       putSolidStorageKeyVal' addr path $ MS.BDefault
-
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
-
 
 {-
 getVar' :: Maybe BasicType -> Variable -> SM Value
@@ -338,14 +322,14 @@ getStorageItem mTypeHint apt@(AddressedPath loc key) = do
         _ -> return $ findDefault typeHint
 -}
 
-
 showSM :: MonadSM m => Value -> m String
 showSM SNULL = return "NULL"
 showSM (SInteger v) = return $ show v
 showSM (SString v) = return v
 showSM (SBool v) = return $ show v
-showSM (SEnumVal enumName valName num) = return
-    $ printf "%s.%s (= %x)" enumName valName num
+showSM (SEnumVal enumName valName num) =
+  return $
+    printf "%s.%s (= %x)" enumName valName num
 showSM (SAccount a _) = return $ show a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
@@ -361,9 +345,10 @@ showSM (SStruct name m) = do
       val <- getVar var
       valString <- showSM val
       return (n, valString)
-  return $ labelToString name ++ "{"
-                ++ intercalate ", " (map (\(n, v) -> labelToString n ++ ": " ++ v) valStrings)
-                ++ "}"
+  return $
+    labelToString name ++ "{"
+      ++ intercalate ", " (map (\(n, v) -> labelToString n ++ ": " ++ v) valStrings)
+      ++ "}"
 showSM (SMap _ m) = do
   valStrings <-
     forM (M.toList m) $ \(key, var) -> do
@@ -371,19 +356,20 @@ showSM (SMap _ m) = do
       valString <- showSM val
       keyString <- showSM key
       return (keyString, valString)
-  return $ "{"
-           ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
-           ++ "}"
+  return $
+    "{"
+      ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
+      ++ "}"
 showSM (SContract name address) = do
   return $ "Contract: " ++ labelToString name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
-showSM (SContractFunction maybeContractName address functionName ) = do
+showSM (SContractFunction maybeContractName address functionName) = do
   contractName <- case maybeContractName of
     Just name -> return name
     Nothing -> do
       contract <- getCurrentContract
       return $ CC._contractName contract
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
-showSM (SVariadic xs) = ('[':) . (++"]") . intercalate ", " <$> traverse showSM xs
+showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x

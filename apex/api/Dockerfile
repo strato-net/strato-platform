@@ -1,16 +1,15 @@
-FROM node:8.16.2-buster-slim
-RUN apt-get update && \
-    apt-get install -y git postgresql-client python build-essential && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+FROM node:18.18-alpine3.18
+ARG STRATO_VERSION
+ENV STRATO_VERSION=${STRATO_VERSION}
+RUN apk add --no-cache postgresql-client curl lsof && \
     mkdir -p /usr/src/app
-    # Layer is shared with SMD. TODO: use shared base
-    # postgres-client is required for pgtools module; also used for container health check
+    # postgres-client is required for pgtools module
 WORKDIR /usr/src/app
 EXPOSE 3009
+HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
+  CMD lsof -i :3009 || \
+    exit 1
 COPY package*.json  /usr/src/app/
 RUN npm install
 COPY . /usr/src/app
-ARG STRATO_VERSION
-ENV STRATO_VERSION=${STRATO_VERSION}
-CMD [ "bash", "-c", "/usr/src/app/docker-run.sh" ]
+CMD [ "sh", "-c", "/usr/src/app/docker-run.sh" ]

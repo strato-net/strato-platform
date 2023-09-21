@@ -1,12 +1,11 @@
-
 module Blockchain.Strato.Mining.Ethash.TimeIt where
 
-import           Data.Time.Clock.POSIX
+import Data.Time.Clock.POSIX
 
-timeIt::IO a->IO a
+timeIt :: IO a -> IO a
 timeIt f = do
   before <- getPOSIXTime
   ret <- f
   after <- getPOSIXTime
-  print (after-before)
+  print (after - before)
   return ret

@@ -14,9 +14,9 @@ import qualified Data.Text as T
 import           BlockApps.Logging as BL
 import           Blockchain.Context
 import           Executable.StratoP2PClient
--- import           Executable.StratoP2PClientDirect
-import           Executable.StratoP2PServer
+-- import          Executable.StratoP2PClientDirect
 import           Executable.StratoP2PLoopback
+import           Executable.StratoP2PServer
 
 raceAll :: [BL.LoggingT IO a]
         -> BL.LoggingT IO a

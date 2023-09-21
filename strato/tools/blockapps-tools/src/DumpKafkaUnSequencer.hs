@@ -1,21 +1,19 @@
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module DumpKafkaUnSequencer where
 
-import           Control.Monad.IO.Class
-import           Network.Kafka.Protocol
+import Blockchain.EthConf
+import Blockchain.Sequencer.Kafka
+import Control.Monad.IO.Class
+import Network.Kafka.Protocol
+import Text.Format
 
-import           Blockchain.EthConf
-import           Blockchain.Sequencer.Kafka
-
-import           Text.Format
-
-dumpKafkaUnSequencer::Offset->IO ()
+dumpKafkaUnSequencer :: Offset -> IO ()
 dumpKafkaUnSequencer startingBlock = do
   ret <- runKafkaConfigured "queryStrato" $ doConsume' startingBlock
   case ret of
-    Left e  -> error $ show e
+    Left e -> error $ show e
     Right _ -> return ()
   where
     doConsume' offset = do

@@ -1,21 +1,19 @@
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
 {-# OPTIONS -fno-warn-orphans      #-}
 
-import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.Secp256k1
-import           BlockApps.X509
-
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Reader
-import           Crypto.PubKey.ECC.Types
-import qualified Data.Aeson                           as Ae
-import           Data.Coerce
-import           Data.Maybe
-import           Data.Hourglass
-
-import           Test.Hspec
-
+import BlockApps.X509
+import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Secp256k1
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Crypto.PubKey.ECC.Types
+import qualified Data.Aeson as Ae
+import Data.Coerce
+import Data.Hourglass
+import Data.Maybe
+import Test.Hspec
 
 type TestCertM = ReaderT PrivateKey IO
 
@@ -24,10 +22,8 @@ instance HasVault TestCertM where
   getShared _ = error "we never call getShared with this tool"
   sign bs = ask >>= return . flip signMsg bs
 
-
 main :: IO ()
 main = hspec spec
-
 
 spec :: Spec
 spec = do
@@ -53,7 +49,7 @@ spec = do
     it "makeCert can use dateTime" $ do
       let date = timeParse ISO8601_Date "2020-12-12"
       cert <- makeCert date iss sub
-      let (_,b) = certValidity cert
+      let (_, b) = certValidity cert
       b `shouldBe` fromMaybe (error "Date in makeCert didn't return properly") date
     it "makeCert defaults to one year" $ do
       exprDate <- snd . certValidity <$> makeCert Nothing iss sub
@@ -72,11 +68,11 @@ spec = do
       rlpDecode rlp `shouldBe` cert
       rlpEncode cert `shouldBe` rlp
     it "can verify cert signatures" $ do
-      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert Nothing Nothing iss sub
+      (X509Certificate (CertificateChain (cert : _))) <- flip runReaderT priv $ makeSignedCert Nothing Nothing iss sub
       let sigVerification = verifySignedSignature (coerce cert) (certPubKey $ getCertificate $ coerce cert)
       sigVerification `shouldBe` SignaturePass
     it "can reject invalid signatures" $ do
-      (X509Certificate (CertificateChain (cert:_))) <- flip runReaderT priv $ makeSignedCert Nothing Nothing iss sub
+      (X509Certificate (CertificateChain (cert : _))) <- flip runReaderT priv $ makeSignedCert Nothing Nothing iss sub
       fakePriv <- newPrivateKey
       let fakeSerialPub = SerializedPoint $ exportPublicKey False (derivePublicKey fakePriv)
           fakePub = PubKeyEC $ PubKeyEC_Named SEC_p256k1 fakeSerialPub
@@ -130,4 +126,3 @@ spec = do
       cert3 <- flip runReaderT priv2 $ makeSignedCert Nothing (Just cert2) iss2 sub3
 
       verifyCert pub cert3 `shouldBe` False
-
