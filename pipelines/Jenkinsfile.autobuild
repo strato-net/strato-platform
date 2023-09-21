@@ -255,7 +255,6 @@ pipeline {
               echo "Running unit tests"
               ./run_unit_tests.sh
             '''
-            archiveArtifacts artifacts: "${sh(returnStdout: true, script: 'cd strato && stack path --local-hpc-root | sed "s|$(pwd)|\.|"').trim()}", fingerprint: true
           },
 
           'SMD tests': {
