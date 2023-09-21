@@ -19,17 +19,17 @@
             ]
         },
         {
-            "name": "Real Estate",
+            "name": "Clothing",
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "House"
+                    "name": "Sneakers"
                 },
                 {
-                    "name": "Apartment"
+                    "name": "Shirts"
                 },
                 {
-                    "name": "Townhouse"
+                    "name": "Pants"
                 }
             ]
         }
