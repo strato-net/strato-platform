@@ -2,10 +2,10 @@ FROM node:14.21.3-alpine3.17 as base
 RUN apk add --no-cache curl yarn git lsof && \
     yarn global add serve@13.0.2 && \
     mkdir -p /usr/src/ui
-WORKDIR /usr/src/ui
+WORKDIR /usr/src/ui/
 
 FROM base as yarninstaller
-COPY package*.json /usr/src/ui
+COPY package*.json /usr/src/ui/
 COPY yarn.lock /usr/src/ui
 RUN yarn install
 
