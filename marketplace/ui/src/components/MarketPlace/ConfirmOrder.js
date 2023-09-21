@@ -30,7 +30,7 @@ import DataTableComponent from "../DataTableComponent";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import "./index.css";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import { ORDER_STATUS, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -336,6 +336,7 @@ const ConfirmOrder = () => {
       orderList,
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
+      status: ORDER_STATUS.PAYMENT_PENDING
     };
 
     TagManager.dataLayer({
@@ -733,11 +734,11 @@ const ConfirmOrder = () => {
               }
             </div>
             {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className="justify-center mt-12">
-              <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
+              <div id="reserve-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);
                 }}>
-                Pay later
+                Reserve
               </div>
               <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
                 onClick={() => {

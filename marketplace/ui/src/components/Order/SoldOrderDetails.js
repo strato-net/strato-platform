@@ -27,7 +27,7 @@ import DataTableComponent from "../DataTableComponent";
 import { getStatus, getStatusByValue } from "./constant";
 import dayjs from "dayjs";
 import ConfirmStatusModal from "./ConfirmStatusModal";
-import { US_DATE_FORMAT } from "../../helpers/constants";
+import { ORDER_STATUS, US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
@@ -503,7 +503,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 id="save-button"
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false}
+                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false || orderDetails.status === ORDER_STATUS.PAYMENT_PENDING}
                 onClick={() => {
                   handleUpdateComment()
                   TagManager.dataLayer({

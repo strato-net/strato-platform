@@ -884,7 +884,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   contract.createOrder = async function (args, options = defaultOptions) {
 
     try {
-      const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
+      const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress, status } = args;
       const currentTimestamp = Math.floor(Date.now() / 1000);
 
       const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
@@ -960,7 +960,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
           orderDate,
           orderTotal,
           orderShippingCharges: shippingCharge,
-          status: ORDER_STATUS.AWAITING_FULFILLMENT,
+          status: status,
           amountPaid,
           buyerComments: '',
           sellerComments: '',

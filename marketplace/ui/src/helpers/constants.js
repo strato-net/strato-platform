@@ -34,6 +34,14 @@ export const INVENTORY_STATUS = {
   2: "Unpublished",
 };
 
+export const ORDER_STATUS = {
+  "AWAITING_FULFILLMENT": 1,
+  "AWAITING_SHIPMENT": 2,
+  "CLOSED": 3,
+  "CANCELED": 4,
+  "PAYMENT_PENDING": 5
+}
+
 export const unitOfMeasures = [
   { name: "LB", value: 1 },
   { name: "Ounce", value: 2 },
@@ -70,18 +78,18 @@ export const STATUS_FILTER = [
 ];
 
 export const STATUS = {
-    0: "",
-    1: "Pending",
-    2: "Approved",
-    3: "Rejected",
-    "Pending" : 1,
-    "Approved" : 2,
-    "Rejected" : 3
-  };
+  0: "",
+  1: "Pending",
+  2: "Approved",
+  3: "Rejected",
+  "Pending": 1,
+  "Approved": 2,
+  "Rejected": 3
+};
 
-  export const APPROVAL_STATUS = {
-    1: "Accept",
-    2: "Reject",
-    "Accept" : 1,
-    "Reject" : 2,
-  };
+export const APPROVAL_STATUS = {
+  1: "Accept",
+  2: "Reject",
+  "Accept": 1,
+  "Reject": 2,
+};

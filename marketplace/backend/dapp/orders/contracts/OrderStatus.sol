@@ -6,6 +6,7 @@ contract OrderStatus{
         AWAITING_SHIPMENT,
         CLOSED,
         CANCELED,
+        PAYMENT_PENDING,
         MAX
     }
 }

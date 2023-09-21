@@ -25,15 +25,15 @@ const SoldOrdersTable = ({ user }) => {
   const { ordersSold, isordersSoldLoading } = useOrderState();
 
   useEffect(() => {
-       actions.fetchOrderSold(
-        dispatch,
-        limit,
-        offset,
-        debouncedSearchTerm,
-        user?.organization
-      );
-    
-   
+    actions.fetchOrderSold(
+      dispatch,
+      limit,
+      offset,
+      debouncedSearchTerm,
+      user?.organization
+    );
+
+
   }, [dispatch, limit, offset, debouncedSearchTerm, user]);
 
   const navigate = useNavigate();
@@ -109,10 +109,10 @@ const SoldOrdersTable = ({ user }) => {
           });
         }}>
           <Link to={`${routes.Invoice.url.replace(":id", text.address)}`} target="_blank" >
-          <div className="flex items-center cursor-pointer hover:text-primary">
-          <EyeOutlined className="mr-2" />
-          <p>View</p>
-          </div>
+            <div className="flex items-center cursor-pointer hover:text-primary">
+              <EyeOutlined className="mr-2" />
+              <p>View</p>
+            </div>
           </Link>
         </button>
       ),
@@ -139,6 +139,10 @@ const SoldOrdersTable = ({ user }) => {
           text: "Closed",
           value: "Closed",
         },
+        {
+          text: "Payment Pending",
+          value: "Payment Pending",
+        },
       ],
       onFilter: (value, record) => record.status.startsWith(value),
       filterSearch: true,
@@ -154,6 +158,8 @@ const SoldOrdersTable = ({ user }) => {
       textClass = "text-success  bg-[#EAFFEE]";
     } else if (status === "Canceled") {
       textClass = "text-error  bg-[#FFF0F0]";
+    } else if (status === "Payment Pending") {
+      textClass = "text-orange bg-[#FFF6EC]";
     }
 
     return (
