@@ -47,7 +47,7 @@ import System.FilePath ((</>))
 import System.IO.Temp
 import qualified Text.Colors as CL
 import Text.Printf
-import Turtle (chmod, fromText, roo)
+import Turtle (chmod, roo)
 
 runWorker :: K.KafkaAddress -> LoggingT IO ()
 runWorker kaddr = do
@@ -70,7 +70,7 @@ runWorker kaddr = do
     $logInfoS "runWorker" "done. here I am once again"
 
 makeReadOnly :: FilePath -> IO ()
-makeReadOnly = void . chmod roo . fromText . T.pack
+makeReadOnly = void . chmod roo  
 
 consumerGroup :: K.ConsumerGroup
 consumerGroup = "init-worker"

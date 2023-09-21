@@ -102,23 +102,23 @@ word256ToBytes ws = unsafePerformIO $ do
     FS.pokeElemOff dst 2 0
     FS.pokeElemOff dst 3 0
     case n of
-      IS i# -> FS.pokeElemOff dst 3 (toBE64 (W64# (int2Word# i#)))
+      IS i# -> FS.pokeElemOff dst 3 (toBE64 (W64# (wordToWord64# (int2Word# i#))))
       IP bn -> do
         case bigNatSize# bn of
           1# -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 0#))))
           2# -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
-            FS.pokeElemOff dst 2 (toBE64 (W64# (bigNatIndex# bn 1#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 0#))))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 1#))))
           3# -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
-            FS.pokeElemOff dst 2 (toBE64 (W64# (bigNatIndex# bn 1#)))
-            FS.pokeElemOff dst 1 (toBE64 (W64# (bigNatIndex# bn 2#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 0#))))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 1#))))
+            FS.pokeElemOff dst 1 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 2#))))
           _ -> do
-            FS.pokeElemOff dst 3 (toBE64 (W64# (bigNatIndex# bn 0#)))
-            FS.pokeElemOff dst 2 (toBE64 (W64# (bigNatIndex# bn 1#)))
-            FS.pokeElemOff dst 1 (toBE64 (W64# (bigNatIndex# bn 2#)))
-            FS.pokeElemOff dst 0 (toBE64 (W64# (bigNatIndex# bn 3#)))
+            FS.pokeElemOff dst 3 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 0#))))
+            FS.pokeElemOff dst 2 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 1#))))
+            FS.pokeElemOff dst 1 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 2#))))
+            FS.pokeElemOff dst 0 (toBE64 (W64# (wordToWord64# (bigNatIndex# bn 3#))))
       _ -> error "negative Word256"
   return $! BI.PS dstFP 0 32
 
@@ -153,7 +153,8 @@ bytesToWord256 bytes
       if numWords == 1 && ll <= 0x7fffffffffffffff
         then
           let !(W64# w#) = ll
-           in return (BigWord (IS (word2Int# w#)))
+              word# = word64ToWord# w# -- Convert Word64# to Word#
+            in return (BigWord (IS (word2Int# word#)))
         else do
           dst <- PBA.newPinnedByteArray (8 * numWords)
           case numWords of
