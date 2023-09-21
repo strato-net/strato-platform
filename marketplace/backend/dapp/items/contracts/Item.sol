@@ -56,11 +56,21 @@ contract Item_3 is ItemStatus {
         status = _status;
         comment = _comment;
         createdDate = _createdDate;
+        itemNumber = _itemNumber;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
+
+        if (_rawMaterialSerialNumber.length > 0) {
+            addRawMaterials(
+                _uniqueProductCode,
+                _rawMaterialProductName,
+                _rawMaterialSerialNumber,
+                _rawMaterialProductId
+            );
+        }
     }
 
     function update(

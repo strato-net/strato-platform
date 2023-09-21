@@ -450,7 +450,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ PRODUCT MANAGER --------------------------------
   contract.createProduct = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs }
+    const newArgs = { uniqueProductCode: parseInt(util.uid()), ...args.productArgs }
     return managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
   };
   contract.updateProduct = async function (args, options = defaultOptions) {
@@ -465,23 +465,83 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const { serialNumber, ...restArgs } = args;
     const newArgs = { ...restArgs, batchId: util.uid() };
 
-    const serialNumbers = []
-    let transformedArray = []
 
-    if (newArgs.inventoryType === "Batch") {
-      transformedArray = [{
-        "serialNumber": util.iuid()
-      }];
-    }
-    else {
-      for (let i = 0; i < newArgs.quantity; i++) {
-        transformedArray.push({
-          "serialNumber": util.iuid()
-        })
+    const serialNo = [];
+    const repeatedSerialNumber = [];
+    const serialNumbers = []
+    let transformedArray = [];
+
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      for (let i = 0; i < serialNumber.length; i += 200) {
+        serialNo.push(serialNumber[i].itemSerialNumber)
+        const serialNumberArr = serialNo.slice(i, i + 200);
+        const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
+
+        items.forEach(obj => {
+          const item = serialNumberArr.find(num => num === obj.serialNumber);
+          if (item) {
+            repeatedSerialNumber.push(item);
+          }
+        });
       }
+    }
+    if (repeatedSerialNumber.length != 0) {
+      throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
     }
 
     const productDetail = await managers.productManager.getProduct({ address: restArgs.productAddress }, getOptions);
+
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      serialNumber.forEach(function (item) {
+        let rawMaterialProductNameArray = [];
+        let rawMaterialSerialNumberArray = [];
+        let rawMaterialProductIdArray = [];
+
+        if (item.rawMaterials.length != 0) {
+          item.rawMaterials.forEach(function (rawMaterial) {
+            let rawMaterialProductName = rawMaterial.rawMaterialProductName;
+            let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
+            let rawMaterialProductId = rawMaterial.rawMaterialProductId;
+
+            for (const element of rawMaterialSerialNumbers) {
+              rawMaterialProductNameArray.push(rawMaterialProductName);
+              rawMaterialSerialNumberArray.push(element);
+              rawMaterialProductIdArray.push(rawMaterialProductId);
+            }
+          });
+        }
+
+        transformedArray.push({
+          "itemNumber": parseInt(util.uid()),
+          "serialNumber": item.itemSerialNumber,
+          "rawMaterialProductName": rawMaterialProductNameArray,
+          "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
+          "rawMaterialProductId": rawMaterialProductIdArray
+        });
+        serialNumbers.push(item.itemSerialNumber)
+      });
+    }
+
+    if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Batch") {
+      transformedArray.push({
+        "itemNumber": parseInt(util.uid()),
+        "serialNumber": "",
+        "rawMaterialProductName": [],
+        "rawMaterialSerialNumber": [],
+        "rawMaterialProductId": []
+      });
+    }
+    else if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Individual") {
+      for (let i = 0; i < newArgs.quantity; i++) {
+        transformedArray.push({
+          "itemNumber": parseInt(util.uid()),
+          "serialNumber": "",
+          "rawMaterialProductName": [],
+          "rawMaterialSerialNumber": [],
+          "rawMaterialProductId": []
+        })
+      }
+    }
 
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
 
@@ -525,8 +585,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.resellInventory = async function (args, options = defaultOptions) {
     const { inventoryId, quantity, price, itemsAddress } = args;
     const newBatchId = util.uid();
-    const newSerialNumber = util.uid();
-    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price, batchId: newBatchId, serialNumber: newSerialNumber, itemsAddress: itemsAddress });
+    const newItemNumber = parseInt(util.uid());
+    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price, batchId: newBatchId, itemNumber: newItemNumber, itemsAddress: itemsAddress });
   };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
@@ -1006,12 +1066,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         let result = []
         const newOwner = orderLines[0].owner
-        const serialNumber = util.uid();
+        const itemNumber = parseInt(util.uid());
 
         for (let orderLineAddress of orderLinesAddresses) {
           const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions);
           const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLines[0].quantity, dappAddress, serialNumber });
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLines[0].quantity, dappAddress, itemNumber });
           result.push({ status, productId, inventoryId });
         }
         return result;

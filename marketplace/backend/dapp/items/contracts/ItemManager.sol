@@ -14,7 +14,11 @@ contract ItemManager is ItemStatus, InventoryStatus {
     mapping(address => address) private itemInventoryIdMapping;
 
     struct ItemObject {
+        uint itemNumber;
         string serialNumber;
+        string[] rawMaterialProductName;
+        string[] rawMaterialSerialNumber;
+        string[] rawMaterialProductId;
     }
 
     function addItem(
@@ -29,21 +33,78 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string itemAddresses = "";
         string repeatedSerialNumbers = "";
 
+        if (_itemObject[0].serialNumber == "") {
+            for (uint256 i = 0; i < _itemObject.length; i++) {
+                Item_3 itemAddr = new Item_3(
+                    _productId,
+                    _uniqueProductCode,
+                    _inventoryId,
+                    _itemObject[i].serialNumber,
+                    _status,
+                    _comment,
+                    _itemObject[i].rawMaterialProductName,
+                    _itemObject[i].rawMaterialSerialNumber,
+                    _itemObject[i].rawMaterialProductId,
+                    _itemObject[i].itemNumber,
+                    _createdDate,
+                    tx.origin
+                );
+
+                address itemContractAddress = address(itemAddr);
+                itemAddr.generateOwnershipHistory(
+                    "",
+                    itemAddr.ownerOrganization(),
+                    _createdDate,
+                    itemContractAddress
+                );
+
+                uniqueSerialNumberByUPC[
+                    _itemObject[0].serialNumber
+                ] = _uniqueProductCode;
+                itemProductIdMapping[itemContractAddress] = _productId;
+                itemInventoryIdMapping[itemContractAddress] = _inventoryId;
+                itemAddresses += string(address(itemAddr)) + ",";
+            }
+            return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
+        }
+
         for (uint256 i = 0; i < _itemObject.length; i++) {
-            Item_3 itemAddr = new Item_3(
-                _productId,
-                _uniqueProductCode,
-                _inventoryId,
-                _itemObject[i].serialNumber,
-                _status,
-                _comment,
-                [""],
-                [""],
-                [""],
-                0,
-                _createdDate,
-                tx.origin
-            );
+            string currentSerialNumber = _itemObject[i].serialNumber;
+            uint exisitngUPC = uniqueSerialNumberByUPC[currentSerialNumber];
+
+            if (exisitngUPC == _uniqueProductCode) {
+                repeatedSerialNumbers += currentSerialNumber + ",";
+            } else {
+                Item_3 itemAddr = new Item_3(
+                    _productId,
+                    _uniqueProductCode,
+                    _inventoryId,
+                    currentSerialNumber,
+                    _status,
+                    _comment,
+                    _itemObject[i].rawMaterialProductName,
+                    _itemObject[i].rawMaterialSerialNumber,
+                    _itemObject[i].rawMaterialProductId,
+                    _itemObject[i].itemNumber,
+                    _createdDate,
+                    tx.origin
+                );
+
+                address itemContractAddress = address(itemAddr);
+                itemAddr.generateOwnershipHistory(
+                    "",
+                    itemAddr.ownerOrganization(),
+                    _createdDate,
+                    itemContractAddress
+                );
+
+                uniqueSerialNumberByUPC[
+                    currentSerialNumber
+                ] = _uniqueProductCode;
+                itemProductIdMapping[itemContractAddress] = _productId;
+                itemInventoryIdMapping[itemContractAddress] = _inventoryId;
+                itemAddresses += string(address(itemAddr)) + ",";
+            }
         }
 
         return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
@@ -123,7 +184,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _newOwner,
         address _dappAddress,
         int _newQuantity,
-        string _serialNumber
+        uint _itemNumber
     ) public returns (uint, address, address) {
         Product_3 product;
         Inventory_12 inventory;
@@ -174,13 +235,13 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 address(product),
                 oldProduct.uniqueProductCode(),
                 address(inventory),
-                _serialNumber,
+                "",
                 ItemStatus.UNPUBLISHED,
                 "",
                 [""],
                 [""],
                 [""],
-                0,
+                _itemNumber,
                 block.timestamp,
                 _newOwner
             );
@@ -206,5 +267,4 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         return (RestStatus.OK, address(product), address(inventory));
     }
-
 }

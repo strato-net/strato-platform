@@ -181,7 +181,7 @@ contract ProductManager is
         int _quantity,
         int _price,
         string _batchId,
-        string _serialNumber,
+        uint _itemNumber,
         address[] _itemsAddress
     ) returns (uint256, address) {
         Inventory_12 existingInventory = Inventory_12(_existingInventory);
@@ -208,13 +208,13 @@ contract ProductManager is
                 address(product),
                 product.uniqueProductCode(),
                 address(inventoryAddress),
-                _serialNumber,
+                "",
                 ItemStatus.PUBLISHED,
                 "",
                 [""],
                 [""],
                 [""],
-                0,
+                _itemNumber,
                 block.timestamp,
                 tx.origin
             );

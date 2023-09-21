@@ -476,9 +476,9 @@ const CreateInventoryModal = ({
                 <TextArea
                   label="serialNumbers"
                   className="mt-2"
-                  disabled={true}
+                  disabled={formik.values.inventoryType === "Batch" ? true : false}
                   rows={4}
-                  value={formik.values.serialNumber.serialNumStr}
+                  value={formik.values.inventoryType === "Batch" ? "" : formik.values.serialNumber.serialNumStr}
                   placeholder="Upload serial numbers using upload CSV option"
                 />
                 {getIn(formik.touched, "serialNumber.serialNumStr") &&
