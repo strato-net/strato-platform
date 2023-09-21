@@ -240,8 +240,10 @@ pipeline {
               echo "Running unit tests"
               cd strato-worktree
               ./run_unit_tests.sh
-              cd strato
-              archiveArtifacts artifacts: "${sh(returnStdout: true, script: 'stack path --local-hpc-root').trim()}", fingerprint: true
+
+              dir ('strato') {
+                archiveArtifacts artifacts: ".stack-work/**/hpc", fingerprint: true
+              }
             '''
           },
 
