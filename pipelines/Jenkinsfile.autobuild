@@ -255,6 +255,9 @@ pipeline {
               echo "Running unit tests"
               ./run_unit_tests.sh
             '''
+            dir ('strato') {
+              archiveArtifacts artifacts: ".stack-work/**/hpc", fingerprint: true
+            }
           },
 
           'SMD tests': {

@@ -240,11 +240,10 @@ pipeline {
               echo "Running unit tests"
               cd strato-worktree
               ./run_unit_tests.sh
-
-              dir ('strato') {
-                archiveArtifacts artifacts: ".stack-work/**/hpc", fingerprint: true
-              }
             '''
+            dir ('strato') {
+              archiveArtifacts artifacts: ".stack-work/**/hpc", fingerprint: true
+            }
           },
 
           'SMD tests': {
