@@ -359,14 +359,7 @@ const ServiceTable = () => {
     isServicesLoading,
   });
 
-  const dataLen = serviceUsageState?.servicesUsage?.total;
-  const paginationConfig = {
-    current: page,
-    pageSize: 10, // Number of items to display per page
-    total: dataLen, // Total number of items
-    showSizeChanger: false, // Allow users to change the page size
-    position: ["bottomCenter"],
-  };
+  const totalCount = serviceUsageState?.servicesUsage?.total;
 
   const handlePaginationChange = (CPage) => {
     setPage(CPage.current);
@@ -472,8 +465,18 @@ const ServiceTable = () => {
           <Table
             columns={columns}
             dataSource={tableData}
-            pagination={paginationConfig}
+            rowClassName={(record, index) =>
+              index % 2 === 0 ? "bg-white" : "bg-secondry"
+            }
+            pagination={{
+              current: page,
+              pageSize: 10, // Number of items to display per page
+              total: totalCount, // Total number of items
+              showSizeChanger: false, // Allow users to change the page size
+              position: ["bottomCenter"],
+            }}
             loading={IsLoading}
+            sticky={true}
             rowKey="key"
             onChange={handlePaginationChange} // Add this line to handle pagination changes
           />
