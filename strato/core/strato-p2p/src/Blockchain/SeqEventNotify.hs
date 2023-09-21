@@ -43,13 +43,13 @@ seqEventNotificationSourceChanFill ks p2peventchan = do
   case res of
     Left  e -> error $ show (e :: K.KafkaClientError)
     Right _ -> return ()
-  where loop nextOffset = do
-                      events <- K.withKafkaRetry1s $ readSeqP2pEvents nextOffset
-                      unless (null events) $ do -- stop bloating the logs
-                        $logInfoS "seqEventNotifyChanFill" . T.pack $ "filling kakfa middleman of kafka seqevents @ " ++ show nextOffset
-                        forM_ events $ \e -> do
-                          liftIO $ writeChan p2peventchan (e,(\(KP.Offset o) -> o) nextOffset)
-                      loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
+    where loop nextOffset = do
+                        events <- K.withKafkaRetry1s $ readSeqP2pEvents nextOffset
+                        unless (null events) $ do -- stop bloating the logs
+                          $logInfoS "seqEventNotifyChanFill" . T.pack $ "filling kakfa middleman of kafka seqevents @ " ++ show nextOffset
+                          forM_ events $ \e -> do
+                            liftIO $ writeChan p2peventchan (e,(\(KP.Offset o) -> o) nextOffset)
+                        loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
 
 
 seqEventNotificationSourceChanPour :: ( MonadIO m
