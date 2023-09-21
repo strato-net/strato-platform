@@ -256,7 +256,7 @@ pipeline {
               ./run_unit_tests.sh FLAGS="--coverage"
             '''
             dir ('strato') {
-              archiveArtifacts artifacts: "./stack-work/**/*.html", fingerprint: true
+              archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
             }
           },
 
