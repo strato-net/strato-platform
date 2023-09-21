@@ -41,7 +41,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 [""],
                 [""],
                 0,
-                _createdDate
+                _createdDate,
+                tx.origin
             );
         }
 
@@ -180,7 +181,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 [""],
                 [""],
                 0,
-                block.timestamp
+                block.timestamp,
+                _newOwner
             );
         } else {
             (uint status, address inventory) = product.addInventory(

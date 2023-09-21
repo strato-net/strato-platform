@@ -215,7 +215,8 @@ contract ProductManager is
                 [""],
                 [""],
                 0,
-                block.timestamp
+                block.timestamp,
+                tx.origin
             );
             return (status, inventoryAddress);
         } else {

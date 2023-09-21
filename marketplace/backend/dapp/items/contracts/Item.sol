@@ -45,9 +45,10 @@ contract Item_3 is ItemStatus {
         string[] _rawMaterialSerialNumber,
         string[] _rawMaterialProductId,
         uint _itemNumber,
-        uint _createdDate
+        uint _createdDate,
+        address _owner
     ) public {
-        owner = tx.origin;
+        owner = _owner;
 
         productId = _productId;
         inventoryId = _inventoryId;
