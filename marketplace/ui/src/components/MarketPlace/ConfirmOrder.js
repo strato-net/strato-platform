@@ -325,20 +325,117 @@ const ConfirmOrder = () => {
 
 
   const handleOrderConfirm = async () => {
-    handleCancel();
+    // Construct Email with order details
+    let concatenatedOrderString = "";
+    let orderTotal = 0; 
+    for (let i = 0; i < confirmOrderList.length; i++) {
+      let orderItem = confirmOrderList[i];
+      let itemName = orderItem.item.name.replace(/%20/g, ' '); 
+      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
+      let itemQty = orderItem.qty;
+      let itemTotal = (itemPrice * itemQty).toFixed(2); 
+  
+      concatenatedOrderString += `${itemName}:\n`; 
+      concatenatedOrderString += `$${itemTotal} <br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each <br><br>`; 
+      orderTotal += parseFloat(itemTotal); 
+      if (i === confirmOrderList.length - 1) {
+        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} <br>`;
+        concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
+      }
+    }
+
+    let customerFirstName = user.commonName.split(' ')[0];
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Your Order Confirmation</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            .container {
+                margin: 20px auto;
+                padding: 20px;
+                background-color: #ffffff;
+                border-radius: 10px;
+                border: 1px solid #0A1B71;
+                max-width: 600px;
+            }
+            h2 {
+                color: #0A1B71;
+            }
+            ul {
+                list-style-type: none;
+                padding: 0;
+            }
+            p {
+                margin: 10px 0;
+            }
+            .signature {
+                display: flex;
+                align-items: center;
+            }
+            .logo {
+                margin-right: 10px;
+                width: 60px;
+                height: 60px;
+            }
+            .logo-text {
+                color: #000;
+                font-weight: 100;
+            }
+            .footer {
+                font-size: 10px;
+                margin-top: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Hello <strong>${customerFirstName},</strong></h2>
+            
+            <p>Thank you for shopping with us. Your recent order on the BlockApps Mercata Marketplace has been successfully processed. Below are the details of your purchase:</p>
+            
+            <ul>
+                ${concatenatedOrderString}
+            </ul>
+            
+            <p>If you have any questions or need assistance with your order, please feel free to contact our customer support team at sales@blockapps.net.</p>
+            
+            <div class="signature">
+            <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
+
+                <h3 class="logo-text">BlockApps Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STATO Mercata™</em><a></h3>
+            </div>
+            <p class="footer">This email was sent from a notification-only address and cannot accept incoming email. Please do not reply to this message.</p>
+        </div>
+    </body>
+    </html>
+    `
     let orderList = [];
     let orderItemAddress = [];
     confirmOrderList.forEach((item) => {
       orderList.push({ inventoryId: item.key, quantity: item.qty });
       orderItemAddress.push(item.key);
     });
+
+    // Send details and email informaion to order controller
     const body = {
       buyerOrganization: userOrganization,
-      orderList,
+      orderList: orderList,
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
+      to: user.preferred_username,
+      subject: "New Membership Order",
+      htmlContent: htmlContent,
     };
-
     TagManager.dataLayer({
       dataLayer: {
         event: 'pay_later_button',
@@ -363,13 +460,24 @@ const ConfirmOrder = () => {
     handleCancel();
     let orderList = [];
     confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
+    // These additional fields need to be sent to form the request after stripe. 
+      orderList.push({
+        inventoryId: item.key, 
+        quantity: item.qty,
+        name: item.item.name,
+        unitPrice: item.unitPrice,
+      });
     });
+
+    // These additional fields need to be sent to form the request after stripe. 
     const body = {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
+      tax: tax,
+      user: user.commonName,
+      email: user.preferred_username,
     };
     TagManager.dataLayer({
       dataLayer: {
