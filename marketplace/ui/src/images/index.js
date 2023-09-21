@@ -16,7 +16,7 @@ export const Images = {
   'topSelling2': require("./resources/topSelling/topSelling2.png"),
   'topSelling3': require("./resources/topSelling/topSelling3.png"),
   'hero': require("./resources/hero.png"),
-  'hero2': require("./resources/hero2.png"),
+  'hero2': require("./resources/carbon.jpg"),
   'orderImg1': require('./resources/orderImages/orderImg1.png'),
   'orderImg2': require('./resources/orderImages/orderImg2.png'),
   'orderImg3': require('./resources/orderImages/orderImg3.png'),
