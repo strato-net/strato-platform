@@ -41,5 +41,5 @@ describe('Using blockhash', function () {
     const state = await rest.getState(admin, contract, options);
     console.log(`Random state: ${JSON.stringify(state, null, 2)}`);
     assert.notEqual(state.value, 0, "Variable value did not match expected state");
-  }).timeout(config.timeout);
+  }); // .timeout(config.timeout);
 });
