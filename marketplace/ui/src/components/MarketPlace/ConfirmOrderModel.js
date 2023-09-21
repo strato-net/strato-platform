@@ -34,7 +34,7 @@ const ConfirmOrderModel = ({ open, handleCancel, handleConfirm }) => {
       <div className="flex flex-col items-center justify-around my-10">
         <CheckoutIcon />
         <p className="text-center mt-4 font-semibold text-primaryC text-lg">
-          Do you want to place the order?
+          Do you want to reserve this order?
         </p>
       </div>
     </Modal>

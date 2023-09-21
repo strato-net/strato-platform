@@ -20,7 +20,7 @@ import { useState, useEffect, useMemo } from "react";
 import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
-import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import { CHARGES, ORDER_STATUS, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
@@ -344,6 +344,7 @@ const Checkout = ({ user }) => {
       buyerOrganization: user.organization,
       orderList,
       orderTotal: total + tax + shipping,
+      status: ORDER_STATUS.AWAITING_FULFILLMENT
     };
 
     let isDone = await orderActions.createOrder(orderDispatch, body);

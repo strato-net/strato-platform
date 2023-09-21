@@ -51,8 +51,8 @@ describe("Renders Orders Page", () => {
         cy.get("#add-address-button").click();
       }
     });
-    cy.get("#pay-later-button").should("exist");
-    cy.get("#pay-later-button").click();
+    cy.get("#reserve-button").should("exist");
+    cy.get("#reserve-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
     cy.get("#yes-button").click();
@@ -116,8 +116,8 @@ describe("Renders Orders Page", () => {
         cy.get("#add-address-button").click();
       }
     });
-    cy.get("#pay-later-button").should("exist");
-    cy.get("#pay-later-button").click();
+    cy.get("#reserve-button").should("exist");
+    cy.get("#reserve-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
 
@@ -206,8 +206,8 @@ describe("Renders Orders Page", () => {
         cy.get("#add-address-button").click();
       }
     });
-    cy.get("#pay-later-button").should("exist");
-    cy.get("#pay-later-button").click();
+    cy.get("#reserve-button").should("exist");
+    cy.get("#reserve-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
     // cy.get("#yes-button").click();
@@ -302,8 +302,8 @@ describe("Renders Orders Page", () => {
         cy.get("#add-address-button").click();
       }
     });
-    cy.get("#pay-later-button").should("exist");
-    cy.get("#pay-later-button").click();
+    cy.get("#reserve-button").should("exist");
+    cy.get("#reserve-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
 
@@ -401,8 +401,8 @@ describe("Renders Orders Page", () => {
         cy.get("#add-address-button").click();
       }
     });
-    cy.get("#pay-later-button").should("exist");
-    cy.get("#pay-later-button").click();
+    cy.get("#reserve-button").should("exist");
+    cy.get("#reserve-button").click();
     cy.get("#modal-title").contains("Confirm Order");
     cy.get("#yes-button").should("exist");
     // cy.get("#yes-button").click();
