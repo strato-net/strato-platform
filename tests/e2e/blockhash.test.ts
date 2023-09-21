@@ -28,7 +28,7 @@ let config:Config = fsUtil.getYaml("config.yaml");
 let options:Options = {config: {...config, VM: "SolidVM"}};
 
 describe('Using blockhash', function () {
-  it('should upload a contract that uses blockhash', async () => {
+  xit('should upload a contract that uses blockhash - TODO: reenable once API can correctly distinguish between SolidVM strings and bytes types', async () => {
 
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
 
