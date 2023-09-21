@@ -453,7 +453,7 @@ const ServiceTable = () => {
             />
             <Select
               placeholder="Status"
-              className="ml-2"
+              className="m-2"
               suffixIcon={<CaretDownOutlined />}
               disabled={IsLoading}
               style={{ width: 120 }}
@@ -463,7 +463,7 @@ const ServiceTable = () => {
               }}
               options={statusOptions}
             />
-            <Button type="primary"
+            <Button
               icon={<CloseOutlined />}
               onClick={clearFilter}
             />

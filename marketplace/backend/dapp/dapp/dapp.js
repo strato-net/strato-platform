@@ -1137,6 +1137,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const arrayOfAddresses = issuedProducts.map(obj => obj.address);
       const args = {
+        notEqualsField: 'ownerOrganization',
+        notEqualsValue: userOrganization,
         productId: arrayOfAddresses
       }
 
