@@ -1133,35 +1133,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getIssuedMemberships = async function (args, options = defaultOptions) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
-      // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
       let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
-      // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
 
       const arrayOfAddresses = issuedProducts.map(obj => obj.address);
       const args = {
-        // ownerOrganization: userOrganization,
         productId: arrayOfAddresses
       }
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       let issuedItems = await itemJs.getAll(rawAdmin, args, getOptions);
-      // Filter ownedItems based on productId and ownerOrg
-      // ownedItems = ownedItems.filter(item =>
-      //   ownedProducts.some(product => item.productId === product.address)
-      // );
 
-      // Get Memberhships where productId = Items.productId 
-      let issuedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
-      // issuedMemberships = issuedMemberships.filter(membership =>
-      //   issuedItems.some(item => membership.productId === item.productId)
-      // );
-
-      // Get ProductFile where productId = Items.productId
-      let issuedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
-      // issuedProductFiles = issuedProductFiles.filter(file =>
-      //   issuedItems.some(item => file.productId === item.productId)
-      // );
 
       // Combine issuedProducts, issuedItems, issuedMemberships, and issuedProductFiles into one JSON object array
       const combinedData = issuedItems
@@ -1189,14 +1170,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             savings: null, //memberships[0].savings,
             membershipAddress: null //memberships[0].address
           };
-        });
+        }).filter((item) => item.manufacturer === userOrganization)
 
       return combinedData;
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getPurchasedMemberships");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getIssuedMemberships");
     }
 
   };
@@ -1876,10 +1857,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions1 = { ...options, org: managers.cirrusOrg, app: contractName, };
     let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
 
-    const arrayOfAddresses = issuedProducts.map(obj => obj.address);
+    const arrayOfProductAddresses = issuedProducts.map(obj => obj.address);
 
     const arg = {
-      productId: arrayOfAddresses
+      productId: arrayOfProductAddresses
     }
 
     let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
@@ -1891,12 +1872,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args1, sort: '-createdDate' }, getOptions)
+    // return serviceUsage
     const memberships = await contract.getPurchasedMemberships();
     const ProvidedService = serviceUsage['serviceUsage'].map((item, index) => {
       let result = issuedItems.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
       return { ...item, itemId: result.itemNumber }
     })
-    return { 'issuedProducts': serviceUsage, 'ownedItems': itemAddressList }
+    return { 'ProvidedService': ProvidedService, 'ownedItems': itemAddressList }
     // return ProvidedService;
   };
 
