@@ -58,9 +58,9 @@ testGetPutRepeatedII :: Test
 testGetPutRepeatedII = TestCase $ do
   res <- runMP $ do
     db <- addAllKVs emptyTriePtr bigTest
-    getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
+    getSingleKV db keyFromRawBS
 
-  assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003", rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
+  assertEqual "get . putn = id" res [(keyFromRawBS, rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
 
 testSingleInsert :: Test
 testSingleInsert = TestCase $ do
@@ -97,6 +97,9 @@ key2 = (byteString2NibbleString "otherString")
 
 val2 :: RLPObject
 val2 = (RLPString "thatString2")
+
+keyFromRawBS :: N.NibbleString
+keyFromRawBS = byteString2NibbleString $ rlpSerialize $ rlpEncode ("00000000000000000000000000000002ffffffffffffffff0000000000000003" :: B.ByteString)
 
 putSingleKV :: (StateRoot `Alters` NodeData) m => Key -> Val -> m StateRoot
 putSingleKV = unsafePutKeyVal emptyTriePtr

@@ -224,7 +224,6 @@ pipeline {
               }
             }
           },
-/*
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
@@ -297,11 +296,9 @@ pipeline {
               //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
             }
           },
- */
         )
       }
     }
-/*
     stage('Test dev docs') {
       steps {
         withCredentials([
@@ -344,7 +341,6 @@ module.exports = {
         }
       }
     }
-*/
   }
 
   post {
