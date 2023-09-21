@@ -106,8 +106,9 @@ pretty: build_buildbase
 hoogle: build_buildbase
 	@echo generating and serving STRATO documentation...
 	cd strato && \
-		stack build --haddock --no-haddock-internal --no-haddock-deps && \
-		stack hoogle generate -- --local=${shell cd strato && stack path --local-doc-root} && \
+		stack build --haddock --no-haddock-internal --no-haddock-deps \
+		--haddock-arguments "-o $(shell pwd)/strato/haddock" && \
+		stack hoogle generate -- --local="$(shell pwd)/strato/haddock" && \
 		stack hoogle -- server --local
 
 strato: build_common
