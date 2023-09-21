@@ -24,7 +24,7 @@ const SoldOrdersTable = ({ user }) => {
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("createdDate.desc");
 
-  const { ordersSold, isordersSoldLoading } = useOrderState();
+  const { ordersSold, isordersSoldLoading, orderTotal } = useOrderState();
 
   useEffect(() => {
        actions.fetchOrderSold(
@@ -205,7 +205,7 @@ const SoldOrdersTable = ({ user }) => {
       <Pagination
         current={page}
         onChange={onPageChange}
-        total={total}
+        total={orderTotal}
         showSizeChanger={false}
         className="flex justify-center my-5 "
       />

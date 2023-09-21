@@ -896,7 +896,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       if (paymentSessionId.length > 1) {
         const order = await managers.orderManager.getOrders(rawAdmin, { paymentSessionId }, createOptions);
-        if (order.length > 0) {
+        if (order.orders.length > 0) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, `Order already placed for payment_id ${paymentSessionId}`)
         }
       }
