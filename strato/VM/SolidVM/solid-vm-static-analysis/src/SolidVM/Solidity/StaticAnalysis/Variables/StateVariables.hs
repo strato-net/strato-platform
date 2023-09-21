@@ -2,75 +2,81 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
-module SolidVM.Solidity.StaticAnalysis.Variables.StateVariables
-  ( detector
-  ) where
 
-import           Control.Lens
-import           Control.Monad.State
-import           Data.Foldable       (traverse_)
-import qualified Data.Map.Strict     as M
-import           Data.Maybe          (isJust, maybeToList)
-import           Data.Source
-import           Data.Text           (Text)
-import           SolidVM.Model.CodeCollection
-import           SolidVM.Model.SolidString
+module SolidVM.Solidity.StaticAnalysis.Variables.StateVariables
+  ( detector,
+  )
+where
+
+import Control.Lens
+import Control.Monad.State
+import Data.Foldable (traverse_)
+import qualified Data.Map.Strict as M
+import Data.Maybe (isJust, maybeToList)
+import Data.Source
+import Data.Text (Text)
+import SolidVM.Model.CodeCollection
+import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
-import           SolidVM.Solidity.StaticAnalysis.Types
+import SolidVM.Solidity.StaticAnalysis.Types
 
 type StateVars = M.Map SolidString (Bool, Bool, VariableDecl)
+
 type LocalVars = [M.Map SolidString (SourceAnnotation ())]
+
 type SSS = State (StateVars, LocalVars)
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
-detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
+detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} =
-  let stateVariables = M.map (False, False,) _storageDefs
+contractHelper Contract {..} =
+  let stateVariables = M.map (False,False,) _storageDefs
       emptyState = (stateVariables, [])
       action = traverse functionHelper $ maybeToList _constructor ++ M.elems _functions
       stateVariables' = fst $ execState action emptyState
       findStateAnns name (False, False, a) =
         [("Unused state variable " <> labelToText name <> ".") <$ _varContext a]
-      findStateAnns name (True, False, VariableDecl{..}) | _varInitialVal == Nothing = case _varType of
-        SVMType.Struct{} -> []
+      findStateAnns name (True, False, VariableDecl {..}) | _varInitialVal == Nothing = case _varType of
+        SVMType.Struct {} -> []
         SVMType.Array _ Nothing -> []
-        SVMType.Mapping{} -> []
+        SVMType.Mapping {} -> []
         _ -> [("Uninitialized state variable " <> labelToText name <> ". Consider initializing it to prevent incorrect behavior.") <$ _varContext]
       findStateAnns name (True, False, a) = case _varType a of
-        SVMType.Struct{} -> []
+        SVMType.Struct {} -> []
         SVMType.Array _ Nothing -> []
-        SVMType.Mapping{} -> []
+        SVMType.Mapping {} -> []
         _ -> [("State variable " <> labelToText name <> " is never written to. Consider making it a constant.") <$ _varContext a]
       findStateAnns _ _ = []
    in M.foldMapWithKey findStateAnns stateVariables'
 
 functionHelper :: Func -> SSS [SourceAnnotation Text]
-functionHelper Func{..} = maybe (pure []) statementsHelper _funcContents
+functionHelper Func {..} = maybe (pure []) statementsHelper _funcContents
 
 statementsHelper :: [Statement] -> SSS [SourceAnnotation Text]
 statementsHelper ss = do
-  modify $ fmap (M.empty:)
+  modify $ fmap (M.empty :)
   anns <- concat <$> traverse statementHelper ss
   modify $ fmap tail
   pure anns
 
 isLocalVariable :: SolidString -> SSS Bool
 isLocalVariable name = foldr lookupVar False <$> gets snd
-  where lookupVar _ True = True
-        lookupVar m _    = isJust $ M.lookup name m
+  where
+    lookupVar _ True = True
+    lookupVar m _ = isJust $ M.lookup name m
 
 pushLocalVariable :: SolidString -> SourceAnnotation () -> SSS ()
 pushLocalVariable name decl = modify . fmap $ \case
   [] -> error "This can't happen by the laws of physics"
-  (x:xs) -> (M.insert name decl x):xs
+  (x : xs) -> (M.insert name decl x) : xs
 
 pushLocalVariables :: [VarDefEntry] -> SSS ()
 pushLocalVariables = traverse_ pushEntry
-  where pushEntry BlankEntry = pure () 
-        pushEntry VarDefEntry{..} = pushLocalVariable vardefName vardefContext
+  where
+    pushEntry BlankEntry = pure ()
+    pushEntry VarDefEntry {..} = pushLocalVariable vardefName vardefContext
 
 statementHelper :: Statement -> SSS [SourceAnnotation Text]
 statementHelper (IfStatement cond thens mElse _) = do
@@ -150,7 +156,7 @@ expressionHelper (Binary y "+=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
-expressionHelper (Binary y "-=" (Variable x name) b) = do 
+expressionHelper (Binary y "-=" (Variable x name) b) = do
   ann <- stateVarWriteHelper name (x <> y)
   bs <- expressionHelper b
   pure $ concat [ann, bs]
@@ -206,11 +212,11 @@ expressionHelper (IndexAccess _ a b) = do
 expressionHelper (MemberAccess _ e _) = expressionHelper e
 expressionHelper (FunctionCall _ e args) = do
   as <- case e of
-          Variable _ _ -> pure []
-          _ -> expressionHelper e
+    Variable _ _ -> pure []
+    _ -> expressionHelper e
   bs <- case args of
-          OrderedArgs es -> concat <$> traverse expressionHelper es
-          NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
+    OrderedArgs es -> concat <$> traverse expressionHelper es
+    NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
   pure $ concat [as, bs]
 expressionHelper (Unitary _ _ a) = expressionHelper a
 expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b, c]

@@ -45,7 +45,7 @@ const { TextArea } = Input;
 
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
-    name: yup.string().required("Name is required"),
+    name: yup.string().matches(/^[A-Za-z.\s]+$/,"Must contain only characters").required("Name is required"),
     zipcode: yup.string().matches(/^\d+$/, "Must contain only numbers").length(5, "Must be exactly 5 digits")
       .required("Zipcode is required"),
     addressLine1: yup.string().required("Address Line 1 is required"),
@@ -459,7 +459,7 @@ const ConfirmOrder = () => {
             </p>
           </Row>
           <Row align="middle">
-            <p className="text-lg font-semibold mr-4">Shipping address</p>
+            <p className="text-lg font-semibold mr-4">Address Details</p>
             {
               userAddresses.length === 0 ? <div /> : showAddress ? <MinusCircleOutlined className="text-xl text-primary"
                 onClick={() => {
@@ -472,7 +472,7 @@ const ConfirmOrder = () => {
               />
             }
           </Row>
-          <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select a shipping address" : "Create a new shipping address"}</p>
+          <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select an address" : "Create a new address"}</p>
           {
             showAddress ? <Card className="w-3/5 mt-4">
               <Form layout="vertical" className="mt-5">

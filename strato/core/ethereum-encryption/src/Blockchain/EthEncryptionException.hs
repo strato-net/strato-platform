@@ -1,12 +1,12 @@
+module Blockchain.EthEncryptionException
+  ( EthEncryptionException (..),
+  )
+where
 
-module Blockchain.EthEncryptionException (
-  EthEncryptionException(..)
-  ) where
+import Control.Exception.Lifted
 
-import           Control.Exception.Lifted
-
-data EthEncryptionException =
-  HandshakeException String
+data EthEncryptionException
+  = HandshakeException String
   | HeadMacIncorrect
   | FrameMacIncorrect
   | PeerHungUp
@@ -16,4 +16,4 @@ data EthEncryptionException =
   | FrameMACTooShort
   deriving (Eq, Read, Show)
 
-instance Exception EthEncryptionException where
+instance Exception EthEncryptionException

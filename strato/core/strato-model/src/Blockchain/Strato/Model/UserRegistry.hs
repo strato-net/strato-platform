@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE QuasiQuotes #-}
 
-module Blockchain.Strato.Model.UserRegistry 
-    (userRegistryContract) where
+module Blockchain.Strato.Model.UserRegistry (userRegistryContract) where
 
-import                      Data.Text
-import                      Text.RawString.QQ
+import Data.Text
+import Text.RawString.QQ
 
 userRegistryContract :: Text
-userRegistryContract = [r|
+userRegistryContract =
+  [r|
 contract UserRegistry {
     // The UserRegistry is responsible for creating User contracts for each user.
     address public owner;

@@ -1,12 +1,13 @@
-{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Strato.Strato23.Database.Create where
 
-import           Database.PostgreSQL.Simple
-import           Database.PostgreSQL.Simple.SqlQQ
+import Database.PostgreSQL.Simple
+import Database.PostgreSQL.Simple.SqlQQ
 
 schemaVersionTable :: Query
-schemaVersionTable = [sql|
+schemaVersionTable =
+  [sql|
 CREATE TABLE IF NOT EXISTS vault_wrapper_schema_version(
   id serial PRIMARY KEY,
   schema_version int NOT NULL UNIQUE
@@ -14,7 +15,8 @@ CREATE TABLE IF NOT EXISTS vault_wrapper_schema_version(
 |]
 
 usersTable :: Query
-usersTable = [sql|
+usersTable =
+  [sql|
 CREATE TABLE IF NOT EXISTS users(
   id serial              PRIMARY KEY,
   x_user_unique_name     varchar(512) NOT NULL,
@@ -30,7 +32,8 @@ CREATE INDEX IF NOT EXISTS indexed_nameId  ON users (x_user_unique_name , x_iden
 |]
 
 messageTable :: Query
-messageTable = [sql|
+messageTable =
+  [sql|
 CREATE TABLE IF NOT EXISTS message(
   id serial PRIMARY KEY,
   salt bytea NOT NULL,
@@ -40,8 +43,9 @@ CREATE TABLE IF NOT EXISTS message(
 |]
 
 createTables :: Query
-createTables = mconcat
-  [ schemaVersionTable
-  , usersTable
-  , messageTable
-  ]
+createTables =
+  mconcat
+    [ schemaVersionTable,
+      usersTable,
+      messageTable
+    ]

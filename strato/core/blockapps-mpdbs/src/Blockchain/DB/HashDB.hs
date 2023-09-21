@@ -1,33 +1,34 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE TypeOperators         #-}
-module Blockchain.DB.HashDB (
-  HashDB(..),
-  HasHashDB,
-  genericLookupHashDB,
-  genericInsertHashDB,
-  genericDeleteHashDB,
-  hashDBPut,
-  hashDBGet
-  ) where
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
-import           Control.Arrow                               ((&&&))
-import           Control.DeepSeq
-import           Control.Monad.Change.Alter
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Reader
-import           Data.Default
-import qualified Database.LevelDB                            as DB
-import           Prelude                                     hiding (lookup)
+module Blockchain.DB.HashDB
+  ( HashDB (..),
+    HasHashDB,
+    genericLookupHashDB,
+    genericInsertHashDB,
+    genericDeleteHashDB,
+    hashDBPut,
+    hashDBGet,
+  )
+where
 
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import           Blockchain.Strato.Model.Util
-import qualified Data.NibbleString                           as N
+import Blockchain.Strato.Model.Util
+import Control.Arrow ((&&&))
+import Control.DeepSeq
+import Control.Monad.Change.Alter
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Data.Default
+import qualified Data.NibbleString as N
+import qualified Database.LevelDB as DB
+import Prelude hiding (lookup)
 
-newtype HashDB = HashDB { unHashDB :: DB.DB }
+newtype HashDB = HashDB {unHashDB :: DB.DB}
 
 instance NFData HashDB where
   rnf (HashDB a) = a `seq` ()
@@ -42,7 +43,9 @@ genericLookupHashDB f key = do
 genericInsertHashDB :: MonadIO m => m HashDB -> N.NibbleString -> N.NibbleString -> m ()
 genericInsertHashDB f key value = do
   db <- unHashDB <$> f
-  DB.put db def
+  DB.put
+    db
+    def
     (nibbleString2ByteString key)
     (nibbleString2ByteString value)
 

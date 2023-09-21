@@ -1,16 +1,16 @@
 module Main (main) where
 
-import Signatures (concatenateSig, incrementSig)
-import Network.JsonRpc.Client
-import System.Process (runInteractiveCommand, terminateProcess)
-import System.IO (Handle, hFlush)
-import System.Environment (getArgs)
-import qualified Data.ByteString.Lazy.Char8 as B
-import Data.Traversable (sequenceA)
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad (replicateM)
-import Control.Monad.Except (runExceptT, liftIO)
-import Control.Monad.Reader (ReaderT, runReaderT, ask)
+import Control.Monad.Except (liftIO, runExceptT)
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
+import qualified Data.ByteString.Lazy.Char8 as B
+import Data.Traversable (sequenceA)
+import Network.JsonRpc.Client
+import Signatures (concatenateSig, incrementSig)
+import System.Environment (getArgs)
+import System.IO (Handle, hFlush)
+import System.Process (runInteractiveCommand, terminateProcess)
 
 runRpcs :: Result ()
 runRpcs = do
@@ -34,11 +34,13 @@ runRpcs = do
 
   -- Send two single requests (prints "count=10"):
   printResult =<< concatenate "count=" . show =<< increment
-      where printResult x = liftIO $ print x
+  where
+    printResult x = liftIO $ print x
 
 -- This client's RPC calls need access to the stdin
 -- and stdout handles of the server subprocess:
 type Result a = RpcResult (ReadInOut IO) a
+
 type ReadInOut = ReaderT (Handle, Handle)
 
 run :: Batch r -> Result r
@@ -63,13 +65,16 @@ incrementB = toBatchFunction incrementSig
 
 -- Create a function for communicating with the server:
 connection :: Connection (ReadInOut IO)
-connection input = ask >>= \(inH, outH) -> liftIO $
-                   do B.hPutStrLn inH input
-                      hFlush inH
-                      line <- (head . B.lines) <$> B.hGetContents outH
-                      return $ if B.null line
-                               then Nothing
-                               else Just line
+connection input =
+  ask >>= \(inH, outH) -> liftIO $
+    do
+      B.hPutStrLn inH input
+      hFlush inH
+      line <- (head . B.lines) <$> B.hGetContents outH
+      return $
+        if B.null line
+          then Nothing
+          else Just line
 
 -- Run the server as a subprocess:
 main = do

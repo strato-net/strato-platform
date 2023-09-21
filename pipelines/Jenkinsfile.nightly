@@ -53,7 +53,7 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-      
+
           writeFile file: "run-vault.sh", text: """#!/bin/bash
             sudo \\
               ssl=true \\
@@ -65,9 +65,9 @@ pipeline {
               ./vault
           """
           sh 'chmod +x run-vault.sh'
-      
+
           sh './run-vault.sh'
-  
+
           // TODO: run node on https (also update check_availability function)
           withCredentials([
               usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
@@ -99,11 +99,11 @@ pipeline {
             """
           }
           sh 'chmod +x run.sh'
-      
+
           sh './run.sh'
-      
+
           sh 'docker ps'
-      
+
           // Few quick tests
           sh '''#!/bin/bash -le
             check_availability() {
@@ -120,11 +120,11 @@ pipeline {
               done
               echo "STRATO health endpoint is available through nginx - node is running"
             }
-            
+
             check_availability
           '''
         }
-  
+
         script {
           lib.generateGenesisBlock('strato-worktree', 'strato-getting-started', null)
         }
@@ -154,15 +154,15 @@ pipeline {
             }
 
             check_availability
-            
+
             echo "Restarting docker containers to simulate computer restart..."
             docker compose -p strato stop
             docker compose -p strato start
-            
+
             check_availability
           '''
         }
-  
+
         script {
           // TODO: replace with jenkins credentials here and in other places in pipelines
           lib.registerTestUserCert(
@@ -181,10 +181,10 @@ pipeline {
     }
 
 //    stage('Test and Push Images') {
-    stage('Push Images') {
+    stage('Push Images & Artifacts') {
       steps {
         parallel (
-          'Push images': {
+          'Push Images': {
             withCredentials([
                 usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
                 usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
@@ -205,12 +205,31 @@ pipeline {
               }
             }
           },
-/*            
+          'Push Artifacts': {
+            withCredentials([
+                usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+            ]) {
+              dir ('strato-worktree') {
+                sh '''#!/bin/bash -le
+                  set -x
+                  version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
+                  AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
+                  aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
+                  aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
+                '''
+              }
+            }
+          },
+/*
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
               echo "Running apex unit tests"
-              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
+              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'apex.*1')
 # TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
@@ -222,6 +241,8 @@ pipeline {
               echo "Running unit tests"
               cd strato-worktree
               ./run_unit_tests.sh
+              cd strato
+              archiveArtifacts artifacts: "${sh(returnStdout: true, script: 'stack path --local-hpc-root').trim()}", fingerprint: true
             '''
           },
 
@@ -230,7 +251,7 @@ pipeline {
               set -x
               echo 'Running SMD tests'
               cd strato-worktree/smd-ui
-              docker build -f Dockerfile.test .
+              docker build --target test .
             '''
           },
 
@@ -290,7 +311,7 @@ pipeline {
           sh 'git clone https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/docs-website -b develop'
           dir('docs-website/') {
             sh 'npm i'
-            
+
             writeFile file: "test-utility/config.js", text: """
 module.exports = {
   stratoConfig: {
@@ -318,7 +339,7 @@ module.exports = {
                 currentBuild.result = 'UNSTABLE'
               }
             }
-            
+
           }
         }
       }
@@ -353,7 +374,7 @@ module.exports = {
           message: "Nightly develop build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
       )
     }
-    
+
     unstable {
       slackSend (
           color: 'warning',
@@ -365,7 +386,7 @@ module.exports = {
           message: "Nightly develop build is unstable: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
       )
     }
-    
+
     fixed {
       slackSend(
           channel: '#engineering',
