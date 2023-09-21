@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Tabs, Table, Select, Button, Row, Col, Typography } from "antd";
+import { Tabs, Table, Select, Button, Row, Col, Typography, notification } from "antd";
 import { PlusOutlined, CaretDownOutlined } from "@ant-design/icons";
 import "./index.css";
 import { generateTableColumns } from "./tableColumns";
@@ -61,6 +61,7 @@ const getProviderOptions = (data) => {
 };
 
 const ServiceTable = () => {
+  const [api, contextHolder] = notification.useNotification();
   const serviceUsageDispatch = useServiceUsageDispatch();
   const serviceDispatch = useServiceDispatch();
   const authUserDispatch = useAuthenticateDispatch();
@@ -78,6 +79,8 @@ const ServiceTable = () => {
     isServicesUsageLoading,
     isCreateServiceUsageSubmitting,
     isUpdateServicesUsageLoading,
+    success,
+    message
   } = serviceUsageState;
 
   const username = userCert?.user?.commonName;
@@ -158,6 +161,7 @@ const ServiceTable = () => {
           offset,
           queryOwner
         );
+        membershipActions.fetchPurchasedMemberships(membershipDispatch);
       } else {
         serviceUsageActions.fetchProvidedServicesUsage(
           serviceUsageDispatch,
@@ -165,16 +169,17 @@ const ServiceTable = () => {
           offset,
           queryOwner
         );
+        membershipActions.fetchIssuedMemberships(membershipDispatch);
       }
     }
     servicesActions.fetchService(serviceDispatch, 10, offset, query);
-    membershipActions.fetchPurchasedMemberships(membershipDispatch);
+
     userAuthActions.fetchUsers(authUserDispatch);
   }, [activeTab, userAddress]);
 
   const handleChangeServiceUsageType = (key) => {
     setFilterQuery({});
-    setPage(0);
+    setPage(1);
     setActiveTab(key);
   };
 
@@ -383,10 +388,29 @@ const ServiceTable = () => {
     }
   };
 
+  const openToast = (placement) => {
+    if (success) {
+      api.success({
+        message: message,
+        onClose: serviceUsageActions.resetMessage(serviceUsageDispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: message,
+        onClose: serviceUsageActions.resetMessage(serviceUsageDispatch),
+        placement,
+        key: 1,
+      });
+    }
+  };
+
   const activeTabCheck = activeTab === "booked" ? "Provider" : "User";
 
   return (
     <>
+      {contextHolder}
       <Row className="mt-2">
         <Col span={22} className="m-auto">
           <Tabs
@@ -406,7 +430,8 @@ const ServiceTable = () => {
             disabled={
               validationError ||
               IsLoading ||
-              (tableData && tableData?.length != 0 && !tableData[0]?.address)
+              (tableData && tableData?.length != 0 && !tableData[0]?.address) ||
+              page != 1
             }
           >
             Add Service Use
@@ -464,6 +489,7 @@ const ServiceTable = () => {
           />
         </Col>
       </Row>
+      {message && openToast("bottom")}
     </>
   );
 };
