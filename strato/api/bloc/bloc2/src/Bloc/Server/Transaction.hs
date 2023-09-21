@@ -12,6 +12,7 @@
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
+{-# LANGUAGE BlockArguments #-}
 
 module Bloc.Server.Transaction
   ( postBlocTransaction,
@@ -323,8 +324,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
-          tx <-
-            lift . signAndPrepare jwt addr metadata' $
+          tx <- lift . signAndPrepare jwt addr metadata' $
               TransactionHeader
                 Nothing
                 addr
@@ -339,7 +339,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           txsWithChainids = map (methodcallChainid %~ (<|> cid)) mapMethodCalls
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
       forStateT Map.empty txsWithParams $
-        \MethodCall {..} -> do
+        \MethodCall{..} -> do
           let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
           mContract <- use $ at theAccount
           contract <- case mContract of
@@ -350,23 +350,25 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
                 Just x -> pure x
               at theAccount <?= x
+          sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+            Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+            Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
           (argsBin, argsAsSource) <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
-          let methodcallMetadataWithCallInfo =
-                Just $
-                  Map.insert "funcName" methodcallMethodName $
-                    Map.insert "args" argsAsSource $
-                      fromMaybe Map.empty methodcallMetadata
-          tx <-
-            lift . signAndPrepare jwt addr methodcallMetadataWithCallInfo $
-              TransactionHeader
-                (Just methodcallContractAddress)
-                addr
-                (fromMaybe emptyTxParams _methodcallTxParams)
-                (Wei (fromIntegral $ unStrung methodcallValue))
-                (Code $ "dead" <> argsBin) -- TODO: EVM no work no more
-                _methodcallChainid
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "args" argsAsSource
+                $ fromMaybe Map.empty methodcallMetadata
+          tx <- lift . signAndPrepare jwt addr methodcallMetadataWithCallInfo $
+            TransactionHeader
+              (Just methodcallContractAddress)
+              addr
+              (fromMaybe emptyTxParams _methodcallTxParams)
+              (Wei (fromIntegral $ unStrung methodcallValue))
+              (Code $ sel <> argsBin)
+              _methodcallChainid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where
@@ -468,20 +470,20 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
 
           let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
           lift . prepareUnsignedRawTx metadata' $
-            TransactionHeader
-              Nothing
-              addr
-              (fromMaybe emptyTxParams params)
-              (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-              (Code $ Text.encodeUtf8 $ serializeSourceMap src)
-              cid'
+              TransactionHeader
+                Nothing
+                addr
+                (fromMaybe emptyTxParams params)
+                (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                cid'
     FUNCTION -> do
       p <- fromFunction tx
       let mapMethodCalls = (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
           txWithChainids = (methodcallChainid %~ (<|> cid)) mapMethodCalls
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
       forStateT Map.empty txsWithParams $
-        \MethodCall {..} -> do
+        \MethodCall{..} -> do
           let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
           mContract <- use $ at theAccount
           contract <- case mContract of
@@ -492,34 +494,36 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
                 Just x -> pure x
               at theAccount <?= x
+          sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+            Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+            Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+          
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
           (argsBin, argsAsSource) <-
             lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
-          let methodcallMetadataWithCallInfo =
-                Just $
-                  Map.insert "funcName" methodcallMethodName $
-                    Map.insert "args" argsAsSource $
-                      fromMaybe Map.empty methodcallMetadata
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "args" argsAsSource
+                $ fromMaybe Map.empty methodcallMetadata
           lift . prepareUnsignedRawTx methodcallMetadataWithCallInfo $
             TransactionHeader
               (Just methodcallContractAddress)
               addr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (Code $ "dead" <> argsBin)
+              (Code $ sel <> argsBin)
               _methodcallChainid
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
-  where
-    fromTransfer = \case
-      BlocTransfer t -> return t
-      _ -> throwIO $ UserError "Could not decode transfer arguments from body"
-    fromContract = \case
-      BlocContract c -> return c
-      _ -> throwIO $ UserError "Could not decode contract arguments from body"
-    fromFunction = \case
-      BlocFunction f -> return f
-      _ -> throwIO $ UserError "Could not decode function arguments from body"
+  where fromTransfer = \case
+          BlocTransfer t -> return t
+          _ -> throwIO $ UserError "Could not decode transfer arguments from body"
+        fromContract = \case
+          BlocContract c -> return c
+          _ -> throwIO $ UserError "Could not decode contract arguments from body"
+        fromFunction = \case
+          BlocFunction f -> return f
+          _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
 
@@ -617,16 +621,18 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
       addr <- case mAddr of
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwtToken) Nothing
         Just addr' -> return addr'
-      let err =
-            CouldNotFind $
-              Text.concat
-                [ "postBlocTransaction': Couldn't find common name for user address ",
-                  Text.pack $ formatAddressWithoutColor addr
-                ]
-      userCert <-
-        maybe (throwIO err) pure
-          =<< A.select (A.Proxy @Certificate) addr
-      let userContractAddr = deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash Nothing
+      walletFlag <- useWalletsByDefault <$> getBlocEnv
+      let useWallet = fromMaybe walletFlag mUseWallet
+      userContractAddr <- if useWallet
+        then do
+          let err = CouldNotFind $ Text.concat
+                    [ "postBlocTransaction': Couldn't find common name for user address "
+                    , Text.pack $ formatAddressWithoutColor addr
+                    ]
+          userCert <- maybe (throwIO err) pure =<<
+            A.select (A.Proxy @Certificate) addr
+          pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash Nothing
+        else pure addr
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
         Nothing -> pure $ 0
@@ -719,64 +725,51 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
           [] -> return []
           [x] -> do
             p <- fromFunction x
-            let bfp =
-                  FunctionParameters
-                    addr
-                    (functionpayloadContractAddress p)
-                    (functionpayloadMethod p)
-                    (functionpayloadArgs p)
-                    (functionpayloadValue p)
-                    (mergeTxParams (functionpayloadTxParams p) txParams)
-                    (functionpayloadMetadata p)
-                    (functionpayloadChainid p <|> chainId)
-                    resolve
-            let bfpWallet =
-                  FunctionParameters
-                    addr
-                    userContractAddr
-                    "callContract"
-                    (M.fromList $ [("contractToCall", ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName", ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
-                    (functionpayloadValue p)
-                    (mergeTxParams (functionpayloadTxParams p) txParams)
-                    (functionpayloadMetadata p)
-                    (functionpayloadChainid p <|> chainId)
-                    resolve
-            walletFlag <- useWalletsByDefault <$> getBlocEnv
-            let bfp' = bool bfp bfpWallet $ fromMaybe walletFlag mUseWallet
-            fmap ((: []) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp' jwtToken
+            let bfp = FunctionParameters
+                        addr
+                        (functionpayloadContractAddress p)
+                        (functionpayloadMethod p)
+                        (functionpayloadArgs p)
+                        (functionpayloadValue p)
+                        (mergeTxParams (functionpayloadTxParams p) txParams)
+                        (functionpayloadMetadata p)
+                        (functionpayloadChainid p <|> chainId)
+                        resolve
+            let bfpWallet = FunctionParameters
+                        addr
+                        userContractAddr
+                        "callContract"
+                        (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
+                        (functionpayloadValue p)
+                        (mergeTxParams (functionpayloadTxParams p) txParams)
+                        (functionpayloadMetadata p)
+                        (functionpayloadChainid p <|> chainId)
+                        resolve
+            let bfp' = bool bfp bfpWallet useWallet
+            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp' jwtToken
           xs -> do
             p <- mapM fromFunction xs
-            let bflp =
-                  FunctionListParameters
-                    addr
-                    ( map
-                        ( \(FunctionPayload a m r v x c md) ->
-                            MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md
-                        )
-                        p
-                    )
-                    chainId
-                    resolve
-            let bflpWallet =
-                  FunctionListParameters
-                    addr
-                    ( map
-                        ( \(FunctionPayload a m r v x c md) ->
-                            MethodCall
-                              userContractAddr
-                              "callContract"
-                              (M.fromList $ [("contractToCall", ArgString $ Text.pack $ show a), ("functionName", ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
-                              (fromMaybe (Strung 0) v)
-                              (mergeTxParams x txParams)
-                              c
-                              md
-                        )
-                        p
-                    )
-                    chainId
-                    resolve
-            walletFlag <- useWalletsByDefault <$> getBlocEnv
-            let bflp' = bool bflp bflpWallet $ fromMaybe walletFlag mUseWallet
+            let bflp = FunctionListParameters
+                        addr
+                        (map (\(FunctionPayload a m r v x c md) ->
+                          MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                        chainId
+                        resolve
+            let bflpWallet = FunctionListParameters
+                        addr
+                        (map (\(FunctionPayload a m r v x c md) ->
+                                MethodCall 
+                                  userContractAddr 
+                                  "callContract"  
+                                  (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
+                                  (fromMaybe (Strung 0) v) 
+                                  (mergeTxParams x txParams) 
+                                  c 
+                                  md
+                              ) p)
+                        chainId
+                        resolve
+            let bflp' = bool bflp bflpWallet useWallet
             fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp' jwtToken
         GENESIS -> case txs of
           [] -> return []
@@ -1024,23 +1017,25 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
                 Just x -> pure x
               at theAccount <?= x
+          sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
+            Just _ -> return $ Text.encodeUtf8 methodcallMethodName
+            Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+
           let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack methodcallMethodName) $ contract ^. functions
           (argsBin, argsAsSource) <- lift $ constructArgValuesAndSource (Just methodcallArgs) xabiArgs
-          let methodcallMetadataWithCallInfo =
-                Just $
-                  Map.insert "funcName" methodcallMethodName $
-                    Map.insert "args" argsAsSource $
-                      fromMaybe Map.empty methodcallMetadata
-          tx <-
-            lift . signAndPrepare jwtToken fromAddr methodcallMetadataWithCallInfo $
-              TransactionHeader
-                (Just methodcallContractAddress)
-                fromAddr
-                (fromMaybe emptyTxParams _methodcallTxParams)
-                (Wei (fromIntegral $ unStrung methodcallValue))
-                (Code $ "dead" <> argsBin) -- TODO: EVM no work no more
-                _methodcallChainid
+          let methodcallMetadataWithCallInfo = Just $
+                Map.insert "funcName" methodcallMethodName
+                $ Map.insert "args" argsAsSource
+                $ fromMaybe Map.empty methodcallMetadata
+          tx <- lift . signAndPrepare jwtToken fromAddr methodcallMetadataWithCallInfo $
+            TransactionHeader
+              (Just methodcallContractAddress)
+              fromAddr
+              (fromMaybe emptyTxParams _methodcallTxParams)
+              (Wei (fromIntegral $ unStrung methodcallValue))
+              (Code $ sel <> argsBin)
+              _methodcallChainid
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx, methodcallMethodName)
       let finalTxs = fst <$> txsFuncNames
@@ -1078,6 +1073,9 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
       =<< A.select
         (A.Proxy @Contract)
         (Account contractAddr (unChainId <$> chainId))
+  sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
+    Just _ -> return $ Text.encodeUtf8 funcName
+    Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
   let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
       xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) . Map.lookup (Text.unpack funcName) $ contract ^. functions
@@ -1094,7 +1092,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
         fromAddr
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
-        (Code $ ("dead" :: ByteString) <> (argsBin :: ByteString)) -- TODO: EVM no work no more
+        (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
   $logDebugLS "postUsersContractMethod'/tx" tx
   txHash <- postTransaction (Just txSizeLimit) tx
