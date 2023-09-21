@@ -1133,7 +1133,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getIssuedMemberships = async function (args, options = defaultOptions) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-      let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
+      let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions);
 
       const arrayOfAddresses = issuedProducts.map(obj => obj.address);
       const args = {
@@ -1169,7 +1169,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             savings: null, //memberships[0].savings,
             membershipAddress: null //memberships[0].address
           };
-        }).filter((item) => item.manufacturer === userOrganization)
+        }) //.filter((item) => item.manufacturer === userOrganization)
 
       return combinedData;
     } catch (error) {
@@ -1855,7 +1855,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const arrayOfProductAddresses = issuedProducts.map(obj => obj.address);
 
-    const arg = { 
+    const arg = {
       productId: arrayOfProductAddresses,
       notEqualsValue: userOrganization,
       notEqualsField: 'ownerOrganization',
@@ -1864,29 +1864,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
     let itemAddressList = issuedItems.map(item => item.address);
     const args1 = {
-
       // ownerOrganization: userOrganization,
       itemId: itemAddressList
     }
 
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args1, sort: '-createdDate' }, getOptions)
-
+    const services = await contract.getServices();
+    const memberships = await contract.getIssuedMemberships();
     const data = serviceUsage['serviceUsage'].map((item) => ({
       ...item,
-      // provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
-      // serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
-      // membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
     }));
 
     return { result: data, total: serviceUsage.total };
 
-    // const ProvidedService = serviceUsage['serviceUsage'].map((item, index) => {
-    //   let result = issuedItems.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-    //   return { ...item, itemId: result.itemNumber }
-    // })
-    // return { 'ProvidedService': ProvidedService, 'ItemsAddress': itemAddressList }
-    // return ProvidedService;
   };
 
   contract.updateServiceUsage = async function (args, options = defaultOptions) {
