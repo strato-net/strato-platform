@@ -1143,7 +1143,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       let issuedItems = await itemJs.getAll(rawAdmin, args, getOptions);
 
-
       // Combine issuedProducts, issuedItems, issuedMemberships, and issuedProductFiles into one JSON object array
       const combinedData = issuedItems
         .filter(item => {
@@ -1864,7 +1863,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
 
     let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
-    let itemAddressList = issuedItems.map(item => item.address)
+    let itemAddressList = issuedItems.map(item => item.address);
     const args1 = {
       // ownerOrganization: userOrganization,
       itemId: itemAddressList
@@ -1872,13 +1871,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args1, sort: '-createdDate' }, getOptions)
-    // return serviceUsage
+
     const memberships = await contract.getPurchasedMemberships();
     const ProvidedService = serviceUsage['serviceUsage'].map((item, index) => {
       let result = issuedItems.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
       return { ...item, itemId: result.itemNumber }
     })
-    return { 'ProvidedService': ProvidedService, 'ownedItems': itemAddressList }
+    return { 'ProvidedService': ProvidedService, 'ItemsAddress': itemAddressList }
     // return ProvidedService;
   };
 

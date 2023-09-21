@@ -99,8 +99,7 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            placeholder="Provider"
-            defaultValue={activeTab === "provided" && organization}
+            placeholder={(activeTab === "provided" && organization)?organization:'Provider'}
             suffixIcon={
               activeTab === "provided" ? (
                 <LockOutlined />
@@ -134,7 +133,7 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            disabled={!record.provider}
+            disabled={!record.provider && activeTab==='booked'}
             placeholder="Membership ID"
             suffixIcon={<CaretDownOutlined />}
             style={{ width: 120 }}

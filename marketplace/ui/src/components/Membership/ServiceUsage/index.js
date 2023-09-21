@@ -167,12 +167,12 @@ const ServiceTable = () => {
           serviceUsageDispatch,
           limit,
           offset,
-          queryOwner
+          ''
         );
         membershipActions.fetchIssuedMemberships(membershipDispatch);
+        servicesActions.fetchService(serviceDispatch, 10, offset, organization);
       }
     }
-    servicesActions.fetchService(serviceDispatch, 10, offset, query);
 
     userAuthActions.fetchUsers(authUserDispatch);
   }, [activeTab, userAddress]);
