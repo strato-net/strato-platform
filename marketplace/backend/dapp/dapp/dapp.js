@@ -1850,17 +1850,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getProvidedServiceUsages = async function (args = {}, options = optionsNoChainIds) {
-
-    // product table where category = membership, manufacturer = loggedin user organization currntly blockapps
-    // Items productId and ownerAddress = loggedin user address
     const getOptions1 = { ...options, org: managers.cirrusOrg, app: contractName, };
     let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
 
     const arrayOfProductAddresses = issuedProducts.map(obj => obj.address);
 
-    const arg = {
-      productId: arrayOfProductAddresses
-    }
+    const arg = { productId: arrayOfProductAddresses };
 
     let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
     let itemAddressList = issuedItems.map(item => item.address);
@@ -1872,7 +1867,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args1, sort: '-createdDate' }, getOptions)
 
-    const memberships = await contract.getPurchasedMemberships();
     const ProvidedService = serviceUsage['serviceUsage'].map((item, index) => {
       let result = issuedItems.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
       return { ...item, itemId: result.itemNumber }
@@ -1888,12 +1882,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       name: serviceUsageJs.contractName,
       address: address,
     };
-
     // const chainOptions = { chainIds: [chainId], ...options };
-
     return serviceUsageJs.update(rawAdmin, contract, updates, options);
   };
-
   return contract;
 }
 

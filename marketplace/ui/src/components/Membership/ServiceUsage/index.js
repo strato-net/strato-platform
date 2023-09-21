@@ -43,6 +43,18 @@ const statusOptions = [
   { value: 3, label: "Completed" },
 ];
 
+const UpdatePayloadKeys = [
+  "summary",
+  "serviceDate",
+  "providerComment",
+  "status",
+  "pricePaid",
+
+  "paymentStatus",
+  "providerLastUpdated",
+  "providerLastUpdatedDate",
+];
+
 const getProviderOptions = (data) => {
   const uniqueManufacturers = new Set();
   const resultArray = data.reduce((acc, item) => {
@@ -195,17 +207,6 @@ const ServiceTable = () => {
     });
     setTableData(data);
 
-    const UpdatePayloadKeys = [
-      "serviceDate",
-      "summary",
-      "status",
-      "paymentStatus",
-      "providerLastUpdated",
-      "providerComment",
-      "providerLastUpdatedDate",
-      "pricePaid",
-    ];
-
     const updatedDataObj = UpdatePayloadKeys.reduce((acc, item) => {
       if (
         ["serviceDate", "providerLastUpdatedDate", "pricePaid"].includes(item)
@@ -224,7 +225,7 @@ const ServiceTable = () => {
 
     if (type === "update") {
       if (isEdit) {
-        // Uncomment the API call for updating service usage
+        setPage(1);
         serviceUsageActions.UpdateServiceUsage(
           serviceUsageDispatch,
           updatedPayload
@@ -285,19 +286,8 @@ const ServiceTable = () => {
   };
 
   const handleValidation = (data) => {
-    const requiredFields = [
-      "summary",
-      "serviceDate",
-      "providerComment",
-      "status",
-      "pricePaid",
-      "serviceId",
-      "paymentStatus",
-      "providerLastUpdated",
-      "providerLastUpdatedDate",
-    ];
 
-    const isRequiredFieldsFilled = requiredFields.every(
+    const isRequiredFieldsFilled = [...UpdatePayloadKeys, 'serviceId'].every(
       (field) => data[field] !== "" || null
     );
 
