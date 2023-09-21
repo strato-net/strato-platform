@@ -38,11 +38,16 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories.map(inventory => ({
-        ...inventory,
-        imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
+      const inventoriesWithImageUrl = inventories.map(inventory => (
+        inventory.imageKey ?
+        {
+          ...inventory,
+          imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
+          )
+        }
+        :
+        inventory
+      ))
       rest.response.status200(res, inventoriesWithImageUrl)
 
       return next()
@@ -129,7 +134,7 @@ class InventoryController {
       }).required(),
     });
 
-    
+
     const validation = createInventorySchema.validate(args);
 
     if (validation.error) {
