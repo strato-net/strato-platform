@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Tabs, Table, Select, Button, Row, Col, Typography, notification } from "antd";
-import { PlusOutlined, CaretDownOutlined } from "@ant-design/icons";
+import { PlusOutlined, CaretDownOutlined, CloseOutlined } from "@ant-design/icons";
 import "./index.css";
 import { generateTableColumns } from "./tableColumns";
 import {
@@ -339,6 +339,12 @@ const ServiceTable = () => {
     setPage(1);
   };
 
+  const clearFilter = () => {
+    setFilterQuery({});
+    handleQuery({}, page);
+
+  }
+
   const columns = generateTableColumns({
     isEdit,
     activeTab,
@@ -456,6 +462,10 @@ const ServiceTable = () => {
                 handleFilter(value, "status");
               }}
               options={statusOptions}
+            />
+            <Button type="primary"
+              icon={<CloseOutlined />}
+              onClick={clearFilter}
             />
           </span>
         </Col>
