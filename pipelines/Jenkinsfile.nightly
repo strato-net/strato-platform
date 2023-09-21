@@ -239,7 +239,7 @@ pipeline {
               set -x
               echo "Running unit tests"
               cd strato-worktree
-              ./run_unit_tests.sh
+              ./run_unit_tests.sh FLAGS="--coverage"
               cd strato
               archiveArtifacts artifacts: "${sh(returnStdout: true, script: 'stack path --local-hpc-root').trim()}", fingerprint: true
             '''

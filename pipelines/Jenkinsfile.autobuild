@@ -253,7 +253,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running unit tests"
-              ./run_unit_tests.sh
+              ./run_unit_tests.sh FLAGS="--coverage"
             '''
             dir ('strato') {
               archiveArtifacts artifacts: "./stack-work/**/*.html", fingerprint: true
