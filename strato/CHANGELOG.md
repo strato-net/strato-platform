@@ -45,6 +45,7 @@ so that they could be properly moved to their respective version's subsection.
 - Typechecker test errors that were missing `pragma strict` and failing
 - The out-of-scope errors of storage variables for Solidity try/catch statements
 - Free function overloading conflict with the import resolver 
+- Multilayer contract creation using `new` not able to be found in call stack
 ### Removed
 - `bloc22` database removed
 
