@@ -23,6 +23,7 @@ module Blockchain.SolidVM.SM
     runSM,
     getCurrentAccount,
     addCallInfo,
+    addCallInfoToEnd,
     dupCallInfo,
     uncheckedCallInfo,
     popCallInfo,
@@ -632,6 +633,37 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
           }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
+
+addCallInfoToEnd ::
+  MonadSM m =>
+  Account ->
+  CC.Contract ->
+  SolidString ->
+  Keccak256 ->
+  CC.CodeCollection ->
+  Map SolidString (SVMType.Type, Variable) ->
+  Bool ->
+  Bool ->
+  m ()
+addCallInfoToEnd a c fn hsh cc initialLocalVariables ro ff = do
+  let newCallInfo =
+        CallInfo
+          { currentFunctionName = fn,
+            currentAccount = a,
+            currentContract = c,
+            codeCollection = cc,
+            collectionHash = hsh,
+            localVariables = initialLocalVariables,
+            variableStack = [initialLocalVariables],
+            readOnly = ro,
+            isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
+            currentSourcePos = Nothing,
+            isFreeFunction = ff
+          }
+
+  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+    [] -> internalError "probably shouldn't happen?" ()
+    rest -> pure $ rest ++ [newCallInfo]
 
 dupCallInfo :: MonadSM m => Bool -> m ()
 dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case

@@ -8417,3 +8417,45 @@ contract qq {
 }|]
       )
       `shouldThrow` anyMissingTypeError
+  it "can test whether embedded contracts created using new can be found in call stack" . runTest $ do
+      runBS [r|
+
+contract Node {
+  address orgAddress;
+
+  constructor (address _orgAddress){
+    orgAddress = _orgAddress;
+  }
+}
+
+contract Organization {
+
+  Node[] public nodes;
+
+  constructor(address _dappAddress) {
+
+    Node node = new Node(_dappAddress);
+    nodes.push(node);
+  }
+
+}
+
+contract qq {
+
+  Organization[] orgs;
+  address test;
+
+  constructor() {
+    test = createOrganization(address(0xdeadbeef));
+  }
+
+  function createOrganization(address _x) returns (address) {
+
+    Organization org = new Organization(_x);
+    orgs.push(org);
+    Node node = Node(org.nodes()[0]);
+    return (address(node));
+  }
+}
+|]
+      getFields ["test"] `shouldReturn` [BAccount $ NamedAccount ((fromJust . stringAddress) "af11a56deca85ea206c89766e250fa5668050568") UnspecifiedChain]

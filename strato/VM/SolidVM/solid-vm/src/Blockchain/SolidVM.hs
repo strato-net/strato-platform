@@ -1900,6 +1900,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' args False
+  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
+  addCallInfoToEnd newAddress contract' (stringToLabel $ labelToString contractName') hsh cc M.empty False False
   return $
     Constant $
       SContract contractName' $
@@ -1918,6 +1920,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' args False
+  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
+  addCallInfoToEnd newAddress contract' (stringToLabel $ labelToString contractName') hsh cc M.empty False False
   onTraced $ do
     liftIO $
       putStrLn $
