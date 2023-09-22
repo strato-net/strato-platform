@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Privacy where
+module BlockApps.Tools.Privacy where
 
 import Blockchain.Constants
 import Blockchain.Privacy.Monad

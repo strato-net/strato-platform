@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module DumpLevelDB
+module BlockApps.Tools.DumpLevelDB
   ( showKeyVal,
     typeToDB,
   )

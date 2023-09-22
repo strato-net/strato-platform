@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module DumpKafkaStateDiff where
+module BlockApps.Tools.DumpKafkaStateDiff where
 
 --import qualified Data.ByteString.Char8  as BC
 

@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module State (doit) where
+module BlockApps.Tools.State (doit) where
 
+import BlockApps.Tools.Util
 import Blockchain.Constants
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
@@ -17,7 +18,6 @@ import qualified Database.LevelDB as DB
 import System.FilePath
 import qualified Text.Colors as CL
 import Text.Format
-import Util
 
 nibbleStringToByteString :: N.NibbleString -> B.ByteString
 nibbleStringToByteString (N.EvenNibbleString x) = x

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module DumpKafkaSequencer where
+module BlockApps.Tools.DumpKafkaSequencer where
 
 import Blockchain.EthConf
 import Blockchain.Sequencer.Kafka

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module RawMP (doit) where
+module BlockApps.Tools.RawMP (doit) where
 
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP

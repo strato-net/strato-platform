@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Redis where
+module BlockApps.Tools.Redis where
 
 import Blockchain.EthConf
 import Blockchain.Strato.RedisBlockDB

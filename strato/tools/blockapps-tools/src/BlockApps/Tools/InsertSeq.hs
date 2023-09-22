@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
-module InsertSeq where
+module BlockApps.Tools.InsertSeq where
 
 -- import Control.Monad
 import Blockchain.Blockstanbul

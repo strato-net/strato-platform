@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockapps.Crossmon (recordMaxBlockNumber, initializeHealthChecks) where
+module BlockApps.Crossmon (recordMaxBlockNumber, initializeHealthChecks) where
 
 import Control.Monad
 import Control.Monad.IO.Class

@@ -1,4 +1,4 @@
-module DumpRedis where
+module BlockApps.Tools.DumpRedis where
 
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Strato.Model.Keccak256
