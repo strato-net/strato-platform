@@ -433,7 +433,7 @@ const ConfirmOrder = () => {
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
       to: user.preferred_username,
-      subject: "New Membership Order",
+      subject: "Your Order Confirmation",
       htmlContent: htmlContent,
     };
     TagManager.dataLayer({
