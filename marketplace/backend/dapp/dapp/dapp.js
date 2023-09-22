@@ -1163,6 +1163,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             itemAddress: item.address,
             itemNumber: item.itemNumber,
             productId: item.productId,
+            owner: item.owner,
+            ownerCommonName: item.ownerCommonName,
             fileLocation: null,//productFiles[0].fileLocation,
             productName: product.name,
             subCategory: product.subCategory,
@@ -1875,11 +1877,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();
+    // const users = await contract.getCertificates()
     const data = serviceUsage['serviceUsage'].map((item) => ({
       ...item,
       provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
       serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+      // userName: (users.find((uItem) => uItem.Address === item.providerLastUpdated) || {}).commonName || '',
     }));
 
     return { result: data, total: serviceUsage.total };

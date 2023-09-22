@@ -60,7 +60,7 @@ export function generateTableColumns({
         {record.editable && !isEdit ? (
           <Select
             placeholder="User"
-            defaultValue={username}
+            defaultValue={serviceType=='booked' && username}
             suffixIcon={
               serviceType === "booked" ? <LockOutlined /> : <CaretDownOutlined />
             }
@@ -79,6 +79,7 @@ export function generateTableColumns({
               }
               return label;
             }, null)}
+            {/* {record.ownerCommonName} */}
           </Typography>
         )}
       </span>
@@ -134,7 +135,7 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            disabled={!record.provider && serviceType==='booked'}
+            disabled={!record.provider && !record.providerLastUpdated}
             placeholder="Membership ID"
             suffixIcon={<CaretDownOutlined />}
             style={{ width: 120 }}

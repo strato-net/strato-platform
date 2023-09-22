@@ -137,6 +137,29 @@ const ServiceTable = () => {
       return { value: itemAddress, label: itemNumber };
     }
   );
+
+  const issuedUser = (apiResponse) => {
+    if (!Array.isArray(apiResponse)) {
+      return [];
+    }
+
+    const uniqueNames = new Set(); // Use a Set to store unique ownerCommonName values
+    const transformedArray = apiResponse.reduce((result, item) => {
+      if (!uniqueNames.has(item.owner)) {
+        uniqueNames.add(item.owner);
+        result.push({
+          label: item.ownerCommonName,
+          value: item.owner
+        });
+      }
+      return result;
+    }, []);
+
+    return transformedArray;
+  }
+
+  const issuedUserList = issuedUser(membership?.purchasedMemberships);
+
   const serviceListData = servicesState?.services?.map(({ address, name }) => {
     return { value: address, label: name };
   });
@@ -144,9 +167,11 @@ const ServiceTable = () => {
     return { value: userAddress, label: commonName };
   });
 
+  const UserListData = serviceType == 'booked' ? userListData : issuedUserList;
+
   const [membershipList, setMembershipList] = useState(defaultMembership);
   const [serviceList, setServiceList] = useState(serviceListData);
-  const [userList, setUserList] = useState(userListData);
+  const [userList, setUserList] = useState(UserListData);
   const [providerState, setProviderState] = useState("");
   const [isEdit, setIsEdit] = useState(false);
   const [isNewRow, setIsNewRow] = useState(false);
@@ -168,7 +193,7 @@ const ServiceTable = () => {
   }, [serviceUsageState]);
 
   useEffect(() => {
-    setUserList(userListData);
+    setUserList(UserListData);
   }, [userCert]);
 
   const queryOwner = ``;
@@ -288,6 +313,16 @@ const ServiceTable = () => {
       setMembershipList(membershipData);
       servicesActions.fetchService(serviceDispatch, 10, offset, value);
     } else if (field === "itemId") {
+      updateTableData(field, value, key);
+    }else if (field === "providerLastUpdated"){
+      const membershipData = membership?.purchasedMemberships
+        .filter(({ owner }) => owner === value)
+        .map(({ itemAddress, itemNumber, manufacturer }) => ({
+          value: itemAddress,
+          label: itemNumber,
+          organization: manufacturer,
+        }));
+      setMembershipList(membershipData);
       updateTableData(field, value, key);
     }
     updateTableData(field, value, key);
