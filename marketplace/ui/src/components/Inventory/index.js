@@ -225,7 +225,7 @@ const Inventory = ({ user }) => {
               <>
                 {inventories.length !== 0 ? (
                   <div className="my-4" id="inventory-list">
-                    {inventories.map((inventory, index) => {
+                    {inventories.filter(inventory => inventory.status === 1).map((inventory, index) => {
                       let category = categorys.find(
                         (c) => c.name === inventory.category
                       );

@@ -383,5 +383,28 @@ describe("Renders Inventory Page", () => {
     });
   });
 
+  it("it should not render unpublished inventories", () => {
+    cy.get("#Inventory").should("exist");
+    cy.get("#Inventory").click();
+    cy.url().should("include", "/inventories");
+
+    // Fetch the list of inventories
+    cy.request({
+      method: "GET",
+      url: "/api/v1/inventory",
+    }).then(({ status, body }) => {
+      expect(status).to.eq(200);
+
+      // For each inventory in the API response
+      body.data.forEach(inventory => {
+        // If the inventory is unpublished
+        if (inventory.status === 2) {
+          // It should not be rendered in the UI
+          cy.get("#inventory-list")
+            .should("not.contain", decodeURIComponent(inventory.name));
+        }
+      });
+    });
+  });
 
 });
