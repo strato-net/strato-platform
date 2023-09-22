@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
 
 const contractName = 'Product_3';
@@ -174,7 +174,29 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
     const products = await searchAllWithQueryArgs(contractName, args, options, admin)
-    return products.map((product) => marshalOut(product))
+    
+    const queryArgs = setSearchQueryOptionsPrime({
+        ...args,
+        limit: undefined,
+        offset: 0,
+        order: undefined,
+    });
+    
+    const totalResult = await searchAll(
+    contractName,
+    {
+        ...queryArgs,
+        sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
+        queryOptions: {
+        ...queryArgs.queryOptions,
+        select: "count",
+        },
+    },
+    options,
+    admin
+    );
+    
+    return { products: products.map((product) => marshalOut(product)), total: totalResult[0].count}
 }
 
 /**

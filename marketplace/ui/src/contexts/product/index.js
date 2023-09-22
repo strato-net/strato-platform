@@ -7,6 +7,7 @@ const ProductDispatchContext = createContext();
 const ProductsProvider = ({ children }) => {
   const initialState = {
     product: null,
+    productTotal: 10,
     isCreateProductSubmitting: false,
     products: [],
     isProductsLoading: false,

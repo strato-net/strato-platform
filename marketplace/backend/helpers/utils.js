@@ -197,6 +197,100 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
   return searchArgs
 }
 
+export const setSearchQueryOptionsPrime = (args) => {
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort']
+  const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
+    if (!nonQueryOptions.includes(key)) {
+      if (Array.isArray(args[key])) {
+        result.push(({ key, value: `(${args[key].join(',')})`, predicate: 'in' }))
+      } else {
+        result.push(({ key, value: args[key] }))
+      }
+    }
+
+    if (key === 'queryValue') {
+      const { queryValue, queryFields } = args
+      if (queryFields) {
+        if (Array.isArray(queryFields)) {
+          result.push({ key: queryFields, value: `*${queryValue}*`, predicate: 'or', subPredicate: 'ilike' })
+        } else {
+          result.push({ key: queryFields, value: `*${queryValue}*`, predicate: 'ilike' })
+        }
+      }
+    }
+
+    if (key === 'sort') {
+      result.push(args[key])
+    }
+
+    return result
+  }, []).map(option => {
+    // Modify the 'isDeleted' option
+    if (option.key === 'isDeleted') {
+      return { key: 'isDeleted', value: `eq.${option.value}` };
+    }
+    return option;
+  }))
+  return queryArgs
+}
+
+export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
+  const queryOptionsArray = Array.isArray(_queryOptionsArray) ? _queryOptionsArray : [_queryOptionsArray]
+  const queryOptions = queryOptionsArray.reduce((agg, cur) => {
+    let { key, value, predicate = 'like' } = cur
+    if (!value) {
+      return agg
+    }
+    if (key == 'and') {
+      return {
+        ...agg,
+        [key]: value
+      }
+    }
+    let dotIndex = value.indexOf('.')
+    if (dotIndex >= 0) {
+      // split the value on a period, allows to directly pass postgrest operators
+      // to this API via ?key=<operator>.<value>
+      // and not setting the <operator> will default to the 'like' operator
+      // This should only be used for simpler queries not things like 'in' or 'or'
+      predicate = value.substring(0, dotIndex)
+      value = value.substring(dotIndex + 1) 
+    }
+    let option = {}
+    if (predicate === 'or') {
+      const { subPredicate = 'eq' } = cur
+      const valueArray = key.reduce((orAgg, orCur) => {
+        orAgg.push(`${orCur}.${subPredicate}.${value}`)
+        return orAgg
+      }, [])
+      option = {
+        [predicate]: `(${valueArray.join(',')})`,
+      }
+    } else {
+      let searchedValue = value
+      if (predicate === 'like') {
+        searchedValue = `*${value}*`
+      }
+      option = {
+        [key]: `${predicate}.${searchedValue}`,
+      }
+    }
+    return {
+      ...agg,
+      ...option,
+    }
+  }, {})
+
+  const searchArgs = {
+    ...args,
+    queryOptions: {
+      ...args.queryOptions,
+      ...queryOptions,
+    },
+  }
+  return searchArgs
+}
+
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
   const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {

@@ -1110,12 +1110,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       const products = await managers.productManager.getProducts({ address: [...productIds], chainId: contract.chainId }, createOptions);
 
-      if (!products || products.length === 0) {
+      if (!products || products.products.length === 0) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Products not found");
       }
 
       result.orderLines.forEach((orderLine) => {
-        const product = products.find(
+        const product = products.products.find(
           (product) => product.address === orderLine.productId
         );
         if (product) {

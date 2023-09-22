@@ -39,7 +39,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchProductSuccessful:
       return {
         ...state,
-        products: action.payload,
+        products: action.payload.productsWithImageUrl,
+        productTotal: action.payload.total,
         isProductsLoading: false,
       };
     case actionDescriptors.fetchProductFailed:
