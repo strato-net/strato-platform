@@ -11,8 +11,8 @@
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
 
+import BlockApps.Crossmon
 import BlockApps.Logging
-import Blockapps.Crossmon
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.Bagger.Transactions
 --import           Blockchain.Data.Block
