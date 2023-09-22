@@ -238,12 +238,10 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running unit tests"
-              cd strato-worktree
               ./run_unit_tests.sh --coverage
             '''
             dir ('strato') {
-              sh 'cp -r .stack-work/**/hpc/ hpc/'
-              archiveArtifacts artifacts: "hpc/**/*html", fingerprint: true
+              archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
             }
           },
 
