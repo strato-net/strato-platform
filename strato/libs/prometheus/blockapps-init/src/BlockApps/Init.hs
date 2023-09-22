@@ -3,8 +3,8 @@
 
 module BlockApps.Init (blockappsInit) where
 
+import BlockApps.Crossmon
 import BlockApps.Logging (LoggingT)
-import Blockapps.Crossmon
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
