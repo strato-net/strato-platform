@@ -52,11 +52,9 @@ const actions = {
   resetMessage: (dispatch) => {
     dispatch({ type: actionDescriptors.resetMessage });
   },
-
   setMessage: (dispatch, message, success = false) => {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
-
   resetState: (dispatch) => {
     dispatch({ type: actionDescriptors.resetState });
   },

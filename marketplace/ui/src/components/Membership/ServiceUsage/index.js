@@ -156,7 +156,7 @@ const ServiceTable = () => {
     providerLastUpdatedDate: new Date().getTime().toString(),
   };
 
-  const queryOwner = `&owner=${userAddress}`;
+  const queryOwner = ``;
   useEffect(() => {
     if (userAddress) {
       if (serviceType === "booked") {
@@ -172,7 +172,7 @@ const ServiceTable = () => {
           serviceUsageDispatch,
           limit,
           offset,
-          ''
+          queryOwner
         );
         membershipActions.fetchIssuedMemberships(membershipDispatch);
         servicesActions.fetchService(serviceDispatch, 10, offset, organization);
@@ -220,7 +220,6 @@ const ServiceTable = () => {
 
     if (type === "update") {
       if (isEdit) {
-        setPage(1);
         if (serviceType == 'booked') {
           serviceUsageActions.UpdateBookedServiceUsage(
             serviceUsageDispatch,
@@ -234,7 +233,6 @@ const ServiceTable = () => {
         }
 
       } else {
-        setPage(1);
         updatedDataObj.itemId = record.itemId;
         updatedDataObj.serviceId = record.serviceId;
         if (serviceType == 'booked') {
@@ -249,6 +247,7 @@ const ServiceTable = () => {
           );
         }
       }
+      setPage(1);
     }
   };
 
