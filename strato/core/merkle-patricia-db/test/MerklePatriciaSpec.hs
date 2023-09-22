@@ -1,30 +1,29 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# OPTIONS_GHC -fno-warn-orphans  #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Main where
 
-import           Blockchain.Data.RLP
-import           Blockchain.Database.MerklePatricia
-import           Blockchain.Database.MerklePatricia.Internal
-import           Blockchain.Strato.Model.Util
-import           Control.Monad.Change.Alter
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                                as B
-import qualified Data.NibbleString                              as N
-import qualified Database.LevelDB                               as LD
-import           Test.Hspec
-import           Test.Hspec.Contrib.HUnit                       (fromHUnitTest)
-import           Test.HUnit
+import Blockchain.Data.RLP
+import Blockchain.Database.MerklePatricia
+import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Strato.Model.Util
+import Control.Monad.Change.Alter
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Resource
+import qualified Data.ByteString as B
+import qualified Data.NibbleString as N
+import qualified Database.LevelDB as LD
+import Test.HUnit
+import Test.Hspec
+import Test.Hspec.Contrib.HUnit (fromHUnitTest)
 
-bigTest :: [(B.ByteString,String)]
-bigTest=
-  [
-    ("00000000000000000000000000000000ffffffffffffffff0000000000000000", "90467269656e647320262046616d696c79"),
+bigTest :: [(B.ByteString, String)]
+bigTest =
+  [ ("00000000000000000000000000000000ffffffffffffffff0000000000000000", "90467269656e647320262046616d696c79"),
     ("00000000000000000000000000000000ffffffffffffffff0000000000000001", "8772656631323334"),
     ("00000000000000000000000000000000ffffffffffffffff0000000000000002", "04"),
     ("00000000000000000000000000000000ffffffffffffffff0000000000000003", "84548123a8"),
@@ -43,7 +42,7 @@ testGetPut = TestCase $ do
     db <- putSingleKV key val
     getSingleKV db key
 
-  assertEqual "get . put = id" res [(key,val)]
+  assertEqual "get . put = id" res [(key, val)]
 
 testGetPutRepeated :: Test
 testGetPutRepeated = TestCase $ do
@@ -53,7 +52,7 @@ testGetPutRepeated = TestCase $ do
 
     getSingleKV db2 key2
 
-  assertEqual "get . put . put = id" res [(key2,val2)]
+  assertEqual "get . put . put = id" res [(key2, val2)]
 
 testGetPutRepeatedII :: Test
 testGetPutRepeatedII = TestCase $ do
@@ -61,12 +60,12 @@ testGetPutRepeatedII = TestCase $ do
     db <- addAllKVs emptyTriePtr bigTest
     getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
 
-  assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003",rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
+  assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003", rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
 
 testSingleInsert :: Test
 testSingleInsert = TestCase $ do
   sr <- runResourceT $ do
-    db <- LD.open "/tmp/testDB" LD.defaultOptions{LD.createIfMissing=True}
+    db <- LD.open "/tmp/testDB" LD.defaultOptions {LD.createIfMissing = True}
     flip runReaderT db $ do
       initializeBlank
       addAllKVs emptyTriePtr [head bigTest]
@@ -78,7 +77,7 @@ testSingleInsert = TestCase $ do
 testMultipleInserts :: Test
 testMultipleInserts = TestCase $ do
   sr <- runResourceT $ do
-    db <- LD.open "/tmp/testDB2" LD.defaultOptions{LD.createIfMissing=True}
+    db <- LD.open "/tmp/testDB2" LD.defaultOptions {LD.createIfMissing = True}
     flip runReaderT db $ do
       initializeBlank
       addAllKVs emptyTriePtr bigTest
@@ -86,7 +85,6 @@ testMultipleInserts = TestCase $ do
   sr2 <- runMP $ addAllKVs emptyTriePtr bigTest
 
   assertEqual "disk - mem multiple insert" sr sr2
-
 
 key :: N.NibbleString
 key = (byteString2NibbleString "anyString")
@@ -103,17 +101,20 @@ val2 = (RLPString "thatString2")
 putSingleKV :: (StateRoot `Alters` NodeData) m => Key -> Val -> m StateRoot
 putSingleKV = unsafePutKeyVal emptyTriePtr
 
-getSingleKV :: (StateRoot `Alters` NodeData) m => StateRoot -> Key -> m [(Key,Val)]
+getSingleKV :: (StateRoot `Alters` NodeData) m => StateRoot -> Key -> m [(Key, Val)]
 getSingleKV = unsafeGetKeyVals
 
 spec :: Spec
 spec = do
   describe "the old merkle-patricia test suite" $ do
-       fromHUnitTest $ TestList [TestLabel " get . put = id" testGetPut,
-                                 TestLabel " get . put . put = id" testGetPutRepeated,
-                                 TestLabel " get . putn = id" testGetPutRepeatedII,
-                                 TestLabel " single insert" testSingleInsert,
-                                 TestLabel " multiple insert" testMultipleInserts]
+    fromHUnitTest $
+      TestList
+        [ TestLabel " get . put = id" testGetPut,
+          TestLabel " get . put . put = id" testGetPutRepeated,
+          TestLabel " get . putn = id" testGetPutRepeatedII,
+          TestLabel " single insert" testSingleInsert,
+          TestLabel " multiple insert" testMultipleInserts
+        ]
 
 main :: IO ()
 main = hspec spec

@@ -6,30 +6,31 @@
 
 module DeprecatedNetworkFunction (connectTo) where
 
-import Control.Monad (liftM)
-import Network.Socket hiding (accept, socketPort, PortNumber)
-import System.IO
 import Control.Exception
+import Control.Monad (liftM)
+import Network.Socket hiding (PortNumber, accept, socketPort)
+import System.IO
 
 connectTo :: HostName -> Int -> IO Handle
 connectTo host port = do
   let caller = "Network.connectTo"
       serv = show port
-  let hints = defaultHints { addrFlags = [AI_ADDRCONFIG]
-                           , addrSocketType = Stream }
+  let hints =
+        defaultHints
+          { addrFlags = [AI_ADDRCONFIG],
+            addrSocketType = Stream
+          }
   addrs <- getAddrInfo (Just hints) (Just host) (Just serv)
   firstSuccessful caller $ map tryToConnect addrs
   where
-  tryToConnect addr =
-    bracketOnError
+    tryToConnect addr =
+      bracketOnError
         (socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr))
-        close  -- only done if there's an error
-        (\sock -> do
-          connect sock (addrAddress addr)
-          socketToHandle sock ReadWriteMode
+        close -- only done if there's an error
+        ( \sock -> do
+            connect sock (addrAddress addr)
+            socketToHandle sock ReadWriteMode
         )
-
-
 
 tryIO :: IO a -> IO (Either IOException a)
 tryIO m = catch (liftM Right m) (return . Left)
@@ -37,13 +38,14 @@ tryIO m = catch (liftM Right m) (return . Left)
 firstSuccessful :: String -> [IO a] -> IO a
 firstSuccessful caller = go Nothing
   where
-  -- Attempt the next operation, remember exception on failure
-  go _ (p:ps) =
-    do r <- tryIO p
-       case r of
-         Right x -> return x
-         Left  e -> go (Just e) ps
+    -- Attempt the next operation, remember exception on failure
+    go _ (p : ps) =
+      do
+        r <- tryIO p
+        case r of
+          Right x -> return x
+          Left e -> go (Just e) ps
 
-  -- All operations failed, throw error if one exists
-  go Nothing  [] = ioError $ userError $ caller ++ ": firstSuccessful: empty list"
-  go (Just e) [] = throwIO e
+    -- All operations failed, throw error if one exists
+    go Nothing [] = ioError $ userError $ caller ++ ": firstSuccessful: empty list"
+    go (Just e) [] = throwIO e

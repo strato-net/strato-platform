@@ -23,8 +23,8 @@ class InventoryController {
       }
 
       const inventory = await dapp.getInventory(args, chainOptions)
-      // const inventoryImageUrl = getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
-      const result = { ...inventory }
+      const inventoryImageUrl = getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
+      const result = { ...inventory, imageUrl: inventoryImageUrl }
       rest.response.status200(res, result)
 
       return next()
@@ -38,12 +38,12 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventories({ ...query })
-      // const inventoriesWithImageUrl = inventories.map(inventory => ({
-      //   ...inventory,
-      //   imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
-      //   )
-      // }))
-      rest.response.status200(res, inventories)
+      const inventoriesWithImageUrl = inventories.map(inventory => ({
+        ...inventory,
+        imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
+        )
+      }))
+      rest.response.status200(res, inventoriesWithImageUrl)
 
       return next()
     } catch (e) {
@@ -127,8 +127,6 @@ class InventoryController {
           })).required()
         })).required()
       }).required(),
-      taxPercentageAmount: Joi.number().integer().min(0).required(),
-      taxDollarAmount:     Joi.number().integer().min(0).required(),
     });
 
     

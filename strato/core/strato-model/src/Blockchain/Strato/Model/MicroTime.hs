@@ -1,19 +1,15 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE NoDeriveAnyClass #-}
 
 module Blockchain.Strato.Model.MicroTime where
 
-import           Data.Data
-
-import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
-
-import qualified Data.Binary              as Binary
-
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances()
-
-import           Blockchain.Strato.Model.PositiveInteger
+import Blockchain.Strato.Model.PositiveInteger
+import qualified Data.Binary as Binary
+import Data.Data
+import Data.Time.Clock.POSIX (POSIXTime, getPOSIXTime)
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 
 newtype Microtime = Microtime Integer deriving (Read, Show, Eq, Ord, Num, Enum, Real, Integral, Data, Typeable)
 
@@ -27,9 +23,8 @@ getCurrentMicrotime :: IO Microtime
 getCurrentMicrotime = posixTimeToMicrotime <$> getPOSIXTime
 
 instance Binary.Binary Microtime where
-    get = Microtime <$> Binary.get
-    put (Microtime a) = Binary.put a
+  get = Microtime <$> Binary.get
+  put (Microtime a) = Binary.put a
 
 instance Arbitrary Microtime where
-    arbitrary = (Microtime . unboxPI) <$> (arbitrary :: Gen PositiveInteger)
-
+  arbitrary = (Microtime . unboxPI) <$> (arbitrary :: Gen PositiveInteger)

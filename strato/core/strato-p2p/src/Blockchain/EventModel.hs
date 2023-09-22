@@ -1,4 +1,4 @@
-module Blockchain.EventModel (Event(..)) where
+module Blockchain.EventModel (Event (..)) where
 
 import Blockchain.Data.Wire
 import Blockchain.Sequencer.Event

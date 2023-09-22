@@ -1,14 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
+
 module Main where
 
-import Blockchain.Options()
-import Blockchain.VMOptions()
-import Executable.EVMFlags()
+import Blockchain.Options ()
+import Blockchain.VMOptions ()
+import Executable.EVMFlags ()
 import HFlags
-import Test.Hspec.Runner
-
 import qualified Spec
+import Test.Hspec.Runner
 
 predicate :: Path -> Bool
 predicate (_, _) = True

@@ -4,16 +4,16 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Handlers.Coinbase
-  ( API
-  , coinbaseClient
-  , server
-  ) where
+  ( API,
+    coinbaseClient,
+    server,
+  )
+where
 
-import           Data.Aeson
-import           Servant
-import           Servant.Client
-
-import           Blockchain.EthConf
+import Blockchain.EthConf
+import Data.Aeson
+import Servant
+import Servant.Client
 
 type API = "coinbase" :> Get '[JSON] Value
 

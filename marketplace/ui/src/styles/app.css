@@ -73,6 +73,10 @@
   margin-bottom: 0px;
 }
 
+.ant-upload-wrapper .ant-upload-select {
+  display: block;
+}
+
 .ant-input-number .ant-input-number-input {
   text-align: center;
 }

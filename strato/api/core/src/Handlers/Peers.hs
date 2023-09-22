@@ -1,20 +1,19 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.Peers (
-  API,
-  server
-  ) where
+module Handlers.Peers
+  ( API,
+    server,
+  )
+where
 
-import           Control.Monad.IO.Class
-import           Data.Aeson
+import Blockchain.Strato.Discovery.Data.Peer
+import Control.Monad.IO.Class
+import Data.Aeson
 import qualified Data.Aeson.Key as DAK
-import           Servant                                 hiding (ServerError)
-
-import           Blockchain.Strato.Discovery.Data.Peer
-
-import           SQLM
-import           UnliftIO
+import SQLM
+import Servant hiding (ServerError)
+import UnliftIO
 
 type API = "peers" :> Get '[JSON] Value
 

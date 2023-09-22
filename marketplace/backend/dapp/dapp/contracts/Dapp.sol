@@ -5,15 +5,12 @@ import "/dapp/products/contracts/ProductManager.sol";
 import "/dapp/orders/contracts/Order.sol";
 import "/dapp/eventType/contracts/EventType.sol";
 import "/dapp/eventType/contracts/EventTypeManager.sol";
-import "/dapp/service/contracts/Service.sol";
-import "/dapp/service/contracts/ServiceManager.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
 import "/dapp/orders/contracts/OrderLineItem.sol";
 import "/dapp/items/contracts/Event.sol";
 import "/dapp/items/contracts/ItemManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
 import "/dapp/orders/contracts/OrderManager.sol";
-import "/dapp/membership/contracts/MembershipManager.sol";
 /**
  * Single entry point to all the project's contracts
  * Deployed by the deploy script
@@ -36,10 +33,8 @@ contract Dapp {
     ItemManager itemManager;
     ProductManager public productManager;
     EventTypeManager_10 eventTypeManager;
-    ServiceManager_10 serviceManager;
     PaymentManager paymentManager;
     OrderManager orderManager;
-    MembershipManager membershipManager;
     
     account public bootUserAccount;
     string public bootUserCommonName;
@@ -58,17 +53,11 @@ contract Dapp {
         itemManager = new ItemManager();
         productManager = new ProductManager();
         eventTypeManager = new EventTypeManager_10();
-        serviceManager = new ServiceManager_10();
         paymentManager = new PaymentManager();
-        membershipManager = new MembershipManager();
     }
 
     function getProductManager() public returns (ProductManager) {
         return productManager;
-    }
-
-    function getMembershipManager() public returns (MembershipManager) {
-        return membershipManager;
     }
 
     function addOrg(string _orgName) {

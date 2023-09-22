@@ -40,7 +40,6 @@ const TopSellingProductCard = () => {
   }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
 
   const naviroute = routes.MarketplaceProductDetail.url;
-  const naviroute2 = routes.MembershipDetail.url;
 
   const limit = 3;
 
@@ -150,17 +149,11 @@ const TopSellingProductCard = () => {
                         width={230}
                         preview={false}
                         onClick={() =>
-                          topSellingProduct.membershipId ? 
-                          navigate(naviroute2.replace(":id", topSellingProduct.membershipId), { state: { isCalledFromMembership: true, inventoryId: topSellingProduct.address} })
-                          :
                           navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                         }
                       />
                       <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer" onClick={() =>
-                        topSellingProduct.membershipId ? 
-                          navigate(naviroute2.replace(":id", topSellingProduct.membershipId), { state: { isCalledFromMembership: true, inventoryId: topSellingProduct.address} })
-                          :
-                          navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                       }>
                         {decodeURIComponent(topSellingProduct.name)}
                       </Text>

@@ -1,10 +1,10 @@
 module BlockApps.Solidity.Parse.TypesSpec where
 
-import           Test.Hspec
-import           Text.Parsec                          hiding (parse)
-import           BlockApps.Solidity.Parse.Types
-import           BlockApps.Solidity.Parse.UnParser
-import           BlockApps.Solidity.Xabi.Type
+import BlockApps.Solidity.Parse.Types
+import BlockApps.Solidity.Parse.UnParser
+import BlockApps.Solidity.Xabi.Type
+import Test.Hspec
+import Text.Parsec hiding (parse)
 
 spec :: Spec
 spec = do

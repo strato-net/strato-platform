@@ -1,28 +1,28 @@
-{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
-module InsertSeq where
+{-# LANGUAGE TypeApplications #-}
 
-import Data.Aeson
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import System.Exit
-import Text.Printf
+module InsertSeq where
 
 -- import Control.Monad
 import Blockchain.Blockstanbul
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
-import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin as TXO
+import Blockchain.Data.Transaction
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Blockchain.TypeLits
+import Data.Aeson
+import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Lazy.Char8 as BLC
 import Network.Kafka.Protocol as KP
+import System.Exit
+import Text.Printf
 
 insertSeq :: IngestEvent -> IO ()
 insertSeq iev = do
@@ -39,7 +39,7 @@ validatorBehavior valB = do
   print msg
   resp <- runKafkaConfigured (KP.KString "validator-bevaiour-flag") $ do
     writeUnseqEvents [msg]
-  print resp 
+  print resp
 
 deleteDepBlock :: String -> IO ()
 deleteDepBlock k = do
@@ -48,7 +48,7 @@ deleteDepBlock k = do
   print msg
   resp <- runKafkaConfigured (KP.KString "delete-dep-block") $ do
     writeUnseqEvents [msg]
-  print resp 
+  print resp
 
 addTx :: String -> IO ()
 addTx tx' = do
@@ -70,8 +70,11 @@ addBlocksFromFile fileName = do
       resps <- runKafkaConfigured "queryStrato" $ do
         assertTopicCreation
         writeUnseqEvents $
-          map (\(Block bd txs us) ->
-             IEBlock (IngestBlock (TXO.PeerString "") bd txs us)) bs
+          map
+            ( \(Block bd txs us) ->
+                IEBlock (IngestBlock (TXO.PeerString "") bd txs us)
+            )
+            bs
       mapM_ print resps
 
 addGenesisFromFile :: FilePath -> IO ()

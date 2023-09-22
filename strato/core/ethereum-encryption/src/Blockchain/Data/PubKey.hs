@@ -1,34 +1,34 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Data.PubKey (
-  stringToPoint,
-  pointToString,
-  pointToBytes,
-  bytesToPoint,
-  secPubKeyToPoint,
-  pointToSecPubKey
-  ) where
+module Blockchain.Data.PubKey
+  ( stringToPoint,
+    pointToString,
+    pointToBytes,
+    bytesToPoint,
+    secPubKeyToPoint,
+    pointToSecPubKey,
+  )
+where
 
-import           Crypto.Types.PubKey.ECC
-import           Data.Bits
-import qualified Data.ByteString           as B
-import qualified Data.ByteString.Base16    as B16
-import qualified Data.ByteString.Char8     as BC
-import           Data.Maybe
-import           Data.Word
+import Blockchain.Data.RLP
+import Blockchain.Strato.Model.ExtendedWord
+import qualified Blockchain.Strato.Model.Secp256k1 as Secp256k1
+import Crypto.Types.PubKey.ECC
+import Data.Bits
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as BC
+import Data.Maybe
+import Data.Word
+import qualified Text.Colors as CL
+import Text.Format
 
-import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.ExtendedWord
-import qualified Blockchain.Strato.Model.Secp256k1          as Secp256k1
-import qualified Text.Colors               as CL
-import           Text.Format
-
-stringToPoint::String->Point
+stringToPoint :: String -> Point
 stringToPoint string =
   case B16.decode $ BC.pack string of
-   Right val -> bytesToPoint val
-   _         -> error $ "stringToPoint called with malformed string: " ++ string
+    Right val -> bytesToPoint val
+    _ -> error $ "stringToPoint called with malformed string: " ++ string
 
 pointToString :: Point -> String
 pointToString = BC.unpack . B16.encode . pointToBytes
@@ -52,28 +52,28 @@ instance Format Point where
   format PointO = "PointO"
 -}
 
-pointToBytes::Point->B.ByteString
+pointToBytes :: Point -> B.ByteString
 pointToBytes (Point x y) = B.pack $ intToBytes x ++ intToBytes y
-pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
+pointToBytes PointO = error "pointToBytes got value PointO, I don't know what to do here"
 
-bytesToPoint::B.ByteString->Point
-bytesToPoint bs | B.length bs == 64 =
-  let (xs, ys)= B.splitAt 32 bs
-  in Point (toInteger $ bytesToWord256 xs) (toInteger $ bytesToWord256 ys)
+bytesToPoint :: B.ByteString -> Point
+bytesToPoint bs
+  | B.length bs == 64 =
+    let (xs, ys) = B.splitAt 32 bs
+     in Point (toInteger $ bytesToWord256 xs) (toInteger $ bytesToWord256 ys)
 bytesToPoint _ = error "bytesToPoint called with the wrong number of bytes"
 
-intToBytes::Integer->[Word8]
-intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
-
+intToBytes :: Integer -> [Word8]
+intToBytes x = map (fromIntegral . (x `shiftR`)) [256 - 8, 256 - 16 .. 0]
 
 -- TODO: eventually, secp256k1 is the ONLY library we should use (no Point conversions)
 secPubKeyToPoint :: Secp256k1.PublicKey -> Point
-secPubKeyToPoint pub = 
+secPubKeyToPoint pub =
   let pkbs = B.drop 1 $ Secp256k1.exportPublicKey False pub
-  in bytesToPoint pkbs
+   in bytesToPoint pkbs
 
 pointToSecPubKey :: Point -> Secp256k1.PublicKey
-pointToSecPubKey pt = 
+pointToSecPubKey pt =
   let pkbs = B.singleton 0x04 `B.append` pointToBytes pt -- 0x04 indicates this is a SEC serialized pubkey
       err = "could not convert point to secp256k1 public key: " ++ show pt
-  in fromMaybe (error err) (Secp256k1.importPublicKey pkbs)
+   in fromMaybe (error err) (Secp256k1.importPublicKey pkbs)
