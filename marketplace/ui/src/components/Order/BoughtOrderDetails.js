@@ -79,7 +79,7 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-   
+
   }, [routeMatch]);
 
   useEffect(() => {
@@ -128,7 +128,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.status)));
       setcomment(orderDetails.buyerComments);
-     
+
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
         items.push({
@@ -195,7 +195,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     );
   };
 
-  const column = [
+  let column = [
     {
       title: "",
       dataIndex: "productImage",
@@ -213,6 +213,30 @@ const BoughtOrderDetails = ({ user, users }) => {
         >
           {decodeURIComponent(text)}
         </p>
+      ),
+    },
+    {
+      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
+      dataIndex: "serialNumber",
+      key: "serialNumber",
+      align: "center",
+      render: (text) => (
+        <div className="flex items-center justify-center">
+          <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
+          <p
+            onClick={() => {
+              navigate(
+                `${routes.BoughtOrderItemDetail.url
+                  .replace(":id", text.address)}`,
+                // .replace(":chainId", text.chainId)}`,
+                { state: { orderId: details.orderId, address: Id } }
+              );
+            }}
+            className="hover:text-primaryHover cursor-pointer"
+          >
+            View
+          </p>
+        </div>
       ),
     },
     {
@@ -260,6 +284,10 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
   ];
+
+  if (data[0] && !data[0].serialNumber.containsSerialNumber) {
+    column = column.filter(col => col.dataIndex !== "serialNumber")
+  }
 
   const handleCancelOrder = async () => {
     const body = {

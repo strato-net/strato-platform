@@ -255,9 +255,9 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
                     event: 'login_register_click'
                   }
                 })
-              } } > 
-              Login / Register 
-              </a> : null
+              }} >
+              Login / Register
+            </a> : (isOauth ? <Title style={{ backgroundColor: 'red', border: 3, padding: 10, color: '#FFFFFF' }} level={3} >Something went wrong, try to refresh page</Title> : null)
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">

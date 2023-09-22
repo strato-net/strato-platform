@@ -187,7 +187,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         uint _itemNumber
     ) public returns (uint, address, address) {
         Product_3 product;
-        Inventory_12 inventory;
+        Inventory inventory;
         Item_3 item = Item_3(_itemsAddress[0]);
 
         // get Dapp contract from dapp chain
@@ -219,7 +219,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             )
             : Product_3(productAddress);
 
-        Inventory_12 oldInventory = Inventory_12(item.inventoryId());
+        Inventory oldInventory = Inventory(item.inventoryId());
 
         if (oldInventory.inventoryType() == "Batch") {
             (uint status, address inventory) = product.addInventory(

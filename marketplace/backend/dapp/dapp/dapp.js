@@ -1169,23 +1169,54 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createOrderLineItem = async function (args, options = defaultOptions) {
     try {
-      const { orderLineId } = args;
+      const { orderLineId, serialNumber } = args;
       const quantity = args.quantity || 0;
       const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
       const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
       const { productId, inventoryId } = orderLine
 
-      const items = await managers.itemManager.getItems(
-        {
-          productId,
-          inventoryId,
-          offset: 0,
-          limit: quantity,
-          status: 1
-        },
-        chainOptions
-      );
+      // If no serial numbers are passed, a quantity is passed from the front end. 
+      // This will allow us to get the first n items from the inventory
+      // quantity is set to 0 if serial numbers are provided, so we can get the items by serial number
+      let items;
+      if (quantity > 0) {
+        items = await managers.itemManager.getItems(
+          {
+            productId,
+            inventoryId,
+            offset: 0,
+            limit: quantity,
+            status: 1
+          },
+          chainOptions
+        );
+      } else {
+        items = await managers.itemManager.getItems(
+          {
+            productId,
+            inventoryId,
+            serialNumber: [...serialNumber]
+          },
+          chainOptions
+        );
+      }
+      if (serialNumber && serialNumber.length !== 0 && serialNumber.length !== items.length) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Serial numbers are different than the actual inventory");
+      }
+
+      const _contract = { name: orderLineJs.contractName, address: orderLineId };
+
+      // const items = await managers.itemManager.getItems(
+      //   {
+      //     productId,
+      //     inventoryId,
+      //     offset: 0,
+      //     limit: quantity,
+      //     status: 1
+      //   },
+      //   chainOptions
+      // );
 
       const itemsAddresses = items.map(_item => _item.address);
 

@@ -154,7 +154,7 @@ contract ProductManager is
         bool _isReduce
     ) returns (uint256) {
         for (uint i = 0; i < _inventories.length; i++) {
-            Inventory_12 inventory = Inventory_12(_inventories[i]);
+            Inventory inventory = Inventory(_inventories[i]);
 
             if (_isReduce) {
                 if (_quantities[i] > inventory.availableQuantity()) {
@@ -184,15 +184,15 @@ contract ProductManager is
         uint _itemNumber,
         address[] _itemsAddress
     ) returns (uint256, address) {
-        Inventory_12 existingInventory = Inventory_12(_existingInventory);
+        Inventory existingInventory = Inventory(_existingInventory);
         if (
             _quantity > existingInventory.availableQuantity() || _quantity <= 0
         ) {
             return (RestStatus.BAD_REQUEST, address(0));
         }
         Product_3 product = Product_3(existingInventory.productId());
-        uint256 isUpdated = existingInventory.updateQuantityForResell(
-            _quantity
+        uint256 isUpdated = existingInventory.updateQuantity(
+            existingInventory.availableQuantity() - _quantity
         );
         if (existingInventory.inventoryType() == "Batch") {
             (uint256 status, address inventoryAddress) = product.addInventory(

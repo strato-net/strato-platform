@@ -131,7 +131,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       if(!isInventoryAvailable) {
         isInventoryAvailable = true;
       }
-      Inventory_12 inventory = new Inventory_12(category, subCategory, _quantity, _pricePerUnit, _batchId, _inventoryType, _status, _createdDate,_owner);
+      Inventory inventory = new Inventory(category, subCategory, _quantity, _pricePerUnit, _batchId, _inventoryType, _status, _createdDate,_owner);
       return (RestStatus.OK, address(inventory));
     }
 
@@ -143,7 +143,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
         return RestStatus.FORBIDDEN;
       }
     
-      Inventory_12 inventory = Inventory_12(_inventory);
+      Inventory inventory = Inventory(_inventory);
       inventory.update(_pricePerUnit, _status, _scheme);
       return (RestStatus.OK);
     }
@@ -157,7 +157,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       //   return RestStatus.FORBIDDEN;
       // }
     
-      Inventory_12 inventory = Inventory_12(_inventory);
+      Inventory inventory = Inventory(_inventory);
       inventory.updateQuantity(_quantity);
       return (RestStatus.OK);
     }
