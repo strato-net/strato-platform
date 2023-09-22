@@ -238,7 +238,7 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               echo "Running unit tests"
-							 cd strato-worktree
+	      cd strato-worktree
               ./run_unit_tests.sh --coverage
             '''
             dir ('strato') {
