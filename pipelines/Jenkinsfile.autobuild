@@ -257,7 +257,6 @@ pipeline {
               cp -r strato/.stack-work/**/hpc/ hpc/
             '''
               archiveArtifacts artifacts: "hpc/**/*html", fingerprint: true
-            }
           },
 
           'SMD tests': {
