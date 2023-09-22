@@ -255,7 +255,9 @@ pipeline {
               echo "Running unit tests"
               ./run_unit_tests.sh --coverage
             '''
-            archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
+            dir ('strato') {
+              archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
+            }
           },
 
           'SMD tests': {
