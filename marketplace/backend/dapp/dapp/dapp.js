@@ -816,7 +816,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       orderList.forEach(orderLine => {
         const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
-        const product = productList.find(item => item.address === inventoryItem.productId)
+        const product = productList.products.find(item => item.address === inventoryItem.productId)
         invoices.push({ productName: decodeURIComponent(product.name), unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
 
         calculatedOrderTotal += (inventoryItem.pricePerUnit * orderLine.quantity)

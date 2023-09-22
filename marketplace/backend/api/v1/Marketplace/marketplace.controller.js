@@ -44,7 +44,7 @@ class MarketplaceController {
       const productsWithImageUrl = inventories
         .map(product => ({
           ...product,
-          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+          imageUrl: product.imageKey ? getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)) : ''
         }))
       rest.response.status200(res, productsWithImageUrl)
 

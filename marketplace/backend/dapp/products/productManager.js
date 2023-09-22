@@ -356,7 +356,7 @@ async function getInventories(admin, contract, args = {}, options) {
       .map((inventory) => {
         const { category, subCategory, ...newInventory } = inventory;
         return {
-          ...products.find((product) => product.address == inventory.productId),
+          ...products.products.find((product) => product.address == inventory.productId),
           ...newInventory,
         };
       });

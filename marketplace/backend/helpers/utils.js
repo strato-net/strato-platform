@@ -198,7 +198,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
 }
 
 export const setSearchQueryOptionsPrime = (args) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key)) {
       if (Array.isArray(args[key])) {
@@ -222,12 +222,17 @@ export const setSearchQueryOptionsPrime = (args) => {
     if (key === 'sort') {
       result.push(args[key])
     }
+    
+    if (key === 'notEqualsValue') {
+      const { notEqualsField, notEqualsValue } = args
+      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+    }
 
     return result
   }, []).map(option => {
-    // Modify the 'isDeleted' option
-    if (option.key === 'isDeleted') {
-      return { key: 'isDeleted', value: `eq.${option.value}` };
+    // Modify options with keys that start with "is"
+    if (option.key && option.key.startsWith('is')) {
+      return { key: option.key, value: `eq.${option.value}` };
     }
     return option;
   }))
@@ -247,7 +252,10 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [key]: value
       }
     }
-    let dotIndex = value.indexOf('.')
+    console.log('cur123:', cur)
+    console.log("typeof value123: ",typeof value)
+    let dotIndex = typeof value === "boolean" ? -1 : value.indexOf('.')
+    console.log("dotIndex12: ", dotIndex)
     if (dotIndex >= 0) {
       // split the value on a period, allows to directly pass postgrest operators
       // to this API via ?key=<operator>.<value>

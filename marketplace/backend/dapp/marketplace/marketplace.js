@@ -63,7 +63,7 @@ async function getAll(admin, args = {}, options) {
         ...restArgs
     }, options);
 
-    const productIds = products.map(product => product.address);
+    const productIds = products.products.map(product => product.address);
     const batchSize = 200; // Set the desired batch size. Can adjust to optimize performance (max 374)
     const inventoryPromises = [];
 
@@ -90,7 +90,7 @@ async function getAll(admin, args = {}, options) {
     // Loop through each inventory result and add the product info to the inventory
     inventoryResults.forEach(inventory => {
         inventory.forEach(item => {
-            const product = products.find(p => p.address === item.productId);
+            const product = products.products.find(p => p.address === item.productId);
             if (product) {
                 const inventoryWithProductInfo = { ...product, ...item };
                 inventoriesWithProductInfo.push(inventoryWithProductInfo);
@@ -111,7 +111,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
         ...restArgs
     }, options);
 
-    const productIds = products.map(product => product.address);
+    const productIds = products.products.map(product => product.address);
     const batchSize = 200; // Set the desired batch size
     const inventoryPromises = [];
 
@@ -138,7 +138,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
 
     inventoryResults.forEach(inventory => {
         inventory.forEach(item => {
-            const product = products.find(p => p.address === item.productId);
+            const product = products.products.find(p => p.address === item.productId);
             if (product) {
                 const inventoryWithProductInfo = { ...product, ...item };
                 inventoriesWithProductInfo.push(inventoryWithProductInfo);
