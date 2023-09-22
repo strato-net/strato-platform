@@ -254,9 +254,8 @@ pipeline {
               set -x
               echo "Running unit tests"
               ./run_unit_tests.sh --coverage
-              cp -r strato/.stack-work/**/hpc/ hpc/
             '''
-              archiveArtifacts artifacts: "hpc/**/*html", fingerprint: true
+            archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
           },
 
           'SMD tests': {
