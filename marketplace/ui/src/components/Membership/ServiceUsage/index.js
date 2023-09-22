@@ -1,8 +1,21 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from 'react-router-dom';
-import { Tabs, Table, Select, Button, Row, Col, Typography, notification } from "antd";
-import { PlusOutlined, CaretDownOutlined, CloseOutlined } from "@ant-design/icons";
 import "./index.css";
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Tabs,
+  Table,
+  Select,
+  Button,
+  Row,
+  Col,
+  Typography,
+  notification,
+} from "antd";
+import {
+  PlusOutlined,
+  CaretDownOutlined,
+  CloseOutlined,
+} from "@ant-design/icons";
 import { generateTableColumns } from "./tableColumns";
 import {
   useServiceUsageDispatch,
@@ -22,7 +35,8 @@ import { actions as serviceUsageActions } from "../../../contexts/serviceUsage/a
 import { actions as servicesActions } from "../../../contexts/service/actions";
 import { actions as userAuthActions } from "../../../contexts/authentication/actions";
 import { actions as membershipActions } from "../../../contexts/membership/actions";
-import TabPane from "antd/es/tabs/TabPane";
+
+const { TabPane } = Tabs;
 
 const limit = 10;
 const offset = 0;
@@ -39,7 +53,6 @@ const UpdatePayloadKeys = [
   "providerComment",
   "status",
   "pricePaid",
-
   "paymentStatus",
   "providerLastUpdated",
   "providerLastUpdatedDate",
@@ -60,6 +73,23 @@ const getProviderOptions = (data) => {
   }, []);
 
   return resultArray;
+};
+
+const getNewRowSchema = (address) => {
+  return {
+    summary: "", //summary
+    serviceDate: "", //Date
+    providerComment: "", //comment
+    status: 1,
+    pricePaid: "", //price paid
+    editable: true,
+    itemId: "", //provider
+    serviceId: "", //service
+    paymentStatus: 1,
+
+    providerLastUpdated: address, //user-address
+    providerLastUpdatedDate: new Date().getTime().toString(),
+  };
 };
 
 const ServiceTable = () => {
@@ -85,7 +115,7 @@ const ServiceTable = () => {
     isCreateServiceUsageSubmitting,
     isUpdateServicesUsageLoading,
     success,
-    message
+    message,
   } = serviceUsageState;
 
   const username = userCert?.user?.commonName;
@@ -100,6 +130,7 @@ const ServiceTable = () => {
     isUpdateServicesUsageLoading;
 
   const serviceUsageData = serviceUsageState?.servicesUsage?.result;
+  const totalCount = serviceUsageState?.servicesUsage?.total;
 
   const defaultMembership = membership?.purchasedMemberships.map(
     ({ itemAddress, itemNumber }) => {
@@ -118,8 +149,8 @@ const ServiceTable = () => {
   const [userList, setUserList] = useState(userListData);
   const [providerState, setProviderState] = useState("");
   const [isEdit, setIsEdit] = useState(false);
-  const [isNewRow, setIsNewRow] = useState(false)
-  const [validationError, setValidationError] = useState(false)
+  const [isNewRow, setIsNewRow] = useState(false);
+  const [validationError, setValidationError] = useState(false);
   const [tableData, setTableData] = useState([]);
   const [page, setPage] = useState(1);
   const [filterQuery, setFilterQuery] = useState({});
@@ -130,7 +161,6 @@ const ServiceTable = () => {
 
   useEffect(() => {
     setMembershipList(defaultMembership);
-    // setProviderFilterList(providerFilter)
   }, [membership]);
 
   useEffect(() => {
@@ -140,21 +170,6 @@ const ServiceTable = () => {
   useEffect(() => {
     setUserList(userListData);
   }, [userCert]);
-
-  const newRowSchema = {
-    summary: "", //summary
-    serviceDate: "", //Date
-    providerComment: "", //comment
-    status: 1,
-    pricePaid: "", //price paid
-    editable: true,
-    itemId: "", //provider
-    serviceId: "", //service
-    paymentStatus: 1,
-
-    providerLastUpdated: userAddress, //user-address
-    providerLastUpdatedDate: new Date().getTime().toString(),
-  };
 
   const queryOwner = ``;
   useEffect(() => {
@@ -180,8 +195,9 @@ const ServiceTable = () => {
     }
 
     userAuthActions.fetchUsers(authUserDispatch);
-
   }, [serviceType, userAddress]);
+
+  const newRowSchema = getNewRowSchema(userAddress);
 
   const handleChangeServiceUsageType = (key) => {
     setFilterQuery({});
@@ -220,7 +236,7 @@ const ServiceTable = () => {
 
     if (type === "update") {
       if (isEdit) {
-        if (serviceType == 'booked') {
+        if (serviceType == "booked") {
           serviceUsageActions.UpdateBookedServiceUsage(
             serviceUsageDispatch,
             updatedPayload
@@ -231,11 +247,10 @@ const ServiceTable = () => {
             updatedPayload
           );
         }
-
       } else {
         updatedDataObj.itemId = record.itemId;
         updatedDataObj.serviceId = record.serviceId;
-        if (serviceType == 'booked') {
+        if (serviceType == "booked") {
           serviceUsageActions.createBookedServiceUsage(
             serviceUsageDispatch,
             updatedDataObj
@@ -271,7 +286,6 @@ const ServiceTable = () => {
           organization: manufacturer,
         }));
       setMembershipList(membershipData);
-      // let serviceQuery = `&ownerOrganization=${value}`
       servicesActions.fetchService(serviceDispatch, 10, offset, value);
     } else if (field === "itemId") {
       updateTableData(field, value, key);
@@ -281,7 +295,7 @@ const ServiceTable = () => {
 
   const handleAddRow = () => {
     setIsEdit(false);
-    setIsNewRow(true)
+    setIsNewRow(true);
     let tableCopy = tableData.map((item, index) => {
       item["editable"] = false;
       return item;
@@ -292,31 +306,26 @@ const ServiceTable = () => {
   };
 
   const handleDelete = (key) => {
-    setIsNewRow(false)
+    setIsNewRow(false);
     let data = tableData.filter((item, index) => index !== key);
     setTableData(data);
   };
 
   const handleValidation = (data) => {
-
-    const isRequiredFieldsFilled = [...UpdatePayloadKeys, 'serviceId'].every(
+    const isRequiredFieldsFilled = [...UpdatePayloadKeys, "serviceId"].every(
       (field) => data[field] !== "" || null
     );
-
     const isTabValid = serviceType === "booked" || serviceType === "provided";
-
     const isValid = isTabValid && isRequiredFieldsFilled;
-
     setValidationError(!isValid);
-
     return isValid;
   };
 
   const handleQuery = (data, page) => {
-    const queryParameters = {}
+    const queryParameters = {};
 
     if (data.status) {
-      queryParameters['&status'] = data.status;
+      queryParameters["&status"] = data.status;
     }
 
     if (data.Provider) {
@@ -327,7 +336,7 @@ const ServiceTable = () => {
         queryParameters["&itemId[]"] = itemIds;
       }
     } else if (data.User) {
-      queryParameters['&providerLastUpdated'] = data.User;
+      queryParameters["&providerLastUpdated"] = data.User;
     }
 
     const query = Object.entries(queryParameters)
@@ -352,8 +361,7 @@ const ServiceTable = () => {
   const clearFilter = () => {
     setFilterQuery({});
     handleQuery({}, page);
-
-  }
+  };
 
   const columns = generateTableColumns({
     isEdit,
@@ -376,8 +384,6 @@ const ServiceTable = () => {
     isServicesLoading,
   });
 
-  const totalCount = serviceUsageState?.servicesUsage?.total;
-
   const handlePaginationChange = (CPage) => {
     setPage(CPage.current);
     let page = CPage.current;
@@ -389,20 +395,16 @@ const ServiceTable = () => {
   };
 
   const openToast = (placement) => {
+    const messageObj = {
+      message: message,
+      onClose: serviceUsageActions.resetMessage(serviceUsageDispatch),
+      placement,
+      key: 1,
+    };
     if (success) {
-      api.success({
-        message: message,
-        onClose: serviceUsageActions.resetMessage(serviceUsageDispatch),
-        placement,
-        key: 1,
-      });
+      api.success(messageObj);
     } else {
-      api.error({
-        message: message,
-        onClose: serviceUsageActions.resetMessage(serviceUsageDispatch),
-        placement,
-        key: 1,
-      });
+      api.error(messageObj);
     }
   };
 
@@ -413,12 +415,9 @@ const ServiceTable = () => {
       {contextHolder}
       <Row className="mt-2">
         <Col span={22} className="m-auto">
-          <Tabs
-            activeKey={serviceType}
-            onChange={handleChangeServiceUsageType}
-          >
-            <TabPane tab="booked" key="booked" disabled={IsLoading} />
-            <TabPane tab="provided" key="provided" disabled={IsLoading} />
+          <Tabs activeKey={serviceType} onChange={handleChangeServiceUsageType}>
+            <TabPane tab="Booked" key="booked" disabled={IsLoading} />
+            <TabPane tab="Provided" key="provided" disabled={IsLoading} />
           </Tabs>
         </Col>
         <Col

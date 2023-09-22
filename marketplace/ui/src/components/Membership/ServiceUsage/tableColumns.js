@@ -21,8 +21,8 @@ import moment from "moment";
 
 const statusOptions = [
   { value: 1, label: "Requested" },
-  { value: 2, label: "Cancelled" },
-  { value: 3, label: "Completed" },
+  { value: 2, label: "Completed" },
+  { value: 3, label: "Cancelled" },
 ];
 
 export function generateTableColumns({

@@ -1083,11 +1083,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       console.log('ownedMemberships', ownedMemberships)
 
       // Get ProductFile where productId = Items.productId
-      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
+      // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
       // ownedProductFiles = ownedProductFiles.filter(file =>
       //   ownedItems.some(item => file.productId === item.productId)
       // );
-      console.log('ownedProductFiles', ownedProductFiles)
+      // console.log('ownedProductFiles', ownedProductFiles)
 
       // Combine ownedProducts, ownedItems, ownedMemberships, and ownedProductFiles into one JSON object array
       const combinedData = ownedItems
@@ -1830,12 +1830,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "" };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: '' };
 
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
       ...args,
       sort: '-createdDate',
-      owner: userAddress
+      owner: userAddress,
+      ownerOrganization: userOrganization,
     }, getOptions);
 
     const memberships = await contract.getPurchasedMemberships();
