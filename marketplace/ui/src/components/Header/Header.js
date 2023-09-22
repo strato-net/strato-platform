@@ -44,7 +44,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
 
-  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false 
+  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
 
   const navItems = [
     {
@@ -61,7 +61,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     {
       role: 1,
       items: [
-        { label: <div id="Marketplace"></div>, key: '0' },
+        { label: <div id="Marketplace">Marketplace</div>, key: '0' },
       ]
     },
   ];
@@ -100,7 +100,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     } else if (pathName.includes("/storage")) {
       setSelectedTab("5");
     }
-    else{
+    else {
       setSelectedTab("0");
     }
   }, [window.location.pathname]);
@@ -162,7 +162,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         >
           <Image src={Images.logo} width={35} preview={false} />
         </div>
-        {((roleIndex === undefined || roleIndex === 1) && !isOauth)  ? null : <div className="ml-7 w-72">
+        {((roleIndex === undefined || roleIndex === 1) && !isOauth) ? null : <div className="ml-7 w-72">
           <Input
             size="large"
             placeholder="Search"
@@ -178,37 +178,42 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         className="h-16 bg-primary text-tertiaryB m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
-          if (item.key === "0") {    
+          if (item.key === "0") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_marketplace_page',
-            },
-          });}
-          if (item.key === "1") {  
+              dataLayer: {
+                event: 'view_marketplace_page',
+              },
+            });
+          }
+          if (item.key === "1") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_orders_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_orders_page',
+              },
+            });
+          }
           if (item.key === "2") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_inventory_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_inventory_page',
+              },
+            });
+          }
           if (item.key === "3") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_products_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_products_page',
+              },
+            });
+          }
           if (item.key === "4") {
             TagManager.dataLayer({
               dataLayer: {
                 event: 'view_events_page',
               },
             });
-            navigate(navUrls[item.key], { state: { tab: "EventType" } })}
+            navigate(navUrls[item.key], { state: { tab: "EventType" } })
+          }
           else navigate(navUrls[item.key]);
           if (item.key === "5") {
             TagManager.dataLayer({
@@ -243,7 +248,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white" 
+            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white"
               onClick={() => {
                 TagManager.dataLayer({
                   dataLayer: {
