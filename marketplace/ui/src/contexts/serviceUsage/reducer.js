@@ -200,6 +200,7 @@ const reducer = (state, action) => {
     case actionDescriptors.resetState:
       return {
         ...state,
+        servicesUsage:[]
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

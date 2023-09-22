@@ -167,8 +167,8 @@ const actions = {
     }
   },
   fetchAllServicesUsage: async (dispatch, limit, offset, query) => {
+    actions.resetState(dispatch)
     dispatch({ type: actionDescriptors.fetchAllServicesUsage });
-
     try {
       const response = await fetch(`${apiUrl}/serviceUsage?limit=${limit}&offset=${offset}${query}`, {
         method: HTTP_METHODS.GET
@@ -190,8 +190,8 @@ const actions = {
     }
   },
   fetchBookedServicesUsage: async (dispatch, limit, offset, query) => {
+    actions.resetState(dispatch)
     dispatch({ type: actionDescriptors.fetchBookedServicesUsage });
-
     try {
       const response = await fetch(`${apiUrl}/serviceUsage/booked?limit=${limit}&offset=${offset}${query}`, {
         method: HTTP_METHODS.GET
@@ -213,6 +213,7 @@ const actions = {
     }
   },
   fetchProvidedServicesUsage: async (dispatch, limit, offset, query) => {
+    actions.resetState(dispatch)
     dispatch({ type: actionDescriptors.fetchProvidedServicesUsage });
 
     try {
@@ -362,7 +363,7 @@ const actions = {
       dispatch({ type: actionDescriptors.updateProvidedServiceUsageFailed, error: "Error while updating provided service usage" });
       actions.setMessage(dispatch, "Error while updating provided service usage")
     }
-  } ,
+  },
 
 };
 

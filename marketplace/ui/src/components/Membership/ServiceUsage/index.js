@@ -314,12 +314,10 @@ const ServiceTable = () => {
   };
 
   const handleQuery = (data, page) => {
-    const queryParameters = {
-      '&owner': userAddress,
-    };
+    const queryParameters = {}
 
     if (data.status) {
-      queryParameters.status = data.status;
+      queryParameters['&status'] = data.status;
     }
 
     if (data.Provider) {
@@ -327,15 +325,15 @@ const ServiceTable = () => {
         .filter((item) => item.manufacturer === data.Provider)
         .map((item) => item.itemAddress);
       if (itemIds.length > 0) {
-        queryParameters["itemId[]"] = itemIds;
+        queryParameters["&itemId[]"] = itemIds;
       }
     } else if (data.User) {
-      queryParameters.providerLastUpdated = data.User;
+      queryParameters['&providerLastUpdated'] = data.User;
     }
 
     const query = Object.entries(queryParameters)
       .map(([key, value]) => `${key}=${value}`)
-      .join("&");
+      .join("");
 
     const fetchFunction =
       serviceType === "booked"
@@ -481,7 +479,7 @@ const ServiceTable = () => {
             />
             <Button
               icon={<CloseOutlined />}
-              disabled={IsLoading}
+              disabled={IsLoading || Object.keys(filterQuery).length == 0}
               onClick={clearFilter}
             />
           </span>
