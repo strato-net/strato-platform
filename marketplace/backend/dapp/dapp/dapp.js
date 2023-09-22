@@ -1871,7 +1871,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
 
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args1, sort: '-createdDate' }, getOptions)
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();
     const data = serviceUsage['serviceUsage'].map((item) => ({

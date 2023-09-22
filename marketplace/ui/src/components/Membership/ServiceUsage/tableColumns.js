@@ -27,7 +27,8 @@ const statusOptions = [
 
 export function generateTableColumns({
   isEdit,
-  activeTab,
+  isNewRow,
+  serviceType,
   username,
   organization,
   setProviderState,
@@ -50,7 +51,7 @@ export function generateTableColumns({
     index,
     userList,
     isEdit,
-    activeTab,
+    serviceType,
     username,
     handleInputChange
   ) => {
@@ -61,9 +62,9 @@ export function generateTableColumns({
             placeholder="User"
             defaultValue={username}
             suffixIcon={
-              activeTab === "booked" ? <LockOutlined /> : <CaretDownOutlined />
+              serviceType === "booked" ? <LockOutlined /> : <CaretDownOutlined />
             }
-            disabled={activeTab === "booked"}
+            disabled={serviceType === "booked"}
             style={{ width: 120 }}
             onChange={(value) =>
               handleInputChange(value, "providerLastUpdated", index)
@@ -89,7 +90,7 @@ export function generateTableColumns({
     record,
     index,
     isEdit,
-    activeTab,
+    serviceType,
     organization,
     setProviderState,
     handleInputChange,
@@ -99,15 +100,15 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            placeholder={(activeTab === "provided" && organization)?organization:'Provider'}
+            placeholder={(serviceType === "provided" && organization)?organization:'Provider'}
             suffixIcon={
-              activeTab === "provided" ? (
+              serviceType === "provided" ? (
                 <LockOutlined />
               ) : (
                 <CaretDownOutlined />
               )
             }
-            disabled={activeTab === "provided"}
+            disabled={serviceType === "provided"}
             style={{ width: 120 }}
             onChange={(value, obj) => {
               setProviderState(obj.value.toString());
@@ -133,7 +134,7 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            disabled={!record.provider && activeTab==='booked'}
+            disabled={!record.provider && serviceType==='booked'}
             placeholder="Membership ID"
             suffixIcon={<CaretDownOutlined />}
             style={{ width: 120 }}
@@ -165,7 +166,7 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            disabled={!!!providerState || isServicesLoading}
+            disabled={!record.itemId || isServicesLoading}
             placeholder="Service"
             suffixIcon={isServicesLoading ? <Spin size='small' /> : <CaretDownOutlined />}
             style={{ width: 120 }}
@@ -269,7 +270,7 @@ export function generateTableColumns({
             value={text}
             placeholder="Status"
             suffixIcon={<CaretDownOutlined />}
-            // disabled={activeTab === "provided"}
+            // disabled={serviceType === "provided"}
             style={{ minWidth: "100px" }}
             onChange={(value) => handleInputChange(value, "status", index)}
             options={statusOptions}
@@ -330,7 +331,7 @@ export function generateTableColumns({
           index,
           userList,
           isEdit,
-          activeTab,
+          serviceType,
           username,
           handleInputChange
         ),
@@ -345,7 +346,7 @@ export function generateTableColumns({
           record,
           index,
           isEdit,
-          activeTab,
+          serviceType,
           organization,
           setProviderState,
           handleInputChange,
@@ -451,7 +452,7 @@ export function generateTableColumns({
             <Button
               type="primary"
               icon={<EditOutlined />}
-              disabled={!handleValidation(record) || validationError}
+              disabled={!handleValidation(record) || validationError || isNewRow}
               onClick={() => handleEditCancel(index, true, "edit", record)}
             />
           )}

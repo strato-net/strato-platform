@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, Table, Select, Button, Row, Col, Typography, notification } from "antd";
 import { PlusOutlined, CaretDownOutlined, CloseOutlined } from "@ant-design/icons";
 import "./index.css";
@@ -21,26 +22,15 @@ import { actions as serviceUsageActions } from "../../../contexts/serviceUsage/a
 import { actions as servicesActions } from "../../../contexts/service/actions";
 import { actions as userAuthActions } from "../../../contexts/authentication/actions";
 import { actions as membershipActions } from "../../../contexts/membership/actions";
+import TabPane from "antd/es/tabs/TabPane";
 
 const limit = 10;
 const offset = 0;
-const query = "";
-
-const serviceUsageTypes = [
-  {
-    key: "booked",
-    label: "Booked",
-  },
-  {
-    key: "provided",
-    label: "Provided",
-  },
-];
 
 const statusOptions = [
   { value: 1, label: "Requested" },
-  { value: 2, label: "Cancelled" },
-  { value: 3, label: "Completed" },
+  { value: 2, label: "Completed" },
+  { value: 3, label: "Cancelled" },
 ];
 
 const UpdatePayloadKeys = [
@@ -73,6 +63,9 @@ const getProviderOptions = (data) => {
 };
 
 const ServiceTable = () => {
+  const navigate = useNavigate();
+  let { serviceType } = useParams();
+
   const [api, contextHolder] = notification.useNotification();
   const serviceUsageDispatch = useServiceUsageDispatch();
   const serviceDispatch = useServiceDispatch();
@@ -125,8 +118,8 @@ const ServiceTable = () => {
   const [userList, setUserList] = useState(userListData);
   const [providerState, setProviderState] = useState("");
   const [isEdit, setIsEdit] = useState(false);
-  const [validationError, setValidationError] = useState(false);
-  const [activeTab, setActiveTab] = useState("booked");
+  const [isNewRow, setIsNewRow] = useState(false)
+  const [validationError, setValidationError] = useState(false)
   const [tableData, setTableData] = useState([]);
   const [page, setPage] = useState(1);
   const [filterQuery, setFilterQuery] = useState({});
@@ -166,7 +159,7 @@ const ServiceTable = () => {
   const queryOwner = `&owner=${userAddress}`;
   useEffect(() => {
     if (userAddress) {
-      if (activeTab === "booked") {
+      if (serviceType === "booked") {
         serviceUsageActions.fetchBookedServicesUsage(
           serviceUsageDispatch,
           limit,
@@ -187,16 +180,18 @@ const ServiceTable = () => {
     }
 
     userAuthActions.fetchUsers(authUserDispatch);
-  }, [activeTab, userAddress]);
+
+  }, [serviceType, userAddress]);
 
   const handleChangeServiceUsageType = (key) => {
     setFilterQuery({});
     setPage(1);
-    setActiveTab(key);
+    navigate(`/memberships/serviceUsage/${key}`);
   };
 
   const handleEditCancel = (key, bool, type, record) => {
     setIsEdit(bool);
+    setIsNewRow(false);
     const data = tableData.map((item, index) => {
       if (index === key) {
         item.editable = bool;
@@ -226,17 +221,33 @@ const ServiceTable = () => {
     if (type === "update") {
       if (isEdit) {
         setPage(1);
-        serviceUsageActions.UpdateServiceUsage(
-          serviceUsageDispatch,
-          updatedPayload
-        );
+        if (serviceType == 'booked') {
+          serviceUsageActions.UpdateBookedServiceUsage(
+            serviceUsageDispatch,
+            updatedPayload
+          );
+        } else {
+          serviceUsageActions.UpdateProvidedServiceUsage(
+            serviceUsageDispatch,
+            updatedPayload
+          );
+        }
+
       } else {
+        setPage(1);
         updatedDataObj.itemId = record.itemId;
         updatedDataObj.serviceId = record.serviceId;
-        serviceUsageActions.createServiceUsage(
-          serviceUsageDispatch,
-          updatedDataObj
-        );
+        if (serviceType == 'booked') {
+          serviceUsageActions.createBookedServiceUsage(
+            serviceUsageDispatch,
+            updatedDataObj
+          );
+        } else {
+          serviceUsageActions.createProvidedServiceUsage(
+            serviceUsageDispatch,
+            updatedDataObj
+          );
+        }
       }
     }
   };
@@ -271,6 +282,7 @@ const ServiceTable = () => {
 
   const handleAddRow = () => {
     setIsEdit(false);
+    setIsNewRow(true)
     let tableCopy = tableData.map((item, index) => {
       item["editable"] = false;
       return item;
@@ -281,6 +293,7 @@ const ServiceTable = () => {
   };
 
   const handleDelete = (key) => {
+    setIsNewRow(false)
     let data = tableData.filter((item, index) => index !== key);
     setTableData(data);
   };
@@ -291,7 +304,7 @@ const ServiceTable = () => {
       (field) => data[field] !== "" || null
     );
 
-    const isTabValid = activeTab === "booked" || activeTab === "provided";
+    const isTabValid = serviceType === "booked" || serviceType === "provided";
 
     const isValid = isTabValid && isRequiredFieldsFilled;
 
@@ -302,7 +315,7 @@ const ServiceTable = () => {
 
   const handleQuery = (data, page) => {
     const queryParameters = {
-      owner: userAddress,
+      '&owner': userAddress,
     };
 
     if (data.status) {
@@ -325,7 +338,7 @@ const ServiceTable = () => {
       .join("&");
 
     const fetchFunction =
-      activeTab === "booked"
+      serviceType === "booked"
         ? serviceUsageActions.fetchBookedServicesUsage
         : serviceUsageActions.fetchProvidedServicesUsage;
 
@@ -347,7 +360,8 @@ const ServiceTable = () => {
 
   const columns = generateTableColumns({
     isEdit,
-    activeTab,
+    isNewRow,
+    serviceType,
     username,
     organization,
     setProviderState,
@@ -370,7 +384,7 @@ const ServiceTable = () => {
   const handlePaginationChange = (CPage) => {
     setPage(CPage.current);
     let page = CPage.current;
-    if (activeTab === "booked") {
+    if (serviceType === "booked") {
       handleQuery(filterQuery, page);
     } else {
       handleQuery(filterQuery, page);
@@ -395,7 +409,7 @@ const ServiceTable = () => {
     }
   };
 
-  const activeTabCheck = activeTab === "booked" ? "Provider" : "User";
+  const activeTabCheck = serviceType === "booked" ? "Provider" : "User";
 
   return (
     <>
@@ -403,10 +417,12 @@ const ServiceTable = () => {
       <Row className="mt-2">
         <Col span={22} className="m-auto">
           <Tabs
-            activeKey={activeTab}
-            items={serviceUsageTypes}
+            activeKey={serviceType}
             onChange={handleChangeServiceUsageType}
-          />
+          >
+            <TabPane tab="booked" key="booked" disabled={IsLoading} />
+            <TabPane tab="provided" key="provided" disabled={IsLoading} />
+          </Tabs>
         </Col>
         <Col
           className="flex justify-between absolute right-20 mt-2 z-10"
@@ -441,12 +457,12 @@ const ServiceTable = () => {
               value={filterQuery[activeTabCheck]}
               onChange={(value, obj) => {
                 handleFilter(
-                  activeTab == "booked" ? obj.label : value,
+                  serviceType == "booked" ? obj.label : value,
                   activeTabCheck
                 );
               }}
               options={
-                activeTab === "booked"
+                serviceType === "booked"
                   ? getProviderOptions(membership?.purchasedMemberships)
                   : userList
               }
@@ -465,6 +481,7 @@ const ServiceTable = () => {
             />
             <Button
               icon={<CloseOutlined />}
+              disabled={IsLoading}
               onClick={clearFilter}
             />
           </span>
