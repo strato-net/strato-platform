@@ -254,9 +254,8 @@ pipeline {
               set -x
               echo "Running unit tests"
               ./run_unit_tests.sh --coverage
+              cp -r strato/.stack-work/**/hpc/ hpc/
             '''
-            dir ('strato') {
-              sh 'cp -r .stack-work/**/hpc/ hpc/'
               archiveArtifacts artifacts: "hpc/**/*html", fingerprint: true
             }
           },
