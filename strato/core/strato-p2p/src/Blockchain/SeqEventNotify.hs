@@ -59,8 +59,8 @@ seqEventNotificationSourceChanPour p2peventchan dupaction = do
   dupchan <- liftIO $ dupaction p2peventchan
   loop dupchan
   where loop chan = do
-            (event,nextoffset) <- liftIO $ readChan chan
-            $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ " ++ show nextoffset
+            (event,nextOffset) <- liftIO $ readChan chan
+            $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ Offset " ++ show nextOffset
             _ <- yield event
             loop chan
 
