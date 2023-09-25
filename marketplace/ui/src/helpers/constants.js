@@ -19,7 +19,8 @@ export const UNIT_OF_MEASUREMENTS = {
   7: "Bale",
   8: "Gallon",
   9: "Pound",
-  10: "Yard"
+  10: "Yard",
+  11: "Kilogram"
 };
 
 export const US_DATE_FORMAT = "MM/DD/YYYY";
@@ -34,14 +35,6 @@ export const INVENTORY_STATUS = {
   2: "Unpublished",
 };
 
-export const ORDER_STATUS = {
-  "AWAITING_FULFILLMENT": 1,
-  "AWAITING_SHIPMENT": 2,
-  "CLOSED": 3,
-  "CANCELED": 4,
-  "PAYMENT_PENDING": 5
-}
-
 export const unitOfMeasures = [
   { name: "LB", value: 1 },
   { name: "Ounce", value: 2 },
@@ -52,7 +45,8 @@ export const unitOfMeasures = [
   { name: "Bale", value: 7 },
   { name: "Gallon", value: 8 },
   { name: "Pound", value: 9 },
-  { name: "Yard", value: 10 }
+  { name: "Yard", value: 10 },
+  { name: "Kilogram", value: 11 }
 ];
 
 export const CHARGES = {

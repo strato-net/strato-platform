@@ -139,10 +139,6 @@ const SoldOrdersTable = ({ user }) => {
           text: "Closed",
           value: "Closed",
         },
-        {
-          text: "Payment Pending",
-          value: "Payment Pending",
-        },
       ],
       onFilter: (value, record) => record.status.startsWith(value),
       filterSearch: true,
@@ -158,8 +154,6 @@ const SoldOrdersTable = ({ user }) => {
       textClass = "text-success  bg-[#EAFFEE]";
     } else if (status === "Canceled") {
       textClass = "text-error  bg-[#FFF0F0]";
-    } else if (status === "Payment Pending") {
-      textClass = "text-orange bg-[#FFF6EC]";
     }
 
     return (

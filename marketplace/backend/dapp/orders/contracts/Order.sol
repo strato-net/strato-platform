@@ -64,7 +64,7 @@ contract Order is OrderStatus {
         orderDate = _orderDate;
         orderTotal = _orderTotal;
         orderShippingCharges = _orderShippingCharges;
-        status = _status;
+        status = OrderStatus.AWAITING_FULFILLMENT;
         amountPaid = _amountPaid;
         buyerComments = _buyerComments;
         sellerComments = _sellerComments;

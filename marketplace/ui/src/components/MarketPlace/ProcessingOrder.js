@@ -1,7 +1,7 @@
 import { Spin, notification } from "antd";
 import React, { useEffect, useState, useMemo } from "react";
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS, ORDER_STATUS } from "../../helpers/constants";
+import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { actions as orderActions } from "../../contexts/order/actions";
@@ -33,7 +33,7 @@ const ProcessingOrder = () => {
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("cartList") ?? []);
   }, []);
-  
+
   // useEffect(() => {
   //   actions.fetchCartItems(marketplaceDispatch, cartList);
   // }, [marketplaceDispatch, cartList]);
@@ -42,7 +42,7 @@ const ProcessingOrder = () => {
     path: routes.ProcessingOrder.url,
     strict: true,
   });
-  
+
   const query = useQuery();
 
   useEffect(() => {
@@ -72,7 +72,7 @@ const ProcessingOrder = () => {
         if (JSON.parse(body.data.metadata.cart) !== {}) {
           if (body.data["payment_status"] === "paid") {
             const cart = JSON.parse(body.data.metadata.cart);
-            let object = { paymentSessionId: sessionId, status: ORDER_STATUS.AWAITING_FULFILLMENT, ...cart };
+            let object = { paymentSessionId: sessionId, ...cart };
             handleOrderConfirm(object);
           }
         }
