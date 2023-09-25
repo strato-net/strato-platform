@@ -17,21 +17,21 @@ const CategoryCard = () => {
   const categoryImages = [
     Images.art,
     Images.carbon,
-    Images.realEstate
+    Images.clothing
   ];
-
+  console.log(categorys)
   return (
     <Card className="w-full">
       <div className="flex justify-between mb-5">
         <Title level={3}>Categories</Title>
-        <Space size="large">
+        {/* <Space size="large">
           <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
             <LeftArrow />
           </div>
           <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
             <RightArrow />
           </div>
-        </Space>
+        </Space> */}
       </div>
       <div className="flex justify-evenly px-2">
         {categorys.map((category, index) => {

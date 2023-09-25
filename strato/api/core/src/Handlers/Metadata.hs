@@ -1,65 +1,61 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE LambdaCase                 #-}
 
 module Handlers.Metadata
-  (  API
-    , getMetaDataClient
-    , MetadataResponse
-    , server
-  ) where
+  ( API,
+    getMetaDataClient,
+    MetadataResponse,
+    server,
+  )
+where
 
-import           Control.Lens
-import           Data.Aeson                     hiding (Success)
-import           Data.Aeson.Casing.Internal     (camelCase, dropFPrefix)
-import           Data.Maybe                     (fromJust, fromMaybe)
-import           Data.Swagger                   hiding (url)
-       
-import           Control.Monad.Composable.SQL
-import           Control.Monad.Change.Modify
-import           Control.Monad.Composable.Vault
-
-import qualified Database.Esqueleto.Legacy       as E
-
-import           GHC.Generics
-import           GHC.Stack
-
-import           BlockApps.Logging
-
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
-import           Blockchain.Strato.Model.Secp256k1      hiding (HasVault(..))
-import           Blockchain.Strato.RedisBlockDB         (runStratoRedisIO, getSyncStatusNow)
-import           Blockchain.Data.DataDefs
-import           Blockchain.DB.SQLDB
-import           Strato.Strato23.Client   hiding (verifyPassword)
-import qualified Strato.Strato23.API.Types as V
-import           Servant
-import           Servant.Client
-
+import BlockApps.Logging
+import Blockchain.DB.SQLDB
+import Blockchain.Data.DataDefs
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
+import Blockchain.Strato.RedisBlockDB (getSyncStatusNow, runStratoRedisIO)
+import Control.Lens
+import Control.Monad.Change.Modify
+import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Vault
+import Data.Aeson hiding (Success)
+import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
+import Data.Maybe (fromJust, fromMaybe)
+import Data.Swagger hiding (url)
+import qualified Database.Esqueleto.Legacy as E
+import GHC.Generics
+import GHC.Stack
 import qualified LabeledError
-import           UnliftIO
-import           SQLM
+import SQLM
+import Servant
+import Servant.Client
+import qualified Strato.Strato23.API.Types as V
+import Strato.Strato23.Client hiding (verifyPassword)
+import UnliftIO
 
 data MetadataResponse = MetadataResponse
-  { nodePubKey            ::  V.PublicKey
-  , nodeAddress           ::  Address
-  , validators            ::  [ChainMemberParsedSet]
-  , isSynced              ::  Bool
-  , isVaultPasswordSet    ::  Bool
-  } deriving (Eq, Show, Generic, FromJSON, ToJSON)
+  { nodePubKey :: V.PublicKey,
+    nodeAddress :: Address,
+    validators :: [ChainMemberParsedSet],
+    isSynced :: Bool,
+    isVaultPasswordSet :: Bool
+  }
+  deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
 type API = "metadata" :> Get '[JSON] MetadataResponse
 
@@ -69,15 +65,16 @@ getMetaDataClient = client (Proxy @API)
 server :: (HasVault m, MonadLogger m, HasSQL m) => ServerT API m
 server = getMetaData
 
-instance HasSQL m => Accessible [ChainMemberParsedSet] m where 
+instance HasSQL m => Accessible [ChainMemberParsedSet] m where
   access _ = do
-    txrs <-  fmap (map E.entityVal) $  sqlQuery . E.select . E.from $ \(a :: E.SqlExpr (E.Entity ValidatorRef)) -> return a
-    pure $  (\(ValidatorRef o u c) -> CommonName o u c True) <$> txrs
+    txrs <- fmap (map E.entityVal) $ sqlQuery . E.select . E.from $ \(a :: E.SqlExpr (E.Entity ValidatorRef)) -> return a
+    pure $ (\(ValidatorRef o u c) -> CommonName o u c True) <$> txrs
 
 instance ToSchema MetadataResponse where
-  declareNamedSchema proxy = genericDeclareNamedSchema metadataSchemaOptions proxy
-    & mapped.schema.description ?~ "MetadataResponse"
-    & mapped.schema.example ?~ toJSON exMetadataRespone
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema metadataSchemaOptions proxy
+      & mapped . schema . description ?~ "MetadataResponse"
+      & mapped . schema . example ?~ toJSON exMetadataRespone
 
 exMetadataRespone :: MetadataResponse
 exMetadataRespone =
@@ -91,28 +88,33 @@ exMetadataRespone =
 
 -- | The model's field modifiers will match the JSON instances
 metadataSchemaOptions :: SchemaOptions
-metadataSchemaOptions = SchemaOptions
-  { fieldLabelModifier = camelCase . dropFPrefix
-  , constructorTagModifier = id
-  , datatypeNameModifier = id
-  , allNullaryToStringTag = True
-  , unwrapUnaryRecords = True
-  }
+metadataSchemaOptions =
+  SchemaOptions
+    { fieldLabelModifier = camelCase . dropFPrefix,
+      constructorTagModifier = id,
+      datatypeNameModifier = id,
+      allNullaryToStringTag = True,
+      unwrapUnaryRecords = True
+    }
 
-getMetaData :: (  MonadLogger m
-                , HasVault m
-                , Accessible [ChainMemberParsedSet] m
-                , HasSQL m )
-                =>   m MetadataResponse
-getMetaData  = 
+getMetaData ::
+  ( MonadLogger m,
+    HasVault m,
+    Accessible [ChainMemberParsedSet] m,
+    HasSQL m
+  ) =>
+  m MetadataResponse
+getMetaData =
   do
-  validators <- access (Proxy @[ChainMemberParsedSet])
-  isSynced <- checkIsSynced
-  V.AddressAndKey a k <- getPubKeyAndAddress
-  pure $ MetadataResponse k a validators isSynced True
+    validators <- access (Proxy @[ChainMemberParsedSet])
+    isSynced <- checkIsSynced
+    V.AddressAndKey a k <- getPubKeyAndAddress
+    pure $ MetadataResponse k a validators isSynced True
 
-blocVaultWrapper :: (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
-                    ClientM x -> m x
+blocVaultWrapper ::
+  (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
+  ClientM x ->
+  m x
 blocVaultWrapper client' = do
   logInfoCS callStack "Querying Vault Wrapper"
   VaultData url mgr <- access Proxy
@@ -120,7 +122,7 @@ blocVaultWrapper client' = do
     liftIO $ runClientM client' (mkClientEnv mgr url)
   either (blocError . VaultWrapperError) return resultEither
 
-getPubKeyAndAddress ::  (MonadLogger m, MonadUnliftIO m, HasVault m) => m V.AddressAndKey
+getPubKeyAndAddress :: (MonadLogger m, MonadUnliftIO m, HasVault m) => m V.AddressAndKey
 getPubKeyAndAddress = blocVaultWrapper $ getKey Nothing Nothing
 
 checkIsSynced :: (HasSQL m) => m Bool

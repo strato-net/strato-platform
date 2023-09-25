@@ -1,36 +1,35 @@
-{-# LANGUAGE
-      OverloadedStrings
-    , DataKinds
-    , FlexibleInstances
-    , KindSignatures , TypeFamilies
-#-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Slipstream.Events where
 
-import           Data.Map                 (Map)
-import           Data.Text                (Text)
-import           Data.Time
-
 import qualified BlockApps.Solidity.Value as V
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
-import           Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.Keccak256
+import Data.Map (Map)
+import Data.Text (Text)
+import Data.Time
 
 type StateRoot = Text
 
 data Detail = Incremental | Eventual
 
 data ProcessedContract = ProcessedContract
-  { address           :: Address
-  , codehash          :: CodePtr
-  , organization      :: Text
-  , application       :: Text
-  , contractName      :: Text
-  , chain             :: Text
-  , blockHash         :: Keccak256
-  , blockTimestamp    :: UTCTime
-  , blockNumber       :: Integer
-  , transactionHash   :: Keccak256
-  , transactionSender :: Address
-  , contractData      :: Map Text V.Value
-  } deriving (Show)
+  { address :: Address,
+    codehash :: CodePtr,
+    organization :: Text,
+    application :: Text,
+    contractName :: Text,
+    chain :: Text,
+    blockHash :: Keccak256,
+    blockTimestamp :: UTCTime,
+    blockNumber :: Integer,
+    transactionHash :: Keccak256,
+    transactionSender :: Address,
+    contractData :: Map Text V.Value
+  }
+  deriving (Show)

@@ -121,7 +121,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
     }
 
     // Add the inventory for the product
-    function addInventory(int _quantity, int _pricePerUnit, string _batchId, 
+    function addInventory(int _quantity, int _pricePerUnit, string _batchId, string _inventoryType, 
       InventoryStatus _status, uint _createdDate,address _owner) public returns(uint256, address){
 
       if(ownerOrganization != getUserOrganization(_owner)){
@@ -131,7 +131,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       if(!isInventoryAvailable) {
         isInventoryAvailable = true;
       }
-      Inventory inventory = new Inventory(category, subCategory, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
+      Inventory inventory = new Inventory(category, subCategory, _quantity, _pricePerUnit, _batchId, _inventoryType, _status, _createdDate,_owner);
       return (RestStatus.OK, address(inventory));
     }
 

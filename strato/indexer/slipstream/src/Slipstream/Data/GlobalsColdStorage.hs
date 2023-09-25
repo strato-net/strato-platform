@@ -1,25 +1,27 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Slipstream.Data.GlobalsColdStorage where
 
-import ClassyPrelude hiding (Handle, (.))
-import Database.Persist.Sql
-import qualified Data.Aeson as Ae
+module Slipstream.Data.GlobalsColdStorage where
 
 import BlockApps.Solidity.Value
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
+import ClassyPrelude hiding (Handle, (.))
+import qualified Data.Aeson as Ae
+import Database.Persist.Sql
 
-data QueueElem = PreStorageEntry Account [(Text, Value)]
-               | SyncFlush
+data QueueElem
+  = PreStorageEntry Account [(Text, Value)]
+  | SyncFlush
 
-data Handle = Handle (TQueue QueueElem) SqlBackend
-            | FakeHandle
+data Handle
+  = Handle (TQueue QueueElem) SqlBackend
+  | FakeHandle
 
 instance NFData Handle where
   rnf = const () -- It doesn't really make sense to force a handle
@@ -32,15 +34,16 @@ fakeHandle = FakeHandle
 deriving instance Read ChainId
 
 -- Primary keys are not nullable, so avoid using persistent's Maybe modifier
-newtype MChainId = MChainId { unMChainId :: Maybe ChainId }
-                   deriving (Show, Eq, Ord, Read, Generic, Ae.ToJSON, Ae.FromJSON)
+newtype MChainId = MChainId {unMChainId :: Maybe ChainId}
+  deriving (Show, Eq, Ord, Read, Generic, Ae.ToJSON, Ae.FromJSON)
 
 instance PersistField MChainId where
   toPersistValue (MChainId Nothing) = PersistText "<no_chain>"
   toPersistValue (MChainId (Just ci)) = toPersistValue ci
-  fromPersistValue v = if v == PersistText "<no_chain>"
-                         then Right $ MChainId Nothing
-                         else (MChainId . Just) <$> fromPersistValue v
+  fromPersistValue v =
+    if v == PersistText "<no_chain>"
+      then Right $ MChainId Nothing
+      else (MChainId . Just) <$> fromPersistValue v
 
 instance PersistFieldSql MChainId where
   sqlType _ = SqlOther "text"

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Blockchain.Sequencer.Kafka.Metrics where
 
 import Control.Monad
@@ -8,10 +9,11 @@ import Data.Text
 import Prometheus
 
 buildCounter :: Text -> Text -> Vector Text Counter
-buildCounter name desc = unsafeRegister
-                       . vector "event"
-                       . counter
-                       $ Info name desc
+buildCounter name desc =
+  unsafeRegister
+    . vector "event"
+    . counter
+    $ Info name desc
 
 {-# NOINLINE unseqWrites #-}
 unseqWrites :: Vector Text Counter
@@ -41,5 +43,6 @@ recordEvents :: (Data a, MonadIO m) => Vector Text Counter -> [a] -> m ()
 recordEvents vec = recordEvents' vec . fmap (show . toConstr)
 
 recordEvents' :: MonadIO m => Vector Text Counter -> [String] -> m ()
-recordEvents' vec events = liftIO $ forM_ events $ \constr -> do
-  withLabel vec (pack constr) incCounter
+recordEvents' vec events = liftIO $
+  forM_ events $ \constr -> do
+    withLabel vec (pack constr) incCounter

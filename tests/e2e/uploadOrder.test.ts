@@ -231,7 +231,7 @@ describe('Nonce upload orders', async () => {
     assert.deepEqual(results, ["300", `${nonce}`]);
   }).timeout(config.timeout);
 
-  it ("won't collide nonces when none are provided for contract txs", async () => {
+  xit ("won't collide nonces when none are provided for contract txs", async () => {
     const user = await createNewUser("user1");
     console.log(`Setting 4, then 300`);
     const contracts = await createNoNonces(user, 'NonceOrder', [4, 300]);

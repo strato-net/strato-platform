@@ -38,11 +38,16 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories.map(inventory => ({
-        ...inventory,
-        imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
+      const inventoriesWithImageUrl = inventories.map(inventory => (
+        inventory.imageKey ?
+        {
+          ...inventory,
+          imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
+          )
+        }
+        :
+        inventory
+      ))
       rest.response.status200(res, inventoriesWithImageUrl)
 
       return next()
@@ -74,6 +79,21 @@ class InventoryController {
       InventoryController.validateUpdateInventoryArgs(body)
 
       const result = await dapp.updateInventory(body, options)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async resell(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateResellInventoryArgs(body)
+
+      const result = await dapp.resellInventory(body)
       rest.response.status200(res, result)
 
       return next()
@@ -116,6 +136,7 @@ class InventoryController {
       pricePerUnit: Joi.number().integer().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),
+      inventoryType: Joi.string().required(),
       serialNumber: Joi.array().when(Joi.array().length(0), {
         then: Joi.array().length(0).required(),
         otherwise: Joi.array().length(Joi.ref('quantity')).items(Joi.object({
@@ -129,7 +150,7 @@ class InventoryController {
       }).required(),
     });
 
-    
+
     const validation = createInventorySchema.validate(args);
 
     if (validation.error) {
@@ -154,6 +175,24 @@ class InventoryController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Inventory Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateResellInventoryArgs(args) {
+    const resellInventorySchema = Joi.object({
+      inventoryId: Joi.string().required(),
+      quantity: Joi.number().integer().min(1).required(),
+      price: Joi.number().integer().greater(0).required(),
+      itemsAddress: Joi.array().required()
+    });
+
+    const validation = resellInventorySchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Resell Inventory Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

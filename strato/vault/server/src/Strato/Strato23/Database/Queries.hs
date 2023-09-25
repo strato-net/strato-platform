@@ -1,40 +1,36 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE Arrows                #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE Arrows #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TupleSections         #-}
-{-# LANGUAGE BangPatterns         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Strato.Strato23.Database.Queries where
 
-import           Control.Arrow
-import           Control.Monad                   (void)
-import qualified Crypto.Saltine.Class            as Saltine
-import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString.Char8           as C8
-import           Data.Int                        (Int32)
-import           Data.Maybe                      (fromMaybe, listToMaybe)
-import           Data.Profunctor
-import           Data.Profunctor.Product.Default
-import qualified Data.Text                       as T
-import           Database.PostgreSQL.Simple      (Connection)
-import           Database.PostgreSQL.Simple.FromField hiding (name)
-import           Opaleye                         hiding (not, null, index, FromField)
-import qualified Opaleye                         as O
-import           Opaleye.Internal.PGTypesExternal
-import           Opaleye.Internal.QueryArr
-
-import           Blockchain.Strato.Model.Address
-
-import           Strato.Strato23.Crypto
-import           Strato.Strato23.Database.Tables
-
-
+import Blockchain.Strato.Model.Address
+import Control.Arrow
+import Control.Monad (void)
+import qualified Crypto.Saltine.Class as Saltine
+import qualified Crypto.Saltine.Core.SecretBox as SecretBox
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as C8
+import Data.Int (Int32)
+import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Profunctor
+import Data.Profunctor.Product.Default
+import qualified Data.Text as T
+import Database.PostgreSQL.Simple (Connection)
+import Database.PostgreSQL.Simple.FromField hiding (name)
+import Opaleye hiding (FromField, index, not, null)
+import qualified Opaleye as O
+import Opaleye.Internal.PGTypesExternal
+import Opaleye.Internal.QueryArr
+import Strato.Strato23.Crypto
+import Strato.Strato23.Database.Tables
 
 countUsers :: T.Text -> Query (O.Field PGInt8)
 countUsers username = aggregate countStar $ proc () -> do
@@ -42,10 +38,9 @@ countUsers username = aggregate countStar $ proc () -> do
   restrict -< name .== toFields username
 
 countUsers' :: T.Text -> T.Text -> Query (O.Field PGInt8)
-countUsers' username oauthRealm  = aggregate countStar $ proc () -> do
-  (_, name, oauth, _, _, _, _ ) <- selectTable usersTable -< ()
-  restrict -< (name .== toFields username  .&& oauth .== toFields oauthRealm ) 
-
+countUsers' username oauthRealm = aggregate countStar $ proc () -> do
+  (_, name, oauth, _, _, _, _) <- selectTable usersTable -< ()
+  restrict -< (name .== toFields username .&& oauth .== toFields oauthRealm)
 
 getUserKeyQuery :: T.Text -> Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getUserKeyQuery username = proc () -> do
@@ -56,76 +51,84 @@ getUserKeyQuery username = proc () -> do
 getUserKeyQuery' :: T.Text -> T.Text -> Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
 getUserKeyQuery' username oauthRealm = proc () -> do
   (_, name, oauth, salt, nonce, encSecPrvKey, address) <- selectTable usersTable -< ()
-  restrict -< (name .== toFields username  .&& oauth .== toFields oauthRealm ) 
+  restrict -< (name .== toFields username .&& oauth .== toFields oauthRealm)
   returnA -< (salt, nonce, encSecPrvKey, address)
 
 getUserByAddress :: Address -> Query (O.Field PGText)
 getUserByAddress qaddr = proc () -> do
-  (_, name, _,  _, _, _, taddr) <- selectTable usersTable -< ()
+  (_, name, _, _, _, _, taddr) <- selectTable usersTable -< ()
   restrict -< taddr .== toFields qaddr
   returnA -< name
 
 getUserByAddress' :: Address -> Query (O.Field PGText, O.Field PGText)
 getUserByAddress' qaddr = proc () -> do
-  (_, name, oauth, _, _,  _, taddr) <- selectTable usersTable -< ()
+  (_, name, oauth, _, _, _, taddr) <- selectTable usersTable -< ()
   restrict -< taddr .== toFields qaddr
   returnA -< (name, oauth)
 
 getUserAddresses :: Maybe Int -> Maybe Int -> Query (O.Field PGText, O.Field PGBytea)
 getUserAddresses mOffset mLimit = maybe id limit mLimit
-                                . maybe id offset mOffset
-                                $ proc () -> do
-  (_, name,  _, _, _,  _, addr) <- selectTable usersTable -< ()
-  returnA -< (name, addr)
+  . maybe id offset mOffset
+  $ proc () -> do
+    (_, name, _, _, _, _, addr) <- selectTable usersTable -< ()
+    returnA -< (name, addr)
 
 postUserKeyQuery :: T.Text -> KeyStore -> Connection -> IO Bool
-postUserKeyQuery userName KeyStore{..} conn = do
+postUserKeyQuery userName KeyStore {..} conn = do
   (userIds :: [Int32]) <- runSelect conn $ proc () -> do
-    (userId, name, _ , _, _, _, _) <- selectTable usersTable -< ()
+    (userId, name, _, _, _, _, _) <- selectTable usersTable -< ()
     restrict -< name .== toFields userName
     returnA -< userId
   case listToMaybe userIds of
     Just _ -> return False
     Nothing -> do
-      void $ runInsert_ conn Insert {
-        iTable=usersTable,
-        iRows=[
-            ( Nothing
-            , toFields userName
-            , toFields userName
-            , toFields keystoreSalt
-            , toFields keystoreAcctNonce
-            , toFields keystoreAcctEncSecKey
-            , toFields keystoreAcctAddress
-            )],
-        iReturning=rCount,
-        iOnConflict=Nothing
-        }
+      void $
+        runInsert_
+          conn
+          Insert
+            { iTable = usersTable,
+              iRows =
+                [ ( Nothing,
+                    toFields userName,
+                    toFields userName,
+                    toFields keystoreSalt,
+                    toFields keystoreAcctNonce,
+                    toFields keystoreAcctEncSecKey,
+                    toFields keystoreAcctAddress
+                  )
+                ],
+              iReturning = rCount,
+              iOnConflict = Nothing
+            }
       return True
 
 postUserKeyQuery' :: T.Text -> T.Text -> KeyStore -> Connection -> IO Bool
-postUserKeyQuery' userName oauthProvider KeyStore{..} conn = do
+postUserKeyQuery' userName oauthProvider KeyStore {..} conn = do
   (userIds :: [Int32]) <- runSelect conn $ proc () -> do
-    (userId, name, oauth, _, _,_,_) <- selectTable usersTable -< ()
-    restrict -< (name .== toFields userName .&& oauth .== toFields oauthProvider ) 
+    (userId, name, oauth, _, _, _, _) <- selectTable usersTable -< ()
+    restrict -< (name .== toFields userName .&& oauth .== toFields oauthProvider)
     returnA -< userId
   case listToMaybe userIds of
     Just _ -> return False
     Nothing -> do
-      void $ runInsert_ conn Insert {
-        iTable=usersTable,
-        iRows=[
-            ( Nothing
-            , toFields userName
-            , toFields oauthProvider
-            , toFields keystoreSalt
-            , toFields keystoreAcctNonce
-            , toFields keystoreAcctEncSecKey
-            , toFields keystoreAcctAddress
-            )],
-        iReturning=rCount,
-        iOnConflict=Nothing
-        }
+      void $
+        runInsert_
+          conn
+          Insert
+            { iTable = usersTable,
+              iRows =
+                [ ( Nothing,
+                    toFields userName,
+                    toFields oauthProvider,
+                    toFields keystoreSalt,
+                    toFields keystoreAcctNonce,
+                    toFields keystoreAcctEncSecKey,
+                    toFields keystoreAcctAddress
+                  )
+                ],
+              iReturning = rCount,
+              iOnConflict = Nothing
+            }
       return True
 
 getMessageQuery :: Query (O.Field PGBytea, O.Field PGBytea, O.Field PGBytea)
@@ -140,26 +143,32 @@ getMessageQueryAll = proc () -> do
   (_, salt, nonce, enc_msg) <- selectTable messageTable -< ()
   returnA -< (salt, nonce, enc_msg)
 
-postMessageQuery :: ByteString
-                 -> SecretBox.Nonce
-                 -> ByteString
-                 -> Connection
-                 -> IO Bool
+postMessageQuery ::
+  ByteString ->
+  SecretBox.Nonce ->
+  ByteString ->
+  Connection ->
+  IO Bool
 postMessageQuery salt nonce message conn = do
   (mesg :: [(ByteString, SecretBox.Nonce, ByteString)]) <- runSelect conn getMessageQuery
   case mesg of
-    (_:_) -> return False
-    [] -> True <$ runInsert_ conn Insert {
-      iTable=messageTable,
-      iRows=[
-          ( Nothing
-          , toFields salt
-          , toFields nonce
-          , toFields message
-          )],
-      iReturning=rCount,
-      iOnConflict=Nothing
-      }
+    (_ : _) -> return False
+    [] ->
+      True
+        <$ runInsert_
+          conn
+          Insert
+            { iTable = messageTable,
+              iRows =
+                [ ( Nothing,
+                    toFields salt,
+                    toFields nonce,
+                    toFields message
+                  )
+                ],
+              iReturning = rCount,
+              iOnConflict = Nothing
+            }
 
 instance DefaultFromField PGBytea Address where
   defaultFromField = fromPGSFromField
@@ -184,4 +193,3 @@ instance FromField SecretBox.Nonce where
 
 instance Default ToFields SecretBox.Nonce (O.Field PGBytea) where
   def = lmap Saltine.encode def
-

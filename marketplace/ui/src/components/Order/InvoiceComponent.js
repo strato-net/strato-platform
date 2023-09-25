@@ -159,30 +159,7 @@ const InvoiceComponent = ({ invoice }) => {
           </View>
           <View style={styles.topSection}>
             <View style={styles.addressSection}>
-              <Text style={styles.addressTitle}>Billing address: </Text>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>Name: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.billingName)}</Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>Address: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.billingAddressLine1)+", "+decodeURIComponent(invoice.userContactAddress.billingAddressLine2) }</Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>City: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.billingCity)}</Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>State: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.billingState)}</Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>Zip code: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.billingZipcode)}</Text>
-              </View>
-            </View>
-            <View style={styles.addressSection}>
-              <Text style={styles.addressTitle}>Shipping address: </Text>
+              <Text style={styles.addressTitle}>Address: </Text>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>Name: </Text>
                 <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.shippingName)}</Text>

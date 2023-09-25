@@ -97,6 +97,19 @@ build_common_profiled: build_buildbase
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
+pretty: build_buildbase
+	@echo formatting STRATO Haskell code...
+	cd strato && \
+		gen-hie > hie.yaml && \
+		ormolu --mode inplace `git ls-files '*.hs'`
+
+hoogle: build_buildbase
+	@echo generating and serving STRATO documentation...
+	cd strato && \
+		stack build --haddock && \
+		stack hoogle generate --rebuild -- --local && \
+		stack hoogle -- server --local
+
 strato: build_common
 	@echo Now building core-strato...
 	cp -fr strato/licenses ${STRATODIR}

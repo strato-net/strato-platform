@@ -33,6 +33,9 @@ so that they could be properly moved to their respective version's subsection.
 - Introduction of `es6` and `strict` pragmas, which enable braced and qualified import syntax, and proper visibility modifier behavior, respectively.
 - `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
 - SolidVM built-in `create` and `create2` functions which allows for the explicit creation of contracts within SolidVM contracts
+- new `solidvmevents` kafka topic for emitted solidvm events
+- `pretty` Makefile command that triggers the `ormolu` code formatter
+- `hoogle` Makefile command that generates Haddock documentation and serves through local Hoogle instance
 
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
@@ -40,6 +43,10 @@ so that they could be properly moved to their respective version's subsection.
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
 - Bagger no longer crashes the VM upon encountering a transaction that exceeds the nonce or size limit
+- String formatting related errors in `.code` SolidVM tests
+- Typechecker test errors that were missing `pragma strict` and failing
+- The out-of-scope errors of storage variables for Solidity try/catch statements
+- Free function overloading conflict with the import resolver 
 ### Removed
 - `bloc22` database removed
 

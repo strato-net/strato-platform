@@ -4,15 +4,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.Version (
-  API,
-  server
-  ) where
+module Handlers.Version
+  ( API,
+    server,
+  )
+where
 
-import           Data.Aeson
-import           GHC.Generics
-import           Servant
-import           Versioning
+import Data.Aeson
+import GHC.Generics
+import Servant
+import Versioning
 
 type API = "version" :> Get '[JSON] Value
 
@@ -21,15 +22,20 @@ server = getVersion
 
 -------------------------
 
-data Repo = Repo { name   :: String
-                 , url    :: String
-                 , sha    :: String
-                 , branch :: String
-                 } deriving (Show, Generic)
+data Repo = Repo
+  { name :: String,
+    url :: String,
+    sha :: String,
+    branch :: String
+  }
+  deriving (Show, Generic)
 
 instance ToJSON Repo
 
 getVersion :: Applicative m => m Value
-getVersion = pure $ object ["monostrato" .= Repo "monostrato" "" $(gitHashMonostrato) $(gitBranchMonostrato)
-                           --,"stack.yaml" .= ("stack" :: String, $(stackYaml) :: String) --(liftIO $ getStackInfo)
-                           ]
+getVersion =
+  pure $
+    object
+      [ "monostrato" .= Repo "monostrato" "" $(gitHashMonostrato) $(gitBranchMonostrato)
+      --,"stack.yaml" .= ("stack" :: String, $(stackYaml) :: String) --(liftIO $ getStackInfo)
+      ]

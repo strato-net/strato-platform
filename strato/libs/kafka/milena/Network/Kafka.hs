@@ -2,59 +2,58 @@
 
 module Network.Kafka where
 
-import Prelude
-
 -- base
-import Control.Concurrent     (threadDelay)
+import Control.Concurrent (threadDelay)
 import Control.Exception (Exception, IOException)
-import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty(..))
-import GHC.Generics (Generic)
-import System.IO
-
 -- Hackage
 import Control.Exception.Lifted (catch)
 import Control.Lens
-import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Except (ExceptT(..), runExceptT, MonadError(..))
-import Control.Monad.Trans.State
 import Control.Monad.State.Class (MonadState)
+import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Trans.State
 import Data.ByteString.Char8 (ByteString)
-import qualified Data.Pool as Pool
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
+import qualified Data.Pool as Pool
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified DeprecatedNetworkFunction
-
+import GHC.Generics (Generic)
 -- local
 import Network.Kafka.Protocol
+import System.IO
+import Prelude
 
 type KafkaAddress = (Host, Port)
 
-data KafkaState = KafkaState { -- | Name to use as a client ID.
-                               _stateName :: KafkaString
-                               -- | How many acknowledgements are required for producing.
-                             , _stateRequiredAcks :: RequiredAcks
-                               -- | Time in milliseconds to wait for messages to be produced by broker.
-                             , _stateRequestTimeout :: Timeout
-                               -- | Minimum size of response bytes to block for.
-                             , _stateWaitSize :: MinBytes
-                               -- | Maximum size of response bytes to retrieve.
-                             , _stateBufferSize :: MaxBytes
-                               -- | Maximum time in milliseconds to wait for response.
-                             , _stateWaitTime :: MaxWaitTime
-                               -- | An incrementing counter of requests.
-                             , _stateCorrelationId :: CorrelationId
-                               -- | Broker cache
-                             , _stateBrokers :: M.Map Leader Broker
-                               -- | Connection cache
-                             , _stateConnections :: M.Map KafkaAddress (Pool.Pool Handle)
-                               -- | Topic metadata cache
-                             , _stateTopicMetadata :: M.Map TopicName TopicMetadata
-                               -- | Address cache
-                             , _stateAddresses :: NonEmpty KafkaAddress
-                             } deriving (Generic, Show)
+data KafkaState = KafkaState
+  { -- | Name to use as a client ID.
+    _stateName :: KafkaString,
+    -- | How many acknowledgements are required for producing.
+    _stateRequiredAcks :: RequiredAcks,
+    -- | Time in milliseconds to wait for messages to be produced by broker.
+    _stateRequestTimeout :: Timeout,
+    -- | Minimum size of response bytes to block for.
+    _stateWaitSize :: MinBytes,
+    -- | Maximum size of response bytes to retrieve.
+    _stateBufferSize :: MaxBytes,
+    -- | Maximum time in milliseconds to wait for response.
+    _stateWaitTime :: MaxWaitTime,
+    -- | An incrementing counter of requests.
+    _stateCorrelationId :: CorrelationId,
+    -- | Broker cache
+    _stateBrokers :: M.Map Leader Broker,
+    -- | Connection cache
+    _stateConnections :: M.Map KafkaAddress (Pool.Pool Handle),
+    -- | Topic metadata cache
+    _stateTopicMetadata :: M.Map TopicName TopicMetadata,
+    -- | Address cache
+    _stateAddresses :: NonEmpty KafkaAddress
+  }
+  deriving (Generic, Show)
 
 makeLenses ''KafkaState
 
@@ -64,46 +63,51 @@ type Kafka m = (MonadState KafkaState m, MonadError KafkaClientError m, MonadIO 
 type KafkaClientId = KafkaString
 
 -- | Errors given from the Kafka monad.
-data KafkaClientError = -- | A response did not contain an offset.
-                        KafkaNoOffset
-                        -- | A value could not be deserialized correctly.
-                      | KafkaDeserializationError String -- TODO: cereal is Stringly typed, should use tickle
-                        -- | Could not find a cached broker for the found leader.
-                      | KafkaInvalidBroker Leader
-                      | KafkaFailedToFetchMetadata
-                      | KafkaFailedToFetchGroupCoordinator KafkaError
-                      | KafkaIOException IOException
-                        deriving (Eq, Generic, Show)
+data KafkaClientError
+  = -- | A response did not contain an offset.
+    KafkaNoOffset
+  | -- | A value could not be deserialized correctly.
+    KafkaDeserializationError String -- TODO: cereal is Stringly typed, should use tickle
+  | -- | Could not find a cached broker for the found leader.
+    KafkaInvalidBroker Leader
+  | KafkaFailedToFetchMetadata
+  | KafkaFailedToFetchGroupCoordinator KafkaError
+  | KafkaIOException IOException
+  deriving (Eq, Generic, Show)
 
 instance Exception KafkaClientError
 
 -- | An abstract form of Kafka's time. Used for querying offsets.
-data KafkaTime = -- | The latest time on the broker.
-                 LatestTime
-                 -- | The earliest time on the broker.
-               | EarliestTime
-                 -- | A specific time.
-               | OtherTime Time
-               deriving (Eq, Generic)
+data KafkaTime
+  = -- | The latest time on the broker.
+    LatestTime
+  | -- | The earliest time on the broker.
+    EarliestTime
+  | -- | A specific time.
+    OtherTime Time
+  deriving (Eq, Generic)
 
-data PartitionAndLeader = PartitionAndLeader { _palTopic :: TopicName
-                                             , _palPartition :: Partition
-                                             , _palLeader :: Leader
-                                             }
-                                             deriving (Show, Generic, Eq, Ord)
+data PartitionAndLeader = PartitionAndLeader
+  { _palTopic :: TopicName,
+    _palPartition :: Partition,
+    _palLeader :: Leader
+  }
+  deriving (Show, Generic, Eq, Ord)
 
 makeLenses ''PartitionAndLeader
 
-data TopicAndPartition = TopicAndPartition { _tapTopic :: TopicName
-                                           , _tapPartition :: Partition
-                                           }
-                         deriving (Eq, Generic, Ord, Show)
+data TopicAndPartition = TopicAndPartition
+  { _tapTopic :: TopicName,
+    _tapPartition :: Partition
+  }
+  deriving (Eq, Generic, Ord, Show)
 
 -- | A topic with a serializable message.
-data TopicAndMessage = TopicAndMessage { _tamTopic :: TopicName
-                                       , _tamMessage :: Message
-                                       }
-                       deriving (Eq, Generic, Show)
+data TopicAndMessage = TopicAndMessage
+  { _tamTopic :: TopicName,
+    _tamMessage :: Message
+  }
+  deriving (Eq, Generic, Show)
 
 makeLenses ''TopicAndMessage
 
@@ -140,23 +144,25 @@ defaultMaxWaitTime = 0
 -- | Create a consumer using default values.
 mkKafkaState :: KafkaClientId -> KafkaAddress -> KafkaState
 mkKafkaState cid addy =
-    KafkaState cid
-               defaultRequiredAcks
-               defaultRequestTimeout
-               defaultMinBytes
-               defaultMaxBytes
-               defaultMaxWaitTime
-               defaultCorrelationId
-               M.empty
-               M.empty
-               M.empty
-               (addy :| [])
+  KafkaState
+    cid
+    defaultRequiredAcks
+    defaultRequestTimeout
+    defaultMinBytes
+    defaultMaxBytes
+    defaultMaxWaitTime
+    defaultCorrelationId
+    M.empty
+    M.empty
+    M.empty
+    (addy :| [])
 
 addKafkaAddress :: KafkaAddress -> KafkaState -> KafkaState
 addKafkaAddress = over stateAddresses . NE.nub .: NE.cons
-  where infixr 9 .:
-        (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
-        (.:) = (.).(.)
+  where
+    infixr 9 .:
+    (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+    (.:) = (.) . (.)
 
 -- | Run the underlying Kafka monad.
 runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
@@ -190,24 +196,23 @@ metadata request = withAnyHandle $ flip metadata' request
 metadata' :: Kafka m => Handle -> MetadataRequest -> m MetadataResponse
 metadata' h request = makeRequest h $ MetadataRR request
 
-
 createTopic :: Kafka m => CreateTopicsRequest -> m CreateTopicsResponse
 createTopic request = withAnyHandle $ flip createTopic' request
 
 createTopic' ::
-       Kafka m => Handle -> CreateTopicsRequest -> m CreateTopicsResponse
+  Kafka m => Handle -> CreateTopicsRequest -> m CreateTopicsResponse
 createTopic' h request = makeRequest h $ TopicsRR request
 
 createTopicsRequest ::
-       TopicName
-    -> Partition
-    -> ReplicationFactor
-    -> [(Partition, Replicas)]
-    -> [(KafkaString, Metadata)]
-    -> CreateTopicsRequest
+  TopicName ->
+  Partition ->
+  ReplicationFactor ->
+  [(Partition, Replicas)] ->
+  [(KafkaString, Metadata)] ->
+  CreateTopicsRequest
 createTopicsRequest topic partition replication_factor replica_assignment config =
-    CreateTopicsReq
-        ([(topic, partition, replication_factor, replica_assignment, config)], defaultRequestTimeout)
+  CreateTopicsReq
+    ([(topic, partition, replication_factor, replica_assignment, config)], defaultRequestTimeout)
 
 deleteTopic :: Kafka m => DeleteTopicsRequest -> m DeleteTopicsResponse
 deleteTopic request = withAnyHandle $ flip deleteTopic' request
@@ -218,7 +223,6 @@ deleteTopic' h request = makeRequest h $ DeleteTopicsRR request
 deleteTopicsRequest :: TopicName -> DeleteTopicsRequest
 deleteTopicsRequest topic = DeleteTopicsReq ([topic], defaultRequestTimeout)
 
-
 fetchOffset :: Kafka m => OffsetFetchRequest -> m OffsetFetchResponse
 fetchOffset request@(OffsetFetchReq (group, _)) = do
   coordinator <- getConsumerGroupCoordinator group
@@ -228,10 +232,10 @@ fetchOffset' :: Kafka m => Handle -> OffsetFetchRequest -> m OffsetFetchResponse
 fetchOffset' h request = makeRequest h $ OffsetFetchRR request
 
 fetchOffsetRequest ::
-     ConsumerGroup -> TopicName -> Partition -> OffsetFetchRequest
+  ConsumerGroup -> TopicName -> Partition -> OffsetFetchRequest
 fetchOffsetRequest consumerGroup topic partition =
   OffsetFetchReq
-        (consumerGroup, [(topic, [partition])])
+    (consumerGroup, [(topic, [partition])])
 
 -- | Send a heartbeat request.
 heartbeat :: Kafka m => HeartbeatRequest -> m HeartbeatResponse
@@ -250,11 +254,11 @@ commitOffset request@(OffsetCommitReq (group, _, _, _, _)) = do
   withBrokerHandle coordinator $ flip commitOffset' request
 
 commitOffset' ::
-     Kafka m => Handle -> OffsetCommitRequest -> m OffsetCommitResponse
+  Kafka m => Handle -> OffsetCommitRequest -> m OffsetCommitResponse
 commitOffset' h request = makeRequest h $ OffsetCommitRR request
 
 commitOffsetRequest ::
-     ConsumerGroup -> TopicName -> Partition -> Offset -> OffsetCommitRequest
+  ConsumerGroup -> TopicName -> Partition -> Offset -> OffsetCommitRequest
 commitOffsetRequest consumerGroup topic partition offset =
   let time = -1
       metadata_ = Metadata "milena"
@@ -266,11 +270,12 @@ getConsumerGroupCoordinator group = do
   let theReq = GroupCoordinatorRR $ GroupCoordinatorReq group
   (GroupCoordinatorResp (err, broker)) <- withAnyHandle $ flip makeRequest theReq
   case err of
-    ConsumerCoordinatorNotAvailableCode -> do  -- coordinator not ready, must retry with backoff
+    ConsumerCoordinatorNotAvailableCode -> do
+      -- coordinator not ready, must retry with backoff
       liftIO $ threadDelay 100000 -- todo something better than threadDelay?
       getConsumerGroupCoordinator group
     NoError -> return broker
-    other   -> throwError $ KafkaFailedToFetchGroupCoordinator other
+    other -> throwError $ KafkaFailedToFetchGroupCoordinator other
 
 getTopicPartitionLeader :: Kafka m => TopicName -> Partition -> m Broker
 getTopicPartitionLeader t p = do
@@ -288,7 +293,8 @@ brokerPartitionInfo t = do
   let s = stateTopicMetadata . at t
   tmd <- findMetadataOrElse [t] s KafkaFailedToFetchMetadata
   return $ Set.fromList $ pal <$> tmd ^. partitionsMetadata
-    where pal d = PartitionAndLeader t (d ^. partitionId) (d ^. partitionMetadataLeader)
+  where
+    pal d = PartitionAndLeader t (d ^. partitionId) (d ^. partitionMetadataLeader)
 
 findMetadataOrElse :: Kafka m => [TopicName] -> Getting (Maybe a) KafkaState (Maybe a) -> KafkaClientError -> m a
 findMetadataOrElse ts s err = do
@@ -317,10 +323,11 @@ updateMetadatas ts = do
   stateBrokers %= \m -> foldr addBroker m brokers
   stateTopicMetadata %= \m -> foldr addTopicMetadata m tmds
   return ()
-    where addBroker :: Broker -> M.Map Leader Broker -> M.Map Leader Broker
-          addBroker b = M.insert (Leader . Just $ b ^. brokerNode . nodeId) b
-          addTopicMetadata :: TopicMetadata -> M.Map TopicName TopicMetadata -> M.Map TopicName TopicMetadata
-          addTopicMetadata tm = M.insert (tm ^. topicMetadataName) tm
+  where
+    addBroker :: Broker -> M.Map Leader Broker -> M.Map Leader Broker
+    addBroker b = M.insert (Leader . Just $ b ^. brokerNode . nodeId) b
+    addTopicMetadata :: TopicMetadata -> M.Map TopicName TopicMetadata -> M.Map TopicName TopicMetadata
+    addTopicMetadata tm = M.insert (tm ^. topicMetadataName) tm
 
 updateMetadata :: Kafka m => TopicName -> m ()
 updateMetadata t = updateMetadatas [t]
@@ -360,10 +367,11 @@ withAddressHandle address kafkaAction = do
       return newPool
     Just p -> return p
   tryKafka $ Pool.withResource pool kafkaAction
-    where
-      mkPool :: KafkaAddress -> IO (Pool.Pool Handle)
-      mkPool a = Pool.createPool (createHandle a) hClose 1 10 1
-        where createHandle (h, p) = DeprecatedNetworkFunction.connectTo (h ^. hostString) (fromIntegral p)
+  where
+    mkPool :: KafkaAddress -> IO (Pool.Pool Handle)
+    mkPool a = Pool.createPool (createHandle a) hClose 1 10 1
+      where
+        createHandle (h, p) = DeprecatedNetworkFunction.connectTo (h ^. hostString) (fromIntegral p)
 
 broker2address :: Broker -> KafkaAddress
 broker2address broker = (,) (broker ^. brokerHost) (broker ^. brokerPort)
@@ -382,19 +390,20 @@ withAnyHandle f = do
   x <- withAddressHandle addy f
   stateAddresses %= rotate
   return x
-    where rotate :: NonEmpty a -> NonEmpty a
-          rotate = NE.fromList . rotate' 1 . NE.toList
-          rotate' n xs = zipWith const (drop n (cycle xs)) xs
+  where
+    rotate :: NonEmpty a -> NonEmpty a
+    rotate = NE.fromList . rotate' 1 . NE.toList
+    rotate' n xs = zipWith const (drop n (cycle xs)) xs
 
 -- * Offsets
 
 -- | Fields to construct an offset request, per topic and partition.
-data PartitionOffsetRequestInfo =
-    PartitionOffsetRequestInfo { -- | Time to find an offset for.
-                                 _kafkaTime :: KafkaTime
-                                 -- | Number of offsets to retrieve.
-                               , _maxNumOffsets :: MaxNumberOfOffsets
-                               }
+data PartitionOffsetRequestInfo = PartitionOffsetRequestInfo
+  { -- | Time to find an offset for.
+    _kafkaTime :: KafkaTime,
+    -- | Number of offsets to retrieve.
+    _maxNumOffsets :: MaxNumberOfOffsets
+  }
 
 -- | Get the first found offset.
 getLastOffset :: Kafka m => KafkaTime -> Partition -> TopicName -> m Offset
@@ -413,6 +422,7 @@ getLastOffset' h m p t = do
 -- | Create an offset request.
 offsetRequest :: [(TopicAndPartition, PartitionOffsetRequestInfo)] -> OffsetRequest
 offsetRequest ts =
-    OffsetReq (ReplicaId (-1), M.toList . M.unionsWith (<>) $ fmap f ts)
-        where f (TopicAndPartition t p, i) = M.singleton t [g p i]
-              g p (PartitionOffsetRequestInfo kt mno) = (p, protocolTime kt, mno)
+  OffsetReq (ReplicaId (-1), M.toList . M.unionsWith (<>) $ fmap f ts)
+  where
+    f (TopicAndPartition t p, i) = M.singleton t [g p i]
+    g p (PartitionOffsetRequestInfo kt mno) = (p, protocolTime kt, mno)

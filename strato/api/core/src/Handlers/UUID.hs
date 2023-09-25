@@ -3,14 +3,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Handlers.UUID (
-  API,
-  server
-  ) where
+module Handlers.UUID
+  ( API,
+    server,
+  )
+where
 
-import           Servant
-
-import           Blockchain.EthConf
+import Blockchain.EthConf
+import Servant
 
 type API = "uuid" :> Get '[JSON] EthUniqueId
 
@@ -21,6 +21,7 @@ server = getUUID
 
 getUUID :: Applicative m => m EthUniqueId
 getUUID = pure $ ethUniqueId ethConf
+
 {-
 getUUIDR = selectRep
              . provideJson

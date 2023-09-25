@@ -79,7 +79,7 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-   
+
   }, [routeMatch]);
 
   useEffect(() => {
@@ -128,7 +128,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.status)));
       setcomment(orderDetails.buyerComments);
-     
+
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
         items.push({
@@ -195,7 +195,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     );
   };
 
-  const column = [
+  let column = [
     {
       title: "",
       dataIndex: "productImage",
@@ -228,7 +228,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               navigate(
                 `${routes.BoughtOrderItemDetail.url
                   .replace(":id", text.address)}`,
-                  // .replace(":chainId", text.chainId)}`,
+                // .replace(":chainId", text.chainId)}`,
                 { state: { orderId: details.orderId, address: Id } }
               );
             }}
@@ -284,6 +284,10 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
   ];
+
+  if (data[0] && !data[0].serialNumber.containsSerialNumber) {
+    column = column.filter(col => col.dataIndex !== "serialNumber")
+  }
 
   const handleCancelOrder = async () => {
     const body = {
