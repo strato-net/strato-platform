@@ -27,6 +27,9 @@ pipeline {
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
+        dir ('strato') {
+          sh 'stack purge'
+        }
         sh 'REPO=private make all'
         sh 'rm -rf .docker-work'
         dir ('blockapps-rest') {
