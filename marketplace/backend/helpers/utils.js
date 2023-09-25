@@ -262,15 +262,6 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [key]: value
       }
     }
-    let dotIndex = value.indexOf('.')
-    if (dotIndex >= 0) {
-      // split the value on a period, allows to directly pass postgrest operators
-      // to this API via ?key=<operator>.<value>
-      // and not setting the <operator> will default to the 'like' operator
-      // This should only be used for simpler queries not things like 'in' or 'or'
-      predicate = value.substring(0, dotIndex)
-      value = value.substring(dotIndex + 1) 
-    }
     let option = {}
     if (predicate === 'or') {
       const { subPredicate = 'eq' } = cur
@@ -291,7 +282,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [predicate]: `(${valueArray.join(',')})`,
       } 
       
-    } else if (value === "true" || value === "false") {
+    } else if (value === "true" || value === "false" || typeof value == 'boolean') {
       option = {
         [key]: `eq.${value}`,
       }
