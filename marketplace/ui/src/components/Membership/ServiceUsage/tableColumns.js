@@ -202,14 +202,11 @@ export function generateTableColumns({
   };
 
   const renderDateColumn = (text, record, index, isEdit, handleInputChange) => {
-    const defaultDate = record.serviceDate ? moment(new Date(parseInt(record.serviceDate)), 'YYYY-MM-DD') : null;
     return (
       <span>
         {record.editable ? (
           <DatePicker
             disabledDate={disabledDate}
-            // value={text ? moment(text, 'YYYY-MM-DD') : null}
-            defaultValue={defaultDate}
             onChange={(serviceDate, dateString) =>
               handleInputChange(
                 new Date(serviceDate).getTime().toString(),
