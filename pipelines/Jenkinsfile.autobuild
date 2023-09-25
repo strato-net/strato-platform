@@ -122,8 +122,8 @@ pipeline {
 
             check_availability
           '''
-        // don't want it to get overwritten
-        sh "mv genesis-block.json genesis-block-official.json"
+          // don't want it to get overwritten
+          sh "cp genesis-block.json genesis-block-official.json"
         }
         script {
           lib.generateGenesisBlock('.', 'strato-getting-started', null)
