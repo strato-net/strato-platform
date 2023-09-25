@@ -503,6 +503,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 id="save-button"
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
+                loading={issellerDetailsUpdating || isCreateOrderLineItem}
                 disabled={status === getStatus(3) || allSerialNumbersUploaded() === false }
                 onClick={() => {
                   handleUpdateComment()

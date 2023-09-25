@@ -156,7 +156,7 @@ class ProductController {
         name: Joi.string().required(),
         description: Joi.string().required(),
         manufacturer: Joi.string().required(),
-        unitOfMeasurement: Joi.number().integer().min(1).max(10).required(),
+        unitOfMeasurement: Joi.number().integer().min(1).max(11).required(),
         userUniqueProductCode: Joi.string().allow("").required(),
         leastSellableUnit: Joi.number().required(),
         imageKey: Joi.string().required(),
