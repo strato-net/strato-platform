@@ -15,12 +15,11 @@ import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 
 
-const BoughtOrdersTable = ({ user }) => {
+const BoughtOrdersTable = ({ user, selectedDate }) => {
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("createdDate.desc");
 
@@ -33,9 +32,15 @@ const BoughtOrdersTable = ({ user }) => {
       offset,
       debouncedSearchTerm,
       user?.organization,
-      order
+      order,
+      selectedDate
     );
-  }, [dispatch, limit, offset, debouncedSearchTerm, user, order]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate]);
+  
+  useEffect(() => {
+    setPage(1);
+    setOffset(0);
+  }, [orderTotal]);
 
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
@@ -182,14 +187,6 @@ const BoughtOrdersTable = ({ user }) => {
     setOffset((page - 1) * limit);
     setPage(page);
   };
-
-  useEffect(() => {
-    let len = data.length;
-    let total;
-    if (len === limit) total = page * 10 + limit;
-    else total = (page - 1) * 10 + limit;
-    setTotal(total);
-  }, [data]);
 
   return (
     <div>
