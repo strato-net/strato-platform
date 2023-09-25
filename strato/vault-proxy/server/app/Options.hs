@@ -1,10 +1,10 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Options where
 
-import           HFlags
-import           Data.Text       as T
+import Data.Text as T
+import HFlags
 
 defineFlag "OAUTH_DISCOVERY_URL" (T.pack "" :: Text) "OAuth2 Discovery URL"
 defineFlag "OAUTH_CLIENT_ID" (T.pack "" :: Text) "OAuth2 Client ID"

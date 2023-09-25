@@ -1,33 +1,34 @@
-{-# LANGUAGE AllowAmbiguousTypes   #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE TupleSections         #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Control.Monad.Change.Alter
-  ( Alters(..)
-  , Maps(..)
-  , Selectable(..)
-  , Replaceable(..)
-  , Removable(..)
-  , module Data.Proxy
-  ) where
+  ( Alters (..),
+    Maps (..),
+    Selectable (..),
+    Replaceable (..),
+    Removable (..),
+    module Data.Proxy,
+  )
+where
 
-import           Control.Lens
-import           Control.Monad
-import           Control.Monad.Change.Modify
-import           Control.Monad.Trans.State   (evalStateT, execStateT, StateT)
-import           Data.Default
-import qualified Data.IntMap                 as IM
-import           Data.Map.Strict             (Map)
-import qualified Data.Map.Strict             as M
-import           Data.Maybe
-import           Data.Proxy
-import           Prelude                     hiding (lookup)
+import Control.Lens
+import Control.Monad
+import Control.Monad.Change.Modify
+import Control.Monad.Trans.State (StateT, evalStateT, execStateT)
+import Data.Default
+import qualified Data.IntMap as IM
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+import Data.Maybe
+import Data.Proxy
+import Prelude hiding (lookup)
 
 {- The Alters Typeclass
   (k `Alters` a) f is a typeclass used to generalize Data.Map-like functions to any monad f.
@@ -63,7 +64,6 @@ import           Prelude                     hiding (lookup)
   than top-level functions with an `Alters` constraint.
 -}
 class (Ord k, Monad f) => Alters k a f where
-
   {- alter
      The most general function that can be applied to a Map-like structure.
      Apply an effectful function to a `Maybe a`, which represents a value that may or may not
@@ -104,8 +104,9 @@ class (Ord k, Monad f) => Alters k a f where
   delete :: Proxy a -> k -> f ()
   delete p k = alter_ p k $ pure . const Nothing
 
-  {-# MINIMAL alter
-            | lookup, insert, delete
+  {-# MINIMAL
+    alter
+    | lookup, insert, delete
     #-}
 
   {- alterMany
@@ -321,8 +322,6 @@ class (Ord k, Monad f) => Alters k a f where
   exists :: Proxy a -> k -> f Bool
   exists p k = isJust <$> lookup p k
 
-
-
 class Maps k a b where
   that :: Proxy a -> k -> Lens' b (Maybe a)
 
@@ -337,7 +336,6 @@ instance (Ord k, b `Has` (Map k a)) => (k `Maps` a) b where
 
 instance b `Has` (IM.IntMap a) => (Int `Maps` a) b where
   that _ k = this (Proxy :: Proxy (IM.IntMap a)) . at k
-
 
 {- The Selectable Typeclass
   `Selectable k a f` is a typeclass used to generalize the Data.Map function `lookup` to any monad f.

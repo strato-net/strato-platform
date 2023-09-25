@@ -13,10 +13,11 @@ import Control.Monad.Except (throwError)
 import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Control.Concurrent.MVar (MVar, newMVar, modifyMVar)
 -}
-import           Server
+import Server
 
-main::IO ()
+main :: IO ()
 main = startServer
+
 {-
 main' = do
   hSetBuffering stdout LineBuffering

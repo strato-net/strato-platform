@@ -2,20 +2,19 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Data.EventDB
-    ( HasMemEventDB(..)
-    , putEventDB
-    , putEventDBs
-    ) where
+  ( HasMemEventDB (..),
+    putEventDB,
+    putEventDBs,
+  )
+where
 
-import           Database.Persist             hiding (get)
-import qualified Database.Persist.Postgresql  as SQL
-
-import           Blockchain.Data.DataDefs
-import           Blockchain.DB.SQLDB
+import Blockchain.DB.SQLDB
+import Blockchain.Data.DataDefs
+import qualified Database.Persist.Postgresql as SQL
 
 class (Monad m) => HasMemEventDB m where
   enqueueEventEntries :: [EventDB] -> m ()
-  flushEventEntries   :: m ()
+  flushEventEntries :: m ()
 
   enqueueEventEntry :: EventDB -> m ()
   enqueueEventEntry = enqueueEventEntries . pure

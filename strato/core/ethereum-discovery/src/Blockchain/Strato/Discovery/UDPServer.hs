@@ -1,47 +1,47 @@
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+
 {-# OPTIONS -fno-warn-deprecations #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.UDPServer
-     ( runEthUDPServer
-     , connectMe
-     ) where
+  ( runEthUDPServer,
+    connectMe,
+  )
+where
 
-import           Control.Applicative                     (liftA2)
-import           Control.Monad.Catch
-import qualified Control.Monad.Change.Alter              as A
-import qualified Control.Monad.Change.Modify             as Mod
-import           Control.Monad.IO.Class
-import           Control.Monad.Reader
-import qualified Crypto.Types.PubKey.ECC                 as ECC
-import qualified Data.ByteString                         as B
-import qualified Data.ByteString.Base16                  as B16
-import qualified Data.ByteString.Char8                   as BC
-import           Data.Either.Combinators
-import           Data.Foldable                           (for_)
-import           Data.Maybe                              (fromJust)
-import qualified Data.Text                               as T
-import           Data.Time.Clock.POSIX
-import           Network.Socket
-import           System.Entropy
-import           System.Random
-
-import           BlockApps.Logging
-import           Blockchain.Data.PubKey
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Strato.Discovery.ContextLite
-import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Discovery.P2PUtil
-import           Blockchain.Strato.Discovery.UDP
-import qualified Text.Colors                             as CL
-import           Text.Format
-
+import BlockApps.Logging
+import Blockchain.Data.PubKey
+import Blockchain.Strato.Discovery.ContextLite
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Discovery.P2PUtil
+import Blockchain.Strato.Discovery.UDP
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
+import Control.Applicative (liftA2)
+import Control.Monad.Catch
+import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.IO.Class
+import Control.Monad.Reader
+import qualified Crypto.Types.PubKey.ECC as ECC
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as BC
+import Data.Either.Combinators
+import Data.Foldable (for_)
+import Data.Maybe (fromJust)
+import qualified Data.Text as T
+import Data.Time.Clock.POSIX
+import Network.Socket
+import System.Entropy
+import System.Random
+import qualified Text.Colors as CL
+import Text.Format
 
 runEthUDPServer :: MonadDiscovery m => Int -> m ()
 runEthUDPServer minPeers = do
@@ -50,12 +50,17 @@ runEthUDPServer minPeers = do
   $logInfoS "ethereumDiscovery" . T.pack $ "My Node Address: " ++ (format $ fromPublicKey pub)
   udpHandshakeServer minPeers
 
-connectMe :: (MonadIO m, MonadFail m, MonadLogger m)
-          => UDPPort -> m Socket
+connectMe ::
+  (MonadIO m, MonadFail m, MonadLogger m) =>
+  UDPPort ->
+  m Socket
 connectMe (UDPPort port') = do
-  (serveraddr:_) <- liftIO $ getAddrInfo
-                                  (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                                  Nothing (Just (show port'))
+  (serveraddr : _) <-
+    liftIO $
+      getAddrInfo
+        (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
+        Nothing
+        (Just (show port'))
   sock <- liftIO $ socket (addrFamily serveraddr) Datagram defaultProtocol
   liftIO $ bind sock (addrAddress serveraddr)
 
@@ -77,7 +82,7 @@ addPeersIfNeeded minPeers = do
         for_ mPeerAddr $ \peerAddr -> do
           time <- liftIO $ round `fmap` getPOSIXTime
           randomBytes <- liftIO $ getEntropy 64
-          updateLastMessage (T.pack "FindNeighbors") thePeer 
+          updateLastMessage (T.pack "FindNeighbors") thePeer
           sendPacket peerAddr $ FindNeighbors (NodeID randomBytes) (time + 50)
           eErr <- disableUDPPeerForSeconds thePeer 10
           whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
@@ -97,33 +102,37 @@ attemptBond = do
       case getHostAddress serverAddr of
         Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
-          if (pPeerLastMsg p == T.pack "Ping") then do
-            disErr <- storeDisableException p (T.pack "attemptBond")
-            whenLeft disErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to store disable exception: " ++ show err
-            eErr <- lengthenPeerDisable' p
-            whenLeft eErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to disable peer: " ++ show err
-          else do
-            updateLastMessage (T.pack "Ping") p
-            sendPacket peerAddr $
-                  Ping 4
-                    (Endpoint hostAddress udpPort tcpPort)
-                    (Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
-                              peerUdpPort
-                              (TCPPort . fromIntegral $ pPeerTcpPort p))
-                    (time+50)
+          if (pPeerLastMsg p == T.pack "Ping")
+            then do
+              disErr <- storeDisableException p (T.pack "attemptBond")
+              whenLeft disErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to store disable exception: " ++ show err
+              eErr <- lengthenPeerDisable' p
+              whenLeft eErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to disable peer: " ++ show err
+            else do
+              updateLastMessage (T.pack "Ping") p
+              sendPacket peerAddr $
+                Ping
+                  4
+                  (Endpoint hostAddress udpPort tcpPort)
+                  ( Endpoint
+                      (stringToIAddr $ T.unpack $ pPeerIp p)
+                      peerUdpPort
+                      (TCPPort . fromIntegral $ pPeerTcpPort p)
+                  )
+                  (time + 50)
 
 udpHandshakeServer :: MonadDiscovery m => Int -> m ()
 udpHandshakeServer minPeers = do
-    _ <- addPeersIfNeeded minPeers
-    _ <- attemptBond
-    -- TODO(tim): make a --strict-ethereum-compliance and reset this to 1280
-    maybePacketData <- A.select (A.Proxy @(B.ByteString, SockAddr)) ()
-    _ <- case maybePacketData of
-      Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
-      Just (msg, addr) -> do
-        _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
-        catch (handler msg addr) $ \(e :: SomeException) -> $logInfoS "udpHandshakeServer" $ "malformed UDP packet: " <> (T.pack $ show e)
-    udpHandshakeServer minPeers
+  _ <- addPeersIfNeeded minPeers
+  _ <- attemptBond
+  -- TODO(tim): make a --strict-ethereum-compliance and reset this to 1280
+  maybePacketData <- A.select (A.Proxy @(B.ByteString, SockAddr)) ()
+  _ <- case maybePacketData of
+    Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
+    Just (msg, addr) -> do
+      _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
+      catch (handler msg addr) $ \(e :: SomeException) -> $logInfoS "udpHandshakeServer" $ "malformed UDP packet: " <> (T.pack $ show e)
+  udpHandshakeServer minPeers
   where
     handler msg addr = case argValidator msg addr of
       Left msgErr -> $logInfoS "udpHandshakeServer/handler" $ T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
@@ -137,105 +146,108 @@ udpHandshakeServer minPeers = do
       let validOtherPubKey = secPubKeyToPoint otherPubkey
       return (packet, validOtherPubKey, UDPPort $ fromIntegral otherUdpPort)
 
-handleValidPacket :: MonadDiscovery m
-                  => SockAddr
-                  -> UDPPort
-                  -> NodeDiscoveryPacket
-                  -> ECC.Point
-                  -> m ()
+handleValidPacket ::
+  MonadDiscovery m =>
+  SockAddr ->
+  UDPPort ->
+  NodeDiscoveryPacket ->
+  ECC.Point ->
+  m ()
 handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet of
-    Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
-        addPeer' otherUdpPort' otherTcpPort
-        time <- liftIO $ round `fmap` getPOSIXTime
-        sendPacket addr $ Pong ep 4 (time+50)
-
-    Pong{} -> do
-        let ip = sockAddrToIP addr
-        thePeer <- getPeerByIP' ip
-        eErr <- resetPeerUdp $ fromJust thePeer
-        whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
-        eErr' <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
-        whenLeft eErr' $ \ err -> do
-            $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
-            throwM err
-
-    (FindNeighbors targetPubkey _) -> do
-        time <- liftIO $ round `fmap` getPOSIXTime
-        let nextTime = time + 50
-            ip = sockAddrToIP addr
-        peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
-        let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
-        sendPacket addr $ Neighbors theNeighbors nextTime
-          where mkEndpoint PPeer{..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
-                mkNodeId             = pointToNodeID . fromJust . pPeerPubkey
-
-    Neighbors neighbors _ -> do
-      let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _)-> format addr') <$> neighbors)
-          ip = sockAddrToIP addr
-      thePeer <- getPeerByIP' ip
-      updateLastMessage (T.pack "Neighbors") $ fromJust thePeer
-      neighborsExist <- doPeersExist neighborIPs
-      if (neighborsExist == True) 
-        then do
-          $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
-          disErr <- storeDisableException (fromJust thePeer) (T.pack "duplicateNeighbors")
-          whenLeft disErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to store disable exception: " ++ show err
-          eErr <- lengthenPeerDisable' $ fromJust thePeer
-          whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
+  Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
+    addPeer' otherUdpPort' otherTcpPort
+    time <- liftIO $ round `fmap` getPOSIXTime
+    sendPacket addr $ Pong ep 4 (time + 50)
+  Pong {} -> do
+    let ip = sockAddrToIP addr
+    thePeer <- getPeerByIP' ip
+    eErr <- resetPeerUdp $ fromJust thePeer
+    whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
+    eErr' <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
+    whenLeft eErr' $ \err -> do
+      $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
+      throwM err
+  (FindNeighbors targetPubkey _) -> do
+    time <- liftIO $ round `fmap` getPOSIXTime
+    let nextTime = time + 50
+        ip = sockAddrToIP addr
+    peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
+    let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
+    sendPacket addr $ Neighbors theNeighbors nextTime
+    where
+      mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
+      mkNodeId = pointToNodeID . fromJust . pPeerPubkey
+  Neighbors neighbors _ -> do
+    let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors)
+        ip = sockAddrToIP addr
+    thePeer <- getPeerByIP' ip
+    updateLastMessage (T.pack "Neighbors") $ fromJust thePeer
+    neighborsExist <- doPeersExist neighborIPs
+    if (neighborsExist == True)
+      then do
+        $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
+        disErr <- storeDisableException (fromJust thePeer) (T.pack "duplicateNeighbors")
+        whenLeft disErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to store disable exception: " ++ show err
+        eErr <- lengthenPeerDisable' $ fromJust thePeer
+        whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to disable peer: " ++ show err
       else do
         forM_ neighbors $ \(Neighbor (Endpoint addr' (UDPPort udpPort) (TCPPort tcpPort)) nodeID) -> do
           $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
           curTime <- liftIO getCurrentTime
-          let peer = PPeer { pPeerPubkey = Just $ nodeIDToPoint nodeID
-                           , pPeerIp = T.pack $ format addr'
-                           , pPeerUdpPort = udpPort
-                           , pPeerTcpPort = tcpPort
-                           , pPeerNumSessions = 0
-                           , pPeerLastTotalDifficulty = 0
-                           , pPeerLastMsg  = T.pack "msg"
-                           , pPeerLastMsgTime = curTime
-                           , pPeerEnableTime = curTime
-                           , pPeerUdpEnableTime = curTime
-                           , pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0
-                           , pPeerBondState = 0
-                           , pPeerActiveState = 0
-                           , pPeerVersion = T.pack "61" -- fix
-                           , pPeerDisableException = T.pack "None"
-                           , pPeerNextDisableWindowSeconds=5
-                           , pPeerNextUdpDisableWindowSeconds=5
-                           , pPeerDisableExpiration=posixSecondsToUTCTime 0
-                           , pPeerEnode = peerToEnode peer
-                           }
+          let peer =
+                PPeer
+                  { pPeerPubkey = Just $ nodeIDToPoint nodeID,
+                    pPeerIp = T.pack $ format addr',
+                    pPeerUdpPort = udpPort,
+                    pPeerTcpPort = tcpPort,
+                    pPeerNumSessions = 0,
+                    pPeerLastTotalDifficulty = 0,
+                    pPeerLastMsg = T.pack "msg",
+                    pPeerLastMsgTime = curTime,
+                    pPeerEnableTime = curTime,
+                    pPeerUdpEnableTime = curTime,
+                    pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0,
+                    pPeerBondState = 0,
+                    pPeerActiveState = 0,
+                    pPeerVersion = T.pack "61", -- fix
+                    pPeerDisableException = T.pack "None",
+                    pPeerNextDisableWindowSeconds = 5,
+                    pPeerNextUdpDisableWindowSeconds = 5,
+                    pPeerDisableExpiration = posixSecondsToUTCTime 0,
+                    pPeerEnode = peerToEnode peer
+                  }
           addPeer peer
         eErr <- resetPeerUdp $ fromJust thePeer
         whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
-  where addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do
-          curTime <- liftIO getCurrentTime
-          let ip   = sockAddrToIP addr
-              peer = PPeer { pPeerPubkey = Just otherPubKey
-                          , pPeerIp = T.pack ip
-                          , pPeerUdpPort = fromIntegral peerUdpPort
-                          , pPeerTcpPort = fromIntegral peerTcpPort
-                          ,  pPeerNumSessions = 0
-                          ,  pPeerLastTotalDifficulty = 0
-                          ,  pPeerLastMsg  = T.pack "msg"
-                          ,  pPeerLastMsgTime = curTime
-                          ,  pPeerEnableTime = curTime
-                          ,  pPeerUdpEnableTime = curTime
-                          ,  pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0
-                          ,  pPeerBondState = 0
-                          ,  pPeerActiveState = 0
-                          ,  pPeerVersion = T.pack "61" -- fix
-                          ,  pPeerDisableException = T.pack "None"
-                          , pPeerNextDisableWindowSeconds=5
-                          , pPeerNextUdpDisableWindowSeconds=5
-                          , pPeerDisableExpiration=posixSecondsToUTCTime 0
-                          , pPeerEnode = peerToEnode peer
-                          }
-          addPeer peer
-
+  where
+    addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do
+      curTime <- liftIO getCurrentTime
+      let ip = sockAddrToIP addr
+          peer =
+            PPeer
+              { pPeerPubkey = Just otherPubKey,
+                pPeerIp = T.pack ip,
+                pPeerUdpPort = fromIntegral peerUdpPort,
+                pPeerTcpPort = fromIntegral peerTcpPort,
+                pPeerNumSessions = 0,
+                pPeerLastTotalDifficulty = 0,
+                pPeerLastMsg = T.pack "msg",
+                pPeerLastMsgTime = curTime,
+                pPeerEnableTime = curTime,
+                pPeerUdpEnableTime = curTime,
+                pPeerLastBestBlockHash = unsafeCreateKeccak256FromWord256 0,
+                pPeerBondState = 0,
+                pPeerActiveState = 0,
+                pPeerVersion = T.pack "61", -- fix
+                pPeerDisableException = T.pack "None",
+                pPeerNextDisableWindowSeconds = 5,
+                pPeerNextUdpDisableWindowSeconds = 5,
+                pPeerDisableExpiration = posixSecondsToUTCTime 0,
+                pPeerEnode = peerToEnode peer
+              }
+      addPeer peer
 
 getAddrPort :: SockAddr -> Either DiscoverException PortNumber
-getAddrPort (SockAddrInet portNumber _)      = Right portNumber
+getAddrPort (SockAddrInet portNumber _) = Right portNumber
 getAddrPort (SockAddrInet6 portNumber _ _ _) = Right portNumber
-getAddrPort s                                = Left . MissingPortException $ "No port number: " ++ show s
+getAddrPort s = Left . MissingPortException $ "No port number: " ++ show s

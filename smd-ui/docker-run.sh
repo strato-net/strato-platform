@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 set -e
 set -x
 
@@ -10,4 +10,4 @@ sed -i "s|__OAUTH_ENABLED__|true|g" build/index.html # Temporary measure require
 sed -i "s|__IS_SSL__|$ssl|g" build/index.html
 sed -i "s|__STRATO_VERSION__|$STRATO_VERSION|g" build/index.html
 
-NO_UPDATE_CHECK=1 serve -l 3002 build
+NO_UPDATE_CHECK=1 serve --single -l 3002 build

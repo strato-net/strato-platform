@@ -8,49 +8,48 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module Blockchain.DB.CodeDB (
-  CodeDB(..),
-  CodeKind(..),
-  HasCodeDB,
-  DBCode,
-  MemCodeDB(..),
-  runMemCodeDB,
-  runNewMemCodeDB,
-  shaToKey,
-  dbCodeToValue,
-  genericLookupCodeDB,
-  genericInsertCodeDB,
-  genericDeleteCodeDB,
-  addCode,
-  getCode,
-  getCodeKind,
-  getEVMCode,
-  codeDBGet,
-  codeDBPut
-  ) where
 
+module Blockchain.DB.CodeDB
+  ( CodeDB (..),
+    CodeKind (..),
+    HasCodeDB,
+    DBCode,
+    MemCodeDB (..),
+    runMemCodeDB,
+    runNewMemCodeDB,
+    shaToKey,
+    dbCodeToValue,
+    genericLookupCodeDB,
+    genericInsertCodeDB,
+    genericDeleteCodeDB,
+    addCode,
+    getCode,
+    getCodeKind,
+    getEVMCode,
+    codeDBGet,
+    codeDBPut,
+  )
+where
 
+import Blockchain.Database.MerklePatricia
+import Blockchain.SolidVM.Model
+import Blockchain.Strato.Model.Keccak256
+import Control.DeepSeq
+import qualified Control.Monad.Change.Alter as A
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State.Strict
+import Data.Bifunctor (first)
+import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Data.Default
+import qualified Data.Map.Strict as M
+import qualified Database.LevelDB as DB
+import Prelude hiding (lookup)
 
-import           Control.DeepSeq
-import qualified Control.Monad.Change.Alter         as A
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.State.Strict
-import           Data.Bifunctor                     (first)
-import           Data.Binary
-import qualified Data.ByteString                    as B
-import qualified Data.ByteString.Lazy               as BL
-import           Data.Default
-import qualified Data.Map.Strict                    as M
-import qualified Database.LevelDB                   as DB
-import           Prelude                            hiding (lookup)
-
-import           Blockchain.Database.MerklePatricia
-import           Blockchain.SolidVM.Model
-import           Blockchain.Strato.Model.Keccak256
-
-newtype CodeDB = CodeDB { unCodeDB :: DB.DB }
+newtype CodeDB = CodeDB {unCodeDB :: DB.DB}
 
 instance NFData CodeDB where
   rnf (CodeDB a) = a `seq` ()
@@ -59,16 +58,16 @@ type HasCodeDB m = (Keccak256 `A.Alters` DBCode) m
 
 type DBCode = (CodeKind, B.ByteString)
 
-newtype MemCodeDB m a = MemCodeDB { unMemCodeDB :: StateT (M.Map Keccak256 DBCode) m a }
+newtype MemCodeDB m a = MemCodeDB {unMemCodeDB :: StateT (M.Map Keccak256 DBCode) m a}
   deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadTrans MemCodeDB where
   lift = MemCodeDB . lift
 
 instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCodeDB m) where
-  lookup _   = MemCodeDB . gets . M.lookup
+  lookup _ = MemCodeDB . gets . M.lookup
   insert _ k = MemCodeDB . modify' . M.insert k
-  delete _   = MemCodeDB . modify' . M.delete
+  delete _ = MemCodeDB . modify' . M.delete
 
 runMemCodeDB :: Monad m => MemCodeDB m a -> M.Map Keccak256 DBCode -> m a
 runMemCodeDB f m = evalStateT (unMemCodeDB f) m
@@ -127,7 +126,7 @@ getCodeKind hsh = maybe (error $ "no codekind found for " ++ show hsh) fst <$> g
 codeDBPut :: HasCodeDB m => CodeKind -> B.ByteString -> m Keccak256
 codeDBPut kind code = do
   let hsh = hash code
-  A.insert A.Proxy hsh (kind,code)
+  A.insert A.Proxy hsh (kind, code)
   return hsh
 
 codeDBGet :: HasCodeDB m => Keccak256 -> m (Maybe DBCode)

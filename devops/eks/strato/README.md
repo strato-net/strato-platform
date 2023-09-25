@@ -7,21 +7,6 @@ Follow steps from [AWS documentation](https://docs.aws.amazon.com/eks/latest/use
 # Update kubectl with the EKS cluster
 * *aws eks update-kubeconfig --name ba-dev3 --region us-east-1*
 
-# Delete Existing Resources (Deployement, EFS Storage Class, Persistent Volume Claims and Persistent Volumes)
-kubectl delete -f strato-platform-manifest.yaml
-
-# Make a copy of the template
-cp strato-platform-manifest.tpl.yaml strato-platform-manifest.yaml
-
-# Download the strato-platform-manifest.yaml file from jenkins build artifact in your local.
-Replace below place holders with valid values:
-* *REPLACE_WITH_OAUTH_CLIENT_ID*
-* *REPLACE_WITH_OAUTH_CLIENT_SECRET*
-* *REPLACE_WITH_EXT_STORAGE_S3_ACCESS_KEY_ID*
-* *REPLACE_WITH_EXT_STORAGE_S3_SECRET_ACCESS_KEY*
-* *REPLACE_WITH_STRIPE_PUBLISHABLE_KEY*
-* *REPLACE_WITH_STRIPE_SECRET_KEY*
-* *REPLACE_WITH_VERSION* For ex: 9.0.0-8354b3ddb
-
-# Execute the manifest file
-kubectl apply -f strato-platform-manifest.yaml
+# Execute the run script
+cd devops/eks/strato
+./run.sh

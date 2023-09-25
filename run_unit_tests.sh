@@ -5,14 +5,14 @@ set -x
 
 declare -i RESULT=0
 
-# There's a good chance that strato-getting-started is also running, so	
-# we change redis's port to avoid a conflict.	
-REDIS=$(docker run -d -p 2023:6379 redis:3.2 redis-server --appendonly yes)	
+# There's a good chance that strato-getting-started is also running, so
+# we change redis's port to avoid a conflict.
+REDIS=$(docker run -d -p 2023:6379 redis:3.2 redis-server --appendonly yes)
 trap "docker rm -f ${REDIS}" EXIT
 
 cd strato
 
-stack test -j1 \
+stack test $1\
       blockapps-data \
       blockapps-mpdbs \
       blockapps-tools \

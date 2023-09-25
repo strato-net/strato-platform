@@ -147,6 +147,12 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
   const queryOptionsArray = Array.isArray(_queryOptionsArray) ? _queryOptionsArray : [_queryOptionsArray]
   const queryOptions = queryOptionsArray.reduce((agg, cur) => {
     const { key, value, predicate = 'eq' } = cur
+    if (key === 'order'){
+      return {
+        ...agg,
+        order: value,
+      }
+    }
     if (!value && typeof value != 'boolean') {
       return agg
     }
@@ -273,4 +279,12 @@ export function getEnvVariable(name) {
   const value = process.env[name] || ''
   if (value == '') throw new Error("missing env var for " + name);
   return value
+}
+
+export const  pollingHelper = async ( func, argsToFunc, attemptNumber=0, attemptsAllowed=8, milliseconds=1000  )  => {
+ if (attemptsAllowed  < attemptNumber) return null;
+ let result = await func(...argsToFunc);
+ if (!(result === null || result === undefined)) return result;
+ await new Promise(resolve => setTimeout(resolve, milliseconds));
+ return pollingHelper(func, argsToFunc, attemptNumber+1, attemptsAllowed, milliseconds  );
 }

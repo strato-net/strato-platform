@@ -22,17 +22,31 @@ so that they could be properly moved to their respective version's subsection.
 - `/transaction/unsigned` endpoint for generating raw transaction inputs
 - Bi-directional sync functionality
 - Mappings in SolidVM receive their own table in Cirrus
+- `/eth/v1.2/identity` endpoint that will call identity server
 - UserRegistry and User Contract on the genesis block
 - Connection to Cirrus Certificate table added in the API
 - Abstract contracts generate Cirrus tables
 - Derived contracts are inserted as rows in abstract tables
 - Support for imports from addresses in SolidVM
 - More lenient P2P disable times to prevent non-validators from being "locked out"
+- Proper behavior of virtual, override, and visibility modifiers
+- Introduction of `es6` and `strict` pragmas, which enable braced and qualified import syntax, and proper visibility modifier behavior, respectively.
+- `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
+- SolidVM built-in `create` and `create2` functions which allows for the explicit creation of contracts within SolidVM contracts
+- new `solidvmevents` kafka topic for emitted solidvm events
+- `pretty` Makefile command that triggers the `ormolu` code formatter
+- `hoogle` Makefile command that generates Haddock documentation and serves through local Hoogle instance
+
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
+- Bagger no longer crashes the VM upon encountering a transaction that exceeds the nonce or size limit
+- String formatting related errors in `.code` SolidVM tests
+- Typechecker test errors that were missing `pragma strict` and failing
+- The out-of-scope errors of storage variables for Solidity try/catch statements
+- Free function overloading conflict with the import resolver 
 ### Removed
 - `bloc22` database removed
 

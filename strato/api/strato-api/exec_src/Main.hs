@@ -1,112 +1,105 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# LANGUAGE TypeOperators     #-}
-
-
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Main where
 
-import           Prelude                         hiding (lookup)
-import           Control.Lens.Operators
-import           Control.Monad.Change.Modify  (Accessible)
-import           Control.Monad.Change.Alter
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.Maybe
-import           Control.Monad.Trans.Reader
-import           Data.Aeson
-import qualified Data.ByteString.Char8           as BC
-import qualified Data.ByteString.Lazy.Char8      as BLC
-import qualified Data.Cache                      as Cache
-import qualified Data.HashMap.Strict.InsOrd      as H
-import           Data.Maybe                      (listToMaybe, maybeToList, isJust, fromJust)
-import           Data.Source.Map
-import           Data.Swagger                    hiding (delete, Http)
-import           HFlags
-import           Network.HTTP.Types.Status
-import           Network.Wai
-import           Network.Wai.Handler.Warp
-import           Network.Wai.Middleware.Cors
-import           Network.Wai.Middleware.Prometheus
-import           Network.Wai.Middleware.RequestLogger
-import           Servant
-import           Servant.Client.Core             hiding (requestMethod)
-import           Servant.Multipart
-import           Servant.Swagger
-import           Servant.Swagger.UI
-import           System.Clock
-
-
-
-import           Bloc.API
-import           Bloc.Monad          -- hiding (handleRuntimeError)
-import           Bloc.Database.Queries
-import           Bloc.Server
-import           Bloc.Server.BlocOptions    ()
-import           Bloc.Server.Utils          (toMaybe)
-import           BlockApps.Init
-import           BlockApps.Logging
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainId
-import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.AddressStateRef
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.CirrusDefs
-import           Blockchain.Data.Json
-import           Blockchain.DB.CodeDB
-
-import           Control.Monad.Composable.SQL
-import           Control.Monad.Composable.Identity
-import           Control.Monad.Composable.Vault  hiding (httpManager)
-
-import           SolidVM.Model.CodeCollection.Contract
-
-import           Text.Tools
-import           Text.Regex
-
-import qualified Handlers.AccountInfo            as Account
+import Bloc.API
+-- hiding (handleRuntimeError)
+import Bloc.Database.Queries
+import Bloc.Monad
+import Bloc.Server
+import Bloc.Server.BlocOptions ()
+import Bloc.Server.Utils (toMaybe)
+import BlockApps.Init
+import BlockApps.Logging
+import Blockchain.DB.CodeDB
+import Blockchain.Data.AddressStateDB
+import Blockchain.Data.AddressStateRef
+import Blockchain.Data.CirrusDefs
+import Blockchain.Data.DataDefs
+import Blockchain.Data.Json
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainId
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Options ()
+import Control.Lens.Operators
+import Control.Monad.Change.Alter
+import Control.Monad.Change.Modify (Accessible)
+import Control.Monad.Composable.Identity
+import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Vault hiding (httpManager)
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Reader
+import Data.Aeson
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.Cache as Cache
+import qualified Data.HashMap.Strict.InsOrd as H
+import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
+import Data.Source.Map
+import Data.Swagger hiding (Http, delete)
+import HFlags
+import qualified Handlers.AccountInfo as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
-import qualified Handlers.BlkLast                as BlkLast
-import qualified Handlers.Block                  as Block
-import qualified Handlers.Chain                  as Chain
-import qualified Handlers.Coinbase               as Coinbase
-import qualified Handlers.Faucet                 as Faucet
+import qualified Handlers.BlkLast as BlkLast
+import qualified Handlers.Block as Block
+import qualified Handlers.Chain as Chain
+import qualified Handlers.Coinbase as Coinbase
+import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
-import qualified Handlers.Log                    as Log
-import qualified Handlers.Metadata               as Metadata
-import qualified Handlers.Peers                  as Peers
-import qualified Handlers.QueuedTransactions     as QueuedTransactions
-import qualified Handlers.Stats                  as Stats
-import qualified Handlers.Storage                as Storage
-import qualified Handlers.Transaction            as Transaction
-import qualified Handlers.TransactionResult      as TransactionResult
-import qualified Handlers.TxLast                 as TxLast
-import qualified Handlers.UUID                   as UUID
-import qualified Handlers.Version                as Version
-import           Options
-import           Blockchain.Strato.Model.Options()
-import           SQLM
-import           UnliftIO                        hiding (Handler)
+import qualified Handlers.Log as Log
+import qualified Handlers.Metadata as Metadata
+import qualified Handlers.Peers as Peers
+import qualified Handlers.QueuedTransactions as QueuedTransactions
+import qualified Handlers.Stats as Stats
+import qualified Handlers.Storage as Storage
+import qualified Handlers.Transaction as Transaction
+import qualified Handlers.TransactionResult as TransactionResult
+import qualified Handlers.TxLast as TxLast
+import qualified Handlers.UUID as UUID
+import qualified Handlers.Version as Version
+import Network.HTTP.Types.Status
+import Network.Wai
+import Network.Wai.Handler.Warp
+import Network.Wai.Middleware.Cors
+import Network.Wai.Middleware.Prometheus
+import Network.Wai.Middleware.RequestLogger
+import Options
+import SQLM
+import Servant
+import Servant.Client.Core hiding (requestMethod)
+import Servant.Multipart
+import Servant.Swagger
+import Servant.Swagger.UI
+import SolidVM.Model.CodeCollection.Contract
+import System.Clock
+import Text.Regex
+import Text.Tools
+import UnliftIO hiding (Handler)
+import Prelude hiding (lookup)
 
 instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
   select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <- MaybeT
-                            . fmap listToMaybe
-                            . Account.getAccount'
-                            $ Account.accountsFilterParams
-                            & Account.qaAddress ?~ (a ^. accountAddress)
-                            & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+    (AddressStateRef' r _) <-
+      MaybeT
+        . fmap listToMaybe
+        . Account.getAccount'
+        $ Account.accountsFilterParams
+          & Account.qaAddress ?~ (a ^. accountAddress)
+          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
@@ -122,14 +115,13 @@ instance Selectable Account Contract m => Selectable Account Contract (VaultM m)
 instance Selectable Account Contract m => Selectable Account Contract (IdentityM m) where
   select p = lift . select p
 
-
 instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
 instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k   = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  lookup _ k = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
-  delete _ _   = error "API: Keccak256 `Alters` DBCode delete"
+  delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 
 instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (VaultM m) where
   select p = lift . select p
@@ -144,40 +136,42 @@ instance Selectable Keccak256 SourceMap m => Selectable Keccak256 SourceMap (Rea
   select p = lift . select p
 
 instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (VaultM m) where
-  lookup p   = lift . lookup p
+  lookup p = lift . lookup p
   insert p k = lift . insert p k
-  delete p   = lift . delete p
+  delete p = lift . delete p
 
 instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (IdentityM m) where
-  lookup p   = lift . lookup p
+  lookup p = lift . lookup p
   insert p k = lift . insert p k
-  delete p   = lift . delete p
+  delete p = lift . delete p
 
 instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT BlocEnv m) where
-  lookup p   = lift . lookup p
+  lookup p = lift . lookup p
   insert p k = lift . insert p k
-  delete p   = lift . delete p
+  delete p = lift . delete p
 
 instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (CirrusM m) where
-  lookup p   = lift . lookup p
+  lookup p = lift . lookup p
   insert p k = lift . insert p k
-  delete p   = lift . delete p
+  delete p = lift . delete p
 
 instance MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
   select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <- MaybeT
-                            . fmap listToMaybe
-                            . Account.getAccount'
-                            $ Account.accountsFilterParams
-                            & Account.qaAddress ?~ (a ^. accountAddress)
-                            & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+    (AddressStateRef' r _) <-
+      MaybeT
+        . fmap listToMaybe
+        . Account.getAccount'
+        $ Account.accountsFilterParams
+          & Account.qaAddress ?~ (a ^. accountAddress)
+          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    pure $ AddressState
-      (addressStateRefNonce r)
-      (addressStateRefBalance r)
-      (addressStateRefContractRoot r)
-      codePtr
-      (toMaybe 0 $ addressStateRefChainId r)
+    pure $
+      AddressState
+        (addressStateRefNonce r)
+        (addressStateRefBalance r)
+        (addressStateRefContractRoot r)
+        codePtr
+        (toMaybe 0 $ addressStateRefChainId r)
 
 instance MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
   select _ = Account.getX509CertForAccount
@@ -207,76 +201,77 @@ instance Selectable Account AddressState m => Selectable Account AddressState (R
   select p = lift . select p
 
 type CoreAPI =
-  "eth" :> "v1.2" :>
-  (
-    Account.API
-    :<|> Account.CodeAPI
-    :<|> BatchTransactionResult.API
-    :<|> BlkLast.API
-    :<|> Block.API
-    :<|> Chain.API
-    :<|> Coinbase.API
-    :<|> Faucet.API
-    :<|> Identity.API
-    :<|> Log.API
-    :<|> Metadata.API
-    :<|> Peers.API
-    :<|> QueuedTransactions.API
-    :<|> Stats.API
-    :<|> Storage.API
-    :<|> Transaction.API
-    :<|> TransactionResult.API
-    :<|> TxLast.API
-    :<|> UUID.API
-    :<|> Version.API
-  )
+  "eth" :> "v1.2"
+    :> ( Account.API
+           :<|> Account.CodeAPI
+           :<|> BatchTransactionResult.API
+           :<|> BlkLast.API
+           :<|> Block.API
+           :<|> Chain.API
+           :<|> Coinbase.API
+           :<|> Faucet.API
+           :<|> Identity.API
+           :<|> Log.API
+           :<|> Metadata.API
+           :<|> Peers.API
+           :<|> QueuedTransactions.API
+           :<|> Stats.API
+           :<|> Storage.API
+           :<|> Transaction.API
+           :<|> TransactionResult.API
+           :<|> TxLast.API
+           :<|> UUID.API
+           :<|> Version.API
+       )
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
-coreServer :: ( MonadLogger m
-               , HasSQL m
-              , Accessible IdentityData m
-              , Accessible VaultData m
-              , Selectable Keccak256 SourceMap m
-              )
-           => ServerT CoreAPI m
-coreServer = Account.server
-  :<|> Account.codeServer
-  :<|> BatchTransactionResult.server
-  :<|> BlkLast.server
-  :<|> Block.server
-  :<|> Chain.server
-  :<|> Coinbase.server
-  :<|> Faucet.server
-  :<|> Identity.server
-  :<|> Log.server
-  :<|> Metadata.server
-  :<|> Peers.server
-  :<|> QueuedTransactions.server
-  :<|> Stats.server
-  :<|> Storage.server
-  :<|> Transaction.server
-  :<|> TransactionResult.server
-  :<|> TxLast.server
-  :<|> UUID.server
-  :<|> Version.server
+coreServer ::
+  ( MonadLogger m,
+    HasSQL m,
+    Accessible IdentityData m,
+    Accessible VaultData m,
+    Selectable Keccak256 SourceMap m
+  ) =>
+  ServerT CoreAPI m
+coreServer =
+  Account.server
+    :<|> Account.codeServer
+    :<|> BatchTransactionResult.server
+    :<|> BlkLast.server
+    :<|> Block.server
+    :<|> Chain.server
+    :<|> Coinbase.server
+    :<|> Faucet.server
+    :<|> Identity.server
+    :<|> Log.server
+    :<|> Metadata.server
+    :<|> Peers.server
+    :<|> QueuedTransactions.server
+    :<|> Stats.server
+    :<|> Storage.server
+    :<|> Transaction.server
+    :<|> TransactionResult.server
+    :<|> TxLast.server
+    :<|> UUID.server
+    :<|> Version.server
 
-fullServer :: ( MonadLogger m
-              , HasSQL m
-              , HasBlocEnv m
-              , HasIdentity m
-              , HasVault m
-              , Selectable Account Contract m
-              , Selectable Account AddressState m
-              , Selectable Address Certificate m
-              , HasCodeDB m
-              , Selectable Keccak256 SourceMap m
-              )
-           => ServerT FullAPI m
+fullServer ::
+  ( MonadLogger m,
+    HasSQL m,
+    HasBlocEnv m,
+    HasIdentity m,
+    HasVault m,
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Address Certificate m,
+    HasCodeDB m,
+    Selectable Keccak256 SourceMap m
+  ) =>
+  ServerT FullAPI m
 fullServer = coreServer :<|> bloc
 
 ----------------
-
 
 hoistCoreServer :: BlocEnv -> Server FullAPI
 hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
@@ -287,12 +282,13 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         Right a -> pure a
         Left e -> throwE $ apiErrorToServantErr e
     runM f =
-      runLoggingT .
-        runSQLM .
-        runCirrusM .
-        flip runReaderT blocEnv .
-        runVaultM ("http://localhost:8013/strato/v2.3" ) . 
-        runIdentitytM getIdServerUrl $ f
+      runLoggingT
+        . runSQLM
+        . runCirrusM
+        . flip runReaderT blocEnv
+        . runVaultM ("http://localhost:8013/strato/v2.3")
+        . runIdentitytM flags_identityServerUrl
+        $ f
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -302,69 +298,74 @@ main = do
   _ <- $initHFlags "Core API"
 
   -- check if id server connection is valid; only run if using https (unless using localhost)
-  identityUrl <- parseBaseUrl getIdServerUrl
+  identityUrl <- parseBaseUrl flags_identityServerUrl
   let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
   let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
   if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
-    then 
-      error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdServerUrl
+    then error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> flags_identityServerUrl
     else putStrLn "Identity server url is valid to connect to"
 
-  let theDoc = toSwagger (Proxy :: Proxy FullAPI)
-               & info.title .~ "Strato API"
-               & info.description ?~
-               "This is the great Strato API, which let's \
+  let theDoc =
+        toSwagger (Proxy :: Proxy FullAPI)
+          & info . title .~ "Strato API"
+          & info . description
+            ?~ "This is the great Strato API, which let's \
                \ you query the blockchain."
-               & info.version .~ "1.2"
+          & info . version .~ "1.2"
 
   --print theDoc
   blockappsInit "core-api"
 
-  let stateFetchLimit'=100
-      nonceCounterTimeout=10
-      txQueueSize=4096
+  let stateFetchLimit' = 100
+      nonceCounterTimeout = 10
+      txQueueSize = 4096
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
   tbqueue <- newTBQueueIO txQueueSize
 
   let env =
-        BlocEnv{
-          gasOn = flags_gasOn,
-          evmCompatible= flags_evmCompatible,
-          txSizeLimit = flags_txSizeLimit,
-          accountNonceLimit = flags_accountNonceLimit,
-          gasLimit = flags_gasLimit,
-          stateFetchLimit = stateFetchLimit',
-          globalNonceCounter = nonceCache,
-          txTBQueue = tbqueue,
-          userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
-          useWalletsByDefault = flags_useWalletsByDefault
+        BlocEnv
+          { gasOn = flags_gasOn,
+            evmCompatible = flags_evmCompatible,
+            txSizeLimit = flags_txSizeLimit,
+            accountNonceLimit = flags_accountNonceLimit,
+            gasLimit = flags_gasLimit,
+            stateFetchLimit = stateFetchLimit',
+            globalNonceCounter = nonceCache,
+            txTBQueue = tbqueue,
+            userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
+            userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
+            useWalletsByDefault = flags_useWalletsByDefault
           }
   run 3000 $ app env theDoc
 
 app :: BlocEnv -> Swagger -> Application
 app blocEnv theDoc =
-  prometheus def{prometheusInstrumentApp = False}
-  $ instrumentApp "core-api"
-  $ logStdoutDev
-  $ cors (const $ Just simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]})
---  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
-  $ addPathsTo404
-  $ serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"))
-  $ hoistCoreServer blocEnv :<|> swaggerSchemaUIServer theDoc
+  prometheus def {prometheusInstrumentApp = False} $
+    instrumentApp "core-api" $
+      logStdoutDev $
+        cors (const $ Just simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]})
+        --  $ serve (Proxy :: Proxy (CoreAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $ (coreServer pool :<|> swaggerSchemaUIServer theDoc)
+        $
+          addPathsTo404 $
+            serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
+              hoistCoreServer blocEnv :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =
   baseApp req $ \response -> do
     if responseStatus response /= status404
-    then respond' response
-    else
-      respond' $ responseLBS notFound404 [("Content-Type", "text/plain")] $ BLC.pack
-        $ "There is no content at: \"" ++ BC.unpack (requestMethod req) ++ " " ++ BC.unpack (rawPathInfo req) ++ "\""
-        ++ "\nHere are the available routes:" ++ tab ("\n" ++ unlines allPaths) ++ "\n"
-      where
-        allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
-
+      then respond' response
+      else
+        respond' $
+          responseLBS notFound404 [("Content-Type", "text/plain")] $
+            BLC.pack $
+              "There is no content at: \"" ++ BC.unpack (requestMethod req) ++ " " ++ BC.unpack (rawPathInfo req) ++ "\""
+                ++ "\nHere are the available routes:"
+                ++ tab ("\n" ++ unlines allPaths)
+                ++ "\n"
+  where
+    allPaths = H.keys $ _swaggerPaths $ toSwagger (Proxy :: Proxy FullAPI)
 
 ----------
 
@@ -374,7 +375,8 @@ instance HasSwagger a => HasSwagger (MultipartForm Mem (MultipartData Mem) :> a)
   toSwagger _ = toSwagger (Proxy :: Proxy a)
 
 instance ToSchema Value where
-  declareNamedSchema _ = return $
-    NamedSchema (Just "JSON Value") mempty
+  declareNamedSchema _ =
+    return $
+      NamedSchema (Just "JSON Value") mempty
 
 -----------

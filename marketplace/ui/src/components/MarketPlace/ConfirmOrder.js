@@ -458,7 +458,7 @@ const ConfirmOrder = () => {
             </p>
           </Row>
           <Row align="middle">
-            <p className="text-lg font-semibold mr-4">Shipping address</p>
+            <p className="text-lg font-semibold mr-4">Address Details</p>
             {
               userAddresses.length === 0 ? <div /> : showAddress ? <MinusCircleOutlined className="text-xl text-primary"
                 onClick={() => {
@@ -471,7 +471,7 @@ const ConfirmOrder = () => {
               />
             }
           </Row>
-          <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select a shipping address" : "Create a new shipping address"}</p>
+          <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select an address" : "Create a new address"}</p>
           {
             showAddress ? <Card className="w-3/5 mt-4">
               <Form layout="vertical" className="mt-5">

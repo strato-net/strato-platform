@@ -6,15 +6,25 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 module Main where
 
 import Control.Concurrent
 import Control.Monad.Identity
 import Control.Monad.RWS
 import Control.Monad.State
+import qualified Data.Foldable as F
+import Data.List (sortBy, sortOn)
+import qualified Data.Map as Map
+import qualified Data.Map.Internal as M
+import Data.Maybe
+import Data.Ord
+import qualified Data.Set as S
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import GHC.Debug.Client
 import GHC.Debug.Fragmentation
 import GHC.Debug.Profile
@@ -23,15 +33,6 @@ import GHC.Debug.Snapshot
 import GHC.Debug.Trace
 import GHC.Debug.TypePointsFrom hiding (detectLeaks)
 import GHC.Debug.Types.Ptr
-import qualified Data.Foldable as F
-import Data.List (sortOn, sortBy)
-import qualified Data.Map as Map
-import qualified Data.Map.Internal as M
-import Data.Maybe
-import Data.Ord
-import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
 import Language.Dot
 
 {- Some resources to help you on your journey:
@@ -49,18 +50,14 @@ Some extra reading on memory analysis: https://github.com/well-typed/memory-usag
 -- Functions that output files will ouput to the /tmp directory inside the strato-strato-1 container.
 -- Note: It is also suggested to add your own debug functions if these do not fulfill your needs.
 main :: IO ()
-main = withDebuggeeConnect "/tmp/ghc-debug" $ \d -> do 
+main = withDebuggeeConnect "/tmp/ghc-debug" $ \d -> do
   makeSnapshot d "/tmp/ghc-debug-snapshot" -- Creates a snapshot of the heap for offline (program does not have to be running) analysis
 
-  -- detectLeaks 10 d -- Experimental leak detection algorithm
+-- detectLeaks 10 d -- Experimental leak detection algorithm
 
-  -- analyseFragmentation 5_000_000 d -- Heap fragmentation analysis
+-- analyseFragmentation 5_000_000 d -- Heap fragmentation analysis
 
-  -- doThunkAnalysis d -- Thunk analysis
-
-
-
-
+-- doThunkAnalysis d -- Thunk analysis
 
 -- -----------------------------------------------------------------------
 -- Below are some prewritten debugging functions copied/modified over from the ghc-debug debugger example program that I found to be useful.
@@ -110,13 +107,15 @@ doThunkAnalysis e = do
 censusClosureTypeF :: (ClosurePtr -> Bool) -> [ClosurePtr] -> DebugM _
 censusClosureTypeF p = closureCensusBy go
   where
-    go :: ClosurePtr -> SizedClosure
-       -> DebugM (Maybe (BlockPtr, CensusStats))
+    go ::
+      ClosurePtr ->
+      SizedClosure ->
+      DebugM (Maybe (BlockPtr, CensusStats))
     go cp s | p cp = do
       d <- addConstrDesc s
       let siz :: Size
           siz = dcSize d
-          v =  mkCS siz
+          v = mkCS siz
       return $ Just (applyMBlockMask cp, v)
     go _ _ = return Nothing
 
@@ -136,22 +135,23 @@ thunkAnalysis rroots = (\(_, r, _) -> r) <$> runRWST (traceFromM funcs rroots) (
     funcs = justClosures closAccum
 
     -- First time we have visited a closure
-    closAccum  :: ClosurePtr
-               -> SizedClosure
-               -> (RWST () () (Map.Map _ Count) DebugM) ()
-               -> (RWST () () (Map.Map _ Count) DebugM) ()
+    closAccum ::
+      ClosurePtr ->
+      SizedClosure ->
+      (RWST () () (Map.Map _ Count) DebugM) () ->
+      (RWST () () (Map.Map _ Count) DebugM) ()
     closAccum cp sc k = do
-          case (noSize sc) of
-            ThunkClosure {} ->  do
-              loc <- lift $ getSourceInfo (tableId (info (noSize sc)))
-              modify' (Map.insertWith (<>) loc (Count 1))
-              k
-            _ -> k
+      case (noSize sc) of
+        ThunkClosure {} -> do
+          loc <- lift $ getSourceInfo (tableId (info (noSize sc)))
+          modify' (Map.insertWith (<>) loc (Count 1))
+          k
+        _ -> k
 
 analyseFragmentation :: Int -> Debuggee -> IO ()
 analyseFragmentation interval e = loop
   where
-    loop ::IO ()
+    loop :: IO ()
     loop = do
       pause e
       putStrLn "PAUSED"
@@ -187,15 +187,16 @@ analyseFragmentation interval e = loop
 
       displayRetainerStack' (catMaybes rs)
       putStrLn "------------------------"
-      -- loop -- Uncomment this if you want to loop
+
+-- loop -- Uncomment this if you want to loop
 
 -- Given the roots and bad closures, find out why they are being retained
-doAnalysis :: [ClosurePtr] -> (String, [ClosurePtr]) -> DebugM(Maybe (String, [(ClosurePtr, SizedClosureP, Maybe SourceInformation)]))
+doAnalysis :: [ClosurePtr] -> (String, [ClosurePtr]) -> DebugM (Maybe (String, [(ClosurePtr, SizedClosureP, Maybe SourceInformation)]))
 doAnalysis cp (l, cptrs) = do
   rs <- findRetainersOf (Just 1) cp cptrs
   stack <- case rs of
     [] -> traceWrite (T.pack "EMPTY RETAINERS") >> return Nothing
-    (r:_) -> do
+    (r : _) -> do
       cs <- dereferenceClosures r
       cs' <- mapM dereferenceToClosurePtr cs
       locs <- mapM (\c -> getSourceInfo (tableId (info (noSize c)))) cs'
@@ -216,23 +217,33 @@ detectLeaks interval e = loop Nothing (M.empty, M.empty) 0
         traceWrite (length rs)
         res <- typePointsFrom rs
         let !new_rmaps = case prev_census of
-                           Nothing -> rms
-                           Just pcensus -> updateRankMap rms pcensus res
+              Nothing -> rms
+              Just pcensus -> updateRankMap rms pcensus res
         let cands = chooseCandidates (fst new_rmaps)
         traceWrite (length cands)
         gs <- mapM (findSlice (snd new_rmaps)) (take 10 cands)
         return (gs, res, new_rmaps)
       resume e
-      zipWithM_ (\n g -> writeFile ("/tmp/slice"
-                                      ++ show @Int i ++ "-"
-                                      ++ show @Int n ++ ".dot")
-                                   (renderDot g)) [0..] gs
+      zipWithM_
+        ( \n g ->
+            writeFile
+              ( "/tmp/slice"
+                  ++ show @Int i
+                  ++ "-"
+                  ++ show @Int n
+                  ++ ".dot"
+              )
+              (renderDot g)
+        )
+        [0 ..]
+        gs
       loop (Just r) new_rmaps (i + 1)
 
 type Rank = Double
+
 type Decay = Double
 
-data RankInfo = RankInfo !Rank !Int deriving Show
+data RankInfo = RankInfo !Rank !Int deriving (Show)
 
 getRank :: RankInfo -> Rank
 getRank (RankInfo r _) = r
@@ -265,9 +276,7 @@ mkDotId (InfoTablePtr w) = IntegerId (fromIntegral w)
 
 findSlice :: RankMap Edge -> Key -> DebugM Graph
 findSlice rm k = Graph StrictGraph DirectedGraph (Just (mkDotId k)) <$> evalStateT (go 3 k) S.empty
-
   where
-
     go :: Int -> InfoTablePtr -> StateT (S.Set InfoTablePtr) DebugM [Statement]
     go n cur_k = do
       visited_set <- get
@@ -280,11 +289,11 @@ findSlice rm k = Graph StrictGraph DirectedGraph (Just (mkDotId k)) <$> evalStat
           let next_edges = take 20 (lookupRM cur_k rm)
               -- Decoding very wide is bad
               edge_stmts = map mkEdge next_edges
-              node_stmt = NodeStatement (NodeId (mkDotId cur_k) Nothing) [AttributeSetValue (StringId "label") (StringId label) ]
-              mkEdge (Edge _ e, ri) = EdgeStatement [ENodeId NoEdge (NodeId (mkDotId cur_k) Nothing), ENodeId DirectedEdge (NodeId (mkDotId e) Nothing)] [AttributeSetValue (StringId "label") (StringId (show (getRank ri))) ]
+              node_stmt = NodeStatement (NodeId (mkDotId cur_k) Nothing) [AttributeSetValue (StringId "label") (StringId label)]
+              mkEdge (Edge _ e, ri) = EdgeStatement [ENodeId NoEdge (NodeId (mkDotId cur_k) Nothing), ENodeId DirectedEdge (NodeId (mkDotId e) Nothing)] [AttributeSetValue (StringId "label") (StringId (show (getRank ri)))]
 
           modify' (S.insert cur_k)
-          ss <- concat <$> mapM (go (n-1) . edgeTarget . fst) next_edges
+          ss <- concat <$> mapM (go (n - 1) . edgeTarget . fst) next_edges
           return $ node_stmt : edge_stmts ++ ss
 
 chooseCandidates :: RankMap Key -> [Key]
@@ -300,10 +309,11 @@ type RankUpdateInfo = Int -> Double -> Double
 
 -- | Update the current rank predictions based on the difference between
 -- two censuses.
-updateRankMap :: (RankMap Key, RankMap Edge)
-              -> TypePointsFrom
-              -> TypePointsFrom
-              -> (RankMap Key, RankMap Edge)
+updateRankMap ::
+  (RankMap Key, RankMap Edge) ->
+  TypePointsFrom ->
+  TypePointsFrom ->
+  (RankMap Key, RankMap Edge)
 updateRankMap (rm_n, rm_e) t1 t2 = (ns, es)
   where
     !(rnodes, redges) = ratioRank t1 t2
@@ -314,21 +324,29 @@ updateRankMap (rm_n, rm_e) t1 t2 = (ns, es)
     !ns = runIdentity $ M.mergeA missingL missingR matched rm_n rnodes
     !es = runIdentity $ M.mergeA missingL missingR matched rm_e redges
 
-
 compareSize :: CensusStats -> CensusStats -> Maybe (Int -> Double -> Double)
 compareSize (cssize -> Size s1) (cssize -> Size s2) =
   if fromIntegral s2 > (1 - default_decay) * fromIntegral s1
-    -- Calculate "Q"
-    then if s1 > s2
-          -- Shrinking phase, penalise rank
-          then Just (\phases rank ->
-                      rank
-                        - ((fromIntegral (phases + 1))
-                            * ((fromIntegral s1 / fromIntegral s2) - 1)))
-          else Just (\phases rank ->
-                        rank +
-                          ((fromIntegral (phases + 1))
-                            * ((fromIntegral s2 / fromIntegral s1) - 1)))
+    then -- Calculate "Q"
+
+      if s1 > s2
+        then -- Shrinking phase, penalise rank
+
+          Just
+            ( \phases rank ->
+                rank
+                  - ( (fromIntegral (phases + 1))
+                        * ((fromIntegral s1 / fromIntegral s2) - 1)
+                    )
+            )
+        else
+          Just
+            ( \phases rank ->
+                rank
+                  + ( (fromIntegral (phases + 1))
+                        * ((fromIntegral s2 / fromIntegral s1) - 1)
+                    )
+            )
     else Nothing
 
 -- | Compute how to update the ranks based on the difference between two
