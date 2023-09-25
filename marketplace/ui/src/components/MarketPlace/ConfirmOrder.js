@@ -47,7 +47,7 @@ const ShippingDetailsSchema = () => {
   return yup.object().shape({
     name: yup.string().required("Name is required"),
     zipcode: yup.string().max(15).required("Zipcode is required")
-        .required("Zipcode is required"),
+      .required("Zipcode is required"),
     addressLine1: yup.string().required("Address Line 1 is required"),
     addressLine2: yup.string().notRequired(),
     city: yup.string().required("City is required"),
