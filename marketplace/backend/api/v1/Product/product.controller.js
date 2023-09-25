@@ -2,7 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3, deleteFileFromS3} from '../../../helpers/s3'
+import { getSignedUrlFromS3, deleteFileFromS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
@@ -90,7 +90,7 @@ class ProductController {
 
       // If the old image key is present, delete the old image from S3. Keys are sent from UpdateProductModal.js
       const result = await dapp.updateProduct(body, options)
-      
+
       if (req.body.updates.oldImageKey) {
 
         const fileKey = req.body.updates.oldImageKey
@@ -99,7 +99,7 @@ class ProductController {
         if (!isDeleted) {
           rest.response.status400(res, "Image is failed to delete")
         }
-      } 
+      }
 
       rest.response.status200(res, result)
       return next()

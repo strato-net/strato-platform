@@ -20,7 +20,7 @@ module Slipstream.Metrics
   )
 where
 
-import Blockapps.Crossmon
+import BlockApps.Crossmon
 import qualified Blockchain.Stream.Action as Action
 import Control.Monad
 import Control.Monad.IO.Class

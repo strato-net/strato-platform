@@ -198,7 +198,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
 }
 
 export const setSearchQueryOptionsPrime = (args) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key)) {
       if (Array.isArray(args[key])) {
@@ -221,6 +221,22 @@ export const setSearchQueryOptionsPrime = (args) => {
 
     if (key === 'sort') {
       result.push(args[key])
+    }
+    
+    if (key == 'range') {
+      if (Array.isArray(args[key])) {
+        const queryArray = args[key].reduce((agg, cum) => {
+          const rangeFilter = cum.split(',')
+          const [name, min = 0, max = 0] = rangeFilter
+          agg.push({
+            name, min, max
+          })
+          return agg
+        }, [])
+        if (queryArray.length > 0) {
+          result.push({ key: queryArray, value: queryArray, predicate: 'and' })
+        }
+      }
     }
     
     if (key === 'notEqualsValue') {
@@ -252,10 +268,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [key]: value
       }
     }
-    console.log('cur123:', cur)
-    console.log("typeof value123: ",typeof value)
     let dotIndex = typeof value === "boolean" ? -1 : value.indexOf('.')
-    console.log("dotIndex12: ", dotIndex)
     if (dotIndex >= 0) {
       // split the value on a period, allows to directly pass postgrest operators
       // to this API via ?key=<operator>.<value>
@@ -274,6 +287,16 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
       option = {
         [predicate]: `(${valueArray.join(',')})`,
       }
+    } else if (predicate === 'and') {
+      const valueArray = key.reduce((andAgg, andCur) => {
+        const { name, min = 0, max = 0 } = andCur
+        andAgg.push(`${name}.gte.${min}`, `${name}.lte.${max}`)
+        return andAgg
+      }, [])
+      option = {
+        [predicate]: `(${valueArray.join(',')})`,
+      } 
+      
     } else {
       let searchedValue = value
       if (predicate === 'like') {
