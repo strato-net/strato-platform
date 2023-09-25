@@ -124,7 +124,7 @@ export function generateTableColumns({
   ) => {
     return (
       <span>
-        {record.editable && !isEdit ? (
+        {record.editable ? (
           <Select
             disabled={!record.provider && !record.bookedUserAddress}
             placeholder="Membership ID"
@@ -157,10 +157,11 @@ export function generateTableColumns({
   ) => {
     return (
       <span>
-        {record.editable && !isEdit ? (
+        {record.editable ? (
           <Select
             disabled={!record.itemId || isServicesLoading}
             placeholder="Service"
+            defaultValue={record.serviceId}
             suffixIcon={isServicesLoading ? <Spin size='small' /> : <CaretDownOutlined />}
             style={{ width: 120 }}
             onChange={(value) => handleInputChange(value, "serviceId", index)}
@@ -201,12 +202,14 @@ export function generateTableColumns({
   };
 
   const renderDateColumn = (text, record, index, isEdit, handleInputChange) => {
+    const defaultDate = record.serviceDate ? moment(new Date(parseInt(record.serviceDate)), 'YYYY-MM-DD') : null;
     return (
       <span>
-        {record.editable && !isEdit ? (
+        {record.editable ? (
           <DatePicker
             disabledDate={disabledDate}
             // value={text ? moment(text, 'YYYY-MM-DD') : null}
+            defaultValue={defaultDate}
             onChange={(serviceDate, dateString) =>
               handleInputChange(
                 new Date(serviceDate).getTime().toString(),
@@ -272,7 +275,7 @@ export function generateTableColumns({
         ) : (
           <Typography style={{ color: "#061A6C" }}>
             {statusOptions?.reduce((label, item) => {
-              if (item.value === text) {
+              if (item.value == text) {
                 return item.label;
               }
               return label;
@@ -292,7 +295,7 @@ export function generateTableColumns({
   ) => {
     return (
       <span>
-        {record.editable && !isEdit ? (
+        {record.editable ? (
           <InputNumber
             keyboard={true}
             className="w-36"

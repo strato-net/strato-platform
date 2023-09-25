@@ -1056,15 +1056,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
       let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
-      console.log('ownedProducts', ownedProducts)
 
       const arrayOfAddresses = ownedProducts.map(obj => obj.address);
-      console.log("arrayOfAddresses", arrayOfAddresses);
       const args = {
         ownerOrganization: userOrganization,
         productId: arrayOfAddresses
       }
-      console.log("args", args);
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       let ownedItems = await itemJs.getAll(rawAdmin, args, getOptions);
@@ -1073,14 +1070,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       //   ownedProducts.some(product => item.productId === product.address)
       // );
 
-      console.log("ownedItems", ownedItems)
-
       // Get Memberhships where productId = Items.productId 
       let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
       // ownedMemberships = ownedMemberships.filter(membership =>
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
-      console.log('ownedMemberships', ownedMemberships)
 
       // Get ProductFile where productId = Items.productId
       // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
@@ -1116,13 +1110,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             membershipAddress: null //memberships[0].address
           };
         });
-      console.log('combinedData', combinedData);
 
       return combinedData;
     } catch (error) {
-      console.log('error123', error)
       if (error.response) {
-        console.log('error.response', error.response)
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getPurchasedMemberships");
@@ -1832,14 +1823,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: '' };
+    const getOptions = { ...options, org: userOrganization, app: '' };
 
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
       ...args,
       sort: '-createdDate',
-      // owner: userAddress, // if only want that are booked by user not by the organization(Provided).
+      // owner: userAddress, 
       // ownerOrganization: userOrganization,
-      bookedUserAddress: userAddress // used to get the loggedIn data of user booked through provided tab.
+      bookedUserAddress: userAddress
     }, getOptions);
 
     const memberships = await contract.getPurchasedMemberships();
@@ -1873,7 +1864,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     let itemAddressList = issuedItems.map(item => item.address);
     const args1 = {
       // ownerOrganization: userOrganization,
-      // providerLastUpdated:userAddress, // we ca use this to show the provided created one.
+      // providerLastUpdated:userAddress,
       itemId: itemAddressList
     }
 

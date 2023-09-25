@@ -243,6 +243,9 @@ const ServiceTable = () => {
     const data = tableData.map((item, index) => {
       if (index === key) {
         item.editable = bool;
+        let manufacturer = membership?.purchasedMemberships.find(mId => mId.itemAddress == record.itemId).manufacturer
+        servicesActions.fetchService(serviceDispatch, 10, offset, manufacturer);
+
       } else if (type === "edit") {
         item.editable = false;
       }
