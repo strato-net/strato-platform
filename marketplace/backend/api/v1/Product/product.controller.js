@@ -38,11 +38,15 @@ class ProductController {
       const { dapp, query } = req
 
       const products = await dapp.getProducts({ ...query })
-      const productsWithImageUrl = products.products.map(product => ({
-        ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
+      const productsWithImageUrl = products.products.map(product => (
+        product.imageKey ?
+        {
+          ...product,
+          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+        }
+        :
+        product
+      ))
 
       rest.response.status200(res, {productsWithImageUrl, total: products.total})
 
