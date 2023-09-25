@@ -5,7 +5,7 @@ RUN apk add --no-cache lsof && \
 WORKDIR /usr/src/app
 
 FROM base as npminstaller
-COPY package*.json /usr/src/app
+COPY package*.json /usr/src/app/
 RUN npm install
 
 ### Builder

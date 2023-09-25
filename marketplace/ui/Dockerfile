@@ -5,7 +5,7 @@ RUN apk add --no-cache curl yarn git lsof && \
 WORKDIR /usr/src/ui
 
 FROM base as yarninstaller
-COPY package*.json /usr/src/ui
+COPY package*.json /usr/src/ui/
 COPY yarn.lock /usr/src/ui
 RUN yarn install
 
