@@ -14,7 +14,7 @@ import           Control.Lens      hiding (enum)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State
 import           Data.Bool (bool)
-import           Data.Foldable (traverse_)
+import           Data.Foldable (traverse_, foldrM)
 -- import           Data.Functor.Identity (runIdentity)
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -156,6 +156,12 @@ lookupStruct name = do
   pure $ f <$> str
   where f (t, ft, _) = (t, fieldTypeType ft)
 
+getLookupParents :: SolidString -> SSS [SolidString]
+getLookupParents name = do
+  cc <- asks codeCollection
+  let contract = head $ getContractsBySolidString name cc
+  pure $ _parents contract
+
 lookupError :: SolidString -> SSS [(SolidString, Type)]
 lookupError name = do
   cc <- asks codeCollection
@@ -164,34 +170,36 @@ lookupError name = do
   pure $ f <$> err
   where f (t, ft, _) = (t, indexedTypeType ft)
 
-functionType :: CodeCollectionF a -> a -> SolidString -> FuncF a -> TypeF' a
-functionType cc x name f =
+functionType :: CodeCollectionF a -> a -> SolidString -> FuncF a -> SSS (TypeF' a)
+functionType cc x name f = do
   let fArgs = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcArgs f
       fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
       fArgNames = fst <$> _funcArgs f
-      overloads = case M.lookup name $ _flFuncs cc of
-        Just freeFunc -> (functionType cc x name <$> _funcOverload f)
-                      ++ [functionType cc x name freeFunc]
-                      ++ (functionType cc x name <$> _funcOverload freeFunc)
-        Nothing -> functionType cc x name <$> _funcOverload f
-   in Function fArgs fRets x overloads fArgNames
+  overloads <- case M.lookup name $ _flFuncs cc of
+    Just freeFunc -> do
+      overloadTypes <- traverse (functionType cc x name) (_funcOverload f)
+      freeFuncType <- functionType cc x name freeFunc
+      freeFuncOverloadTypes <- traverse (functionType cc x name) (_funcOverload freeFunc)
+      return (overloadTypes ++ [freeFuncType] ++ freeFuncOverloadTypes)
+    Nothing -> traverse (functionType cc x name) (_funcOverload f)
+  return (Function fArgs fRets x overloads fArgNames)
 
-filterFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> [Visibility] -> Type'
+filterFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> [Visibility] -> SSS Type'
 filterFuncs cc x name f visibilities = case f ^. funcVisibility of
   Just v | usesStrictModifiers cc && v `elem` visibilities ->
-    bottom $ "cannot access function " <> labelToText name <> " because it is marked as " <> tShowVisibility v <$ x
+    return $ bottom $ "cannot access function " <> labelToText name <> " because it is marked as " <> tShowVisibility v <$ x
   _ -> functionType cc x name $ ("" <$) <$> f
 
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
 lookupContractFunction x cName fName = do
   --liftIO $ putStrLn $ C.green ("lookupContractFunction " ++ (show cName) ++ " " ++ (show fName))
   cc@CodeCollection{..} <- asks codeCollection
-  pure $ case M.lookup cName _contracts of
-    Nothing -> bottom $ ("Unknown contract: " <> labelToText cName) <$ x
+  case M.lookup cName _contracts of
+    Nothing -> return $ bottom $ ("Unknown contract: " <> labelToText cName) <$ x
     Just c -> case M.lookup fName (_functions c) of
       Nothing -> case M.lookup fName (_constants c) of
         Nothing -> case M.lookup fName (_storageDefs c) of
-          Nothing -> bottom $ (T.concat
+          Nothing -> return $ bottom $ (T.concat
             [ "Unknown contract function: "
             , labelToText cName
             , "."
@@ -199,16 +207,16 @@ lookupContractFunction x cName fName = do
             ]) <$ x
           Just VariableDecl{..} ->
             if _varIsPublic
-              then Function (Product [] x) (Static _varType x) x [] []
-              else bottom $ (T.concat
+              then return $ Function (Product [] x) (Static _varType x) x [] []
+              else return $ bottom $ (T.concat
                 [ "Contract variable "
                 , labelToText cName
                 , "."
                 , labelToText fName
                 , " is not public."
                 ]) <$ x
-        Just ConstantDecl{..} -> Static _constType x
-      Just f -> filterFuncs cc x fName f [Internal, Private]
+        Just ConstantDecl{..} -> return $ Static _constType x
+      Just f ->filterFuncs cc x fName f [Internal, Private]
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
@@ -256,7 +264,7 @@ apply x _ _ = pure . bottom $ "trying to apply function to a non-function type" 
 bottom :: a -> TypeF' a
 bottom a = Bottom $ a :| []
 
-unlessBottom :: TypeF' a -> (TypeF' a -> TypeF' a) -> TypeF' a
+unlessBottom :: (TypeF' a) -> (TypeF' a -> TypeF' a) -> (TypeF' a)
 unlessBottom (Bottom e) _ = Bottom e
 unlessBottom t'         f = f t'
 
@@ -332,7 +340,7 @@ context' (Sum (a :| _))    = context' a
 context' MultiVariate{..}  = multiVariateContext
 
 
-typecheck' :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> Type' -> Type' -> m Type'
+typecheck' :: (SourceAnnotation Text -> SolidString -> Type -> SSS Type') -> Type' -> Type' -> SSS Type'
 typecheck' unify r1 r2 = case (r1, r2) of
   (Bottom e1, Bottom e2) -> pure $ Bottom (e1 <> e2)
   (Bottom e, _) -> pure $ Bottom e
@@ -344,9 +352,9 @@ typecheck' unify r1 r2 = case (r1, r2) of
   (m, Top _ _) -> pure m
   (t1, Sum t2) -> pickType' (context' t1) <$> traverse (typecheck' unify t1) (NE.toList t2)
   (Sum t1, t2) -> pickType' (context' t2) <$> traverse (flip (typecheck' unify) t2) (NE.toList t1)
-  (Static t1 _, Static t2 x) -> pure $ case typecheckStatic t1 t2 of
-    Left msg -> bottom $ msg <$ x
-    Right t  -> Static t x
+  (Static t1 _, Static t2 x) -> typecheckStatic t1 t2 >>= \case
+    Left msg -> return $ bottom $ msg <$ x
+    Right t  -> return $ Static t x
   (Product t1 x, Product t2 _) -> typecheckProduct unify x t1 t2
   (Product [a] _, b) -> typecheck' unify a b
   (a, Product [b] _) -> typecheck' unify a b
@@ -392,7 +400,7 @@ ma !> mb = do
   pure $ const' b a
 infixl 5 !>
 
-typecheckProduct :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> m Type'
+typecheckProduct :: (SourceAnnotation Text -> SolidString -> Type -> SSS Type') -> SourceAnnotation Text -> [Type'] -> [Type'] -> SSS Type'
 typecheckProduct unify c t1 t2 = typecheckProduct' (Product t1 c) (Product t2 c) t1 t2
   where
     typecheckProduct' _ _ a [Static SVMType.Variadic _] = pure $ Product a c
@@ -436,38 +444,38 @@ string' [] = fromString ""
 string' ("":as) = string' as
 string' (a:_) = a
 
-typecheckStatic :: Type -> Type -> Either Text Type
+typecheckStatic :: Type -> Type -> SSS (Either Text Type)
 typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
   case (s1, s2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched signedness between integer values"
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched signedness between integer values"
     _ -> case (b1, b2) of
-           (Just a, Just b) | a /= b -> Left "Mismatched length between integer values"
-           _ -> Right $ SVMType.Int (s1 <|> s2) (b1 <|> b2)
+           (Just a, Just b) | a /= b -> return $ Left "Mismatched length between integer values"
+           _ -> return $ Right $ SVMType.Int (s1 <|> s2) (b1 <|> b2)
 typecheckStatic (SVMType.String d1) (SVMType.String d2) =
   case (d1, d2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between string values"
-    _ -> Right $ SVMType.String (d1 <|> d2)
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched dynamicity between string values"
+    _ -> return $ Right $ SVMType.String (d1 <|> d2)
 typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
   case (d1, d2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between bytes values"
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched dynamicity between bytes values"
     _ -> case (b1, b2) of
-           (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
-           _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
+           (Just a, Just b) | a /= b -> return $ Left "Mismatched length between bytes values"
+           _ -> return $ Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
 typecheckStatic (SVMType.Fixed s1 d1) (SVMType.Fixed s2 d2) =
   case(s1, s2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched dynamicity between fixed-point values"
     _ -> case(d1, d2) of
-      (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between fixed-point values"
-      _ ->  Right $ SVMType.Fixed (s1 <|> s2) (d1 <|> d2)
-typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
-typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
-typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
-typecheckStatic (SVMType.Account a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
-typecheckStatic (SVMType.Account a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
+      (Just a, Just b) | a /= b -> return $ Left "Mismatched dynamicity between fixed-point values"
+      _ ->  return $ Right $ SVMType.Fixed (s1 <|> s2) (d1 <|> d2)
+typecheckStatic SVMType.Bool SVMType.Bool = return $ Right SVMType.Bool
+typecheckStatic (SVMType.Address a) (SVMType.Address b) = return $ Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Address a) (SVMType.Account b) = return $ Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Account a) (SVMType.Address b) = return $ Right $ SVMType.Account (a && b)
+typecheckStatic (SVMType.Account a) (SVMType.Account b) = return $ Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.UnknownLabel a _) (SVMType.UnknownLabel b _) =
   if a == b || a == "" || b == ""
-    then Right (SVMType.UnknownLabel (string' [a, b]) Nothing)
-    else Left $ "Type mismatch: labels "
+    then return $ Right (SVMType.UnknownLabel (string' [a, b]) Nothing)
+    else return $ Left $ "Type mismatch: labels "
              <> labelToText a
              <> " and "
              <> labelToText b
@@ -478,11 +486,11 @@ typecheckStatic a@SVMType.Struct{} (SVMType.UnknownLabel b _) =
   typecheckStatic a (SVMType.Struct Nothing b)
 typecheckStatic (SVMType.Struct b1 t1) (SVMType.Struct b2 t2) =
   case (b1, b2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched byte sizes between struct types"
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched byte sizes between struct types"
     _ ->
       if t1 == t2 || t1 == "" || t2 == ""
-        then Right $ SVMType.Struct (b1 <|> b2) (string' [t1, t2])
-        else Left $ "Type mismatch between struct values: "
+        then return $ Right $ SVMType.Struct (b1 <|> b2) (string' [t1, t2])
+        else return $ Left $ "Type mismatch between struct values: "
                  <> labelToText t1
                  <> " and "
                  <> labelToText t2
@@ -493,12 +501,12 @@ typecheckStatic a@SVMType.Enum{} (SVMType.UnknownLabel b _) =
   typecheckStatic a (SVMType.Enum Nothing b Nothing)
 typecheckStatic (SVMType.Enum b1 t1 n1) (SVMType.Enum b2 t2 n2) =
   case (b1, b2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched byte sizes between enum types"
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched byte sizes between enum types"
     _ -> case (n1, n2) of
-           (Just a, Just b) | a /= b -> Left "Mismatched names between enum types"
+           (Just a, Just b) | a /= b -> return $ Left "Mismatched names between enum types"
            _ -> if t1 == t2 || t1 == "" || t2 == ""
-                  then Right $ SVMType.Enum (b1 <|> b2) (string' [t1, t2]) (n1 <|> n2)
-                  else Left $ "Type mismatch between enum values: "
+                  then return $ Right $ SVMType.Enum (b1 <|> b2) (string' [t1, t2]) (n1 <|> n2)
+                  else return $ Left $ "Type mismatch between enum values: "
                            <> labelToText t1
                            <> " and "
                            <> labelToText t2
@@ -506,45 +514,45 @@ typecheckStatic (SVMType.Enum b1 t1 n1) (SVMType.Enum b2 t2 n2) =
 typecheckStatic (SVMType.Array t1 l1) (SVMType.Array t2 l2) = do
   e <- typecheckStatic t1 t2
   case (l1, l2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched length between array values"
-    _ -> Right $ SVMType.Array e (l1 <|> l2)
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched length between array values"
+    _ -> return $ e >>= (\x -> Right $ SVMType.Array x (l1 <|> l2))
 typecheckStatic (SVMType.UnknownLabel a _) b@SVMType.Contract{} =
   typecheckStatic (SVMType.Contract a) b
 typecheckStatic a@SVMType.Contract{} (SVMType.UnknownLabel b _) =
   typecheckStatic a (SVMType.Contract b)
-typecheckStatic (SVMType.Contract a) (SVMType.Contract b) =
-  if a == b || a == "" || b == ""
-    then Right (SVMType.Contract $ string' [a, b])
-    else Left $ "Type mismatch: contracts "
-             <> labelToText a
-             <> " and "
-             <> labelToText b
-             <> " do not match."
+typecheckStatic (SVMType.Contract a) (SVMType.Contract b) = do
+  parentsOfA <- getLookupParents a
+  parentsOfB <- getLookupParents b
+  if a `elem` parentsOfB
+    then return $ Left $ "Type mismatch: contract " <> labelToText a <> " is a child of " <> labelToText b
+    else if any (`elem` parentsOfB) parentsOfA || a == b || a == "" || b == ""
+      then return $ Right (SVMType.Contract (string' [a, b]))
+      else return $ Left $ "Type mismatch: contracts " <> labelToText a <> " and " <> labelToText b <> " do not match."
 typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
   k <- typecheckStatic k1 k2
   v <- typecheckStatic v1 v2
   case (d1, d2) of
-    (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
-    _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
-typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
+    (Just a, Just b) | a /= b -> return $ Left "Mismatched dynamicity between mapping values"
+    _ -> return $ k >>= (\x -> (v >>= \y -> Right $ SVMType.Mapping (d1 <|> d2) x y))
+typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = return $ Right (SVMType.Bytes d1 b1)
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b)  = if alias1 == alias2
   then typecheckStatic a b
-  else Left $ "Type mismatch Test1: "
+  else return $ Left $ "Type mismatch Test1: "
                             <> showType (SVMType.UserDefined alias1 a)
                             <> " and "
                             <> showType (SVMType.UserDefined alias2 b)
                             <> " do not match."
-typecheckStatic (SVMType.UserDefined a c) b  = Left $ "Type mismatch Test1: "
+typecheckStatic (SVMType.UserDefined a c) b  = return $ Left $ "Type mismatch Test1: "
                             <> showType (SVMType.UserDefined a c)
                             <> " and "
                             <> showType b
                             <> " do not match."
 
-typecheckStatic _ (SVMType.UserDefined _ _)   = Left "Type mismatch"
-typecheckStatic theType (SVMType.Bytes _ _) = Right theType
-typecheckStatic _ SVMType.Variadic = Right SVMType.Variadic
-typecheckStatic SVMType.Variadic _ = Right SVMType.Variadic
-typecheckStatic t1 t2 = Left $ "Type mismatch: "
+typecheckStatic _ (SVMType.UserDefined _ _)   = return $ Left "Type mismatch"
+typecheckStatic theType (SVMType.Bytes _ _) = return $ Right theType
+typecheckStatic _ SVMType.Variadic = return $ Right SVMType.Variadic
+typecheckStatic SVMType.Variadic _ = return $ Right SVMType.Variadic
+typecheckStatic t1 t2 = return $ Left $ "Type mismatch: "
                             <> showType t1
                             <> " and "
                             <> showType t2
@@ -603,12 +611,12 @@ typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "runtimeCode"  
 typecheckMember (Static (SVMType.UnknownLabel "super" Nothing) x) method = do
   ctract <- asks contract
   cc <- asks codeCollection
-  pure $ case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
-    Left _ -> bottom $ "Contract has missing parents" <$ x
+  case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
+    Left _ -> return $ bottom $ "Contract has missing parents" <$ x
     Right parents' -> case filter (elem method . M.keys .  _functions) parents' of
-      [] -> bottom $ "cannot use super without a parent contract" <$ x
+      [] -> return $ bottom $ "cannot use super without a parent contract" <$ x
       ps -> case M.lookup method . _functions $ last ps of
-        Nothing -> bottom $ ("super does not have a function called " <> labelToText method) <$ x
+        Nothing -> return $ bottom $ ("super does not have a function called " <> labelToText method) <$ x
         Just f -> filterFuncs cc x method ((""<$) <$> f) [External, Private]
 typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
   names <- case mNames of
@@ -704,8 +712,11 @@ typecheckMember t@(Static svmType x) n = do
       pure $ pickType' x results
 typecheckMember x n = pure . bottom $ ("Unknown member: " <> showType' x <> "." <> labelToText n) <$ context' x
 
-typecheckFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> Annotated FuncF -> Type'
-typecheckFuncs cc x n f g = runIdentity $ typecheck' ignoreTops (functionType cc x n f) (functionType cc x n g)
+typecheckFuncs :: Annotated CodeCollectionF -> SourceAnnotation Text -> SolidString -> Annotated FuncF -> Annotated FuncF -> SSS Type'
+typecheckFuncs cc x n f g = do
+  f1 <- (functionType cc x n f)
+  f2 <- (functionType cc x n g)
+  runIdentity $ return $ typecheck' ignoreTops f1 f2
 
 getConstructorType' :: MonadReader R m => SourceAnnotation Text -> SolidString -> m Type'
 getConstructorType' x l  = do
@@ -781,7 +792,7 @@ checkOverrides :: Annotated CodeCollectionF
                -> Annotated ContractF
                -> SolidString 
                -> Annotated FuncF
-               -> Type'
+               -> SSS Type'
 checkOverrides cc c funcName f =
   let ctx = f ^. funcContext
       mOs = f ^. funcOverrides
@@ -792,9 +803,9 @@ checkOverrides cc c funcName f =
    in case parentsWithSameFunc of
         [] -> case mOs of
                 Nothing -> functionType cc ctx funcName f
-                Just _ -> bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
+                Just _ -> return $ bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
         p:ps -> case mOs of
-          Nothing -> bottom $ T.concat
+          Nothing -> return $ bottom $ T.concat
             [ "Function "
             , tFuncName
             , " is not marked as override, but its parent(s) "
@@ -802,136 +813,139 @@ checkOverrides cc c funcName f =
             , " have a function by the same name"
             ] <$ ctx
           Just [] -> case ps of
-            [] -> typecheckFuncs cc ctx funcName f $ snd p
-            _  -> bottom $ T.concat
+            [] -> typecheckFuncs cc ctx funcName f (snd p)
+            _  -> return $ bottom $ T.concat
               [ "Function "
               , tFuncName
               , " is marked as override, but does not specify which base contract to override. Options include "
               , T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc
               ] <$ ctx
-          Just os ->
+          Just os -> do
             let parentMap = M.fromList parentsWithSameFunc
                 parentFuncs = flip M.lookup parentMap <$> os
-                invalidParentFuncs =
-                  foldr (\a (ns,vs,es) -> case a of
-                    (o, Nothing) -> (o:ns, vs, es)
+            invalidParentFuncs <- do
+                  foldrM (\a (ns,vs,es) -> case a of
+                    (o, Nothing) -> pure $ (o:ns, vs, es)
                     (o, Just f') ->
-                      if f' ^. funcVirtual
-                        then case typecheckFuncs cc ctx funcName f f' of
-                          Bottom e -> (ns, vs, (o,e):es)
-                          _        -> (ns, vs, es)
-                        else (ns, o:vs, es)
-                  ) ([], [], []) $ zip os parentFuncs
-             in case invalidParentFuncs of
-                  ([], [], []) -> functionType cc ctx funcName f
-                  (ns, vs, es) ->
-                    let nMsg = T.concat
-                          [ "The following parent contracts don't have a function named "
-                          , tFuncName
-                          , ": "
-                          , T.intercalate ", " $ labelToText <$> ns
-                          , "\n"
-                          ]
-                        vMsg = T.concat
-                          [ "The following parent contracts don't have "
-                          , tFuncName
-                          , " marked as virtual: "
-                          , T.intercalate ", " $ labelToText <$> vs
-                          , "\n"
-                          ]
-                        eMsg = T.concat
-                          [ "The following parent contracts' signatures for "
-                          , tFuncName
-                          , " don't match the one found in "
-                          , labelToText $ c ^. contractName
-                          , ": "
-                          , T.intercalate ", " $ (\(o, e) -> "In " <> labelToText o <> ":\n  " <> T.pack (concatMap (("\n  " ++) . show) e)) <$> es
-                          , "\n"
-                          ]
-                     in bottom $ bool nMsg "" (null ns)
-                              <> bool vMsg "" (null vs)
-                              <> bool eMsg "" (null es)
-                              <$ ctx
+                      if f' ^. funcVirtual 
+                        then typecheckFuncs cc ctx funcName f f' >>= \case
+                          Bottom e -> pure $ (ns, vs, (o,e):es)
+                          _        -> pure $ (ns, vs, es)
+                        else pure $ (ns, o:vs, es)
+                    ) ([], [], []) $ zip os parentFuncs
+            case invalidParentFuncs of
+                ([], [], []) -> functionType cc ctx funcName f
+                (ns, vs, es) ->
+                  let nMsg = T.concat
+                        [ "The following parent contracts don't have a function named "
+                        , tFuncName
+                        , ": "
+                        , T.intercalate ", " $ labelToText <$> ns
+                        , "\n"
+                        ]
+                      vMsg = T.concat
+                        [ "The following parent contracts don't have "
+                        , tFuncName
+                        , " marked as virtual: "
+                        , T.intercalate ", " $ labelToText <$> vs
+                        , "\n"
+                        ]
+                      eMsg = T.concat
+                        [ "The following parent contracts' signatures for "
+                        , tFuncName
+                        , " don't match the one found in "
+                        , labelToText $ c ^. contractName
+                        , ": "
+                        , T.intercalate ", " $ (\(o, e) -> "In " <> labelToText o <> ":\n  " <> T.pack (concatMap (("\n  " ++) . show) e)) <$> es
+                        , "\n"
+                        ]
+                    in return $ bottom $ bool nMsg "" (null ns)
+                            <> bool vMsg "" (null vs)
+                            <> bool eMsg "" (null es)
+                            <$ ctx
 
 functionHelper :: Annotated CodeCollectionF
                -> Annotated ContractF
                -> String
                -> Annotated FuncF
                -> Type'
-functionHelper cc c funcName f@Func{..} =
-  let check = if usesStrictModifiers cc
-                then checkOverrides cc c funcName f
-                else functionType cc (f ^. funcContext) funcName f
-   in unlessBottom check $ \t' -> case f ^. funcContents of
-        Nothing -> t'
-        Just stmts ->
-          if (funcName == "receive")
-            then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
-              ([], [], Just Payable, Just External) ->
-                 let r = R cc c (Just f) funcName $
-                           map (fmap $ isJust . _varInitialVal)
-                               (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
-                     swap = uncurry $ flip (,)
-                     args = (\(it,n) -> ( n
-                                        , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                        ))
-                        <$> (catMaybes $ sequence . swap <$> _funcArgs)
-                     vals = (\(it,n) -> ( n
-                                        , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                        ))
-                        <$> (catMaybes $ sequence . swap <$> _funcVals)
-                     argVals = M.fromList $ args ++ vals
-                  in runReader (statementsHelper argVals stmts) r
-              ([fArg], _, _, _) -> bottom  $ (T.concat
-                                [ "Function `receive` must take no arguments, but has been given "
-                                , T.pack $ show fArg
-                                ]) <$ _funcContext
-              (_, [fVal], _, _) -> bottom $ (T.concat
-                                [ "Function `receive` must have no return values, but has been given "
-                                , T.pack $ show fVal
-                                ]) <$ _funcContext
-              _ -> bottom $ "Function `receive` must be External and Payable, but has not been declared so " <$ _funcContext
-          else if (funcName == "fallback")
-                then case (_funcArgs, _funcVals, _funcVisibility) of
-                      ([], [], Just External) ->
-                        let r = R cc c (Just f) funcName $
-                                  map (fmap $ isJust . _varInitialVal)
-                                      (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
-                            swap = uncurry $ flip (,)
-                            args = (\(it,n) -> ( n
-                                                  , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                                ))
-                                              <$> (catMaybes $ sequence . swap <$> _funcArgs)
-                            vals = (\(it,n) -> ( n
-                                                  , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                                ))
-                                              <$> (catMaybes $ sequence . swap <$> _funcVals)
-                            argVals = M.fromList $ args ++ vals
-                         in runReader (statementsHelper argVals stmts) r
-                      ([fArg], _, _) -> bottom  $ (T.concat
-                                        [ "Function `fallback` must take no arguments, but has been given "
-                                        , T.pack $ show fArg
-                                        ]) <$ _funcContext
-                      (_, [fVal], _) -> bottom $ (T.concat
-                                        [ "Function `fallback` must have no return values, but has been given "
-                                        , T.pack $ show fVal
-                                        ]) <$ _funcContext
-                      _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
-          else
-            let r = R cc c (Just f) funcName $
-                      map (fmap $ isJust . _varInitialVal)
-                          (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
-                swap = uncurry $ flip (,)
-                args = (\(it,n) -> ( n
-                                  , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                  ))
-                  <$> (catMaybes $ sequence . swap <$> _funcArgs)
-                vals = (\(it,n) -> ( n
-                                  , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                                  ))
-                  <$> (catMaybes $ sequence . swap <$> _funcVals)
-                argVals = M.fromList $ args ++ vals
-            in runReader (statementsHelper argVals stmts) r
+functionHelper cc c funcName f@Func{..} = do
+  let r = R cc c Nothing "Nothing" []
+      f1 = runReader (evalStateT (checkOverrides cc c funcName f) ((Nothing, M.empty) :| [])) r 
+      f2 = runReader (evalStateT (functionType cc (f ^. funcContext) funcName f) ((Nothing, M.empty) :| [])) r  
+      check = if usesStrictModifiers cc
+                then f1
+                else f2
+  unlessBottom check $ \t' -> case f ^. funcContents of
+    Nothing -> t'
+    Just stmts ->
+      if (funcName == "receive")
+        then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
+          ([], [], Just Payable, Just External) ->
+              let r' = R cc c (Just f) funcName $
+                        map (fmap $ isJust . _varInitialVal)
+                            (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                  swap = uncurry $ flip (,)
+                  args = (\(it,n) -> ( n
+                                    , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                    ))
+                    <$> (catMaybes $ sequence . swap <$> _funcArgs)
+                  vals = (\(it,n) -> ( n
+                                    , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                    ))
+                    <$> (catMaybes $ sequence . swap <$> _funcVals)
+                  argVals = M.fromList $ args ++ vals
+              in runReader (statementsHelper argVals stmts) r'
+          ([fArg], _, _, _) -> bottom  $ (T.concat
+                            [ "Function `receive` must take no arguments, but has been given "
+                            , T.pack $ show fArg
+                            ]) <$ _funcContext
+          (_, [fVal], _, _) -> bottom $ (T.concat
+                            [ "Function `receive` must have no return values, but has been given "
+                            , T.pack $ show fVal
+                            ]) <$ _funcContext
+          _ -> bottom $ "Function `receive` must be External and Payable, but has not been declared so " <$ _funcContext
+      else if (funcName == "fallback")
+            then case (_funcArgs, _funcVals, _funcVisibility) of
+                  ([], [], Just External) ->
+                    let r' = R cc c (Just f) funcName $
+                              map (fmap $ isJust . _varInitialVal)
+                                  (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                        swap = uncurry $ flip (,)
+                        args = (\(it,n) -> ( n
+                                              , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                            ))
+                                          <$> (catMaybes $ sequence . swap <$> _funcArgs)
+                        vals = (\(it,n) -> ( n
+                                              , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                                            ))
+                                          <$> (catMaybes $ sequence . swap <$> _funcVals)
+                        argVals = M.fromList $ args ++ vals
+                      in runReader (statementsHelper argVals stmts) r'
+                  ([fArg], _, _) -> bottom  $ (T.concat
+                                    [ "Function `fallback` must take no arguments, but has been given "
+                                    , T.pack $ show fArg
+                                    ]) <$ _funcContext
+                  (_, [fVal], _) -> bottom $ (T.concat
+                                    [ "Function `fallback` must have no return values, but has been given "
+                                    , T.pack $ show fVal
+                                    ]) <$ _funcContext
+                  _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
+      else
+        let r' = R cc c (Just f) funcName $
+                  map (fmap $ isJust . _varInitialVal)
+                      (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+            swap = uncurry $ flip (,)
+            args = (\(it,n) -> ( n
+                              , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                              ))
+              <$> (catMaybes $ sequence . swap <$> _funcArgs)
+            vals = (\(it,n) -> ( n
+                              , VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
+                              ))
+              <$> (catMaybes $ sequence . swap <$> _funcVals)
+            argVals = M.fromList $ args ++ vals
+        in runReader (statementsHelper argVals stmts) r'
 
 statementsHelper :: (M.Map SolidString (Annotated VarDefEntryF))
                  -> [Annotated StatementF]
@@ -944,19 +958,19 @@ statementsHelper args ss = do
       pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
     Just f -> do
       let x = _funcContext f
-      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
+      flip evalStateT ((Nothing, args) :| []) $ do
         cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
           let constructorArgs = getConstructorType' x cName
               givenArgs = flip Product x <$> traverse tcExpr exprs
               givenFunc = (\t-> Function t (Static (SVMType.Contract cName) x) x [] []) <$> givenArgs
           constructorArgs <~> givenFunc
         stmts' <- traverse statementHelper ss
-        pure $ concat [stmts', cCalls]
-      let ret = case fst $ NE.head s of
-                  Nothing -> Product [] x
-                  Just (Sum rs) -> runIdentity $
-                    foldr
-                      (\a mb -> mb >>= \b -> case (a,b) of
+        s <- get
+        ret <- case fst $ NE.head s of
+                  Nothing -> return $ Product [] x
+                  Just (Sum rs) ->
+                    foldrM
+                      (\a b -> case (a,b) of
                         (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
                         (Bottom es, _) -> pure $ Bottom es
                         (_, Bottom ess) -> pure $ Bottom ess
@@ -966,10 +980,11 @@ statementsHelper args ss = do
                             Bottom _ -> pure . bottom $ "not all paths return a value." <$ x
                             _ -> pure t'
                       )
-                      (pure $ topType' x)
+                      (topType' x)
                       (NE.toList rs)
-                  Just r -> r
-      pure $ reduceType' x $ ret:ts'
+                  Just r -> return $ r
+        pure $ reduceType' x $ ret:concat [stmts', cCalls]
+      --pure $ concat [stmts', cCalls]
 
 statementsHelper' :: SourceAnnotation Text -> [Annotated StatementF] -> SSS Type'
 statementsHelper' x stmts = do
@@ -1192,7 +1207,7 @@ getFunctionByNameRecursively name ctx = go False
           c <- asks contract
           cc <- asks codeCollection
           case M.lookup name $ c ^. functions of
-            Just theFunc -> pure $ filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
+            Just theFunc -> filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
             Nothing -> pickType' ctx <$> traverse recurse (c ^. parents)
         recurse parentName = do
           cc <- asks codeCollection
@@ -1244,11 +1259,11 @@ getVarTypeByName' name ctx = do
         Just (t, ctx') -> pure $ Static t ctx'
         Nothing -> getFunctionByNameRecursively name ctx >>= \case
             b@Bottom{} -> do
-              pure $ case M.lookup name $ _contracts cc of
+              case M.lookup name $ _contracts cc of
                 Just _->
                   let ctrct = Static (SVMType.Contract name) ctx
                       lbl = Static (SVMType.UnknownLabel name Nothing) ctx
-                  in Sum $ ctrct :|
+                  in return $ Sum $ ctrct :|
                           [Function (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
                             ctrct
                             ctx
@@ -1257,7 +1272,7 @@ getVarTypeByName' name ctx = do
                 Nothing -> do
                   case M.lookup name $ _flFuncs cc of
                       Just f -> functionType cc ctx name f
-                      Nothing -> b
+                      Nothing -> return $ b
             t -> pure t
             
   where lookupVar m Nothing = M.lookup name m
@@ -1267,19 +1282,26 @@ ignoreTops :: Monad m => SourceAnnotation Text -> SolidString -> Type -> m Type'
 ignoreTops ann _ _ = pure $ topType' ann
 
 setVarType' :: SourceAnnotation Text -> SolidString -> Type -> SSS Type'
-setVarType' ctx name ty = state setType'
-  where setType' (m:|ms) = case M.lookup name $ snd m of
-          Nothing -> case ms of
-            [] -> (bottom $ ("Unknown variable: " <> labelToText name) <$ ctx, m:|[])
-            (r:est) -> NE.cons m <$> setType' (r:|est)
-          Just BlankEntry -> (bottom $ ("Variable listed as BlankEntry: " <> labelToText name) <$ ctx, m:|ms)
-          Just t@VarDefEntry{..} -> case vardefType of
-            Nothing ->
-              let t' = t{vardefType = Just ty}
-               in (Static ty ctx, (M.insert name t' <$> m) :| ms)
-            Just ty' -> case typecheckStatic ty ty' of
-              Right ty'' -> (Static ty'' ctx, m:|ms)
-              Left e -> (bottom $ ("Variable " <> labelToText name <> " being updated with wrong type: " <> e) <$ ctx, m:|ms)
+setVarType' ctx name ty = setType'
+  where setType' :: SSS Type' = do
+          m :| ms <- get
+          case M.lookup name $ snd m of
+                Nothing -> case ms of
+                  [] -> return $ (bottom $ ("Unknown variable: " <> labelToText name) <$ ctx)
+                  (r:est) -> do
+                    put $ r:|est -- moves to next layer and runs setType'
+                    x <- setType' 
+                    modify' (NE.cons m) -- takes modified layers and puts it back on top of stack
+                    pure $ x
+                Just BlankEntry -> return $ (bottom $ ("Variable listed as BlankEntry: " <> labelToText name) <$ ctx)
+                Just t@VarDefEntry{..} -> case vardefType of
+                  Nothing -> do
+                    let t' = t{vardefType = Just ty}
+                    put $ (M.insert name t' <$> m) :| ms
+                    return $ Static ty ctx
+                  Just ty' -> typecheckStatic ty ty' >>= \case
+                    Right ty'' -> return $ (Static ty'' ctx)
+                    Left e -> return $ (bottom $ ("Variable " <> labelToText name <> " being updated with wrong type: " <> e) <$ ctx)
 
 pushLocalVariable :: Annotated VarDefEntryF -> SSS ()
 pushLocalVariable BlankEntry = pure ()

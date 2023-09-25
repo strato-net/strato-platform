@@ -21,6 +21,7 @@ module SolidVM.Model.CodeCollection (
   pragmas,  
   imports,
   usesStrictModifiers,
+  getContractsBySolidString,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -135,3 +136,10 @@ instance Arbitrary CodeCollection where
 
 usesStrictModifiers :: CodeCollectionF a -> Bool
 usesStrictModifiers = isJust . find ((== "strict") . fst) . _pragmas
+
+-- Function to get all ContractF values matching a SolidString
+getContractsBySolidString :: SolidString -> CodeCollectionF a -> [ContractF a]
+getContractsBySolidString solidStr codeCollection =
+  case M.lookup solidStr (_contracts codeCollection) of
+    Just contract -> [contract] 
+    Nothing       -> []         

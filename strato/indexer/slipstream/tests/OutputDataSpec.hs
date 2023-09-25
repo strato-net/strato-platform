@@ -10,8 +10,7 @@ import Control.Monad
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
-import Data.Text (Text)
---import qualified Data.Text as T
+import qualified Data.Text as T
 import Data.Time
 import Numeric
 import Test.Hspec
@@ -51,7 +50,7 @@ int = V.SimpleValue . V.valueInt
 createInserts :: OutputM m
               => IORef Globals
               -> [(SE.ProcessedContract, Contract)]
-              -> ConduitM () Text m ()
+              -> ConduitM () T.Text m ()
 createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
@@ -59,6 +58,57 @@ createInserts globalsIORef contracts = do
     createHistoryTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
+
+createInsertsMapping :: OutputM m
+              => IORef Globals
+              -> [ProcessedMappingRow]
+              -> ConduitM () T.Text m ()
+createInsertsMapping globalsIORef mappings = do
+  unless (null mappings) $ do
+    let mapping = head mappings
+    _ <- createMappingTable globalsIORef (organization mapping, application mapping, contractname mapping) (mapname mapping)
+    insertMappingTable mappings
+
+createInsertsAbstract :: OutputM m
+              => IORef Globals
+              -> (SE.ProcessedContract, Contract)
+              -> [(SE.ProcessedContract, T.Text, TableColumns)]
+              -> ConduitM () T.Text m ()
+createInsertsAbstract globalsIORef abstract inherited = do
+    let contract =snd abstract
+    _ <- createAbstractTable globalsIORef (contract) (SE.organization $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract)
+    unless (null inherited) $ do 
+      insertAbstractTable inherited
+
+createDummyContract :: [(T.Text, SVMType.Type)] -> Contract
+createDummyContract v = 
+  let createVariableDecl t = VariableDecl{
+        _varType=t,
+        _varIsPublic=True,
+        _varInitialVal=Nothing,
+        _varContext=error "varContext undefined",
+        _isImmutable = False,
+        _isRecord = True
+        }
+  in
+    Contract{
+      _contractName=undefined,
+      _parents=undefined,
+      _constants=undefined,
+      _userDefined=undefined,
+      _storageDefs=M.mapKeys textToLabel $ M.fromList $ map (fmap createVariableDecl) v,
+      _enums=undefined,
+      _structs=undefined,
+      _errors=undefined,
+      _events=undefined,
+      _functions=undefined,
+      _constructor=undefined,
+      _modifiers=undefined,
+      _usings=undefined,
+      _contractType=undefined,
+      _importedFrom=undefined,
+      _contractContext=undefined
+    }
 
 fakeCirrusHandle :: CirrusHandle
 fakeCirrusHandle = FakeCirrusHandle
@@ -591,33 +641,272 @@ spec = do
     "str" = excluded."str",
     "strukt" = excluded."strukt";|]
 
+  it "can create and insert into mapping tables" $ do
+    let testAdd = Address 0x98eaddede
+        input = [ProcessedMappingRow {
+          address = testAdd,
+          codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          organization = "",
+          application = "",
+          contractname = "SwissArmy",
+          mapname = "SwissArmyMapping",
+          chain = "<CHAIN>",
+          blockHash = hash "<BLOCKHASH>",
+          blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          blockNumber = 123,
+          transactionHash = hash "<TRANSACTIONHASH>",
+          transactionSender = testAdd,
+          mapDataKey = V.SimpleValue $ V.ValueString "hi-key",
+          mapDataValue = V.SimpleValue $ V.ValueString "hi-value"
+          }     ]
 
-createDummyContract :: [(Text, SVMType.Type)] -> Contract
-createDummyContract v = 
-  let createVariableDecl t = VariableDecl{
-        _varType=t,
-        _varIsPublic=True,
-        _varInitialVal=Nothing,
-        _varContext=error "varContext undefined",
-        _isImmutable = False,
-        _isRecord = True
-        }
-  in
-    Contract{
-      _contractName=undefined,
-      _parents=undefined,
-      _constants=undefined,
-      _userDefined=undefined,
-      _storageDefs=M.mapKeys textToLabel $ M.fromList $ map (fmap createVariableDecl) v,
-      _enums=undefined,
-      _structs=undefined,
-      _errors=undefined,
-      _events=undefined,
-      _functions=undefined,
-      _constructor=undefined,
-      _modifiers=undefined,
-      _usings=undefined,
-      _contractType=undefined,
-      _importedFrom=undefined,
-      _contractContext=undefined
-    }
+    g <- newGlobals fakeHandle fakeCirrusHandle
+    [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
+        runLoggingT . runConduit $ createInsertsMapping g input .| sinkList
+
+    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy.SwissArmyMapping" (record_id text,
+    address text,
+    "chainId" text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    contract_name text,
+    mapname text,
+    key text,
+    value text,
+  PRIMARY KEY (record_id, key));|]
+
+    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "SwissArmy.SwissArmyMapping" ("record_id",
+    "address",
+    "chainId",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "contract_name",
+    "mapname",
+    "key",
+    "value")
+  VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
+    '000000000000000000000000000000098eaddede',
+    '<CHAIN>',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
+    'SwissArmy',
+    'SwissArmyMapping',
+    'hi-key',
+    'hi-value')
+  ON CONFLICT (record_id, key) DO UPDATE SET
+    record_id = excluded.record_id,
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    contract_name = excluded.contract_name,
+    mapname = excluded.mapname,
+    value = excluded.value;|]
+
+  fit "can create and insert into abstract tables" $ do
+    let testAdd = Address 0x98eaddede
+        input = (SE.ProcessedContract {
+          SE.address = testAdd,
+          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          SE.organization = "",
+          SE.application = "",
+          SE.contractName = "SwissArmy",
+          SE.chain = "<CHAIN>",
+          SE.blockHash = hash "<BLOCKHASH>",
+          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          SE.blockNumber = 123,
+          SE.transactionHash = hash "<TRANSACTIONHASH>",
+          SE.transactionSender = testAdd,
+          SE.contractData = M.fromList
+            [ ("addr", addr 0xdeadbeef)
+            ]
+          }, createDummyContract [
+               ("addr", SVMType.Address False)
+            ])
+        inherited = [(SE.ProcessedContract {
+          SE.address = testAdd,
+          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
+          SE.organization = "",
+          SE.application = "",
+          SE.contractName = "SwissArmyz",
+          SE.chain = "<CHAIN>",
+          SE.blockHash = hash "<BLOCKHASH>",
+          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+          SE.blockNumber = 123,
+          SE.transactionHash = hash "<TRANSACTIONHASH>",
+          SE.transactionSender = testAdd,
+          SE.contractData = M.fromList
+            [ ("addr2", addr 0xdeadbeef)
+            ]
+          }, T.pack "SwissArmy", tableColumns [(T.pack "addr",SVMType.Address False)])]
+
+
+    g <- newGlobals fakeHandle fakeCirrusHandle
+    [swissArmyCreateAbstract, swissArmynsertAbstract] <-
+        runLoggingT . runConduit $ createInsertsAbstract g input inherited .| sinkList
+
+    swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
+    address text,
+    "chainId" text,
+    block_hash text,
+    block_timestamp text,
+    block_number text,
+    transaction_hash text,
+    transaction_sender text,
+    contract_name text,
+    "addr" text,
+    data jsonb,
+  PRIMARY KEY (record_id));|]
+
+    swissArmynsertAbstract `shouldBe` [r|INSERT INTO SwissArmy ("record_id",
+    "address",
+    "chainId",
+    "block_hash",
+    "block_timestamp",
+    "block_number",
+    "transaction_hash",
+    "transaction_sender",
+    "contract_name",
+    "\"addr\" text")
+  VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
+    '000000000000000000000000000000098eaddede',
+    '<CHAIN>',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
+    'SwissArmyz',
+    '"{\"addr2\":\"00000000000000000000000000000000deadbeef\"}"')
+  ON CONFLICT (record_id) DO UPDATE SET
+    address = excluded.address,
+    "chainId" = excluded."chainId",
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    contract_name = excluded.contract_name,
+    data = excluded.data;|]
+
+  -- it "can create and expand into abstract tables" $ do
+  --   let testAdd = Address 0x98eaddede
+  --       input = (SE.ProcessedContract {
+  --         SE.address = testAdd,
+  --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+  --         SE.organization = "",
+  --         SE.application = "",
+  --         SE.contractName = "SwissArmy",
+  --         SE.chain = "<CHAIN>",
+  --         SE.blockHash = hash "<BLOCKHASH>",
+  --         SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+  --         SE.blockNumber = 123,
+  --         SE.transactionHash = hash "<TRANSACTIONHASH>",
+  --         SE.transactionSender = testAdd,
+  --         SE.contractData = M.fromList
+  --           [ ("addr", addr 0xdeadbeef)
+  --           ]
+  --         }, createDummyContract [
+  --              ("addr", SVMType.Address False)
+  --           ])
+
+  --       inherited = [(SE.ProcessedContract {
+  --         SE.address = testAdd,
+  --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
+  --         SE.organization = "",
+  --         SE.application = "",
+  --         SE.contractName = "SwissArmyz",
+  --         SE.chain = "<CHAIN>",
+  --         SE.blockHash = hash "<BLOCKHASH>",
+  --         SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+  --         SE.blockNumber = 123,
+  --         SE.transactionHash = hash "<TRANSACTIONHASH>",
+  --         SE.transactionSender = testAdd,
+  --         SE.contractData = M.fromList
+  --           [ ("addr2", addr 0xdeadbeef)
+  --           ]
+  --         }, T.pack "SwissArmy", tableColumns [(T.pack "addr",SVMType.Address False)])]
+
+  --       expand = [(SE.ProcessedContract {
+  --         SE.address = testAdd,
+  --         SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+  --         SE.organization = "",
+  --         SE.application = "",
+  --         SE.contractName = "SwissArmy",
+  --         SE.chain = "<CHAIN>",
+  --         SE.blockHash = hash "<BLOCKHASH>",
+  --         SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
+  --         SE.blockNumber = 123,
+  --         SE.transactionHash = hash "<TRANSACTIONHASH>",
+  --         SE.transactionSender = testAdd,
+  --         SE.contractData = M.fromList
+  --           [ ("addr", addr 0xdeadbeef), ("addr2", addr 0xdeadbeef)
+  --           ]
+  --         }), createDummyContract [
+  --              ("addr", SVMType.Address False),
+  --              ("addr2", SVMType.Address False)
+  --           ]]
+
+
+
+  --   g <- newGlobals fakeHandle fakeCirrusHandle
+  --   [swissArmyCreateAbstract, swissArmynsertAbstract] <-
+  --       runLoggingT . runConduit $ createInsertsAbstract g input inherited .| sinkList
+  --   expand <- runLoggingT . runConduit $ (expandAbstractTable g expand (SE.organization $ head expand, SE.application $ head  expand, SE.contractName $ head expand)) .| sinkList
+
+  --   swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
+  --   address text,
+  --   "chainId" text,
+  --   block_hash text,
+  --   block_timestamp text,
+  --   block_number text,
+  --   transaction_hash text,
+  --   transaction_sender text,
+  --   contract_name text,
+  --   "addr" text,
+  --   data jsonb,
+  -- PRIMARY KEY (record_id));|]
+
+  --   swissArmynsertAbstract `shouldBe` [r|INSERT INTO SwissArmy ("record_id",
+  --   "address",
+  --   "chainId",
+  --   "block_hash",
+  --   "block_timestamp",
+  --   "block_number",
+  --   "transaction_hash",
+  --   "transaction_sender",
+  --   "contract_name",
+  --   "\"addr\" text")
+  -- VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
+  --   '000000000000000000000000000000098eaddede',
+  --   '<CHAIN>',
+  --   '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+  --   '2018-09-16 18:28:52.607875 UTC',
+  --   '123',
+  --   '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+  --   '000000000000000000000000000000098eaddede',
+  --   'SwissArmyz',
+  --   '"{\"addr2\":\"00000000000000000000000000000000deadbeef\"}"')
+  -- ON CONFLICT (record_id) DO UPDATE SET
+  --   address = excluded.address,
+  --   "chainId" = excluded."chainId",
+  --   block_hash = excluded.block_hash,
+  --   block_timestamp = excluded.block_timestamp,
+  --   block_number = excluded.block_number,
+  --   transaction_hash = excluded.transaction_hash,
+  --   transaction_sender = excluded.transaction_sender,
+  --   contract_name = excluded.contract_name,
+  --   data = excluded.data;|]
+

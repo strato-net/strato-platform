@@ -18,6 +18,7 @@ module Slipstream.OutputData (
   insertIndexTable,
   insertForeignKeys,
   insertMappingTable,
+  insertMappingTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
   createIndexTable,
@@ -34,8 +35,10 @@ module Slipstream.OutputData (
   notifyPostgREST,
   createExpandHistoryTable,
   cirrusInfo,
-  historyTableName
+  historyTableName,
+  tableColumns
   ) where
+
 
 import           BlockApps.Solidity.Value
 import           Conduit
