@@ -202,6 +202,7 @@ const Product = () => {
                   onChange={onPageChange}
                   total={productTotal}
                   className="flex justify-center my-5 "
+                  showSizeChanger={false}
                 />
                 <div className="pb-12"></div>
               </>
