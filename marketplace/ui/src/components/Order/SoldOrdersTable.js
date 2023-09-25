@@ -23,7 +23,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("createdDate.desc");
 
-  const { ordersSold, isordersSoldLoading, orderTotal } = useOrderState();
+  const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
   useEffect(() => {
        actions.fetchOrderSold(
@@ -42,7 +42,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
   useEffect(() => {
     setPage(1);
     setOffset(0);
-  }, [orderTotal]);
+  }, [orderSoldTotal]);
   
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
@@ -203,7 +203,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       <Pagination
         current={page}
         onChange={onPageChange}
-        total={orderTotal}
+        total={orderSoldTotal}
         showSizeChanger={false}
         className="flex justify-center my-5 "
       />
