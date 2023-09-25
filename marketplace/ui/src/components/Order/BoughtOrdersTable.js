@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined } from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined  } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus } from "./constant";
@@ -10,19 +10,20 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination } from "antd";
+import { Pagination, Button} from "antd";
 import TagManager from "react-gtm-module";
+import "./ordersTable.css"
 
 
-const BoughtOrdersTable = ({ user }) => {
+const BoughtOrdersTable = ({ user, selectedDate }) => {
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
+  const [order, setOrder] = useState("createdDate.desc");
 
-  const { orders, isordersLoading } = useOrderState();
+  const { orders, isordersLoading, orderBoughtTotal} = useOrderState();
 
   useEffect(() => {
     actions.fetchOrder(
@@ -30,9 +31,16 @@ const BoughtOrdersTable = ({ user }) => {
       limit,
       offset,
       debouncedSearchTerm,
-      user?.organization
+      user?.organization,
+      order,
+      selectedDate
     );
-  }, [dispatch, limit, offset, debouncedSearchTerm, user]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate]);
+  
+  useEffect(() => {
+    setPage(1);
+    setOffset(0);
+  }, [orderBoughtTotal]);
 
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
@@ -65,10 +73,7 @@ const BoughtOrdersTable = ({ user }) => {
           id={order.orderId}
           onClick={() => {
             navigate(
-              `${routes.BoughtOrderDetails.url.replace(
-                ":id",
-                order.address
-              )}`
+              `${routes.BoughtOrderDetails.url.replace(":id", order.address)}`
             );
           }}
           className="text-primary hover:text-primaryHover cursor-pointer"
@@ -90,24 +95,40 @@ const BoughtOrdersTable = ({ user }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "Date (mm/dd/yyyy)".toUpperCase(),
       dataIndex: "date",
       key: "date",
       render: (text) => <p>{text}</p>,
+      title: (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div>{"Date (mm/dd/yyyy)".toUpperCase()}</div>
+          <div>
+            {order === "createdDate.desc" ? (
+              <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
+            ) : (
+              <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.desc")} />
+            )}
+          </div>
+        </div>
+      ),
     },
     {
       title: "invoice".toUpperCase(),
       dataIndex: "invoice",
       key: "invoice",
       render: (text) => (
-        <button onClick={() => {
-          TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_invoice_in_orders_bought',
-            },
-          });
-        }}>
-          <Link to={`${routes.Invoice.url.replace(":id", text.address)}`} target="_blank" >
+        <button
+          onClick={() => {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: "view_invoice_in_orders_bought",
+              },
+            });
+          }}
+        >
+          <Link
+            to={`${routes.Invoice.url.replace(":id", text.address)}`}
+            target="_blank"
+          >
             <div className="flex items-center cursor-pointer hover:text-primary">
               <EyeOutlined className="mr-2" />
               <p>View</p>
@@ -173,14 +194,6 @@ const BoughtOrdersTable = ({ user }) => {
     setPage(page);
   };
 
-  useEffect(() => {
-    let len = data.length;
-    let total;
-    if (len === limit) total = page * 10 + limit;
-    else total = (page - 1) * 10 + limit;
-    setTotal(total);
-  }, [data]);
-
   return (
     <div>
       <DataTableComponent
@@ -194,7 +207,7 @@ const BoughtOrdersTable = ({ user }) => {
       <Pagination
         current={page}
         onChange={onPageChange}
-        total={total}
+        total={orderBoughtTotal}
         showSizeChanger={false}
         className="flex justify-center my-5 "
       />

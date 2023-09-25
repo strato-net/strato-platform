@@ -54,7 +54,20 @@ const Checkout = ({ user }) => {
   };
 
   const storedData = useMemo(() => {
-    return JSON.parse(window.localStorage.getItem("cartList") ?? []);
+    const cartListData = window.localStorage.getItem("cartList");
+    let cartList = [];
+
+    try {
+      if (cartListData) {
+        // Attempt to parse the stored data as JSON
+        cartList = JSON.parse(cartListData);
+      }
+    } catch (error) {
+      // Handle JSON parsing error
+      console.error("Error parsing cartList data:", error);
+    }
+    
+    return cartList;
   }, []);
 
   useEffect(() => {

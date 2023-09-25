@@ -12,6 +12,7 @@ const InventoriesProvider = ({ children }) => {
     isInventoriesLoading: false,
     inventoryUpdateObject: null,
     isinventoryUpdating: false,
+    isReselling: false,
     inventoryDetails: null,
     isInventoryDetailsLoading: false,
     error: undefined,

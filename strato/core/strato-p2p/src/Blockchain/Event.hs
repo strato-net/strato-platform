@@ -589,19 +589,16 @@ syncFetch ::
   Integer ->
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
-  blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
-  if null blockHeaders'
-    then do
-      mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-      yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
-      lift stampActionTimestamp
-    else
-      $logInfoS "syncFetch" $
-        T.unlines
-          [ "Tried to request more block headers but it seems the block headers cache is currenlty being used.",
-            "If this message shows up a lot but the node's best block # doesn't increase,",
-            "there might be something wrong with the cache."
-          ]
+    blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
+    if null blockHeaders' then do
+        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
+        yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
+        lift stampActionTimestamp
+      else $logInfoS "syncFetch" $ T.unlines [
+        "Tried to request more block headers but it seems the block headers cache is currently being used.",
+        "If this message shows up a lot but the node's best block # doesn't increase,",
+        "there might be something wrong with the cache."
+      ]
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of

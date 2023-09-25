@@ -259,7 +259,7 @@ pipeline {
 	      cd strato-worktree
               ./run_unit_tests.sh --coverage
             '''
-            dir ('strato') {
+            dir ('strato-worktree/strato') {
               archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
             }
           },
