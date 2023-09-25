@@ -254,8 +254,11 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order) => {
-    const query = queryValue ? `&orderId=${queryValue}` : "";
+  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order, selectedDate) => {
+    let query = queryValue ? `&orderId=${queryValue}` : "";
+    let end = selectedDate + 86400;
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "";
+
 
     dispatch({ type: actionDescriptors.fetchOrderSold });
 
