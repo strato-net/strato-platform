@@ -47,7 +47,6 @@ class ProductController {
         :
         product
       ))
-
       rest.response.status200(res, {productsWithImageUrl, total: products.total})
 
       return next()

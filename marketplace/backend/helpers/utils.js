@@ -245,13 +245,7 @@ export const setSearchQueryOptionsPrime = (args) => {
     }
 
     return result
-  }, []).map(option => {
-    // Modify options with keys that start with "is"
-    if (option.key && option.key.startsWith('is')) {
-      return { key: option.key, value: `eq.${option.value}` };
-    }
-    return option;
-  }))
+  }, []))
   return queryArgs
 }
 
@@ -268,7 +262,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [key]: value
       }
     }
-    let dotIndex = typeof value === "boolean" ? -1 : value.indexOf('.')
+    let dotIndex = value.indexOf('.')
     if (dotIndex >= 0) {
       // split the value on a period, allows to directly pass postgrest operators
       // to this API via ?key=<operator>.<value>
@@ -297,6 +291,10 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [predicate]: `(${valueArray.join(',')})`,
       } 
       
+    } else if (value === "true" || value === "false") {
+      option = {
+        [key]: `eq.${value}`,
+      }
     } else {
       let searchedValue = value
       if (predicate === 'like') {
