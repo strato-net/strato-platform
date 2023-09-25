@@ -29,6 +29,7 @@ import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../../contexts/membership";
+import moment from "moment";
 import { useServiceDispatch, useServiceState } from "../../../contexts/service";
 
 import { actions as serviceUsageActions } from "../../../contexts/serviceUsage/actions";
@@ -43,8 +44,8 @@ const offset = 0;
 
 const statusOptions = [
   { value: 1, label: "Requested" },
-  { value: 2, label: "Completed" },
-  { value: 3, label: "Cancelled" },
+  { value: 2, label: "Cancelled" },
+  { value: 3, label: "Completed" },
 ];
 
 const UpdatePayloadKeys = [
@@ -75,7 +76,7 @@ const getProviderOptions = (data) => {
   return resultArray;
 };
 
-const getNewRowSchema = (address) => {
+const getNewRowSchema = (serviceType, address) => {
   return {
     summary: "", //summary
     serviceDate: "", //Date
@@ -86,6 +87,7 @@ const getNewRowSchema = (address) => {
     itemId: "", //provider
     serviceId: "", //service
     paymentStatus: 1,
+    bookedUserAddress: serviceType == 'booked' ? address : '',
 
     providerLastUpdated: address, //user-address
     providerLastUpdatedDate: new Date().getTime().toString(),
@@ -129,7 +131,7 @@ const ServiceTable = () => {
     isCreateServiceUsageSubmitting ||
     isUpdateServicesUsageLoading;
 
-  const serviceUsageData = serviceUsageState?.servicesUsage?.result;
+  const serviceUsageData = serviceUsageState?.servicesUsage?.result || [];
   const totalCount = serviceUsageState?.servicesUsage?.total;
 
   const defaultMembership = membership?.purchasedMemberships.map(
@@ -186,6 +188,9 @@ const ServiceTable = () => {
 
   useEffect(() => {
     setMembershipList(defaultMembership);
+    if (serviceType == 'provided') {
+      setUserList(UserListData);
+    }
   }, [membership]);
 
   useEffect(() => {
@@ -193,7 +198,9 @@ const ServiceTable = () => {
   }, [serviceUsageState]);
 
   useEffect(() => {
-    setUserList(UserListData);
+    if (serviceType == 'booked') {
+      setUserList(UserListData);
+    }
   }, [userCert]);
 
   const queryOwner = ``;
@@ -222,7 +229,7 @@ const ServiceTable = () => {
     userAuthActions.fetchUsers(authUserDispatch);
   }, [serviceType, userAddress]);
 
-  const newRowSchema = getNewRowSchema(userAddress);
+  const newRowSchema = getNewRowSchema(serviceType, userAddress);
 
   const handleChangeServiceUsageType = (key) => {
     setFilterQuery({});
@@ -243,7 +250,7 @@ const ServiceTable = () => {
     });
     setTableData(data);
 
-    const updatedDataObj = UpdatePayloadKeys.reduce((acc, item) => {
+    const updatedDataObj = [...UpdatePayloadKeys, 'bookedUserAddress'].reduce((acc, item) => {
       if (
         ["serviceDate", "providerLastUpdatedDate", "pricePaid"].includes(item)
       ) {
@@ -254,9 +261,11 @@ const ServiceTable = () => {
       return acc;
     }, {});
 
+    let updatedServiceUsage = { ...updatedDataObj };
+    delete updatedServiceUsage['bookedUserAddress'];
     const updatedPayload = {
       address: record.address,
-      updates: updatedDataObj,
+      updates: updatedServiceUsage,
     };
 
     if (type === "update") {
@@ -314,7 +323,7 @@ const ServiceTable = () => {
       servicesActions.fetchService(serviceDispatch, 10, offset, value);
     } else if (field === "itemId") {
       updateTableData(field, value, key);
-    }else if (field === "providerLastUpdated"){
+    } else if (field === "bookedUserAddress") {
       const membershipData = membership?.purchasedMemberships
         .filter(({ owner }) => owner === value)
         .map(({ itemAddress, itemNumber, manufacturer }) => ({
@@ -323,9 +332,14 @@ const ServiceTable = () => {
           organization: manufacturer,
         }));
       setMembershipList(membershipData);
+      updateTableData("itemId", '', key);
       updateTableData(field, value, key);
     }
     updateTableData(field, value, key);
+  };
+
+  const disabledDate = (current) => {
+    return current && current < moment().startOf('day');
   };
 
   const handleAddRow = () => {
@@ -371,7 +385,7 @@ const ServiceTable = () => {
         queryParameters["&itemId[]"] = itemIds;
       }
     } else if (data.User) {
-      queryParameters["&providerLastUpdated"] = data.User;
+      queryParameters["&bookedUserAddress"] = data.User;
     }
 
     const query = Object.entries(queryParameters)
@@ -401,6 +415,7 @@ const ServiceTable = () => {
   const columns = generateTableColumns({
     isEdit,
     isNewRow,
+    statusOptions,
     serviceType,
     username,
     organization,
@@ -410,6 +425,7 @@ const ServiceTable = () => {
     serviceList,
     getProviderOptions,
     handleInputChange,
+    disabledDate,
     handleEditCancel,
     handleDelete,
     handleValidation,

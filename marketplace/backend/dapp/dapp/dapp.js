@@ -1837,18 +1837,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
       ...args,
       sort: '-createdDate',
-      owner: userAddress,
-      ownerOrganization: userOrganization,
+      // owner: userAddress, // if only want that are booked by user not by the organization(Provided).
+      // ownerOrganization: userOrganization,
+      bookedUserAddress: userAddress // used to get the loggedIn data of user booked through provided tab.
     }, getOptions);
 
     const memberships = await contract.getPurchasedMemberships();
     const services = await contract.getServices();
+    const users = await contract.getCertificates();
 
     const data = serviceUsage['serviceUsage'].map((item) => ({
       ...item,
       provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
       serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+      bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
     }));
 
     return { result: data, total: serviceUsage.total };
@@ -1870,6 +1873,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     let itemAddressList = issuedItems.map(item => item.address);
     const args1 = {
       // ownerOrganization: userOrganization,
+      // providerLastUpdated:userAddress, // we ca use this to show the provided created one.
       itemId: itemAddressList
     }
 
@@ -1877,13 +1881,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();
-    // const users = await contract.getCertificates()
+    const users = await contract.getCertificates()
     const data = serviceUsage['serviceUsage'].map((item) => ({
       ...item,
       provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
       serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
-      // userName: (users.find((uItem) => uItem.Address === item.providerLastUpdated) || {}).commonName || '',
+      bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
     }));
 
     return { result: data, total: serviceUsage.total };

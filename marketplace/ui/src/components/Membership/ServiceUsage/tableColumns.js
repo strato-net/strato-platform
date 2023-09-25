@@ -19,11 +19,6 @@ import {
 } from "@ant-design/icons";
 import moment from "moment";
 
-const statusOptions = [
-  { value: 1, label: "Requested" },
-  { value: 2, label: "Completed" },
-  { value: 3, label: "Cancelled" },
-];
 
 export function generateTableColumns({
   isEdit,
@@ -37,6 +32,7 @@ export function generateTableColumns({
   serviceList,
   getProviderOptions,
   handleInputChange,
+  disabledDate,
   handleEditCancel,
   handleDelete,
   handleValidation,
@@ -44,6 +40,7 @@ export function generateTableColumns({
   membership,
   providerState,
   isServicesLoading,
+  statusOptions
 }) {
   const renderUserColumn = (
     text,
@@ -60,26 +57,20 @@ export function generateTableColumns({
         {record.editable && !isEdit ? (
           <Select
             placeholder="User"
-            defaultValue={serviceType=='booked' && username}
+            defaultValue={serviceType == 'booked' && username}
             suffixIcon={
               serviceType === "booked" ? <LockOutlined /> : <CaretDownOutlined />
             }
             disabled={serviceType === "booked"}
             style={{ width: 120 }}
             onChange={(value) =>
-              handleInputChange(value, "providerLastUpdated", index)
+              handleInputChange(value, "bookedUserAddress", index)
             }
             options={userList}
           />
         ) : (
           <Typography style={{ color: "#061A6C" }}>
-            {userList.reduce((label, item) => {
-              if (item.value === text) {
-                return item.label;
-              }
-              return label;
-            }, null)}
-            {/* {record.ownerCommonName} */}
+            {record.bookedUserName}
           </Typography>
         )}
       </span>
@@ -101,7 +92,7 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            placeholder={(serviceType === "provided" && organization)?organization:'Provider'}
+            placeholder={(serviceType === "provided" && organization) ? organization : 'Provider'}
             suffixIcon={
               serviceType === "provided" ? (
                 <LockOutlined />
@@ -135,8 +126,9 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            disabled={!record.provider && !record.providerLastUpdated}
+            disabled={!record.provider && !record.bookedUserAddress}
             placeholder="Membership ID"
+            value={record.itemId}
             suffixIcon={<CaretDownOutlined />}
             style={{ width: 120 }}
             onChange={(value, obj) =>
@@ -213,6 +205,7 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <DatePicker
+            disabledDate={disabledDate}
             // value={text ? moment(text, 'YYYY-MM-DD') : null}
             onChange={(serviceDate, dateString) =>
               handleInputChange(
@@ -278,7 +271,7 @@ export function generateTableColumns({
           />
         ) : (
           <Typography style={{ color: "#061A6C" }}>
-            {statusOptions.reduce((label, item) => {
+            {statusOptions?.reduce((label, item) => {
               if (item.value === text) {
                 return item.label;
               }
@@ -323,8 +316,8 @@ export function generateTableColumns({
   return [
     {
       title: "User",
-      dataIndex: "providerLastUpdated",
-      key: "providerLastUpdated",
+      dataIndex: "bookedUserAddress",
+      key: "bookedUserAddress",
       render: (text, record, index) =>
         renderUserColumn(
           text,
