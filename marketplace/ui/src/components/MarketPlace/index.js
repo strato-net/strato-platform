@@ -23,20 +23,20 @@ const MarketPlace = () => {
   return (
     <>
       <div className="relative">
-        <Typography.Text className="w-80 z-10 absolute left-12 top-12 text-5xl leading-[60px]">
+        <Typography.Text className="w-80 z-10 absolute left-12 top-12 text-5xl leading-[60px] text-white font-semibold">
           Explore New Products
         </Typography.Text>
-        <Typography.Text className="absolute z-10 left-12 top-48 text-sm text-grayDark">
+        <Typography.Text className="absolute z-10 left-12 top-48 text-sm text-white">
         </Typography.Text>
         <Button
           id="viewMore"
           onClick={() => navigate(routes.MarketplaceProductList.url)}
-          className="group w-44 h-11 z-10 absolute left-12 top-60 border border-primary hover:bg-primary">
-          <div className="text-primary group-hover:text-white text-sm font-medium ">
+          className="group w-56 h-14 z-10 absolute left-12 top-60 border border-white hover:bg-primary opacity-80">
+          <div className="text-white font-bold group-hover:text-white text-base text-lg">
             View More
           </div>
         </Button>
-        <Image height={380} src={Images.hero2} preview={false} width="100%" />
+        <Image className="absolute inset-0 w-full h-full object-cover" style={{ filter: "brightness(0.7) saturate(70%) sepia(10%)" }} height={380} src={Images.hero2} preview={false} width="100%" />
       </div>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">

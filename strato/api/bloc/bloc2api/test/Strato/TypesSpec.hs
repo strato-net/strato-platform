@@ -1,19 +1,18 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Strato.TypesSpec where
 
-import           Control.Applicative
-import           Data.Aeson
-import           Test.Hspec
-import           Test.Hspec.QuickCheck
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances ()
-import           Text.Read
-
-import           Bloc.API.TypeWrappers
+import Bloc.API.TypeWrappers
+import Control.Applicative
+import Data.Aeson
+import Test.Hspec
+import Test.Hspec.QuickCheck
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
+import Text.Read
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do

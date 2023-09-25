@@ -1,7 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Blockchain.Init.Generator where
 
+import Blockchain.Init.EthConf
+import Blockchain.Init.Options
+import Blockchain.Init.Protocol
+import qualified Blockchain.Network as Net
 import Control.Concurrent
 import Control.Lens.Combinators (use)
 import Control.Monad
@@ -11,21 +16,15 @@ import Control.Monad.Trans.State
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString.Char8 as C8
 import Data.FileEmbed
+import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
-import qualified Data.Map as M
 import qualified Data.Text.IO as TIO
+import Network.Kafka (KafkaAddress, KafkaClientError, KafkaState, mkKafkaState, runKafka, stateTopicMetadata, updateMetadata)
+import Network.Kafka.Protocol (KafkaError (..), TopicMetadata (..))
 import System.Exit
 import UnliftIO.Directory
 import UnliftIO.IO
-
-import Blockchain.Init.Protocol
-import Blockchain.Init.EthConf
-import Blockchain.Init.Options
-import qualified Blockchain.Network as Net
-
-import Network.Kafka (KafkaAddress, mkKafkaState, runKafka, updateMetadata, KafkaState, KafkaClientError, stateTopicMetadata)
-import Network.Kafka.Protocol (KafkaError(..), TopicMetadata(..))
 
 type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
 
@@ -52,14 +51,27 @@ mkAll genesisBlockName = do
   ethconf <- liftIO genEthConf
   addEvent $ EthConf ethconf
 
-  addEvent $ TopicList [(t, t) | t <- ["statediff", "seq_vm_events", "seq_p2p_events"
-                                      , "unseqevents", "jsonrpcresponse", "indexevents", "block", "vmevents"]]
-    
+  addEvent $
+    TopicList
+      [ (t, t)
+        | t <-
+            [ "statediff",
+              "seq_vm_events",
+              "seq_p2p_events",
+              "unseqevents",
+              "jsonrpcresponse",
+              "indexevents",
+              "block",
+              "vmevents",
+              "solidvmevents"
+            ]
+      ]
+
   bootnodes <- case (flags_addBootnodes, flags_stratoBootnode) of
-                 (False, _) -> return Nothing
-                 (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
-                 (True, _)  -> return $ Just flags_stratoBootnode
-                         
+    (False, _) -> return Nothing
+    (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
+    (True, _) -> return $ Just flags_stratoBootnode
+
   addEvent $ PeerList bootnodes
 
   let genesisFileName = genesisBlockName ++ "Genesis.json"
@@ -73,11 +85,12 @@ mkAll genesisBlockName = do
 sendGenesisJson :: FilePath -> GenM ()
 sendGenesisJson genesisFilename = do
   fsFile <- doesFileExist genesisFilename
-  eGenInfo <- if fsFile
-                then liftIO $ Ae.eitherDecodeFileStrict' genesisFilename
-                else return $ do
-                  contents <- maybe (Left "file not found") Right $ lookup genesisFilename genesisFiles
-                  Ae.eitherDecodeStrict' contents
+  eGenInfo <-
+    if fsFile
+      then liftIO $ Ae.eitherDecodeFileStrict' genesisFilename
+      else return $ do
+        contents <- maybe (Left "file not found") Right $ lookup genesisFilename genesisFiles
+        Ae.eitherDecodeStrict' contents
   case eGenInfo of
     Left err -> liftIO $ die err
     Right genInfo -> addEvent $ GenesisBlock genInfo
@@ -99,5 +112,5 @@ sendAccountInfo accountInfoFileName = do
         mErr <- runKafka s $ sendChunks h
         either (die . ("sendAccountInfo: " ++) . show) return mErr
     else case lookup accountInfoFileName genesisFiles of
-            Nothing -> liftIO $ putStrLn "No account info found, assuming it isn't needed"
-            Just bs -> addEvent $ GenesisAccounts $ decodeUtf8 bs
+      Nothing -> liftIO $ putStrLn "No account info found, assuming it isn't needed"
+      Just bs -> addEvent $ GenesisAccounts $ decodeUtf8 bs

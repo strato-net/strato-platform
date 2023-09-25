@@ -1,29 +1,30 @@
 {-# LANGUAGE LambdaCase #-}
-module FaucetKey (
-  getFaucetKey
-  ) where
 
-import           Control.Monad.Except
-import qualified Data.ByteString.Base64         as Base64
-import qualified Data.ByteString.Char8          as BC
-import           Data.Either.Extra
-import           System.Environment
-import           System.Exit
-import           System.FilePath
+module FaucetKey
+  ( getFaucetKey,
+  )
+where
 
-import           Text.Format
-
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Secp256k1
+import Control.Monad.Except
+import qualified Data.ByteString.Base64 as Base64
+import qualified Data.ByteString.Char8 as BC
+import Data.Either.Extra
+import System.Environment
+import System.Exit
+import System.FilePath
+import Text.Format
 
 getGlobalKey :: IO (Maybe PrivateKey)
 getGlobalKey = fmap importPrivateKey . BC.readFile $ "config" </> "priv"
 
 getLocalKey :: IO (Maybe PrivateKey)
-getLocalKey = eitherExtractNodeKey >>= \case
-  Left "NODEKEY not set" -> return Nothing
-  Left err -> die err
-  Right prvKey -> return $ Just prvKey
+getLocalKey =
+  eitherExtractNodeKey >>= \case
+    Left "NODEKEY not set" -> return Nothing
+    Left err -> die err
+    Right prvKey -> return $ Just prvKey
 
 eitherExtractNodeKey :: IO (Either String PrivateKey)
 eitherExtractNodeKey = runExceptT $ do
@@ -32,7 +33,6 @@ eitherExtractNodeKey = runExceptT $ do
     throwError "NODEKEY not set"
   bytes <- liftEither . Base64.decode . BC.pack $ mKey
   liftEither . maybeToEither "Invalid NODEKEY" . importPrivateKey $ bytes
-
 
 -- | The @main@ function for an executable running this site.
 getFaucetKey :: IO (Maybe PrivateKey)

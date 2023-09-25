@@ -2,20 +2,19 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Data.LogDB
-    ( HasMemLogDB(..)
-    , putLogDB
-    , putLogDBs
-    ) where
+  ( HasMemLogDB (..),
+    putLogDB,
+    putLogDBs,
+  )
+where
 
-import           Database.Persist             hiding (get)
-import qualified Database.Persist.Postgresql  as SQL
-
-import           Blockchain.Data.DataDefs
-import           Blockchain.DB.SQLDB
+import Blockchain.DB.SQLDB
+import Blockchain.Data.DataDefs
+import qualified Database.Persist.Postgresql as SQL
 
 class (Monad m) => HasMemLogDB m where
   enqueueLogEntries :: [LogDB] -> m ()
-  flushLogEntries   :: m ()
+  flushLogEntries :: m ()
 
   enqueueLogEntry :: LogDB -> m ()
   enqueueLogEntry = enqueueLogEntries . pure

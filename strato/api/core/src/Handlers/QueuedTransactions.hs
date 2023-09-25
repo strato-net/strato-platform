@@ -7,22 +7,20 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Handlers.QueuedTransactions (
-  API,
-  server
-  ) where
+module Handlers.QueuedTransactions
+  ( API,
+    server,
+  )
+where
 
-import           Control.Monad.Change.Modify
-import           Database.Persist.Postgresql
-import           Servant
-
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Json
-import           Blockchain.DB.SQLDB
-
-import           Control.Monad.Composable.SQL
-
-import           Settings
+import Blockchain.DB.SQLDB
+import Blockchain.Data.DataDefs
+import Blockchain.Data.Json
+import Control.Monad.Change.Modify
+import Control.Monad.Composable.SQL
+import Database.Persist.Postgresql
+import Servant
+import Settings
 
 type API = "transaction" :> "last" :> "queued" :> Get '[JSON] [RawTransaction']
 
@@ -32,12 +30,13 @@ server = getQueuedTransactions
 ---------------------
 
 instance HasSQL m => Accessible [RawTransaction] m where
-  access _ = fmap (map entityVal) . sqlQuery $
-    selectList [ RawTransactionBlockNumber ==. (-1) ]
-               [ LimitTo (fromIntegral $ appFetchLimit :: Int)
-               , Desc RawTransactionNonce
-               ]
+  access _ =
+    fmap (map entityVal) . sqlQuery $
+      selectList
+        [RawTransactionBlockNumber ==. (-1)]
+        [ LimitTo (fromIntegral $ appFetchLimit :: Int),
+          Desc RawTransactionNonce
+        ]
 
 getQueuedTransactions :: (Functor m, Accessible [RawTransaction] m) => m [RawTransaction']
 getQueuedTransactions = map rtToRtPrime' <$> access (Proxy @[RawTransaction])
-

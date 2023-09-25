@@ -51,7 +51,7 @@ pipeline {
           // Copy .pem and .key for SSL
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
           sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-          
+
           writeFile file: "run-vault.sh", text: """#!/bin/bash
             sudo \\
               ssl=true \\
@@ -63,9 +63,9 @@ pipeline {
               ./vault
           """
           sh 'chmod +x run-vault.sh'
-      
+
           sh './run-vault.sh'
-  
+
           // TODO: run node on https (also update check_availability function)
           withCredentials([
             usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
@@ -82,7 +82,6 @@ pipeline {
                 OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
-                requireCerts=false \\
                 certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
                 STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
                 STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
@@ -98,11 +97,11 @@ pipeline {
           }
 
           sh 'chmod +x run.sh'
-      
+
           sh './run.sh'
-      
+
           sh 'docker ps'
-      
+
           // Few quick tests
           sh '''#!/bin/bash -le
             check_availability() {
@@ -119,7 +118,7 @@ pipeline {
               done
               echo "STRATO health endpoint is available through nginx - node is running"
             }
-            
+
             check_availability
           '''
         }
@@ -129,7 +128,7 @@ pipeline {
 
         dir("strato-getting-started") {
           sh './strato --wipe'
-  
+
           sh './run.sh'
 
           sh 'docker ps'
@@ -152,25 +151,44 @@ pipeline {
             }
 
             check_availability
-            
+
             echo "Restarting docker containers to simulate computer restart..."
             docker compose -p strato stop
             docker compose -p strato start
-            
+
             check_availability
           '''
         }
-  
+
         script {
           // TODO: replace with jenkins credentials here and in other places in pipelines
           lib.registerTestUserCert(
               '.',
-              'strato-getting-started',
               'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
               'dev',
               'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f',
               'user1',
               '1234'
+          )
+          lib.registerTestUserCert(
+              '.',
+              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+              'dev-testing1',
+              'e4ccbcec-1824-468a-a869-c90a842de9be',
+              '',
+              '',
+              'dev',
+              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+          )
+          lib.registerTestUserCert(
+              '.',
+              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+              'dev-testing2',
+              'd29bca04-c503-4329-a853-a9e6ef19a205',
+              '',
+              '',
+              'dev',
+              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
           )
           // Unlock the marketplace deploy script:
           sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
@@ -209,7 +227,7 @@ pipeline {
             ]) {
               sh '''#!/bin/bash -le
                 set -x
-                version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)     
+                version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
                 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
                 aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
                 aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
@@ -221,12 +239,11 @@ pipeline {
               }
           },
 
-/*            
           'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
               echo "Running apex unit tests"
-              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
+              APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'apex.*1')
 # TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
@@ -245,7 +262,7 @@ pipeline {
               set -x
               echo 'Running SMD tests'
               cd smd-ui
-              docker build -f Dockerfile.test .
+              docker build --target test .
             '''
           },
 
@@ -290,7 +307,6 @@ pipeline {
               sh 'npm run test'
             }
           },
- */
         )
       }
     }

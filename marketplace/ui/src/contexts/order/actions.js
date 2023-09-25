@@ -226,14 +226,16 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, queryValue, organization) => {
-    const query = queryValue ? `&orderId=${queryValue}` : "";
-
+  fetchOrder: async (dispatch, limit, offset, queryValue, organization, order, selectedDate) => {
+    let query = queryValue ? `&orderId=${queryValue}` : "";
+    let end = selectedDate + 86400;
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "";
+    
     dispatch({ type: actionDescriptors.fetchOrder });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&buyerOrganization=${organization}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&order=${order}&buyerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -254,14 +256,17 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization) => {
-    const query = queryValue ? `&orderId=${queryValue}` : "";
+  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order, selectedDate) => {
+    let query = queryValue ? `&orderId=${queryValue}` : "";
+    let end = selectedDate + 86400;
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "";
+
 
     dispatch({ type: actionDescriptors.fetchOrderSold });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&sellerOrganization=${organization}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}${query}&sellerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }

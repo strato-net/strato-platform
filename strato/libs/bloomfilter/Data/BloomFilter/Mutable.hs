@@ -1,5 +1,8 @@
-{-# LANGUAGE BangPatterns, CPP, Rank2Types,
-    TypeOperators,FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- |
 -- Module: Data.BloomFilter.Mutable
@@ -24,10 +27,8 @@
 --
 -- This module provides low-level control.  For an easier to use
 -- interface, see the "Data.BloomFilter.Easy" module.
-
 module Data.BloomFilter.Mutable
-    (
-    -- * Overview
+  ( -- * Overview
     -- $overview
 
     -- ** Ease of use
@@ -37,61 +38,77 @@ module Data.BloomFilter.Mutable
     -- $performance
 
     -- * Types
-      Hash
-    , MBloom
+    Hash,
+    MBloom,
+
     -- * Mutable Bloom filters
 
     -- ** Creation
-    , new
+    new,
 
     -- ** Accessors
-    , length
-    , elem
+    length,
+    elem,
 
     -- ** Mutation
-    , insert
+    insert,
 
     -- * The underlying representation
+
     -- | If you serialize the raw bit arrays below to disk, do not
     -- expect them to be portable to systems with different
     -- conventions for endianness or word size.
 
     -- | The raw bit array used by the mutable 'MBloom' type.
-    , bitArray
-    ) where
+    bitArray,
+  )
+where
 
 #include "MachDeps.h"
 
-import Control.Monad (liftM, forM_)
+import Control.Monad (forM_, liftM)
 import Control.Monad.ST (ST)
 import Data.Array.Base (unsafeRead, unsafeWrite)
-import Data.Bits ((.&.), (.|.), unsafeShiftL, unsafeShiftR)
+import Data.Bits (unsafeShiftL, unsafeShiftR, (.&.), (.|.))
 import Data.BloomFilter.Array (newArray)
-import Data.BloomFilter.Util ((:*)(..), nextPowerOfTwo)
-import Data.Word (Word32)
 import Data.BloomFilter.Mutable.Internal
-
-import Prelude hiding (elem, length, notElem,
-                       (/), (*), div, divMod, mod, rem)
+import Data.BloomFilter.Util (nextPowerOfTwo, (:*) (..))
+import Data.Word (Word32)
+import Prelude hiding
+  ( div,
+    divMod,
+    elem,
+    length,
+    mod,
+    notElem,
+    rem,
+    (*),
+    (/),
+  )
 
 -- | Create a new mutable Bloom filter.  For efficiency, the number of
 -- bits used may be larger than the number requested.  It is always
 -- rounded up to the nearest higher power of two, but will be clamped
 -- at a maximum of 4 gigabits, since hashes are 32 bits in size.
-new :: (a -> [Hash])          -- ^ family of hash functions to use
-    -> Int                    -- ^ number of bits in filter
-    -> ST s (MBloom s a)
+new ::
+  -- | family of hash functions to use
+  (a -> [Hash]) ->
+  -- | number of bits in filter
+  Int ->
+  ST s (MBloom s a)
 new hash numBits = MB hash shft msk `liftM` newArray numElems numBytes
-  where twoBits | numBits < 1 = 1
-                | numBits > maxHash = maxHash
-                | isPowerOfTwo numBits = numBits
-                | otherwise = nextPowerOfTwo numBits
-        numElems = max 2 (twoBits `unsafeShiftR` logBitsInHash)
-        numBytes = numElems `unsafeShiftL` logBytesInHash
-        trueBits = numElems `unsafeShiftL` logBitsInHash
-        shft     = logPower2 trueBits
-        msk      = trueBits - 1
-        isPowerOfTwo n = n .&. (n - 1) == 0
+  where
+    twoBits
+      | numBits < 1 = 1
+      | numBits > maxHash = maxHash
+      | isPowerOfTwo numBits = numBits
+      | otherwise = nextPowerOfTwo numBits
+    numElems = max 2 (twoBits `unsafeShiftR` logBitsInHash)
+    numBytes = numElems `unsafeShiftL` logBytesInHash
+    trueBits = numElems `unsafeShiftL` logBitsInHash
+    shft = logPower2 trueBits
+    msk = trueBits - 1
+    isPowerOfTwo n = n .&. (n - 1) == 0
 
 maxHash :: Int
 #if WORD_SIZE_IN_BITS == 64
@@ -110,8 +127,9 @@ logBytesInHash = 2 -- logPower2 (sizeOf (undefined :: Hash))
 -- a word array and a bit offset within that word.
 hashIdx :: Int -> Word32 -> (Int :* Int)
 hashIdx msk x = (y `unsafeShiftR` logBitsInHash) :* (y .&. hashMask)
-  where hashMask = 31 -- bitsInHash - 1
-        y = fromIntegral x .&. msk
+  where
+    hashMask = 31 -- bitsInHash - 1
+    y = fromIntegral x .&. msk
 
 -- | Hash the given value, returning a list of (word offset, bit
 -- offset) pairs, one per hash value.
@@ -124,21 +142,22 @@ insert :: MBloom s a -> a -> ST s ()
 insert mb elt = do
   let mu = bitArray mb
   forM_ (hashesM mb elt) $ \(word :* bit) -> do
-      old <- unsafeRead mu word
-      unsafeWrite mu word (old .|. (1 `unsafeShiftL` bit))
+    old <- unsafeRead mu word
+    unsafeWrite mu word (old .|. (1 `unsafeShiftL` bit))
 
 -- | Query a mutable Bloom filter for membership.  If the value is
 -- present, return @True@.  If the value is not present, there is
 -- /still/ some possibility that @True@ will be returned.
 elem :: a -> MBloom s a -> ST s Bool
 elem elt mb = loop (hashesM mb elt)
-  where mu = bitArray mb
-        loop ((word :* bit):wbs) = do
-          i <- unsafeRead mu word
-          if i .&. (1 `unsafeShiftL` bit) == 0
-            then return False
-            else loop wbs
-        loop _ = return True
+  where
+    mu = bitArray mb
+    loop ((word :* bit) : wbs) = do
+      i <- unsafeRead mu word
+      if i .&. (1 `unsafeShiftL` bit) == 0
+        then return False
+        else loop wbs
+    loop _ = return True
 
 -- bitsInHash :: Int
 -- bitsInHash = sizeOf (undefined :: Hash) `shiftL` 3
@@ -147,13 +166,13 @@ elem elt mb = loop (hashesM mb elt)
 length :: MBloom s a -> Int
 length = unsafeShiftL 1 . shift
 
-
 -- | Slow, crummy way of computing the integer log of an integer known
 -- to be a power of two.
 logPower2 :: Int -> Int
 logPower2 k = go 0 k
-    where go j 1 = j
-          go j n = go (j+1) (n `unsafeShiftR` 1)
+  where
+    go j 1 = j
+    go j n = go (j + 1) (n `unsafeShiftR` 1)
 
 -- $overview
 --
