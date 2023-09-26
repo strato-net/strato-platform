@@ -22,7 +22,26 @@ pipeline {
         '''
       }
     }
-
+    
+    stage('Ensure branch merge flow') {
+      steps {
+        script {
+          if (env.BRANCH_NAME.startsWith('PR-')) {
+            if (env.CHANGE_TARGET == 'master' && env.CHANGE_BRANCH != 'staging') {
+              unstable("ERROR: You can only merge to 'master' from 'staging'.")
+            }
+            else if (env.CHANGE_TARGET == 'staging' && env.CHANGE_BRANCH != 'develop') {
+              unstable("ERROR: You can only merge to 'staging' from 'develop'.")
+            }
+            else {
+              echo "Allowing the PR merge for branches ${env.CHANGE_BRANCH} -> ${env.CHANGE_TARGET}"
+            }
+          } else {
+            echo 'Not a PR, skipping the git merge flow checks'
+          }
+        }
+      }
+    }
 
     stage('Build') {
       steps {
@@ -196,9 +215,8 @@ pipeline {
 
       }
     }
-
-//    stage('Test and Push Images') {
-    stage('Push Images & Artifacts') {
+    
+    stage('Test & Push Artifacts') {
       steps {
         parallel (
           'Push Images': {

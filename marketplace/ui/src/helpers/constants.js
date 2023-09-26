@@ -33,7 +33,8 @@ export const UNIT_OF_MEASUREMENTS = {
   7: "Bale",
   8: "Gallon",
   9: "Pound",
-  10: "Yard"
+  10: "Yard",
+  11: "Kilogram"
 };
 
 export const US_DATE_FORMAT = "MM/DD/YYYY";
@@ -58,7 +59,8 @@ export const unitOfMeasures = [
   { name: "Bale", value: 7 },
   { name: "Gallon", value: 8 },
   { name: "Pound", value: 9 },
-  { name: "Yard", value: 10 }
+  { name: "Yard", value: 10 },
+  { name: "Kilogram", value: 11 }
 ];
 
 export const CHARGES = {
@@ -84,18 +86,18 @@ export const STATUS_FILTER = [
 ];
 
 export const STATUS = {
-    0: "",
-    1: "Pending",
-    2: "Approved",
-    3: "Rejected",
-    "Pending" : 1,
-    "Approved" : 2,
-    "Rejected" : 3
-  };
+  0: "",
+  1: "Pending",
+  2: "Approved",
+  3: "Rejected",
+  "Pending": 1,
+  "Approved": 2,
+  "Rejected": 3
+};
 
-  export const APPROVAL_STATUS = {
-    1: "Accept",
-    2: "Reject",
-    "Accept" : 1,
-    "Reject" : 2,
-  };
+export const APPROVAL_STATUS = {
+  1: "Accept",
+  2: "Reject",
+  "Accept": 1,
+  "Reject": 2,
+};
