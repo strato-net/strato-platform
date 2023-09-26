@@ -17,7 +17,9 @@ import {
   CloseOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import moment from "moment";
+import dayjs from "dayjs";
+
+dayjs.locale('es');
 
 
 export function generateTableColumns({
@@ -127,7 +129,7 @@ export function generateTableColumns({
         {record.editable ? (
           <Select
             disabled={!record.provider && !record.bookedUserAddress}
-            placeholder="Membership ID"
+            placeholder={"Membership ID"}
             value={record.itemId}
             suffixIcon={<CaretDownOutlined />}
             style={{ width: 120 }}
@@ -160,8 +162,8 @@ export function generateTableColumns({
         {record.editable ? (
           <Select
             disabled={!record.itemId || isServicesLoading}
-            placeholder="Service"
-            defaultValue={record.serviceId}
+            placeholder={"Service"}
+            value={record.serviceId}
             suffixIcon={isServicesLoading ? <Spin size='small' /> : <CaretDownOutlined />}
             style={{ width: 120 }}
             onChange={(value) => handleInputChange(value, "serviceId", index)}
@@ -207,9 +209,10 @@ export function generateTableColumns({
         {record.editable ? (
           <DatePicker
             disabledDate={disabledDate}
+            defaultValue={text ? dayjs(text) : ''}
             onChange={(serviceDate, dateString) =>
               handleInputChange(
-                new Date(serviceDate).getTime().toString(),
+                dayjs(serviceDate).valueOf(),
                 "serviceDate",
                 index
               )
@@ -217,7 +220,7 @@ export function generateTableColumns({
           />
         ) : (
           <Typography style={{ color: "#061A6C" }}>
-            {moment(text).format("MM-DD-YYYY")}
+            {dayjs(text).format("MM-DD-YYYY")}
           </Typography>
         )}
       </span>
