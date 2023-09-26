@@ -1,0 +1,10 @@
+module BlockApps.Tools.RLP where
+
+import BlockApps.Tools.Util
+import Blockchain.Data.RLP
+import Text.Format
+
+doit :: String -> IO ()
+doit filename = ldbForEach filename $ \key val -> do
+  putStrLn $ format key ++ ":" ++ tab ("\n" ++ formatRLPObject (rlpDeserialize val))
+  putStrLn "--------------------"

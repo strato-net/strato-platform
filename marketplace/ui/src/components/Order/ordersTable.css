@@ -1,0 +1,10 @@
+.icon-container {
+    padding: 8px;
+    /* Adjust the padding as needed */
+    border-radius: 30%; /* Make the container rounded */
+}
+
+.icon-hover:hover {
+    background-color: #f0f0f0;
+    /* Change to the desired gray color */
+}

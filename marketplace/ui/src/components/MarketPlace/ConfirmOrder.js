@@ -20,7 +20,7 @@ import {
   Form,
   Input,
 } from "antd";
-import { useState, useEffect, useMemo} from "react";
+import { useState, useEffect, useMemo } from "react";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
@@ -45,8 +45,8 @@ const { TextArea } = Input;
 
 const ShippingDetailsSchema = () => {
   return yup.object().shape({
-    name: yup.string().matches(/^[A-Za-z.\s]+$/,"Must contain only characters").required("Name is required"),
-    zipcode: yup.string().matches(/^\d+$/, "Must contain only numbers").length(5, "Must be exactly 5 digits")
+    name: yup.string().required("Name is required"),
+    zipcode: yup.string().max(15).required("Zipcode is required")
       .required("Zipcode is required"),
     addressLine1: yup.string().required("Address Line 1 is required"),
     addressLine2: yup.string().notRequired(),
@@ -55,12 +55,11 @@ const ShippingDetailsSchema = () => {
     sameAddress: yup.boolean(),
     name_b: yup.string().when("sameAddress", {
       is: false,
-      then: yup.string().required("Billing Name is required"),
+      then: yup.string().required("Name is required"),
     }),
     zipcode_b: yup.number().when("sameAddress", {
       is: false,
-      then: yup.number().required("Zipcode is required")
-        .test('len', 'Must be exactly 5 digits', val => val && val.toString().length === 5),
+      then: yup.string().max(15).required("Zipcode is required"),
     }),
     addressLine1_b: yup.string().when("sameAddress", {
       is: false,
@@ -105,15 +104,15 @@ const ConfirmOrder = () => {
   const handleCancel = () => {
     setOpen(false);
   };
-  
+
   useEffect(() => {
     actions.fetchUserAddresses(marketplaceDispatch);
   }, [marketplaceDispatch])
-  
+
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
-  
+
   useEffect(() => {
     actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
@@ -265,7 +264,7 @@ const ConfirmOrder = () => {
           <p className="text-primary text-[17px]">{decodeURIComponent(text.name)}</p>
         );
       },
-      
+
     },
     {
       title: (
@@ -274,7 +273,7 @@ const ConfirmOrder = () => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: (
@@ -283,7 +282,7 @@ const ConfirmOrder = () => {
       dataIndex: "unitOfMeasure",
       align: "center",
       render: (text) => <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -319,7 +318,7 @@ const ConfirmOrder = () => {
     },
   ];
 
-  
+
 
   const navigate = useNavigate();
 
@@ -485,7 +484,7 @@ const ConfirmOrder = () => {
       },
     });
     let data = await orderActions.createPayment(orderDispatch, body);
-   
+
     if (data != null && data.url !== undefined) {
       window.location.replace(data.url);
     }
@@ -606,6 +605,7 @@ const ConfirmOrder = () => {
                         label="zipcode"
                         name="zipcode"
                         placeholder="Enter Zipcode"
+                        maxLength={15}
                         value={formik.values.zipcode}
                         onChange={formik.handleChange}
                       />
@@ -746,6 +746,7 @@ const ConfirmOrder = () => {
                                 placeholder="Enter Zipcode"
                                 value={formik.values.zipcode}
                                 onChange={formik.handleChange}
+                                maxLength={15}
                               />
                               {formik.touched.zipcode && formik.errors.zipcode && (
                                 <span className="text-error text-xs">
@@ -840,12 +841,12 @@ const ConfirmOrder = () => {
               }
             </div>
             {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className="justify-center mt-12">
-              <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
+              {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);
                 }}>
-                Pay later
-              </div>
+                Pay Later
+              </div> */}
               <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
                 onClick={() => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
@@ -853,7 +854,7 @@ const ConfirmOrder = () => {
                   }
                 }}
               >
-                Pay now
+                Review and Submit
               </div>
             </Row>}
           </div>

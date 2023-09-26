@@ -142,7 +142,6 @@ runPeerInList thePeer sSource = do
 stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
 stratoP2PClient runner = runner $ \sSource -> do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
-
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
@@ -169,7 +168,6 @@ stratoP2PClient runner = runner $ \sSource -> do
             result <- runPeerInList p sSource
             handleRunPeerResult p result
             liftIO (SSem.signal sem)
-
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException a -> m ()
     handleRunPeerResult thePeer = \case
       Left e | Just (ErrorCall x) <- fromException e -> error x
