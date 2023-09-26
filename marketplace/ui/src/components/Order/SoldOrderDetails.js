@@ -230,20 +230,14 @@ const SoldOrderDetails = ({ user, users }) => {
           quantity: details.orderLines[i].quantity,
         };
 
-        promises.push(actions.createOrderLineItem(dispatch, body));
+        promises.push(await actions.createOrderLineItem(dispatch, body));
       }
-      // body = {
-      //   orderId: details.orderId,
-      //   orderAddress: details.address,
-      //   orderLineId: details.orderLines[i].address,
-      //   quantity: details.orderLines[i].quantity,
-      // };
-
-      // promises.push(actions.createOrderLineItem(dispatch, body));
     }
-    if (promises.length > 0) {
-      await Promise.all(promises);
-    }
+    if (promises.length > 0) 
+      {
+        await Promise.all(promises);
+      }
+      
     body = {};
     if (selectedDate == null) {
       body = {
