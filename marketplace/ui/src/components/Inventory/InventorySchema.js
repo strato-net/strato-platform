@@ -17,6 +17,7 @@ const getSchema = () => {
       return value === undefined || !value.includes('"');
     }),
     status: yup.boolean().required("Status is required"),
+    inventoryType: yup.string().required("Inventory type is required"),
     serialNumber: yup.object().shape({
       serialNumStr: yup
         .string()

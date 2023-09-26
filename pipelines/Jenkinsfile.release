@@ -99,7 +99,6 @@ pipeline {
               OAUTH_CLIENT_SECRET=d5e67b8c-4fbf-42c6-a8d9-29a4dd13575f \\
               VAULT_URL=https://\$(</host):8093 \\
               VAULT_PROXY_DEBUG=true \\
-              requireCerts=false \\
               certInfo='{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"}' \\
               ./strato --single
           """
@@ -168,6 +167,23 @@ pipeline {
             check_availability
           '''
         }
+
+        script {
+          // TODO: replace with jenkins credentials here and in other places in pipelines
+          lib.registerTestUserCert(
+              'strato-worktree',
+              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+              'dev-testing2',
+              'd29bca04-c503-4329-a853-a9e6ef19a205',
+              '',
+              '',
+              'dev',
+              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f'
+          )
+          // Unlock the marketplace deploy script:
+          sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+        }
+
       }
     }
 
