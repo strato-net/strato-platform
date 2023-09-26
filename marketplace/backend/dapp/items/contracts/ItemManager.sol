@@ -196,28 +196,30 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         Product_3 oldProduct = Product_3(item.productId());
         address productAddress = productManager.checkForProduct(
-            address(oldProduct),
             oldProduct.uniqueProductCode(),
             _newOwner
         );
 
-        product = (productAddress == address(0))
-            ? new Product_3(
-                oldProduct.name(),
-                oldProduct.description(),
-                oldProduct.manufacturer(),
-                oldProduct.unitOfMeasurement(),
-                oldProduct.userUniqueProductCode(),
-                oldProduct.uniqueProductCode(),
-                oldProduct.leastSellableUnit(),
-                oldProduct.imageKey(),
-                oldProduct.isActive(),
-                oldProduct.category(),
-                oldProduct.subCategory(),
-                block.timestamp,
-                _newOwner
-            )
-            : Product_3(productAddress);
+        if (productAddress == address(0)) {
+                    address addr = productManager.addProductForBuyer(
+                        oldProduct.name(),
+                        oldProduct.description(),
+                        oldProduct.manufacturer(),
+                        oldProduct.unitOfMeasurement(),
+                        oldProduct.userUniqueProductCode(),
+                        oldProduct.uniqueProductCode(),
+                        oldProduct.leastSellableUnit(),
+                        oldProduct.imageKey(),
+                        oldProduct.isActive(),
+                        oldProduct.category(),
+                        oldProduct.subCategory(),
+                        block.timestamp,
+                        _newOwner
+                    );
+                    product = Product_3(addr);
+                } else {
+                    product = Product_3(productAddress);
+                }
 
         Inventory oldInventory = Inventory(item.inventoryId());
 
@@ -245,6 +247,9 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             );
+            address itemContractAddress = address(itemAddr);
+            itemProductIdMapping[itemContractAddress] = address(product);
+            itemInventoryIdMapping[itemContractAddress] = address(inventory);
         } else {
             (uint status, address inventory) = product.addInventory(
                 _itemsAddress.length,

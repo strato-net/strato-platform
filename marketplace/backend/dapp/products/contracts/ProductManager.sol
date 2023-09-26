@@ -54,6 +54,43 @@ contract ProductManager is
         return (RestStatus.OK, address(product));
     }
 
+    function addProductForBuyer(
+        string _name,
+        string _description,
+        string _manufacturer,
+        UnitOfMeasurement _unitOfMeasurement,
+        string _userUniqueProductCode,
+        uint _uniqueProductCode,
+        int _leastSellableUnit,
+        string _imageKey,
+        bool _isActive,
+        string _category,
+        string _subCategory,
+        uint _createdDate,
+        address _newOwner
+    ) returns (address) {
+        Product_3 product = new Product_3(
+            _name,
+            _description,
+            _manufacturer,
+            _unitOfMeasurement,
+            _userUniqueProductCode,
+            _uniqueProductCode,
+            _leastSellableUnit,
+            _imageKey,
+            _isActive,
+            _category,
+            _subCategory,
+            _createdDate,
+            _newOwner
+        );
+
+        string _organization = getOrganization(_newOwner);
+        orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
+
+        return (address(product));
+    }
+
     function updateProduct(
         address _productAddress,
         string _description,
@@ -251,18 +288,13 @@ contract ProductManager is
     }
 
     function checkForProduct(
-        address _productAddress,
         uint _uniqueProductCode,
         address _owner
     ) public returns (address) {
         string _organization = getOrganization(_owner);
 
-        if (
-            orgToUPCToProduct[_organization][_uniqueProductCode] !=
-            address(0) &&
-            orgToUPCToProduct[_organization][_uniqueProductCode] ==
-            address(_productAddress)
-        ) {
+        if (orgToUPCToProduct[_organization][_uniqueProductCode] != address(0)) 
+        {
             return orgToUPCToProduct[_organization][_uniqueProductCode];
         }
         return address(0);
