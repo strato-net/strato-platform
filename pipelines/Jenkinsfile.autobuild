@@ -30,15 +30,17 @@ pipeline {
             if (env.CHANGE_TARGET == 'master' && env.CHANGE_BRANCH != 'staging') {
               unstable("ERROR: You can only merge to master from 'staging'.")
             }
-            if (env.CHANGE_TARGET == 'staging' && env.CHANGE_BRANCH != 'develop') {
+            else if (env.CHANGE_TARGET == 'staging' && env.CHANGE_BRANCH != 'develop') {
               unstable("ERROR: You can only merge to staging from 'develop'.")
             }
-            if (env.CHANGE_TARGET == 'develop' && env.CHANGE_BRANCH != 'my-non-existent-branch') {
+            else if (env.CHANGE_TARGET == 'develop' && env.CHANGE_BRANCH != 'my-non-existent-branch') {
               unstable("ERROR: You can only merge to develop from 'my-non-existent-branch'.")
             }
-            echo "Allowing the PR merge for branches $env.CHANGE_BRANCH -> $env.CHANGE_TARGET"
+            else {
+              echo "Allowing the PR merge for branches ${env.CHANGE_BRANCH} -> ${env.CHANGE_TARGET}"
+            }
           } else {
-            echo 'Not a PR, skipped git merge flow checks'
+            echo 'Not a PR, skipping the git merge flow checks'
           }
         }
       }
