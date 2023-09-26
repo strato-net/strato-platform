@@ -4,6 +4,7 @@ import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
 import { getSignedUrlFromS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
+import sendEmail from '../../../helpers/email'
 const options = { config, cacheNonce: true }
 
 class OrderController {
@@ -50,11 +51,19 @@ class OrderController {
   static async create(req, res, next) {
     try {
       const { dapp, body } = req
+      
+      const { to, subject, htmlContent } = body;
 
       OrderController.validateCreateOrderArgs(body)
 
       const result = await dapp.createOrder(body)
+      
       rest.response.status200(res, result)
+
+      // Only send email if order is created successfully
+      if (res.statusCode === 200) {
+        await sendEmail(to, subject, htmlContent);
+      }
 
       console.log("*Buyer placed order*");
 
@@ -165,6 +174,9 @@ class OrderController {
       orderTotal: Joi.number().required(),
       paymentSessionId: Joi.string(),
       shippingAddress: Joi.string().required(),
+      to: Joi.string().required(),
+      subject: Joi.string().required(),
+      htmlContent: Joi.string().required(),
     }).required();
 
     const validation = createOrderSchema.validate(args);
@@ -181,10 +193,15 @@ class OrderController {
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
             inventoryId: Joi.string().required(),
-            quantity: Joi.number().required()
+            quantity: Joi.number().required(),
+            name: Joi.string().required(),
+            unitPrice: Joi.number().required(),
           })).required(),
       orderTotal: Joi.number().required(),
-      shippingAddress: Joi.string().required()
+      shippingAddress: Joi.string().required(),
+      tax: Joi.number().required(),
+      user: Joi.string().required(),
+      email: Joi.string().required(),
     }).required();
 
     const validation = paymentSchema.validate(args);

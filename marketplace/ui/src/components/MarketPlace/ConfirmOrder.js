@@ -319,56 +319,27 @@ const ConfirmOrder = () => {
   ];
 
 
-
-  const navigate = useNavigate();
-
-
-  const handleOrderConfirm = async () => {
-    handleCancel();
-    let orderList = [];
-    let orderItemAddress = [];
-    confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
-      orderItemAddress.push(item.key);
-    });
-    const body = {
-      buyerOrganization: userOrganization,
-      orderList,
-      orderTotal: total + tax + shipping,
-      shippingAddress: userAddresses[selectedAddress].address,
-    };
-
-    TagManager.dataLayer({
-      dataLayer: {
-        event: 'pay_later_button',
-      },
-    });
-    let isDone = await orderActions.createOrder(orderDispatch, body);
-    if (isDone) {
-      let updatedCart = [];
-      cartList.forEach(cart => {
-        if (!orderItemAddress.includes(cart.product.address)) {
-          updatedCart.push(cart);
-        }
-      });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
-      setTimeout(function () {
-        navigate(`/orders`, { state: { defaultKey: "Bought" } });
-      }, 2000);
-    }
-  };
-
   const handlePaymentConfirm = async () => {
-    handleCancel();
     let orderList = [];
     confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
+    // These additional fields need to be sent to form the request after stripe. 
+      orderList.push({
+        inventoryId: item.key, 
+        quantity: item.qty,
+        name: item.item.name,
+        unitPrice: item.unitPrice,
+      });
     });
+
+    // These additional fields need to be sent to form the request after stripe. 
     const body = {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
+      tax: tax,
+      user: user.commonName,
+      email: user.preferred_username,
     };
     TagManager.dataLayer({
       dataLayer: {
@@ -733,12 +704,6 @@ const ConfirmOrder = () => {
               }
             </div>
             {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className="justify-center mt-12">
-              {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
-                onClick={() => {
-                  setOpen(true);
-                }}>
-                Pay Later
-              </div> */}
               <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
                 onClick={() => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
@@ -752,11 +717,6 @@ const ConfirmOrder = () => {
           </div>
         </div>
       )}
-      <ConfirmOrderModel
-        open={open}
-        handleCancel={handleCancel}
-        handleConfirm={handleOrderConfirm}
-      />
       {marketplaceMessage && openToastMarketplace("Bottom")}
       {message && openToastOrder("bottom")}
     </div>
