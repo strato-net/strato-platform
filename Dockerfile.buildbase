@@ -7,22 +7,8 @@ RUN apt-get update && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean && \
-    # TODO: check if the libsodium installed with apt is ver 1.0.18 (for ubuntu 20.04+) and if not - make from source. Remove the touch command
-    if [ ! -f /usr/local/lib/libsodium.so.23 ]; then \
-        wget https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-stable.tar.gz && \
-        tar -xvzf libsodium-1.0.18-stable.tar.gz && \
-        cd libsodium-stable && \
-        ./configure && \
-        make && \
-        make install && \
-        make check && \
-        cd .. && \
-        rm -rf libsodium-stable && \
-        rm -rf libsodium-1.0.18-stable.tar.gz; \
-        touch /usr/local/lib/libsodium.so.23; \
-    fi
-RUN stack install ormolu implicit-hie
-RUN git clone https://github.com/blockapps/secp256k1 && \
+    stack install ormolu implicit-hie && \
+    git clone https://github.com/blockapps/secp256k1 && \
     cd secp256k1/ && \
     ./autogen.sh && \
     ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh && \
