@@ -18,7 +18,7 @@ jobs:
           echo "ERROR: You can only merge to 'staging' from 'devel'."
           exit 1
       - name: Check branch
-          if: github.base_ref == 'devel' && github.head_ref != 'my-non-existent-branch'
-          run: |
-            echo "ERROR: You can only merge to 'devel' from 'my-non-existent-branch' (TESTING)."
-            exit 1
+        if: github.base_ref == 'devel' && github.head_ref != 'my-non-existent-branch'
+        run: |
+          echo "ERROR: You can only merge to 'devel' from 'my-non-existent-branch' (TESTING)."
+          exit 1
