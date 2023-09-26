@@ -22,7 +22,27 @@ pipeline {
         '''
       }
     }
-
+    
+    stage('Ensure branch merge flow') {
+      steps {
+        script {
+          if (env.BRANCH_NAME.startsWith('PR-')) {
+            if (env.CHANGE_TARGET == 'master' && env.CHANGE_BRANCH != 'staging') {
+              unstable("ERROR: You can only merge to master from 'staging'.")
+            }
+            if (env.CHANGE_TARGET == 'staging' && env.CHANGE_BRANCH != 'develop') {
+              unstable("ERROR: You can only merge to staging from 'develop'.")
+            }
+            if (env.CHANGE_TARGET == 'develop' && env.CHANGE_BRANCH != 'my-non-existent-branch') {
+              unstable("ERROR: You can only merge to develop from 'my-non-existent-branch'.")
+            }
+            echo "Allowing the PR merge for branches $env.CHANGE_BRANCH -> $env.CHANGE_TARGET"
+          } else {
+            echo 'Not a PR, skipped git merge flow checks'
+          }
+        }
+      }
+    }
 
     stage('Build') {
       steps {
@@ -196,9 +216,8 @@ pipeline {
 
       }
     }
-
-//    stage('Test and Push Images') {
-    stage('Push Images & Artifacts') {
+    
+    stage('Test & Push Artifacts') {
       steps {
         parallel (
           'Push Images': {
@@ -221,7 +240,7 @@ pipeline {
               '''
             }
           },
-          'Push Artifacts': {
+          'Test & Push Artifacts': {
             withCredentials([
                 usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
