@@ -7,17 +7,7 @@ jobs:
   check_branch:
     runs-on: ubuntu-latest
     steps:
-      - name: Check branch
-        if: github.base_ref == 'master' && github.head_ref != 'staging'
-        run: |
-          echo "ERROR: You can only merge to 'master' from 'staging'."
-          exit 1
-      - name: Check branch
-        if: github.base_ref == 'staging' && github.head_ref != 'devel'
-        run: |
-          echo "ERROR: You can only merge to 'staging' from 'devel'."
-          exit 1
-      - name: Check branch
+      - name: Check branch 3
         if: github.base_ref == 'devel' && github.head_ref != 'my-non-existent-branch'
         run: |
           echo "ERROR: You can only merge to 'devel' from 'my-non-existent-branch' (TESTING). Trigger GitHub Action \#1"
