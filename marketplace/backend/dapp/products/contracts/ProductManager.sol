@@ -14,7 +14,7 @@ contract ProductManager is
     RestStatus
 {
     // constructor() public {}
-    mapping(string => mapping(uint => address)) orgToUPCToProduct;
+    mapping(string => mapping(uint => address)) record orgToUPCToProduct;
     mapping(address => mapping(string => bool))
         private uniqueSerialNumberByProductAddress;
 
