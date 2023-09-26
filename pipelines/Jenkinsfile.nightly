@@ -198,8 +198,7 @@ pipeline {
       }
     }
 
-//    stage('Test and Push Images') {
-    stage('Push Images & Artifacts') {
+    stage('Test & Push Artifacts') {
       steps {
         parallel (
           'Push Images': {

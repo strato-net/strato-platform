@@ -239,7 +239,7 @@ pipeline {
               '''
             }
           },
-          'Test & Push Artifacts': {
+          'Push Artifacts': {
             withCredentials([
                 usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
