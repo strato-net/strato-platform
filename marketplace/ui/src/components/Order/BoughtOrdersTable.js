@@ -45,7 +45,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
   useEffect(() => {
-    
+
     let items = [];
     orders.forEach((order) => {
       items.push({
