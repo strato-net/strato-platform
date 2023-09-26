@@ -343,10 +343,6 @@ const ServiceTable = () => {
     updateTableData(field, value, key);
   };
 
-  const disabledDate = (current) => {
-    return current && current < moment().startOf('day');
-  };
-
   const handleAddRow = () => {
     setIsEdit(false);
     setIsNewRow(true);
@@ -430,7 +426,6 @@ const ServiceTable = () => {
     serviceList,
     getProviderOptions,
     handleInputChange,
-    disabledDate,
     handleEditCancel,
     handleDelete,
     handleValidation,
