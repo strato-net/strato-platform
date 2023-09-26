@@ -28,6 +28,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { setCookie } from "../../helpers/cookie";
 
 const { Search } = Input;
 
@@ -156,6 +157,7 @@ const Inventory = ({ user }) => {
                   className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 mr-3"
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      setCookie("returnUrl", routes.OnboardingSellerToStripe.url, 10);
                       window.location.href = loginUrl;
                     } else {
                       onboardSeller()
@@ -201,6 +203,7 @@ const Inventory = ({ user }) => {
                   <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", routes.OnboardingSellerToStripe.url, 10);
                         window.location.href = loginUrl;
                       } else {
                         onboardSeller()
@@ -212,6 +215,7 @@ const Inventory = ({ user }) => {
                   <Button id="add-inventory-button" type="primary" className="w-48"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", routes.OnboardingSellerToStripe.url, 10);
                         window.location.href = loginUrl;
                       } else {
                         showModal()
