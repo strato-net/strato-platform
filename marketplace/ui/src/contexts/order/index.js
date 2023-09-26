@@ -11,6 +11,8 @@ const OrdersProvider = ({ children }) => {
     payment:null,
     isCreatePaymentSubmitting: false,
     orders: [],
+    orderSoldTotal: 10,
+    orderBoughtTotal: 10,
     isordersLoading: false,
     ordersSold: [],
     isordersSoldLoading: false,

@@ -15,7 +15,6 @@ import Blockchain.MemVMContext
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Simple
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMOptions ()
 import Control.DeepSeq
 import Control.Lens
@@ -48,10 +47,13 @@ wingsContract :: String
 wingsContract = BC.unpack $(embedFile "bench/wings.sol")
 
 wingsCC :: CodeCollection
-wingsCC =
+wingsCC = do
   let srcMap = M.singleton "Wings.sol" $ T.pack wingsContract
-   in either (error . show) id $ compileSource False srcMap
-
+  let compiled = runIdentity . runMemCompilerT $ compileSource False srcMap 
+  case compiled of
+    Left err -> error $ show err
+    Right cc -> cc
+   
 strBench :: Benchmark
 strBench =
   bench "time to pack the wings contract" $
@@ -131,9 +133,12 @@ sipCCBench =
     nf (sipHash (SipKey 0x8888 0x1432)) (BC.pack $ show wingsCC)
 
 readCC :: BC.ByteString -> CodeCollection
-readCC bStr =
+readCC bStr = do
   let srcMap = M.singleton "Wings.sol" $ T.pack $ BC.unpack bStr
-   in either (error . show) id $ compileSource False srcMap
+  let compiled = runIdentity . runMemCompilerT $ compileSource False srcMap 
+  case compiled of
+    Left err -> error $ show err
+    Right cc -> cc
 
 readCCBench :: Benchmark
 readCCBench =

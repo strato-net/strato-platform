@@ -26,6 +26,7 @@ executables:
       - ordered-containers
       - strato-model
       - strato-p2p
+      - unagi-chan
       - wai-middleware-prometheus
       - warp
       
@@ -50,6 +51,7 @@ library:
     - cross-monitoring
     - crypto-pubkey-types
     - data-default
+    - deepseq
     - dlist
     - dns
     - either
@@ -71,6 +73,8 @@ library:
     - milena
     - milena-tools
     - monad-alter
+    - monad-control
+    - monad-logger
     - monadIO
     - mtl
     - network
@@ -84,6 +88,7 @@ library:
     - servant-client
     - servant-server
     - split
+    - stm
     - stm-conduit
     - strato-conf
     - strato-model
@@ -92,8 +97,9 @@ library:
     - these
     - time
     - transformers
+    - unagi-chan
     - unliftio-core
-    - unliftio
+    - unliftio 
     - warp
     - x509-certs
 
