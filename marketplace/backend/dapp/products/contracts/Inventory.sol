@@ -5,7 +5,7 @@ import "/dapp/dapp/contracts/Dapp.sol"
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory is InventoryStatus{
+contract Inventory_2 is InventoryStatus{
 
     address public owner;
     string public ownerOrganization;
@@ -21,6 +21,8 @@ contract Inventory is InventoryStatus{
     int public availableQuantity;
     InventoryStatus public status;
     uint public createdDate;
+    uint public taxPercentageAmount;
+    uint public taxDollarAmount;
 
 
     constructor(
@@ -32,6 +34,8 @@ contract Inventory is InventoryStatus{
         ,   InventoryStatus _status
         ,   uint _createdDate
         ,   address _owner
+        ,   uint _taxPercentageAmount
+        ,   uint _taxDollarAmount
     ) public {
         owner = _owner;
 
@@ -44,6 +48,8 @@ contract Inventory is InventoryStatus{
         availableQuantity = _quantity;
         status = _status;
         createdDate = _createdDate;
+        taxPercentageAmount = _taxPercentageAmount;
+        taxDollarAmount = _taxDollarAmount;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

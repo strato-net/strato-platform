@@ -27,17 +27,21 @@ import { UsersProvider } from "./contexts/users";
 import EventList from "./components/Inventory/EventList";
 import InventoryEventDetails from "./components/Inventory/EventDetail";
 import Certifier from "./components/Certifier";
-import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate"
+import OnboardingIntermediate from "./components/Inventory/OnboardingIntermediate";
 import ProductDetails from "./components/MarketPlace/ProductDetail";
-import MembershipDetails from "./components/MarketPlace/MembershipDetail";
 import Checkout from "./components/MarketPlace/AddCart";
 import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
 import EventSerialNumberList from "./components/Event/EventSerialNumberList";
 import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
+import { StorageProvider } from "./contexts/storage";
+import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
 import Membership from "./components/Membership";
+import MembershipDetails from "./components/MarketPlace/MembershipDetail";
+import ServiceUsage from "./components/Membership/ServiceUsage";
+import { ServiceUsageProvider } from "./contexts/serviceUsage";
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -187,10 +191,10 @@ const AuthenticatedRoutes = ({ user, users }) => {
                   <InventoriesProvider>
                     <ServicesProvider>
                       <MembershipsProvider>
-                        <Membership user={user} users={users}/>
-                      </MembershipsProvider>  
-                    </ServicesProvider>  
-                  </InventoriesProvider>              
+                        <Membership user={user} users={users} />
+                      </MembershipsProvider>
+                    </ServicesProvider>
+                  </InventoriesProvider>
                 </ProductsProvider>
               </SubCategorysProvider>
             </CategorysProvider>
@@ -227,21 +231,46 @@ const AuthenticatedRoutes = ({ user, users }) => {
         path={routes.MembershipDetail.url}
         element={
           <UsersProvider>
-            <EventsProvider>
-              <MembershipsProvider>
-                <CategorysProvider>
-                  <SubCategorysProvider>
+            <ServicesProvider>
+                <EventsProvider>
+                  <MembershipsProvider>
+                    <CategorysProvider>
+                      <SubCategorysProvider>
+                        <InventoriesProvider>
+                          <ProductsProvider>
+                            <ItemsProvider>
+                              <MembershipDetails user={user} users={users} />
+                            </ItemsProvider>
+                          </ProductsProvider>
+                        </InventoriesProvider>
+                      </SubCategorysProvider>
+                    </CategorysProvider>
+                  </MembershipsProvider>
+                </EventsProvider>
+            </ServicesProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.ServiceUsage.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ProductsProvider>
+                  <ServiceUsageProvider>
                     <InventoriesProvider>
-                      <ProductsProvider>
-                        <ItemsProvider>
-                          <MembershipDetails user={user} users={users} />
-                        </ItemsProvider>
-                      </ProductsProvider>
+                      <MembershipsProvider>
+                        <ServicesProvider>
+                          <ServiceUsage user={user} users={users} />
+                        </ServicesProvider>
+                      </MembershipsProvider>
                     </InventoriesProvider>
-                  </SubCategorysProvider>
-                </CategorysProvider>
-              </MembershipsProvider>
-            </EventsProvider>
+                  </ServiceUsageProvider>
+                </ProductsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
           </UsersProvider>
         }
       />
@@ -432,6 +461,17 @@ const AuthenticatedRoutes = ({ user, users }) => {
             <EventsProvider>
               <EventSerialNumberList user={user} users={users} />
             </EventsProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.Storage.url}
+        element={
+          <UsersProvider>
+            <StorageProvider>
+              <Storage user={user} users={users} />
+            </StorageProvider>
           </UsersProvider>
         }
       />

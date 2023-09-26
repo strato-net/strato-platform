@@ -304,7 +304,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
     case result of
         Right execResult ->
-          let supportedPragmas = []
+          let supportedPragmas = [("es6",""), ("strict","")]
               findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma:) -- include solidity pragma for backwards compatibility
               invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult) 
            in if not $ null invalidPragmasUsed
@@ -374,6 +374,9 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx{otSigner=t
     
      
     success <- lift $ addToBalance tAcct (-transactionGasLimit bt * transactionGasPrice bt)
+
+    when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
+
     when flags_debug $ $logDebugS "addTx" "running code"
     let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
         -- coinbaseAcct = Account (blockDataCoinbase b) chainId

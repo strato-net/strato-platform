@@ -295,6 +295,7 @@ postfix p = Postfix . chainl1 p $ return (flip (.))
 memberName :: SolidityParser SolidString
 memberName = do
   (reserved "call" >> return (stringToLabel "call"))
+  <|> (reserved "derive" >> return (stringToLabel "derive"))
   <|> (reserved "length" >> return (stringToLabel "length"))
   <|> fmap stringToLabel identifier
 

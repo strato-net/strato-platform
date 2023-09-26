@@ -22,6 +22,7 @@
     "test:productFile": "yarn mocha-babel dapp/productFile/test -b",
     "test:membership": "yarn mocha-babel dapp/membership/test -b",
     "test:membershipService": "yarn mocha-babel dapp/membershipService/test -b",
+    "test:serviceUsage": "yarn mocha-babel dapp/serviceUsage/test -b",
     "test:api:category": "yarn mocha-babel test/v1/category.test.js -b",
     "test:api:subCategory": "yarn mocha-babel test/v1/subCategory.test.js -b",
     "test:api:product": "yarn mocha-babel test/v1/product.test.js -b",
@@ -39,6 +40,7 @@
     "test:api:marketplace": "yarn mocha-babel test/v1/marketplace.test.js -b",
     "test:api:membership": "yarn mocha-babel test/v1/membership.test.js -b",
     "test:api:membershipService": "yarn mocha-babel test/v1/membershipService.test.js -b",
+    "test:api:serviceUsage": "yarn mocha-babel test/v1/serviceUsage.test.js -b",
     "test:api": "yarn mocha-babel test/v1/ -b",
     "addToDapp": "babel-node membership-utility/addToDapp.js",
     "clean": "rm -f ${CONFIG_DIR_PATH:-config}/*.deploy.yaml ${CONFIG_DIR_PATH:-config}/testdeploy.*"
@@ -50,6 +52,7 @@
   "private": true,
   "dependencies": {
     "@hapi/joi": "^17.1.1",
+    "@sendgrid/mail": "^7.7.0",
     "aws-sdk": "^2.1284.0",
     "babel-plugin-module-resolver": "^4.1.0",
     "blockapps-rest": "8.1.0",

@@ -85,6 +85,29 @@ class MembershipController {
       return next(e)
     }
   }
+  
+  static async purchased(req, res, next) {
+    try {
+      const { dapp, body } = req
+      
+      let results = await dapp.getPurchasedMemberships()
+      //Get image location associated with each membership/product
+      results = results.map((result) => { 
+        let img;
+        if (result.fileLocation === null) {
+          img = null;
+        }
+        else{
+          img  =  getSignedUrlFromS3(result.fileLocation, req.app.get(constants.s3ParamName));
+        }
+        return {...result, productImageLocation: img} });
+      rest.response.status200(res, results)
+      
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
         
   static validateCreateMembershipArgs(args) {
     const createMembershipSchema = Joi.object({

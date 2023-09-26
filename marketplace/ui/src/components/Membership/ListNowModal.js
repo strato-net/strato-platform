@@ -1,16 +1,52 @@
 import React, { useState } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Table } from "antd";
+import { Form, Modal, InputNumber, Button, Spin,  Select, Table } from "antd";
+
+const { Option } = Select;
 
 const ListNowModal = ({
   open,
   handleCancel,
   user,
   formik,
+  type,
+  id,
   getIn,
   isCreateMembershipSubmitting,
 }) => {
-  const seller = user.user.organization;
+  const seller = user.user.user.organization;
   const membership = formik.values.name;
+  
+  const handleFormatter = (value) => {
+    if (value === '' || value === '.') {
+      return '0.00';
+    }
+
+    const decimalParts = value.toString().split('.');
+    if (decimalParts.length === 1) {
+      return `${decimalParts[0]}.00`;
+    } else if (decimalParts[1].length === 1) {
+      return `${decimalParts[0]}.${decimalParts[1]}0`;
+    } else {
+      return `${decimalParts[0]}.${decimalParts[1].substring(0, 2)}`;
+    }
+  };
+
+  const handleParser = (value) => {
+    // Remove non-numeric characters and leading zeros
+    const numericValue = value.replace(/[^\d.-]/g, '');
+    const parsedValue = parseFloat(numericValue).toFixed(2);
+    return isNaN(parsedValue) ? '' : parsedValue;
+  };
+
+  const selectAfter = (
+  <Select 
+    defaultValue="1"
+    onChange={(value) => {formik.setFieldValue("isTaxPercentage", value === "1" )}}
+    style={{ width: 60 }}>
+      <Option value="0">$</Option>
+      <Option value="1">%</Option>
+  </Select>
+);
 
   const columns = [
     {
@@ -24,14 +60,29 @@ const ListNowModal = ({
       key: "membership",
     },
     {
+      title: "Id",
+      dataIndex: "id",
+      key: "id",
+    },
+    {
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
     },
     {
+      title: "Tax Percentage/Amount",
+      dataIndex: "percentage",
+      key: "precentage",
+    },
+    {
       title: "Price",
       dataIndex: "price",
       key: "price",
+    },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
     },
   ];
 
@@ -40,6 +91,7 @@ const ListNowModal = ({
       key: "1",
       seller: seller,
       membership: membership,
+      id: id,
       quantity: (
         <>
           <InputNumber
@@ -58,6 +110,33 @@ const ListNowModal = ({
           )}
         </>
       ),
+      percentage: (
+        <>
+          <InputNumber
+            id="percentage"
+            name="percentage"
+            min={0}
+            addonAfter={selectAfter}
+            formatter={handleFormatter}
+            parser={handleParser}
+            value={formik.values.taxPercentage}
+            onChange={(value) => {
+              formik.setFieldValue("taxPercentage", value);
+              formik.values.isTaxPercentage  ? 
+                  (formik.setFieldValue("taxPercentageAmount", value))
+                  :  (formik.setFieldValue("taxDollarAmount", value))
+              !formik.values.isTaxPercentage ? 
+                  (formik.setFieldValue("taxPercentageAmount", 0))
+                  :  (formik.setFieldValue("taxDollarAmount", 0))
+              console.log(formik.values);
+            }}
+          />
+          {getIn(formik.touched, `taxPercentage`) && getIn(formik.errors, `percentage`) && (
+            <span className="text-error text-xs">
+              {getIn(formik.errors, `percentage`)}
+            </span>
+          )}
+        </>),
       price: (
         <>
           <InputNumber
@@ -76,11 +155,15 @@ const ListNowModal = ({
           )}
         </>
       ),
+      type: type,
     },
   ];
 
   return (
     <Modal
+      // width={800}
+      style={{ maxWidth: '1000px' }}
+      width="auto"
       title="Create Listing"
       open={open}
       onCancel={handleCancel}

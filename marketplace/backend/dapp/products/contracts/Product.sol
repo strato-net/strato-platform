@@ -122,7 +122,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
 
     // Add the inventory for the product
     function addInventory(int _quantity, int _pricePerUnit, string _batchId, 
-      InventoryStatus _status, uint _createdDate,address _owner) public returns(uint256, address){
+      InventoryStatus _status, uint _createdDate,address _owner, uint _taxPercentageAmount, uint _taxDollarAmount) public returns(uint256, address){
 
       if(ownerOrganization != getUserOrganization(_owner)){
         return (RestStatus.FORBIDDEN, address(0));
@@ -131,7 +131,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       if(!isInventoryAvailable) {
         isInventoryAvailable = true;
       }
-      Inventory inventory = new Inventory(category, subCategory, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner);
+      Inventory_2 inventory = new Inventory_2(category, subCategory, _quantity, _pricePerUnit, _batchId, _status, _createdDate,_owner, _taxPercentageAmount, _taxDollarAmount);
       return (RestStatus.OK, address(inventory));
     }
 
@@ -143,7 +143,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
         return RestStatus.FORBIDDEN;
       }
     
-      Inventory inventory = Inventory(_inventory);
+      Inventory_2 inventory = Inventory_2(_inventory);
       inventory.update(_pricePerUnit, _status, _scheme);
       return (RestStatus.OK);
     }
@@ -157,7 +157,7 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
       //   return RestStatus.FORBIDDEN;
       // }
     
-      Inventory inventory = Inventory(_inventory);
+      Inventory_2 inventory = Inventory_2(_inventory);
       inventory.updateQuantity(_quantity);
       return (RestStatus.OK);
     }

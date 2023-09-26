@@ -40,9 +40,9 @@ simpleType =
   intSuffixed "uint"  (SVMType.Int (Just False)) <|>
   intSuffixed "int"  (SVMType.Int (Just True)) <|>
   simple "variadic" SVMType.Variadic <|>
-  choice [optionParser, unknownLabelParser, unknownLabelMemberParser]
+  choice [saltParser, unknownLabelParser, unknownLabelMemberParser]
   where
-    optionParser =  try $ do
+    saltParser = try $ do
       name <- identifier
       salt <- braces $ do
         reserved "salt"
@@ -50,9 +50,7 @@ simpleType =
         let myReallyGoodParser = do
               myStr <- stringLiteral
               return ("\"" ++ myStr ++ "\"")
-
-        s <- identifier <|> myReallyGoodParser
-        return s
+        identifier <|> myReallyGoodParser
       return $ SVMType.UnknownLabel name $ Just salt
     unknownLabelParser = try $ do
       name <- identifier
