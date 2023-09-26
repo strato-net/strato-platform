@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Select,
   Input,
@@ -19,6 +19,9 @@ import {
 } from "@ant-design/icons";
 import moment from "moment";
 
+const disabledDate = (current) => {
+  return current && current < moment().startOf("day");
+};
 
 export function generateTableColumns({
   isEdit,
@@ -32,7 +35,6 @@ export function generateTableColumns({
   serviceList,
   getProviderOptions,
   handleInputChange,
-  disabledDate,
   handleEditCancel,
   handleDelete,
   handleValidation,
@@ -40,7 +42,7 @@ export function generateTableColumns({
   membership,
   providerState,
   isServicesLoading,
-  statusOptions
+  statusOptions,
 }) {
   const renderUserColumn = (
     text,
@@ -57,9 +59,13 @@ export function generateTableColumns({
         {record.editable && !isEdit ? (
           <Select
             placeholder="User"
-            defaultValue={serviceType == 'booked' && username}
+            defaultValue={serviceType == "booked" && username}
             suffixIcon={
-              serviceType === "booked" ? <LockOutlined /> : <CaretDownOutlined />
+              serviceType === "booked" ? (
+                <LockOutlined />
+              ) : (
+                <CaretDownOutlined />
+              )
             }
             disabled={serviceType === "booked"}
             style={{ width: 120 }}
@@ -92,7 +98,11 @@ export function generateTableColumns({
       <span>
         {record.editable && !isEdit ? (
           <Select
-            placeholder={(serviceType === "provided" && organization) ? organization : 'Provider'}
+            placeholder={
+              serviceType === "provided" && organization
+                ? organization
+                : "Provider"
+            }
             suffixIcon={
               serviceType === "provided" ? (
                 <LockOutlined />
@@ -162,7 +172,9 @@ export function generateTableColumns({
             disabled={!record.itemId || isServicesLoading}
             placeholder="Service"
             defaultValue={record.serviceId}
-            suffixIcon={isServicesLoading ? <Spin size='small' /> : <CaretDownOutlined />}
+            suffixIcon={
+              isServicesLoading ? <Spin size="small" /> : <CaretDownOutlined />
+            }
             style={{ width: 120 }}
             onChange={(value) => handleInputChange(value, "serviceId", index)}
             options={serviceList}
@@ -446,7 +458,9 @@ export function generateTableColumns({
             <Button
               type="primary"
               icon={<EditOutlined />}
-              disabled={!handleValidation(record) || validationError || isNewRow}
+              disabled={
+                !handleValidation(record) || validationError || isNewRow
+              }
               onClick={() => handleEditCancel(index, true, "edit", record)}
             />
           )}
