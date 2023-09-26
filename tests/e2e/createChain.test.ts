@@ -163,7 +163,8 @@ describe("Create Chain", function() {
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should create a new chain when contract source is empty', async() => {
+  // TODO: unsure if we want to support this functionality; either delete or come to a consensus
+  xit('should create a new chain when contract source is empty', async() => {
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);

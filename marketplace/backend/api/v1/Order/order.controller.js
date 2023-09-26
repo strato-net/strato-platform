@@ -164,7 +164,7 @@ class OrderController {
       })).required(),
       orderTotal: Joi.number().required(),
       paymentSessionId: Joi.string(),
-      shippingAddress: Joi.string().required()
+      shippingAddress: Joi.string().required(),
     }).required();
 
     const validation = createOrderSchema.validate(args);

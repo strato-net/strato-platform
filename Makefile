@@ -103,6 +103,13 @@ pretty: build_buildbase
 		gen-hie > hie.yaml && \
 		ormolu --mode inplace `git ls-files '*.hs'`
 
+hoogle: build_buildbase
+	@echo generating and serving STRATO documentation...
+	cd strato && \
+		stack build --haddock && \
+		stack hoogle generate --rebuild -- --local && \
+		stack hoogle -- server --local
+
 strato: build_common
 	@echo Now building core-strato...
 	cp -fr strato/licenses ${STRATODIR}
