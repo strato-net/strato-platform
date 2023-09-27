@@ -1823,7 +1823,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: userOrganization, app: '' };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: '' };
 
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
       ...args,

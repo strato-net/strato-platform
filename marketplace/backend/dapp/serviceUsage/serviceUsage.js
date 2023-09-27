@@ -185,8 +185,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let arg = { ...args }
-  arg['limit'] = ''
-  arg['offset'] = 0
+  // arg['limit'] = ''
+  // arg['offset'] = 0
   const serviceUsages = await searchAllWithQueryArgs(contractName, args, options, admin)
   const serviceCount = await searchAllWithQueryArgs(contractName, arg, options, admin)
 
