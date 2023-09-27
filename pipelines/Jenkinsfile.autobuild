@@ -93,6 +93,7 @@ pipeline {
                 MP_IS_BOOTNODE='true' \\
                 MP_DELAY_DEPLOYMENT='true' \\
                 network='mercata-hydrogen' \\
+                networkID=7596898649924658542 \\
                 ./strato --single
             """
           }
@@ -333,31 +334,34 @@ pipeline {
             done
 
             WAIT_TIME=30
+            STALLED_INTERVALS=0
+            MAX_STALLED_INTERVALS=10
 
             LAST_VM_BLOCK_NUM=0
             LAST_SEQ_BLOCK_NUM=0
-            MAYBE_STALLED=false
 
-            IS_SYNCED=$(./strato --get-metadata | jq -r .isSynced)
+            METADATA=$(./strato --get-metadata)
+            IS_SYNCED=$(jq -r .isSynced <<< ${METADATA})
             while [ "$IS_SYNCED" != true ]; do
-                STATUS=$(docker exec strato-apex-1 curl -s -f http://localhost:3009/status )
-                if [ $? != 0 ]; then
-                    echo "Failure: unable to obtain status info from Apex; likely something has gone wrong"
+                if [[ $(docker ps | grep unhealthy) ]]; then
+                    echo "Failure: one or more docker containers became unhealthy during sync"
                     exit 2
                 fi
+                STATUS=$(docker exec strato-apex-1 curl -s -f http://localhost:3009/status )
                 CUR_VM_BLOCK_NUM=$(jq -r .lastBlock.number <<< ${STATUS})
                 CUR_SEQ_BLOCK_NUM=$(jq -r .pbftData.sequence_number <<< ${STATUS})
                 echo "prev vm block #: ${LAST_VM_BLOCK_NUM}, cur vm block #: ${CUR_VM_BLOCK_NUM}"
                 echo "prev seq block #: ${LAST_SEQ_BLOCK_NUM}, cur seq block #: ${CUR_SEQ_BLOCK_NUM}"
-                if (( $CUR_VM_BLOCK_NUM == $LAST_VM_BLOCK_NUM ))  && \\
-                  (( $CUR_SEQ_BLOCK_NUM == $LAST_SEQ_BLOCK_NUM )) ; then
+                if [[ $CUR_VM_BLOCK_NUM == $LAST_VM_BLOCK_NUM && $CUR_SEQ_BLOCK_NUM == $LAST_SEQ_BLOCK_NUM ]] ; then
                     # VM and Sequencer not gone forward. Perhaps stalled
-                    if [[ !$MAYBE_STALLED ]] ; then 
-                        MAYBE_STALLED=true
+                    if (( $STALLED_INTERVALS < $MAX_STALLED_INTERVALS )) ; then 
+                        STALLED_INTERVALS=$((++STALLED_INTERVALS))
                     else
-                        echo "Failure: node is likely stalled during sync; went ${WAIT_TIME} seconds without increasing block number"
+                        echo "Failure: node stalled during sync; went $(( MAX_STALLED_INTERVALS * WAIT_TIME )) seconds without increasing block number"
                         exit 1
                     fi
+                else
+                    STALLED_INTERVALS=0
                 fi
                 sleep $WAIT_TIME
                 IS_SYNCED=$(./strato --get-metadata | jq -r .isSynced)
