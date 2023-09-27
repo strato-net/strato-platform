@@ -256,13 +256,6 @@ vaultModify modify = do
   pool <- asks dbPool
   liftIO $ withResource pool modify
 
-
---vaultModify :: HasCallStack => (Connection -> IO x) -> VaultM x
---vaultModify modify = do
---  logInfoCS callStack "Updating the database"
---  pool <- asks dbPool
---  withResource pool $ (\conn -> liftIO $ modify conn)
-
 vaultModify1 :: HasCallStack => (Connection -> IO [x]) -> VaultM x
 vaultModify1 modify = do
   logInfoCS callStack "Updating the database"
@@ -272,65 +265,11 @@ vaultModify1 modify = do
     [y] -> return y
     _ : _ : _ -> throwIO $ DBError "Multiple results, expected one row"
 
-
---vaultTransaction :: VaultM x -> VaultM x
---vaultTransaction vault = do
---  pool <- asks dbPool
---  withResource pool $ \conn -> 
---      lift $ liftBaseOp (withTransaction conn) vault
---
---withAddressHandle :: Kafka m => KafkaAddress -> (Handle -> m a) -> m a
---withAddressHandle address kafkaAction = do
---  conns <- use stateConnections
---  let foundPool = conns ^. at address
---  pool <- case foundPool of
---    Nothing -> do
---      newPool <- tryKafka $ liftIO $ mkPool address
---      stateConnections .= (at address ?~ newPool $ conns)
---      return newPool
---    Just p -> return p
---  tryKafka $ liftBaseWith (\runInIO -> 
---    Pool.withResource pool (\handle -> runInIO (kafkaAction handle))
---    ) >>= restoreM
---
-----  tryKafka $ liftBaseWith $ \runInIO -> Pool.withResource pool (runInIO . kafkaAction)
-----  tryKafka $ Pool.withResource pool kafkaAction
---  where
---    mkPool :: KafkaAddress -> IO (Pool.Pool Handle)
---    mkPool a = Pool.createPool (createHandle a) hClose 1 10 1
---      where
---        createHandle (h, p) = DeprecatedNetworkFunction.connectTo (h ^. hostString) (fromIntegral p)
---withTransaction :: Connection -> IO a -> IO a
-
---vaultTransaction :: VaultM x -> VaultM x
---vaultTransaction vault = do
---  pool <- asks dbPool
---  env <- ask  -- Extract the environment
---  liftBaseWith $ \runInIO -> 
---    withResource pool (\conn -> runInIO (withTransaction conn (runReaderT vault env)))
---    >>= restoreM
-
---vaultTransaction :: VaultM x -> VaultM x
---vaultTransaction vault = do
---    pool <- asks dbPool
---    env <- ask
---    withResource pool $ \conn -> 
---        liftBaseOp (
---            withTransaction conn $ do
---                runReaderT vault env
---            )
---    >>= restoreM
-
 vaultTransaction :: VaultM x -> VaultM x
 vaultTransaction vaultAction = do
     pool <- asks dbPool
     env  <- ask
     liftIO $ withResource pool $ \conn -> withTransaction conn (runLoggingT (runReaderT vaultAction env))
-
---vaultTransaction :: VaultM x -> VaultM x
---vaultTransaction vault = do
---  pool <- asks dbPool
---  withResource pool $ (\conn -> liftBaseOp_ (withTransaction conn) vault)
 
 vaultMaybe :: Text -> Maybe x -> VaultM x
 vaultMaybe msg = maybe (throwIO (CouldNotFind msg)) return

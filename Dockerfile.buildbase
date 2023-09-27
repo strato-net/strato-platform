@@ -6,9 +6,15 @@ RUN apt-get update && \
     apt-get -y --allow-unauthenticated install autoconf libtool libblas-dev liblapack-dev libsodium-dev jq vim liblzma-dev libleveldb-dev libpq-dev pkg-config && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/* && \
+<<<<<<< HEAD
     apt-get clean 
 RUN stack install ormolu implicit-hie
 RUN git clone https://github.com/blockapps/secp256k1 && \
+=======
+    apt-get clean && \
+    stack install ormolu implicit-hie && \
+    git clone https://github.com/blockapps/secp256k1 && \
+>>>>>>> 51f5b504e7e3c9506a42ca2efa3ea047f753d5fc
     cd secp256k1/ && \
     ./autogen.sh && \
     ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh && \
