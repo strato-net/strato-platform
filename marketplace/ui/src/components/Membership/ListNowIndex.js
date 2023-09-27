@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Select, Table } from "antd";
+import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography } from "antd";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -25,7 +25,7 @@ const ListNowIndex = ({
   const [possibleMemberships, setPossibleMemberships] = useState([]);
   const [selectedMembership, setSelectedMembership] = useState(null);
   const [productId, setProductId] = useState('')
-  // const [id, setId] = useState("");
+  const [id, setId] = useState("");
   const [inventoryId, setInventoryId] = useState('')
   const [quantity, setQuantity] = useState(0);
   const [taxPercentage, setTaxPercentage] = useState(0);
@@ -66,9 +66,6 @@ const ListNowIndex = ({
     }
   }, [inventories])
 
-
-  console.log("inventories", inventoryId, "productId", productId);
-
   const handleFormatter = (value) => {
     if (value === "" || value === ".") {
       return "0.00";
@@ -97,7 +94,7 @@ const ListNowIndex = ({
     inventoryActions.fetchInventory(inventoryDispatch, '', 0, productId);
     setProductId(membership.productId)
     setSelectedMembership(value);
-    // setId(value);
+    setId(value);
   }
 
   const selectAfter = (
@@ -179,7 +176,7 @@ const ListNowIndex = ({
       key: "1",
       seller: seller,
       membership: selectedMembership,
-      // id: id,
+      id: id,
       quantity: (
         <>
           <InputNumber
@@ -246,36 +243,45 @@ const ListNowIndex = ({
   ];
 
   const handleCreateFormSubmit = async () => {
-    const inventoryBody = {
-      productAddress: productId,
-      quantity: quantity,
-      pricePerUnit: price,
-      // Generate random code for now
-      batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-      // Status should always be published if we use List Now
-      status: INVENTORY_STATUS.PUBLISHED,
-      serialNumber: [],
-      taxPercentageAmount: taxPercentageAmount,
-      taxDollarAmount: taxDollarAmount,
-    };
 
-    // const updatePayload = {
+    // const inventoryBody = {
     //   productAddress: productId,
-    //   inventory: inventoryId,
-    //   updates: {
-    //     pricePerUnit: price,
-    //     status: INVENTORY_STATUS.PUBLISHED
-    //   }
-    // }
+    //   quantity: quantity,
+    //   pricePerUnit: price,
+    //   // Generate random code for now
+    //   batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+    //   // Status should always be published if we use List Now
+    //   status: INVENTORY_STATUS.PUBLISHED,
+    //   serialNumber: [],
+    //   taxPercentageAmount: taxPercentageAmount,
+    //   taxDollarAmount: taxDollarAmount,
+    // };
 
-    const createInventory = await inventoryActions.createInventory(
+    // const createInventory = await inventoryActions.createInventory(
+    //   inventoryDispatch,
+    //   inventoryBody
+    // );
+
+
+    const updatePayload = {
+      productAddress: productId,
+      inventory: inventoryId,
+      updates: {
+        pricePerUnit: price,
+        status: INVENTORY_STATUS.PUBLISHED,
+        quantity: quantity
+      }
+    }
+
+    const updateInventory = await inventoryActions.updateInventory(
       inventoryDispatch,
-      inventoryBody
+      updatePayload
     );
 
-    if (createInventory) {
+
+
+    if (updateInventory) {
       // membership.product_with_inventory = 1;
-      console.log("Great success!")
       setInventoryId('')
       setProductId('')
     }

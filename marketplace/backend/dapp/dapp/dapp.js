@@ -1051,7 +1051,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getPurchasedMemberships = async function (args, options = defaultOptions) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
       let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
