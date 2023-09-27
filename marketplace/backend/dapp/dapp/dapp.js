@@ -584,9 +584,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
   contract.resellInventory = async function (args, options = defaultOptions) {
     const { inventoryId, quantity, price, itemsAddress } = args;
-    const newBatchId = util.uid();
     const newItemNumber = parseInt(util.uid());
-    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price, batchId: newBatchId, itemNumber: newItemNumber, itemsAddress: itemsAddress });
+    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price, itemNumber: newItemNumber, itemsAddress: itemsAddress });
   };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
