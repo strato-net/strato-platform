@@ -1061,16 +1061,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
 
         const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-        const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
         let result = []
         const newOwner = orderLines[0].owner
         const itemNumber = parseInt(util.uid());
 
-        for (let orderLineAddress of orderLinesAddresses) {
-          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions);
+        for (let orderLine of orderLines) {
+          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address }, createOptions);
           const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLines[0].quantity, dappAddress, itemNumber });
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber });
           result.push({ status, productId, inventoryId });
         }
         return result;
