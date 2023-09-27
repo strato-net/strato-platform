@@ -136,7 +136,7 @@ export function generateTableColumns({
   ) => {
     return (
       <span>
-        {record.editable ? (
+        {record.editable && serviceType == 'provided' ? (
           <Select
             disabled={!record.provider && !record.bookedUserAddress}
             placeholder={"Membership ID"}
@@ -169,7 +169,7 @@ export function generateTableColumns({
   ) => {
     return (
       <span>
-        {record.editable ? (
+        {record.editable && serviceType == 'provided' ? (
           <Select
             disabled={!record.itemId || isServicesLoading}
             placeholder="Service"
@@ -218,7 +218,7 @@ export function generateTableColumns({
   const renderDateColumn = (text, record, index, isEdit, handleInputChange) => {
     return (
       <span>
-        {record.editable ? (
+        {record.editable && serviceType == 'provided' ? (
           <DatePicker
             disabledDate={disabledDate}
             defaultValue={text ? dayjs(text) : ''}
@@ -307,7 +307,7 @@ export function generateTableColumns({
   ) => {
     return (
       <span>
-        {record.editable ? (
+        {record.editable && serviceType == 'provided' ? (
           <InputNumber
             keyboard={true}
             className="w-36"
