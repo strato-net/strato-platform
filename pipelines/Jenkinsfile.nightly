@@ -94,6 +94,8 @@ pipeline {
                 EXT_STORAGE_S3_BUCKET='tcommerce-dev' \\
                 MP_IS_BOOTNODE='true' \\
                 MP_DELAY_DEPLOYMENT='true' \\
+                network='mercata-hydrogen' \\
+                networkID=7596898649924658542 \\
                 ./strato --single
             """
           }
@@ -122,6 +124,8 @@ pipeline {
 
             check_availability
           '''
+          // don't want it to get overwritten
+          sh "cp genesis-block.json genesis-block-official.json"
         }
 
         script {
@@ -247,7 +251,7 @@ pipeline {
               set -x
               echo "Running apex unit tests"
               APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'apex.*1')
-# TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
+              # TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
           },
@@ -318,6 +322,67 @@ pipeline {
         )
       }
     }
+
+    stage('Test Sync'){
+      steps {
+        dir("strato-getting-started"){
+          sh './strato --wipe'
+          sh 'mv genesis-block-official.json genesis-block.json'
+          sh './run.sh'
+          sh '''#!/usr/bin/env bash
+            counter=0
+            until docker exec strato-apex-1 curl -s -f http://localhost:3009/health | jq .healthInfo.isHealthy | grep true
+            do
+                if (( $counter >= 120 )) ; then
+                    echo "Failure: STRATO did not rise and shine after two minutes. Something is wrong"
+                    exit 3
+                fi
+                sleep 1
+                counter=$((++counter))
+            done
+
+            WAIT_TIME=30
+            STALLED_INTERVALS=0
+            MAX_STALLED_INTERVALS=10
+
+            LAST_VM_BLOCK_NUM=0
+            LAST_SEQ_BLOCK_NUM=0
+
+            METADATA=$(./strato --get-metadata)
+            IS_SYNCED=$(jq -r .isSynced <<< ${METADATA})
+            while [ "$IS_SYNCED" != true ]; do
+                if [[ $(docker ps | grep unhealthy) ]]; then
+                    echo "Failure: one or more docker containers became unhealthy during sync"
+                    exit 2
+                fi
+                STATUS=$(docker exec strato-apex-1 curl -s -f http://localhost:3009/status )
+                CUR_VM_BLOCK_NUM=$(jq -r .lastBlock.number <<< ${STATUS})
+                CUR_SEQ_BLOCK_NUM=$(jq -r .pbftData.sequence_number <<< ${STATUS})
+                echo "prev vm block #: ${LAST_VM_BLOCK_NUM}, cur vm block #: ${CUR_VM_BLOCK_NUM}"
+                echo "prev seq block #: ${LAST_SEQ_BLOCK_NUM}, cur seq block #: ${CUR_SEQ_BLOCK_NUM}"
+                if [[ $CUR_VM_BLOCK_NUM == $LAST_VM_BLOCK_NUM && $CUR_SEQ_BLOCK_NUM == $LAST_SEQ_BLOCK_NUM ]] ; then
+                    # VM and Sequencer not gone forward. Perhaps stalled
+                    if (( $STALLED_INTERVALS < $MAX_STALLED_INTERVALS )) ; then 
+                        STALLED_INTERVALS=$((++STALLED_INTERVALS))
+                    else
+                        echo "Failure: node stalled during sync; went $(( MAX_STALLED_INTERVALS * WAIT_TIME )) seconds without increasing block number"
+                        exit 1
+                    fi
+                else
+                    STALLED_INTERVALS=0
+                fi
+                sleep $WAIT_TIME
+                IS_SYNCED=$(./strato --get-metadata | jq -r .isSynced)
+                LAST_VM_BLOCK_NUM=$CUR_VM_BLOCK_NUM
+                LAST_SEQ_BLOCK_NUM=$CUR_SEQ_BLOCK_NUM
+            done
+            echo "Sync successful!"
+            exit 0
+          '''
+        }
+      }
+    }
+
     stage('Test dev docs') {
       steps {
         withCredentials([
