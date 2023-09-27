@@ -245,7 +245,7 @@ const ServiceTable = () => {
         item.editable = bool;
         let manufacturer = membership?.purchasedMemberships.find(mId => mId.itemAddress == record.itemId).manufacturer;
         if (type == 'edit') {
-          servicesActions.fetchService(serviceDispatch, 10, offset, manufacturer);
+          // servicesActions.fetchService(serviceDispatch, 10, offset, manufacturer);
         }
 
       } else if (type === "edit") {
