@@ -600,6 +600,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       getOptions
     );
   };
+  contract.count = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    console.log('dapp.count - userOrganization', userOrganization)
+    return managers.productManager.count(
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+  };
   contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProducts(

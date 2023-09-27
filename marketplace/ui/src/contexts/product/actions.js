@@ -143,11 +143,20 @@ const actions = {
       );
 
       const body = await response.json();
-     
-      if (response.status === RestStatus.OK) {
+      
+      const responseCount = await fetch(
+        `${apiUrl}/product/count?isDeleted=false&limit=${limit}&offset=${offset}${query}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const bodyCount = await responseCount.json();
+      console.log("bodyCount", bodyCount)
+      if (response.status === RestStatus.OK && responseCount.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchProductSuccessful,
-          payload: body.data,
+          payload: {data: body.data, count: bodyCount.data},
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
