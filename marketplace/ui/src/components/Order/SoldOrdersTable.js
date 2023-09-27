@@ -10,18 +10,25 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button } from "antd";
+import { Pagination, Button, DatePicker } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
+import dayjs from "dayjs";
 
 
-const SoldOrdersTable = ({ user, selectedDate }) => {
+const SoldOrdersTable = ({ user }) => {
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("createdDate.desc");
+  const [selectedDate, setSelectedDate] = useState("");
+  
+  
+  const onDateChange = (date) => {
+    setSelectedDate(date);
+  };
 
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
@@ -33,7 +40,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       debouncedSearchTerm,
       user?.organization,
       order,
-      selectedDate
+      dayjs(selectedDate).startOf('day').unix()
     );
 
 
@@ -101,12 +108,31 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       render: (text) => <p>{text}</p>,
       title: (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div>{"Date (mm/dd/yyyy)".toUpperCase()}</div>
+          {/* <div>{"Date (mm/dd/yyyy)".toUpperCase()}</div> */}
+          <div>
+            <DatePicker
+              value={selectedDate}
+              disabledDate={(current) => {
+                const currentDate = dayjs().startOf("day"); // Get the start of today
+                const selectedDate = dayjs(current).startOf("day");
+
+                return selectedDate.isAfter(currentDate);
+              }}
+              onChange={onDateChange}
+              disabled={false}
+            />
+          </div>
           <div>
             {order === "createdDate.desc" ? (
-              <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
+              <UpOutlined
+                className="icon-container icon-hover"
+                onClick={() => setOrder("createdDate.asc")}
+              />
             ) : (
-              <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.desc")} />
+              <DownOutlined
+                className="icon-container icon-hover"
+                onClick={() => setOrder("createdDate.desc")}
+              />
             )}
           </div>
         </div>
