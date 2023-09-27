@@ -10,14 +10,14 @@ RUN npm install
 
 ### Builder
 FROM npminstaller as builder
-COPY . /usr/src/app
+COPY . /usr/src/app/
 RUN npm run build
 
 ### Prod
 FROM base as prod
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
-COPY docker-run.sh /usr/src/app
+COPY docker-run.sh /usr/src/app/
 COPY --from=builder /usr/src/app/build build/
 EXPOSE 3002
 HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \

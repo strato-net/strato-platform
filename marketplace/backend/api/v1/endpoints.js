@@ -47,6 +47,7 @@ export const Inventory = {
   getAll: '/',
   create: '/',
   update: '/update',
+  resell: '/resell',
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership',
 }
