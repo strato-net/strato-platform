@@ -125,6 +125,19 @@ class ProductController {
       return next(e)
     }
   }
+  
+  static async count(req, res, next) {
+    try {
+      const { dapp, query } = req
+
+      const products = await dapp.getProductsCount({ ...query })
+      rest.response.status200(res, products)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
 
   // static async audit(req, res, next) {
   //   try {
