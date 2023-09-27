@@ -37,7 +37,6 @@ export const Product = {
   create: '/',
   update: '/update',
   delete: '/delete',
-  count: '/count',
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership'
 }

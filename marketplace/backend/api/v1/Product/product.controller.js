@@ -38,7 +38,7 @@ class ProductController {
       const { dapp, query } = req
 
       const products = await dapp.getProducts({ ...query })
-      const productsWithImageUrl = products.map(product => (
+      const productsWithImageUrl = products.products.map(product => (
         product.imageKey ?
         {
           ...product,
@@ -47,7 +47,7 @@ class ProductController {
         :
         product
       ))
-      rest.response.status200(res, productsWithImageUrl)
+      rest.response.status200(res, {productsWithImageUrl:productsWithImageUrl, count: products.productCount})
 
       return next()
     } catch (e) {
@@ -120,19 +120,6 @@ class ProductController {
       const result = await dapp.deleteProduct(body, options)
 
       rest.response.status200(res, result)
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-  
-  static async count(req, res, next) {
-    try {
-      const { dapp, query } = req
-
-      const products = await dapp.getProductsCount({ ...query })
-      rest.response.status200(res, products)
-
       return next()
     } catch (e) {
       return next(e)

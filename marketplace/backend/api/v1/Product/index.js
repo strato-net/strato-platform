@@ -7,13 +7,6 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
-  Product.count,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ProductController.count
-)
-
-router.get(
   Product.get,
   authHandler.authorizeRequest(),
   loadDapp,
