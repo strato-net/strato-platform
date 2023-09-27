@@ -4,9 +4,10 @@ import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../contexts/membership";
+import { CaretDownOutlined } from "@ant-design/icons"
 import { actions } from "../../contexts/membership/actions";
 import { INVENTORY_STATUS } from "../../helpers/constants";
-import { actions as inventoryActions} from "../../contexts/inventory/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 
 const { Option } = Select;
@@ -23,7 +24,9 @@ const ListNowIndex = ({
   const seller = user.user.organization;
   const [possibleMemberships, setPossibleMemberships] = useState([]);
   const [selectedMembership, setSelectedMembership] = useState(null);
-  const [id, setId] = useState("select a membership");
+  const [productId, setProductId] = useState('')
+  // const [id, setId] = useState("");
+  const [inventoryId, setInventoryId] = useState('')
   const [quantity, setQuantity] = useState(0);
   const [taxPercentage, setTaxPercentage] = useState(0);
   const [taxDollarAmount, setTaxDollarAmount] = useState(0);
@@ -32,15 +35,16 @@ const ListNowIndex = ({
   const [price, setPrice] = useState(0);
   const dispatch = useMembershipDispatch();
   const inventoryDispatch = useInventoryDispatch();
+  const { inventories } = useInventoryState()
   let {
     memberships,
-    ismembershipsLoading,
+    isMembershipLoading,
     purchasedMemberships,
     isPurchasedMembershipLoading,
   } = useMembershipState();
 
+
   useEffect(() => {
-    actions.fetchMembership(dispatch);
     actions.fetchPurchasedMemberships(dispatch);
   }, []);
 
@@ -52,9 +56,18 @@ const ListNowIndex = ({
           membership.ownerOrganization ===
           membership.inventories[0].manufacturer
       );
-    setPossibleMemberships(memberships_issued.concat(purchasedMemberships));
-    console.log("possibleMemberships", possibleMemberships);
+    setPossibleMemberships(purchasedMemberships);
   }, [memberships, purchasedMemberships]);
+
+  useEffect(() => {
+    if (inventories.length > 0) {
+      setInventoryId(inventories[0]?.address)
+      setProductId(inventories[0]?.productId)
+    }
+  }, [inventories])
+
+
+  console.log("inventories", inventoryId, "productId", productId);
 
   const handleFormatter = (value) => {
     if (value === "" || value === ".") {
@@ -78,21 +91,26 @@ const ListNowIndex = ({
     return isNaN(parsedValue) ? "" : parsedValue;
   };
 
+  const handleMembership = (value) => {
+    let membership = purchasedMemberships.find((item) => item.itemNumber == value)
+
+    inventoryActions.fetchInventory(inventoryDispatch, '', 0, productId);
+    setProductId(membership.productId)
+    setSelectedMembership(value);
+    // setId(value);
+  }
+
   const selectAfter = (
     <Select
       defaultValue="1"
       onChange={(value) => {
-        console.log("value",value)
-        if (value === "1"){
-            setIsTaxPercentage(true)
-            console.log("isTaxPercentage1", isTaxPercentage)
+        if (value === "1") {
+          setIsTaxPercentage(true)
         }
-        else if (value === "0"){
-            setIsTaxPercentage(false)
-            console.log("isTaxPercentage2", isTaxPercentage)
+        else if (value === "0") {
+          setIsTaxPercentage(false)
         }
         // formik.setFieldValue("isTaxPercentage", value === "1");
-        console.log("isTaxPercentage", isTaxPercentage)
       }}
       style={{ width: 60 }}
     >
@@ -115,15 +133,15 @@ const ListNowIndex = ({
         <Select
           style={{ width: 200 }}
           placeholder="Select a membership"
+          suffixIcon={isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />}
+          disabled={isPurchasedMembershipLoading}
           onChange={(value) => {
-            setSelectedMembership(value);
-            setId(value);
+            handleMembership(value)
           }}
-          value={selectedMembership}
         >
           {possibleMemberships.map((membership, index) => (
-            <Option key={index} value={ membership.productName ? membership.membershipAddress : membership.address }>
-              {membership.productName || membership.product.name}
+            <Option key={index} value={membership.itemNumber}>
+              {membership.productName}
             </Option>
           ))}
         </Select>
@@ -161,12 +179,15 @@ const ListNowIndex = ({
       key: "1",
       seller: seller,
       membership: selectedMembership,
-      id: id,
+      // id: id,
       quantity: (
         <>
           <InputNumber
             id="quantity"
             name="quantity"
+            controls={false}
+            type="number"
+            onWheel={(e) => e.target.blur()}
             min={0}
             value={quantity}
             onChange={(value) => {
@@ -180,13 +201,16 @@ const ListNowIndex = ({
           <InputNumber
             id="percentage"
             name="percentage"
+            controls={false}
+            type="number"
+            onWheel={(e) => e.target.blur()}
             min={0}
             addonAfter={selectAfter}
             formatter={handleFormatter}
             parser={handleParser}
             value={taxPercentage}
             onChange={(value) => {
-            //   formik.setFieldValue("taxPercentage", value);
+              //   formik.setFieldValue("taxPercentage", value);
               setTaxPercentage(value)
               isTaxPercentage
                 ? setTaxPercentageAmount(value)//formik.setFieldValue("taxPercentageAmount", value)
@@ -203,6 +227,9 @@ const ListNowIndex = ({
           <InputNumber
             id="price"
             name="price"
+            controls={false}
+            type="number"
+            onWheel={(e) => e.target.blur()}
             min={0}
             value={price}
             onChange={(value) => {
@@ -214,24 +241,13 @@ const ListNowIndex = ({
       type: possibleMemberships.find((membership) => membership.address === selectedMembership)
         ? "New"
         : "Sale"
-    
+
     },
   ];
-  
+
   const handleCreateFormSubmit = async () => {
-    let selectedMembershipObject = possibleMemberships.find(
-        (membership) => membership.address === selectedMembership
-      );
-      
-    selectedMembershipObject = selectedMembershipObject
-    ? selectedMembershipObject
-    : possibleMemberships.find(
-        (membership) => membership.membershipAddress === selectedMembership
-        );
-        
-        
     const inventoryBody = {
-      productAddress: selectedMembershipObject.productId,
+      productAddress: productId,
       quantity: quantity,
       pricePerUnit: price,
       // Generate random code for now
@@ -242,7 +258,16 @@ const ListNowIndex = ({
       taxPercentageAmount: taxPercentageAmount,
       taxDollarAmount: taxDollarAmount,
     };
-    console.log(inventoryBody)
+
+    // const updatePayload = {
+    //   productAddress: productId,
+    //   inventory: inventoryId,
+    //   updates: {
+    //     pricePerUnit: price,
+    //     status: INVENTORY_STATUS.PUBLISHED
+    //   }
+    // }
+
     const createInventory = await inventoryActions.createInventory(
       inventoryDispatch,
       inventoryBody
@@ -251,6 +276,8 @@ const ListNowIndex = ({
     if (createInventory) {
       // membership.product_with_inventory = 1;
       console.log("Great success!")
+      setInventoryId('')
+      setProductId('')
     }
     handleCancel();
   };
@@ -262,16 +289,15 @@ const ListNowIndex = ({
       title="Create Listing"
       open={open}
       onCancel={handleCancel}
-    //   onOk={handleCreateFormSubmit()}
+      //   onOk={handleCreateFormSubmit()}
       footer={[
         <Button
           key="list-now"
           onClick={
             () => {
-                console.log('Excusi?');
-                handleCreateFormSubmit();
+              handleCreateFormSubmit();
             }
-        }
+          }
           loading={false}
           type="primary"
         >
