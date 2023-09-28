@@ -55,6 +55,7 @@ import Data.Text.Encoding
 import qualified Data.Vector as V
 import GHC.Generics
 import SolidVM.Model.Storable hiding (size)
+import SolidVM.Model.Value
 import Text.RawString.QQ
 
 data Type
@@ -911,13 +912,10 @@ insertUserRegistryContract certs gi =
     rootSub = fromJust $ getCertSubject rootCert
     rootAcct =
       SolidVMContractWithStorage
-        (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing Nothing)
+        (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName rootSub]))
         123
         (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-        [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
-          (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
-          (".isActive", rlpWrap $ BBool True),
-          (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
+        [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
         ]
 
     userAccts =
@@ -931,13 +929,10 @@ insertUserRegistryContract certs gi =
                 certSub = certSub' cert
                 reverseAddr = Address . bytesToWord160 . reverse . word160ToBytes . unAddress . certUserAddress
             SolidVMContractWithStorage
-              (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing Nothing)
+              (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName certSub]))
               0
               (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-              [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
-                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
-                (".isActive", rlpWrap $ BBool True),
-                (BC.pack $ ".userCertificates<a:" ++ (show $ certUserAddress cert) ++ ">", addrToCertIdx . show . reverseAddr $ cert)
+              [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
               ]
         )
         certs
