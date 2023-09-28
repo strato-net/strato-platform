@@ -1,10 +1,13 @@
 pipeline {
   agent {
-    label "" //which agent should I use?
+    label "upgrade" //which agent should I use?
   }
   options { disableConcurrentBuilds() }
   parameters {
     string(name: 'VersionTag', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
+  }
+  environment {
+    execution_arn = ""
   }
   stage('Start Step Functions Execution') {
     steps {
@@ -17,7 +20,7 @@ pipeline {
           --query "executionArn" \
           --output text)
 
-        echo "Started Step Functions execution
+        echo "Started Step Functions execution"
       '''
     }
   }
