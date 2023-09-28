@@ -915,7 +915,7 @@ insertUserRegistryContract certs gi =
         (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName rootSub]))
         123
         (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-        [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+        [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub)
         ]
 
     userAccts =
@@ -932,7 +932,7 @@ insertUserRegistryContract certs gi =
               (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName certSub]))
               0
               (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-              [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
+              [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub)
               ]
         )
         certs
