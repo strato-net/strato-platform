@@ -229,7 +229,7 @@ lookupContractFunction x cName fName = do
           Just VariableDecl {..} ->
             if _varIsPublic
               then case _varType of
-                    SVMType.Array _ _ -> Function (Product [variadicType' x] x) (Static _varType x) x [] [] True
+                    SVMType.Array _ _ -> Function (Product [intType' x] x) (Static _varType x) x [] [] True
                     _ -> Function (Product [] x) (Static _varType x) x [] [] False
               else
                 bottom $
@@ -276,7 +276,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
     Nothing -> typecheck funcArgTypes args
     _ -> typecheck funcArgTypes reorderedArgs
   let funcValTypes' = case (functionArrayGetter, funcArgTypes, funcValTypes) of
-                        (True, (Product ([Static SVMType.Variadic _]) _), (Static (SVMType.Array t _) x)) -> Static t x  
+                        (True, (Product ([Static (SVMType.Int _ _) _]) _), (Static (SVMType.Array t _) x)) -> Static t x  
                         _ -> funcValTypes
   case (p, funcValTypes') of
     (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
@@ -341,9 +341,6 @@ certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.
 
 topType' :: SourceAnnotation Text -> Type'
 topType' = Top S.empty
-
-variadicType' :: SourceAnnotation Text -> Type'
-variadicType' = Static (SVMType.Variadic)
 
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)

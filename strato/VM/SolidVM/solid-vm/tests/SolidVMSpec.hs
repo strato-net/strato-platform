@@ -8474,3 +8474,39 @@ contract qq {
 }
 |]
       getFields ["b"] `shouldReturn` [BInteger 8]
+    
+  it "can't access a contract array without any parameters" $ runTest ( do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x();
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+  it "can't access a contract array without any parameters and also using braces" $ runTest ( do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x()[0];
+  }
+}
+|]) `shouldThrow` anyTypeError
