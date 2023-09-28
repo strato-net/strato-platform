@@ -8414,45 +8414,63 @@ contract qq {
 }|]
       )
       `shouldThrow` anyMissingTypeError
-  it "can test whether embedded contracts created using new can be found in call stack" . runTest $ do
+
+  it "can index access a contract array returned from a function" . runTest $ do
       runBS [r|
-
-contract Node {
-  address orgAddress;
-
-  constructor (address _orgAddress){
-    orgAddress = _orgAddress;
-  }
-}
-
-contract Organization {
-
-  Node[] public nodes;
-
-  constructor(address _dappAddress) {
-
-    Node node = new Node(_dappAddress);
-    nodes.push(node);
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
   }
 
+  function get() returns (uint[]) {
+    return x;
+  }
 }
 
 contract qq {
-
-  Organization[] orgs;
-  address test;
-
+  uint b;
   constructor() {
-    test = createOrganization(address(0xdeadbeef));
-  }
-
-  function createOrganization(address _x) returns (address) {
-
-    Organization org = new Organization(_x);
-    orgs.push(org);
-    Node node = Node(org.nodes()[0]);
-    return (address(node));
+      SomeContract p = new SomeContract();
+      b = p.get()[0];
   }
 }
 |]
-      getFields ["test"] `shouldReturn` [BAccount $ NamedAccount ((fromJust . stringAddress) "af11a56deca85ea206c89766e250fa5668050568") UnspecifiedChain]
+      getFields ["b"] `shouldReturn` [BInteger 8]
+  
+  it "can't index access a contract array from the builtin getter" $ runTest ( do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x()[0];
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+  it "can test array index access by passing in as a parameter" . runTest $ do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x(0);
+  }
+}
+|]
+      getFields ["b"] `shouldReturn` [BInteger 8]
