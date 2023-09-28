@@ -229,7 +229,7 @@ lookupContractFunction x cName fName = do
           Just VariableDecl {..} ->
             if _varIsPublic
               then case _varType of
-                    SVMType.Array _ _ -> Function (Product [intType' x] x) (Static _varType x) x [] [] True
+                    SVMType.Array _ _ -> Function (Product [intType' x, variadicType' x] x) (Static _varType x) x [] [] True
                     _ -> Function (Product [] x) (Static _varType x) x [] [] False
               else
                 bottom $
@@ -275,8 +275,15 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
   p <- case argNames of
     Nothing -> typecheck funcArgTypes args
     _ -> typecheck funcArgTypes reorderedArgs
-  let funcValTypes' = case (functionArrayGetter, funcArgTypes, funcValTypes) of
-                        (True, (Product ([Static (SVMType.Int _ _) _]) _), (Static (SVMType.Array t _) x)) -> Static t x  
+  let lengthOfArgs = case args of
+                       (Product [] _) -> 0
+                       (Product a _) -> length a
+                       _ -> 0
+      arrayLayer = case funcValTypes of
+                     (Static a@(SVMType.Array _ _) x) -> flip Static x $ loop lengthOfArgs a
+                     _ -> funcValTypes
+      funcValTypes' = case (functionArrayGetter, funcArgTypes, funcValTypes) of
+                        (True, (Product ([(Static (SVMType.Int _ _) _), (Static (SVMType.Variadic) _)]) _), (Static (SVMType.Array _ _) _)) -> arrayLayer  
                         _ -> funcValTypes
   case (p, funcValTypes') of
     (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
@@ -284,6 +291,13 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
       [] -> pure $ Bottom es
       (x : xs) -> apply' (functionArgType x) (functionReturnType x) xs args argNames (functionArgNames x) functionArrayGetter
     _ -> pure $ funcValTypes'
+  where
+    loop count (SVMType.Array t _) = 
+      if count == 0
+        then t
+        else loop (count - 1) t
+    loop 0 b = b
+    loop _ _ = error "trying to access an index outside of range"
 
 apply :: Type' -> Type' -> Maybe [SolidString] -> SSS Type'
 apply (Bottom es) (Bottom ess) _ = pure $ Bottom (es <> ess)
@@ -339,6 +353,9 @@ contractType' = Static (SVMType.Contract "")
 certType' :: SourceAnnotation Text -> Type'
 certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.String Nothing)) x
 
+variadicType' :: SourceAnnotation Text -> Type'
+variadicType' = Static (SVMType.Variadic)
+
 topType' :: SourceAnnotation Text -> Type'
 topType' = Top S.empty
 
@@ -391,6 +408,7 @@ typecheck' unify r1 r2 = case (r1, r2) of
     Right t -> Static t x
   (Product t1 x, Product t2 _) -> typecheckProduct unify x t1 t2
   (Product [a] _, b) -> typecheck' unify a b
+  (Product [a, (Static SVMType.Variadic _)] _, b) -> typecheck' unify a b
   (a, Product [b] _) -> typecheck' unify a b
   (MultiVariate a _, MultiVariate b _) -> typecheck' unify a b
   (MultiVariate a _, Product xs x) -> typecheckProduct unify x xs (replicate (length xs) a)

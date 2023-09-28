@@ -642,20 +642,22 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         case M.lookup functionName $ contract ^. CC.storageDefs of
           Just CC.VariableDecl {..} -> do
             let args' = case (_varType, argExps) of
-                          ((SVMType.Array _ _), CC.OrderedArgs [(CC.NumberLiteral _ n Nothing)]) -> OrderedVals [SInteger n]
-                          _ -> OrderedVals []
+                          ((SVMType.Array _ _), CC.OrderedArgs oa) -> case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
+                                                                        True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
+                                                                        False -> []
+                          _ -> []
             let isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
             when ((from /= to) && isForbidden) $
               unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
             -- TODO: this should only exist if the storage variable is declared "public",
             -- right now I just ignore this and allow anything to be called as a getter
-            case args' of
-              (OrderedVals [(SInteger idx)]) -> do
+            case null args' of
+              False -> do
                 addCallInfo to contract (functionName ++ "()") hsh cc M.empty True False
-                let valPath' = Just $ SReference $ apSnoc (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) $ MS.ArrayIndex $ fromIntegral idx
+                let valPath' = Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
                 popCallInfo
                 return (pure valPath', OrderedVals [])
-              _ -> do
+              True -> do
                 addCallInfo to contract functionName hsh cc M.empty True False
                 val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
                 popCallInfo
