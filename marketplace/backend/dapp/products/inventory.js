@@ -54,8 +54,8 @@ function marshalIn(_args) {
     const defaultArgs = {
         pricePerUnit: 0,
         status: 0,
-        taxPercentageAmount:0,
-        taxDollarAmount:0,
+        taxPercentageAmount: 0,
+        taxDollarAmount: 0,
     };
 
     const args = {

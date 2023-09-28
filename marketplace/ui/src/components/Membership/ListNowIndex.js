@@ -49,13 +49,13 @@ const ListNowIndex = ({
   }, []);
 
   useEffect(() => {
-    const memberships_issued = memberships
-      .filter((membership_) => membership_.inventories.length > 0)
-      .filter(
-        (membership) =>
-          membership.ownerOrganization ===
-          membership.inventories[0].manufacturer
-      );
+    // const memberships_issued = memberships
+    //   .filter((membership_) => membership_.inventories.length > 0)
+    //   .filter(
+    //     (membership) =>
+    //       membership.ownerOrganization ===
+    //       membership.inventories[0].manufacturer
+    //   );
     setPossibleMemberships(purchasedMemberships);
   }, [memberships, purchasedMemberships]);
 
@@ -243,26 +243,6 @@ const ListNowIndex = ({
   ];
 
   const handleCreateFormSubmit = async () => {
-
-    // const inventoryBody = {
-    //   productAddress: productId,
-    //   quantity: quantity,
-    //   pricePerUnit: price,
-    //   // Generate random code for now
-    //   batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-    //   // Status should always be published if we use List Now
-    //   status: INVENTORY_STATUS.PUBLISHED,
-    //   serialNumber: [],
-    //   taxPercentageAmount: taxPercentageAmount,
-    //   taxDollarAmount: taxDollarAmount,
-    // };
-
-    // const createInventory = await inventoryActions.createInventory(
-    //   inventoryDispatch,
-    //   inventoryBody
-    // );
-
-
     const updatePayload = {
       productAddress: productId,
       inventory: inventoryId,
@@ -277,8 +257,6 @@ const ListNowIndex = ({
       inventoryDispatch,
       updatePayload
     );
-
-
 
     if (updateInventory) {
       // membership.product_with_inventory = 1;
