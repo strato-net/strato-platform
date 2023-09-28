@@ -107,7 +107,7 @@ import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
-import SolidVM.Model.Value (ValList(..))
+import SolidVM.Model.Value (SString, OrderedVals)
 import Strato.Strato23.API.Types
 import Strato.Strato23.Client
 import System.Clock
