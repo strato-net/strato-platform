@@ -1952,7 +1952,15 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                 (CC.OrderedArgs []) -> typeError "derive needs at least one argument, none were given " args
                 (CC.OrderedArgs (_ : as)) -> OrderedVals <$> mapM (getVar <=< expToVar) as
                 (CC.NamedArgs _) -> typeError "Cannot provide named args to derive" args
-              let salt = case convertedFirstArg of
+              let args'' =
+                    case args' of
+                      OrderedVals [] -> args'
+                      OrderedVals [SVariadic v] -> OrderedVals v
+                      OrderedVals a -> case last a of
+                        SVariadic v -> OrderedVals (init a ++ v) -- unpack variadic values
+                        _ -> args'
+                      _ -> typeError "This should not be possible to reach..." args'
+                  salt = case convertedFirstArg of
                     SString s -> s
                     _ -> typeError "first arugment must be a string " args
                   newAddress =
@@ -1960,7 +1968,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                       addr
                       salt
                       (keccak256ToByteString hsh)
-                      (show args')
+                      (show args'')
               onTraced $ do
                 liftIO $
                   putStrLn $

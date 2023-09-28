@@ -3,7 +3,7 @@
 import Control.Monad
 import qualified Data.ByteString as B
 import Data.ByteString.Arbitrary (fastRandBs)
-import Kafka
+import BlockApps.Tools.Kafka
 import System.IO
 import System.IO.Temp
 import Test.Hspec

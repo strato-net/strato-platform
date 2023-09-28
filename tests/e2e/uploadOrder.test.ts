@@ -61,7 +61,7 @@ async function createNewUser(username:string) {
 
 
 async function upload() {
-  const user = await createNewUser("user1");
+  const user = await createNewUser("user3");
   const args = {_a: 0, _b: 0};
   console.log(`User ${user.address} uploading a NonceOrder`);
   return [user, await rest.createContract(user, {name: 'NonceOrder', source: nonceOrder, args}, options)];
@@ -175,9 +175,9 @@ async function getBalance(user:OAuthUser, address:string) {
 describe('Nonce upload orders', async () => {
 
   it ('will respect the nonce provided on each send tx', async () => {
-    const user = await createNewUser("user1");
+    const user = await createNewUser("user3");
     console.log(`Setting 300, then 4`);
-    const user2 = await createNewUser("user2");
+    const user2 = await createNewUser("user4");
     const balance1 = await getBalance(user, user2.address);
     const v1 = 40000000; // These numbers should be higher than any value other tests use
     const v2 = 3000000000;
@@ -188,9 +188,9 @@ describe('Nonce upload orders', async () => {
   }).timeout(config.timeout);
   
   it ("won't collide nonces when none are provided for send txs", async () => {
-    const user = await createNewUser("user1");
+    const user = await createNewUser("user3");
     console.log(`Setting 4, then 300`);
-    const user2 = await createNewUser("user2");
+    const user2 = await createNewUser("user4");
     const balance1 = await getBalance(user, user2.address);
     const v1 = 40000000; // These numbers should be higher than any value other tests use
     const v2 = 3000000000;
@@ -219,7 +219,7 @@ describe('Nonce upload orders', async () => {
   }).timeout(config.timeout);
 
   it ('will respect the nonce provided on each contract tx', async () => {
-    const user = await createNewUser("user1");
+    const user = await createNewUser("user3");
     console.log(`Setting 300, then 4`);
     let result = await rest.getAccounts(user, {...options, params: {address: user.address}})
     let nonce = result[0].nonce;
@@ -232,7 +232,7 @@ describe('Nonce upload orders', async () => {
   }).timeout(config.timeout);
 
   it ("won't collide nonces when none are provided for contract txs", async () => {
-    const user = await createNewUser("user1");
+    const user = await createNewUser("user3");
     console.log(`Setting 4, then 300`);
     const contracts = await createNoNonces(user, 'NonceOrder', [4, 300]);
     console.log(`Checking our work`);

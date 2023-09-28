@@ -73,7 +73,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchOrderSuccessful:
       return {
         ...state,
-        orders: action.payload,
+        orders: action.payload.orders,
+        orderBoughtTotal: action.payload.total,
         isordersLoading: false,
       };
     case actionDescriptors.fetchOrderFailed:
@@ -90,7 +91,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchOrderSoldSuccessful:
       return {
         ...state,
-        ordersSold: action.payload,
+        ordersSold: action.payload.orders,
+        orderSoldTotal: action.payload.total,
         isordersSoldLoading: false,
       };
     case actionDescriptors.fetchOrderSoldFailed:

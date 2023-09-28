@@ -319,7 +319,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/product?isDeleted=false&category=${category}&subCategory=${subCategory}`,
+        `${apiUrl}/product?isActive=true&isDeleted=false&category=${category}&subCategory=${subCategory}`,
         {
           method: HTTP_METHODS.GET,
         }
