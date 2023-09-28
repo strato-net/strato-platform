@@ -23,7 +23,6 @@ module Blockchain.SolidVM.SM
     runSM,
     getCurrentAccount,
     addCallInfo,
-    addCallInfoToEnd,
     dupCallInfo,
     uncheckedCallInfo,
     popCallInfo,
@@ -56,6 +55,7 @@ module Blockchain.SolidVM.SM
     getBSum,
     addEvent,
     addDelegatecall,
+    getCodeAndCollection,
   )
 where
 
@@ -73,6 +73,7 @@ import Blockchain.Data.ChainInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Environment as Env
+import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
 import Blockchain.Strato.Model.Account
@@ -634,37 +635,6 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
 
-addCallInfoToEnd ::
-  MonadSM m =>
-  Account ->
-  CC.Contract ->
-  SolidString ->
-  Keccak256 ->
-  CC.CodeCollection ->
-  Map SolidString (SVMType.Type, Variable) ->
-  Bool ->
-  Bool ->
-  m ()
-addCallInfoToEnd a c fn hsh cc initialLocalVariables ro ff = do
-  let newCallInfo =
-        CallInfo
-          { currentFunctionName = fn,
-            currentAccount = a,
-            currentContract = c,
-            codeCollection = cc,
-            collectionHash = hsh,
-            localVariables = initialLocalVariables,
-            variableStack = [initialLocalVariables],
-            readOnly = ro,
-            isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
-            currentSourcePos = Nothing,
-            isFreeFunction = ff
-          }
-
-  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-    [] -> internalError "probably shouldn't happen?" ()
-    rest -> pure $ rest ++ [newCallInfo]
-
 dupCallInfo :: MonadSM m => Bool -> m ()
 dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "dupCallInfo was called on an already empty stack" ()
@@ -831,25 +801,17 @@ hintFromType = \case
   SVMType.Mapping {} -> return TComplex
   tt'' -> todo "hintFromType" tt''
 
-getXabiType' :: B.ByteString -> CallInfo -> Maybe SVMType.Type
-getXabiType' field callInfo =
+getXabiTypeFromContract :: B.ByteString -> CC.Contract -> Maybe SVMType.Type
+getXabiTypeFromContract field ctract =
   M.lookup (stringToLabel $ BC.unpack field)
     . fmap CC._varType
     . CC._storageDefs
-    . currentContract
-    $ callInfo
+    $ ctract
 
-getCallInfoForAccount :: Mod.Modifiable [CallInfo] m => Account -> m CallInfo
-getCallInfoForAccount acct = do
-  -- This field might have been defined in e.g. a caller contract.
-  -- We search from the top down for the home of this data
-  stack <- Mod.get (Mod.Proxy @[CallInfo])
-  case filter ((== acct) . currentAccount) stack of
-    [] -> internalError "account not found in call stack" (acct, stack)
-    (callInfo : _) -> return callInfo
-
-getXabiType :: Mod.Modifiable [CallInfo] m => Account -> B.ByteString -> m (Maybe SVMType.Type)
-getXabiType acct field = getXabiType' field <$> getCallInfoForAccount acct
+getXabiType :: MonadSM m => Account -> B.ByteString -> m (Maybe SVMType.Type)
+getXabiType acct field = do
+  (ctract, _, _) <- getCodeAndCollection acct
+  pure $ getXabiTypeFromContract field ctract
 
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
@@ -884,7 +846,7 @@ getXabiValueType (AccountPath loc path) = do
               (_, StructTypo {}) -> typeError "non field access to struct" x
               (_, ContractTypo {}) -> todo "getValueType/contract access" t'
               (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
-      t'' -> todo "atomic type does not have value type" t''
+      t'' -> t''
     loop ccs (_ : rs) = \case
       SVMType.Mapping {SVMType.value = t'} -> loop ccs rs t'
       SVMType.Array {SVMType.entry = t'} -> loop ccs rs t'
@@ -929,3 +891,34 @@ getBSum :: (Keccak256 `A.Alters` BlockSummary) m => Keccak256 -> m BlockSummary
 getBSum bh =
   fromMaybe (error $ "missing value in block summary DB: " ++ format bh)
     <$> A.lookup (A.Proxy @BlockSummary) bh
+
+getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollection address' = do
+  callStack' <- Mod.get (Mod.Proxy @[CallInfo])
+  let maybeAddress =
+        case callStack' of
+          (current' : _) -> Just $ currentAccount current'
+          _ -> Nothing
+
+  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+  $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
+  if Just address' == maybeAddress
+    then do
+      c' <- getCurrentContract
+      (hsh, cc') <- getCurrentCodeCollection
+      return (c', hsh, cc')
+    else do
+      codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
+
+      resolvedCodeHash <- resolveCodePtr (address' ^. accountChainId) codeHash
+      (contractName', ch, cc) <-
+        case resolvedCodeHash of
+          Just (SolidVMCode cn ch') -> do
+            cc' <- codeCollectionFromHash True ch'
+            return (stringToLabel cn, ch', cc')
+          Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
+          Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
+
+      let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
+
+      return (contract', ch, cc)
