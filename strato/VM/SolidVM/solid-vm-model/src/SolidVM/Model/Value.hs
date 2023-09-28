@@ -12,6 +12,7 @@ module SolidVM.Model.Value
     createVar,
     coerceType,
     apSnoc,
+    apSnocList,
     defaultValue,
     createDefaultValue,
     valEquals,
@@ -55,6 +56,9 @@ data AccountPath = AccountPath
 
 apSnoc :: AccountPath -> MS.StoragePathPiece -> AccountPath
 apSnoc (AccountPath loc path) piece = AccountPath loc $! path `MS.snoc` piece
+
+apSnocList :: AccountPath -> [MS.StoragePathPiece] -> AccountPath
+apSnocList (AccountPath loc path) pieces = AccountPath loc $! path `MS.snocList` pieces
 
 instance Show AccountPath where
   show (AccountPath a p) = printf "%s//%s" (show a) (show p)
