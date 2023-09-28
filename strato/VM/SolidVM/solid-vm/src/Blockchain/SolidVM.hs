@@ -641,16 +641,25 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
       _ -> do
         case M.lookup functionName $ contract ^. CC.storageDefs of
           Just CC.VariableDecl {..} -> do
-            $logDebugS "call'/getter" . T.pack $ labelToString functionName
+            let args' = case (_varType, argExps) of
+                          ((SVMType.Array _ _), CC.OrderedArgs [(CC.NumberLiteral _ n Nothing)]) -> OrderedVals [SInteger n]
+                          _ -> OrderedVals []
             let isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
             when ((from /= to) && isForbidden) $
               unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
-            addCallInfo to contract functionName hsh cc M.empty True False
             -- TODO: this should only exist if the storage variable is declared "public",
             -- right now I just ignore this and allow anything to be called as a getter
-            val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
-            popCallInfo
-            return (pure val, OrderedVals [])
+            case args' of
+              (OrderedVals [(SInteger idx)]) -> do
+                addCallInfo to contract (functionName ++ "()") hsh cc M.empty True False
+                let valPath' = Just $ SReference $ apSnoc (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) $ MS.ArrayIndex $ fromIntegral idx
+                popCallInfo
+                return (pure valPath', OrderedVals [])
+              _ -> do
+                addCallInfo to contract functionName hsh cc M.empty True False
+                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
+                popCallInfo
+                return (pure val, OrderedVals [])
           Nothing ->
             ( case M.lookup "fallback" functionsIncludingConstructor of
                 Just fallbackFunc -> do
@@ -740,37 +749,6 @@ getOrg caller = do
             _ -> do
               $logDebugS "getOrg/versioning" . T.pack $ "Its org is unset. Returning empty string"
               return ""
-
-getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = do
-  callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-  let maybeAddress =
-        case callStack' of
-          (current' : _) -> Just $ currentAccount current'
-          _ -> Nothing
-
-  onTraced $ $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  onTraced $ $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
-  if Just address' == maybeAddress
-    then do
-      c' <- getCurrentContract
-      (hsh, cc') <- getCurrentCodeCollection
-      return (c', hsh, cc')
-    else do
-      codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
-
-      resolvedCodeHash <- resolveCodePtr (address' ^. accountChainId) codeHash
-      (contractName', ch, cc) <-
-        case resolvedCodeHash of
-          Just (SolidVMCode cn ch') -> do
-            cc' <- codeCollectionFromHash True ch'
-            return (stringToLabel cn, ch', cc')
-          Just ch -> internalError "SolidVM for non-solidvm code" (format ch)
-          Nothing -> missingCodeCollection "SolidVM for non-existent code" (format codeHash)
-
-      let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
-
-      return (contract', ch, cc)
 
 logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
@@ -1596,7 +1574,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
   var <- expToVar expr
   val <- getVar var
   chainId <- view accountChainId <$> getCurrentAccount
-
   case (val, name) of
     (SEnum enumName, _) -> do
       contract' <- getCurrentContract
@@ -1900,8 +1877,6 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' args False
-  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
-  addCallInfoToEnd newAddress contract' (stringToLabel $ labelToString contractName') hsh cc M.empty False False
   return $
     Constant $
       SContract contractName' $
@@ -1920,8 +1895,6 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show args'
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' args False
-  let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
-  addCallInfoToEnd newAddress contract' (stringToLabel $ labelToString contractName') hsh cc M.empty False False
   onTraced $ do
     liftIO $
       putStrLn $
