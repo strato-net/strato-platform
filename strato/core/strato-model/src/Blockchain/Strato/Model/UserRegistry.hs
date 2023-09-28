@@ -16,13 +16,6 @@ pragma builtinCreates;
 import { Certificate, CertificateRegistry } from <509>;
 
 contract UserRegistry {
-    // The UserRegistry is responsible for creating User contracts for each user.
-    address public owner;
-
-    constructor() {
-        owner = msg.sender;
-    }
-
     function createUser(string _commonName) public returns (address) {
         User newUser = new User{salt: _commonName}(_commonName);
         return address(newUser);
@@ -30,7 +23,6 @@ contract UserRegistry {
 }
 
 contract User {
-
     string public commonName;
 
     constructor(string _commonName) {

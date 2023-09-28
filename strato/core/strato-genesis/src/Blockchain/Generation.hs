@@ -942,4 +942,4 @@ insertUserRegistryContract certs gi =
         0x720
         720
         (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry))
-        $ [(".owner", rootAddress)]
+        $ []
