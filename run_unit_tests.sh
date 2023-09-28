@@ -12,7 +12,7 @@ trap "docker rm -f ${REDIS}" EXIT
 
 cd strato
 
-stack test --coverage\
+stack test $1\
       blockapps-data \
       blockapps-mpdbs \
       blockapps-tools \

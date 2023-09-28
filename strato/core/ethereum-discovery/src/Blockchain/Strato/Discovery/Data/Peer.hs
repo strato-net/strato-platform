@@ -66,6 +66,8 @@ PPeer
     lastBestBlockHash Keccak256
     bondState Int
     activeState Int
+--    activeThread Bool
+--    activeThreadId Int Maybe
     version T.Text
     disableException T.Text
     nextDisableWindowSeconds Int default=5
@@ -146,6 +148,26 @@ instance (A.Replaceable (IPAsText, TCPPort) ActivityState) IO where
     SQL.updateWhere
       [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
       [PPeerActiveState SQL.=. fromEnum state]
+
+{-
+instance (A.Replaceable (IPAsText, TCPPort) PeerActiveThread) IO where
+  replace _ (IPAsText ip, TCPPort port) activethread = withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      case activethread of
+        (PeerActiveThread False) -> SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
+                                                    [PPeerActiveThread SQL.=. True]
+        (PeerActiveThread True)  -> SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
+                                                    [PPeerActiveThread SQL.=. False]
+
+instance (A.Replaceable (IPAsText, TCPPort) PeerActiveThreadId) IO where
+  replace _ (IPAsText ip, TCPPort port) activethreadid = withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      case activethreadid of
+        (PeerActiveThreadId Nothing)    -> SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
+                                                           [PPeerActiveThreadId SQL.=. (Just tid)]
+        (PeerActiveThreadId (Just tid)) -> SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
+                                                           [PPeerActiveThreadId SQL.=. Nothing]
+-}
 
 instance Mod.Accessible ActivePeers IO where
   access _ = withGlobalSQLPool $ \sqldb -> do
@@ -337,6 +359,14 @@ setPeerActiveState ::
 setPeerActiveState ip port state = do
   recordStateChange state
   try $ A.replace (A.Proxy @ActivityState) (IPAsText ip, TCPPort port) state
+
+{-
+setPeerActiveThread :: (MonadUnliftIO m, Mod.Accessible BondedPeers m)
+                    => String -> Int -> Bool -> Maybe Int -> m (Either SomeException ())
+setPeerActiveThread ip port activethread activethreadid = do
+  try $ A.replace (A.Proxy @PeerActiveThread)   (IPAsText $ T.pack ip,UDPPort port) (PeerActiveThread activethread)
+  try $ A.replace (A.Proxy @PeerActiveThreadId) (IPAsText $ T.pack ip,UDPPort port) (PeerActiveThreadId activethreadid)
+-}
 
 getActivePeers :: (MonadUnliftIO m, Mod.Accessible ActivePeers m) => m (Either SomeException [PPeer])
 getActivePeers = try $ unActivePeers <$> Mod.access (Mod.Proxy @ActivePeers)

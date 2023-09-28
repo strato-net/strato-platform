@@ -115,12 +115,6 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
                     ),
                   },
                   {
-                    label: <p className="font-medium text-strike-m">Events</p>,
-                    key: "Events",
-                    disabled: true,
-                    // children: <Description />,
-                  },
-                  {
                     label: (
                       <p className="font-medium text-strike-m">
                         Ownership History
