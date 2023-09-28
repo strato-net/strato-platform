@@ -170,8 +170,7 @@ stratoP2PClient runner = runner $ \sSource -> do
             liftIO (SSem.signal sem)
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException a -> m ()
     handleRunPeerResult thePeer = \case
-      Left e | Just (ErrorCall x) <- fromException e -> do _  <- liftIO $ print ("handleRunPeerResult Left!" :: String)
-                                                           error x
+      Left e | Just (ErrorCall x) <- fromException e -> error x
       Left e -> do
         $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
         recordException thePeer e
