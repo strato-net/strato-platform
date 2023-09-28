@@ -900,15 +900,12 @@ insertUserRegistryContract certs gi =
       genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedRegistry userRegistryContract (Just "UserRegistry")]
     }
   where
-    addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
 
     rlpWrap = rlpSerialize . rlpEncode
     encodedRegistry = encodeUtf8 userRegistryContract
 
-    rootAddress' = fromPublicKey rootPubKey
-    rootAddress = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
     rootSub = fromJust $ getCertSubject rootCert
     rootAcct =
       SolidVMContractWithStorage
@@ -925,9 +922,7 @@ insertUserRegistryContract certs gi =
                   case getCertSubject crt of
                     Just s -> s
                     Nothing -> error "Certificate requires a subject"
-                certUserAddress = fromPublicKey . subPub . certSub'
                 certSub = certSub' cert
-                reverseAddr = Address . bytesToWord160 . reverse . word160ToBytes . unAddress . certUserAddress
             SolidVMContractWithStorage
               (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName certSub]))
               0
