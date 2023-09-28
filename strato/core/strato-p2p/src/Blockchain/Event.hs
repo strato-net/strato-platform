@@ -518,7 +518,7 @@ handleEvents peer = awaitForever $ \case
         when (diffTime > maxTime) $ do
           yieldR $ Disconnect UselessPeer
           liftIO $ setTitle "timer timed out!"
-          error "Peer did not respond"
+          throwIO PeerNonResponsive
       Nothing -> do
         $logInfoS "TimerEvt" $ T.pack "Timestamp is not set"
         return ()

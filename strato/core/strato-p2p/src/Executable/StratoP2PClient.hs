@@ -170,7 +170,8 @@ stratoP2PClient runner = runner $ \sSource -> do
             liftIO (SSem.signal sem)
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException a -> m ()
     handleRunPeerResult thePeer = \case
-      Left e | Just (ErrorCall x) <- fromException e -> error x
+      Left e | Just (ErrorCall x) <- fromException e -> do _  <- liftIO $ print ("handleRunPeerResult Left!" :: String)
+                                                           error x
       Left e -> do
         $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
         recordException thePeer e
@@ -197,6 +198,10 @@ stratoP2PClient runner = runner $ \sSource -> do
             lengthenPeerDisable thePeer
           e' | Just PeerDisconnected <- fromException e' -> do
             disErr <- storeDisableException thePeer (T.pack "PeerDisconnected")
+            whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
+            lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
+          e' | Just PeerNonResponsive <- fromException e' -> do
+            disErr <- storeDisableException thePeer (T.pack "PeerNonResponsive")
             whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
             lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) thePeer
           e' | Just TimeoutException <- fromException e' -> do
