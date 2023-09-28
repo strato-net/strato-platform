@@ -34,7 +34,6 @@ so that they could be properly moved to their respective version's subsection.
 - `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
 - SolidVM built-in `create` and `create2` functions which allows for the explicit creation of contracts within SolidVM contracts
 - new `solidvmevents` kafka topic for emitted solidvm events
-- new built-in accessor functions for arrays
 - `pretty` Makefile command that triggers the `ormolu` code formatter
 - `hoogle` Makefile command that generates Haddock documentation and serves through local Hoogle instance
 - new built-in accessor functions for arrays
@@ -49,7 +48,6 @@ so that they could be properly moved to their respective version's subsection.
 - Typechecker test errors that were missing `pragma strict` and failing
 - The out-of-scope errors of storage variables for Solidity try/catch statements
 - Free function overloading conflict with the import resolver 
-- Multilayer contract creation using `new` not able to be found in call stack
 - Account not found in call stack errors for returning arrays to another contract
 ### Removed
 - `bloc22` database removed
