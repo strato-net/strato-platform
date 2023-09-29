@@ -615,6 +615,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
+  contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
+    const { userAddress, ...restArgs } = args
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const productList = await managers.productManager.getProducts({...restArgs, limit: 2000, offset:0, ownerOrganization: userOrganization}, getOptions);
+    console.log('productList123:', productList)
+    const productIds = productList.map(product => product.address);
+    const { queryValue, queryFields, ...restArgsPrime } = restArgs
+    return managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
+  };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
