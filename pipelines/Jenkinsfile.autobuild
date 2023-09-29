@@ -256,8 +256,8 @@ pipeline {
                 }
               }
             }
-          },
-          'Push Artifacts': {
+          }
+          stage('Push Artifacts') {
             withCredentials([
                 usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
@@ -273,9 +273,9 @@ pipeline {
                 aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
                 '''
               }
-          },
+          }
 
-          'Apex tests': {
+          stage('Apex tests') {
             sh '''#!/bin/bash -le
               set -x
               echo "Running apex unit tests"
@@ -283,26 +283,26 @@ pipeline {
               # TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
-          },
+          }
 
-          'Strato unit tests': {
+          stage('Strato unit tests') {
             sh '''#!/bin/bash -le
               set -x
               echo "Running unit tests"
               ./run_unit_tests.sh
             '''
-          },
+          }
 
-          'SMD tests': {
+          stage('SMD tests') {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
               cd smd-ui
               docker build --target test .
             '''
-          },
+          }
 
-          'STRATO API Tests': {
+          stage('STRATO API Tests') {
             withCredentials([
               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
             ]) {
@@ -324,9 +324,9 @@ pipeline {
                   strato-api-tests
               '''
             }
-          },
+          }
 
-          'BA-Rest Tests': {
+          stage('BA-Rest Tests') {
             sh '''#!/bin/bash -le
               set -x
               echo "Running ba-rest E2E tests"
@@ -334,15 +334,16 @@ pipeline {
               DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
               docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
             '''
-          },
+          }
 
-          'Integration tests' : {
+          stage('Integration tests') {
             dir ('tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
               sh 'npm run test'
             }
-          },
+          }
+          
         }
       }
     }
