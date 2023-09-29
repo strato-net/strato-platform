@@ -315,17 +315,24 @@ pipeline {
 
     stage('Test Sync'){
       //agent { label "placeholder-name" } //todo: update when parallelize
+      
+      // test sync for prs wanting to merge into develop
+      when {
+        // beforeAgent true
+        allOf {
+          branch "PR-*"
+          environment(name: "CHANGE_TARGET", value: "develop")
+        }
+        //(env.BRANCH_NAME.startsWith('PR-') && env.CHANGE_TARGET == 'develop')
+      }
       steps {
-        // test sync for prs wanting to merge into develop
-        if (env.BRANCH_NAME.startsWith('PR-') && env.CHANGE_TARGET == 'develop'){
-          dir("strato-getting-started"){
-            sh './strato --wipe'
-            sh 'mv genesis-block-official.json genesis-block.json'
-            // run again but connecting to mercata-hydrogen this time
-            sh 'network=mercata-hydrogen networkID=7596898649924658542 ./run.sh'
-            lib.runSyncTester()
-            sh './strato --wipe'
-          }
+        dir("strato-getting-started"){
+          sh './strato --wipe'
+          sh 'mv genesis-block-official.json genesis-block.json'
+          // run again but connecting to mercata-hydrogen this time
+          sh 'network=mercata-hydrogen networkID=7596898649924658542 ./run.sh'
+          lib.runSyncTester()
+          sh './strato --wipe'
         }
       }
     }
