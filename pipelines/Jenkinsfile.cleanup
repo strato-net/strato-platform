@@ -1,4 +1,4 @@
-def cleanOldWorkspaces(Integer olderThanNumDays = 4) {
+def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = true) {
 
   script {
     def diskspaceAvailableBefore = sh(
@@ -37,9 +37,11 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4) {
         ); 
       done
     """
-
-    //clean yarn cache for blockapps-rest module (it's large because it's for local package - when using 'file:' path in package.json)
-    sh "yarn cache clean blockapps-rest"
+    
+    if (hasNodeYarn == true) {
+      //clean yarn cache for blockapps-rest module (it's large because it's for local package - when using 'file:' path in package.json)
+      sh "yarn cache clean blockapps-rest"
+    }
 
     // clean docker images older than $olderThanNumDays days
     sh """
@@ -160,6 +162,63 @@ pipeline {
             script {
               def diskspaceFreed = cleanOldWorkspaces()
               echo "Diskspace freed on test5: $diskspaceFreed kilobytes"
+            }
+          }
+        }
+        
+        stage('Cleanup testsync1') {
+          when {
+            beforeAgent true
+            expression {
+              if (nodesByLabel("testsync1").size() == 0) {
+                currentBuild.result = 'UNSTABLE'
+                return false
+              } else return true
+            }
+          }
+          agent { label "testsync1" }
+          steps {
+            script {
+              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              echo "Diskspace freed on testsync1: $diskspaceFreed kilobytes"
+            }
+          }
+        }
+        
+        stage('Cleanup testsync2') {
+          when {
+            beforeAgent true
+            expression {
+              if (nodesByLabel("testsync2").size() == 0) {
+                currentBuild.result = 'UNSTABLE'
+                return false
+              } else return true
+            }
+          }
+          agent { label "testsync2" }
+          steps {
+            script {
+              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              echo "Diskspace freed on testsync2: $diskspaceFreed kilobytes"
+            }
+          }
+        }
+        
+        stage('Cleanup testsync3') {
+          when {
+            beforeAgent true
+            expression {
+              if (nodesByLabel("testsync3").size() == 0) {
+                currentBuild.result = 'UNSTABLE'
+                return false
+              } else return true
+            }
+          }
+          agent { label "testsync3" }
+          steps {
+            script {
+              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              echo "Diskspace freed on testsync3: $diskspaceFreed kilobytes"
             }
           }
         }
