@@ -227,11 +227,11 @@ pipeline {
     }
     
     stage('Test & Push Artifacts') {
-      steps {
-        parallel {
-          stage('Push Images and Test Sync') {
-            stages {
-              stage('Push Images'){
+      parallel {
+        stage('Push Images and Test Sync') {
+          stages {
+            stage('Push Images'){
+              steps{
                 withCredentials([
                     usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
                     usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
@@ -252,38 +252,40 @@ pipeline {
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
                 }
               }
-              stage('Test Sync') {
-                // only test sync for prs wanting to merge into develop
-                when {
-                  beforeAgent true
-                  allOf {
-                    branch "PR-*"
-                    environment(name: "CHANGE_TARGET", value: "develop")
-                  }
+            }
+            stage('Test Sync') {
+              // only test sync for prs wanting to merge into develop
+              when {
+                beforeAgent true
+                allOf {
+                  branch "PR-*"
+                  environment(name: "CHANGE_TARGET", value: "develop")
                 }
-                agent { label "testsync" } 
-                steps {
-                  withCredentials([
-                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-                  ]) {
-                    sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+              }
+              agent { label "testsync" } 
+              steps {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                ]) {
+                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+                }
+                unstash 'stratoGettingStarted'
+                dir("strato-getting-started"){
+                  sh './strato --wipe'
+                  sh 'mv genesis-block-official.json genesis-block.json'
+                  // run again but connecting to mercata-hydrogen this time
+                  sh 'network=mercata-hydrogen networkID=7596898649924658542 ./run.sh'
+                  script{
+                    lib.runSyncTester()
                   }
-                  unstash 'stratoGettingStarted'
-                  dir("strato-getting-started"){
-                    sh './strato --wipe'
-                    sh 'mv genesis-block-official.json genesis-block.json'
-                    // run again but connecting to mercata-hydrogen this time
-                    sh 'network=mercata-hydrogen networkID=7596898649924658542 ./run.sh'
-                    script{
-                      lib.runSyncTester()
-                    }
-                    sh './strato --wipe'
-                  }
+                  sh './strato --wipe'
                 }
               }
             }
           }
-          stage('Test & Push Artifacts') {
+        }
+        stage('Test & Push Artifacts') {
+          steps{
             withCredentials([
                 usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
             ]) {
@@ -297,11 +299,13 @@ pipeline {
                 aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
                 aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
                 aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
-                '''
-              }
+              '''
+            }
           }
+        }
 
-          stage('Apex tests') {
+        stage('Apex tests') {
+          steps{
             sh '''#!/bin/bash -le
               set -x
               echo "Running apex unit tests"
@@ -310,16 +314,20 @@ pipeline {
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
           }
+        }
 
-          stage('Strato unit tests') {
+        stage('Strato unit tests') {
+          steps{
             sh '''#!/bin/bash -le
               set -x
               echo "Running unit tests"
               ./run_unit_tests.sh
             '''
-          }
+            }
+        }
 
-          stage('SMD tests') {
+        stage('SMD tests') {
+          steps{
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
@@ -327,8 +335,10 @@ pipeline {
               docker build --target test .
             '''
           }
+        }
 
-          stage('STRATO API Tests') {
+        stage('STRATO API Tests') {
+          steps{
             withCredentials([
               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
             ]) {
@@ -351,8 +361,10 @@ pipeline {
               '''
             }
           }
+        }
 
-          stage('BA-Rest Tests') {
+        stage('BA-Rest Tests') {
+          steps{
             sh '''#!/bin/bash -le
               set -x
               echo "Running ba-rest E2E tests"
@@ -361,15 +373,16 @@ pipeline {
               docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
             '''
           }
+        }
 
-          stage('Integration tests') {
+        stage('Integration tests') {
+          steps{
             dir ('tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
               sh 'npm run test'
             }
           }
-          
         }
       }
     }
