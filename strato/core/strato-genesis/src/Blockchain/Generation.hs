@@ -31,6 +31,7 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.CertificateRegistry
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
@@ -258,7 +259,6 @@ insertCertRegistryContract certs gi =
         Just s -> s
         Nothing -> error "Certificate requires a subject"
     maybeCertField = fromMaybe ""
-    certUserAddress = fromPublicKey . subPub . certSub'
     rootAcct =
       SolidVMContractWithStorage
         0x1337
@@ -277,9 +277,6 @@ insertCertRegistryContract certs gi =
           (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
         ]
 
-    -- Reversing the cert user address to create a placeholder Certificate contract address
-    reverseAddr = Address . bytesToWord160 . reverse . word160ToBytes . unAddress . certUserAddress
-    addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
     registryAcct =
       SolidVMContractWithStorage
         0x509
@@ -292,7 +289,7 @@ insertCertRegistryContract certs gi =
         ( \cert -> do
             let certSub = certSub' cert
             SolidVMContractWithStorage
-              (deriveAddressWithSalt (Address 0x509) (fromPublicKey . subPub $ certSub) (KECCAK256.hash encodedRegistry) Nothing)
+              (deriveAddressWithSalt (Just $ Address 0x509) (show $ fromPublicKey $ subPub $ certSub) (Just $ KECCAK256.hash encodedRegistry) Nothing)
               0
               (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
               [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
@@ -309,130 +306,6 @@ insertCertRegistryContract certs gi =
               ]
         )
         certs
-
-certificateRegistryContract :: Text
-certificateRegistryContract =
-  [r|
-contract Certificate {
-    address owner;  // The CertificateRegistry Contract
-
-    address public userAddress;
-    address public parent;
-    address[] public children;
-
-    
-    // Store all the fields of a certificate in a Cirrus record
-    string public commonName;
-    string public country;
-    string public organization;
-    string public group;
-    string public organizationalUnit;
-    string public publicKey;
-    string public certificateString;
-    bool public isValid;
-
-    constructor() {
-        owner = msg.sender;
-    }
-
-    function initializeCertificate (string _certificateString) {
-        mapping(string => string) parsedCert = parseCert(_certificateString);
-
-        userAddress = address(parsedCert["userAddress"]);
-        commonName = parsedCert["commonName"];
-        organization = parsedCert["organization"];
-        group = parsedCert["group"];
-        organizationalUnit = parsedCert["organizationalUnit"];
-        country = parsedCert["country"];
-        publicKey = parsedCert["publicKey"];
-        certificateString = parsedCert["certString"];
-        isValid = true;
-        parent = address(parsedCert["parent"]);
-        children = [];
-    }
-    
-    function addChild(address _child) public {
-        require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
-        
-        children.push(_child);
-    }
-    
-    function revoke() public returns (int){
-        require(msg.sender == owner,"You don't have permission to CALL revoke!");
-
-        isValid = false;
-        return children.length;
-    }
-    
-    function getChild(int index) public returns (address){
-        require(msg.sender == owner,"You don't have permission to get children!");
-        
-        return children[index];
-    }
-}
-
-contract CertificateRegistry {
-    address public owner;
-
-    event CertificateRegistered(string certificate);
-    event CertificateRevoked(address userAddress);
-
-    function registerCertificate(string newCertificateString) returns (int) {
-        mapping(string => string) parsedCert = parseCert(newCertificateString);
-        string parentUserAddress = parsedCert["parent"];
-        address parentCertAddress = address(this).derive(parentUserAddress);
-        Certificate parentContract = Certificate(address(parentCertAddress));
-        
-        if (address(parentContract) != address(0) && parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())) {
-            // Create the new Certificate record
-            userAddress = parsedCert["userAddress"];
-            Certificate c = new Certificate{salt: userAddress}();
-            c.initializeCertificate(newCertificateString);
-
-            if (parentUserAddress != address(0x0)){
-                parentContract.addChild(c.userAddress());    
-            }
-
-            emit CertificateRegistered(newCertificateString);
-            return 200; // 200 = HTTP Status OK
-        }
-        return 400;
-    }
-
-    function getCertByAddress(address _address) returns (Certificate) {
-        address certAddress = address(this).derive(string(_address));
-        return Certificate(certAddress);
-    }
-    
-    function revokeCert(address userAddress){
-        address certAddress = address(this).derive(string(userAddress));
-        Certificate myCert = Certificate(certAddress);
-        require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
-
-        int childrenLength = myCert.revoke();
-        for (int i = 0; i < childrenLength; i += 1) {
-            revokeCert(myCert.getChild(i));
-        }
-        
-        emit CertificateRevoked(userAddress);
-    }
-    
-    function isChild(string pCert, address certUserAddress) returns (bool) {
-        address certAddress = address(this).derive(certUserAddress);
-        Certificate myCert = Certificate(certAddress);
-        string parentUserAddress = string(myCert.parent());
-        address parentCertAddress = address(this).derive(parentUserAddress);
-        if(myCert.parent() != address(0x0) && pCert == Certificate(parentCertAddress).certificateString()){
-            return true;
-        }
-        
-        if(myCert.parent() != address(0x0)){
-            return isChild(pCert, address(parentUserAddress));
-        }
-        
-        return false;
-    }
-}|]
 
 -- | Inserts a Governance contract into the genesis block with the BlockApps root cert as owner
 insertMercataGovernanceContract :: [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
