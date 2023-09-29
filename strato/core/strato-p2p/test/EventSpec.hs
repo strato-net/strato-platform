@@ -74,7 +74,7 @@ import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Wei
 import Blockchain.Strato.RedisBlockDB (RedisConnection)
 import qualified Blockchain.TxRunResultCache as TRC
-import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
+import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, deriveX509AddrFromUserAddress, putContextBestBlockInfo, vmGasCap)
 import Conduit
 import Control.Applicative (liftA2)
 import Control.Concurrent.STM.TMChan
@@ -738,14 +738,14 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MonadTest m) where
 instance (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509.X509Certificate) (MonadTest m) where
   select _ k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
+        mCertAddress = deriveX509AddrFromUserAddress k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (eitherToMaybe . bsToCert) <$> A.lookup (A.Proxy) (certKey certAddress "certificateString")
 
 instance (MonadIO m, MonadLogger m) => ((Address, T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
   select _ (k, t) = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
+        mCertAddress = deriveX509AddrFromUserAddress k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 

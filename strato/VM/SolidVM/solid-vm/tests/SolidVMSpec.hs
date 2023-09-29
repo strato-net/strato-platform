@@ -49,6 +49,7 @@ import Blockchain.SolidVM.CodeCollectionDB as CCDB
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address as MA
+import Blockchain.Strato.Model.CertificateRegistry
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -359,22 +360,21 @@ runTestWithTimeout timeout f = do
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do
         let certKey addr = ((Account addr Nothing),) . encodeUtf8
-            certRegistryKey = certKey (Address 0x509)
             rlpWrap = rlpSerialize . rlpEncode
             ua = userAddress $ x509CertToCertInfoState getCert
             certsub = fromJust $ getCertSubject cert
-        insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor ua <> ">") ((rlpWrap $ BAccount $ NamedAccount (Address 0xdeadbeef) MainChain)) --(encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (rlpWrap $ BString $ BC.pack myCertString)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".userAddress") ((rlpWrap $ BAccount $ NamedAccount ua MainChain))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".owner") (rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".commonName") (rlpWrap . BString . BC.pack . subCommonName $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".country") (rlpWrap . BString . BC.pack . fromJust . subCountry $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organization") (rlpWrap . BString . BC.pack . subOrg $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organizationalUnit") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".isValid") (rlpWrap (BBool True))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
+            testCertAddress = deriveAddressWithSalt (Just $ Address 0x509) (show ua) (Just . hash $ encodeUtf8 certificateRegistryContract) Nothing 
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".certificateString") (rlpWrap $ BString $ BC.pack myCertString)
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".userAddress") ((rlpWrap $ BAccount $ NamedAccount ua MainChain))
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".owner") (rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain))
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".commonName") (rlpWrap . BString . BC.pack . subCommonName $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".country") (rlpWrap . BString . BC.pack . fromJust . subCountry $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".organization") (rlpWrap . BString . BC.pack . subOrg $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".organizationalUnit") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".isValid") (rlpWrap (BBool True))
+        insert (Proxy @RawStorageValue) (certKey (testCertAddress) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
         f
   case result of
     Left {} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
