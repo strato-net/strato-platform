@@ -66,8 +66,9 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
+    console.log("called")
     if (isSearch) {
-      setOffset(0);
+      // setOffset(0);
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
     } else actions.fetchInventory(dispatch, limit, offset, "");
   }, [dispatch, limit, offset, debouncedSearchTerm]);
@@ -117,6 +118,7 @@ const Inventory = ({ user }) => {
       setIsSearch(true)
     }
     setQueryValue(e.target.value);
+    setOffset(0);
     setPage(1);
   };
 
