@@ -108,7 +108,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
         isActive: true,
         isDeleted: false,
         isInventoryAvailable: true,
-        limit: 12,
+        limit: 200,
         ...restArgs
     }, options);
 
@@ -135,7 +135,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
     }
 
     const inventoryResults = await Promise.all(inventoryPromises);
-    const inventoriesWithProductInfo = [];
+    let inventoriesWithProductInfo = [];
 
     inventoryResults.forEach(inventory => {
         inventory.forEach(item => {
@@ -146,6 +146,8 @@ async function getTopSellingProducts(admin, args = {}, options) {
             }
         });
     });
+
+    inventoriesWithProductInfo = inventoriesWithProductInfo.slice(0, 12);
 
     return inventoriesWithProductInfo.map(inventory => marshalOut(inventory));
 }
