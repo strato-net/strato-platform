@@ -1,7 +1,11 @@
-.ant-table-thead .ant-table-cell {
-  background-color: #061a6c !important;
+/* .ant-table-thead .ant-table-cell {
+  background-color: lightgrey !important;
   color: white !important;
-}
+} */
+
+/* .ant-table-row:nth-child(even) {
+  background-color: lightgrey;
+} */
 
 .service-filter > div > .ant-select-selector {
   background-color: transparent !important;

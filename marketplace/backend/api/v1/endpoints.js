@@ -162,6 +162,7 @@ export const Membership = {
   getAll: '/',
   create: '/',
   purchased: '/purchased',
+  issued: '/issued',
   //update: '/update',
   //transferOwnership: '/transferOwnership',
 }

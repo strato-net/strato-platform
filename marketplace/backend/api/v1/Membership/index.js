@@ -14,17 +14,24 @@ router.get(
 );
 
 router.get(
- Membership.get,
- authHandler.authorizeRequest(),
- loadDapp,
- MembershipController.get
+  Membership.issued,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MembershipController.issued
 );
 
 router.get(
- Membership.getAll,
- authHandler.authorizeRequest(),
- loadDapp,
- MembershipController.getAll
+  Membership.get,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MembershipController.get
+);
+
+router.get(
+  Membership.getAll,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MembershipController.getAll
 );
 
 router.post(
