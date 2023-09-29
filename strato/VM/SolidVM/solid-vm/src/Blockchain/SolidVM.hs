@@ -200,7 +200,7 @@ instance MonadSM m => Mod.Accessible [SourcePosition] m where
 -- instance (MonadIO m, MonadLogger m) => ((Address,T.Text) `A.Selectable` X509.X509CertificateField) (MonadTest m) where
 --   select _ (k,t) = do
 --     let certKey addr = ((Account addr Nothing),) . TE.encodeUtf8
---     mCertAddress <- lookupX509AddrFromCBHash k
+--     mCertAddress <- deriveX509AddrFromUserAddress k
 --     fmap join . for mCertAddress $ \certAddress ->
 --       maybe Nothing (readMaybe . T.unpack . TE.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 

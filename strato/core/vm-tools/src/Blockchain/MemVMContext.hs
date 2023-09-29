@@ -60,7 +60,7 @@ import Blockchain.VMContext
     MemDBs (..),
     currentBlock,
     debugSettings,
-    lookupX509AddrFromCBHash,
+    deriveX509AddrFromUserAddress,
     memDBs,
     stateBlockMap,
     stateRoots,
@@ -309,14 +309,14 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
 instance ((Address, T.Text) `A.Selectable` X509CertificateField) MemContextM where
   select _ (k, t) = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
+        mCertAddress = deriveX509AddrFromUserAddress k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (Address `A.Selectable` X509Certificate) MemContextM where
   select _ k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
+        mCertAddress = deriveX509AddrFromUserAddress k
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of

@@ -49,7 +49,7 @@ module Blockchain.SolidVM.SM
     getValueType,
     pushSender,
     initializeAction,
-    -- lookupX509AddrFromCBHash,
+    -- deriveX509AddrFromUserAddress,
     markDiffForAction,
     getBlockHashWithNumber,
     getBSum,
