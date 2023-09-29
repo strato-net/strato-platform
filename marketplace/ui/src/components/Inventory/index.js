@@ -66,10 +66,9 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    if (debouncedSearchTerm !== "") {
+    if (isSearch) {
       setOffset(0);
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
-      setIsSearch(false)
     } else actions.fetchInventory(dispatch, limit, offset, "");
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
@@ -78,12 +77,10 @@ const Inventory = ({ user }) => {
   }, [dispatch, user]);
 
   useEffect(() => {
-    console.log("inventories.length", inventories.length)
     let len = inventories.length;
     let total;
     if (len === limit) total = page * 10 + limit;
     else total = (page - 1) * 10 + limit;
-    console.log('page total', total)
     setTotal(total);
   }, [inventories]);
 
@@ -114,8 +111,12 @@ const Inventory = ({ user }) => {
   };
   
   const queryHandle = (e) => {
+    if (e.target.value.length === 0 || e.target.value === "") {
+      setIsSearch(false)
+    } else {
+      setIsSearch(true)
+    }
     setQueryValue(e.target.value);
-    setIsSearch(true)
     setPage(1);
   };
 

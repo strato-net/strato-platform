@@ -374,16 +374,15 @@ async function getInventory(user, contract, args, options) {
 async function getInventories(admin, contract, args = {}, options) {
   try {
     const inventories = await inventoryJs.getAll(admin, args, options);
-    console.log("getInventories inventories", inventories.length)
     const productIds = [
       ...new Set(inventories.map((inventory) => inventory.productId)),
     ];
-    console.log("getInventories productIds", productIds.length)
+
     const products = await contract.getProducts(
       { address: [...productIds] },
       options
     );
-    console.log("getInventories products", products.length)
+
     const inventoriesWithProductInfo = inventories
       .filter((inventory) => productIds.includes(inventory.productId))
       .map((inventory) => {
@@ -393,7 +392,7 @@ async function getInventories(admin, contract, args = {}, options) {
           ...newInventory,
         };
       });
-      console.log("getInventories inventoriesWithProductInfo", inventoriesWithProductInfo.length)
+
     return inventoriesWithProductInfo;
   } catch (error) {
     throw error;
