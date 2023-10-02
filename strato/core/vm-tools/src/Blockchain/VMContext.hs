@@ -74,6 +74,7 @@ module Blockchain.VMContext
     getContextBestBlockInfo,
     putContextBestBlockInfo,
     compactContextM,
+    lookupX509AddrFromCBHash,
     deriveX509AddrFromUserAddress,
     knownFailedTxs,
   )
@@ -490,23 +491,39 @@ instance (Keccak256 `A.Alters` DBCode) ContextM where
 instance ((Address, T.Text) `A.Selectable` X509CertificateField) ContextM where
   select _ (k, t) = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-        mCertAddress = deriveX509AddrFromUserAddress k
+    mCertAddress <- if flags_useSaltedCerts then deriveX509AddrFromUserAddress k else lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (Address `A.Selectable` X509Certificate) ContextM where
   select _ k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
-        mCertAddress = deriveX509AddrFromUserAddress k
+    mCertAddress <- if flags_useSaltedCerts then deriveX509AddrFromUserAddress k else lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of
         Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
         _ -> pure Nothing
 
-deriveX509AddrFromUserAddress :: Address -> Maybe Address
-deriveX509AddrFromUserAddress addr = 
-  Just $ deriveAddressWithSalt (Just $ Address 0x509) (show addr) (Just $ hash $ Text.encodeUtf8 certificateRegistryContract) Nothing
+lookupX509AddrFromCBHash ::
+  ( MonadLogger m,
+    (A.Alters (Account, B.ByteString) B.ByteString) m
+  ) =>
+  Address ->
+  m (Maybe Address)
+lookupX509AddrFromCBHash k = do
+  let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+      certRegistryKey = certKey (Address 0x509)
+  mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
+  $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
+  case mAccount of
+    Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
+    _ -> pure Nothing
+
+deriveX509AddrFromUserAddress :: MonadLogger m => Address -> m (Maybe Address)
+deriveX509AddrFromUserAddress addr = do
+  $logDebugS "deriveX509AddrFromUserAddress" $ T.pack $ "Deriving X509 address for address " ++ show addr
+  pure $ Just $ deriveAddressWithSalt (Just $ Address 0x509) (show addr) (Just $ hash $ Text.encodeUtf8 certificateRegistryContract) Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
