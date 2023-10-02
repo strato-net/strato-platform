@@ -23,27 +23,15 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
-import Conduit
-import Control.Monad
-import qualified Data.ByteString as B
-import qualified Data.IntMap as I
-import qualified Data.Map as M
-import Data.Text (Text)
-import Data.Time
-import Numeric
 import qualified Slipstream.Events as SE
 import Slipstream.Globals
 import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
--- import Slipstream.Processor
 
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
-import Test.Hspec
-import Text.RawString.QQ
-import UnliftIO.IORef
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain

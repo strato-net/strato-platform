@@ -564,9 +564,9 @@ typecheckStatic a@SVMType.Contract {} (SVMType.UnknownLabel b _) =
 typecheckStatic (SVMType.Contract a) (SVMType.Contract b) = do
   parentsOfA <- getLookupParents a
   parentsOfB <- getLookupParents b
-  if a `elem` parentsOfB
+  if b `elem` parentsOfA
     then return $ Left $ "Type mismatch: contract " <> labelToText a <> " is a child of " <> labelToText b
-    else if any (`elem` parentsOfB) parentsOfA || a == b || a == "" || b == ""
+    else if a `elem` parentsOfB || any (`elem` parentsOfA) parentsOfB || a == b || a == "" || b == ""
       then return $ Right (SVMType.Contract (string' [a, b]))
       else return $ Left $ "Type mismatch: contracts " <> labelToText a <> " and " <> labelToText b <> " do not match."
 typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do

@@ -392,54 +392,6 @@ getAbstractParentsFromContract c cc =
       parentContracts = getContractsForParents parents' (cc ^. contracts)
    in filter ((== AbstractType) . _contractType) parentContracts
 
-resolveNameParts ::
-  ( MonadLogger m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable StorageFilterParams [StorageAddress] m
-  ) =>
-  Text ->
-  Text ->
-  Contract ->
-  m (Text, Text, Text)
-resolveNameParts o a c = do
-  let tName = T.pack . _contractName
-  case c ^. importedFrom of
-    Nothing -> pure (o, a, tName c)
-    Just acct ->
-      select (Proxy @AddressState) acct >>= \case
-        Nothing -> do
-          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for account " ++ show acct
-          pure (o, a, tName c)
-        Just s ->
-          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> do
-              let qs =
-                    storageFilterParams
-                      { qsKey = Just $ HexStorage ".:creator",
-                        qsAddress = Just $ acct ^. accountAddress,
-                        qsChainId = Unnamed . ChainId <$> acct ^. accountChainId
-                      }
-              select (Proxy @[StorageAddress]) qs >>= \case
-                Just (sa : _) -> case value sa of
-                  HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe orgHex of
-                    Just (MS.BString orgBS) -> case decodeUtf8' orgBS of
-                      Right o' -> pure (o', T.pack appName, tName c)
-                      Left _ -> do
-                        $logWarnS "resolveNameParts" . T.pack $
-                          ":creator field is not valid UTF8 for account " ++ show acct ++ ": " ++ show orgBS
-                        pure (o, T.pack appName, tName c)
-                    _ -> do
-                      $logWarnS "resolveNameParts" . T.pack $
-                        "Could not RLP decode :creator field for account " ++ show acct ++ ": " ++ show orgHex
-                      pure (o, T.pack appName, tName c)
-                _ -> pure ("", T.pack appName, tName c)
-            _ -> do
-              $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for account " ++ show acct
-              pure (o, a, tName c)
-
 processTheMessages ::
   ( MonadLogger m,
     HasSQL m,

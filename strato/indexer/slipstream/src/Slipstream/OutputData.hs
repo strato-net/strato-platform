@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Slipstream.OutputData (
   outputData,
@@ -38,13 +39,14 @@ module Slipstream.OutputData (
   ) where
 
 
-import           BlockApps.Solidity.Value
+import           BlockApps.Solidity.Value as V
 import           Conduit
 import           Control.Arrow                   ((***))
 import           Control.Lens ((^.))
 import           Control.Monad
+import           Control.Monad.Change.Alter
 import qualified Data.Aeson                      as Aeson
-import           Data.Bifunctor                  (first)
+import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Char8           as BC
 import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
@@ -52,60 +54,53 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
--- import qualified Data.Text.Encoding as TE
+import           Bloc.Server.Utils               (partitionWith)
+import           BlockApps.Logging
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
+import qualified Blockchain.Strato.Model.Event   as Action
+import           Blockchain.Strato.Model.Keccak256
+import           Data.Bifunctor                  (first)
+import           Data.Function                   (on)
+import           Data.List                       (groupBy, nubBy)
+import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
+import           Data.Time
+import           Database.PostgreSQL.Typed
+import           Database.PostgreSQL.Typed.Protocol
+import           Database.PostgreSQL.Typed.Query
+import           Slipstream.Data.Action
+import qualified Slipstream.Events               as E
+import           Slipstream.Globals
+import           Slipstream.Metrics
+import           Slipstream.Options
+import           Slipstream.QueryFormatHelper
+import           Slipstream.SolidityValue
+import           SolidVM.Model.CodeCollection    hiding (contractName, contracts)
+import           SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type              as SVMType
+import           Text.Format
+import           Text.Printf
+import           Text.RawString.QQ
+import           UnliftIO.Exception              (SomeException, catch, handle)
+import           UnliftIO.IORef
+import           Blockchain.Data.AddressStateDB (AddressState)
+import           Blockchain.Data.ChainInfo (ParentChainIds)
+import           Blockchain.Data.AddressStateDB
+import qualified Handlers.Storage as HS
+import           Blockchain.Strato.Model.ExtendedWord
+import qualified SolidVM.Model.Storable as MS
+import           MaybeNamed
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Data.RLP
+ 
 
--- import qualified Data.ByteString.Lazy.Char8 as BSL
-
-import Bloc.Server.Utils (partitionWith)
-import BlockApps.Logging
-import BlockApps.Solidity.Value
-import qualified BlockApps.Solidity.Value as V
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
-import qualified Blockchain.Strato.Model.Event as Action
-import Blockchain.Strato.Model.Keccak256
-import Conduit
-import Control.Arrow ((***))
-import Control.Lens ((^.))
-import Control.Monad
-import qualified Data.Aeson as Aeson
-import Data.Bifunctor (first)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import Data.Function (on)
-import Data.List (groupBy, nubBy)
-import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, listToMaybe, mapMaybe)
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
-import Data.Time
-import Database.PostgreSQL.Typed
-import Database.PostgreSQL.Typed.Protocol
-import Database.PostgreSQL.Typed.Query
-import Slipstream.Data.Action
-import qualified Slipstream.Events as E
-import Slipstream.Globals
-import Slipstream.Metrics
-import Slipstream.Options
-import Slipstream.QueryFormatHelper
-import Slipstream.SolidityValue
-import SolidVM.Model.CodeCollection hiding (contractName, contracts)
-import SolidVM.Model.SolidString
-import qualified SolidVM.Model.Type as SVMType
-import Text.Format
-import Text.Printf
-import Text.RawString.QQ
-import UnliftIO.Exception (SomeException, catch, handle)
-import UnliftIO.IORef
 
 newtype First b a = First {unFirst :: (a, b)}
 
 instance Functor (First b) where
   fmap f (First (a, b)) = First (f a, b)
+
 
 data ProcessedMappingRow = ProcessedMappingRow
   { address :: Address,
@@ -303,6 +298,54 @@ mappingTableName o a n m =
   let (o', a', n') = constructTableNameParameters o a n
    in MappingTableName o' a' n' m
 
+resolveNameParts ::
+  ( MonadLogger m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
+  Text ->
+  Text ->
+  Contract ->
+  m (Text, Text, Text)
+resolveNameParts o a c = do
+  let tName = T.pack . _contractName
+  case c ^. importedFrom of
+    Nothing -> pure (o, a, tName c)
+    Just acct ->
+      select (Proxy @AddressState) acct >>= \case
+        Nothing -> do
+          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
+            "Could not find address state for account " ++ show acct
+          pure (o, a, tName c)
+        Just s ->
+          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
+            Just (SolidVMCode appName _) -> do
+              let qs =
+                    HS.storageFilterParams
+                      { HS.qsKey = Just $ HS.HexStorage ".:creator",
+                        HS.qsAddress = Just $ acct ^. accountAddress,
+                        HS.qsChainId = Unnamed . ChainId <$> acct ^. accountChainId
+                      }
+              select (Proxy @[HS.StorageAddress]) qs >>= \case
+                Just (sa : _) -> case HS.value sa of
+                  HS.HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe orgHex of
+                    Just (MS.BString orgBS) -> case decodeUtf8' orgBS of
+                      Right o' -> pure (o', T.pack appName, tName c)
+                      Left _ -> do
+                        $logWarnS "resolveNameParts" . T.pack $
+                          ":creator field is not valid UTF8 for account " ++ show acct ++ ": " ++ show orgBS
+                        pure (o, T.pack appName, tName c)
+                    _ -> do
+                      $logWarnS "resolveNameParts" . T.pack $
+                        "Could not RLP decode :creator field for account " ++ show acct ++ ": " ++ show orgHex
+                      pure (o, T.pack appName, tName c)
+                _ -> pure ("", T.pack appName, tName c)
+            _ -> do
+              $logWarnS "resolveNameParts" . T.pack $
+                "Could not resolve code for account " ++ show acct
+              pure (o, a, tName c)
+
 createExpandIndexTable ::
   OutputM m =>
   IORef Globals ->
@@ -363,17 +406,20 @@ createExpandHistoryTable g c nameParts = do
   createHistoryTable' g c nameParts
   expandHistoryTable g c nameParts
 
-getDeferredForeignKeys :: TableName -> Contract -> Text -> Text -> [ForeignKeyInfo]
-getDeferredForeignKeys tableName c o a =
-  --    deferredForeignKeys' <- fmap concat $
-  --      forM (Map.toList $ cc^.contracts) $ \(nameString, c) ->
-
-  flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- (Map.toList $ c ^. storageDefs)] $ \(theName, x) ->
-    ForeignKeyInfo
-      { tableName = tableName,
-        columnName = labelToText theName,
-        foreignTableName = indexTableName o a $ labelToText x
-      }
+getDeferredForeignKeys ::   ( MonadLogger m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>TableName -> Contract -> Text -> Text ->m[ForeignKeyInfo]
+getDeferredForeignKeys tableName c o a = do
+  (o', a', n') <- resolveNameParts o a c
+  let result = flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- (Map.toList $ c ^. storageDefs)] $ \(theName, x) ->
+        ForeignKeyInfo
+          { tableName = tableName,
+            columnName = labelToText theName,
+            foreignTableName = indexTableName o' a' n'
+          }
+  return result
 
 getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForMapping tableName o a =
@@ -409,7 +455,7 @@ createIndexTable globalsIORef contract (o, a, n) = do
       yield $ createIndexTableQuery contract (o, a, n)
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       setTableCreated globalsIORef tableName list
-      return $ getDeferredForeignKeys tableName contract o a
+      getDeferredForeignKeys tableName contract o a
 
 createAbstractTable ::
   OutputM m =>
@@ -426,7 +472,7 @@ createAbstractTable globalsIORef contract (o, a, n) = do
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       yield $ createAbstractTableQuery contract (o, a, n)
       setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      return $ getDeferredForeignKeys tableName contract o a
+      getDeferredForeignKeys tableName contract o a
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::
@@ -756,7 +802,7 @@ insertAbstractTable ::
 insertAbstractTable [] = pure ()
 insertAbstractTable cs@((E.ProcessedContract {organization = org, application = app, contractName = cName}, _, _) : _) = do
   let tableName = indexTableName org app cName
-  $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show tableName ++ " (and potentially others)"
+  $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show tableName ++ " (and potentially others)" ++ show cs
   yieldMany $ insertAbstractTableQuery cs
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
