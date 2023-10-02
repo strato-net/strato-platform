@@ -8431,3 +8431,143 @@ contract qq {
 }|]
       )
       `shouldThrow` anyMissingTypeError
+
+  it "can index access a contract array returned from a function" . runTest $ do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+
+  function get() returns (uint[]) {
+    return x;
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.get()[0];
+  }
+}
+|]
+      getFields ["b"] `shouldReturn` [BInteger 8]
+
+  it "can multidimensional index access a contract array returned from a function" . runTest $ do
+      runBS [r|
+contract SomeContract {
+  uint[][] public x;
+  constructor() public {
+    x.push([1,2]);
+    x.push([3,4]);
+  }
+
+  function get() returns (uint[][]) {
+    return x;
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.get()[0][0];
+  }
+}
+|]
+      getFields ["b"] `shouldReturn` [BInteger 1]
+  
+  it "can't index access a contract array from the builtin getter" $ runTest ( do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x()[0];
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+  it "can test array index access by passing in as a parameter" . runTest $ do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x(0);
+  }
+}
+|]
+      getFields ["b"] `shouldReturn` [BInteger 8]
+
+  it "can test multidimensional array index access by passing in as a parameter" . runTest $ do
+      runBS [r|
+contract SomeContract {
+  uint[][] public x;
+  constructor() public {
+    x.push([1,2]);
+    x.push([3,4]);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x(1,0);
+  }
+}
+|]
+      getFields ["b"] `shouldReturn` [BInteger 3]
+    
+  it "can't access a contract array without any parameters" $ runTest ( do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x();
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+  it "can't access a contract array without any parameters and also using braces" $ runTest ( do
+      runBS [r|
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  uint b;
+  constructor() {
+      SomeContract p = new SomeContract();
+      b = p.x()[0];
+  }
+}
+|]) `shouldThrow` anyTypeError
