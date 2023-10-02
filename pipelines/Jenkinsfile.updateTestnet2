@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "upgrade" //which agent should I use?
+    label "upgrade" 
   }
   options { disableConcurrentBuilds() }
   parameters {
@@ -9,48 +9,50 @@ pipeline {
   environment {
     execution_arn = ""
   }
-  stage('Start Step Functions Execution') {
-    steps {
-      sh '''#!/bin/bash
-        VERSION_TAG="$VersionTag"
+  stages {
+    stage('Start Step Functions Execution') {
+      steps {
+        sh '''#!/bin/bash
+          VERSION_TAG="$VersionTag"
 
-        execution_arn=$(aws stepfunctions start-execution \
-          --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
-          --input "{\"VersionTag\": \"$VERSION_TAG\"}" \
-          --query "executionArn" \
-          --output text)
-
-        echo "Started Step Functions execution"
-      '''
-    }
-  }
-  stage('Wait for Step Functions Completion') {
-     steps {
-      sh '''#!/bin/bash
-        while true; do
-          execution_status=$(aws stepfunctions describe-execution \
-            --execution-arn "$execution_arn" \
-            --query "status" \
+          execution_arn=$(aws stepfunctions start-execution \
+            --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
+            --input "{\"VersionTag\": \"$VERSION_TAG\"}" \
+            --query "executionArn" \
             --output text)
-        
-          if [ "$execution_status" == "SUCCEEDED" ]; then
-            echo "Step Functions execution succeeded."
-            exit 0
-          elif [ "$execution_status" == "FAILED" ]; then
-            echo "Step Functions execution failed."
-            exit 1 
-          elif [ "$execution_status" == "TIMED_OUT" ]; then
-            echo "Step Functions execution timed out."
-            exit 1  
-          elif [ "$execution_status" == "RUNNING" ]; then
-            echo "Step Functions execution is still running. Waiting..."
-            sleep 30
-          else
-            echo "Unknown execution status: $execution_status"
-            exit 1  
-          fi
-        done
-      '''
-     }
+
+          echo "Started Step Functions execution"
+        '''
+      }
+    }
+    stage('Wait for Step Functions Completion') {
+      steps {
+        sh '''#!/bin/bash
+          while true; do
+            execution_status=$(aws stepfunctions describe-execution \
+              --execution-arn "$execution_arn" \
+              --query "status" \
+              --output text)
+          
+            if [ "$execution_status" == "SUCCEEDED" ]; then
+              echo "Step Functions execution succeeded."
+              exit 0
+            elif [ "$execution_status" == "FAILED" ]; then
+              echo "Step Functions execution failed."
+              exit 1 
+            elif [ "$execution_status" == "TIMED_OUT" ]; then
+              echo "Step Functions execution timed out."
+              exit 1  
+            elif [ "$execution_status" == "RUNNING" ]; then
+              echo "Step Functions execution is still running. Waiting..."
+              sleep 30
+            else
+              echo "Unknown execution status: $execution_status"
+              exit 1  
+            fi
+          done
+        '''
+      }
+    }
   }
 }
