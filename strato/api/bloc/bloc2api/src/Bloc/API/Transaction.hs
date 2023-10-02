@@ -35,7 +35,7 @@ import Data.Aeson.Casing
 import qualified Data.ByteString as B
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe
+import Data.Maybe()
 import Data.Source.Map
 import Data.Text (Text)
 import Data.Word
@@ -227,6 +227,7 @@ instance ToSample PostBlocTransactionRequest where
               Nothing
               Nothing
               (Just $ Map.fromList [("purpose", "groceries")])
+              Nothing
         ]
         (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
         Nothing
@@ -249,6 +250,7 @@ instance ToSchema PostBlocTransactionRequest where
                 Nothing
                 Nothing
                 (Just $ Map.fromList [("purpose", "groceries")])
+                Nothing
           ]
           (Just (TxParams (Just $ Gas 1000000) (Just $ Wei 1) (Just $ Nonce 0)))
           Nothing
@@ -257,7 +259,7 @@ data BlocTransactionPayload
   = BlocTransfer TransferPayload
   | BlocContract ContractPayload
   | BlocFunction FunctionPayload
-  | BlocGenesis ChainInput
+  | BlocGenesis ChainInput --NOTE TO AYA: does this need updating too?
   deriving (Eq, Show, Generic)
 
 instance Arbitrary BlocTransactionPayload where
@@ -286,7 +288,8 @@ data ContractPayload = ContractPayload
     contractpayloadValue :: Maybe (Strung Natural),
     contractpayloadTxParams :: Maybe TxParams,
     contractpayloadChainid :: Maybe ChainId,
-    contractpayloadMetadata :: Maybe (Map Text Text)
+    contractpayloadMetadata :: Maybe (Map Text Text),
+    contractpayloadNetworkid :: Maybe Integer
   }
   deriving (Eq, Show, Generic)
 
@@ -295,7 +298,8 @@ data TransferPayload = TransferPayload
     transferpayloadValue :: Strung Natural,
     transferpayloadTxParams :: Maybe TxParams,
     transferpayloadChainid :: Maybe ChainId,
-    transferpayloadMetadata :: Maybe (Map Text Text)
+    transferpayloadMetadata :: Maybe (Map Text Text),
+    transferpayloadNetworkid :: Maybe Integer
   }
   deriving (Eq, Show, Generic)
 
@@ -306,7 +310,8 @@ data FunctionPayload = FunctionPayload
     functionpayloadValue :: Maybe (Strung Natural),
     functionpayloadTxParams :: Maybe TxParams,
     functionpayloadChainid :: Maybe ChainId,
-    functionpayloadMetadata :: Maybe (Map Text Text)
+    functionpayloadMetadata :: Maybe (Map Text Text),
+    functionpayloadNetworkid :: Maybe Integer
   }
   deriving (Eq, Show, Generic)
 
@@ -320,16 +325,7 @@ instance Arbitrary FunctionPayload where
   arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON ContractPayload where
-  toJSON ContractPayload {..} =
-    object
-      [ "contract" .= contractpayloadContract,
-        "src" .= contractpayloadSrc,
-        "args" .= contractpayloadArgs,
-        "value" .= contractpayloadValue,
-        "txParams" .= contractpayloadTxParams,
-        "chainid" .= contractpayloadChainid,
-        "metadata" .= contractpayloadMetadata
-      ]
+  toJSON = genericToJSON (aesonPrefix camelCase)
 
 instance ToJSON TransferPayload where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -338,16 +334,7 @@ instance ToJSON FunctionPayload where
   toJSON = genericToJSON (aesonPrefix camelCase)
 
 instance FromJSON ContractPayload where
-  parseJSON (Object o) =
-    ContractPayload
-      <$> (fromMaybe mempty <$> o .:? "src")
-      <*> (o .:? "contract")
-      <*> (o .:? "args")
-      <*> (o .:? "value")
-      <*> (o .:? "txParams")
-      <*> (o .:? "chainid")
-      <*> (o .:? "metadata")
-  parseJSON o = fail $ "parseJSON ContractPayload: Expected Object, got " ++ show o
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance FromJSON TransferPayload where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
@@ -372,7 +359,8 @@ instance ToSchema BlocTransactionPayload where
               contractpayloadValue = Nothing,
               contractpayloadTxParams = Nothing,
               contractpayloadChainid = Nothing,
-              contractpayloadMetadata = Nothing
+              contractpayloadMetadata = Nothing,
+              contractpayloadNetworkid = Nothing
             }
 
 instance ToSchema ContractPayload where
@@ -391,7 +379,8 @@ instance ToSchema ContractPayload where
             contractpayloadValue = Nothing,
             contractpayloadTxParams = Nothing,
             contractpayloadChainid = Nothing,
-            contractpayloadMetadata = Nothing
+            contractpayloadMetadata = Nothing,
+            contractpayloadNetworkid = Nothing
           }
 
 instance ToSchema TransferPayload where
@@ -408,7 +397,8 @@ instance ToSchema TransferPayload where
             transferpayloadValue = Strung 1000000,
             transferpayloadTxParams = Nothing,
             transferpayloadChainid = Nothing,
-            transferpayloadMetadata = Nothing
+            transferpayloadMetadata = Nothing,
+            transferpayloadNetworkid = Nothing
           }
 
 instance ToSchema FunctionPayload where
@@ -427,7 +417,8 @@ instance ToSchema FunctionPayload where
             functionpayloadValue = Nothing,
             functionpayloadTxParams = Nothing,
             functionpayloadChainid = Nothing,
-            functionpayloadMetadata = Nothing
+            functionpayloadMetadata = Nothing,
+            functionpayloadNetworkid = Nothing
           }
 
 data BlocChainOrTransactionResult

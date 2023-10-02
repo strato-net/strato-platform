@@ -294,7 +294,8 @@ spec = do
                     U.unsignedTransactionTo = Nothing,
                     U.unsignedTransactionValue = Wei 0,
                     U.unsignedTransactionInitOrData = Code $ BC.pack registry,
-                    U.unsignedTransactionChainId = Nothing
+                    U.unsignedTransactionChainId = Nothing,
+                    U.unsignedTransactionNetworkId = Nothing
                   }
               )
               txMd'
@@ -338,7 +339,8 @@ contract A {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Just $ ChainId chainId
+                U.unsignedTransactionChainId = Just $ ChainId chainId,
+                U.unsignedTransactionNetworkId = Nothing
               }
           tx' = mkSignedTx (privKeys !! 0) utx' txMd
           txMd = M.fromList [("funcName", "addOrg"), ("args", args)]
@@ -460,7 +462,8 @@ contract A {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Just $ ChainId chainId
+                U.unsignedTransactionChainId = Just $ ChainId chainId,
+                U.unsignedTransactionNetworkId = Nothing
               }
           incXUtx0 chainId = (incXUtx chainId)
           incXUtx1 chainId = (incXUtx chainId) {U.unsignedTransactionNonce = Nonce 1}
@@ -499,7 +502,8 @@ contract A {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Just $ ChainId chainId
+                U.unsignedTransactionChainId = Just $ ChainId chainId,
+                U.unsignedTransactionNetworkId = Nothing
               }
           addMemberTxMd = M.fromList [("funcName", "addMember"), ("args", addMemberArgs)]
           addMemberTx cId = mkSignedTx (privKeys !! 0) (addMemberUtx cId) addMemberTxMd
@@ -614,7 +618,8 @@ contract RegisterCert {
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code $ BC.pack src,
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           txMd addr cert = M.fromList [("src", src), ("name", contractName), ("args", args addr cert)]
           mkTx pSigner pCert n =
@@ -678,7 +683,8 @@ contract RegisterCert {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
 
@@ -729,7 +735,8 @@ contract RegisterCert {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           signedAddTx = mkSignedTx (privKeys !! 0) addTx addTxMd
           removeTxMd = M.fromList [("funcName", "voteToRemoveValidator"), ("args", args)]
@@ -741,7 +748,8 @@ contract RegisterCert {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           signedRemoveTx = mkSignedTx (privKeys !! 0) removeTx removeTxMd
 
@@ -806,7 +814,8 @@ contract RegisterCert {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
           mainChainSrc =
@@ -829,7 +838,8 @@ contract B {
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc,
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
           mkMainChainTx n =
@@ -941,7 +951,8 @@ contract B {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Just $ ChainId cId
+                U.unsignedTransactionChainId = Just $ ChainId cId,
+                U.unsignedTransactionNetworkId = Nothing
               }
           signedPrivTx tx = mkSignedTx (privKeys !! 0) (setupTx tx) txMd
 
@@ -1009,7 +1020,8 @@ contract B {
                 U.unsignedTransactionTo = Just $ Address 0x100,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code "",
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           signedTx = mkSignedTx (privKeys !! 0) setupTx txMd
 
@@ -1056,7 +1068,8 @@ contract C {
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc,
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           mainChainUtx2 =
             U.UnsignedTransaction
@@ -1066,7 +1079,8 @@ contract C {
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
                 U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrcC,
-                U.unsignedTransactionChainId = Nothing
+                U.unsignedTransactionChainId = Nothing,
+                U.unsignedTransactionNetworkId = Nothing
               }
           mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
           mkMainChainTx =

@@ -63,7 +63,7 @@ import Data.Aeson hiding (Success)
 import Data.Aeson.Casing
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe
+import Data.Maybe()
 import Data.Source.Map
 import Data.Text (Text)
 import GHC.Generics
@@ -351,6 +351,7 @@ data TransferParameters = TransferParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
+    networkId :: Maybe Integer,
     resolve :: Bool
   }
   deriving (Eq, Show, Generic)
@@ -365,6 +366,7 @@ data ContractParameters = ContractParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
+    networkId :: Maybe Integer,
     resolve :: Bool
   }
 
@@ -376,7 +378,8 @@ data UploadListContract = UploadListContract
     _uploadlistcontractTxParams :: Maybe TxParams,
     uploadlistcontractValue :: Maybe (Strung Natural),
     _uploadlistcontractChainid :: Maybe ChainId,
-    uploadlistcontractMetadata :: Maybe (Map Text Text)
+    uploadlistcontractMetadata :: Maybe (Map Text Text),
+    uploadlistcontractNetworkid :: Maybe Integer
   }
   deriving (Eq, Show, Generic)
 
@@ -397,16 +400,7 @@ instance ToJSON UploadListContract where
       ]
 
 instance FromJSON UploadListContract where
-  parseJSON (Object o) =
-    UploadListContract
-      <$> (o .: "contractName")
-      <*> (fromMaybe mempty <$> o .:? "src")
-      <*> (o .: "args")
-      <*> (o .:? "txParams")
-      <*> (o .:? "value")
-      <*> (o .:? "chainid")
-      <*> (o .:? "metadata")
-  parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance ToSchema UploadListContract where
   declareNamedSchema proxy =
@@ -423,7 +417,8 @@ instance ToSchema UploadListContract where
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
             uploadlistcontractValue = Nothing,
             _uploadlistcontractChainid = Nothing,
-            uploadlistcontractMetadata = Nothing
+            uploadlistcontractMetadata = Nothing,
+            uploadlistcontractNetworkid = Nothing
           }
 
 data ContractListParameters = ContractListParameters
@@ -444,6 +439,7 @@ data FunctionParameters = FunctionParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
+    networkId :: Maybe Integer,
     resolve :: Bool
   }
 
@@ -453,7 +449,8 @@ data SendTransaction = SendTransaction
     sendtransactionValue :: Strung Natural,
     _sendtransactionTxParams :: Maybe TxParams,
     _sendtransactionChainid :: Maybe ChainId,
-    sendtransactionMetadata :: Maybe (Map Text Text)
+    sendtransactionMetadata :: Maybe (Map Text Text),
+    sendtransactionNetworkid :: Maybe Integer
   }
   deriving (Eq, Show, Generic)
 
@@ -517,7 +514,8 @@ instance ToSchema SendTransaction where
                     (Just $ Nonce 9876)
                 ),
             _sendtransactionChainid = Nothing,
-            sendtransactionMetadata = (Just $ Map.fromList [("purpose", "groceries")])
+            sendtransactionMetadata = (Just $ Map.fromList [("purpose", "groceries")]),
+            sendtransactionNetworkid = Nothing
           }
 
 data TransferListParameters = TransferListParameters
@@ -623,7 +621,8 @@ instance ToSchema MethodCall where
             methodcallMethodName = "getHoroscope",
             methodcallContractAddress = Address 0xdeadbeef,
             _methodcallChainid = Nothing,
-            methodcallMetadata = Nothing
+            methodcallMetadata = Nothing,
+            methodcallNetworkid = Nothing
           }
 
 data FunctionListParameters = FunctionListParameters
@@ -666,7 +665,8 @@ methodErroredExample =
           methodcallMethodName = "getHoroscope",
           methodcallContractAddress = Address 0xdeadbeef,
           _methodcallChainid = Nothing,
-          methodcallMetadata = Nothing
+          methodcallMetadata = Nothing,
+          methodcallNetworkid = Nothing
         }
 
 instance ToSample MethodErrored where
@@ -686,7 +686,8 @@ data MethodCall = MethodCall
     methodcallValue :: Strung Natural,
     _methodcallTxParams :: Maybe TxParams,
     _methodcallChainid :: Maybe ChainId,
-    methodcallMetadata :: Maybe (Map Text Text)
+    methodcallMetadata :: Maybe (Map Text Text),
+    methodcallNetworkid :: Maybe Integer
   }
   deriving (Eq, Show, Generic)
 

@@ -328,7 +328,8 @@ main = do
             unsignedTransactionTo = optAddress,
             unsignedTransactionValue = optValue,
             unsignedTransactionInitOrData = txData,
-            unsignedTransactionChainId = optChainId
+            unsignedTransactionChainId = optChainId,
+            unsignedTransactionNetworkId = Nothing
           }
       txHash = rlpHash unsignedTx
       sig = signMsg optKey txHash

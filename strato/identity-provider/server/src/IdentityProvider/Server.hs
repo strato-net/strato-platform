@@ -360,7 +360,8 @@ registerCert cert token realm = do
                   functionpayloadValue = Nothing,
                   functionpayloadTxParams = Nothing,
                   functionpayloadChainid = Nothing,
-                  functionpayloadMetadata = Nothing
+                  functionpayloadMetadata = Nothing,
+                  functionpayloadNetworkid = Nothing
                 }
           txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
           postBlocTx = runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest)

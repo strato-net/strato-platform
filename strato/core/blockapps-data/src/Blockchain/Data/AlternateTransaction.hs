@@ -148,7 +148,8 @@ data UnsignedTransaction = UnsignedTransaction
     unsignedTransactionTo :: Maybe Address,
     unsignedTransactionValue :: Wei,
     unsignedTransactionInitOrData :: Code,
-    unsignedTransactionChainId :: Maybe ChainId
+    unsignedTransactionChainId :: Maybe ChainId,
+    unsignedTransactionNetworkId :: Maybe Integer
   }
   deriving (Eq, Show, Generic, A.ToJSON, A.FromJSON)
 
@@ -167,18 +168,21 @@ instance RLPEncodable UnsignedTransaction where
       ]
         ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
   rlpDecode (Array (n : gp : gl : to' : va : iod : rest)) =
-    UnsignedTransaction
+    let (chainid, netid) = case rest of 
+          [] -> (Right Nothing, Right Nothing)
+          [Array nid] -> (Right Nothing, Just <$> ((-1) *) <$> rlpDecode (Array nid))
+          [cid] -> (Just <$> rlpDecode cid, Right Nothing)
+          [cid, Array nid] -> (Just <$> rlpDecode cid, Just <$> ((-1) *) <$> rlpDecode (Array nid))
+          x -> (Left $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x, Right Nothing)
+    in UnsignedTransaction
       <$> rlpDecode n
       <*> rlpDecode gp
       <*> rlpDecode gl
       <*> rlpDecode to'
       <*> rlpDecode va
       <*> rlpDecode iod
-      <*> ( case rest of
-              [] -> pure Nothing
-              [cid] -> Just <$> rlpDecode cid
-              x -> Left $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x
-          )
+      <*> chainid 
+      <*> netid
   rlpDecode x = Left $ "rlpDecode UnsignedTransaction: Got " ++ show x
 
 rlpHash :: RLPEncodable x => x -> ByteString

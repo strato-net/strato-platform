@@ -149,7 +149,8 @@ optionsToTX priv nonce =
             unsignedTransactionTo = Nothing,
             unsignedTransactionValue = Wei 0,
             unsignedTransactionInitOrData = Code $ T.encodeUtf8 $ serializeSourceMap $ namedSource "" certificateRegistryContract,
-            unsignedTransactionChainId = Nothing
+            unsignedTransactionChainId = Nothing,
+            unsignedTransactionNetworkId = Nothing
           }
       txHash = rlpHash unsignedTx
       sig = signMsg priv txHash
@@ -185,7 +186,8 @@ initializeCertificateRegistryTX priv addr certs nonce =
             unsignedTransactionTo = Just addr,
             unsignedTransactionValue = Wei 0,
             unsignedTransactionInitOrData = Code $ B.empty,
-            unsignedTransactionChainId = Nothing
+            unsignedTransactionChainId = Nothing,
+            unsignedTransactionNetworkId = Nothing
           }
       txHash = rlpHash unsignedTx
       sig = signMsg priv txHash

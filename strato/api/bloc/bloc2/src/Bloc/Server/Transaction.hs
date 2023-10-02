@@ -59,6 +59,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import Blockchain.Strato.Model.Nonce
+import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Blockchain.Strato.Model.Wei
 import Blockchain.Strato.RedisBlockDB (getBestBlockInfo, getSyncStatus, getWorldBestBlockInfo, runStratoRedisIO)
@@ -179,6 +180,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
               postbloctransactionrawrequestValue
               postbloctransactionrawrequestInitOrData
               postbloctransactionrawrequestChainId
+              (Just computeNetworkID) --NOTE TO AYA: dont hardcode
           txHash = rlpHash unsignedTX
 
           -- try both 27 and 28, see what matches
@@ -262,12 +264,14 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
   fmap join . forM (partitionWith transactionType txList) $ \(ttype, txs) -> case ttype of
     TRANSFER -> do
       txs' <- mapM fromTransfer txs
-      let ts = map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) txs'
+      -- check all are going to the right network
+      when (any (/= computeNetworkID) $ mapMaybe transferpayloadNetworkid txs') $ throwIO $ InvalidArgs "Incorrect network id provided"
+      let ts = map (\(TransferPayload t v x c m n) -> SendTransaction t v (mergeTxParams x txParams) c m n) txs'
           txsWithChainids = map (sendtransactionChainid %~ (<|> cid)) ts
       txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionChainid sendtransactionTxParams txsWithChainids
       txs'' <-
         mapM
-          ( \(SendTransaction toAddr (Strung value) params cid' md) -> do
+          ( \(SendTransaction toAddr (Strung value) params cid' md netid) -> do
               let header =
                     TransactionHeader
                       (Just toAddr)
@@ -276,12 +280,15 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                       (Wei $ fromIntegral value)
                       (Code ByteString.empty)
                       cid'
+                      netid
               signAndPrepare jwt addr md header
           )
           txsWithParams
       forM txs'' (\r -> return $ BlocTransactionBodyResult (hash' r) (Just r))
     CONTRACT -> do
       ps <- mapM fromContract txs
+      -- check all are going to the right network
+      when (any (/= computeNetworkID) $ mapMaybe contractpayloadNetworkid ps) $ throwIO $ InvalidArgs "Incorrect network id provided"
       let srcMap :: ContractPayload -> Maybe SourceMap
           srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
           src' :: ContractPayload -> Maybe SourceMap
@@ -292,7 +299,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           mapUploadList =
             map
-              ( \p@(ContractPayload _ c a v x cid' m) -> do
+              ( \p@(ContractPayload _ c a v x cid' m nid) -> do
                   let cn = fromMaybe "unnamed_contract" c
                   UploadListContract
                     (fromJust c)
@@ -305,12 +312,13 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                         Nothing -> Just $ Map.singleton "history" cn
                         Just h -> Just $ Map.insert "history" cn h
                     )
+                    nid
               )
               ps
           contracts' = map (uploadlistcontractChainid %~ (<|> cid)) mapUploadList
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams contracts'
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params value cid' md) -> do
+        \(UploadListContract name srcs args params value cid' md nid) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -332,10 +340,13 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
                 (Code $ Text.encodeUtf8 $ serializeSourceMap src)
                 cid'
+                nid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     FUNCTION -> do
       p <- mapM fromFunction txs
-      let mapMethodCalls = map (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
+      -- check all are going to the right network
+      when (any (/= computeNetworkID) $ mapMaybe functionpayloadNetworkid p) $ throwIO $ InvalidArgs "Incorrect network id provided"
+      let mapMethodCalls = map (\(FunctionPayload a m r v x c md n) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md n) p
           txsWithChainids = map (methodcallChainid %~ (<|> cid)) mapMethodCalls
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
       forStateT Map.empty txsWithParams $
@@ -369,6 +380,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               (Wei (fromIntegral $ unStrung methodcallValue))
               (Code $ sel <> argsBin)
               _methodcallChainid
+              methodcallNetworkid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where
@@ -410,11 +422,12 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
   fmap join . forM txList $ \tx -> case transactionType tx of
     TRANSFER -> do
       tx' <- fromTransfer tx
-      let t = (\(TransferPayload t' v x c m) -> SendTransaction t' v (mergeTxParams x txParams) c m) tx'
+      when (any (/= computeNetworkID) $ mapMaybe transferpayloadNetworkid [tx']) $ throwIO $ InvalidArgs "Incorrect network id provided" --TODO: come back and make prettier
+      let t = (\(TransferPayload t' v x c m n) -> SendTransaction t' v (mergeTxParams x txParams) c m n) tx'
           txWithChainid = (sendtransactionChainid %~ (<|> cid)) t
       txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionChainid sendtransactionTxParams [txWithChainid]
       mapM
-        ( \(SendTransaction toAddr (Strung value) params cid' md) -> do
+        ( \(SendTransaction toAddr (Strung value) params cid' md netid) -> do
             let header =
                   TransactionHeader
                     (Just toAddr)
@@ -423,11 +436,13 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                     (Wei $ fromIntegral value)
                     (Code ByteString.empty)
                     cid'
+                    netid
             prepareUnsignedRawTx md header
         )
         txsWithParams
     CONTRACT -> do
       ps <- fromContract tx
+      when (any (/= computeNetworkID) $ mapMaybe contractpayloadNetworkid [ps]) $ throwIO $ InvalidArgs "Incorrect network id provided" --TODO: come back and make prettier
       let srcMap :: ContractPayload -> Maybe SourceMap
           srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
           src' :: ContractPayload -> Maybe SourceMap
@@ -437,7 +452,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
               else Just $ contractpayloadSrc p
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           upload =
-            ( \p@(ContractPayload _ c a v x cid' m) -> do
+            ( \p@(ContractPayload _ c a v x cid' m nid) -> do
                 let cn = fromMaybe "unnamed_contract" c
                 UploadListContract
                   (fromJust c)
@@ -450,12 +465,13 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                       Nothing -> Just $ Map.singleton "history" cn
                       Just h -> Just $ Map.insert "history" cn h
                   )
+                  nid
             )
               ps
           contract' = (uploadlistcontractChainid %~ (<|> cid)) upload
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractChainid uploadlistcontractTxParams [contract']
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params value cid' md) -> do
+        \(UploadListContract name srcs args params value cid' md netid) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -477,9 +493,11 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
                 (Code $ Text.encodeUtf8 $ serializeSourceMap src)
                 cid'
+                netid
     FUNCTION -> do
       p <- fromFunction tx
-      let mapMethodCalls = (\(FunctionPayload a m r v x c md) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p
+      when (any (/= computeNetworkID) $ mapMaybe functionpayloadNetworkid [p]) $ throwIO $ InvalidArgs "Incorrect network id provided" --TODO: come back and make prettier
+      let mapMethodCalls = (\(FunctionPayload a m r v x c md n) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md n) p 
           txWithChainids = (methodcallChainid %~ (<|> cid)) mapMethodCalls
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
       forStateT Map.empty txsWithParams $
@@ -514,6 +532,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
               (Wei (fromIntegral $ unStrung methodcallValue))
               (Code $ sel <> argsBin)
               _methodcallChainid
+              methodcallNetworkid
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where fromTransfer = \case
           BlocTransfer t -> return t
@@ -659,6 +678,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                     (mergeTxParams (transferpayloadTxParams p) txParams)
                     (transferpayloadMetadata p)
                     (transferpayloadChainid p <|> chainId)
+                    (transferpayloadNetworkid p)
                     resolve
             fmap ((: []) . BlocTxResult) $ postUsersSend' cacheNonce btp jwtToken
           xs -> do
@@ -666,7 +686,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
             let btlp =
                   TransferListParameters
                     addr
-                    (map (\(TransferPayload t v x c m) -> SendTransaction t v (mergeTxParams x txParams) c m) p)
+                    (map (\(TransferPayload t v x c m n) -> SendTransaction t v (mergeTxParams x txParams) c m n) p)
                     chainId
                     resolve
             fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp jwtToken
@@ -692,6 +712,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         Just m -> Just $ Map.insert "history" cn m
                     )
                     (contractpayloadChainid p <|> chainId)
+                    (contractpayloadNetworkid p)
                     resolve
                 poster = postUsersContractSolidVM'
             fmap ((: []) . BlocTxResult) $ poster cacheNonce bcp jwtToken
@@ -701,7 +722,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                   ContractListParameters
                     addr
                     ( map
-                        ( \p@(ContractPayload _ c a v x cid m) -> do
+                        ( \p@(ContractPayload _ c a v x cid m nid) -> do
                             let cn = fromMaybe "unnamed_contract" c
                             UploadListContract
                               (fromJust c)
@@ -714,6 +735,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                                   Nothing -> Just $ Map.singleton "history" cn
                                   Just h -> Just $ Map.insert "history" cn h
                               )
+                              nid
                         )
                         ps
                     )
@@ -734,6 +756,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         (mergeTxParams (functionpayloadTxParams p) txParams)
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
+                        (functionpayloadNetworkid p)
                         resolve
             let bfpWallet = FunctionParameters
                         addr
@@ -744,20 +767,27 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         (mergeTxParams (functionpayloadTxParams p) txParams)
                         (functionpayloadMetadata p)
                         (functionpayloadChainid p <|> chainId)
+                        (functionpayloadNetworkid p)
                         resolve
+            -- NOTE TO AYA: would be nice to do this instead
+            -- let bfpWallet = bfp{
+            --             contractAddr = userContractAddr,
+            --             funcName = "callContract",
+            --             args = (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
+            --           }
             let bfp' = bool bfp bfpWallet useWallet
             fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp' jwtToken
           xs -> do
             p <- mapM fromFunction xs
             let bflp = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload a m r v x c md) ->
-                          MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md) p)
+                        (map (\(FunctionPayload a m r v x c md n) ->
+                          MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md n) p)
                         chainId
                         resolve
             let bflpWallet = FunctionListParameters
                         addr
-                        (map (\(FunctionPayload a m r v x c md) ->
+                        (map (\(FunctionPayload a m r v x c md n) ->
                                 MethodCall 
                                   userContractAddr 
                                   "callContract"  
@@ -766,6 +796,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                                   (mergeTxParams x txParams) 
                                   c 
                                   md
+                                  n
                               ) p)
                         chainId
                         resolve
@@ -829,7 +860,8 @@ data TransactionHeader = TransactionHeader
     transactionheaderTxParams :: TxParams,
     transactionheaderValue :: Wei,
     transactionheaderCode :: Code,
-    transactionheaderChainId :: Maybe ChainId
+    transactionheaderChainId :: Maybe ChainId,
+    transactionheaderNetworkId :: Maybe Integer
   }
 
 postUsersSend' ::
@@ -857,6 +889,7 @@ postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
         (Wei (fromIntegral $ unStrung value))
         (Code ByteString.empty)
         chainId
+        networkId
   txHash <- postTransaction (Just txSizeLimit) tx
   getResultAndRespond [txHash] resolve
 
@@ -898,6 +931,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         (Wei (fromIntegral (maybe 0 unStrung value)))
         (Code $ Text.encodeUtf8 $ serializeSourceMap src)
         chainId
+        networkId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
   txHash <- postTransaction (Just txSizeLimit) tx
@@ -922,7 +956,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractChainid uploadlistcontractTxParams contracts'
   namesTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name srcs args params value cid md) -> do
+    \(UploadListContract name srcs args params value cid md netid) -> do
       (src, contract) <- do
         cd <-
           fmap snd . lift $
@@ -945,6 +979,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
             (Code $ Text.encodeUtf8 $ serializeSourceMap src)
             cid
+            netid
       return (name, tx)
   let txs = map snd namesTxs
   hashes <- postTransactionList (Just txSizeLimit) txs
@@ -969,7 +1004,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txs'' <-
     mapM
-      ( \(SendTransaction toAddr (Strung value) params cid md) -> do
+      ( \(SendTransaction toAddr (Strung value) params cid md netid) -> do
           let header =
                 TransactionHeader
                   (Just toAddr)
@@ -978,6 +1013,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
                   (Wei $ fromIntegral value)
                   (Code ByteString.empty)
                   cid
+                  netid
           signAndPrepare jwtToken fromAddr md header
       )
       txsWithParams
@@ -1036,6 +1072,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
               (Wei (fromIntegral $ unStrung methodcallValue))
               (Code $ sel <> argsBin)
               _methodcallChainid
+              methodcallNetworkid
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx, methodcallMethodName)
       let finalTxs = fst <$> txsFuncNames
@@ -1094,6 +1131,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
         (Wei (maybe 0 (fromIntegral . unStrung) value))
         (Code $ (sel::ByteString) <> (argsBin::ByteString))
         chainId
+        networkId
   $logDebugLS "postUsersContractMethod'/tx" tx
   txHash <- postTransaction (Just txSizeLimit) tx
   $logInfoLS "postUsersContractMethod'/hash" txHash
@@ -1111,7 +1149,8 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
       unsignedTransactionTo = transactionheaderToAddr,
       unsignedTransactionValue = transactionheaderValue,
       unsignedTransactionInitOrData = transactionheaderCode,
-      unsignedTransactionChainId = transactionheaderChainId
+      unsignedTransactionChainId = transactionheaderChainId,
+      unsignedTransactionNetworkId = transactionheaderNetworkId
     }
 
 preparePostTx ::
