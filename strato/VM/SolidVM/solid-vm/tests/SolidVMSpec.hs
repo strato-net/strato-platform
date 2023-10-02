@@ -347,7 +347,7 @@ runTestWithTimeout timeout f = do
           eInput = Ae.eitherDecodeStrict (BC.pack gi)
           !input = either error id eInput
           cert = getCert
-          gi' = buildGenesisInfo [] [cert] vals admins input
+          gi' = buildGenesisInfo [] [cert] vals admins input flags_useSaltedCerts
 
       (blockCreated, outputBlock) <- generateGBlock gi'
       MP.initializeBlank
