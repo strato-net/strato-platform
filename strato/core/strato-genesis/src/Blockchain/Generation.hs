@@ -37,6 +37,7 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Blockchain.Strato.Model.UserRegistry
+import Blockchain.VMOptions (flags_useSaltedCerts)
 import qualified Data.Aeson as Ae
 import qualified Data.Aeson.Key as DAK
 import qualified Data.Aeson.KeyMap as KM
@@ -260,6 +261,7 @@ insertCertRegistryContract certs gi =
         Just s -> s
         Nothing -> error "Certificate requires a subject"
     maybeCertField = fromMaybe ""
+    certUserAddress = fromPublicKey . subPub . certSub'
     rootAcct =
       SolidVMContractWithStorage
         0x1337
@@ -278,19 +280,33 @@ insertCertRegistryContract certs gi =
           (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
         ]
 
-    registryAcct =
-      SolidVMContractWithStorage
-        0x509
-        509
-        (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
-        $ [ (".owner", rootAddress) ]
+    -- Reversing the cert user address to create a placeholder Certificate contract address
+    reverseAddr = Address . bytesToWord160 . reverse . word160ToBytes . unAddress . certUserAddress
+    addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
+    registryAcct = case flags_useSaltedCerts of
+      True -> SolidVMContractWithStorage
+                0x509
+                509
+                (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
+                $ [ (".owner", rootAddress) ]
+      False -> SolidVMContractWithStorage
+                 0x509
+                 509
+                 (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
+                 $ [ (".owner", rootAddress),
+                   (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx "1337")
+                 ]
+                 ++ map (\c -> (BC.pack $ ".addressToCertMap<a:" ++ show (certUserAddress c) ++ ">", addrToCertIdx . show . reverseAddr $ c)) certs
 
     certAccts =
       map
         ( \cert -> do
             let certSub = certSub' cert
+                certAddr = case flags_useSaltedCerts of
+                             True -> deriveAddressWithSalt (Just $ Address 0x509) (show $ fromPublicKey $ subPub $ certSub) (Just $ KECCAK256.hash encodedRegistry) Nothing
+                             False -> reverseAddr cert
             SolidVMContractWithStorage
-              (deriveAddressWithSalt (Just $ Address 0x509) (show $ fromPublicKey $ subPub $ certSub) (Just $ KECCAK256.hash encodedRegistry) Nothing)
+              certAddr
               0
               (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
               [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
