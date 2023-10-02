@@ -4,24 +4,22 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   parameters {
-    string(name: 'VersionTag', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
-  }
-  environment {
-    execution_arn = ""
+    string(name: 'VERSION_TAG', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
   }
   stages {
     stage('Start Step Functions Execution') {
       steps {
         sh '''#!/bin/bash
-          VERSION_TAG="$VersionTag"
 
-          execution_arn=$(aws stepfunctions start-execution \
+          echo "Input JSON: {\"VersionTag\": \"${params.VERSION_TAG}\"}"
+
+          env.execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
-            --input "{\"VersionTag\": \"$VERSION_TAG\"}" \
+            --input "{\"VersionTag\": \"${params.VERSION_TAG}\"}" \
             --query "executionArn" \
             --output text)
 
-          echo "Started Step Functions execution"
+          echo "Started Step Functions execution with ARN: $execution_arn" 
         '''
       }
     }
@@ -30,7 +28,7 @@ pipeline {
         sh '''#!/bin/bash
           while true; do
             execution_status=$(aws stepfunctions describe-execution \
-              --execution-arn "$execution_arn" \
+              --execution-arn "${execution_arn}" \
               --query "status" \
               --output text)
           
