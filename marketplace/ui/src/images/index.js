@@ -4,6 +4,7 @@ export const Images = {
   'noEventPageSymbol': require('./resources/no_event.png'),
   'art': require("./resources/categories/art.png"),
   'carbon': require("./resources/categories/carbon.png"),
+  'clothing': require("./resources/categories/clothing.jpg"),
   'realEstate': require("./resources/categories/real_estate.png"),
   'materials': require("./resources/categories/materials.png"),
   'category1': require("./resources/categories/category1.png"),

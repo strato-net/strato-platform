@@ -22,6 +22,21 @@
             ]
         },
         {
+            "name": "Clothing",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Sneakers"
+                },
+                {
+                    "name": "Shirts"
+                },
+                {
+                    "name": "Pants"
+                }
+            ]
+        },
+        {
             "name": "Materials",
             "imageKey": "",
             "subCategories": [
