@@ -36,8 +36,8 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
+import Blockchain.Strato.Model.OldCertificateRegistry
 import Blockchain.Strato.Model.UserRegistry
-import Blockchain.VMOptions (flags_useSaltedCerts)
 import qualified Data.Aeson as Ae
 import qualified Data.Aeson.Key as DAK
 import qualified Data.Aeson.KeyMap as KM
@@ -239,18 +239,18 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
 
 -- | Inserts a Certificate Registry contract into the genesis block with the BlockApps root cert as owner
 -- | Accepts a list of X509 certificates, if there are any that need to be initialized at init besides root
-insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
-insertCertRegistryContract certs gi =
+insertCertRegistryContract :: [X509Certificate] -> Bool -> GenesisInfo -> GenesisInfo
+insertCertRegistryContract certs useSaltedCerts gi =
   gi
     { genesisInfoAccountInfo = initialAccounts ++ registryAcct : rootAcct : certAccts,
-      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedRegistry (if useSaltedCerts then certificateRegistryContract else oldCertificateRegistryContract) (Just "CertificateRegistry")]
     }
   where
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
 
     rlpWrap = rlpSerialize . rlpEncode
-    encodedRegistry = encodeUtf8 certificateRegistryContract
+    encodedRegistry = if useSaltedCerts then encodeUtf8 certificateRegistryContract else encodeUtf8 oldCertificateRegistryContract
 
     rootAddress' = fromPublicKey rootPubKey
     rootAddress = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
@@ -283,28 +283,28 @@ insertCertRegistryContract certs gi =
     -- Reversing the cert user address to create a placeholder Certificate contract address
     reverseAddr = Address . bytesToWord160 . reverse . word160ToBytes . unAddress . certUserAddress
     addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
-    registryAcct = case flags_useSaltedCerts of
+    registryAcct = case useSaltedCerts of
       True -> SolidVMContractWithStorage
                 0x509
                 509
                 (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
                 $ [ (".owner", rootAddress) ]
-      False -> SolidVMContractWithStorage
-                 0x509
-                 509
-                 (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
-                 $ [ (".owner", rootAddress),
-                   (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx "1337")
-                 ]
-                 ++ map (\c -> (BC.pack $ ".addressToCertMap<a:" ++ show (certUserAddress c) ++ ">", addrToCertIdx . show . reverseAddr $ c)) certs
+      _ -> SolidVMContractWithStorage
+             0x509
+             509
+             (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
+             $ [ (".owner", rootAddress),
+               (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx "1337")
+             ]
+             ++ map (\c -> (BC.pack $ ".addressToCertMap<a:" ++ show (certUserAddress c) ++ ">", addrToCertIdx . show . reverseAddr $ c)) certs
 
     certAccts =
       map
         ( \cert -> do
             let certSub = certSub' cert
-                certAddr = case flags_useSaltedCerts of
+                certAddr = case useSaltedCerts of
                              True -> deriveAddressWithSalt (Just $ Address 0x509) (show $ fromPublicKey $ subPub $ certSub) (Just $ KECCAK256.hash encodedRegistry) Nothing
-                             False -> reverseAddr cert
+                             _ -> reverseAddr cert
             SolidVMContractWithStorage
               certAddr
               0

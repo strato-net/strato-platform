@@ -29,7 +29,8 @@ data Options = Options
     optAdmins :: [ChainMemberParsedSet],
     optFaucets :: [Address],
     optInput :: GenesisInfo,
-    optOutputName :: String
+    optOutputName :: String,
+    optUseSaltedCerts :: Bool
   }
   deriving (Show)
 
@@ -41,7 +42,8 @@ defaultOptions =
       optAdmins = [],
       optFaucets = [],
       optInput = error "Uninitialized input genesis info",
-      optOutputName = "outputGenesisBlock.json"
+      optOutputName = "outputGenesisBlock.json",
+      optUseSaltedCerts = False
     }
 
 options :: [OptDescr (Options -> IO Options)]
@@ -125,7 +127,13 @@ options =
           )
           "OutputName"
       )
-      "The .json filepath to write the created genesis block info to. If not provided, this will be written to ./outputGenesisBlock.json"
+      "The .json filepath to write the created genesis block info to. If not provided, this will be written to ./outputGenesisBlock.json",
+    Option
+      ['u']
+      ["useSaltedCerts"]
+      ( NoArg
+          ( \opts -> return opts {optUseSaltedCerts = True} ))
+      "Whether or not to use salted addresses for X509 certs. The default is False."
   ]
 
 helpMessage :: String
@@ -148,6 +156,6 @@ main = do
   --------------------------------- GENERATE GENESIS INFO ------------------------------------
   --------------------------------------------------------------------------------------------
 
-  let gi' = buildGenesisInfo optFaucets optCerts optValidators optAdmins optInput
+  let gi' = buildGenesisInfo optFaucets optCerts optValidators optAdmins optInput optUseSaltedCerts
   B.writeFile optOutputName . BL.toStrict $ Ae.encode gi'
   putStrLn $ "Done. Output genesis block info was written to " ++ optOutputName

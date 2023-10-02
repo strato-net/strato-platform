@@ -99,13 +99,13 @@ readSupplementaryAccounts genesisBlockName = do
             _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
-buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
-buildGenesisInfo extraFaucets extraCerts validators admins gi =
+buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> Bool -> GenesisInfo
+buildGenesisInfo extraFaucets extraCerts validators admins gi useSaltedCerts =
   let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
       faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
    in insertUserRegistryContract extraCerts
         . insertMercataGovernanceContract validators admins
-        . insertCertRegistryContract extraCerts
+        . insertCertRegistryContract extraCerts useSaltedCerts
         $ gi {genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}
 
 getGenesisBlockAndPopulateInitialMPs ::
