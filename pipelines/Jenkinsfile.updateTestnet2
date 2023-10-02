@@ -4,18 +4,18 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   parameters {
-    string(name: 'VersionTag', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
+    string(name: 'VERSION_TAG', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
   }
   stages {
     stage('Start Step Functions Execution') {
       steps {
         sh '''#!/bin/bash
 
-          echo "Input JSON: {\"VersionTag\": \"${params.VersionTag}\"}"
+          echo "Input JSON: {\"VersionTag\": \"${params.VERSION_TAG}\"}"
 
           env.execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
-            --input "{\"VersionTag\": \"${params.VersionTag}\"}" \
+            --input "{\"VersionTag\": \"${params.VERSION_TAG}\"}" \
             --query "executionArn" \
             --output text)
 
