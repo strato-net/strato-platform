@@ -48,6 +48,20 @@ class AuthenticationController {
           return next(e)
         }
       }
+
+      res.cookie(oauth.getCookieNameAccessToken(), accessToken, {
+        maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
+        httpOnly: true,
+      })
+      res.cookie(oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
+        maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
+        httpOnly: true,
+      })
+      res.cookie(oauth.getCookieNameRefreshToken(), refreshToken, {
+        maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
+        httpOnly: true,
+      })
+
       const userCredentials = { token: accessToken }
       const userResponse = await oauthHelper.getStratoUserFromToken(accessToken)
       const user = { ...userResponse.user, ...userCredentials }
@@ -81,19 +95,6 @@ class AuthenticationController {
       rest.response.status(RestStatus.FORBIDDEN, res)
       return next()
     }
-
-    res.cookie(oauth.getCookieNameAccessToken(), accessToken, {
-      maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
-      httpOnly: true,
-    })
-    res.cookie(oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
-      maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
-      httpOnly: true,
-    })
-    res.cookie(oauth.getCookieNameRefreshToken(), refreshToken, {
-      maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
-      httpOnly: true,
-    })
 
     // check if user exists - if not, create them
 
