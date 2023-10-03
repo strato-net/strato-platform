@@ -10,50 +10,10 @@ import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions"
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useMarketplaceState } from "../../contexts/marketplace";
+import helperJson from "../../helpers/helper.json"
+const { columns, taxOptions } = helperJson;
 
-const { Option } = Select;
 let MAX_QUANTITY = null;
-const taxOptions = [
-  { value: '0', label: '$' },
-  { value: '1', label: '%' },
-]
-
-const columns = [
-  {
-    title: "Seller",
-    dataIndex: "seller",
-    key: "seller",
-  },
-  {
-    title: "Membership",
-    dataIndex: "membership",
-    key: "membership",
-  },
-  {
-    title: "Id",
-    dataIndex: "id",
-    key: "id",
-  },
-  {
-    title: "Quantity",
-    dataIndex: "quantity",
-    key: "quantity",
-  },
-  {
-    title: "Tax Percentage/Amount",
-    dataIndex: "percentage",
-    key: "precentage",
-  },
-  {
-    title: "Price",
-    dataIndex: "price",
-    key: "price",
-  },
-  {
-    title: "Type",
-    dataIndex: "type",
-    key: "type",
-  },]
 
 const ListNowIndex = ({
   open,
