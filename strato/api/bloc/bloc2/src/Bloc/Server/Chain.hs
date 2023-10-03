@@ -135,7 +135,7 @@ createChainInfo userName creationBlockHash (ChainInput src mCodePtr cname lbl ba
         )
       msgHash = keccak256ToByteString $ rlpHash unsigned
   sig <- blocVaultWrapper $ postSignature (Just userName) (MsgHash msgHash)
-  let (r, s, v) = getSigVals sig
+  let (r, s, v) = getSigVals sig (Nothing) --TODO: don't hardcode (update chaininput?)
       chainInfo = ChainInfo unsigned (ChainSignature r s v)
   return chainInfo
 

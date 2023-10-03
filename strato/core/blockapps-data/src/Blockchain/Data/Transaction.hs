@@ -197,10 +197,13 @@ createMessageTX n gp gl to' val theData md prvKey = createChainMessageTX n gp gl
 
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
-getSigVals :: EC.Signature -> (Word256, Word256, Word8)
-getSigVals (EC.Signature (SEC.CompactRecSig r s v)) =
+getSigVals :: EC.Signature -> Maybe Integer -> (Word256, Word256, Integer)
+getSigVals (EC.Signature (SEC.CompactRecSig r s v)) mNetId =
   let convert = bytesToWord256 . BSS.fromShort
-   in (convert r, convert s, v + 0x1b)
+      addend = case mNetId of
+        Nothing -> 27
+        Just netid -> netid * 2 + 35
+   in (convert r, convert s, toInteger v + addend)
 
 createChainMessageTX ::
   Integer ->
@@ -230,7 +233,7 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
           }
   let theHash = partialTransactionHash unsignedTX
 
-  let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
+  let (r, s, v) = getSigVals (EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash) Nothing --TODO: DON'T HARDCODE
 
   return $ case unsignedTX of
     MessageTX {} -> unsignedTX {transactionR = toInteger r, transactionS = toInteger s, transactionV = v}
@@ -266,7 +269,7 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
 
   let theHash = partialTransactionHash unsignedTX
 
-  let (r, s, v) = getSigVals $ EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash
+  let (r, s, v) = getSigVals (EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash) Nothing
 
   return $ case unsignedTX of
     ContractCreationTX {} -> unsignedTX {transactionR = toInteger r, transactionS = toInteger s, transactionV = v}
@@ -284,7 +287,7 @@ whoSignedThisTransaction tx = case tx of
   t -> fromPublicKey <$> EC.recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (fromInteger ((transactionV t + 1) `mod` 2) :: Word8))
       mesg = keccak256ToByteString $ partialTransactionHash t
 
 whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address

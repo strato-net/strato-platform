@@ -84,7 +84,7 @@ RawTransaction
     chainId Word256
     r Integer
     s Integer
-    v Word8
+    v Integer
     metadata [TextPair] Maybe
     blockNumber Int
     txHash Keccak256
@@ -195,7 +195,7 @@ ChainInfoRef
     chainNonce Word256
     r Integer
     s Integer
-    v Word8
+    v Integer
     deriving Eq Generic Show
 
 ParentChainRef

@@ -206,7 +206,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
           postbloctransactionrawrequestValue
           postbloctransactionrawrequestInitOrData
           postbloctransactionrawrequestChainId
-          v
+          (fromInteger v) --archaic
           postbloctransactionrawrequestR
           postbloctransactionrawrequestS
           postbloctransactionrawrequestMetadata
@@ -837,7 +837,7 @@ callSignature ::
 callSignature jwtToken unsigned@UnsignedTransaction {..} = do
   let msgHash = rlpHash unsigned
   sig <- blocVaultWrapper $ postSignature (Just jwtToken) (MsgHash msgHash)
-  let (r, s, v) = getSigVals sig
+  let (r, s, v) = getSigVals sig unsignedTransactionNetworkId
   return $
     Transaction
       unsignedTransactionNonce

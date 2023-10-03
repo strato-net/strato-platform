@@ -50,7 +50,7 @@ data Transaction
         transactionChainId :: Maybe Word256,
         transactionR :: Integer,
         transactionS :: Integer,
-        transactionV :: Word8,
+        transactionV :: Integer,
         transactionMetadata :: Maybe (Map Text Text)
       }
   | ContractCreationTX
@@ -62,7 +62,7 @@ data Transaction
         transactionChainId :: Maybe Word256,
         transactionR :: Integer,
         transactionS :: Integer,
-        transactionV :: Word8,
+        transactionV :: Integer,
         transactionMetadata :: Maybe (Map Text Text)
       }
   | PrivateHashTX

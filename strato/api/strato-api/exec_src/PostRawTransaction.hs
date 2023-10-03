@@ -329,11 +329,11 @@ main = do
             unsignedTransactionValue = optValue,
             unsignedTransactionInitOrData = txData,
             unsignedTransactionChainId = optChainId,
-            unsignedTransactionNetworkId = Nothing
+            unsignedTransactionNetworkId = Nothing --TODO: DONT HARDCODE
           }
       txHash = rlpHash unsignedTx
       sig = signMsg optKey txHash
-      (r, s, v) = getSigVals sig
+      (r, s, v) = getSigVals sig Nothing --TODO: DONT HARDCODE; update PostBlocTransactionRawRequest instead
 
       -- create the API request body
       request =

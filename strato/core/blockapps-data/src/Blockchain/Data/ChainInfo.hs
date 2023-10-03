@@ -252,7 +252,7 @@ instance Arbitrary AccountInfo where
 data ChainSignature = ChainSignature
   { chainR :: Word256,
     chainS :: Word256,
-    chainV :: Word8
+    chainV :: Integer
   }
   deriving (Eq, Show, GHCG.Generic, Data)
 
@@ -467,6 +467,6 @@ acctInfo = JS.value
 whoSignedThisChainInfo :: ChainInfo -> Maybe Address
 whoSignedThisChainInfo (ChainInfo u (ChainSignature r s v)) =
   let intToBSS = BSS.toShort . word256ToBytes
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) (v - 0x1b))
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) (fromInteger ((v + 1) `mod` 2) :: Word8))
       mesg = keccak256ToByteString $ rlpHash u
    in fromPublicKey <$> EC.recoverPub sig mesg

@@ -26,7 +26,6 @@ import Data.Maybe
 import Data.Swagger hiding (format)
 import Data.Time.Calendar
 import Data.Time.Clock
-import Data.Word
 import GHC.Generics
 import qualified LabeledError
 import Numeric
@@ -106,7 +105,7 @@ instance FromJSON RawTransaction' where
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
     (tr :: Integer) <- parseHexStr (t .: "r")
     (ts :: Integer) <- parseHexStr (t .: "s")
-    (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
+    (tv :: Integer) <- parseHexStr (t .:? "v" .!= "0")
     md <- t .:? "metadata"
     bn <- t .:? "blockNumber" .!= (-1)
     h <- (t .:? "hash" .!= (unsafeCreateKeccak256FromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
@@ -132,7 +131,7 @@ instance FromJSON RawTransaction' where
               (fromMaybe 0 (cid :: Maybe Word256))
               (tr :: Integer)
               (ts :: Integer)
-              (tv :: Word8)
+              (tv :: Integer)
               (M.toList <$> md)
               bn
               h
@@ -182,7 +181,7 @@ instance FromJSON UnsignedRawTransaction' where
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
     (tr :: Integer) <- parseHexStr (t .: "r")
     (ts :: Integer) <- parseHexStr (t .: "s")
-    (tv :: Word8) <- parseHexStr (t .:? "v" .!= "0")
+    (tv :: Integer) <- parseHexStr (t .:? "v" .!= "0")
     md <- t .:? "metadata"
     bn <- t .:? "blockNumber" .!= (-1)
     h <- (t .:? "hash" .!= (unsafeCreateKeccak256FromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
@@ -207,7 +206,7 @@ instance FromJSON UnsignedRawTransaction' where
               (fromMaybe 0 (cid :: Maybe Word256))
               (tr :: Integer)
               (ts :: Integer)
-              (tv :: Word8)
+              (tv :: Integer)
               (M.toList <$> md)
               bn
               h

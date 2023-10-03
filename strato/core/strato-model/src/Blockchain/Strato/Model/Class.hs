@@ -11,7 +11,6 @@ import qualified Data.ByteString as B
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.Time
-import Data.Word
 
 class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
   blockHeader :: b -> h
@@ -101,7 +100,7 @@ class (RLPSerializable t) => TransactionLike t where
   txSigner :: t -> Maybe Address
   txNonce :: t -> Integer
   txType :: t -> TransactionType
-  txSignature :: t -> (Integer, Integer, Word8)
+  txSignature :: t -> (Integer, Integer, Integer)
   txValue :: t -> Integer
   txDestination :: t -> Maybe Address
   txGasPrice :: t -> Integer
@@ -137,5 +136,5 @@ class (RLPSerializable t) => TransactionLike t where
   txSigS :: t -> Integer
   txSigS t = let (_, s, _) = txSignature t in s
 
-  txSigV :: t -> Word8
+  txSigV :: t -> Integer
   txSigV t = let (_, _, v) = txSignature t in v

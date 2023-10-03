@@ -1632,7 +1632,7 @@ makeValidators = map fromPrivateKey
 
 signChain :: PrivateKey -> UnsignedChainInfo -> ChainInfo
 signChain privKey u =
-  let (r', s', v') = getSigVals . signMsg privKey . keccak256ToByteString $ rlpHash u
+  let (r', s', v') = getSigVals (signMsg privKey . keccak256ToByteString $ rlpHash u) Nothing --TODO: DONT HARDCODE (add mNetId to unsigned chain info??? )
       chainSig = ChainSignature r' s' v'
    in ChainInfo u chainSig
 
@@ -1643,7 +1643,7 @@ mkSignedTx privKey utx =
       cId = unChainId <$> U.unsignedTransactionChainId utx
       Wei gp = U.unsignedTransactionGasPrice utx
       Wei val = U.unsignedTransactionValue utx
-      (r', s', v') = getSigVals . signMsg privKey $ U.rlpHash utx
+      (r', s', v') = getSigVals (signMsg privKey $ U.rlpHash utx) (U.unsignedTransactionNetworkId utx)
    in if isJust $ U.unsignedTransactionTo utx
         then -- then let Code c = U.unsignedTransactionInitOrData utx
 

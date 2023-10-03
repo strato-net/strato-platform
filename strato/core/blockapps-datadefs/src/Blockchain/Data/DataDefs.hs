@@ -49,7 +49,6 @@ import Data.Swagger hiding (Format, format)
 import Data.Text (Text)
 import Data.Time
 import Data.Time.Clock.POSIX
-import Data.Word
 import Database.Persist.Quasi
 import Database.Persist.Sql
 import Database.Persist.TH

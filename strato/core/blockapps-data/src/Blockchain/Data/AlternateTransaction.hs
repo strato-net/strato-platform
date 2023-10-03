@@ -42,7 +42,6 @@ import Data.RLP
 import qualified Data.RLP as RLP (RLPObject (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Word
 import GHC.Generics
 import Generic.Random
 import Test.QuickCheck hiding ((.&.))
@@ -84,7 +83,7 @@ data Transaction = Transaction
     transactionValue :: Wei,
     transactionInitOrData :: Code,
     transactionChainId :: Maybe ChainId,
-    transactionV :: Word8,
+    transactionV :: Integer,
     transactionR :: Word256,
     transactionS :: Word256,
     transactionMetadata :: Maybe (Map Text Text)
@@ -167,10 +166,13 @@ instance RLPEncodable UnsignedTransaction where
         rlpEncode unsignedTransactionInitOrData
       ]
         ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
+        ++ case unsignedTransactionNetworkId of
+            Nothing -> []
+            Just nid -> [Array [rlpEncode nid]]
   rlpDecode (Array (n : gp : gl : to' : va : iod : rest)) =
     let (chainid, netid) = case rest of 
           [] -> (Right Nothing, Right Nothing)
-          [Array nid] -> (Right Nothing, Just <$> ((-1) *) <$> rlpDecode (Array nid))
+          [Array [nid]] -> (Right Nothing, Just <$> rlpDecode nid)
           [cid] -> (Just <$> rlpDecode cid, Right Nothing)
           [cid, Array nid] -> (Just <$> rlpDecode cid, Just <$> ((-1) *) <$> rlpDecode (Array nid))
           x -> (Left $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x, Right Nothing)

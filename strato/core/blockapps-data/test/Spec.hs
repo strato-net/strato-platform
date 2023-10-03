@@ -362,7 +362,7 @@ ecWhoSignedThisTransaction tx = case tx of
   t -> fromPublicKey <$> recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
-      sig = Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
+      sig = Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (fromInteger ((transactionV t + 1) `mod` 2) :: Word8))
       mesg = keccak256ToByteString $ partialTransactionHash t
 
 blockRoundTrip :: Spec

@@ -38,7 +38,6 @@ import qualified Data.Map as Map
 import Data.Maybe()
 import Data.Source.Map
 import Data.Text (Text)
-import Data.Word
 import GHC.Generics
 import qualified Generic.Random as GR
 import Numeric.Natural
@@ -144,7 +143,7 @@ data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
     postbloctransactionrawrequestChainId :: Maybe ChainId,
     postbloctransactionrawrequestR :: Word256,
     postbloctransactionrawrequestS :: Word256,
-    postbloctransactionrawrequestV :: Maybe Word8, -- we can infer from Address if necessary
+    postbloctransactionrawrequestV :: Maybe Integer, -- we can infer from Address if necessary
     postbloctransactionrawrequestMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
