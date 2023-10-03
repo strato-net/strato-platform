@@ -904,6 +904,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createOrder = async function (args, options = defaultOptions) {
 
     try {
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
       const currentTimestamp = Math.floor(Date.now() / 1000);
 
@@ -926,23 +927,110 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         createOptions
       );
 
+
       if (!Array.isArray(inventories)) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
       }
 
       const quantitiesToReduce = orderList.map(order => order.quantity);
 
+
+      // fetching all product details to create new product to make user its owner.
+      // const productdetails = await inventories.map((item) => {
+      //   return managers.productManager.getProduct({ address: item.productId }, getOptions);
+      // })
+
       // reducing quantity inside inventories to place order and checking the buyerOrganization should not be equal to inventory organization
-      inventories.forEach(inventory => {
+      inventories.forEach(async (inventory) => {
         if (buyerOrganization == inventory.ownerOrganization) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller can not buy his own product");
         }
-        const orderItem = orderList.find(item => item.inventoryId === inventory.address);
+        const orderItem = orderList.find(item => item.inventoryId == inventory.address);
         if (orderItem) {
           inventory.quantity = orderItem.quantity;
+
+          // fetching all product details to create new product to make user its owner.
+          let productDetails = await managers.productManager.getProduct({ address: inventory.productId }, getOptions)
+          let membershipDetail = await membershipJs.get(rawAdmin, { productId: inventory.productId }, { ...options, org: managers.cirrusOrg, app: contractName })
+          let membershipService = await membershipServiceJs.get(rawAdmin, { membershipId: membershipDetail.address }, { ...options, org: managers.cirrusOrg, app: "" })
+          let productFileDetail = await productFileJs.get(rawAdmin, { productId: inventory.productId }, getOptions)
+
+          const body = {
+            productArgs: {
+              name: productDetails.name,
+              description: productDetails.description,
+              manufacturer: productDetails.manufacturer,
+              unitOfMeasurement: 1,
+              // Generate random code for now
+              // userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+              userUniqueProductCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+              // Generate random number for now
+              uniqueProductCode: Math.floor(Math.random() * 1000000),
+              // uniqueMembershipCode: Math.floor(Math.random() * 1000000),
+              leastSellableUnit: 1,
+              // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array.
+              imageKey: productDetails.imageKey,
+              category: "Membership",
+              subCategory: productDetails.subCategory,
+              createdDate: new Date().getTime(),
+              // timePeriodInMonths: membershipDetail.timePeriodInMonths,
+              // additionalInfo: membershipDetail.additionalInfo,
+              // If visible is true the List Now form is open and the membership is active
+              isActive: productDetails.isActive,
+            },
+            membershipServiceArgs: [{
+              serviceId: membershipService.serviceId,
+              membershipPrice: membershipService.membershipPrice,
+              discountPrice: membershipService.discountPrice,
+              maxQuantity: orderItem.quantity,
+              createdDate: new Date().getTime(),
+              // If visible is true the List Now form is open and the membership is active
+              isActive: true,
+            }],
+            //TODO: where do I put the imageKey from the uploaded File?
+            productFileArgs: [{
+              fileLocation: `${productDetails.imageKey}`,
+              fileHash: `${productFileDetail.fileHash}`,
+              fileName: `${productFileDetail.fileName}`,
+              uploadDate: new Date().getTime(),
+              createdDate: new Date().getTime(),
+              section: 1,
+              type: 2,
+            }],
+          };
+
+          const createdDate = Math.floor(Date.now() / 1000);
+          const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...body.productArgs }
+          const [restStatus, productAddress] = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
+
+          const inventoryData = {
+            productAddress: productAddress,
+            quantity: orderItem.quantity,
+            pricePerUnit: inventory.pricePerUnit,
+            batchId: inventory.batchId,
+            status: inventory.status,
+            createdDate: new Date().getTime(),
+            serialNumbers: [],
+            taxPercentageAmount: inventory.taxPercentageAmount,
+            taxDollarAmount: inventory.taxDollarAmount,
+          }
+
+          const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...inventoryData, createdDate });
+
+          // const [status, membershipAddress, productAddress] = await managers.membershipManager.createMembership({
+          //   dappAddress: contract.address,
+          //   membershipArgs: body.membershipArgs,
+          //   membershipServiceArgs: body.membershipServiceArgs,
+          //   productFileArgs: body.productFileArgs
+          // });
+
+          console.log("restStatus==>", restStatus, "productAddress===>", productAddress);
+          // const { } = productDetail;
         }
 
       });
+
+
 
       const groupedData = inventories.reduce((acc, inventory) => {
         if (!acc[inventory.productId]) {
@@ -1052,6 +1140,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
+      // let check = await managers.productManager.getProducts({ owner: userAddress }, getOptions);
       let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
 
@@ -1062,6 +1151,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
+      // let ownedMem = await membershipJs.getAll(rawAdmin, args, getOptions);
       let ownedItems = await itemJs.getAll(rawAdmin, args, getOptions);
       // Filter ownedItems based on productId and ownerOrg
       // ownedItems = ownedItems.filter(item =>
@@ -1246,6 +1336,88 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
     }
+  };
+
+  contract.resaleMembership = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs }
+    // const [restStatus, productAddress] = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
+    // now we have to create membership(item) and inventory based on the productId.
+
+    // const { membershipArgs, membershipServiceArgs, productFileArgs } = args;
+
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+
+    let productDetails = await managers.productManager.getProduct({ address: args.productAddress }, getOptions)
+    let membershipDetail = await membershipJs.get(rawAdmin, { productId: args.productAddress }, { ...options, org: managers.cirrusOrg, app: contractName })
+    let membershipService = await membershipServiceJs.get(rawAdmin, { membershipId: membershipDetail.address }, { ...options, org: managers.cirrusOrg, app: "" })
+    let productFileDetail = await productFileJs.get(rawAdmin, { productId: args.productAddress }, getOptions)
+
+    const body = {
+      membershipArgs: {
+        name: productDetails.name,
+        description: productDetails.description,
+        manufacturer: productDetails.manufacturer,
+        unitOfMeasurement: 1,
+        // Generate random code for now
+        userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+        userUniqueProductCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
+        // Generate random number for now
+        uniqueProductCode: Math.floor(Math.random() * 1000000),
+        uniqueMembershipCode: Math.floor(Math.random() * 1000000),
+        leastSellableUnit: 1,
+        // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array.
+        imageKey: productDetails.imageKey,
+        category: "Membership",
+        subCategory: productDetails.subCategory,
+        createdDate: new Date().getTime(),
+        timePeriodInMonths: membershipDetail.timePeriodInMonths,
+        additionalInfo: membershipDetail.additionalInfo,
+        // If visible is true the List Now form is open and the membership is active
+        isActive: productDetails.isActive,
+      },
+      membershipServiceArgs: [{
+        serviceId: membershipService.serviceId,
+        membershipPrice: membershipService.membershipPrice,
+        discountPrice: membershipService.discountPrice,
+        maxQuantity: args.quantity,
+        createdDate: new Date().getTime(),
+        // If visible is true the List Now form is open and the membership is active
+        isActive: true,
+      }],
+      //TODO: where do I put the imageKey from the uploaded File?
+      productFileArgs: [{
+        fileLocation: `${productDetails.imageKey}`,
+        fileHash: `${productFileDetail.fileHash}`,
+        fileName: `${productFileDetail.fileName}`,
+        uploadDate: new Date().getTime(),
+        createdDate: new Date().getTime(),
+        section: 1,
+        type: 2,
+      }],
+    };
+
+    // createMembership will create new product with the membership
+    const [status, membershipAddress, productAddress] = await managers.membershipManager.createMembership({
+      dappAddress: contract.address,
+      membershipArgs: body.membershipArgs,
+      membershipServiceArgs: body.membershipServiceArgs,
+      productFileArgs: body.productFileArgs
+    });
+
+    if (status == 200) {
+      // use create Inventory here.
+      // we have to update the inventory as well to reduce the quantity.
+
+    }
+    // create inventory for the product
+    let args1 = {...args, productAddress:productAddress}
+    let { inventoryId, ...createInventoryArgs} = args1;
+    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...createInventoryArgs, createdDate });
+    console.log("createInventoryStatus, createdInventoryAddress", createInventoryStatus, createdInventoryAddress);
+    // update the inventory which we are putting for resale.
+    const [ restStatus ] = await managers.productManager.updateInventoriesQuantities({ inventories: [inventoryId[0]], quantities: [args.quantity], isReduce: true })
+   console.log("restStatus", restStatus);
   };
 
   contract.getOrder = async function (args, options = optionsNoChainIds) {
