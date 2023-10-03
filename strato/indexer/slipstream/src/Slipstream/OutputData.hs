@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MonoLocalBinds #-}
 
 module Slipstream.OutputData (
   outputData,
@@ -35,7 +36,8 @@ module Slipstream.OutputData (
   createExpandHistoryTable,
   cirrusInfo,
   historyTableName,
-  tableColumns
+  tableColumns,
+  resolveNameParts
   ) where
 
 
@@ -54,6 +56,7 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
+import           Data.Traversable                (for)
 import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
@@ -84,7 +87,7 @@ import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.Exception              (SomeException, catch, handle)
 import           UnliftIO.IORef
-import           Blockchain.Data.AddressStateDB (AddressState)
+-- import           Blockchain.Data.AddressStateDB (AddressState)
 import           Blockchain.Data.ChainInfo (ParentChainIds)
 import           Blockchain.Data.AddressStateDB
 import qualified Handlers.Storage as HS
@@ -347,24 +350,34 @@ resolveNameParts o a c = do
               pure (o, a, tName c)
 
 createExpandIndexTable ::
-  OutputM m =>
+  ( OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
   IORef Globals ->
   Contract ->
   (Text, Text, Text) ->
+  CodeCollection ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandIndexTable g c nameParts = do
-  creationForeignKeys <- createIndexTable g c nameParts
+createExpandIndexTable g c nameParts cc = do
+  creationForeignKeys <- createIndexTable g c nameParts cc
   expansionForeignKeys <- expandIndexTable g c nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
 createExpandAbstractTable ::
-  OutputM m =>
+  ( OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
   IORef Globals ->
   Contract ->
   (Text, Text, Text) ->
+  CodeCollection ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandAbstractTable g c nameParts = do
-  creationForeignKeys <- createAbstractTable g c nameParts
+createExpandAbstractTable g c nameParts cc = do
+  creationForeignKeys <- createAbstractTable g c nameParts cc
   expansionForeignKeys <- expandAbstractTable g c nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
@@ -406,16 +419,23 @@ createExpandHistoryTable g c nameParts = do
   createHistoryTable' g c nameParts
   expandHistoryTable g c nameParts
 
-getDeferredForeignKeys ::  TableName -> Contract -> Text -> Text -> [ForeignKeyInfo]
-getDeferredForeignKeys tableName c o a = do
-  (o', a', n') <- resolveNameParts o a c
-  let result = flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- (Map.toList $ c ^. storageDefs)] $ \(theName, x) ->
-        ForeignKeyInfo
-          { tableName = tableName,
-            columnName = labelToText theName,
-            foreignTableName = indexTableName o' a' n'
-          }
-  return result
+getDeferredForeignKeys ::   ( MonadLogger m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) => TableName -> Contract -> Text -> Text -> CodeCollection -> m[ForeignKeyInfo]
+getDeferredForeignKeys tableName c o a cc =
+  fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+      let contract = getContractsBySolidString x cc
+      case contract of
+        Just c' -> do
+          (o',a',n') <- resolveNameParts o a c'
+          pure $ Just $ ForeignKeyInfo
+                          { tableName = tableName,
+                            columnName = labelToText theName,
+                            foreignTableName = indexTableName o' a' n'
+                          }
+        Nothing -> return Nothing
 
 getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForMapping tableName o a =
@@ -433,12 +453,17 @@ getDeferredForeignKeysForMapping tableName o a =
   ]
 
 createIndexTable ::
-  OutputM m =>
+  (OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
   IORef Globals ->
   Contract ->
   (Text, Text, Text) ->
+  CodeCollection ->
   ConduitM () Text m [ForeignKeyInfo]
-createIndexTable globalsIORef contract (o, a, n) = do
+createIndexTable globalsIORef contract (o, a, n) cc = do
   let tableName = indexTableName o a n
   contractAlreadyCreated <- isTableCreated globalsIORef tableName
 
@@ -451,15 +476,20 @@ createIndexTable globalsIORef contract (o, a, n) = do
       yield $ createIndexTableQuery contract (o, a, n)
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       setTableCreated globalsIORef tableName list
-      return $ getDeferredForeignKeys tableName contract o a
+      lift $ getDeferredForeignKeys tableName contract o a cc
 
 createAbstractTable ::
-  OutputM m =>
+  ( OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
   IORef Globals ->
   Contract ->
   (Text, Text, Text) ->
+  CodeCollection ->
   ConduitM () Text m [ForeignKeyInfo]
-createAbstractTable globalsIORef contract (o, a, n) = do
+createAbstractTable globalsIORef contract (o, a, n) cc = do
   let tableName = abstractTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
   if tableExists
@@ -468,7 +498,7 @@ createAbstractTable globalsIORef contract (o, a, n) = do
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       yield $ createAbstractTableQuery contract (o, a, n)
       setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      return $ getDeferredForeignKeys tableName contract o a
+      lift $ getDeferredForeignKeys tableName contract o a cc
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::

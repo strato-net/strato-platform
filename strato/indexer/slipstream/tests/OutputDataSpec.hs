@@ -7,11 +7,13 @@ module OutputDataSpec where
 
 import Conduit
 import Control.Monad
+import           Control.Monad.Change.Alter
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Time
+import Data.Default
 import Numeric
 import Test.Hspec
 import Text.RawString.QQ
@@ -46,19 +48,25 @@ int :: Integer -> V.Value
 int = V.SimpleValue . V.valueInt
 
 
-createInserts :: OutputM m
+createInserts ::( OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m)
               => IORef Globals
               -> [(SE.ProcessedContract, Contract)]
               -> ConduitM () T.Text m ()
 createInserts globalsIORef contracts = do
   unless (null contracts) $ do
     let contract = head contracts
-    _ <- createIndexTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
+    _ <- createIndexTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract) def
     createHistoryTable globalsIORef (snd contract) (SE.organization $ fst contract, SE.application $ fst contract, SE.contractName $ fst contract)
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
 
-createInsertsMapping :: OutputM m
+createInsertsMapping :: ( OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m)
               => IORef Globals
               -> [ProcessedMappingRow]
               -> ConduitM () T.Text m ()
@@ -75,7 +83,7 @@ createInsertsAbstract :: OutputM m
               -> ConduitM () T.Text m ()
 createInsertsAbstract globalsIORef abstract inherited = do
     let contract =snd abstract
-    _ <- createAbstractTable globalsIORef (contract) (SE.organization $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract)
+    _ <- createAbstractTable globalsIORef (contract) (SE.organization $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) def
     unless (null inherited) $ do 
       insertAbstractTable inherited
 
@@ -581,7 +589,7 @@ spec = do
           )
     g <- newGlobals fakeHandle fakeCirrusHandle
 
-    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) (SE.organization $ fst input, SE.application $ fst input, SE.contractName $ fst input) def `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable [fst input] .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 

@@ -143,8 +143,5 @@ usesStrictModifiers :: CodeCollectionF a -> Bool
 usesStrictModifiers = isJust . find ((== "strict") . fst) . _pragmas
 
 -- Function to get all ContractF values matching a SolidString
-getContractsBySolidString :: SolidString -> CodeCollectionF a -> [ContractF a]
-getContractsBySolidString solidStr codeCollection =
-  case M.lookup solidStr (_contracts codeCollection) of
-    Just contract -> [contract] 
-    Nothing       -> []         
+getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (ContractF a)
+getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)

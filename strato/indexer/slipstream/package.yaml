@@ -24,6 +24,8 @@ dependencies:
   - sql-monad
   - text
   - transformers
+  - data-default
+  - monad-alter
 
 library:
   source-dirs: src/

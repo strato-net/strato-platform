@@ -178,8 +178,10 @@ lookupStruct name = do
 getLookupParents :: SolidString -> SSS [SolidString]
 getLookupParents name = do
   cc <- asks codeCollection
-  let contract = head $ getContractsBySolidString name cc
-  pure $ _parents contract
+  let contract = getContractsBySolidString name cc
+  case contract of
+    Just x -> pure $ _parents x
+    Nothing -> pure $ []
 
 lookupError :: SolidString -> SSS [(SolidString, Type)]
 lookupError name = do

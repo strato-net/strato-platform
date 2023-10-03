@@ -37,7 +37,6 @@ import Blockchain.Data.AddressStateRef
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
-import Blockchain.Data.RLP
 import Blockchain.Data.TransactionResult
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
@@ -73,8 +72,6 @@ import Data.Text.Encoding
 import Data.Traversable (for)
 import Database.PostgreSQL.Typed (PGConnection)
 import qualified Handlers.AccountInfo as Account
-import Handlers.Storage
-import MaybeNamed
 import SelectAccessible ()
 import Slipstream.Data.Action
 import Slipstream.Events
@@ -87,7 +84,6 @@ import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.CodeCollection as CC (contractName)
 import SolidVM.Model.SolidString
-import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
 import Prelude hiding (lookup)
@@ -462,9 +458,9 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                outputData conn $ createExpandAbstractTable g c nameParts
+                outputData conn $ createExpandAbstractTable g c nameParts cc
               _ -> do
-                outputData conn $ createExpandIndexTable g c nameParts
+                outputData conn $ createExpandIndexTable g c nameParts cc
 
             outputData' conn $ createExpandHistoryTable g c nameParts
 
@@ -490,14 +486,15 @@ processTheMessages env conn messages = do
         $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
         mStorageContract <- select (Proxy @Contract) s
         mCodeContract <- select (Proxy @Contract) c'
-        deferredForeignKeys <- case (,) <$> mStorageContract <*> mCodeContract of
+        mCodeCollection <- select (Proxy @CodeCollection) c' 
+        deferredForeignKeys <- case (,,) <$> mStorageContract <*> mCodeContract <*> mCodeCollection of
           Nothing -> pure []
-          Just (sc, cc) -> do
+          Just (sc, cc, cc') -> do
             let c = cc {_contractName = _contractName sc}
                 mapNames = getMapNamesFromContract c
             nameParts <- resolveNameParts o a c
             forM_ mapNames $ outputData conn . createMappingTable g nameParts
-            deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
+            deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts cc'
             outputData' conn $ createExpandHistoryTable g c nameParts
             outputData conn $ createExpandEventTables g c nameParts
             pure deferredForeignKeys
