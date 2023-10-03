@@ -1279,7 +1279,6 @@ def runSyncTester() {
       sleep 1
       ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
       NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
-      sudo docker ps
       counter=$((++counter))
   done
 

@@ -273,6 +273,7 @@ pipeline {
                 dir("strato-getting-started"){
                   sh 'sudo ./strato --wipe'
                   sh 'mv genesis-block-official.json genesis-block.json'
+                  sh './run-vault.sh'
                   // run again but connecting to mercata-hydrogen this time
                   sh 'network=mercata-hydrogen networkID=7596898649924658542 ./run.sh'
                   script{
