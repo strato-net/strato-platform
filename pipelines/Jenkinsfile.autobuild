@@ -276,8 +276,10 @@ pipeline {
                   sh 'sudo ./strato --wipe'
                   sh 'mv genesis-block-official.json genesis-block.json'
                   sh './run-vault.sh'
+                  sh 'sudo docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
                   // run again but connecting to mercata-hydrogen this time
-                  sh 'network=mercata-hydrogen networkID=7596898649924658542 ./run.sh'
+                  sh 'sed -i "s|./strato --single|network=mercata-hydrogen networkID=7596898649924658542 ./strato|" run.sh'
+                  sh './run.sh'
                   script{
                     lib.runSyncTester()
                   }
