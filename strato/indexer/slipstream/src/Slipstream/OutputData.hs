@@ -406,11 +406,7 @@ createExpandHistoryTable g c nameParts = do
   createHistoryTable' g c nameParts
   expandHistoryTable g c nameParts
 
-getDeferredForeignKeys ::   ( MonadLogger m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable HS.StorageFilterParams [HS.StorageAddress] m
-  ) =>TableName -> Contract -> Text -> Text ->m[ForeignKeyInfo]
+getDeferredForeignKeys ::  TableName -> Contract -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeys tableName c o a = do
   (o', a', n') <- resolveNameParts o a c
   let result = flip map [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- (Map.toList $ c ^. storageDefs)] $ \(theName, x) ->
@@ -455,7 +451,7 @@ createIndexTable globalsIORef contract (o, a, n) = do
       yield $ createIndexTableQuery contract (o, a, n)
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       setTableCreated globalsIORef tableName list
-      getDeferredForeignKeys tableName contract o a
+      return $ getDeferredForeignKeys tableName contract o a
 
 createAbstractTable ::
   OutputM m =>
@@ -472,7 +468,7 @@ createAbstractTable globalsIORef contract (o, a, n) = do
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       yield $ createAbstractTableQuery contract (o, a, n)
       setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      getDeferredForeignKeys tableName contract o a
+      return $ getDeferredForeignKeys tableName contract o a
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::
