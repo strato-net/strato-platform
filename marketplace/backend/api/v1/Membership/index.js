@@ -41,6 +41,13 @@ router.post(
   MembershipController.create
 );
 
+router.post(
+  Membership.resale,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MembershipController.resale
+);
+
 //router.post(
 //  Membership.transferOwnership,
 //  authHandler.authorizeRequest(),
