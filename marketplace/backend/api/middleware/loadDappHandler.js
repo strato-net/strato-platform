@@ -15,7 +15,7 @@ const loadDapp = async (req, res, next) => {
     username,
     ...accessToken,
   }
-  console.log('User Credentials: \n\n\n\n\n', userCredentials)
+
   const user = {
     ...userCredentials,
     node: config.nodes[0],
