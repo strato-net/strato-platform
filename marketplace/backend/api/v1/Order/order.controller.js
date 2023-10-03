@@ -136,7 +136,7 @@ class OrderController {
   static async paymentSession(req, res, next) {
     try {
       const { dapp, params } = req
-      console.log("params: ", params)
+
       OrderController.validatePaymentSessionArgs(params)
 
       const result = await dapp.getPaymentSession({ session_id: params.session_id })

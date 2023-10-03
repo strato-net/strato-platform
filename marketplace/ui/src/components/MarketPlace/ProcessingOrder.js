@@ -144,7 +144,6 @@ const ProcessingOrder = () => {
       }
     });
     
-    console.log("cartData: ", cartData)
     if (htmlContent === "") {
       htmlContent = generateHtmlContent(customerFirstName, concatenatedOrderString);
     }
@@ -159,7 +158,7 @@ const ProcessingOrder = () => {
       subject: "Your Order Confirmation",
       htmlContent: htmlContent,
     };
-    console.log("body123: ", body)
+
 
     let isDone = await orderActions.createOrder(orderDispatch, body);
     if (isDone) {
