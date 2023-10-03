@@ -20,6 +20,42 @@ const reducer = (state, action) => {
         isCreateServiceUsageSubmitting: false
       };
 
+    // Create Booked services
+    case actionDescriptors.createBookedServiceUsage:
+      return {
+        ...state,
+        isCreateServiceUsageSubmitting: true
+      };
+    case actionDescriptors.createBookedServiceUsageSuccessful:
+      return {
+        ...state,
+        isCreateServiceUsageSubmitting: false
+      };
+    case actionDescriptors.createBookedServiceUsageFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateServiceUsageSubmitting: false
+      };
+
+    // Create Provided services
+    case actionDescriptors.createProvidedServiceUsage:
+      return {
+        ...state,
+        isCreateServiceUsageSubmitting: true
+      };
+    case actionDescriptors.createProvidedServiceUsageSuccessful:
+      return {
+        ...state,
+        isCreateServiceUsageSubmitting: false
+      };
+    case actionDescriptors.createProvidedServiceUsageFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateServiceUsageSubmitting: false
+      };
+
     // fetch all serviceUsage
     case actionDescriptors.fetchAllServicesUsage:
       return {
@@ -98,13 +134,51 @@ const reducer = (state, action) => {
         ...state,
         isUpdateServicesUsageLoading: true
       };
-    case actionDescriptors.UpdateServiceUsageSuccessful:
+    case actionDescriptors.updateServiceUsageSuccessful:
       return {
         ...state,
         servicesUsage: action.payload.servicesUsage,
         isUpdateServicesUsageLoading: false
       };
-    case actionDescriptors.UpdateServiceUsageFailed:
+    case actionDescriptors.updateServiceUsageFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUpdateServicesUsageLoading: false
+      };
+
+    // update Booked service usage
+    case actionDescriptors.updateBookedServiceUsage:
+      return {
+        ...state,
+        isUpdateServicesUsageLoading: true
+      };
+    case actionDescriptors.updateBookedServiceUsageSuccessful:
+      return {
+        ...state,
+        servicesUsage: action.payload.servicesUsage,
+        isUpdateServicesUsageLoading: false
+      };
+    case actionDescriptors.updateBookedServiceUsageFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUpdateServicesUsageLoading: false
+      };
+
+    // update Provided service usage
+    case actionDescriptors.updateProvidedServiceUsage:
+      return {
+        ...state,
+        isUpdateServicesUsageLoading: true
+      };
+    case actionDescriptors.updateProvidedServiceUsageSuccessful:
+      return {
+        ...state,
+        servicesUsage: action.payload.servicesUsage,
+        isUpdateServicesUsageLoading: false
+      };
+    case actionDescriptors.updateProvidedServiceUsageFailed:
       return {
         ...state,
         error: action.error,
@@ -122,6 +196,11 @@ const reducer = (state, action) => {
         ...state,
         success: action.success,
         message: action.message
+      };
+    case actionDescriptors.resetState:
+      return {
+        ...state,
+        servicesUsage:[]
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

@@ -1068,7 +1068,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       //   ownedProducts.some(product => item.productId === product.address)
       // );
 
-
       // Get Memberhships where productId = Items.productId 
       let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
       // ownedMemberships = ownedMemberships.filter(membership =>
@@ -1076,10 +1075,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // );
 
       // Get ProductFile where productId = Items.productId
-      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
+      // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
       // ownedProductFiles = ownedProductFiles.filter(file =>
       //   ownedItems.some(item => file.productId === item.productId)
       // );
+      // console.log('ownedProductFiles', ownedProductFiles)
 
       // Combine ownedProducts, ownedItems, ownedMemberships, and ownedProductFiles into one JSON object array
       const combinedData = ownedItems
@@ -1115,6 +1115,61 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getPurchasedMemberships");
+    }
+
+  };
+
+  contract.getIssuedMemberships = async function (args, options = defaultOptions) {
+    try {
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+      let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions);
+
+      const arrayOfAddresses = issuedProducts.map(obj => obj.address);
+      const args = {
+        notEqualsField: 'ownerOrganization',
+        notEqualsValue: userOrganization,
+        productId: arrayOfAddresses
+      }
+
+      // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
+      let issuedItems = await itemJs.getAll(rawAdmin, args, getOptions);
+
+      // Combine issuedProducts, issuedItems, issuedMemberships, and issuedProductFiles into one JSON object array
+      const combinedData = issuedItems
+        .filter(item => {
+          const product = issuedProducts.find(p => p.address === item.productId);
+          // const memberships = issuedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = issuedProductFiles.filter(file => file.productId === item.productId);
+
+          return product //&& productFiles.length > 0; //&& memberships.length > 0
+        })
+        .map(item => {
+          const product = issuedProducts.find(p => p.address === item.productId);
+          // const memberships = issuedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = issuedProductFiles.filter(file => file.productId === item.productId);
+
+          return {
+            itemAddress: item.address,
+            itemNumber: item.itemNumber,
+            productId: item.productId,
+            owner: item.owner,
+            ownerCommonName: item.ownerCommonName,
+            fileLocation: null,//productFiles[0].fileLocation,
+            productName: product.name,
+            subCategory: product.subCategory,
+            manufacturer: product.manufacturer,
+            timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
+            savings: null, //memberships[0].savings,
+            membershipAddress: null //memberships[0].address
+          };
+        }) //.filter((item) => item.manufacturer === userOrganization)
+
+      return combinedData;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getIssuedMemberships");
     }
 
   };
@@ -1766,40 +1821,66 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
+    const getOptions = { ...options, org: managers.cirrusOrg, app: '' };
+
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
+      ...args,
+      sort: '-createdDate',
+      // owner: userAddress, 
+      // ownerOrganization: userOrganization,
+      bookedUserAddress: userAddress
+    }, getOptions);
+
     const memberships = await contract.getPurchasedMemberships();
-    const data = serviceUsage.map((item, index) => {
-      let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-      return { ...item, provider: result.manufacturer }
-    })
-    return data
+    const services = await contract.getServices();
+    const users = await contract.getCertificates();
+
+    const data = serviceUsage['serviceUsage'].map((item) => ({
+      ...item,
+      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+      bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
+    }));
+
+    return { result: data, total: serviceUsage.total };
   };
 
   contract.getProvidedServiceUsages = async function (args = {}, options = optionsNoChainIds) {
-
-    // product table where category = membership, manufacturer = loggedin user organization currntly blockapps
-    // Items productId and ownerAddress = loggedin user address
     const getOptions1 = { ...options, org: managers.cirrusOrg, app: contractName, };
-    let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
+    let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
 
-    const arrayOfAddresses = ownedProducts.map(obj => obj.address);
+    const arrayOfProductAddresses = issuedProducts.map(obj => obj.address);
 
     const arg = {
-      ownerOrganization: userOrganization,
-      productId: arrayOfAddresses
+      productId: arrayOfProductAddresses,
+      notEqualsValue: userOrganization,
+      notEqualsField: 'ownerOrganization',
+    };
+
+    let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
+    let itemAddressList = issuedItems.map(item => item.address);
+    const args1 = {
+      // ownerOrganization: userOrganization,
+      // providerLastUpdated:userAddress,
+      itemId: itemAddressList
     }
 
-    let ownedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
-
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
-    const memberships = await contract.getPurchasedMemberships();
-    const data = serviceUsage.map((item, index) => {
-      let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-      return { ...item, provider: result.manufacturer }
-    })
-    return { 'ownedProducts': ownedProducts, 'ownedItems': ownedItems }
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
+    const services = await contract.getServices();
+    const memberships = await contract.getIssuedMemberships();
+    const users = await contract.getCertificates()
+    const data = serviceUsage['serviceUsage'].map((item) => ({
+      ...item,
+      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+      bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
+    }));
+
+    return { result: data, total: serviceUsage.total };
+
   };
 
   contract.updateServiceUsage = async function (args, options = defaultOptions) {
@@ -1809,12 +1890,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       name: serviceUsageJs.contractName,
       address: address,
     };
-
     // const chainOptions = { chainIds: [chainId], ...options };
-
     return serviceUsageJs.update(rawAdmin, contract, updates, options);
   };
-
   return contract;
 }
 
