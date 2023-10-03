@@ -23,6 +23,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { getCookie, delete_cookie } from "../../helpers/cookie";
 
 const { Title } = Typography;
 const { Header } = Layout;

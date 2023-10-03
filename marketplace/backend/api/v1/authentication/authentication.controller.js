@@ -20,6 +20,7 @@ class AuthenticationController {
     const { app } = req
 
     let address
+    let returnUrl
     let username
     let accessToken
     let refreshToken
@@ -132,7 +133,15 @@ class AuthenticationController {
       return next(e)
     }
 
-    res.redirect('/')
+    returnUrl = req.cookies.returnUrl
+
+    console.log("returnUrl", req.cookies.returnUrl, "req-return", )
+    if (returnUrl) {
+      res.redirect(`${returnUrl}`)
+    }
+    else {
+      res.redirect('/')
+    }
 
     return true
   }

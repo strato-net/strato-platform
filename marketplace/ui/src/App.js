@@ -34,10 +34,11 @@ const App = () => {
   // useEffect if path is empty then redirect to marketplace without using navigate
   // This is needed for non dockerized version to redirect to marketplace after login and anon access
   useEffect(() => {
-    if (window.location.pathname === "/") {
+    if(window.location.pathname === "/"){
       window.location.href = "/marketplace";
     }
   }, []);
+  
   
   
   return (
@@ -47,7 +48,7 @@ const App = () => {
           <HeaderComponent isOauth={isAuthenticated}  user={user} users={users} loginUrl={loginUrl} />
         </UsersProvider>
         <Content>
-          <AuthenticatedRoutes user={user} users={users} />
+          <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
         </Content>
       </Layout>
     </BrowserRouter>
