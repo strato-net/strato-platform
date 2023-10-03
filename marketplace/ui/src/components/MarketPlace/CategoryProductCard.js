@@ -132,6 +132,9 @@ const CategoryProductCard = ({ product, category }) => {
           </div>
           <div>
             <div className="flex items-baseline">
+              <Text className="text-secondryB text-sm" id="prod-category">({product.ownerOrganization}: {product.ownerCommonName})</Text>
+            </div>
+            <div className="flex items-baseline">
               <Text
                 strong
                 className="text-xl text-primaryB hover:text-primary hover:underline"
