@@ -136,7 +136,7 @@ class OrderController {
   static async paymentSession(req, res, next) {
     try {
       const { dapp, params } = req
-
+      console.log("params: ", params)
       OrderController.validatePaymentSessionArgs(params)
 
       const result = await dapp.getPaymentSession({ session_id: params.session_id })
@@ -169,7 +169,9 @@ class OrderController {
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
         inventoryId: Joi.string().required(),
-        quantity: Joi.number().required()
+        quantity: Joi.number().required(),
+        subCategory: Joi.string().required(),
+        category: Joi.string().required(),
       })).required(),
       orderTotal: Joi.number().required(),
       paymentSessionId: Joi.string(),
@@ -192,9 +194,11 @@ class OrderController {
     const paymentSchema = Joi.object({
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
+            category: Joi.string().required(), 
             inventoryId: Joi.string().required(),
             quantity: Joi.number().required(),
             name: Joi.string().required(),
+            subCategory: Joi.string().required(),
             unitPrice: Joi.number().required(),
           })).required(),
       orderTotal: Joi.number().required(),

@@ -4,6 +4,7 @@ import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
+import {generateHtmlContent, generateHtmlContentNickel} from "../../helpers/emailTemplate";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
@@ -99,8 +100,15 @@ const ProcessingOrder = () => {
 
     // Construct Email with order details
     let concatenatedOrderString = "";
+    let nickel = {}
     let orderTotal = 0; 
     for (let i = 0; i < cartData.orderList.length; i++) {
+      if("Nickel Reserve" === cartData.orderList[i].subCategory && "Materials" === cartData.orderList[i].category){
+        let orderItem = cartData.orderList[i];
+        nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
+        nickel.itemQty = orderItem.quantity;
+        nickel.itemName = orderItem.name;
+      }
       let orderItem = cartData.orderList[i];
       let itemName = orderItem.name.replace(/%20/g, ' '); 
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
@@ -120,85 +128,26 @@ const ProcessingOrder = () => {
     }
 
     let customerFirstName = cartData.user.split(" ")[0];
-
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Your Order Confirmation</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-            }
-            .container {
-                margin: 20px auto;
-                padding: 20px;
-                background-color: #ffffff;
-                border-radius: 10px;
-                border: 1px solid #0A1B71;
-                max-width: 600px;
-            }
-            h2 {
-                color: #0A1B71;
-            }
-            ul {
-                list-style-type: none;
-                padding: 0;
-            }
-            p {
-                margin: 10px 0;
-            }
-            .signature {
-                display: flex;
-                align-items: center;
-            }
-            .logo {
-                margin-right: 10px;
-                width: 60px;
-                height: 60px;
-            }
-            .logo-text {
-                color: #000;
-                font-weight: 100;
-            }
-            .footer {
-                font-size: 10px;
-                margin-top: 20px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h2>Hello <strong>${customerFirstName},</strong></h2>
-            
-            <p>Thank you for shopping with us. Your recent order on the BlockApps Mercata Marketplace has been successfully processed. Below are the details of your purchase:</p>
-            
-            <ul>
-                ${concatenatedOrderString}
-            </ul>
-            
-            <p>If you have any questions or need assistance with your order, please feel free to contact our customer support team at sales@blockapps.net.</p>
-            
-            <div class="signature">
-            <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
-
-                <h3 class="logo-text">BlockApps Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STATO Mercata™</em><a></h3>
-            </div>
-            <p class="footer">This email was sent from a notification-only address and cannot accept incoming email. Please do not reply to this message.</p>
-        </div>
-    </body>
-    </html>
-    `;
+    
+    let htmlContent = "";
 
     // Prepare order data to be sent to order controller
     const orderList = cartData.orderList.map(c => {
+      if (c.category === "Materials" && c.subCategory === "Nickel Reserve") {
+        htmlContent = generateHtmlContentNickel(customerFirstName, nickel );
+      }
       return {
         inventoryId: c.inventoryId,
         quantity: c.quantity,
+        category: c.category,
+        subCategory: c.subCategory
       }
     });
+    
+    console.log("cartData: ", cartData)
+    if (htmlContent === "") {
+      htmlContent = generateHtmlContent(customerFirstName, concatenatedOrderString);
+    }
     
     const body = {
       buyerOrganization: cartData.buyerOrganization,
@@ -210,6 +159,7 @@ const ProcessingOrder = () => {
       subject: "Your Order Confirmation",
       htmlContent: htmlContent,
     };
+    console.log("body123: ", body)
 
     let isDone = await orderActions.createOrder(orderDispatch, body);
     if (isDone) {
