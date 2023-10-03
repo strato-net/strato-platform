@@ -1,16 +1,59 @@
 import React, { useState, useEffect } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography } from "antd";
+import { Form, Modal, InputNumber, Button, Spin, Select, Table } from "antd";
 import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../contexts/membership";
 import { CaretDownOutlined } from "@ant-design/icons"
-import { actions } from "../../contexts/membership/actions";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as membershipActions } from "../../contexts/membership/actions"
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useMarketplaceState } from "../../contexts/marketplace";
 
 const { Option } = Select;
+let MAX_QUANTITY = null;
+const taxOptions = [
+  { value: '0', label: '$' },
+  { value: '1', label: '%' },
+]
+
+const columns = [
+  {
+    title: "Seller",
+    dataIndex: "seller",
+    key: "seller",
+  },
+  {
+    title: "Membership",
+    dataIndex: "membership",
+    key: "membership",
+  },
+  {
+    title: "Id",
+    dataIndex: "id",
+    key: "id",
+  },
+  {
+    title: "Quantity",
+    dataIndex: "quantity",
+    key: "quantity",
+  },
+  {
+    title: "Tax Percentage/Amount",
+    dataIndex: "percentage",
+    key: "precentage",
+  },
+  {
+    title: "Price",
+    dataIndex: "price",
+    key: "price",
+  },
+  {
+    title: "Type",
+    dataIndex: "type",
+    key: "type",
+  },]
 
 const ListNowIndex = ({
   open,
@@ -22,49 +65,65 @@ const ListNowIndex = ({
   //   isCreateMembershipSubmitting,
 }) => {
   const seller = user.user.organization;
-  const [possibleMemberships, setPossibleMemberships] = useState([]);
-  const [selectedMembership, setSelectedMembership] = useState(null);
+  const { cartList } = useMarketplaceState();
+  const [purchasedMembershipData, setPurchasedMembershipData] = useState([]);
+  const [memebershipList, setMemebershipList] = useState([]);
+  const [error, setError] = useState('');
   const [productId, setProductId] = useState('')
   const [id, setId] = useState("");
+  const [membershipNumber, setMembershipNumber] = useState('')
   const [inventoryId, setInventoryId] = useState('')
-  const [quantity, setQuantity] = useState(0);
-  const [taxPercentage, setTaxPercentage] = useState(0);
+  const [quantity, setQuantity] = useState('');
+  const [taxPercentage, setTaxPercentage] = useState('');
   const [taxDollarAmount, setTaxDollarAmount] = useState(0);
   const [taxPercentageAmount, setTaxPercentageAmount] = useState(0);
   const [isTaxPercentage, setIsTaxPercentage] = useState(true);
-  const [price, setPrice] = useState(0);
-  const dispatch = useMembershipDispatch();
+  const [price, setPrice] = useState('');
+  const membershipDispatch = useMembershipDispatch();
   const inventoryDispatch = useInventoryDispatch();
   const { inventories } = useInventoryState()
+
+  const isListNow = (!productId || !id || !inventoryId || !quantity || !price);
+
   let {
     memberships,
     isMembershipLoading,
+    isResaleMembershipSubmitting,
     purchasedMemberships,
     isPurchasedMembershipLoading,
   } = useMembershipState();
 
+  function transformData(data) {
+    const uniqueMembership = {};
+    const resultArray = [];
+
+    data.forEach((item) => {
+      const productId = item.productId;
+      const productName = item.productName;
+
+      if (!uniqueMembership[productId]) {
+        uniqueMembership[productId] = true; // Mark this product ID as seen
+        resultArray.push({ value: productId, label: productName });
+      }
+    });
+
+    setPurchasedMembershipData(resultArray)
+    // return resultArray;
+  }
 
   useEffect(() => {
-    actions.fetchPurchasedMemberships(dispatch);
-  }, []);
-
-  useEffect(() => {
-    // const memberships_issued = memberships
-    //   .filter((membership_) => membership_.inventories.length > 0)
-    //   .filter(
-    //     (membership) =>
-    //       membership.ownerOrganization ===
-    //       membership.inventories[0].manufacturer
-    //   );
-    setPossibleMemberships(purchasedMemberships);
+    // setPurchasedMembershipData(purchasedMemberships);
+    transformData(purchasedMemberships)
   }, [memberships, purchasedMemberships]);
 
   useEffect(() => {
     if (inventories.length > 0) {
-      setInventoryId(inventories[0]?.address)
-      setProductId(inventories[0]?.productId)
+      setInventoryId(inventories.map((item) => item.address));
+      setProductId(inventories[0]?.productId);
+      MAX_QUANTITY = inventories[0].availableQuantity;
     }
   }, [inventories])
+
 
   const handleFormatter = (value) => {
     if (value === "" || value === ".") {
@@ -89,12 +148,12 @@ const ListNowIndex = ({
   };
 
   const handleMembership = (value) => {
-    let membership = purchasedMemberships.find((item) => item.itemNumber == value)
-
-    inventoryActions.fetchInventory(inventoryDispatch, '', 0, productId);
-    setProductId(membership.productId)
-    setSelectedMembership(value);
-    setId(value);
+    setMembershipNumber('')
+    setQuantity('')
+    setProductId(value)
+    // let membership = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber }))
+    setMemebershipList(purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber })))
+    inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
   }
 
   const selectAfter = (
@@ -110,73 +169,39 @@ const ListNowIndex = ({
         // formik.setFieldValue("isTaxPercentage", value === "1");
       }}
       style={{ width: 60 }}
-    >
-      <Option value="0">$</Option>
-      <Option value="1">%</Option>
-    </Select>
+      options={taxOptions}
+    />
   );
 
-  const columns = [
-    {
-      title: "Seller",
-      dataIndex: "seller",
-      key: "seller",
-    },
-    {
-      title: "Membership",
-      dataIndex: "membership",
-      key: "membership",
-      render: () => (
-        <Select
-          style={{ width: 200 }}
-          placeholder="Select a membership"
-          suffixIcon={isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />}
-          disabled={isPurchasedMembershipLoading}
-          onChange={(value) => {
-            handleMembership(value)
-          }}
-        >
-          {possibleMemberships.map((membership, index) => (
-            <Option key={index} value={membership.itemNumber}>
-              {membership.productName}
-            </Option>
-          ))}
-        </Select>
-      )
-    },
-    {
-      title: "Id",
-      dataIndex: "id",
-      key: "id",
-    },
-    {
-      title: "Quantity",
-      dataIndex: "quantity",
-      key: "quantity",
-    },
-    {
-      title: "Tax Percentage/Amount",
-      dataIndex: "percentage",
-      key: "precentage",
-    },
-    {
-      title: "Price",
-      dataIndex: "price",
-      key: "price",
-    },
-    {
-      title: "Type",
-      dataIndex: "type",
-      key: "type",
-    },
-  ];
 
   const data = [
     {
       key: "1",
       seller: seller,
-      membership: selectedMembership,
-      id: id,
+      membership: <Select
+        style={{ width: 200 }}
+        placeholder="Membership"
+        suffixIcon={isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />}
+        disabled={isPurchasedMembershipLoading}
+        onChange={(value) => {
+          handleMembership(value)
+        }}
+        options={purchasedMembershipData}
+      />
+      ,
+      id: <Select
+        style={{ width: 200 }}
+        placeholder="Membership Id"
+        value={membershipNumber}
+        suffixIcon={isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />}
+        disabled={isPurchasedMembershipLoading}
+        onChange={(value, obj) => {
+          setMembershipNumber(obj.label)
+          setId(value)
+        }}
+        options={memebershipList}
+      />
+      ,
       quantity: (
         <>
           <InputNumber
@@ -184,58 +209,64 @@ const ListNowIndex = ({
             name="quantity"
             controls={false}
             type="number"
+            placeholder="Quantity"
             onWheel={(e) => e.target.blur()}
             min={0}
+            max={MAX_QUANTITY}
             value={quantity}
             onChange={(value) => {
-              setQuantity(value);
+              if (value > MAX_QUANTITY) {
+                setError(`Quantity cannot exceed ${MAX_QUANTITY}`);
+              } else {
+                setError('');
+                setQuantity(value);
+              }
             }}
           />
+          {error && <div style={{ color: 'red' }}>{error}</div>}
         </>
       ),
       percentage: (
-        <>
-          <InputNumber
-            id="percentage"
-            name="percentage"
-            controls={false}
-            type="number"
-            onWheel={(e) => e.target.blur()}
-            min={0}
-            addonAfter={selectAfter}
-            formatter={handleFormatter}
-            parser={handleParser}
-            value={taxPercentage}
-            onChange={(value) => {
-              //   formik.setFieldValue("taxPercentage", value);
-              setTaxPercentage(value)
-              isTaxPercentage
-                ? setTaxPercentageAmount(value)//formik.setFieldValue("taxPercentageAmount", value)
-                : setTaxDollarAmount(value) // formik.setFieldValue("taxDollarAmount", value);
-              !isTaxPercentage
-                ? setTaxPercentageAmount(0) //formik.setFieldValue("taxPercentageAmount", 0)
-                : setTaxDollarAmount(0) //formik.setFieldValue("taxDollarAmount", 0);
-            }}
-          />
-        </>
+        <InputNumber
+          id="percentage"
+          name="percentage"
+          controls={false}
+          type="number"
+          placeholder="Percentage"
+          onWheel={(e) => e.target.blur()}
+          min={0}
+          addonAfter={selectAfter}
+          formatter={handleFormatter}
+          parser={handleParser}
+          value={taxPercentage}
+          onChange={(value) => {
+            //   formik.setFieldValue("taxPercentage", value);
+            setTaxPercentage(value)
+            isTaxPercentage
+              ? setTaxPercentageAmount(value)//formik.setFieldValue("taxPercentageAmount", value)
+              : setTaxDollarAmount(value) // formik.setFieldValue("taxDollarAmount", value);
+            !isTaxPercentage
+              ? setTaxPercentageAmount(0) //formik.setFieldValue("taxPercentageAmount", 0)
+              : setTaxDollarAmount(0) //formik.setFieldValue("taxDollarAmount", 0);
+          }}
+        />
       ),
       price: (
-        <>
-          <InputNumber
-            id="price"
-            name="price"
-            controls={false}
-            type="number"
-            onWheel={(e) => e.target.blur()}
-            min={0}
-            value={price}
-            onChange={(value) => {
-              setPrice(value)
-            }}
-          />
-        </>
+        <InputNumber
+          id="price"
+          name="price"
+          controls={false}
+          type="number"
+          placeholder="Price"
+          onWheel={(e) => e.target.blur()}
+          min={0}
+          value={price}
+          onChange={(value) => {
+            setPrice(value)
+          }}
+        />
       ),
-      type: possibleMemberships.find((membership) => membership.address === selectedMembership)
+      type: purchasedMembershipData.find((membership) => membership.address === id)
         ? "New"
         : "Sale"
 
@@ -243,28 +274,53 @@ const ListNowIndex = ({
   ];
 
   const handleCreateFormSubmit = async () => {
-    const updatePayload = {
+    const membershipBody = {
+      inventoryId: inventoryId,
       productAddress: productId,
-      inventory: inventoryId,
-      updates: {
-        pricePerUnit: price,
-        status: INVENTORY_STATUS.PUBLISHED,
-        quantity: quantity
-      }
-    }
+      quantity: quantity,
+      pricePerUnit: price,
+      // Generate random code for now
+      batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+      // Status should always be published if we use List Now
+      status: INVENTORY_STATUS.PUBLISHED,
+      serialNumbers: [],
+      taxPercentageAmount: taxPercentageAmount,
+      taxDollarAmount: taxDollarAmount,
+    };
 
-    const updateInventory = await inventoryActions.updateInventory(
-      inventoryDispatch,
-      updatePayload
-    );
+    const resaleMembership = await membershipActions.resaleMembership(
+      membershipDispatch, membershipBody
+    )
 
-    if (updateInventory) {
+    // const createInventory = await inventoryActions.createInventory(
+    //   inventoryDispatch,
+    //   inventoryBody
+    // );
+
+
+    // const updatePayload = {
+    //   productAddress: productId,
+    //   inventory: inventoryId,
+    //   updates: {
+    //     pricePerUnit: price,
+    //     status: INVENTORY_STATUS.PUBLISHED,
+    //     quantity: quantity
+    //   }
+    // }
+
+    // const updateInventory = await inventoryActions.updateInventory(
+    //   inventoryDispatch,
+    //   updatePayload
+    // );
+
+    if (resaleMembership) {
       // membership.product_with_inventory = 1;
       setInventoryId('')
       setProductId('')
     }
     handleCancel();
   };
+
 
   return (
     <Modal
@@ -273,16 +329,16 @@ const ListNowIndex = ({
       title="Create Listing"
       open={open}
       onCancel={handleCancel}
-      //   onOk={handleCreateFormSubmit()}
       footer={[
         <Button
           key="list-now"
+          disabled={isListNow || isResaleMembershipSubmitting}
+          loading={isResaleMembershipSubmitting}
           onClick={
             () => {
               handleCreateFormSubmit();
             }
           }
-          loading={false}
           type="primary"
         >
           List Now
@@ -290,7 +346,7 @@ const ListNowIndex = ({
       ]}
     >
       <Form>
-        <Table columns={columns} dataSource={data} pagination={false}></Table>
+        <Table columns={columns} dataSource={data} pagination={false} />
       </Form>
     </Modal>
   );
