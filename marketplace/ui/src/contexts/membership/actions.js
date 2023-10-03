@@ -5,6 +5,11 @@ const actionDescriptors = {
   createMembership: "create_membership",
   createMembershipSuccessful: "create_membership_successful",
   createMembershipFailed: "create_membership_failed",
+
+  resaleMembership:"resale_membership",
+  resaleMembershipSuccessful:"resale_membership_successful",
+  resaleMembershipFailed:"resale_membership_failed",
+
   fetchMembership: "fetch_memberships",
   fetchMembershipSuccessful: "fetch_membership_successful",
   fetchMembershipFailed: "fetch_membership_failed",
@@ -96,6 +101,41 @@ const actions = {
     } catch (err) {
       dispatch({ type: actionDescriptors.createMembershipFailed, error: "Error while creating Membership" });
       actions.setMessage(dispatch, "Error while creating Membership")
+    }
+  },
+
+  resaleMembership: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.resaleMembership });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/resale`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.resaleMembershipSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Membership reselled successfully", true)
+        return body.data
+      }
+
+      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: 'Error while reselling Membership' });
+      actions.setMessage(dispatch, "Error while reselling Membership")
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: "Error while reselling Membership" });
+      actions.setMessage(dispatch, "Error while reselling Membership")
     }
   },
 

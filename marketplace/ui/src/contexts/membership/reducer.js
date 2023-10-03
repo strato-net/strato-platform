@@ -87,6 +87,25 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateMembershipSubmitting: false
       };
+    // Resale membership
+    case actionDescriptors.resaleMembership:
+      return {
+        ...state,
+        isResaleMembershipSubmitting: true
+      };
+    case actionDescriptors.resaleMembershipSuccessful:
+      return {
+        ...state,
+        membership: action.payload,
+        isResaleMembershipSubmitting: false
+      };
+    case actionDescriptors.resaleMembershipFailed:
+      return {
+        ...state,
+        error: action.error,
+        isResaleMembershipSubmitting: false
+      };
+
     case actionDescriptors.fetchMembership:
       return {
         ...state,

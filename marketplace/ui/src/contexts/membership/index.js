@@ -9,6 +9,7 @@ const MembershipsProvider = ({ children }) => {
     purchasedMemberships: [],
     isPurchasedMembershipLoading: false,
     isIssuedMembershipLoading: false,
+    isResaleMembershipSubmitting: false,
     membership: null,
     membershipServices: [],
     isMembershipLoading: false,

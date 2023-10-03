@@ -55,8 +55,8 @@ contract Inventory_2 is InventoryStatus {
 
     function update(
         int _pricePerUnit,
-        int _quantity,
         InventoryStatus _status,
+        int _quantity,
         uint _scheme
     ) returns (uint) {
         if (ownerOrganization != getUserOrganization(tx.origin)) {

@@ -131,8 +131,8 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         address _productAddress,
         address _inventory,
         int _pricePerUnit,
-        int _quantity,
         InventoryStatus _status,
+        int _quantity,
         uint _scheme
     ) returns (uint256) {
         Product_3 product = Product_3(_productAddress);
