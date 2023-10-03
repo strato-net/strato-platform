@@ -1391,7 +1391,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
       initialValidators = fst <$> initialValidators'
   cache <- TRC.new 64
   let vals = snd <$> initialValidators'
-      gi = insertMercataGovernanceContract vals (take 1 vals) $ insertCertRegistryContract extraCerts defaultGenesisInfo
+      gi = insertMercataGovernanceContract vals (take 1 vals) $ insertCertRegistryContract extraCerts flags_useSaltedCerts defaultGenesisInfo
       (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
         for_ initialValidators $ \addr -> do
