@@ -63,11 +63,11 @@ const ListNowModal = ({
             id="quantity"
             name="quantity"
             min={0}
-            max={inventories[0].availableQuantity}
+            max={inventories[0]?.availableQuantity}
             // disabled={true}
-            value={1}
+            // value={1}
             controls={false}
-            // value={formik.values.quantity}
+            value={formik.values.quantity}
             onChange={(value) => {
               formik.setFieldValue("quantity", value);
             }}
