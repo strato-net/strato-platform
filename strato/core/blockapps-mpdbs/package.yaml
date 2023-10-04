@@ -44,6 +44,7 @@ library:
   - text
   - transformers
   - x509-certs
+  - unliftio-core
 
 tests:
   blockapps-mpdbs-test:

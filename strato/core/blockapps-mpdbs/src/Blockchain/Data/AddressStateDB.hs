@@ -42,6 +42,7 @@ import Control.Monad
 import Control.Monad.Change.Alter
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import Control.Monad.IO.Unlift
 import Data.Default
 import Data.Maybe (maybeToList)
 import qualified Data.Set as Set
@@ -52,6 +53,7 @@ import Text.Format
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 import Text.Tools
 import Prelude hiding (lookup)
+
 
 data AddressState = AddressState
   { addressStateNonce :: Integer,
@@ -80,6 +82,13 @@ instance Selectable Account AddressState m => Selectable Account AddressState (M
 
 instance Monad m => Selectable Word256 ParentChainIds (MainChainT m) where
   select _ _ = pure Nothing
+
+instance MonadUnliftIO m => MonadUnliftIO (MainChainT m) where
+  {-# INLINE withRunInIO #-}
+  withRunInIO inner =
+    MainChainT $
+    withRunInIO $ \run ->
+    inner (run . runMainChainT)
 
 blankAddressState :: AddressState
 blankAddressState = AddressState {addressStateNonce = 0, addressStateBalance = 0, addressStateContractRoot = MP.emptyTriePtr, addressStateCodeHash = EVMCode $ hash "", addressStateChainId = Nothing}

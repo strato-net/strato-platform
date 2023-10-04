@@ -8,6 +8,7 @@ module OutputDataSpec where
 import Conduit
 import Control.Monad
 import           Control.Monad.Change.Alter
+import qualified Handlers.Storage as HS
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
@@ -34,6 +35,9 @@ import Slipstream.SolidityValue
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
+import Blockchain.Data.AddressStateDB
+import Network.Haskoin.Crypto.BigWord
+import Blockchain.Data.ChainInfo
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
@@ -63,10 +67,7 @@ createInserts globalsIORef contracts = do
     insertIndexTable $ map fst contracts
     insertHistoryTable $ map fst contracts
 
-createInsertsMapping :: ( OutputM m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable HS.StorageFilterParams [HS.StorageAddress] m)
+createInsertsMapping :: OutputM m
               => IORef Globals
               -> [ProcessedMappingRow]
               -> ConduitM () T.Text m ()
@@ -76,7 +77,10 @@ createInsertsMapping globalsIORef mappings = do
     _ <- createMappingTable globalsIORef (organization mapping, application mapping, contractname mapping) (mapname mapping)
     insertMappingTable mappings
 
-createInsertsAbstract :: OutputM m
+createInsertsAbstract :: (OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m)
               => IORef Globals
               -> (SE.ProcessedContract, Contract)
               -> [(SE.ProcessedContract, T.Text, TableColumns)]
@@ -159,8 +163,7 @@ spec = do
             ]
 
       g <- newGlobals fakeHandle fakeCirrusHandle
-      [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
-
+      [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runMainChainT . runConduit $ createInserts g input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
     address text,
