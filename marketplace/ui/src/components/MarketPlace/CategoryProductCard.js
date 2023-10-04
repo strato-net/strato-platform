@@ -132,9 +132,6 @@ const CategoryProductCard = ({ product, category }) => {
           </div>
           <div>
             <div className="flex items-baseline">
-              <Text className="text-secondryB text-sm" id="prod-category">({product.ownerOrganization}: {product.ownerCommonName})</Text>
-            </div>
-            <div className="flex items-baseline">
               <Text
                 strong
                 className="text-xl text-primaryB hover:text-primary hover:underline"
@@ -147,6 +144,7 @@ const CategoryProductCard = ({ product, category }) => {
               </Text>
               <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
             </div>
+            <Text className="text-secondryB text-sm" id="prod-category">Sold By: {product?.ownerCommonName ?? ''} ({product?.ownerOrganization ?? ''})</Text>
             <Paragraph
               ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
               className="text-primaryC text-xs mt-2"
