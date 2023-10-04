@@ -39,7 +39,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchProductSuccessful:
       return {
         ...state,
-        products: action.payload,
+        products: action.payload.data,
+        productsTotal: action.payload.count,
         isProductsLoading: false,
       };
     case actionDescriptors.fetchProductFailed:

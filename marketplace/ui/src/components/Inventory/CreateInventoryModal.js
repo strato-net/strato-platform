@@ -368,7 +368,7 @@ const CreateInventoryModal = ({
                     onChange={(value) => {
                       let selectedProduct = { address: "" };
                       if (value) {
-                        selectedProduct = categoryBasedProducts.find(
+                        selectedProduct = categoryBasedProducts.productsWithImageUrl.find(
                           (e) => e.name === value
                         );
                       }
@@ -380,7 +380,7 @@ const CreateInventoryModal = ({
                       formik.setFieldTouched("productName.name", false, false);
                     }}
                   >
-                    {categoryBasedProducts.map((e, index) => (
+                    {categoryBasedProducts.productsWithImageUrl && categoryBasedProducts.productsWithImageUrl.map((e, index) => (
                       <Option value={e.name} key={index}>
                         {decodeURIComponent(e.name)}
                       </Option>

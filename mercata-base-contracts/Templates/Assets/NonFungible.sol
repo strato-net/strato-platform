@@ -1,4 +1,4 @@
-abstract contract NonFungible is SellableAsset{
+abstract contract NonFungible is Asset{
     string private assetID;
     string private name;
     string private symbol;
