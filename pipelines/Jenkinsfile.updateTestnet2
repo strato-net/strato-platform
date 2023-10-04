@@ -9,7 +9,7 @@ pipeline {
   stages {
     stage('Start Step Functions Execution') {
       steps {
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
 
           echo "Input JSON: {\"VersionTag\": \"${params.VERSION_TAG}\"}"
 
@@ -20,12 +20,12 @@ pipeline {
             --output text)
 
           echo "Started Step Functions execution with ARN: $execution_arn" 
-        '''
+        """
       }
     }
     stage('Wait for Step Functions Completion') {
       steps {
-        sh '''#!/bin/bash
+        sh """#!/bin/bash
           while true; do
             execution_status=$(aws stepfunctions describe-execution \
               --execution-arn "${execution_arn}" \
@@ -49,7 +49,7 @@ pipeline {
               exit 1  
             fi
           done
-        '''
+        """
       }
     }
   }
