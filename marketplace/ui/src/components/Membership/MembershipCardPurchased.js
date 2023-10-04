@@ -14,7 +14,7 @@ import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useMembershipDispatch } from "../../contexts/membership";
 
 import { INVENTORY_STATUS } from "../../helpers/constants";
-import { useInventoryDispatch, useInventoryState,} from "../../contexts/inventory";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 
 const MembershipCardPurchased = ({
   user,
@@ -34,12 +34,15 @@ const MembershipCardPurchased = ({
 
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { isCreateInventorySubmitting } = useInventoryState();
+  const { isCreateInventorySubmitting, inventories } = useInventoryState();
+
   const inventoryDispatch = useInventoryDispatch();
 
-  // useEffect(() => {
-  //   inventoryActions.fetchInventory(inventoryDispatch, '', 0, membershipId);
-  // }, [])
+  useEffect(() => {
+    if (visible) {
+      inventoryActions.fetchInventory(inventoryDispatch, '', 0, membership.productId);
+    }
+  }, [visible])
 
   const showModal = () => {
     hide();
@@ -118,17 +121,19 @@ const MembershipCardPurchased = ({
 
   const handleCreateFormSubmit = async (values) => {
     if (user) {
-      if (formik.values.price !== "" && formik.values.quantity !== "") {
+      if (formik.values.price !== "" && inventories) {
         const membershipBody = {
-          inventoryId: "",
+          inventoryId: [inventories[0].address],
           productAddress: membership.productId,
           quantity: formik.values.quantity,
           pricePerUnit: formik.values.price,
           // Generate random code for now
           batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
           // Status should always be published if we use List Now
+          taxPercentageAmount: 0,
+          taxDollarAmount: 0,
           status: INVENTORY_STATUS.PUBLISHED,
-          serialNumber: [],
+          serialNumbers: [],
         };
         const resaleMembership = await membershipActions.resaleMembership(
           membershipDispatch, membershipBody

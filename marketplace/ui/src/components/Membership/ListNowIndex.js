@@ -41,7 +41,7 @@ const ListNowIndex = ({
   const [price, setPrice] = useState('');
   const membershipDispatch = useMembershipDispatch();
   const inventoryDispatch = useInventoryDispatch();
-  const { inventories } = useInventoryState()
+  const { inventories, isInventoriesLoading } = useInventoryState()
 
   const isListNow = (!productId || !id || !inventoryId || !quantity || !price);
 
@@ -171,6 +171,7 @@ const ListNowIndex = ({
             type="number"
             placeholder="Quantity"
             onWheel={(e) => e.target.blur()}
+            disabled={isInventoriesLoading}
             min={0}
             max={MAX_QUANTITY}
             value={quantity}
