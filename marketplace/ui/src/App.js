@@ -36,10 +36,8 @@ const App = () => {
   useEffect(() => {
     const referrer = document.referrer;
     const specificReferralURL = 'https://mercatacarbon.com/';
-    console.log("Refer link", referrer);
 
     if (referrer === specificReferralURL) {
-      console.log("Event fired");
       TagManager.dataLayer({
         dataLayer: {
           event: 'redirected_from_mercata_carbon',
