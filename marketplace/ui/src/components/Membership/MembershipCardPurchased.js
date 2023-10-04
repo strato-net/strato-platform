@@ -37,9 +37,9 @@ const MembershipCardPurchased = ({
   const { isCreateInventorySubmitting } = useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
 
-  useEffect(() => {
-    inventoryActions.fetchInventory(inventoryDispatch, '', 0, membershipId);
-  }, [])
+  // useEffect(() => {
+  //   inventoryActions.fetchInventory(inventoryDispatch, '', 0, membershipId);
+  // }, [])
 
   const showModal = () => {
     hide();

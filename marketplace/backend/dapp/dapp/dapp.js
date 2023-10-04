@@ -1010,12 +1010,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             batchId: inventory.batchId,
             status: inventory.status,
             createdDate: new Date().getTime(),
-            serialNumbers: [],
+            serialNumber: [],
             taxPercentageAmount: inventory.taxPercentageAmount,
             taxDollarAmount: inventory.taxDollarAmount,
           }
 
-          const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...inventoryData, createdDate });
+          const [createInventoryStatus, createdInventoryAddress] = await contract.createInventory({ ...inventoryData, createdDate });
+          console.log("createInventoryStatus, createdInventoryAddress", [createInventoryStatus, createdInventoryAddress]);
+
+          // const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...inventoryData, createdDate });
 
           // const [status, membershipAddress, productAddress] = await managers.membershipManager.createMembership({
           //   dappAddress: contract.address,
@@ -1024,7 +1027,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           //   productFileArgs: body.productFileArgs
           // });
 
-          console.log("restStatus==>", restStatus, "productAddress===>", productAddress);
+          // console.log("restStatus==>", restStatus, "productAddress===>", productAddress);
           // const { } = productDetail;
         }
 
@@ -1147,7 +1150,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const arrayOfAddresses = ownedProducts.map(obj => obj.address);
       const args = {
         ownerOrganization: userOrganization,
-        productId: arrayOfAddresses
+        productId: arrayOfAddresses,
+        sort: '-createdDate',
       }
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
@@ -1218,7 +1222,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const args = {
         notEqualsField: 'ownerOrganization',
         notEqualsValue: userOrganization,
-        productId: arrayOfAddresses
+        productId: arrayOfAddresses,
+        sort: '-createdDate',
       }
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
