@@ -205,7 +205,7 @@ pipeline {
     
     stage('Test & Push Artifacts') {
       parallel {
-        stage('Push Images and Test Sync') {
+        stage(' ') { //sequentially push images then test sync
           stages {
             stage('Push Images'){
               steps{
