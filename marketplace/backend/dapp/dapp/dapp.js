@@ -1338,10 +1338,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     let args1 = {...args, productAddress:productAddress}
     let { inventoryId, ...createInventoryArgs} = args1;
     const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...createInventoryArgs, createdDate });
-    console.log("createInventoryStatus, createdInventoryAddress", createInventoryStatus, createdInventoryAddress);
     // update the inventory which we are putting for resale.
-    const [ restStatus ] = await managers.productManager.updateInventoriesQuantities({ inventories: [inventoryId[0]], quantities: [args.quantity], isReduce: true })
-   console.log("restStatus", restStatus);
+    const [ restStatus ] = await managers.productManager.updateInventoriesQuantities({ inventories: [inventoryId[0]], quantities: [args.quantity], isReduce: true });
   };
 
   contract.getOrder = async function (args, options = optionsNoChainIds) {
