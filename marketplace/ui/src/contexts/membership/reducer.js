@@ -48,7 +48,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchIssuedMembershipsSuccessful:
       return {
         ...state,
-        purchasedMemberships: action.payload,
+        issuedMembership: action.payload,
         isIssuedMembershipLoading: false
       };
     case actionDescriptors.fetchIssuedMembershipsFailed:

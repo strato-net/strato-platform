@@ -125,17 +125,17 @@ const actions = {
           type: actionDescriptors.resaleMembershipSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Membership reselled successfully", true)
+        actions.setMessage(dispatch, "Membership listed for sale successfully", true)
         return body.data
       }
 
-      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: 'Error while reselling Membership' });
-      actions.setMessage(dispatch, "Error while reselling Membership")
+      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: 'Error while listing membership for sale ' });
+      actions.setMessage(dispatch, "Error while listing membership for sale ")
       return false;
 
     } catch (err) {
-      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: "Error while reselling Membership" });
-      actions.setMessage(dispatch, "Error while reselling Membership")
+      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: "Error while listing membership for sale " });
+      actions.setMessage(dispatch, "Error while listing membership for sale ")
     }
   },
 
