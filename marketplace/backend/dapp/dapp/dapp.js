@@ -911,7 +911,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
 
       const createOptions = { ...optionsNoChainIds, org: managers.cirrusOrg }
-      const orderOptions = { ..._defaultOptions, org: managers.cirrusOrg }
 
       if (paymentSessionId.length > 1) {
         const order = await managers.orderManager.getOrders(rawAdmin, { paymentSessionId }, createOptions);
@@ -949,86 +948,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (orderItem) {
           inventory.quantity = orderItem.quantity;
 
-          // fetching all product details to create new product to make user its owner.
-          let productDetails = await managers.productManager.getProduct({ address: inventory.productId }, getOptions)
-          let membershipDetail = await membershipJs.get(rawAdmin, { productId: inventory.productId }, { ...options, org: managers.cirrusOrg, app: contractName })
-          let membershipService = await membershipServiceJs.get(rawAdmin, { membershipId: membershipDetail.address }, { ...options, org: managers.cirrusOrg, app: "" })
-          let productFileDetail = await productFileJs.get(rawAdmin, { productId: inventory.productId }, getOptions)
-
-          const body = {
-            productArgs: {
-              name: productDetails.name,
-              description: productDetails.description,
-              manufacturer: productDetails.manufacturer,
-              unitOfMeasurement: 1,
-              // Generate random code for now
-              // userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-              userUniqueProductCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-              // Generate random number for now
-              uniqueProductCode: Math.floor(Math.random() * 1000000),
-              // uniqueMembershipCode: Math.floor(Math.random() * 1000000),
-              leastSellableUnit: 1,
-              // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array.
-              imageKey: productDetails.imageKey,
-              category: "Membership",
-              subCategory: productDetails.subCategory,
-              createdDate: new Date().getTime(),
-              // timePeriodInMonths: membershipDetail.timePeriodInMonths,
-              // additionalInfo: membershipDetail.additionalInfo,
-              // If visible is true the List Now form is open and the membership is active
-              isActive: productDetails.isActive,
-            },
-            membershipServiceArgs: [{
-              serviceId: membershipService.serviceId,
-              membershipPrice: membershipService.membershipPrice,
-              discountPrice: membershipService.discountPrice,
-              maxQuantity: orderItem.quantity,
-              createdDate: new Date().getTime(),
-              // If visible is true the List Now form is open and the membership is active
-              isActive: true,
-            }],
-            //TODO: where do I put the imageKey from the uploaded File?
-            productFileArgs: [{
-              fileLocation: `${productDetails.imageKey}`,
-              fileHash: `${productFileDetail.fileHash}`,
-              fileName: `${productFileDetail.fileName}`,
-              uploadDate: new Date().getTime(),
-              createdDate: new Date().getTime(),
-              section: 1,
-              type: 2,
-            }],
-          };
-
-          const createdDate = Math.floor(Date.now() / 1000);
-          const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...body.productArgs }
-          const [restStatus, productAddress] = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
-
-          const inventoryData = {
-            productAddress: productAddress,
-            quantity: orderItem.quantity,
-            pricePerUnit: inventory.pricePerUnit,
-            batchId: inventory.batchId,
-            status: inventory.status,
-            createdDate: new Date().getTime(),
-            serialNumber: [],
-            taxPercentageAmount: inventory.taxPercentageAmount,
-            taxDollarAmount: inventory.taxDollarAmount,
-          }
-
-          const [createInventoryStatus, createdInventoryAddress] = await contract.createInventory({ ...inventoryData, createdDate });
-          console.log("createInventoryStatus, createdInventoryAddress", [createInventoryStatus, createdInventoryAddress]);
-
-          // const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...inventoryData, createdDate });
-
-          // const [status, membershipAddress, productAddress] = await managers.membershipManager.createMembership({
-          //   dappAddress: contract.address,
-          //   membershipArgs: body.membershipArgs,
-          //   membershipServiceArgs: body.membershipServiceArgs,
-          //   productFileArgs: body.productFileArgs
-          // });
-
-          // console.log("restStatus==>", restStatus, "productAddress===>", productAddress);
-          // const { } = productDetail;
         }
 
       });
