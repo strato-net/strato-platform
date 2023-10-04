@@ -175,6 +175,14 @@ pipeline {
           lib.registerTestUserCert(
               'strato-worktree',
               'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+              'dev',
+              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f',
+              'user3',
+              '1234'
+          )
+          lib.registerTestUserCert(
+              'strato-worktree',
+              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
               'dev-testing1',
               'e4ccbcec-1824-468a-a869-c90a842de9be',
               '',
@@ -198,8 +206,7 @@ pipeline {
       }
     }
 
-//    stage('Test and Push Images') {
-    stage('Push Images & Artifacts') {
+    stage('Test & Push Artifacts') {
       steps {
         parallel (
           'Push Images': {

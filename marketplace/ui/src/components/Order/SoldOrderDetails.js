@@ -213,7 +213,8 @@ const SoldOrderDetails = ({ user, users }) => {
 
   const handleUpdateComment = async () => {
     let body = {};
-    let promises = [];
+    let isDone=false;
+
     for (let i = 0; i < orderDetails.orderLines.length; i++) {
       setselectedProd(orderDetails.orderLines[i]);
 
@@ -230,20 +231,11 @@ const SoldOrderDetails = ({ user, users }) => {
           quantity: details.orderLines[i].quantity,
         };
 
-        promises.push(actions.createOrderLineItem(dispatch, body));
+        isDone= await actions.createOrderLineItem(dispatch, body);
       }
-      // body = {
-      //   orderId: details.orderId,
-      //   orderAddress: details.address,
-      //   orderLineId: details.orderLines[i].address,
-      //   quantity: details.orderLines[i].quantity,
-      // };
-
-      // promises.push(actions.createOrderLineItem(dispatch, body));
     }
-    if (promises.length > 0) {
-      await Promise.all(promises);
-    }
+    
+      
     body = {};
     if (selectedDate == null) {
       body = {
@@ -266,7 +258,7 @@ const SoldOrderDetails = ({ user, users }) => {
         },
       };
     }
-    let isDone = await actions.updateSellerDetails(dispatch, body);
+    isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
       await actions.fetchOrderDetails(dispatch, Id);
@@ -503,7 +495,8 @@ const SoldOrderDetails = ({ user, users }) => {
                 id="save-button"
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false}
+                loading={issellerDetailsUpdating || isCreateOrderLineItem}
+                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false }
                 onClick={() => {
                   handleUpdateComment()
                   TagManager.dataLayer({

@@ -180,7 +180,6 @@ contract ProductManager is
         address _existingInventory,
         int _quantity,
         int _price,
-        string _batchId,
         uint _itemNumber,
         address[] _itemsAddress
     ) returns (uint256, address) {
@@ -198,7 +197,7 @@ contract ProductManager is
             (uint256 status, address inventoryAddress) = product.addInventory(
                 _quantity,
                 _price,
-                _batchId,
+                existingInventory.batchId(),
                 existingInventory.inventoryType(),
                 InventoryStatus.PUBLISHED,
                 block.timestamp,
@@ -223,7 +222,7 @@ contract ProductManager is
             (uint256 status, address inventoryAddress) = product.addInventory(
                 _quantity,
                 _price,
-                _batchId,
+                existingInventory.batchId(),
                 existingInventory.inventoryType(),
                 InventoryStatus.PUBLISHED,
                 block.timestamp,

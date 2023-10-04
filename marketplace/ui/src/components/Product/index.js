@@ -74,7 +74,7 @@ const Product = () => {
     }
   };
 
-  const { products, isProductsLoading, message, success } = useProductState();
+  const { products, isProductsLoading, message, success, productsTotal } = useProductState();
 
   useEffect(() => {
     if (isSearch) {
@@ -200,7 +200,8 @@ const Product = () => {
                 <Pagination
                   current={page}
                   onChange={onPageChange}
-                  total={total}
+                  total={productsTotal}
+                  showSizeChanger={false}
                   className="flex justify-center my-5 "
                 />
                 <div className="pb-12"></div>

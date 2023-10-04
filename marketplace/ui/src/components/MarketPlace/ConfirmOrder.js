@@ -20,7 +20,7 @@ import {
   Form,
   Input,
 } from "antd";
-import { useState, useEffect, useMemo} from "react";
+import { useState, useEffect, useMemo } from "react";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
@@ -104,15 +104,15 @@ const ConfirmOrder = () => {
   const handleCancel = () => {
     setOpen(false);
   };
-  
+
   useEffect(() => {
     actions.fetchUserAddresses(marketplaceDispatch);
   }, [marketplaceDispatch])
-  
+
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
-  
+
   useEffect(() => {
     actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
@@ -264,7 +264,7 @@ const ConfirmOrder = () => {
           <p className="text-primary text-[17px]">{decodeURIComponent(text.name)}</p>
         );
       },
-      
+
     },
     {
       title: (
@@ -273,7 +273,7 @@ const ConfirmOrder = () => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: (
@@ -282,7 +282,7 @@ const ConfirmOrder = () => {
       dataIndex: "unitOfMeasure",
       align: "center",
       render: (text) => <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -318,7 +318,7 @@ const ConfirmOrder = () => {
     },
   ];
 
-  
+
 
   const navigate = useNavigate();
 
@@ -359,16 +359,26 @@ const ConfirmOrder = () => {
   };
 
   const handlePaymentConfirm = async () => {
-    handleCancel();
     let orderList = [];
     confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
+    // These additional fields need to be sent to form the request after stripe. 
+      orderList.push({
+        inventoryId: item.key, 
+        quantity: item.qty,
+        name: item.item.name,
+        unitPrice: item.unitPrice,
+      });
     });
+
+    // These additional fields need to be sent to form the request after stripe. 
     const body = {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
+      tax: tax,
+      user: user.commonName,
+      email: user.preferred_username,
     };
     TagManager.dataLayer({
       dataLayer: {
@@ -376,7 +386,7 @@ const ConfirmOrder = () => {
       },
     });
     let data = await orderActions.createPayment(orderDispatch, body);
-   
+
     if (data != null && data.url !== undefined) {
       window.location.replace(data.url);
     }
@@ -733,12 +743,12 @@ const ConfirmOrder = () => {
               }
             </div>
             {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className="justify-center mt-12">
-              <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
+              {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);
                 }}>
-                Pay later
-              </div>
+                Pay Later
+              </div> */}
               <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
                 onClick={() => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
@@ -746,17 +756,12 @@ const ConfirmOrder = () => {
                   }
                 }}
               >
-                Pay now
+                Review and Submit
               </div>
             </Row>}
           </div>
         </div>
       )}
-      <ConfirmOrderModel
-        open={open}
-        handleCancel={handleCancel}
-        handleConfirm={handleOrderConfirm}
-      />
       {marketplaceMessage && openToastMarketplace("Bottom")}
       {message && openToastOrder("bottom")}
     </div>

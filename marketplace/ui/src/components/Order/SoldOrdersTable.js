@@ -10,7 +10,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button} from "antd";
+import { Pagination, Button } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 
@@ -26,24 +26,24 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
   useEffect(() => {
-       actions.fetchOrderSold(
-        dispatch,
-        limit,
-        offset,
-        debouncedSearchTerm,
-        user?.organization,
-        order,
-        selectedDate
-      );
-    
-   
+    actions.fetchOrderSold(
+      dispatch,
+      limit,
+      offset,
+      debouncedSearchTerm,
+      user?.organization,
+      order,
+      selectedDate
+    );
+
+
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate]);
 
   useEffect(() => {
     setPage(1);
     setOffset(0);
   }, [orderSoldTotal]);
-  
+
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
   useEffect(() => {
