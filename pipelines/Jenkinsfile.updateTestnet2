@@ -11,11 +11,11 @@ pipeline {
       steps {
         sh """#!/bin/bash
 
-          echo "Input JSON: {\"VersionTag\": \"${params.VERSION_TAG}\"}"
+          echo "Input JSON: {"VersionTag": "${params.VERSION_TAG}"}"
 
           env.execution_arn=\$(aws stepfunctions start-execution \
             --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
-            --input "{\"VersionTag\": \"${params.VERSION_TAG}\"}" \
+            --input "{"VersionTag": "${params.VERSION_TAG}"}" \
             --query "executionArn" \
             --output text)
 
