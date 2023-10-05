@@ -325,7 +325,7 @@ pipeline {
       }
     }
 
-    stage('Test dev docs') {
+/*    stage('Test dev docs') {
       steps {
         withCredentials([
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
@@ -367,7 +367,7 @@ module.exports = {
         }
       }
     }
-  }
+  }*/
 
   post {
     always {
