@@ -383,8 +383,8 @@ const Membership = (user) => {
           user={user}
           handleCancel={closeSellModal}
           onClick={openSellModal}
-        // formik={formik}
-        // type="New"
+          // formik={formik}
+          type="Resale"
         // id="None"
         // getIn={getIn}
         // isCreateMembershipSubmitting={isCreateInventorySubmitting}
