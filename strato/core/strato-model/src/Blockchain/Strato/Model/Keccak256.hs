@@ -41,12 +41,11 @@ import qualified Data.Aeson.Key as DAK
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import Data.ByteString.Arbitrary
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.ByteString.Short as BSS
 import Data.Data
 import Data.Hashable (Hashable)
 import qualified Data.RLP as RLP2
@@ -64,11 +63,11 @@ import Text.Format
 import Web.FormUrlEncoded hiding (fieldLabelModifier)
 import Web.PathPieces
 
-newtype Keccak256 = Keccak256 ByteString
+newtype Keccak256 = Keccak256 BSS.ShortByteString
   deriving (Eq, Read, Show, Ord, Generic, Data)
   deriving anyclass (Hashable)
 
-newtype SHA = SHA ByteString
+newtype SHA = SHA BSS.ShortByteString
   deriving (Eq, Read, Show, Ord, Generic, Data)
   deriving anyclass (Hashable)
 
@@ -77,36 +76,36 @@ instance NFData Keccak256
 keccak256ToWord256 :: Keccak256 -> Word256
 keccak256ToWord256 (Keccak256 val) = bytesToWord256 val
 
-keccak256ToByteString :: Keccak256 -> ByteString
+keccak256ToByteString :: Keccak256 -> BSS.ShortByteString
 keccak256ToByteString (Keccak256 val) = val
 
-unsafeCreateKeccak256FromByteString :: ByteString -> Keccak256
+unsafeCreateKeccak256FromByteString :: BSS.ShortByteString -> Keccak256
 unsafeCreateKeccak256FromByteString = Keccak256
 
 unsafeCreateKeccak256FromWord256 :: Word256 -> Keccak256
 unsafeCreateKeccak256FromWord256 = Keccak256 . word256ToBytes
 
 instance Binary Keccak256 where
-  put (Keccak256 x) = putByteString x
-  get = Keccak256 <$> getByteString 32
+  put (Keccak256 x) = putByteString (BSS.fromShort x)
+  get = Keccak256 . BSS.toShort <$> getByteString 32
 
 instance RLPSerializable Keccak256 where
-  rlpDecode (RLPString s) | B.length s == 32 = Keccak256 s
+  rlpDecode (RLPString s) | BSS.length s == 32 = Keccak256 s
   rlpDecode (RLPScalar 0) = unsafeCreateKeccak256FromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
   rlpDecode x = error ("Missing case in rlpDecode for Keccak256: " ++ show x)
 
   --rlpEncode (Keccak256 0) = RLPNumber 0
   rlpEncode (Keccak256 val)
-    | B.length val >= 32 = RLPString $ B.take 32 val
+    | BSS.length val >= 32 = RLPString $ BSS.take 32 val
     | otherwise =
       RLPString $
-        B.replicate (32 - B.length val) 0
-          `B.append` val
+        BSS.replicate (32 - BSS.length val) 0
+          `BSS.append` val
 
 -- Someday we should remove the second RLP library...
 instance RLP2.RLPEncodable Keccak256 where
-  rlpEncode = RLP2.rlpEncode . keccak256ToByteString
-  rlpDecode = Right . Keccak256 <=< RLP2.rlpDecode
+  rlpEncode = RLP2.rlpEncode . BSS.fromShort . keccak256ToByteString
+  rlpDecode = Right . Keccak256 . BSS.toShort <=< RLP2.rlpDecode
 
 instance Ae.ToJSON Keccak256 where
   toJSON = Ae.String . T.pack . keccak256ToHex
@@ -114,7 +113,7 @@ instance Ae.ToJSON Keccak256 where
 instance Ae.FromJSON Keccak256 where
   parseJSON = Ae.withText "Keccak256" $ \t ->
     case B16.decode $ BC.pack $ T.unpack t of
-      Right val -> pure $ Keccak256 val
+      Right val -> pure $ Keccak256 $ BSS.toShort val
       _ -> fail $ "error parsing Keccak256: " ++ show t
 
 instance Ae.ToJSONKey Keccak256 where
@@ -127,10 +126,10 @@ instance Ae.FromJSONKey Keccak256 where
   fromJSONKey = Ae.FromJSONKeyTextParser (Ae.parseJSON . Ae.String)
 
 instance PersistField Keccak256 where
-  toPersistValue (Keccak256 i) = PersistText . T.pack $ BC.unpack $ B16.encode i
+  toPersistValue (Keccak256 i) = PersistText . T.pack $ BC.unpack $ B16.encode $ BSS.fromShort i
   fromPersistValue (PersistText s) =
     case B16.decode $ BC.pack $ T.unpack s of
-      Right val -> Right $ Keccak256 val
+      Right val -> Right $ Keccak256 $ BSS.toShort val
       _ -> Left $ T.pack $ "unable to parse Keccak256: " ++ show s
   fromPersistValue _ = Left $ T.pack $ "PersistField Keccak256 must be persisted as PersistText"
 
@@ -138,16 +137,16 @@ instance PersistFieldSql Keccak256 where
   sqlType _ = SqlOther $ T.pack "varchar(64)"
 
 keccak256ToHex :: Keccak256 -> String
-keccak256ToHex (Keccak256 sha) = BC.unpack $ B16.encode sha
+keccak256ToHex (Keccak256 sha) = BC.unpack $ B16.encode $ BSS.fromShort sha
 
 -- todo: this shouldn't be partial... ever...
 keccak256FromHex :: String -> Keccak256
-keccak256FromHex = Keccak256 . LabeledError.b16Decode "keccak256FromHex" . BC.pack . padZeros 64
+keccak256FromHex = Keccak256 . BSS.toShort . LabeledError.b16Decode "keccak256FromHex" . BC.pack . padZeros 64
 
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =
   case B16.decode $ BC.pack (padZeros 64 string) of
-    Right x -> Just $ Keccak256 x
+    Right x -> Just $ Keccak256 $ BSS.toShort x
     _ -> Nothing
 
 formatKeccak256WithoutColor :: Keccak256 -> String
@@ -158,8 +157,8 @@ formatKeccak256WithoutColor s
 rlpHash :: RLPSerializable a => a -> Keccak256
 rlpHash = hash . rlpSerialize . rlpEncode
 
-hash :: BC.ByteString -> Keccak256
-hash = Keccak256 . fastKeccak256
+hash :: BSS.ShortByteString -> Keccak256
+hash = Keccak256 . BSS.toShort . fastKeccak256 . BSS.fromShort
 
 {-# NOINLINE emptyHash #-}
 emptyHash :: Keccak256
@@ -187,11 +186,11 @@ instance PathPiece Keccak256 where
   toPathPiece = T.pack . show
   fromPathPiece t =
     case B16.decode $ BC.pack $ T.unpack t of
-      Right x -> Just $ Keccak256 x
+      Right x -> Just $ Keccak256 $ BSS.toShort x
       _ -> Nothing
 
 instance ToHttpApiData Keccak256 where
-  toUrlPiece (Keccak256 bytes) = T.pack . BC.unpack . B16.encode $ bytes
+  toUrlPiece (Keccak256 bytes) = T.pack . BC.unpack . B16.encode . BSS.fromShort $ bytes
 
 instance FromHttpApiData Keccak256 where
   parseUrlPiece = unmaybe . fromPathPiece
@@ -203,7 +202,7 @@ instance FromHttpApiData Keccak256 where
 instance MimeUnrender PlainText Keccak256 where
   mimeUnrender _ v =
     case B16.decode $ BLC.toStrict v of
-      Right bytes -> Right $ Keccak256 bytes
+      Right bytes -> Right $ Keccak256 $ BSS.toShort bytes
       _ -> Left "Couldn't read Keccak"
 
 instance MimeRender PlainText Keccak256 where
@@ -225,7 +224,7 @@ instance FromForm Keccak256 where
 instance Arbitrary Keccak256 where
   arbitrary = do
     random256Bit <- fastRandBs 32
-    return $ Keccak256 random256Bit
+    return $ Keccak256 $ BSS.toShort $ random256Bit
 
 instance ToCapture (Capture "hash" Keccak256) where
   toCapture _ = DocCapture "hash" "a transaction hash"
@@ -235,7 +234,7 @@ instance ToParamSchema Keccak256 where
 
 instance ToSample Keccak256 where
   toSamples _ =
-    samples [hash $ BLC.toStrict (encode @Integer n) | n <- [1 .. 10]]
+    samples [hash $ BSS.toShort $ BLC.toStrict (encode @Integer n) | n <- [1 .. 10]]
 
 instance ToSchema Keccak256 where
   declareNamedSchema _ =
@@ -244,7 +243,7 @@ instance ToSchema Keccak256 where
         (Just "Keccak256 hash, 32 byte hex encoded string")
         ( mempty
             & type_ ?~ SwaggerString
-            & example ?~ Ae.toJSON (hash $ BLC.toStrict (encode @Integer 1))
+            & example ?~ Ae.toJSON (hash $ BSS.toShort $ BLC.toStrict (encode @Integer 1))
             & description ?~ "Keccak256 hash, 32 byte hex encoded string"
         )
 

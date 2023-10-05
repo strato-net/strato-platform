@@ -19,9 +19,9 @@ import Control.DeepSeq
 import Control.Monad
 import Data.Aeson
 import Data.Binary
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Short as B
 import Data.Data
 import Data.Default
 import Data.String
@@ -36,16 +36,16 @@ import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 -- The stateRoot is of this type,
 -- (ie- the pointer to the full set of key/value pairs at a particular time in history), and
 -- will be of interest if you need to refer to older or parallel version of the data.
-newtype StateRoot = StateRoot B.ByteString
+newtype StateRoot = StateRoot B.ShortByteString
   deriving (Show, Eq, Ord, Read, Generic, Data)
   deriving newtype (IsString)
 
 instance Format StateRoot where
   format x | x == emptyTriePtr = CL.yellow "<empty>"
-  format (StateRoot x) = CL.yellow $ BC.unpack $ B16.encode x
+  format (StateRoot x) = CL.yellow $ BC.unpack $ B16.encode $ B.fromShort x
 
 instance Pretty StateRoot where
-  pretty (StateRoot sr) = green . text . BC.unpack $ B16.encode sr
+  pretty (StateRoot sr) = green . text . BC.unpack . B16.encode . B.fromShort $ sr
 
 instance NFData StateRoot
 
@@ -71,5 +71,5 @@ emptyTriePtr = StateRoot $ keccak256ToByteString $ hash $ rlpSerialize $ rlpEnco
 sha2StateRoot :: Keccak256 -> StateRoot
 sha2StateRoot x = StateRoot $ keccak256ToByteString x
 
-unboxStateRoot :: StateRoot -> B.ByteString
+unboxStateRoot :: StateRoot -> B.ShortByteString
 unboxStateRoot (StateRoot b) = b

@@ -8,9 +8,9 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Secp256k1
 import Control.Lens
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 
-type RawExtraData = B.ByteString
+type RawExtraData = B.ShortByteString
 
 data IstanbulExtra = IstanbulExtra
   { _validatorList :: ChainMembers,
@@ -22,7 +22,7 @@ data IstanbulExtra = IstanbulExtra
 makeLenses ''IstanbulExtra
 
 data ExtraData = ExtraData
-  { _vanity :: B.ByteString,
+  { _vanity :: B.ShortByteString,
     _istanbul :: Maybe IstanbulExtra
   }
   deriving (Eq, Show)

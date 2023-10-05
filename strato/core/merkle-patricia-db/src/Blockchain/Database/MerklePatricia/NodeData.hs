@@ -37,7 +37,7 @@ import Control.Monad.State
 import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
 import Data.Bits
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Fix
@@ -61,11 +61,11 @@ type Val = RLPObject
 
 -------------------------
 
-type NodeRefF a = Either B.ByteString a
+type NodeRefF a = Either B.ShortByteString a
 
 type NodeRef = NodeRefF StateRoot
 
-smallRef :: B.ByteString -> NodeRefF a
+smallRef :: B.ShortByteString -> NodeRefF a
 smallRef = Left
 
 ptrRef :: a -> NodeRefF a
@@ -116,14 +116,14 @@ formatVal (Just x) = green $ pretty x
 
 instance Pretty a => Pretty (NodeDataF a) where
   pretty EmptyNodeData = text "    <EMPTY>"
-  pretty (ShortcutNodeData s (Left (Left p))) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green . text . BC.unpack $ B16.encode p)
+  pretty (ShortcutNodeData s (Left (Left p))) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green . text . BC.unpack $ B16.encode $ B.fromShort p)
   pretty (ShortcutNodeData s (Left (Right v))) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (pretty v)
   pretty (ShortcutNodeData s (Right val)) = text $ "    " ++ show (pretty s) ++ " -> " ++ show (green $ pretty val)
   pretty (FullNodeData cs val) = text "    val: " </> formatVal val </> text "\n        " </> vsep (showChoice <$> zip ([0 ..] :: [Int]) cs)
     where
       showChoice :: Pretty a => (Int, NodeRefF a) -> Doc
       showChoice (v, Left "") = blue (text $ showHex v "") </> text ": " </> red (text "NULL")
-      showChoice (v, Left p) = blue (text $ showHex v "") </> text ": " </> green (text . BC.unpack $ B16.encode p)
+      showChoice (v, Left p) = blue (text $ showHex v "") </> text ": " </> green (text . BC.unpack $ B16.encode $ B.fromShort p)
       showChoice (v, Right p) = blue (text $ showHex v "") </> text ": " </> green (pretty p)
 
 instance RLPSerializable1 NodeDataF where
@@ -178,7 +178,7 @@ instance RLPSerializable a => RLPSerializable (NodeDataF a) where
   rlpEncode = rlpEncode1
   rlpDecode = rlpDecode1
 
-byteString2TermNibbleString :: B.ByteString -> (Bool, N.NibbleString)
+byteString2TermNibbleString :: B.ShortByteString -> (Bool, N.NibbleString)
 byteString2TermNibbleString bs
   | B.null bs = error "string2TermNibbleString called with empty String"
   | otherwise = (terminator, ns)
@@ -188,13 +188,13 @@ byteString2TermNibbleString bs
     (flags, extraNibble) = if w > 0xF then (w `shiftR` 4, 0xF .&. w) else (w, 0)
     terminator = flags `shiftR` 1 == 1
     oddLength = flags .&. 1 == 1
-    ns = if oddLength then N.OddNibbleString extraNibble rest else N.EvenNibbleString rest
+    ns = if oddLength then N.OddNibbleString extraNibble (B.fromShort rest) else N.EvenNibbleString (B.fromShort rest)
 
-termNibbleString2String :: Bool -> N.NibbleString -> B.ByteString
+termNibbleString2String :: Bool -> N.NibbleString -> B.ShortByteString
 termNibbleString2String terminator s =
   case s of
-    (N.EvenNibbleString s') -> B.singleton (extraNibble `shiftL` 4) `B.append` s'
-    (N.OddNibbleString n rest) -> B.singleton (extraNibble `shiftL` 4 + n) `B.append` rest
+    (N.EvenNibbleString s') -> B.singleton (extraNibble `shiftL` 4) `B.append` B.toShort s'
+    (N.OddNibbleString n rest) -> B.singleton (extraNibble `shiftL` 4 + n) `B.append` B.toShort rest
   where
     extraNibble =
       (if terminator then 2 else 0)
@@ -237,7 +237,7 @@ type NodeDataProof = Compose Proof NodeDataF
 type MPProof = Fix NodeDataProof
 
 padKey :: N.NibbleString -> N.NibbleString
-padKey (N.EvenNibbleString n) = N.EvenNibbleString $ B.take 32 $ n `B.append` B.replicate 32 0
+padKey (N.EvenNibbleString n) = N.EvenNibbleString $ B.fromShort $ B.take 32 $ (B.toShort n) `B.append` B.replicate 32 0
 padKey n = N.pack . take 64 . (++ repeat 0) $ N.unpack n
 
 proveNodeData :: (StateRoot `A.Alters` NodeData) m => KeyRange -> (Key, StateRoot) -> m (NodeDataProof (Either MPProof (Key, StateRoot)))

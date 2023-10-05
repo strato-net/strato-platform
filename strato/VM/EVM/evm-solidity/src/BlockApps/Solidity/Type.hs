@@ -7,7 +7,7 @@ module BlockApps.Solidity.Type where
 
 import Control.DeepSeq
 import Data.Binary
-import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import Data.List
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -33,7 +33,7 @@ data Type
   | TypeArrayDynamic Type
   | TypeArrayFixed Word Type
   | TypeMapping SimpleType Type
-  | TypeFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
+  | TypeFunction ShortByteString [(Text, Type)] [(Maybe Text, Type)]
   | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text

@@ -7,7 +7,7 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.Time
@@ -39,21 +39,21 @@ class RLPSerializable h => BlockHeaderLike h where
   blockHeaderParentHash :: h -> Keccak256
   blockHeaderOmmersHash :: h -> Keccak256
   blockHeaderBeneficiary :: h -> ChainMemberParsedSet
-  blockHeaderStateRoot :: h -> B.ByteString -- todo: "StateRoot" thats not the MPDB StateRoot
-  blockHeaderTransactionsRoot :: h -> B.ByteString -- todo: ditto
-  blockHeaderReceiptsRoot :: h -> B.ByteString -- todo: ditto
-  blockHeaderLogsBloom :: h -> B.ByteString -- todo: "Bloom" data?
+  blockHeaderStateRoot :: h -> B.ShortByteString -- todo: "StateRoot" thats not the MPDB StateRoot
+  blockHeaderTransactionsRoot :: h -> B.ShortByteString -- todo: ditto
+  blockHeaderReceiptsRoot :: h -> B.ShortByteString -- todo: ditto
+  blockHeaderLogsBloom :: h -> B.ShortByteString -- todo: "Bloom" data?
   blockHeaderGasLimit :: h -> Integer -- todo: "gas" newtype?
   blockHeaderGasUsed :: h -> Integer -- todo: ditto
   blockHeaderDifficulty :: h -> Integer
   blockHeaderNonce :: h -> Word64 -- todo: nonce newtype
-  blockHeaderExtraData :: h -> B.ByteString -- todo: extradata newtype
+  blockHeaderExtraData :: h -> B.ShortByteString -- todo: extradata newtype
   blockHeaderTimestamp :: h -> UTCTime
   blockHeaderMixHash :: h -> Keccak256
 
   -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
   -- derive it.
-  blockHeaderModifyExtra :: (B.ByteString -> B.ByteString) -> h -> h
+  blockHeaderModifyExtra :: (B.ShortByteString -> B.ShortByteString) -> h -> h
 
   morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
   {-# MINIMAL
@@ -107,7 +107,7 @@ class (RLPSerializable t) => TransactionLike t where
   txGasPrice :: t -> Integer
   txGasLimit :: t -> Integer
   txCode :: t -> Maybe Code
-  txData :: t -> Maybe B.ByteString -- todo make a `Code` newtype
+  txData :: t -> Maybe B.ShortByteString -- todo make a `Code` newtype
   txChainId :: t -> Maybe Word256
   txMetadata :: t -> Maybe (Map Text Text)
 

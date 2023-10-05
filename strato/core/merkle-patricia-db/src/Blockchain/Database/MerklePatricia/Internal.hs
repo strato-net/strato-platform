@@ -41,7 +41,7 @@ import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Control.Monad.Change.Alter (Alters)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.State
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import Data.Function
 import Data.List
 import Data.Maybe
@@ -85,7 +85,7 @@ unsafeDeleteKey sr key = do
 
 keyToSafeKey :: N.NibbleString -> N.NibbleString
 keyToSafeKey key
-  | N.EvenNibbleString keyByteString <- key = N.EvenNibbleString $ keccak256ToByteString $ hash keyByteString
+  | N.EvenNibbleString keyByteString <- key = N.EvenNibbleString $ B.fromShort $ keccak256ToByteString $ hash $ B.toShort keyByteString
   | otherwise = error $ "keyToSafeKey: key is not an EvenNibbleString: " ++ (show key)
 
 -----

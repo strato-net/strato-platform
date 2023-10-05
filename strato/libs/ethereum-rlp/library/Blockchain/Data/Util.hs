@@ -6,14 +6,14 @@ module Blockchain.Data.Util
 where
 
 import Data.Bits
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import Data.Word
 
 --I hate this, it is an ugly way to create an Integer from its component bytes.
 --There should be an easier way....
 --See http://stackoverflow.com/questions/25854311/efficient-packing-bytes-into-integers
-byteString2Integer :: B.ByteString -> Integer
-byteString2Integer x = bytes2Integer $ B.unpack x
+byteString2Integer :: BSS.ShortByteString -> Integer
+byteString2Integer x = bytes2Integer $ BSS.unpack x
 
 bytes2Integer :: [Word8] -> Integer
 bytes2Integer [] = 0

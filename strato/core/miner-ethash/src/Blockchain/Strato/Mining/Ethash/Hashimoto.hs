@@ -12,7 +12,7 @@ import qualified Data.Array.IO as MA
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Bits
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Word
 
@@ -46,13 +46,13 @@ import Data.Word
     }
 -}
 
-wordPack :: [Word32] -> B.ByteString
-wordPack = B.concat . fmap (BL.toStrict . runPut . putWord32le)
+wordPack :: [Word32] -> B.ShortByteString
+wordPack = B.concat . fmap (B.toShort . BL.toStrict . runPut . putWord32le)
 
-hashimoto :: B.ByteString -> B.ByteString -> Int -> (Word32 -> IO Slice) -> IO (B.ByteString, B.ByteString)
+hashimoto :: B.ShortByteString -> B.ShortByteString -> Int -> (Word32 -> IO Slice) -> IO (B.ShortByteString, B.ShortByteString)
 hashimoto header nonce fullSize' dataset = do
   let mixhashes = mixBytes `div` hashBytes
-      s = keccak512 $ header `B.append` B.reverse nonce
+      s = keccak512 . B.fromShort $ header `B.append` B.reverse nonce
 
   mix <- MA.newArray (0, 31) 0
 
@@ -60,7 +60,7 @@ hashimoto header nonce fullSize' dataset = do
   sequence_ $ map (uncurry $ MA.writeArray mix) $ zip [16 ..] (shatter s)
 
   forM_ [0 .. 63] $ \j ->
-    f (dataset, fullSize', mixhashes, s) j mix
+    f (dataset, fullSize', mixhashes, B.toShort s) j mix
 
   let f2 i = do
         v1 <- MA.readArray mix i
@@ -70,9 +70,9 @@ hashimoto header nonce fullSize' dataset = do
         return $ v1 `fnv` v2 `fnv` v3 `fnv` v4
 
   cmix <- fmap repair $ sequence $ map f2 [0, 4 .. 31]
-  return (cmix, keccak256ToByteString $ hash (s `B.append` cmix))
+  return (B.toShort cmix, keccak256ToByteString $ hash (B.toShort s `B.append` B.toShort cmix))
 
-f :: (Word32 -> IO Slice, Int, Integer, B.ByteString) -> Word32 -> MA.IOUArray Word32 Word32 -> IO ()
+f :: (Word32 -> IO Slice, Int, Integer, B.ShortByteString) -> Word32 -> MA.IOUArray Word32 Word32 -> IO ()
 f (dataset, fullSize', mixhashes, s) i mix = do
   let n = fullSize' `div` fromInteger hashBytes
       w = mixBytes `div` wordBytes
@@ -81,7 +81,7 @@ f (dataset, fullSize', mixhashes, s) i mix = do
 
   let p =
         ( fnv
-            (i `xor` (runGet getWord32le $ BL.fromStrict $ B.take 4 s))
+            (i `xor` (runGet getWord32le $ BL.fromStrict $ B.fromShort $ B.take 4 s))
             mixVal
         )
           `mod` (fromIntegral n `div` fromInteger mixhashes)

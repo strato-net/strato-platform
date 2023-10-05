@@ -19,7 +19,7 @@ import qualified Data.Aeson as Ae
 import Data.Aeson.QQ
 import Data.Binary
 import qualified Data.Bits as Bits
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Maybe
 import Data.Ranged
@@ -73,7 +73,7 @@ spec = do
     it "works on mid size" $
       replicateM_ 1000 $
         word256ToBytes 0x60646359b0ecaf704caa6f35
-          `shouldBe` ( LabeledError.b16Decode
+          `shouldBe` ( B.toShort $ LabeledError.b16Decode
                          "strato-model/Spec.hs"
                          "000000000000000000000000000000000000000060646359b0ecaf704caa6f35"
                      )
@@ -152,7 +152,7 @@ spec = do
     it "should be fixed width" $ do
       addressToHex 0xdeadbeef
         `shouldBe` "00000000000000000000000000000000deadbeef"
-      addressToHex 0 `shouldBe` C8.replicate 40 '0'
+      addressToHex 0 `shouldBe` (B.toShort $ C8.replicate 40 '0')
       addressToHex 0xca35b7d915458ef540ade6068dfe2f44e8fa733c
         `shouldBe` "ca35b7d915458ef540ade6068dfe2f44e8fa733c"
 
@@ -197,11 +197,11 @@ spec = do
     let mPrv = importPrivateKey $ LabeledError.b16Decode "strato-model/Spec.hs" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"
         prv = fromMaybe (error "could not import private key") mPrv
         pub = derivePublicKey prv
-        mesg = keccak256ToByteString $ hash $ C8.pack "hey guys!"
-        sig = signMsg prv mesg
+        mesg = keccak256ToByteString $ hash $ B.toShort $ C8.pack "hey guys!"
+        sig = signMsg prv $ B.fromShort mesg
 
     it "can export public key as SEC bytestring" $ do
-      B.length (exportPublicKey False pub) `shouldBe` 65
+      B.length (B.toShort $ exportPublicKey False pub) `shouldBe` 65
     it "can convert public key to and from JSON encoding" $ do
       Ae.decode (Ae.encode pub) `shouldBe` Just pub
     it "can convert signature to and from JSON encoding" $ do
@@ -218,17 +218,17 @@ spec = do
     it "arbitrary sigs can be exported/imported" $
       property $ \s -> do
         let sigBS = exportSignature s
-        B.length sigBS `shouldBe` 65
+        B.length (B.toShort sigBS) `shouldBe` 65
         importSignature sigBS `shouldBe` (Right s)
     it "exported sigs can be used for recovery" $ do
       let sigBS = exportSignature sig
           sig' = importSignature sigBS
       case sig' of
         Left err -> error err
-        Right sig'' -> recoverPub sig'' mesg `shouldBe` Just pub
+        Right sig'' -> recoverPub sig'' (B.fromShort mesg) `shouldBe` Just pub
 
     it "can recover public keys from signatures" $ do
-      let mRecPub = recoverPub sig mesg
+      let mRecPub = recoverPub sig $ B.fromShort mesg
       (Just pub) `shouldBe` mRecPub
 
     -- It can verify signatures given a message and key
@@ -243,10 +243,10 @@ spec = do
 
     it "test address derivation, signatures, and signature recovery on arbitrary private keys" $
       property $ \k -> do
-        let sig' = signMsg k mesg
+        let sig' = signMsg k $ B.fromShort mesg
             pub' = derivePublicKey k
             add = fromPublicKey pub'
-            mRecPub = recoverPub sig' mesg
+            mRecPub = recoverPub sig' $ B.fromShort mesg
         Just pub' `shouldBe` mRecPub
         fromPublicKey (fromJust mRecPub) `shouldBe` add
         fromPublicKey (fromJust mRecPub) `shouldBe` fromPrivateKey k

@@ -54,7 +54,7 @@ import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import Control.Monad.Change.Alter
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import Data.Default
 import Data.Maybe (isJust, listToMaybe)
 import qualified Database.LevelDB as DB
@@ -64,7 +64,7 @@ genericLookupDB f (StateRoot sr) = do
   db <- f
   fmap bytes2NodeData <$> DB.get db def sr
   where
-    bytes2NodeData :: B.ByteString -> NodeData
+    bytes2NodeData :: B.ShortByteString -> NodeData
     bytes2NodeData bytes | B.null bytes = EmptyNodeData
     bytes2NodeData bytes = rlpDecode . rlpDeserialize $ bytes
 
@@ -76,7 +76,7 @@ genericInsertDB f (StateRoot sr) nd = do
 genericDeleteDB :: MonadIO m => m DB.DB -> StateRoot -> m ()
 genericDeleteDB f (StateRoot sr) = do
   db <- f
-  DB.delete db def sr
+  DB.delete db def (B.fromShort sr)
 
 instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT DB.DB m) where
   lookup _ = genericLookupDB ask
@@ -139,5 +139,5 @@ blankStateRoot = emptyTriePtr
 addAllKVs :: (RLPSerializable x, RLPSerializable y, (StateRoot `Alters` NodeData) m) => StateRoot -> [(x, y)] -> m StateRoot
 addAllKVs sr [] = return sr
 addAllKVs sr (x : rest) = do
-  sr' <- unsafePutKeyVal sr (byteString2NibbleString $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
+  sr' <- unsafePutKeyVal sr (byteString2NibbleString $ B.fromShort $ rlpSerialize $ rlpEncode $ fst x) (rlpEncode $ rlpSerialize $ rlpEncode $ snd x)
   addAllKVs sr' rest

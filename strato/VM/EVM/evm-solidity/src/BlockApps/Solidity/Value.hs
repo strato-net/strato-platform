@@ -14,7 +14,8 @@ import Control.DeepSeq
 import qualified Data.Bimap as Bimap
 import qualified Data.Binary as Binary
 import Data.Bits (complement, shiftL, (.|.))
-import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short as Short
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
@@ -44,7 +45,7 @@ valueUInt256 = ValueInt False (Just 32)
 valueInt256 :: Integer -> SimpleValue
 valueInt256 = ValueInt False (Just 32)
 
-valueBytes :: ByteString -> SimpleValue
+valueBytes :: Short.ShortByteString -> SimpleValue
 valueBytes = ValueBytes Nothing
 
 data Value
@@ -53,7 +54,7 @@ data Value
   | ValueArrayFixed Word [Value]
   | ValueContract NamedAccount
   | ValueEnum Text Text Word256
-  | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
+  | ValueFunction ShortByteString [(Text, Type)] [(Maybe Text, Type)]
   | ValueMapping (Map.Map SimpleValue Value)
   | ValueStruct (Map.Map Text Value)
   | ValueArraySentinel Int
@@ -72,7 +73,7 @@ data SimpleValue
       }
   | ValueBytes
       { bytesSize :: Maybe Integer,
-        bytesVal :: ByteString
+        bytesVal :: ShortByteString
       }
   deriving (Eq, Show, Generic, NFData, Binary.Binary, Ord, Hashable)
 
@@ -95,24 +96,24 @@ zeroOf = \case
   ValueEnum {} -> error "default value of enum"
   ValueVariadic {} -> error "default value of variadic"
 
-bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
+bytesToSimpleValue :: ShortByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue bs = \case
   TypeBool ->
     if (bytesToNum False (Just 1)) /= 0
       then Just $ ValueBool True
       else Just $ ValueBool False
-  TypeAddress -> ValueAddress <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
-  TypeAccount -> ValueAccount . unspecifiedChain <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
-  TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
+  TypeAddress -> ValueAddress <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode $ Short.fromShort bs)
+  TypeAccount -> ValueAccount . unspecifiedChain <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode $ Short.fromShort bs)
+  TypeString -> Just $ ValueString (Text.decodeUtf8 . Short.fromShort $ bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs
   where
     bytesToNum :: Bool -> Maybe Integer -> Integer
     bytesToNum signed' bytes' =
-      if ByteString.null bs
+      if Short.null bs
         then 0
         else
-          let bs' = ByteString.unpack bs
+          let bs' = Short.unpack bs
               h = head bs'
               neg =
                 if signed'
@@ -131,11 +132,11 @@ bytesToSimpleValue bs = \case
               else w
        in go inv ws (x' .|. toInteger w')
 
-bytesToValue :: ByteString -> Type -> Maybe Value
+bytesToValue :: ShortByteString -> Type -> Maybe Value
 bytesToValue b = \case
   SimpleType ty -> SimpleValue <$> bytesToSimpleValue b ty
   TypeArrayDynamic ty ->
-    let rb = ByteString.drop 32 b
+    let rb = Short.drop 32 b
         valArray = splitBytes rb ty
      in ValueArrayDynamic . tosparse <$> sequence valArray
   TypeArrayFixed len ty ->
@@ -149,24 +150,24 @@ bytesToValue b = \case
   TypeVariadic {} -> Nothing -- TODO
   where
     splitBytes b' ty
-      | ByteString.null b' = []
+      | Short.null b' = []
       | otherwise = case getTypeByteLength ty of
         Nothing -> [Nothing]
         Just size ->
-          let (valBytes, rb) = ByteString.splitAt size b'
+          let (valBytes, rb) = Short.splitAt size b'
            in bytesToValue valBytes ty : splitBytes rb ty
 
-bytestringToValues :: ByteString -> [Type] -> Maybe [Value]
+bytestringToValues :: ShortByteString -> [Type] -> Maybe [Value]
 bytestringToValues bs ts =
   case bytesToBytesTypePair bs ts of
     Nothing -> Nothing
     Just byteTypePairs -> for byteTypePairs (uncurry bytesToValue)
 
-bytesToBytesTypePair :: ByteString -> [Type] -> Maybe [(ByteString, Type)]
+bytesToBytesTypePair :: ShortByteString -> [Type] -> Maybe [(ShortByteString, Type)]
 bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
   where
     toBytesTypePair _ [] = Just []
-    toBytesTypePair b (_ : _) | ByteString.null b = Nothing
+    toBytesTypePair b (_ : _) | Short.null b = Nothing
     toBytesTypePair b types =
       let headType = head types
           tailTypes = tail types
@@ -180,44 +181,44 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
             TypeArrayDynamic ty -> case getTypeByteLength ty of
               Nothing -> Nothing
               Just size -> do
-                let (startingByte, restOfBytes) = ByteString.splitAt 32 b
-                    start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
+                let (startingByte, restOfBytes) = Short.splitAt 32 b
+                    start = Binary.decode (ByteString.Lazy.fromStrict $ Short.fromShort startingByte)
                     (lengthBytes, rb) =
-                      ByteString.splitAt
+                      Short.splitAt
                         32
-                        (ByteString.drop (fromIntegral (start :: Word256)) totalBytes)
-                    len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
+                        (Short.drop (fromIntegral (start :: Word256)) totalBytes)
+                    len = Binary.decode (ByteString.Lazy.fromStrict $ Short.fromShort lengthBytes)
                     lenAsInt = fromIntegral (len :: Word256)
-                    vBytes = ByteString.take (size * lenAsInt) rb
-                    arrayBytes = ByteString.append lengthBytes vBytes
+                    vBytes = Short.take (size * lenAsInt) rb
+                    arrayBytes = Short.append lengthBytes vBytes
                 rest <- toBytesTypePair restOfBytes tailTypes
                 return $ (arrayBytes, headType) : rest
             SimpleType (TypeBytes Nothing) -> do
-              let (startingByte, restOfBytes) = ByteString.splitAt 32 b
-                  start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
+              let (startingByte, restOfBytes) = Short.splitAt 32 b
+                  start = Binary.decode (ByteString.Lazy.fromStrict $ Short.fromShort startingByte)
                   (lengthBytes, rb) =
-                    ByteString.splitAt
+                    Short.splitAt
                       32
-                      (ByteString.drop (fromIntegral (start :: Word256)) totalBytes)
-                  len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
-                  arrayBytes = ByteString.take (fromIntegral (len :: Word256)) rb
+                      (Short.drop (fromIntegral (start :: Word256)) totalBytes)
+                  len = Binary.decode (ByteString.Lazy.fromStrict $ Short.fromShort lengthBytes)
+                  arrayBytes = Short.take (fromIntegral (len :: Word256)) rb
               rest <- toBytesTypePair restOfBytes tailTypes
               return $ (arrayBytes, headType) : rest
             SimpleType TypeString -> do
-              let (startingByte, restOfBytes) = ByteString.splitAt 32 b
-                  start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
+              let (startingByte, restOfBytes) = Short.splitAt 32 b
+                  start = Binary.decode (ByteString.Lazy.fromStrict $ Short.fromShort startingByte)
                   (lengthBytes, rb) =
-                    ByteString.splitAt
+                    Short.splitAt
                       32
-                      (ByteString.drop (fromIntegral (start :: Word256)) totalBytes)
-                  len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
-                  arrayBytes = ByteString.take (fromIntegral (len :: Word256)) rb
+                      (Short.drop (fromIntegral (start :: Word256)) totalBytes)
+                  len = Binary.decode (ByteString.Lazy.fromStrict $ Short.fromShort lengthBytes)
+                  arrayBytes = Short.take (fromIntegral (len :: Word256)) rb
               rest <- toBytesTypePair restOfBytes tailTypes
               return $ (arrayBytes, headType) : rest
             _ -> case getTypeByteLength headType of -- TODO: Figure out wtf
               Nothing -> Nothing
               Just size -> do
-                let (tBytes, restOfBytes) = ByteString.splitAt size b
+                let (tBytes, restOfBytes) = Short.splitAt size b
                 rest <- toBytesTypePair restOfBytes tailTypes
                 return $
                   (tBytes, headType) : rest
@@ -263,7 +264,7 @@ simpleValueToText sv = case sv of
   ValueAccount acct -> Text.pack $ "0x" ++ show acct
   ValueString tx -> '"' `Text.cons` tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
-  ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes _ b -> Text.pack $ show . Base16.encode . Short.fromShort $ b
 
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case
@@ -319,14 +320,14 @@ textToSimpleValue str = \case
     readNum = case readMaybe (Text.unpack str) of
       Nothing -> Left $ "textToSimpleValue: could not decode as number: " <> str
       Just x -> return x
-    readBytes :: Integer -> Either Text ByteString
+    readBytes :: Integer -> Either Text Short.ShortByteString
     readBytes n =
       case Base16.decode (Text.encodeUtf8 str) of
-        Right bytes' | ByteString.length bytes' == fromInteger n -> return bytes'
+        Right bytes' | ByteString.length bytes' == fromInteger n -> return $ Short.toShort bytes'
         _ -> Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
 
-    readBytesDyn :: Either Text ByteString
+    readBytesDyn :: Either Text Short.ShortByteString
     readBytesDyn =
       case Base16.decode (Text.encodeUtf8 str) of
-        Right val -> return val
+        Right val -> return (Short.toShort val)
         _ -> Left $ "textToSimpleValue: could not decode as dynamically sized bytes: " <> str

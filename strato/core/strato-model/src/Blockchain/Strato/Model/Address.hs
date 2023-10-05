@@ -41,10 +41,10 @@ import qualified Data.Aeson.Encoding as Enc
 import qualified Data.Aeson.Key as DAK
 import Data.Aeson.Types
 import Data.Binary
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Short as B
 import Data.Data
 import Data.Hashable
 import Data.Maybe (fromMaybe)
@@ -72,8 +72,8 @@ import Web.FormUrlEncoded
 import Web.PathPieces
 
 instance RLPSerializable Address where
-  rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
-  rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
+  rlpEncode (Address a) = RLPString $ B.toShort $ BL.toStrict $ encode a
+  rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict $ B.fromShort s
   rlpDecode x = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
 type AddressPayable = Address
@@ -91,10 +91,10 @@ instance PrintfArg Address where
 -- first byte of serialized pubkey is metdata, so we drop it
 fromPrivateKey :: PrivateKey -> Address
 fromPrivateKey =
-  Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPublicKey False . derivePublicKey
+  Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . B.toShort . exportPublicKey False . derivePublicKey
 
 fromPublicKey :: PublicKey -> Address
-fromPublicKey = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPublicKey False
+fromPublicKey = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . B.toShort . exportPublicKey False
 
 {-
  Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).
@@ -143,7 +143,7 @@ instance Binary Address where
   get = do
     bytes <- replicateM 20 get
     let byteString = B.pack bytes
-    return (Address $ fromInteger $ byteString2Integer byteString)
+    return (Address $ fromInteger $ byteString2Integer $ B.fromShort byteString)
 
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither err m = maybe (Left err) Right m
@@ -235,7 +235,7 @@ getNewAddress_unsafe a n =
 -- Construct salted contract addresses using a version of the solidity CREATE2 method:
 -- Original -> new_address = hash(0xFF, sender, salt, bytecode)[12::]
 -- Current  -> new_address = hash(0xFF, sender, salt, codecollection_hash, args)[12::]
-getNewAddressWithSalt_unsafe :: Address -> String -> B.ByteString -> String -> Address
+getNewAddressWithSalt_unsafe :: Address -> String -> B.ShortByteString -> String -> Address
 getNewAddressWithSalt_unsafe creator salt codeHash args =
   let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (0xFF :: Integer), rlpEncode creator, rlpEncode salt, rlpEncode codeHash, rlpEncode args]
    in decode $ BL.drop 12 $ encode theHash
@@ -251,7 +251,7 @@ deriveAddressWithSalt sender salt srcHash args = do
               [ rlpEncode (0xFF :: Integer),
                 rlpEncode theAddress,
                 rlpEncode salt,
-                rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash $ encodeUtf8 userRegistryContract) srcHash,
+                rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash . B.toShort $ encodeUtf8 userRegistryContract) srcHash,
                 rlpEncode $ fromMaybe "OrderedVals []" args
               ]
   -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
@@ -267,11 +267,11 @@ addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteSt
 formatAddressWithoutColor :: Address -> String
 formatAddressWithoutColor x = padZeros 40 $ showHex x ""
 
-addressToHex :: Address -> B.ByteString
-addressToHex = B16.encode . BL.toStrict . encode
+addressToHex :: Address -> B.ShortByteString
+addressToHex = B.toShort . B16.encode . BL.toStrict . encode
 
-addressFromHex :: B.ByteString -> Either String Address
-addressFromHex hex = case B16.decode hex of
+addressFromHex :: B.ShortByteString -> Either String Address
+addressFromHex hex = case B16.decode $ B.fromShort hex of
   Right h -> case decodeOrFail (BL.fromStrict h) of
     Right (_, _, a) -> return a
     Left (_, _, mesg) -> Left $ "cannot decode address: " ++ mesg

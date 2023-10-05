@@ -225,13 +225,13 @@ instance Arbitrary Signature where
     return $ Signature (S.CompactRecSig r s v)
 
 instance RLPSerializable Signature where
-  rlpEncode = RLPString . exportSignature
+  rlpEncode = RLPString . BSS.toShort . exportSignature
 
-  rlpDecode (RLPString str) = case importSignature str of
+  rlpDecode (RLPString str) = case importSignature (BSS.fromShort str) of
     Left err -> error $ "rlpDecode for RecSig failed for: " ++ show err
     Right sig -> sig
   rlpDecode (RLPArray [RLPString r, RLPString s, RLPScalar v]) =
-    Signature $ S.CompactRecSig (BSS.toShort r) (BSS.toShort s) v
+    Signature $ S.CompactRecSig r s v
   rlpDecode x = error $ "rlpDecode for RecSig failed on " ++ show x
 
 instance ToJSON Signature where

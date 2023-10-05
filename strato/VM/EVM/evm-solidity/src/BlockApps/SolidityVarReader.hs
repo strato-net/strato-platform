@@ -42,8 +42,8 @@ import Control.Monad.Except
 import Data.Bifunctor (bimap)
 import qualified Data.Bimap as Bimap
 import Data.Bits
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
+import Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short as Short
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.IntMap as I
@@ -83,7 +83,7 @@ valueToSolidityValue = \case
   ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
   ValueArrayDynamic values -> SolidityArray $ map valueToSolidityValue $ unsparse values
   SimpleValue (ValueBytes _ bytes) ->
-    SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bytes
+    SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode $ Short.fromShort bytes
   ValueEnum _ _ index -> SolidityValueAsString $ Text.pack $ show index
   -- TODO(tim): What if declaration order is needed here?
   ValueStruct namedItems -> SolidityObject . Map.toList $ fmap valueToSolidityValue namedItems
@@ -99,16 +99,16 @@ valueToSolidityValue = \case
   ValueArraySentinel {} -> error "TODO(tim): ValueArraySentinel"
   ValueVariadic values -> SolidityArray $ map valueToSolidityValue values
 
-word256ToByteString :: Word256 -> ByteString
+word256ToByteString :: Word256 -> ShortByteString
 word256ToByteString = word256ToBytes
 
-byteStringToWord256 :: ByteString -> Word256
+byteStringToWord256 :: ShortByteString -> Word256
 byteStringToWord256 = bytesToWord256
 
 getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = getArrayStartingKeyBS . word256ToByteString
 
-getArrayStartingKeyBS :: ByteString -> Word256
+getArrayStartingKeyBS :: ShortByteString -> Word256
 getArrayStartingKeyBS = keccak256ToWord256 . hash
 
 decodeStorageKeySimple :: SimpleType -> Word256 -> Integer -> Integer -> [(Word256, Word256)]
@@ -158,7 +158,7 @@ decodeStorageKey typeDefs'@TypeDefs {..} struct' (varName : _) _ ofs cnt len =
         TypeFunction name _ _ ->
           error $
             "Cannot retrieve "
-              ++ show (ByteString.unpack name)
+              ++ show (Short.unpack name)
               ++ ": Functions are not kept in storage"
         TypeStruct name ->
           case Map.lookup name structDefs of
@@ -217,8 +217,8 @@ decodeCacheValue' typeDefs'@TypeDefs {..} cache position@Storage.Position {..} v
           SimpleValue
             . fromJust
             . flip bytesToSimpleValue t
-            . ByteString.take b
-            . ByteString.drop b'
+            . Short.take b
+            . Short.drop b'
             . word256ToByteString
             <$> cache offset
   SimpleType TypeAddress ->
@@ -246,15 +246,15 @@ decodeCacheValue' typeDefs'@TypeDefs {..} cache position@Storage.Position {..} v
 
         let len' = lastWord64 w `div` 2
             startingKey = getArrayStartingKey offset
-         in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . fromMaybe 0 . cache . (startingKey +)) [0 ..] -- if the length is there, so should the data
+         in SimpleValue $ valueBytes $ Short.pack $ take (fromIntegral len') $ concatMap (Short.unpack . word256ToByteString . fromMaybe 0 . cache . (startingKey +)) [0 ..] -- if the length is there, so should the data
       else --small string, less than 32 bytes
 
         let len' = lastWord64 w .&. 0xfe `div` 2
-         in SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString w
+         in SimpleValue $ valueBytes $ Short.take (fromIntegral len') $ word256ToByteString w
   SimpleType TypeString ->
     let v = decodeCacheValue' typeDefs' cache position value $ SimpleType typeBytes
      in case v of
-          Just (SimpleValue (ValueBytes Nothing bytes)) -> Just . SimpleValue . ValueString $ Text.decodeUtf8 bytes
+          Just (SimpleValue (ValueBytes Nothing bytes)) -> Just . SimpleValue . ValueString $ Text.decodeUtf8 $ Short.fromShort bytes
           Just (s@(SimpleValue (ValueString _))) -> Just s
           o -> error $ "decodeCacheValue': Expected ValueBytes or ValueString, but got: " ++ show o
   TypeFunction selector args returns -> Just $ ValueFunction selector args returns
@@ -399,8 +399,8 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
           . SimpleValue
           . fromJust
           . flip bytesToSimpleValue t
-          . ByteString.take b
-          . ByteString.drop b'
+          . Short.take b
+          . Short.drop b'
           . word256ToByteString
           $ storage offset
   SimpleType TypeAddress ->
@@ -423,16 +423,16 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
     | storage offset `testBit` 0 -> --large string, 32+ bytes
       let len' = lastWord64 (storage offset) `div` 2
           startingKey = getArrayStartingKey offset
-       in Just $ SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey +)) [0 ..]
+       in Just $ SimpleValue $ valueBytes $ Short.pack $ take (fromIntegral len') $ concatMap (Short.unpack . word256ToByteString . storage . (startingKey +)) [0 ..]
   SimpleType (TypeBytes Nothing) ->
     --small string, less than 32 bytes
     let len' = lastWord64 (storage offset) .&. 0xfe `div` 2
-     in Just $ SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
+     in Just $ SimpleValue $ valueBytes $ Short.take (fromIntegral len') $ word256ToByteString $ storage offset
   SimpleType TypeString ->
     let bytes = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes of
           Just (SimpleValue (ValueBytes Nothing bytes')) -> bytes'
           _ -> error "decodeValue': Expected ValueBytes Nothing" -- ++ show v
-     in Just $ SimpleValue $ ValueString $ Text.decodeUtf8 bytes
+     in Just $ SimpleValue $ ValueString $ Text.decodeUtf8 $ Short.fromShort bytes
   TypeFunction selector args returns -> Just $ ValueFunction selector args returns
   TypeArrayFixed _ _ -> Nothing
   {-
@@ -510,7 +510,7 @@ decodeMapValue fetchLimit typeDefs' Struct {..} storage mappingName keyName = do
         return $ word256ToByteString $ fromInteger keyAsInteger
       x -> throwError $ "Sorry, This route doesn't support maps with keys of type: " ++ show x
 
-  let valPositionInt = getArrayStartingKeyBS $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
+  let valPositionInt = getArrayStartingKeyBS $ keyByteString `Short.append` word256ToByteString (Storage.offset position)
       getValPosition :: SimpleType -> Text -> Storage.Position -> Storage.Position
       getValPosition _ _ _ = Storage.positionAt valPositionInt --TODO fill in this dummy stub
       valPosition = getValPosition fromType keyName position
@@ -568,7 +568,7 @@ encodeValue' typeDefs'@TypeDefs {} position@Storage.Position {..} ty = \case
   ValueContract (NamedAccount a _) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueBytes (Just n) v) -> encodeByteString offset byte (fromInteger n) v
   SimpleValue (ValueBytes Nothing v) -> [(offset, byteStringToWord256 v)]
-  SimpleValue (ValueString v) -> encodeValue' typeDefs' position ty . SimpleValue . ValueBytes Nothing $ Text.encodeUtf8 v
+  SimpleValue (ValueString v) -> encodeValue' typeDefs' position ty . SimpleValue . ValueBytes Nothing . Short.toShort $ Text.encodeUtf8 v
   ValueFunction _ _ _ -> error "Cannot convert function to storage"
   ValueArrayFixed _ vs -> case ty of
     TypeArrayFixed _ ty' ->
@@ -595,16 +595,16 @@ orFail :: Maybe a -> String -> Either String a
 orFail Nothing msg = Left msg
 orFail (Just x) _ = Right x
 
-encodeByteString :: Word256 -> Int -> Int -> ByteString -> [(Word256, Word256)]
+encodeByteString :: Word256 -> Int -> Int -> ShortByteString -> [(Word256, Word256)]
 encodeByteString offset byte size bs =
-  let bss = ByteString.concat [ByteString.replicate (32 - byte - size) 0, bs, ByteString.replicate byte 0]
+  let bss = Short.concat [Short.replicate (32 - byte - size) 0, bs, Short.replicate byte 0]
    in [(offset, byteStringToWord256 bss)]
 
 decodeByteString :: Storage -> Word256 -> Int -> Int -> Value
-decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
+decodeByteString storage offset byte size = SimpleValue $ ValueBytes Nothing $ Short.take size $ Short.drop (32 - byte - size) $ word256ToByteString $ storage offset
 
 decodeCacheByteString :: Cache -> Word256 -> Int -> Int -> Value -> Value
-decodeCacheByteString storage offset byte size value = fromMaybe value $ SimpleValue . ValueBytes Nothing . B16.encode . ByteString.take size . ByteString.drop (32 - byte - size) . word256ToByteString <$> storage offset
+decodeCacheByteString storage offset byte size value = fromMaybe value $ SimpleValue . ValueBytes Nothing . Short.take size . Short.drop (32 - byte - size) . word256ToByteString <$> storage offset
 
 encodeInt :: (Integral t, Bits t) => Word256 -> Int -> t -> [(Word256, Word256)]
 encodeInt offset byte val = return $ fmap (fromIntegral . (`shiftL` (byte * 8))) (offset, val)

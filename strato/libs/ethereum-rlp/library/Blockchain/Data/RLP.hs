@@ -31,6 +31,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.ByteString.Internal
+import qualified Data.ByteString.Short as BSS
 import Data.Fix
 import Data.Functor.Compose
 import Data.Functor.Identity
@@ -47,7 +48,7 @@ import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 -- End users will not need to directly create objects of this type (an 'RLPObject' can be created using 'rlpEncode'),
 -- however the designer of a new type will need to create conversion code by making their type an instance
 -- of the RLPSerializable class.
-data RLPObject = RLPScalar Word8 | RLPString B.ByteString | RLPArray [RLPObject] deriving (Show, Eq, Ord, Generic)
+data RLPObject = RLPScalar Word8 | RLPString {-# UNPACK #-} !BSS.ShortByteString | RLPArray [RLPObject] deriving (Show, Eq, Ord, Generic)
 
 instance NFData RLPObject
 
@@ -70,51 +71,51 @@ instance Pretty RLPObject where
   pretty (RLPArray objects) =
     encloseSep (text "[") (text "]") (text ", ") $ pretty <$> objects
   pretty (RLPScalar n) = text $ "0x" ++ showHex n ""
-  pretty (RLPString s) = text $ "0x" ++ BC.unpack (B16.encode s)
+  pretty (RLPString s) = text $ "0x" ++ BC.unpack (B16.encode . BSS.fromShort $ s)
 
 formatRLPObject :: RLPObject -> String
 formatRLPObject = show . pretty
 
-splitAtEither :: Int -> B.ByteString -> Either String (B.ByteString, B.ByteString)
-splitAtEither i s | i > B.length s = Left "splitAtEither called with n > length arr"
-splitAtEither i s = Right $ B.splitAt i s
+splitAtEither :: Int -> BSS.ShortByteString -> Either String (BSS.ShortByteString, BSS.ShortByteString)
+splitAtEither i s | i > BSS.length s = Left "splitAtEither called with n > length arr"
+splitAtEither i s = Right $ BSS.splitAt i s
 
-getLength :: Int -> B.ByteString -> (Integer, B.ByteString)
+getLength :: Int -> BSS.ShortByteString -> (Integer, BSS.ShortByteString)
 getLength sizeOfLength bytes =
-  (bytes2Integer $ B.unpack $ B.take sizeOfLength bytes, B.drop sizeOfLength bytes)
+  (bytes2Integer $ BSS.unpack $ BSS.take sizeOfLength bytes, BSS.drop sizeOfLength bytes)
 
-rlpSplit :: B.ByteString -> (RLPObject, B.ByteString)
+rlpSplit :: BSS.ShortByteString -> (RLPObject, BSS.ShortByteString)
 rlpSplit = either error id . rlpSplitEither
 
-rlpSplitMaybe :: B.ByteString -> Maybe (RLPObject, B.ByteString)
+rlpSplitMaybe :: BSS.ShortByteString -> Maybe (RLPObject, BSS.ShortByteString)
 rlpSplitMaybe = either (const Nothing) Just . rlpSplitEither
 
-rlpSplitEither :: B.ByteString -> Either String (RLPObject, B.ByteString)
+rlpSplitEither :: BSS.ShortByteString -> Either String (RLPObject, BSS.ShortByteString)
 rlpSplitEither input =
-  case B.head input of
+  case BSS.head input of
     x
       | x >= 192 && x <= 192 + 55 ->
-        let eResult = splitAtEither (fromIntegral x - 192) $ B.tail input
+        let eResult = splitAtEither (fromIntegral x - 192) $ BSS.tail input
          in (\(arrayData, nextRest) -> (RLPArray $ getRLPObjects arrayData, nextRest)) <$> eResult
     x
       | x >= 0xF8 && x <= 0xFF ->
-        let (arrLength, restAfterLen) = getLength (fromIntegral x - 0xF7) $ B.tail input
+        let (arrLength, restAfterLen) = getLength (fromIntegral x - 0xF7) $ BSS.tail input
             eResult = splitAtEither (fromIntegral arrLength) restAfterLen
          in (\(arrayData, nextRest) -> (RLPArray $ getRLPObjects arrayData, nextRest)) <$> eResult
     x
       | x >= 128 && x <= 128 + 55 ->
-        let eResult = splitAtEither (fromIntegral $ x - 128) $ B.tail input
+        let eResult = splitAtEither (fromIntegral $ x - 128) $ BSS.tail input
          in (\(strList, nextRest) -> (RLPString strList, nextRest)) <$> eResult
     x
       | x >= 0xB8 && x <= 0xBF ->
-        let (strLength, restAfterLen) = getLength (fromIntegral x - 0xB7) $ B.tail input
+        let (strLength, restAfterLen) = getLength (fromIntegral x - 0xB7) $ BSS.tail input
             eResult = splitAtEither (fromIntegral strLength) restAfterLen
          in (\(strList, nextRest) -> (RLPString strList, nextRest)) <$> eResult
-    x | x < 128 -> Right (RLPScalar x, B.tail input)
+    x | x < 128 -> Right (RLPScalar x, BSS.tail input)
     x -> Left ("Missing case in rlpSplit: " ++ show x)
 
-getRLPObjects :: ByteString -> [RLPObject]
-getRLPObjects x | B.null x = []
+getRLPObjects :: BSS.ShortByteString -> [RLPObject]
+getRLPObjects x | BSS.null x = []
 getRLPObjects theData = obj : getRLPObjects rest
   where
     (obj, rest) = rlpSplit theData
@@ -130,54 +131,54 @@ int2Bytes _ = error "int2Bytes not defined for val >= 0x10000000000."
 -- | Converts bytes to 'RLPObject's.
 --
 -- Full deserialization of an object can be obtained using @rlpDecode . rlpDeserialize@.
-rlpDeserialize :: B.ByteString -> RLPObject
+rlpDeserialize :: BSS.ShortByteString -> RLPObject
 rlpDeserialize s =
   case rlpSplit s of
-    (o, x) | B.null x -> o
-    _ -> error ("parse error converting ByteString to an RLP Object: " ++ show (B.unpack s))
+    (o, x) | BSS.null x -> o
+    _ -> error ("parse error converting ByteString to an RLP Object: " ++ show (BSS.unpack s))
 
-rlpDeserializeMaybe :: B.ByteString -> Maybe RLPObject
+rlpDeserializeMaybe :: BSS.ShortByteString -> Maybe RLPObject
 rlpDeserializeMaybe s =
   case rlpSplitMaybe s of
-    Just (o, x) | B.null x -> Just o
+    Just (o, x) | BSS.null x -> Just o
     _ -> Nothing
 
-rlpDeserializeEither :: B.ByteString -> Either String RLPObject
+rlpDeserializeEither :: BSS.ShortByteString -> Either String RLPObject
 rlpDeserializeEither s =
   case rlpSplitEither s of
-    Right (o, x) | B.null x -> Right o
-    Right _ -> Left ("parse error converting ByteString to an RLP Object: " ++ show (B.unpack s))
+    Right (o, x) | BSS.null x -> Right o
+    Right _ -> Left ("parse error converting ByteString to an RLP Object: " ++ show (BSS.unpack s))
     Left e -> Left e
 
 -- | Converts 'RLPObject's to bytes.
 --
 -- Full serialization of an object can be obtained using @rlpSerialize . rlpEncode@.
-rlpSerialize :: RLPObject -> B.ByteString
+rlpSerialize :: RLPObject -> BSS.ShortByteString
 rlpSerialize = \case
-  RLPScalar val -> B.singleton val
+  RLPScalar val -> BSS.singleton val
   RLPString s ->
-    let l = B.length s
+    let l = BSS.length s
      in if l <= 55
-          then B.cons (0x80 + fromIntegral l) s
+          then BSS.cons (0x80 + fromIntegral l) s
           else
             let ibs = int2Bytes l
                 ll = length ibs
-             in (B.pack $ 0xb7 + fromIntegral ll : ibs) <> s
+             in (BSS.pack $ 0xb7 + fromIntegral ll : ibs) <> s
   RLPArray innerObjects -> do
-    let innerBytes = B.concat . map rlpSerialize $ innerObjects
-        l = B.length innerBytes
+    let innerBytes = BSS.concat . map rlpSerialize $ innerObjects
+        l = BSS.length innerBytes
     if l <= 55
-      then B.cons (0xc0 + fromIntegral l) innerBytes
+      then BSS.cons (0xc0 + fromIntegral l) innerBytes
       else
         let ibs = int2Bytes . fromIntegral $ l
             ll = length ibs
-         in (B.pack $ 0xf7 + fromIntegral ll : ibs) <> innerBytes
+         in (BSS.pack $ 0xf7 + fromIntegral ll : ibs) <> innerBytes
 
 instance RLPSerializable Integer where
-  rlpEncode 0 = RLPString B.empty
+  rlpEncode 0 = RLPString BSS.empty
   rlpEncode x | x < 0 = RLPArray [rlpEncode (-x)]
   rlpEncode x | x < 128 = RLPScalar $ fromIntegral x
-  rlpEncode x = RLPString $ B.pack $ integer2Bytes x
+  rlpEncode x = RLPString $ BSS.pack $ integer2Bytes x
   rlpDecode (RLPScalar x) = fromIntegral x
   rlpDecode (RLPString s) = byteString2Integer s
   rlpDecode (RLPArray [x]) = -rlpDecode x
@@ -187,12 +188,20 @@ instance {-# OVERLAPPING #-} RLPSerializable String where
   rlpEncode = rlpEncode . T.pack
   rlpDecode = T.unpack . rlpDecode
 
-instance RLPSerializable B.ByteString where
-  rlpEncode x | B.length x == 1 && B.head x < 128 = RLPScalar $ B.head x
+instance RLPSerializable BSS.ShortByteString where
+  rlpEncode x | BSS.length x == 1 && BSS.head x < 128 = RLPScalar $ BSS.head x
   rlpEncode s = RLPString s
 
-  rlpDecode (RLPScalar x) = B.singleton x
+  rlpDecode (RLPScalar x) = BSS.singleton x
   rlpDecode (RLPString s) = s
+  rlpDecode x = error ("rlpDecode for ByteString not defined for: " ++ show x)
+
+instance RLPSerializable ByteString where
+  rlpEncode x | B.length x == 1 && B.head x < 128 = RLPScalar . BSS.head . BSS.toShort $ x
+  rlpEncode s = RLPString $ BSS.toShort s
+
+  rlpDecode (RLPScalar x) = B.singleton x
+  rlpDecode (RLPString s) = BSS.fromShort s
   rlpDecode x = error ("rlpDecode for ByteString not defined for: " ++ show x)
 
 instance RLPSerializable T.Text where

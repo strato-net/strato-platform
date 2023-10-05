@@ -16,8 +16,8 @@ import qualified Data.Aeson.Key as DAK
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Bifunctor as BF
 import qualified Data.Bimap as Bimap
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Short as Short
 import qualified Data.ByteString.Base16 as Base16
 import Data.Either
 import qualified Data.Map.Strict as Map
@@ -200,13 +200,13 @@ argValueToSimpleValue theType argVal = case theType of
     ArgString str -> ValueBytes Nothing <$> readBytesDyn str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeBytes to be a string, but got " ++ show o
   where
-    readBytes :: Integer -> Text -> Either Text ByteString
+    readBytes :: Integer -> Text -> Either Text Short.ShortByteString
     readBytes n str =
       case Base16.decode (Text.encodeUtf8 str) of
-        Right bytes' | ByteString.length bytes' == fromInteger n -> return bytes'
+        Right bytes' | ByteString.length bytes' == fromInteger n -> return $ Short.toShort bytes'
         _ -> Left $ "argValueToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
-    readBytesDyn :: Text -> Either Text ByteString
+    readBytesDyn :: Text -> Either Text Short.ShortByteString
     readBytesDyn str =
       case Base16.decode (Text.encodeUtf8 str) of
-        Right bytes' -> return bytes'
+        Right bytes' -> return $ Short.toShort bytes'
         _ -> Left $ "argValueToSimpleValue: could not decode as dynamically sized bytes: " <> str

@@ -17,9 +17,9 @@ import Control.Exception
 import Data.Attoparsec.ByteString as Atto
 import Data.Attoparsec.ByteString.Char8 (scientific)
 import Data.Binary
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Internal as BI
+import qualified Data.ByteString.Short as B
 import qualified Data.ByteString.UTF8 as UTF8
 import qualified Data.ByteString.Unsafe as BU
 import Data.Char
@@ -35,7 +35,7 @@ import Text.Format
 
 data BasicValue
   = BInteger !Integer
-  | BString !B.ByteString
+  | BString {-# UNPACK #-} !B.ShortByteString
   | BBool !Bool
   | BAccount !NamedAccount
   | BEnumVal !SolidString !SolidString !Word32
@@ -58,7 +58,7 @@ isDefault BDefault = True
 
 instance Format BasicValue where
   format (BInteger i) = show i
-  format (BString s) = ('"' :) . (++ "\"") $ UTF8.toString s
+  format (BString s) = ('"' :) . (++ "\"") $ UTF8.toString $ B.fromShort s
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
@@ -69,19 +69,19 @@ instance Format BasicValue where
 
 data IndexType
   = INum Integer
-  | IText B.ByteString
+  | IText {-# UNPACK #-} !B.ShortByteString
   | IBool Bool
   | IAccount NamedAccount
   deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
 data StoragePathPiece
-  = Field B.ByteString
+  = Field {-# UNPACK #-} !B.ShortByteString
   | MapIndex IndexType
   | ArrayIndex Int
   deriving (Eq, Show, Generic, NFData, Hashable)
 
 instance Format StoragePathPiece where
-  format (Field n) = C8.unpack n
+  format (Field n) = C8.unpack . B.fromShort $ n
   format (MapIndex i) = "[" ++ show i ++ "]"
   format (ArrayIndex i) = "[" ++ show i ++ "]"
 
@@ -99,10 +99,10 @@ instance Format StoragePath where
 empty :: StoragePath
 empty = StoragePath []
 
-singleton :: B.ByteString -> StoragePath
+singleton :: B.ShortByteString -> StoragePath
 singleton bs = StoragePath [Field bs]
 
-getField :: StoragePath -> B.ByteString
+getField :: StoragePath -> B.ShortByteString
 getField (StoragePath (Field f : _)) = f
 getField path = error "StoragePath must begin with field" path
 
@@ -166,12 +166,12 @@ parseMapIndex = do
     'f' -> string "false" >> return (IBool False)
     'a' -> do
       _ <- string "a:"
-      eAddress <- addressFromHex <$> Atto.take 40
+      eAddress <- addressFromHex . B.toShort <$> Atto.take 40
       mColon <- peekWord8
       mChain <- case w82c <$> mColon of
         Just ':' -> do
           _ <- string ":"
-          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . LabeledError.b16Decode "parseMapIndex" <$> Atto.take 64) <?> "parseMapIndex"
+          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . B.toShort . LabeledError.b16Decode "parseMapIndex" <$> Atto.take 64) <?> "parseMapIndex"
         _ -> pure UnspecifiedChain
       IAccount <$> either fail (return . flip NamedAccount mChain) eAddress
     '"' -> do
@@ -181,7 +181,7 @@ parseMapIndex = do
           ignoreEscapedQuotes _ _ = Just False
       strContents <- scan False ignoreEscapedQuotes
       skip (== c2w8 '"')
-      return . IText . unescapeKey $ strContents
+      return . IText . unescapeKey . B.toShort $ strContents
     _ -> INum <$> parseInteger
   skip (== c2w8 '>')
   (MapIndex idx :) <$> pathParser
@@ -190,20 +190,20 @@ parseField :: Parser [StoragePathPiece]
 parseField = do
   skip (== c2w8 '.')
   ( do
-      n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
+      n <- B.toShort <$> Atto.takeWhile1 (inClass "_a-zA-Z0-9")
       (Field n :) <$> pathParser
     )
     <|> ((string ":creator") *> pathParser)
     <|> ((string ":creatorAddress") *> pathParser)
 
-parsePath :: B.ByteString -> Either String StoragePath
-parsePath = fmap StoragePath . parseOnly pathParser
+parsePath :: B.ShortByteString -> Either String StoragePath
+parsePath = fmap StoragePath . parseOnly pathParser . B.fromShort
 
-escapeKey :: B.ByteString -> B.ByteString
+escapeKey :: B.ShortByteString -> B.ShortByteString
 escapeKey srcBS = unsafePerformIO $ do
   let len = B.length srcBS
-  BI.createAndTrim (2 * len) $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
+  B.toShort <$> (BI.createAndTrim (2 * len) $ \dst ->
+    BU.unsafeUseAsCString (B.fromShort srcBS) $ \src' -> do
       let src = castPtr src'
           copyAndEscape :: Int -> Int -> IO Int
           copyAndEscape !dstOff !srcOff =
@@ -219,13 +219,13 @@ escapeKey srcBS = unsafePerformIO $ do
                     pokeByteOff dst dstOff (0x5c :: Word8)
                     pokeByteOff dst (dstOff + 1) ch
                     copyAndEscape (dstOff + 2) (srcOff + 1)
-      copyAndEscape 0 0
+      copyAndEscape 0 0)
 
-unescapeKey :: B.ByteString -> B.ByteString
+unescapeKey :: B.ShortByteString -> B.ShortByteString
 unescapeKey srcBS = unsafePerformIO $ do
   let len = B.length srcBS
-  BI.createAndTrim len $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
+  B.toShort <$> (BI.createAndTrim len $ \dst ->
+    BU.unsafeUseAsCString (B.fromShort srcBS) $ \src' -> do
       let src = castPtr src'
           copyAndUnescape :: Int -> Int -> IO Int
           copyAndUnescape !dstOff !srcOff =
@@ -247,19 +247,19 @@ unescapeKey srcBS = unsafePerformIO $ do
                     pokeByteOff dst dstOff ch
                     copyAndUnescape (dstOff + 1) (srcOff + 1)
                   else return dstOff
-      copyAndUnescape 0 0
+      copyAndUnescape 0 0)
 
-unparsePath :: StoragePath -> B.ByteString
+unparsePath :: StoragePath -> B.ShortByteString
 unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
   where
-    go :: StoragePathPiece -> [B.ByteString]
+    go :: StoragePathPiece -> [B.ShortByteString]
     go (Field p) = [".", p]
-    go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
-    go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
+    go (ArrayIndex n) = ["[", B.toShort $ C8.pack $ show n, "]"]
+    go (MapIndex (INum n)) = ["<", B.toShort $ C8.pack $ show n, ">"]
     go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
     go (MapIndex (IBool True)) = ["<true>"]
     go (MapIndex (IBool False)) = ["<false>"]
-    go (MapIndex (IAccount a)) = ["<a:", C8.pack $ show a, ">"]
+    go (MapIndex (IAccount a)) = ["<a:", B.toShort $ C8.pack $ show a, ">"]
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case

@@ -36,11 +36,11 @@ import qualified Data.Aeson.Key as DAK
 import Data.Binary
 import Data.Bits
 import qualified Data.ByteArray as BA
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Short as B
 import Data.Ix
 import qualified Data.Primitive.ByteArray as PBA
 import Data.Swagger hiding (Format, format)
@@ -91,7 +91,7 @@ bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of byt
 slowWord256ToBytes :: Word256 -> [Word8]
 slowWord256ToBytes word = map (fromIntegral . (word `shiftR`)) [256 - 8, 256 - 16 .. 0]
 
-word256ToBytes :: Word256 -> B.ByteString
+word256ToBytes :: Word256 -> B.ShortByteString
 word256ToBytes ws = unsafePerformIO $ do
   let n = getBigWordInteger ws
   dstFP <- BI.mallocByteString 32 :: IO (ForeignPtr Word8)
@@ -120,7 +120,7 @@ word256ToBytes ws = unsafePerformIO $ do
             FS.pokeElemOff dst 1 (toBE64 (W64# (bigNatIndex# bn 2#)))
             FS.pokeElemOff dst 0 (toBE64 (W64# (bigNatIndex# bn 3#)))
       _ -> error "negative Word256"
-  return $! BI.PS dstFP 0 32
+  return $! B.toShort $ BI.PS dstFP 0 32
 
 slowBytesToWord256 :: [Word8] -> Word256
 slowBytesToWord256 bytes
@@ -130,11 +130,12 @@ slowBytesToWord256 bytes
     error $
       "slowBytesToWord256 was called with the wrong number of bytes: " ++ show bytes
 
-bytesToWord256 :: B.ByteString -> Word256
+bytesToWord256 :: B.ShortByteString -> Word256
 bytesToWord256 bytes
   | B.length bytes /= 32 = error $ "bytesToWord256 called with the wrong number of bytes: " ++ show bytes
   | otherwise = unsafePerformIO $
-    (BA.withByteArray bytes :: (Ptr Word64 -> IO Word256) -> IO Word256) $ \src -> do
+    -- todo: instance ByteArrayAccess ShortByteString
+    (BA.withByteArray (B.fromShort bytes) :: (Ptr Word64 -> IO Word256) -> IO Word256) $ \src -> do
       hh <- fromBE64 <$!> FS.peekElemOff src 0
       hl <- fromBE64 <$!> FS.peekElemOff src 1
       lh <- fromBE64 <$!> FS.peekElemOff src 2
@@ -222,9 +223,9 @@ instance FromHttpApiData Word160 where
       _ -> Left $ T.pack $ "Error parsing Word160: " ++ show v
 
 instance RLPSerializable Word512 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ B.toShort $ BL.toStrict $ encode val
 
-  rlpDecode (RLPString s) | B.length s == 64 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | B.length s == 64 = decode . BL.fromStrict . B.fromShort $ s
   rlpDecode x = error ("Missing case in rlp2Word512: " ++ show x)
 
 instance RLPSerializable Word256 where
@@ -232,28 +233,28 @@ instance RLPSerializable Word256 where
   rlpDecode = fromInteger . rlpDecode
 
 instance RLPSerializable Word128 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ B.toShort $ BL.toStrict $ encode val
 
   rlpDecode (RLPString s) | B.null s = 0
-  rlpDecode (RLPString s) | B.length s <= 16 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | B.length s <= 16 = decode . BL.fromStrict . B.fromShort $ s
   rlpDecode x = error ("Missing case in rlp2Word128: " ++ show x)
 
 instance RLPSerializable Word32 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ B.toShort $ BL.toStrict $ encode val
 
   rlpDecode (RLPString s) | B.null s = 0
-  rlpDecode (RLPString s) | B.length s <= 4 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | B.length s <= 4 = decode . BL.fromStrict . B.fromShort $ s
   rlpDecode x = error ("Missing case in rlp2Word32: " ++ show x)
 
 instance RLPSerializable Word16 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ B.toShort $ BL.toStrict $ encode val
 
   rlpDecode (RLPString s) | B.null s = 0
-  rlpDecode (RLPString s) | B.length s <= 2 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | B.length s <= 2 = decode . BL.fromStrict . B.fromShort $ s
   rlpDecode x = error ("Missing case in rlp2Word16: " ++ show x)
 
 instance Format Word256 where
-  format x = BC.unpack $ B16.encode $ B.pack $ slowWord256ToBytes x
+  format x = BC.unpack $ B16.encode $ B.fromShort $ B.pack $ slowWord256ToBytes x
 
 instance Ae.ToJSONKey Word256 where
   toJSONKey = Ae.ToJSONKeyText f (Enc.text . t)

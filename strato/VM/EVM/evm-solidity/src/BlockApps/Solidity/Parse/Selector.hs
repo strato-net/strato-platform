@@ -10,8 +10,8 @@ module BlockApps.Solidity.Parse.Selector (deriveSelector) where
 import BlockApps.Solidity.Type
 import Crypto.Hash
 import qualified Data.ByteArray as ByteArray
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
+import Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short as ByteString
 import Data.List
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -25,13 +25,13 @@ import Data.Text.Encoding
 -- respectively 'uintX' and 'address' types, where X is the least number of
 -- bytes (in bits) that can hold all the enum's values.  Structs are not
 -- permitted at all.
-deriveSelector :: [(Text, Int)] -> Text -> [Type] -> ByteString
-deriveSelector enumSizes name args = hash4 $ signature enumSizes name args
+deriveSelector :: [(Text, Int)] -> Text -> [Type] -> ShortByteString
+deriveSelector enumSizes name args = hash4 . ByteString.fromShort $ signature enumSizes name args
   where
-    hash4 bs = ByteString.take 4 . ByteArray.convert $ (hash bs :: Digest Keccak_256)
+    hash4 bs = ByteString.take 4 . ByteString.toShort . ByteArray.convert $ (hash bs :: Digest Keccak_256)
 
-signature :: [(Text, Int)] -> Text -> [Type] -> ByteString
-signature enumSizes name args = encodeUtf8 $ Text.pack $ Text.unpack name ++ prettyArgTypes enumSizes args
+signature :: [(Text, Int)] -> Text -> [Type] -> ShortByteString
+signature enumSizes name args = ByteString.toShort $ encodeUtf8 $ Text.pack $ Text.unpack name ++ prettyArgTypes enumSizes args
 
 prettyArgTypes :: [(Text, Int)] -> [Type] -> String
 prettyArgTypes enumSizes args =
