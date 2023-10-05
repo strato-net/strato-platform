@@ -174,7 +174,7 @@ const ListNowIndex = ({
             placeholder="Quantity"
             prefix={isInventoriesLoading && <Spin />}
             onWheel={(e) => e.target.blur()}
-            disabled={isInventoriesLoading || productId==''}
+            disabled={isInventoriesLoading || productId == ''}
             min={0}
             max={MAX_QUANTITY}
             value={quantity}
@@ -187,7 +187,7 @@ const ListNowIndex = ({
               }
             }}
           />
-          {type === "Resale" && inventoryId!='' && <p>Available: {inventoryQuantity}</p>}
+          {type === "Resale" && inventoryId != '' && <p>Available: {inventoryQuantity}</p>}
           {error && <div style={{ color: 'red' }}>{error}</div>}
         </>
       ),
@@ -239,44 +239,19 @@ const ListNowIndex = ({
   ];
 
   const handleCreateFormSubmit = async () => {
-    const membershipBody = {
-      inventoryId: inventoryId,
+    const resalePayload = {
       productAddress: productId,
-      quantity: quantity,
-      pricePerUnit: price,
-      // Generate random code for now
-      batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-      // Status should always be published if we use List Now
-      status: INVENTORY_STATUS.PUBLISHED,
-      serialNumbers: [],
-      taxPercentageAmount: taxPercentageAmount,
-      taxDollarAmount: taxDollarAmount,
-    };
+      inventory: inventoryId,
+      updates: {
+        pricePerUnit: price,
+        status: INVENTORY_STATUS.PUBLISHED,
+        quantity: 1
+      }
+    }
 
     const resaleMembership = await membershipActions.resaleMembership(
-      membershipDispatch, membershipBody
+      membershipDispatch, resalePayload
     )
-
-    // const createInventory = await inventoryActions.createInventory(
-    //   inventoryDispatch,
-    //   inventoryBody
-    // );
-
-
-    // const updatePayload = {
-    //   productAddress: productId,
-    //   inventory: inventoryId,
-    //   updates: {
-    //     pricePerUnit: price,
-    //     status: INVENTORY_STATUS.PUBLISHED,
-    //     quantity: quantity
-    //   }
-    // }
-
-    // const updateInventory = await inventoryActions.updateInventory(
-    //   inventoryDispatch,
-    //   updatePayload
-    // );
 
     if (resaleMembership) {
       // membership.product_with_inventory = 1;

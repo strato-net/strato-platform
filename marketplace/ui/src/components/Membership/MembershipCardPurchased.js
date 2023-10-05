@@ -122,21 +122,17 @@ const MembershipCardPurchased = ({
   const handleCreateFormSubmit = async (values) => {
     if (user) {
       if (formik.values.price !== "" && inventories) {
-        const membershipBody = {
-          inventoryId: [inventories[0].address],
+        const resalePayload = {
           productAddress: membership.productId,
-          quantity: formik.values.quantity,
-          pricePerUnit: formik.values.price,
-          // Generate random code for now
-          batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-          // Status should always be published if we use List Now
-          taxPercentageAmount: 0,
-          taxDollarAmount: 0,
-          status: INVENTORY_STATUS.PUBLISHED,
-          serialNumbers: [],
-        };
+          inventory: inventories[0].address,
+          updates: {
+            pricePerUnit: formik.values.price,
+            status: INVENTORY_STATUS.PUBLISHED,
+            quantity: 1
+          }
+        }
         const resaleMembership = await membershipActions.resaleMembership(
-          membershipDispatch, membershipBody
+          membershipDispatch, resalePayload
         )
 
         if (resaleMembership) {
