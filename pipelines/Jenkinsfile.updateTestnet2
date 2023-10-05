@@ -18,7 +18,7 @@ pipeline {
             --input '{"VersionTag": "${params.VERSION_TAG}"}' \
             --query "executionArn" \
             --output text).trim()
-          """)
+        """)
 
         sh """
           echo "Started Step Functions execution with ARN: \$execution_arn" 
