@@ -261,6 +261,7 @@ function bind(user, _contract, options) {
     const contract = { ..._contract };
 
     contract.createMembership = async (args) => createMembership(user, contract, args, options);
+    contract.addMembershipOrderFlow = async (args) => addMembershipOrderFlow(user, contract, args, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
 
@@ -316,6 +317,23 @@ async function createMembership(user, contract, args, options) {
     return createMembershipStatus
 }
 
+async function addMembershipOrderFlow(user, contract, args, options) {
+
+    const callArgs = {
+        contract,
+        method: 'addMembershipOrderFlow',
+        args: util.usc(args),
+    };
+    const createMembershipStatus = await rest.call(user, callArgs, options);
+
+    console.log('createMembershipStatus', createMembershipStatus);
+
+    if (parseInt(createMembershipStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(createMembershipStatus, 'You cannot create a Membership', { args })
+    }
+
+    return createMembershipStatus
+}
 
 export default {
     uploadContract,
@@ -325,6 +343,7 @@ export default {
     bind,
     getState,
     createMembership,
+    addMembershipOrderFlow,
     marshalIn,
     marshalOut,
     getHistory

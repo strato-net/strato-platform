@@ -33,7 +33,8 @@ contract ProductFile is ProductFileSection, ProductFileType {
 
 
     constructor(
-            address _productId
+            address _owner
+        ,   address _productId
         ,   string _fileLocation
         ,   string _fileHash
         ,   string _fileName
@@ -42,7 +43,7 @@ contract ProductFile is ProductFileSection, ProductFileType {
         ,   ProductFileSection _section
         ,   ProductFileType _type
     ) public {
-        owner = tx.origin;
+        owner = _owner;
 
         productId = _productId;
         fileLocation = _fileLocation;
@@ -53,7 +54,7 @@ contract ProductFile is ProductFileSection, ProductFileType {
         currentSection = _section;
         currentType = _type;
 
-        mapping(string => string) ownerCert = getUserCert(tx.origin);
+        mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];

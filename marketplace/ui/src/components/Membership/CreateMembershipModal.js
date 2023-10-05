@@ -316,8 +316,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 fileName: `${file.originalName}`,
                 uploadDate: new Date().getTime(),
                 createdDate: new Date().getTime(),
-                section: 1,
-                type: 2,
+                currentSection: 1,
+                currentType: 2,
               })),
             };
             switch (visible) {
@@ -331,7 +331,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 break;
               case true:
                 const createMembership = await actions.createMembership(dispatch, body);
-                console.log("createMembership", createMembership);
+                console.log("createMembership:", createMembership);
                   const productId = createMembership.productAddress;
                   const inventoryBody = {
                     productAddress: productId,
