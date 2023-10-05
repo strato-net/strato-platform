@@ -135,9 +135,8 @@ class AuthenticationController {
 
     returnUrl = req.cookies.returnUrl
 
-    console.log("returnUrl", req.cookies.returnUrl, "req-return", )
     if (returnUrl) {
-      res.redirect(`${returnUrl}`)
+      res.redirect(returnUrl)
     }
     else {
       res.redirect('/')

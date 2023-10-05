@@ -593,7 +593,7 @@ const ProductDetails = ({ user, users }) => {
                     id="addToCart"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/products/${details.productId}`, 10);
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -613,7 +613,7 @@ const ProductDetails = ({ user, users }) => {
                     className="group w-1/3 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/products/${details.productId}`, 10);
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -637,7 +637,7 @@ const ProductDetails = ({ user, users }) => {
                     className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/products/${details.productId}`, 10);
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({

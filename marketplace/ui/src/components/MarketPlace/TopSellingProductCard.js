@@ -175,7 +175,7 @@ const TopSellingProductCard = () => {
                           className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
                           onClick={() => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                              setCookie("returnUrl", `/marketplace/products/${topSellingProduct.productId}`, 10);
+                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
                               TagManager.dataLayer({
@@ -196,7 +196,7 @@ const TopSellingProductCard = () => {
                         <div
                           onClick={() => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                              setCookie("returnUrl", `/marketplace/products/${topSellingProduct.productId}`, 10);
+                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
                               TagManager.dataLayer({

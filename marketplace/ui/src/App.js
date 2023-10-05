@@ -23,14 +23,12 @@ const App = () => {
   const {user, loginUrl, users, isAuthenticated } =
     useAuthenticateState();
 
-  // Checking for return url after login/registration. Cookies are set if the user clicks on items to buy without logging in. 
-  // We will use that cookie to redirect them to where they left off. 
-  if(getCookie("returnUrl") && isAuthenticated){
-    window.location.href = getCookie("returnUrl");
-    delete_cookie("returnUrl");
-  }
   
-
+    // Using this to delete our returnUrl cookie after login
+    if (getCookie('returnUrl') && isAuthenticated) {
+      delete_cookie('returnUrl');
+    }
+  
   // useEffect if path is empty then redirect to marketplace without using navigate
   // This is needed for non dockerized version to redirect to marketplace after login and anon access
   useEffect(() => {
