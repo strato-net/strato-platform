@@ -251,11 +251,11 @@ const actions = {
         if (response.status === RestStatus.OK) {
           dispatch({
             type: actionDescriptors.updateAssetImportCount,
-            count: i+1,
+            count: i + 1,
           });
         } else {
           errors.push({ status: response.error.status, error: response.error.data.method, id: i })
-        }        
+        }
       } catch (err) {
         //  nothing
       }

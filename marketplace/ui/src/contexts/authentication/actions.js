@@ -32,7 +32,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.checkSuccessful,
-          payload: {...body.data}
+          payload: { ...body.data }
         });
         return;
       }
@@ -48,13 +48,14 @@ const actions = {
         method: HTTP_METHODS.GET,
         credentials: "same-origin",
       });
+
       const body = await response.json();
-      if (response.status === RestStatus.OK) {
+      if (body.success) {
         dispatch({
           type: actionDescriptors.fetchUsersSuccessful,
           payload: body.data,
         });
-        return;
+        return body.data;
       }
       dispatch({ type: actionDescriptors.fetchUsersFailed, payload: undefined });
     } catch (err) {
@@ -65,8 +66,8 @@ const actions = {
     dispatch({ type: actionDescriptors.logoutCheck });
     try {
       const response = await fetch(`${apiUrl}/authentication/logout`, {
-          method: HTTP_METHODS.GET,
-          credentials: "same-origin",
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
       });
       if (response.status === RestStatus.OK) {
         const body = await response.json();

@@ -1,0 +1,44 @@
+import express from "express";
+import ServiceUsageController from "./serviceUsage.controller";
+import { ServiceUsage } from "../endpoints";
+import authHandler from "../../middleware/authHandler";
+import loadDapp from "../../middleware/loadDappHandler";
+
+const router = express.Router();
+
+router.get(
+  ServiceUsage.getAll,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ServiceUsageController.getAll
+);
+
+router.get(
+  ServiceUsage.getBooked,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ServiceUsageController.getAllBooked
+);
+
+router.get(
+  ServiceUsage.getProvided,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ServiceUsageController.getAllProvided
+);
+
+router.post(
+  ServiceUsage.create,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ServiceUsageController.create
+);
+
+router.put(
+  ServiceUsage.update,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ServiceUsageController.update
+);
+
+export default router;

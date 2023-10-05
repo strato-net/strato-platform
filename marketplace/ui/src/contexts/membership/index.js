@@ -8,6 +8,7 @@ const MembershipsProvider = ({ children }) => {
   const initialState = {
     purchasedMemberships: [],
     isPurchasedMembershipLoading: false,
+    isIssuedMembershipLoading: false,
     membership: null,
     membershipServices: [],
     isMembershipLoading: false,
