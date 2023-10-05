@@ -20,7 +20,6 @@ const MarketPlace = () => {
     actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
-
   return (
     <>
       <div className="relative">
