@@ -1410,8 +1410,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         fileName: `${productFileDetail.fileName}`,
         uploadDate: new Date().getTime(),
         createdDate: new Date().getTime(),
-        section: 1,
-        type: 2,
+        currentSection: 1,
+        currentType: 2,
       }],
     };
 
