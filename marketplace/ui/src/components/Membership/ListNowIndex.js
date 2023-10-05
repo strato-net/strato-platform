@@ -174,10 +174,10 @@ const ListNowIndex = ({
             placeholder="Quantity"
             prefix={isInventoriesLoading && <Spin />}
             onWheel={(e) => e.target.blur()}
-            disabled={isInventoriesLoading || productId == ''}
+            disabled={true}
             min={0}
             max={MAX_QUANTITY}
-            value={quantity}
+            value={1}
             onChange={(value) => {
               if (value > MAX_QUANTITY) {
                 setError(`Quantity cannot exceed ${MAX_QUANTITY}`);

@@ -70,10 +70,10 @@ const ListNowModal = ({
             min={0}
             max={inventoryQuantity}
             prefix={isInventoriesLoading && <Spin />}
-            // disabled={true}
+            disabled={type === "Resale"}
             // value={1}
             controls={false}
-            value={formik.values.quantity}
+            value={type === "Resale" ? 1 : formik.values.quantity}
             onChange={(value) => {
               formik.setFieldValue("quantity", value);
             }}
