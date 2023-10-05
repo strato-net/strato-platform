@@ -1076,6 +1076,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       // let ownedMem = await membershipJs.getAll(rawAdmin, args, getOptions);
       let ownedItems = await itemJs.getAll(rawAdmin, args, getOptions);
+      let inventoriesAddresses = ownedItems.map(item=>item.inventoryId) 
+      const inventoriesList = await managers.productManager.getInventories({ address: inventoriesAddresses }, getOptions);
       // Filter ownedItems based on productId and ownerOrg
       // ownedItems = ownedItems.filter(item =>
       //   ownedProducts.some(product => item.productId === product.address)
@@ -1146,7 +1148,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             itemAddress: item.address,
             itemNumber: item.itemNumber,
             productId: item.productId,
-            fileLocation: productFiles[0].fileLocation,
+            fileLocation: null, // productFiles[0]?.fileLocation, // comment for resale test
+            status:inventoriesList.find((inventory)=>inventory.address===item.inventoryId)?.status,
             productName: product.name,
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,

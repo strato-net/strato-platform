@@ -161,11 +161,13 @@ const MembershipCardPurchased = ({
                 alt=""
                 src={membership.productImageLocation}
               />
-              {membership.product_with_inventory ?
+              {/* {membership.product_with_inventory ?
                 (membership.isInventoryAvailable ?
                   (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px" }}> For Sale </Button>)
                   : (<Button type="primary" shape="round" style={{ background: "red", marginTop: "10px" }}> Retained </Button>))
-                : (<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> Not for Sale </Button>)}
+                : (<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> Not for Sale </Button>)} */}
+              {membership?.status == 1 && <Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> For Sale </Button>}
+              {membership?.status == 2 && <Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> Not for Sale </Button>}
             </div>
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
