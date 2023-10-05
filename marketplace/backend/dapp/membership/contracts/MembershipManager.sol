@@ -5,11 +5,13 @@ import "/dapp/membershipService/contracts/MembershipService.sol";
 import "/dapp/productFile/contracts/ProductFile.sol";
 import "/dapp/products/contracts/ProductManager.sol";
 import "/dapp/Dapp/contracts/Dapp.sol";
+import "/dapp/productFile/contracts/ProductFileSection.sol";
+import "/dapp/productFile/contracts/ProductFileType.sol";
 
 
 
 /// @title A representation of MembershipManager to manage membership and inventory
-contract MembershipManager is RestStatus{
+contract MembershipManager is RestStatus, ProductFileSection, ProductFileType{
 
 
     address owner;
@@ -60,8 +62,8 @@ contract MembershipManager is RestStatus{
         string fileName;
         int uploadDate;
         uint createdDate;
-        ProductFileSection section;
-        ProductFileType type;
+        ProductFileSection currentSection;
+        ProductFileType currentType;
     }
 
     function addMembership(address _dappAddress, MembershipArgs _membershipArgs, MembershipServiceArgs[] _membershipServiceArgs, ProductFileArgs[] _productFileArgs) 
@@ -87,13 +89,14 @@ contract MembershipManager is RestStatus{
                                                  _membershipArgs.imageKey, _membershipArgs.isActive, _membershipArgs.category,
                                                  _membershipArgs.subCategory, _membershipArgs.createdDate);
         
-        Membership_2 membership = new Membership_2(address(product), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
+        Membership_2 membership = new Membership_2(address(tx.origin), address(product), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
 
         //iterate throught MembershipServiceArgs array and create MembershipServices 
 
         for(uint i = 0; i < _membershipServiceArgs.length; i++) {
             MembershipServiceArgs membershipServiceArg = _membershipServiceArgs[i];
-            MembershipService membershipService = new MembershipService(address(membership), 
+            MembershipService membershipService = new MembershipService(address(tx.origin),
+                                                                        address(membership), 
                                                                         address(membershipServiceArg.serviceId), 
                                                                         membershipServiceArg.membershipPrice, 
                                                                         membershipServiceArg.discountPrice, 
@@ -107,14 +110,15 @@ contract MembershipManager is RestStatus{
 
         for (uint ip = 0; ip < _productFileArgs.length; ip++) {
             ProductFileArgs productFileArg = _productFileArgs[ip];
-            ProductFile productFile = new ProductFile(address(product), 
+            ProductFile productFile = new ProductFile(  address(tx.origin),
+                                                        address(product), 
                                                         productFileArg.fileLocation, 
                                                         productFileArg.fileHash, 
                                                         productFileArg.fileName, 
                                                         productFileArg.uploadDate, 
                                                         productFileArg.createdDate, 
-                                                        productFileArg.section, 
-                                                        productFileArg.type);
+                                                        productFileArg.currentSection, 
+                                                        productFileArg.currentType);
 
             //add productFile to productFiles mapping
             productFiles[address(product)].push(address(productFile));
@@ -125,6 +129,53 @@ contract MembershipManager is RestStatus{
 
 
         return (RestStatus.OK, address(membership), address(product));
+    }
+    
+    function addMembershipOrderFlow(address _dappAddress, address _owner, address _productId, MembershipArgs _membershipArgs, MembershipServiceArgs[] _membershipServiceArgs, ProductFileArgs[] _productFileArgs) 
+        returns (uint256, address, address) {
+
+        dapp = Dapp(account(_dappAddress, "parent"));
+
+        Membership_2 membership = new Membership_2( address(_owner), address(_productId), _membershipArgs.timePeriodInMonths, _membershipArgs.additionalInfo, _membershipArgs.createdDate);
+
+        //iterate throught MembershipServiceArgs array and create MembershipServices 
+
+        for(uint i = 0; i < _membershipServiceArgs.length; i++) {
+            MembershipServiceArgs membershipServiceArg = _membershipServiceArgs[i];
+            MembershipService membershipService = new MembershipService(address(_owner),
+                                                                        address(membership), 
+                                                                        address(membershipServiceArg.serviceId), 
+                                                                        membershipServiceArg.membershipPrice, 
+                                                                        membershipServiceArg.discountPrice, 
+                                                                        membershipServiceArg.maxQuantity, 
+                                                                        membershipServiceArg.createdDate, 
+                                                                        membershipServiceArg.isActive);
+            //add membershipService to membershipServices mapping 
+            membershipServices[address(membership)].push(address(membershipService));
+
+        }
+
+        for (uint ip = 0; ip < _productFileArgs.length; ip++) {
+            ProductFileArgs productFileArg = _productFileArgs[ip];
+            ProductFile productFile = new ProductFile(  address(_owner),
+                                                        address(_productId), 
+                                                        productFileArg.fileLocation, 
+                                                        productFileArg.fileHash, 
+                                                        productFileArg.fileName, 
+                                                        productFileArg.uploadDate, 
+                                                        productFileArg.createdDate, 
+                                                        productFileArg.currentSection, 
+                                                        productFileArg.currentType);
+
+            //add productFile to productFiles mapping
+            productFiles[address(_productId)].push(address(productFile));
+        }
+
+        //add membership to memberships array
+        memberships.push(address(membership));
+
+
+        return (RestStatus.OK, address(membership), address(_productId));
     }
 
 //    function updateMembership (address _membershipAddress, string _description, string _imageKey, bool _isActive, string _userUniqueMembershipCode, uint _scheme) 
