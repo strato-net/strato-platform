@@ -18,4 +18,5 @@ getGenesisHash :: HasSQLDB m => m Keccak256
 getGenesisHash = sqlQuery $ LabeledError.read "Extra/getGenesisHash" . extraValue <$> SQL.getJust (ExtraKey "genesisHash")
 
 putGenesisHash :: HasSQLDB m => Keccak256 -> m ()
-putGenesisHash hash' = void . sqlQuery $ SQL.upsert (Extra "genesisHash" $ show hash') []
+putGenesisHash hash' = void . sqlQuery $ SQL.upsertBy (TheKey "genesisHash") (Extra "genesisHash" $ show hash') []
+

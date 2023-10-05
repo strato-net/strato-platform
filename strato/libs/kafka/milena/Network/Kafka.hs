@@ -1,4 +1,6 @@
 {-# OPTIONS -fno-warn-deprecations #-}
+{-# OPTIONS -fno-warn-orphans      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 
 module Network.Kafka where
 
@@ -11,7 +13,7 @@ import Control.Lens
 import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.State.Class (MonadState)
-import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Trans.Control 
 import Control.Monad.Trans.State
 import Data.ByteString.Char8 (ByteString)
 import Data.List.NonEmpty (NonEmpty (..))
@@ -22,6 +24,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified DeprecatedNetworkFunction
 import GHC.Generics (Generic)
+
 -- local
 import Network.Kafka.Protocol
 import System.IO
@@ -53,9 +56,40 @@ data KafkaState = KafkaState
     -- | Address cache
     _stateAddresses :: NonEmpty KafkaAddress
   }
-  deriving (Generic, Show)
+  deriving (Generic)
 
 makeLenses ''KafkaState
+
+
+instance Show (Pool.Pool Handle) where
+  show _ = "Pool Handle"
+
+instance Show KafkaState where
+  show s =
+    "KafkaState {"
+      ++ "\n\tstateName = "
+      ++ show (s ^. stateName)
+      ++ "\n\tstateRequiredAcks = "
+      ++ show (s ^. stateRequiredAcks)
+      ++ "\n\tstateRequestTimeout = "
+      ++ show (s ^. stateRequestTimeout)
+      ++ "\n\tstateWaitSize = "
+      ++ show (s ^. stateWaitSize)
+      ++ "\n\tstateBufferSize = "
+      ++ show (s ^. stateBufferSize)
+      ++ "\n\tstateWaitTime = "
+      ++ show (s ^. stateWaitTime)
+      ++ "\n\tstateCorrelationId = "
+      ++ show (s ^. stateCorrelationId)
+      ++ "\n\tstateBrokers = "
+      ++ show (s ^. stateBrokers)
+      ++ "\n\tstateConnections = "
+      ++ show (s ^. stateConnections)
+      ++ "\n\tstateTopicMetadata = "
+      ++ show (s ^. stateTopicMetadata)
+      ++ "\n\tstateAddresses = "
+      ++ show (s ^. stateAddresses)
+      ++ "\n}"
 
 -- | The core Kafka monad.
 type Kafka m = (MonadState KafkaState m, MonadError KafkaClientError m, MonadIO m, MonadBaseControl IO m)
@@ -366,7 +400,12 @@ withAddressHandle address kafkaAction = do
       stateConnections .= (at address ?~ newPool $ conns)
       return newPool
     Just p -> return p
-  tryKafka $ Pool.withResource pool kafkaAction
+  tryKafka $ liftBaseWith (\runInIO -> 
+    Pool.withResource pool (\handle -> runInIO (kafkaAction handle))
+    ) >>= restoreM
+
+--  tryKafka $ liftBaseWith $ \runInIO -> Pool.withResource pool (runInIO . kafkaAction)
+--  tryKafka $ Pool.withResource pool kafkaAction
   where
     mkPool :: KafkaAddress -> IO (Pool.Pool Handle)
     mkPool a = Pool.createPool (createHandle a) hClose 1 10 1

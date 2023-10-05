@@ -27,7 +27,7 @@ derivePersistFieldJSON "Xabi"
 integerCap :: Integer
 integerCap = 1000
 
-showHexFixed :: (Integral a, Show a) => Int -> a -> String
+showHexFixed :: (Integral a) => Int -> a -> String
 showHexFixed len val = pad $ showHex val ""
   where
     pad s = if length s >= len then s else pad ('0' : s)
