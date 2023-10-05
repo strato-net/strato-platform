@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Select, Table } from "antd";
+import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography } from "antd";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -20,10 +20,13 @@ const ListNowIndex = ({
   handleCancel,
   user,
   //   formik,
-  //   type,
+  type,
   //   getIn,
   //   isCreateMembershipSubmitting,
 }) => {
+
+  const { inventories, isInventoriesLoading } = useInventoryState()
+  const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user.user.organization;
   const { cartList } = useMarketplaceState();
   const [purchasedMembershipData, setPurchasedMembershipData] = useState([]);
@@ -41,7 +44,6 @@ const ListNowIndex = ({
   const [price, setPrice] = useState('');
   const membershipDispatch = useMembershipDispatch();
   const inventoryDispatch = useInventoryDispatch();
-  const { inventories, isInventoriesLoading } = useInventoryState()
 
   const isListNow = (!productId || !id || !inventoryId || !quantity || !price);
 
@@ -170,8 +172,9 @@ const ListNowIndex = ({
             controls={false}
             type="number"
             placeholder="Quantity"
+            prefix={isInventoriesLoading && <Spin />}
             onWheel={(e) => e.target.blur()}
-            disabled={isInventoriesLoading}
+            disabled={isInventoriesLoading || productId==''}
             min={0}
             max={MAX_QUANTITY}
             value={quantity}
@@ -184,6 +187,7 @@ const ListNowIndex = ({
               }
             }}
           />
+          {type === "Resale" && inventoryId!='' && <p>Available: {inventoryQuantity}</p>}
           {error && <div style={{ color: 'red' }}>{error}</div>}
         </>
       ),

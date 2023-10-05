@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Select, Table } from "antd";
+import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography } from "antd";
 import helperJson from "../../helpers/helper.json"
 import { useInventoryState } from "../../contexts/inventory";
+import { useMembershipState } from "../../contexts/membership";
+import { useProductState } from "../../contexts/product";
 const { columns, taxOptions } = helperJson;
 
 const ListNowModal = ({
@@ -15,9 +17,12 @@ const ListNowModal = ({
   isCreateMembershipSubmitting,
 }) => {
   const { isInventoriesLoading, inventories } = useInventoryState();
+  const { isuploadImageSubmitting } = useProductState()
   const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user.user.user.organization;
   const membership = formik.values.name;
+  let { isResaleMembershipSubmitting } = useMembershipState();
+  const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting;
 
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {
@@ -64,6 +69,7 @@ const ListNowModal = ({
             name="quantity"
             min={0}
             max={inventoryQuantity}
+            prefix={isInventoriesLoading && <Spin />}
             // disabled={true}
             // value={1}
             controls={false}
@@ -72,6 +78,7 @@ const ListNowModal = ({
               formik.setFieldValue("quantity", value);
             }}
           />
+          {type === "Resale" && <p>Available: {inventoryQuantity}</p>}
           {getIn(formik.touched, `quantity`) && getIn(formik.errors, `quantity`) && (
             <span className="text-error text-xs">
               {getIn(formik.errors, `quantity`)}
@@ -142,7 +149,7 @@ const ListNowModal = ({
         <Button
           key="list-now"
           onClick={formik.handleSubmit}
-          loading={isCreateMembershipSubmitting}
+          loading={isSubmit}
           type="primary"
         >
           List Now
@@ -150,7 +157,7 @@ const ListNowModal = ({
       ]}
     >
       <Form>
-        <Table loading={isInventoriesLoading} columns={columns} dataSource={data} pagination={false}></Table>
+        <Table columns={columns} dataSource={data} pagination={false}></Table>
       </Form>
     </Modal>
   );
