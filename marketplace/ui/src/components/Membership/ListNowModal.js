@@ -15,7 +15,7 @@ const ListNowModal = ({
   isCreateMembershipSubmitting,
 }) => {
   const { isInventoriesLoading, inventories } = useInventoryState();
-
+  const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user.user.user.organization;
   const membership = formik.values.name;
 
@@ -63,7 +63,7 @@ const ListNowModal = ({
             id="quantity"
             name="quantity"
             min={0}
-            max={inventories[0]?.availableQuantity}
+            max={inventoryQuantity}
             // disabled={true}
             // value={1}
             controls={false}
