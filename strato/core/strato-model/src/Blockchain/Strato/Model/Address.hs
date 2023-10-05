@@ -55,6 +55,7 @@ import qualified Data.Swagger as Sw
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.Persist.Sql hiding (get)
+-- import Debug.Trace
 import GHC.Generics
 import qualified LabeledError
 import Numeric
@@ -254,7 +255,7 @@ deriveAddressWithSalt sender salt srcHash args = do
                 rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash $ encodeUtf8 userRegistryContract) srcHash,
                 rlpEncode $ fromMaybe "OrderedVals []" args
               ]
-  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show $ keccak256ToByteString $ hash src) ++ " " ++ args)
+  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show srcHash) ++ " " ++ show args) $
   (decode $ BL.drop 12 $ encode theHash)
 
 addressAsNibbleString :: Address -> N.NibbleString
