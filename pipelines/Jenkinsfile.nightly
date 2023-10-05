@@ -142,7 +142,7 @@ pipeline {
           // Few quick tests
           sh './check_availability.sh'
 
-          echo "Restarting docker containers to simulate computer restart..."
+          echo "Restarting docker containers to simulate computer reboot..."
           docker compose -p strato stop
           docker compose -p strato start
 
