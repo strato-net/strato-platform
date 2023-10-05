@@ -12,43 +12,43 @@ class MembershipController {
   static async get(req, res, next) {
     try {
       const { dapp, params } = req
-      const { address, chainId } = params 
-     
+      const { address, chainId } = params
+
       let args
       let chainOptions = options
-      
+
       if (address) {
         args = { address }
         if (chainId) {
           chainOptions = { ...options, chainIds: [chainId] }
         }
       }
-      
+
       let out = {}
       try {
         const result = await dapp.getMembership(args, chainOptions);
-        
+
         const temp = await Promise.all(
           (result.productFiles || []).map(async (productFile) => {
             const productFileImageUrl = await getSignedUrlFromS3(productFile.fileLocation, req.app.get(constants.s3ParamName));
             return { ...productFile, imageUrl: productFileImageUrl };
           })
         );
-      
+
         out = {
           membership: result.membership,
           membershipServices: result.membershipServices,
           productFiles: temp,
         };
-      
+
         // You can now use 'out' in your code
       } catch (err) {
         console.log(err);
       }
-      
+
 
       rest.response.status200(res, out)
-      
+
       return next()
     } catch (e) {
       return next(e)
@@ -58,12 +58,13 @@ class MembershipController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
-      
+
       let memberships = await dapp.getMemberships({ ...query })
       //Get image location associated with each membership/product
-      memberships = memberships.map((membership) => { 
-        const img  =  getSignedUrlFromS3(membership.productImage.fileLocation, req.app.get(constants.s3ParamName));
-        return {...membership, productImageLocation: img} });
+      memberships = memberships.map((membership) => {
+        const img = getSignedUrlFromS3(membership.productImage.fileLocation, req.app.get(constants.s3ParamName));
+        return { ...membership, productImageLocation: img }
+      });
       rest.response.status200(res, memberships)
       return next()
     } catch (e) {
@@ -76,39 +77,79 @@ class MembershipController {
       const { dapp, body } = req
 
       MembershipController.validateCreateMembershipArgs(body)
-    
+
       const result = await dapp.createMembership(body)
       rest.response.status200(res, result)
-      
+
       return next()
     } catch (e) {
       return next(e)
     }
   }
-  
+
   static async purchased(req, res, next) {
     try {
       const { dapp, body } = req
-      
+
       let results = await dapp.getPurchasedMemberships()
       //Get image location associated with each membership/product
-      results = results.map((result) => { 
+      results = results.map((result) => {
         let img;
         if (result.fileLocation === null) {
           img = null;
         }
-        else{
-          img  =  getSignedUrlFromS3(result.fileLocation, req.app.get(constants.s3ParamName));
+        else {
+          img = getSignedUrlFromS3(result.fileLocation, req.app.get(constants.s3ParamName));
         }
-        return {...result, productImageLocation: img} });
+        return { ...result, productImageLocation: img }
+      });
       rest.response.status200(res, results)
-      
+
       return next()
     } catch (e) {
       return next(e)
     }
   }
-        
+
+  static async issued(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      let results = await dapp.getIssuedMemberships()
+      //Get image location associated with each membership/product
+      results = results.map((result) => {
+        let img;
+        if (result.fileLocation === null) {
+          img = null;
+        }
+        else {
+          img = getSignedUrlFromS3(result.fileLocation, req.app.get(constants.s3ParamName));
+        }
+        return { ...result, productImageLocation: img }
+      });
+      rest.response.status200(res, results)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async resale(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      MembershipController.validateResaleMembershipArgs(body)
+
+      const result = await dapp.resaleMembership(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static validateCreateMembershipArgs(args) {
     const createMembershipSchema = Joi.object({
         membershipArgs: Joi.object({
@@ -156,6 +197,31 @@ class MembershipController {
     }
   }
 
+  static validateResaleMembershipArgs(args) {
+    const resaleMembershipSchema = Joi.object({
+      inventoryId: Joi.array().items(Joi.string()),
+      productAddress: Joi.string().required(),
+      quantity: Joi.number().required(),
+      pricePerUnit: Joi.number().required(),
+      // Generate random code for now
+      batchId: Joi.string().required(),
+      // Status should always be published if we use List Now
+      status: Joi.number().required(),
+      serialNumbers: Joi.array().items(Joi.string()),
+      taxPercentageAmount: Joi.number().required(),
+      taxDollarAmount: Joi.number().required(),
+    })
+
+
+    const validation = resaleMembershipSchema.validate(args);
+
+    if (validation.error) {
+      console.log(validation.error.message);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Resale Membership Argument Validation Error`, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
 }
 
 export default MembershipController

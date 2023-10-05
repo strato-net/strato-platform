@@ -13,15 +13,11 @@ const PurchasedList = (
   user,
   categorys,
   subCategorys,
-  key,
   debouncedSearchTerm
 ) => {
   const dispatch = useMembershipDispatch();
-  const { purchasedMemberships, isPurchasedMembershipLoading } =
-    useMembershipState();
-  useEffect(() => {
-    actions.fetchPurchasedMemberships(dispatch);
-  }, []);
+  const { purchasedMemberships, isPurchasedMembershipLoading } = useMembershipState();
+  useEffect(() => { actions.fetchPurchasedMemberships(dispatch) }, []);
   const { Title } = Typography;
   return (
     <>
@@ -48,6 +44,7 @@ const PurchasedList = (
                 subCategorys={subCategorys}
                 debouncedSearchTerm={debouncedSearchTerm}
                 membershipId={product.itemNumber}
+                isPurchasedList={true}
               />
             );
           })}

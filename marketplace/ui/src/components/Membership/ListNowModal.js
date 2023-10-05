@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Form, Modal, InputNumber, Button, Spin,  Select, Table } from "antd";
-
-const { Option } = Select;
+import { Form, Modal, InputNumber, Button, Spin, Select, Table } from "antd";
+import helperJson from "../../helpers/helper.json"
+import { useInventoryState } from "../../contexts/inventory";
+const { columns, taxOptions } = helperJson;
 
 const ListNowModal = ({
   open,
@@ -13,9 +14,11 @@ const ListNowModal = ({
   getIn,
   isCreateMembershipSubmitting,
 }) => {
+  const { isInventoriesLoading, inventories } = useInventoryState();
+
   const seller = user.user.user.organization;
   const membership = formik.values.name;
-  
+
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {
       return '0.00';
@@ -39,52 +42,14 @@ const ListNowModal = ({
   };
 
   const selectAfter = (
-  <Select 
-    defaultValue="1"
-    onChange={(value) => {formik.setFieldValue("isTaxPercentage", value === "1" )}}
-    style={{ width: 60 }}>
-      <Option value="0">$</Option>
-      <Option value="1">%</Option>
-  </Select>
-);
+    <Select
+      defaultValue="1"
+      onChange={(value) => { formik.setFieldValue("isTaxPercentage", value === "1") }}
+      style={{ width: 60 }}
+      options={taxOptions}
+    />
+  );
 
-  const columns = [
-    {
-      title: "Seller",
-      dataIndex: "seller",
-      key: "seller",
-    },
-    {
-      title: "Membership",
-      dataIndex: "membership",
-      key: "membership",
-    },
-    {
-      title: "Id",
-      dataIndex: "id",
-      key: "id",
-    },
-    {
-      title: "Quantity",
-      dataIndex: "quantity",
-      key: "quantity",
-    },
-    {
-      title: "Tax Percentage/Amount",
-      dataIndex: "percentage",
-      key: "precentage",
-    },
-    {
-      title: "Price",
-      dataIndex: "price",
-      key: "price",
-    },
-    {
-      title: "Type",
-      dataIndex: "type",
-      key: "type",
-    },
-  ];
 
   const data = [
     {
@@ -98,6 +63,10 @@ const ListNowModal = ({
             id="quantity"
             name="quantity"
             min={0}
+            max={inventories[0]?.availableQuantity}
+            // disabled={true}
+            // value={1}
+            controls={false}
             value={formik.values.quantity}
             onChange={(value) => {
               formik.setFieldValue("quantity", value);
@@ -118,17 +87,17 @@ const ListNowModal = ({
             min={0}
             addonAfter={selectAfter}
             formatter={handleFormatter}
+            controls={false}
             parser={handleParser}
             value={formik.values.taxPercentage}
             onChange={(value) => {
               formik.setFieldValue("taxPercentage", value);
-              formik.values.isTaxPercentage  ? 
-                  (formik.setFieldValue("taxPercentageAmount", value))
-                  :  (formik.setFieldValue("taxDollarAmount", value))
-              !formik.values.isTaxPercentage ? 
-                  (formik.setFieldValue("taxPercentageAmount", 0))
-                  :  (formik.setFieldValue("taxDollarAmount", 0))
-              console.log(formik.values);
+              formik.values.isTaxPercentage ?
+                (formik.setFieldValue("taxPercentageAmount", value))
+                : (formik.setFieldValue("taxDollarAmount", value))
+              !formik.values.isTaxPercentage ?
+                (formik.setFieldValue("taxPercentageAmount", 0))
+                : (formik.setFieldValue("taxDollarAmount", 0))
             }}
           />
           {getIn(formik.touched, `taxPercentage`) && getIn(formik.errors, `percentage`) && (
@@ -143,6 +112,7 @@ const ListNowModal = ({
             id="price"
             name="price"
             min={0}
+            controls={false}
             value={formik.values.price}
             onChange={(value) => {
               formik.setFieldValue("price", value);
@@ -180,7 +150,7 @@ const ListNowModal = ({
       ]}
     >
       <Form>
-        <Table columns={columns} dataSource={data} pagination={false}></Table>
+        <Table loading={isInventoriesLoading} columns={columns} dataSource={data} pagination={false}></Table>
       </Form>
     </Modal>
   );

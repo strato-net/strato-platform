@@ -1,41 +1,48 @@
 import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
-import classNames from "classnames";
 import { Card, Popover, Spin, Button } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
+import { actions as membershipActions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { useMembershipDispatch } from "../../contexts/membership";
+
 import { INVENTORY_STATUS } from "../../helpers/constants";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import { actions } from "../../contexts/inventory/actions";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 
 const MembershipCardPurchased = ({
   user,
   membership,
   categorys,
   debouncedSearchTerm,
-  membershipId
+  membershipId,
+  isPurchasedList
 }) => {
+  const membershipDispatch = useMembershipDispatch();
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
-  
-  
+
+
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const {isCreateInventorySubmitting } = useInventoryState();
-  const dispatch = useInventoryDispatch();
+  const { isCreateInventorySubmitting, inventories } = useInventoryState();
+
+  const inventoryDispatch = useInventoryDispatch();
+
+  useEffect(() => {
+    if (visible) {
+      inventoryActions.fetchInventory(inventoryDispatch, '', 0, membership.productId);
+    }
+  }, [visible])
 
   const showModal = () => {
     hide();
@@ -67,11 +74,11 @@ const MembershipCardPurchased = ({
     setState(membership);
   }, [membership]);
 
-  
+
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress!==undefined || state.inventoryAddress!==null ) ? state.inventoryAddress : null } });
+    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
   }
-  
+
   const closeListNowModal = () => {
     setVisible(false);
   };
@@ -79,27 +86,27 @@ const MembershipCardPurchased = ({
   const openListNowModal = () => {
     setVisible(true);
   };
-  
+
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
       name: yup.string().required("Membership name is required"),
       price: yup.number().when("isListNowModalOpen", {
-          is: () => isListNowModalOpen, // Use a function to evaluate the condition
-          then: yup.number().required("Price is required"),
-        }),
+        is: () => isListNowModalOpen, // Use a function to evaluate the condition
+        then: yup.number().required("Price is required"),
+      }),
       quantity: yup.number().when("isListNowModalOpen", {
         is: () => isListNowModalOpen, // Use a function to evaluate the condition
         then: yup.number().required("Quantity is required"),
       }),
     });
   };
-  
+
   const initialValues = {
     name: "",
     price: "",
     quantity: ""
   };
-  
+
   const formik = useFormik({
     initialValues: initialValues,
     validationSchema: getSchema(visible),
@@ -111,32 +118,34 @@ const MembershipCardPurchased = ({
     },
     enableReinitialize: true,
   });
-  
+
   const handleCreateFormSubmit = async (values) => {
     if (user) {
-        if (formik.values.price !== "" && formik.values.quantity !== "") {
-          const inventoryBody = {
-            productAddress: membership.productId,
-            quantity: formik.values.quantity,
-            pricePerUnit: formik.values.price,
-            // Generate random code for now
-            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-            // Status should always be published if we use List Now
-            status: INVENTORY_STATUS.PUBLISHED,
-            serialNumber: [],
-          };
-          const createInventory = await actions.createInventory(
-            dispatch,
-            inventoryBody
-          );
-          
-          if (createInventory) {
-            // membership.product_with_inventory = 1;
-            formik.resetForm();
-          }
-          setVisible(false);
-          
+      if (formik.values.price !== "" && inventories) {
+        const membershipBody = {
+          inventoryId: [inventories[0].address],
+          productAddress: membership.productId,
+          quantity: formik.values.quantity,
+          pricePerUnit: formik.values.price,
+          // Generate random code for now
+          batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+          // Status should always be published if we use List Now
+          taxPercentageAmount: 0,
+          taxDollarAmount: 0,
+          status: INVENTORY_STATUS.PUBLISHED,
+          serialNumbers: [],
+        };
+        const resaleMembership = await membershipActions.resaleMembership(
+          membershipDispatch, membershipBody
+        )
+
+        if (resaleMembership) {
+          // membership.product_with_inventory = 1;
+          formik.resetForm();
         }
+        setVisible(false);
+
+      }
     }
   };
 
@@ -148,19 +157,19 @@ const MembershipCardPurchased = ({
           <Spin />
         </div>
       ) : (
-        <Card className="w-full mt-6" id="product">
+        <Card className="w-full mt-6" id="product" key={membershipId}>
           <div className="flex">
             <div className="text-center py-1 rounded w-24 text-sm mt-2.5">
-                <img
-                  className="w-52 object-cover"
-                  alt=""
-                  src={membership.productImageLocation}
-                />  
-                {membership.product_with_inventory ?  
-                  (membership.isInventoryAvailable ?
-                      (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px"  }}> For Sale </Button>) 
-                      : (<Button type="primary" shape="round"  style={{ background: "red", marginTop: "10px"  }}> Retained </Button>) )
-                  :(<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px"  }}> Not for Sale </Button>)}
+              <img
+                className="w-52 object-cover"
+                alt=""
+                src={membership.productImageLocation}
+              />
+              {membership.product_with_inventory ?
+                (membership.isInventoryAvailable ?
+                  (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px" }}> For Sale </Button>)
+                  : (<Button type="primary" shape="round" style={{ background: "red", marginTop: "10px" }}> Retained </Button>))
+                : (<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> Not for Sale </Button>)}
             </div>
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
@@ -170,29 +179,29 @@ const MembershipCardPurchased = ({
                   </h3>
                 </div>
                 <div className="flex items-center">
-                {!membership.product_with_inventory ?
-                   <Button type="text"
-                     className="text-primary text-sm cursor-pointer"
-                     onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        formik.setFieldValue("name", membership.productName);
-                        openListNowModal();
-                      }
-                     }}
-                   >
-                     List for Sale
-                   </Button>
-                :null}
-                <Button type="text"
-                  className="text-primary text-sm cursor-pointer"
-                  onClick={callDetailPage}
-                >
-                  Preview
-                </Button>
-                
-                {/* <Popover
+                  {(!membership.product_with_inventory && isPurchasedList) ?
+                    <Button type="text"
+                      className="text-primary text-sm cursor-pointer"
+                      onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          window.location.href = loginUrl;
+                        } else {
+                          formik.setFieldValue("name", membership.productName);
+                          openListNowModal();
+                        }
+                      }}
+                    >
+                      List for Sale
+                    </Button>
+                    : null}
+                  <Button type="text"
+                    className="text-primary text-sm cursor-pointer"
+                    onClick={callDetailPage}
+                  >
+                    Preview
+                  </Button>
+
+                  {/* <Popover
                   placement="bottomLeft"
                   open={openPop}
                   onOpenChange={handleOpenChange}
@@ -248,7 +257,7 @@ const MembershipCardPurchased = ({
                   :
                 </p>
                 <p className="text-secondryB text-sm ml-3">
-                 {membership.timePeriodInMonths} Month(s)
+                  {membership.timePeriodInMonths} Month(s)
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">
@@ -258,8 +267,8 @@ const MembershipCardPurchased = ({
                 <p text-secondryB text-sm>
                   :
                 </p>
-                <p style={{ color: "green"}} className="text-primaryB font-bold text-sm ml-3">
-                 $ {membership.savings}
+                <p style={{ color: "green" }} className="text-primaryB font-bold text-sm ml-3">
+                  $ {membership.savings}
                 </p>
               </div>
               <div className="flex mt-1.5 items-center">

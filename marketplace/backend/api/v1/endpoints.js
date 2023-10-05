@@ -106,6 +106,15 @@ export const Service = {
   update: '/update',
 }
 
+export const ServiceUsage = {
+  prefix: '/serviceUsage',
+  getAll: '/',
+  getBooked: '/booked',
+  getProvided: '/provided',
+  create: '/',
+  update: '/update',
+}
+
 export const ProductFile = {
   prefix: '/productFile',
   get: '/:address',
@@ -153,6 +162,8 @@ export const Membership = {
   getAll: '/',
   create: '/',
   purchased: '/purchased',
+  issued: '/issued',
+  resale:'/resale'
   //update: '/update',
   //transferOwnership: '/transferOwnership',
 }

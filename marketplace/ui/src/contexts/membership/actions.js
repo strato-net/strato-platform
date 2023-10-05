@@ -5,6 +5,11 @@ const actionDescriptors = {
   createMembership: "create_membership",
   createMembershipSuccessful: "create_membership_successful",
   createMembershipFailed: "create_membership_failed",
+
+  resaleMembership:"resale_membership",
+  resaleMembershipSuccessful:"resale_membership_successful",
+  resaleMembershipFailed:"resale_membership_failed",
+
   fetchMembership: "fetch_memberships",
   fetchMembershipSuccessful: "fetch_membership_successful",
   fetchMembershipFailed: "fetch_membership_failed",
@@ -41,6 +46,9 @@ const actionDescriptors = {
   fetchPurchasedMemberships: "fetch_purchased_memberships",
   fetchPurchasedMembershipsSuccessful: "fetch_purchased_memberships_successful",
   fetchPurchasedMembershipsFailed: "fetch_purchased_memberships_failed",
+  fetchIssuedMemberships: "fetch_issued_memberships",
+  fetchIssuedMembershipsSuccessful: "fetch_issued_memberships_successful",
+  fetchIssuedMembershipsFailed: "fetch_issued_memberships_failed",
 };
 
 const actions = {
@@ -93,6 +101,41 @@ const actions = {
     } catch (err) {
       dispatch({ type: actionDescriptors.createMembershipFailed, error: "Error while creating Membership" });
       actions.setMessage(dispatch, "Error while creating Membership")
+    }
+  },
+
+  resaleMembership: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.resaleMembership });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/resale`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.resaleMembershipSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Membership listed for sale successfully", true)
+        return body.data
+      }
+
+      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: 'Error while listing membership for sale ' });
+      actions.setMessage(dispatch, "Error while listing membership for sale ")
+      return false;
+
+    } catch (err) {
+      dispatch({ type: actionDescriptors.resaleMembershipFailed, error: "Error while listing membership for sale " });
+      actions.setMessage(dispatch, "Error while listing membership for sale ")
     }
   },
 
@@ -265,11 +308,11 @@ const actions = {
         if (response.status === RestStatus.OK) {
           dispatch({
             type: actionDescriptors.updateAssetImportCount,
-            count: i+1,
+            count: i + 1,
           });
         } else {
           errors.push({ status: response.error.status, error: response.error.data.method, id: i })
-        }        
+        }
       } catch (err) {
         //  nothing
       }
@@ -279,7 +322,7 @@ const actions = {
     dispatch({ type: actionDescriptors.updateAssetUploadError, errors });
     actions.setMessage(dispatch, `Imported ${assets.length} records`, true)
   },
-  
+
   fetchMembershipFromDetails: async (dispatch, limit, offset, queryValue, membershipId) => {
     const query = queryValue
       ? `&serviceTypeId=${queryValue}`
@@ -376,7 +419,7 @@ const actions = {
       });
     }
   },
-  
+
   fetchPurchasedMemberships: async (dispatch) => {
     // const query = queryValue
     //   ? `&serviceTypeId=${queryValue}`
@@ -390,7 +433,6 @@ const actions = {
       });
 
       const body = await response.json();
-      console.log("fetchPurchasedMemberships response: ", body.data)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchPurchasedMembershipsSuccessful,
@@ -401,6 +443,32 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchPurchasedMembershipsFailed, error: undefined });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchPurchasedMembershipsFailed, error: undefined });
+    }
+  },
+
+  fetchIssuedMemberships: async (dispatch) => {
+    // const query = queryValue
+    //   ? `&serviceTypeId=${queryValue}`
+    //   : "";
+
+    dispatch({ type: actionDescriptors.fetchIssuedMemberships });
+
+    try {
+      const response = await fetch(`${apiUrl}/membership/issued`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchIssuedMembershipsSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+      dispatch({ type: actionDescriptors.fetchIssuedMembershipsFailed, error: undefined });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchIssuedMembershipsFailed, error: undefined });
     }
   },
 };

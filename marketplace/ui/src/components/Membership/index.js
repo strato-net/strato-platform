@@ -32,7 +32,7 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
 import ListNowIndex from "./ListNowIndex";
@@ -116,7 +116,6 @@ const Membership = (user) => {
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url);
   };
-
 
   // useEffect(() => {
   //   if (isSearch) {
@@ -232,15 +231,14 @@ const Membership = (user) => {
               </div>
             </Col>
             {/* <Col>
-
-                                    <Dropdown.Button
-                                        style={{ margin: '10px' }}
-                                        icon={<DownOutlined />}
-                                        menu={{ dummyData }}
-                                    >
-                                        All
-                                    </Dropdown.Button>
-                                </Col> */}
+                    <Dropdown.Button
+                        style={{ margin: '10px' }}
+                        icon={<DownOutlined />}
+                        menu={{ dummyData }}
+                    >
+                        All
+                    </Dropdown.Button>
+                </Col> */}
             <div className="flex">
               <Button
                 id="add-product-button"
@@ -287,6 +285,19 @@ const Membership = (user) => {
                 }}
               >
                 Sell Existing Membership{" "}
+              </Button>
+              <Button
+                id="add-product-button"
+                type="primary"
+                style={{
+                  backgroundColor: "orange",
+                  color: "white",
+                  margin: "10px",
+                }}
+                className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                onClick={() => navigate("/memberships/serviceUsage/booked")}
+              >
+                Service Usage
               </Button>
               <Button
                 id="add-product-button"
@@ -360,10 +371,10 @@ const Membership = (user) => {
           open={open}
           user={user}
           handleCancel={handleCancel}
-          //   categorys={categorys}
-          //   resetPage={onPageChange}
-          //   page={page}
-          //   debouncedSearchTerm={debouncedSearchTerm}
+        //   categorys={categorys}
+        //   resetPage={onPageChange}
+        //   page={page}
+        //   debouncedSearchTerm={debouncedSearchTerm}
         />
       )}
       {visible && (
@@ -372,11 +383,11 @@ const Membership = (user) => {
           user={user}
           handleCancel={closeSellModal}
           onClick={openSellModal}
-          // formik={formik}
-          // type="New"
-          // id="None"
-          // getIn={getIn}
-          // isCreateMembershipSubmitting={isCreateInventorySubmitting}
+        // formik={formik}
+        // type="New"
+        // id="None"
+        // getIn={getIn}
+        // isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
       {message && openToast("bottom")}

@@ -21,7 +21,7 @@ const reducer = (state, action) => {
         error: action.error,
         isMembershipLoading: false
       };
-    
+
     case actionDescriptors.fetchPurchasedMemberships:
       return {
         ...state,
@@ -39,7 +39,25 @@ const reducer = (state, action) => {
         error: action.error,
         isPurchasedMembershipLoading: false
       };
-        
+
+    case actionDescriptors.fetchIssuedMemberships:
+      return {
+        ...state,
+        isIssuedMembershipLoading: true
+      };
+    case actionDescriptors.fetchIssuedMembershipsSuccessful:
+      return {
+        ...state,
+        issuedMembership: action.payload,
+        isIssuedMembershipLoading: false
+      };
+    case actionDescriptors.fetchIssuedMembershipsFailed:
+      return {
+        ...state,
+        error: action.error,
+        isIssuedMembershipLoading: false
+      };
+
     case actionDescriptors.resetMessage:
       return {
         ...state,
@@ -69,6 +87,25 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateMembershipSubmitting: false
       };
+    // Resale membership
+    case actionDescriptors.resaleMembership:
+      return {
+        ...state,
+        isResaleMembershipSubmitting: true
+      };
+    case actionDescriptors.resaleMembershipSuccessful:
+      return {
+        ...state,
+        membership: action.payload,
+        isResaleMembershipSubmitting: false
+      };
+    case actionDescriptors.resaleMembershipFailed:
+      return {
+        ...state,
+        error: action.error,
+        isResaleMembershipSubmitting: false
+      };
+
     case actionDescriptors.fetchMembership:
       return {
         ...state,

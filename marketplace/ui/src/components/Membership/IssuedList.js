@@ -23,9 +23,7 @@ const IssuedList = (
   } = useMembershipState();
   
   useEffect(() => {
-    console.log(1)
     actions.fetchMembership(dispatch);
-    console.log(2)
   }, []);
 
   const memberships_issued = memberships
@@ -34,7 +32,6 @@ const IssuedList = (
       (membership) =>
         membership.ownerOrganization === membership.inventories[0].manufacturer
     );
-console.log("ismembershipsLoading", ismembershipsLoading);
   const { Title } = Typography;
   return (
     <>
