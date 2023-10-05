@@ -8,9 +8,8 @@ import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
-import { getCookie, delete_cookie } from "../../helpers/cookie";
 
-const MarketPlace = (user, isAuthenticated) => {
+const MarketPlace = () => {
   const limit = 10, offset = 0;
   const navigate = useNavigate();
   const dispatch = useCategoryDispatch();
@@ -21,13 +20,6 @@ const MarketPlace = (user, isAuthenticated) => {
     actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
-
-  // // Checking for return url after login/registration. Cookies are set if the user clicks on items to buy without logging in. 
-  // // We will use that cookie to redirect them to where they left off. 
-  // if(getCookie("returnUrl") && isAuthenticated && user){
-  //   window.location.href = getCookie("returnUrl");
-  //   delete_cookie("returnUrl");
-  // }
 
   return (
     <>

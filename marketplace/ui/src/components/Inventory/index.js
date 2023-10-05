@@ -28,7 +28,6 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { setCookie } from "../../helpers/cookie";
 
 const { Search } = Input;
 

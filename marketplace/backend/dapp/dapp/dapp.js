@@ -1137,7 +1137,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           orderLine.amount = orderLine.pricePerUnit * orderLine.quantity + orderLine.shippingCharges + orderLine.tax;
         }
       });
-     
+
       return result;
     } catch (error) {
       if (error.response) {
