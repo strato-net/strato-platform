@@ -22,7 +22,9 @@ pipeline {
         '''
       }
     }
-    
+
+    /*
+    # Commented out until we settle on the release flow
     stage('Ensure branch merge flow') {
       steps {
         script {
@@ -42,7 +44,8 @@ pipeline {
         }
       }
     }
-
+    */
+    
     stage('Build') {
       steps {
         sh 'rm -rf .docker-work'
