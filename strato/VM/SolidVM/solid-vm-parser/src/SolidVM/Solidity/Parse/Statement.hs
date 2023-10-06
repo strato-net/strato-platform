@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Source
 import qualified Data.Text as T
+import Debug.Trace
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
@@ -427,7 +428,27 @@ numberUnit = do
     <|> (reserved "ether" >> return Ether)
 
 parseArgs :: SolidityParser [Expression]
-parseArgs = parens $ commaSep literal
+parseArgs = (try $ parens $ commaSep literal) <|> parseCreateArgs
+
+parseCreateArgs :: SolidityParser [Expression]
+parseCreateArgs = do
+  void $ char '('
+  str1 <- uncurry StringLiteral <$> withPosition parseQuotedString  -- name
+  str2 <- trace (show str1) $ uncurry StringLiteral <$> withPosition parseQuotedString  -- contract
+  str3 <- trace (show str2) $ uncurry StringLiteral <$> withPosition parseQuotedString' -- tuple
+  return [str1, str2, str3]
+
+parseQuotedString :: SolidityParser String
+parseQuotedString = do
+  void $ string "\""
+  content <- manyTill anyChar (try (void $ string "\","))
+  return content
+
+parseQuotedString' :: SolidityParser String
+parseQuotedString' = do
+  void $ string "\""
+  content <- manyTill anyChar (try (string "\")" <* eof))
+  return content
 
 parseExternalCallArgs :: SolidityParser (SolidString, [SVMType.Type])
 parseExternalCallArgs = do
