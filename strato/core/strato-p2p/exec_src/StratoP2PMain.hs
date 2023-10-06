@@ -40,6 +40,7 @@ initP2P = do
   context <- liftIO $ readIORef $ configContext cfg
   let contextkafkastate = contextKafkaState context
   let contextkafkamiddleman = contextKafkaMiddleman context
+  --let contextthreadtracker = contextThreadTracker context
   _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate ((\(a,_) -> a) contextkafkamiddleman)
   let sSource = seqEventNotificationSourceChanPour ((\(a,_) -> a) contextkafkamiddleman)
                                                    dupChan

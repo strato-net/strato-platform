@@ -64,7 +64,8 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
-    , withCertifiedPeer
+    , withCertifiedPeerClient
+    , withCertifiedPeerServer
     , getPeerX509
     , getMyX509
     , getPeerByParsedSet
@@ -76,7 +77,8 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Concurrent.Chan.Unagi        as CCCU
+import           Control.Concurrent.Chan.Unagi         as CCCU
+import           Control.Concurrent.STM.Map            as CCSTMM
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 -- import           Control.Arrow                         ( (***))
@@ -784,8 +786,11 @@ withActivePeer p = bracket a b . const
     a = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
     b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
 
-withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
-withCertifiedPeer = flip const
+withCertifiedPeerClient :: PPeer -> m (Maybe SomeException,Map ThreadId ThreadId) -> m (Maybe SomeException,Map ThreadId ThreadId)
+withCertifiedPeerClient = flip const
+
+withCertifiedPeerServer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
+withCertifiedPeerServer = flip const
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b

@@ -97,6 +97,7 @@ library:
     - these
     - time
     - transformers
+    - ttrie
     - unagi-chan
     - unliftio-core
     - unliftio 
@@ -150,6 +151,7 @@ tests:
       - strato-redis-blockdb
       - text
       - time
+      - ttrie
       - unliftio
       - vm-runner
       - vm-tools

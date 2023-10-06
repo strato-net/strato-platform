@@ -20,39 +20,40 @@ where
 
 -- import           Data.Traversable                      (for)
 
-import BlockApps.Logging
-import Blockchain.CommunicationConduit
-import Blockchain.Context
-import Blockchain.Data.PubKey (secPubKeyToPoint)
-import Blockchain.EthEncryptionException
-import Blockchain.EventException
-import Blockchain.Metrics
-import Blockchain.Options
-import Blockchain.RLPx
-import Blockchain.Sequencer.Event
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Discovery.UDP
-import Blockchain.Strato.Model.Secp256k1
-import Blockchain.TCPClientWithTimeout
-import Control.Concurrent hiding (yield)
-import Control.Concurrent.SSem (SSem)
+import           BlockApps.Logging
+import           Blockchain.CommunicationConduit
+import           Blockchain.Context
+import           Blockchain.Data.PubKey (secPubKeyToPoint)
+import           Blockchain.EthEncryptionException
+import           Blockchain.EventException
+import           Blockchain.Metrics
+import           Blockchain.Options
+import           Blockchain.RLPx
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.UDP
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.TCPClientWithTimeout
+import           Control.Concurrent hiding (yield)
+import           Control.Concurrent.SSem (SSem)
 import qualified Control.Concurrent.SSem as SSem
-import Control.Exception.Base (ErrorCall (..))
-import Control.Lens ((^.))
+import           Control.Concurrent.STM.Map as CCSTMM
+import           Control.Exception.Base (ErrorCall (..))
+import           Control.Lens ((^.))
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.IO.Class
-import Control.Monad.IO.Unlift
-import Control.Monad.Reader
-import Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
+import           Control.Monad.IO.Unlift
+import           Control.Monad.Reader
+import           Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
-import Data.Conduit
-import Data.Either.Combinators
-import Data.Maybe
+import           Data.Conduit
+import           Data.Either.Combinators
+import           Data.Maybe
 import qualified Data.Text as T
-import GHC.IO.Exception
+import           GHC.IO.Exception
 import qualified Text.Colors as C
-import Text.Format
-import UnliftIO
+import           Text.Format
+import           UnliftIO
 
 runPeer ::
   (RunsClient m, MonadP2P m) =>
@@ -62,9 +63,10 @@ runPeer ::
 runPeer peer sSource = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
-
   myPublic <- getPub
-
+  tt <- liftIO $ atomically CCSTMM.empty
+  parentthreadid <- liftIO myThreadId
+  _ <- liftIO $ atomically $ insert parentthreadid parentthreadid tt
   otherPubKey <- case (pPeerPubkey peer) of
     Nothing -> do
       $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
@@ -85,44 +87,59 @@ runPeer peer sSource = do
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
   runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
     let pStr = pPeerString peer -- display string will show up as dns name
-    attempt :: Maybe SomeException <-
-      withCertifiedPeer peer . withActivePeer peer $
+    attempt :: (Maybe SomeException,Map ThreadId ThreadId) <- 
+      withCertifiedPeerClient peer . withActivePeer peer $
         runEthClientConduit
+          parentthreadid
+          tt
           peer {pPeerPubkey = Just otherPubKey}
           (c ^. peerSource)
           (c ^. peerSink)
           (c ^. seqSource)
           pStr
     case attempt of
-      Nothing -> $logDebugS "runPeer" "Peer ran successfully!"
-      Just err -> do
-        $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
-        throwIO err
+      (Nothing,tt')  -> do $logDebugS "runPeer" "Peer ran successfully!"
+                           childtoclose <- liftIO $ atomically $ CCSTMM.lookup parentthreadid tt'
+                           case childtoclose of
+                             Nothing            -> return ()
+                             Just childtoclosef -> do $logDebugS "runPeer" "Ensuring child thread is closed."
+                                                      _ <- liftIO $ killThread childtoclosef
+                                                      liftIO $ atomically $ delete parentthreadid tt'
+      (Just err,tt') -> do $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
+                           childtoclose <- liftIO $ atomically $ CCSTMM.lookup parentthreadid tt'
+                           case childtoclose of
+                             Nothing            -> throwIO err
+                             Just childtoclosef -> do $logDebugS "runPeer" "Ensuring child thread is closed."
+                                                      _ <- liftIO $ killThread childtoclosef
+                                                      _ <- liftIO $ atomically $ delete parentthreadid tt'
+                                                      throwIO err
 
 runEthClientConduit ::
   MonadP2P m =>
+  ThreadId ->
+  Map ThreadId ThreadId ->
   PPeer ->
   ConduitM () B.ByteString m () ->
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
   String ->
-  m (Maybe SomeException)
-runEthClientConduit peer pSource pSink seqSrc peerStr = do
+  m (Maybe SomeException,Map ThreadId ThreadId)
+runEthClientConduit parenttid tt peer pSource pSink seqSrc peerStr = do
   myPublic' <- getPub
-
   let myPublic = secPubKeyToPoint myPublic'
       otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
   mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
   case mConnectionResult of
-    Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
+    Nothing                   -> pure (Just $ toException $ HandshakeException "handshake timed out",tt)
     Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
-      !eventSink <- mkEthP2PEventConduit peerStr outCtx
-      fmap (either Just (const Nothing)) . try . runConduit $
-        eventSource
-          .| handleMsgClientConduit myPublic peer
-          .| eventSink
-          .| pSink
+      !(eventSource,tt') <- mkEthP2PEventSourceClient parenttid tt pSource seqSrc peerStr inCtx
+      !eventSink         <- mkEthP2PEventConduit peerStr outCtx
+      result             <- fmap (either Just (const Nothing)) . try . runConduit $
+                              eventSource
+                                .| handleMsgClientConduit myPublic peer
+                                .| eventSink
+                                .| pSink
+      return (result,tt')
 
 runPeerInList ::
   ( MonadP2P m,

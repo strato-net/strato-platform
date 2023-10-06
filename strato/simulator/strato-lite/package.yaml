@@ -95,6 +95,7 @@ library:
   - text
   - time
   - transformers
+  - ttrie
   - unliftio
   - vm-runner
   - vm-tools
@@ -162,6 +163,7 @@ tests:
       - strato-sequencer
       - text
       - transformers
+      - ttrie
       - unliftio
       - vm-runner
       - vm-tools

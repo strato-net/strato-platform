@@ -68,7 +68,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr ++ ". rejecting violently."
         Just _ -> do
           (attempt :: Maybe SomeException) <-
-            withCertifiedPeer p . withActivePeer p $
+            withCertifiedPeerServer p . withActivePeer p $
               runEthServerConduit p pSource pSink seqSrc peerStr
           case attempt of
             Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
@@ -133,14 +133,13 @@ runEthServerConduit ::
   m (Maybe SomeException)
 runEthServerConduit p pSource pSink seqSrc peerStr = do
   myPubKey' <- getPub
-
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
   mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptAccept otherPubKey `fuseUpstream` pSink
   case mConnectionResult of
     Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+      !eventSource <- mkEthP2PEventSourceServer pSource seqSrc peerStr inCtx
       !eventSink <- mkEthP2PEventConduit peerStr outCtx
       fmap (either Just (const Nothing)) . try . runConduit $
         eventSource

@@ -92,6 +92,10 @@ mergeSourcesByForce sx bound = do
           (unmask $ unliftIO st $
             runConduit $ s .| chanSink c writeTBMChan)
           `finally` (liftSTM $ decRefcount refcount c))
+    _ <- liftIO $ print ("before chanSource." :: String)
     chanSource c readTBMChan
+    _ <- liftIO $ print ("about to release chkey." :: String)
     release chkey
+    refcountr <- readTVarIO refcount
+    _ <- liftIO $ print $ "refcount: " ++ (show refcountr)
     traverse_ release regs
