@@ -198,7 +198,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
 }
 
 export const setSearchQueryOptionsPrime = (args) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', , 'notEqualsField', 'notEqualsValue','status']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', , 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key)) {
       if (Array.isArray(args[key])) {
@@ -242,10 +242,6 @@ export const setSearchQueryOptionsPrime = (args) => {
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
       result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
-    }
-    
-    if (key === 'status') {
-      result.push({ key: key, value: args[key], predicate: 'eq' })
     }
 
     return result
