@@ -38,7 +38,7 @@ class ProductController {
       const { dapp, query } = req
 
       const products = await dapp.getProducts({ ...query })
-      const productsWithImageUrl = products.map(product => (
+      const productsWithImageUrl = products.products.map(product => (
         product.imageKey ?
         {
           ...product,
@@ -47,7 +47,7 @@ class ProductController {
         :
         product
       ))
-      rest.response.status200(res, productsWithImageUrl)
+      rest.response.status200(res, {productsWithImageUrl:productsWithImageUrl, count: products.productCount})
 
       return next()
     } catch (e) {
@@ -159,7 +159,7 @@ class ProductController {
         name: Joi.string().required(),
         description: Joi.string().required(),
         manufacturer: Joi.string().required(),
-        unitOfMeasurement: Joi.number().integer().min(1).max(10).required(),
+        unitOfMeasurement: Joi.number().integer().min(1).max(11).required(),
         userUniqueProductCode: Joi.string().allow("").required(),
         leastSellableUnit: Joi.number().required(),
         imageKey: Joi.string().required(),

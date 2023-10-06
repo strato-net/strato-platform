@@ -1,4 +1,4 @@
-abstract contract Fungible is SellableAsset{
+abstract contract Fungible is Asset{
     uint public totalSupply;
     mapping(address => uint) record public balanceOf;
     string public name;

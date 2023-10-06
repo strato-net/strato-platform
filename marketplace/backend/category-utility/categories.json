@@ -22,6 +22,45 @@
             ]
         },
         {
+            "name": "Materials",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Nickel Reserve"
+                },
+                {
+                    "name": "Nickel"
+                },
+                {
+                    "name": "Gold"
+                },
+                {
+                    "name": "Copper"
+                },
+                {
+                    "name": "Aluminium"
+                },
+                {
+                    "name": "Zinc"
+                },
+                {
+                    "name": "Lead"
+                },
+                {
+                    "name": "Tin"
+                },
+                {
+                    "name": "Cobalt"
+                },
+                {
+                    "name": "Palladium"
+                },
+                {
+                    "name": "Platinum"
+                }
+            ]
+        },
+        {
             "name": "Clothing",
             "imageKey": "",
             "subCategories": [

@@ -2,14 +2,12 @@ import <509>;
 
 contract Mercata{}
 
-abstract contract Asset {constructor(){}}
-
-abstract contract OwnedAsset is Asset{
+abstract contract Asset {
     string public ownerOrganization;
     string public ownerCommonName;
+    Sale public sale;
 
-    constructor() Asset() 
-    {
+    constructor() {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         ownerOrganization = Certificate(account(address(c), "main")).organization();
@@ -32,29 +30,23 @@ abstract contract OwnedAsset is Asset{
         require(commonName == ownerCommonName, err);
         _;
     }
-}
 
-abstract contract SellableAsset is OwnedAsset{
-    Sale public sale;
-
-    constructor() OwnedAsset() {}
-
-    function createBaseSale( string _purchaserOrganization, string _purchaserCommonName, string _purchasePrice) returns(Sale){
+    function createBaseSale(string _purchaserOrganization, string _purchaserCommonName, string _purchasePrice) internal returns (Sale) {
         Sale b = new Sale(
             _purchaserOrganization,
             _purchaserCommonName,
             address(this),
             _purchasePrice
-            );
+        );
         return b;
     }
 
-    function createSale( string _purchaserOrganization, string _purchaserCommonName, string _purchasePrice) public requireOwner("Create sale") {
+    function createSale(string _purchaserOrganization, string _purchaserCommonName, string _purchasePrice) public requireOwner("Create sale") {
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = createBaseSale( _purchaserOrganization, _purchaserCommonName, _purchasePrice);
+        sale = createBaseSale(_purchaserOrganization, _purchaserCommonName, _purchasePrice);
     }
 
-    function transferOwnership( string _newOwnerOrganization, string _newOwnerCommonName ) public requireOwner("Ownership transfer") {
+    function transferOwnership(string _newOwnerOrganization, string _newOwnerCommonName) public requireOwner("Ownership transfer") {
         require(msg.sender == address(sale), "Ownership transfer must originate from the active bill of sale");
         ownerOrganization = _newOwnerOrganization;
         ownerCommonName = _newOwnerCommonName;
@@ -68,7 +60,7 @@ abstract contract Sale{
     string sellersCommonName;
     string purchasersOrganization;
     string purchasersCommonName;
-    SellableAsset assetToBeSold;
+    Asset assetToBeSold;
     string price;
 
     constructor(
@@ -77,7 +69,7 @@ abstract contract Sale{
         address _assetToBeSold,
         string _price
     ) {
-        assetToBeSold = SellableAsset(_assetToBeSold);
+        assetToBeSold = Asset(_assetToBeSold);
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
         sellersOrganization = Certificate(account(address(c), "main")).organization();
@@ -171,14 +163,14 @@ abstract contract SimpleSale is Sale{
     }
 }
 
-abstract contract Fungible is SellableAsset{
+abstract contract Fungible is Asset{
     uint public totalSupply;
     mapping(address => uint) record public balanceOf;
     string public name;
 
     event Transfer(address indexed from, address indexed to, uint amount);
 
-    constructor(string memory _assetID, uint _totalSupply, string _name) SellableAsset() {
+    constructor(uint _totalSupply, string _name) Asset() {
         totalSupply = _totalSupply;
         name = _name;
         balanceOf[msg.sender] = _totalSupply;
@@ -205,7 +197,7 @@ abstract contract Fungible is SellableAsset{
     }
 }
 
-abstract contract NonFungible is SellableAsset{
+abstract contract NonFungible is Asset{
     string private assetID;
     string private name;
     string private symbol;
@@ -229,7 +221,7 @@ abstract contract NonFungible is SellableAsset{
     // Event emitted when an approval is set or removed
     event Approval(address indexed owner, address indexed spender, uint256 tokenId, bool approved);
 
-    constructor(string memory _assetID, string memory _name, string memory _symbol, uint256 _totalSupply) SellableAsset(){
+    constructor(string memory _assetID, string memory _name, string memory _symbol, uint256 _totalSupply) Asset(){
         assetID = _assetID;
         name = _name;
         symbol = _symbol;
@@ -342,4 +334,5 @@ abstract contract FractionalizedFungible is Fungible {
         super.burn(tokenAmount);
     }
 
+<<<<<<< HEAD
 }
