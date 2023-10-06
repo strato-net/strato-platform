@@ -143,11 +143,11 @@ const actions = {
       );
 
       const body = await response.json();
-     
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchProductSuccessful,
-          payload: body.data,
+          payload: {data: body.data.productsWithImageUrl, count: body.data.count},
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {

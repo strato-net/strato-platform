@@ -625,7 +625,7 @@ const ProductDetails = ({ user, users }) => {
                 // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(details.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                {decodeURIComponent(details.description).split('\n').map((line, index) => (
                   <React.Fragment key={index}>
                     {line}
                     <br />

@@ -14,7 +14,6 @@ module Strato.Strato23.Monad where
 
 import BlockApps.Logging
 import Control.Monad.Reader
-import Control.Monad.Trans.Control
 import Control.Monad.Trans.Except
 import qualified Crypto.Saltine.Core.SecretBox as SecretBox
 import qualified Data.ByteString.Lazy as LB
@@ -220,7 +219,7 @@ vaultQuery ::
 vaultQuery q = do
   traverse_ (logDebugCS callStack . Text.pack) (showSql q)
   pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ runSelect conn q)
+  liftIO $ withResource pool (\conn -> runSelect conn q)
 
 vaultQueryMaybe ::
   (HasCallStack, Default Unpackspec x x, Default FromFields x y) =>
@@ -255,7 +254,7 @@ vaultModify :: HasCallStack => (Connection -> IO x) -> VaultM x
 vaultModify modify = do
   logInfoCS callStack "Updating the database"
   pool <- asks dbPool
-  withResource pool $ (\conn -> liftIO $ modify conn)
+  liftIO $ withResource pool modify
 
 vaultModify1 :: HasCallStack => (Connection -> IO [x]) -> VaultM x
 vaultModify1 modify = do
@@ -267,9 +266,17 @@ vaultModify1 modify = do
     _ : _ : _ -> throwIO $ DBError "Multiple results, expected one row"
 
 vaultTransaction :: VaultM x -> VaultM x
-vaultTransaction vault = do
-  pool <- asks dbPool
-  withResource pool $ (\conn -> liftBaseOp_ (withTransaction conn) vault)
+vaultTransaction vaultAction = do
+    pool <- asks dbPool
+    env  <- ask
+    liftIO $ withResource pool $ \conn -> withTransaction conn (runLoggingT (runReaderT vaultAction env))
 
 vaultMaybe :: Text -> Maybe x -> VaultM x
 vaultMaybe msg = maybe (throwIO (CouldNotFind msg)) return
+
+
+
+
+
+
+

@@ -495,7 +495,7 @@ instance FromJSON AddressStateRef' where
               )
   parseJSON _ = fail "JSON not an object"
 
-showHexSimple :: (Show a, Integral a) => a -> String
+showHexSimple :: (Integral a) => a -> String
 showHexSimple t = showHex t ""
 
 instance ToJSON LogDB where
