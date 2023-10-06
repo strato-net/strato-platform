@@ -43,6 +43,7 @@ import Control.Monad.Change.Alter
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Unlift
+import Control.Monad.Logger
 import Data.Default
 import Data.Maybe (maybeToList)
 import qualified Data.Set as Set
@@ -89,6 +90,8 @@ instance MonadUnliftIO m => MonadUnliftIO (MainChainT m) where
     MainChainT $
     withRunInIO $ \run ->
     inner (run . runMainChainT)
+
+instance MonadLogger m => MonadLogger  (MainChainT m)
 
 blankAddressState :: AddressState
 blankAddressState = AddressState {addressStateNonce = 0, addressStateBalance = 0, addressStateContractRoot = MP.emptyTriePtr, addressStateCodeHash = EVMCode $ hash "", addressStateChainId = Nothing}
