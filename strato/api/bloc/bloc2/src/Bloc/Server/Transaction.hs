@@ -690,15 +690,12 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                 let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
                     xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
                 (_, argsAsSource) <- constructArgValuesAndSource contractArgs xabiArgs
-                -- We're replacing double quotes here with single quotes to conform to the formatting.
-                -- '(1, '2')' -> '(1, \"2\")'
-                let testArgs = Text.replace "'" "\"" argsAsSource
                 let bcp =
                       FunctionParameters
                         addr
                         userContractAddr
                         "createContract"
-                        (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgString $ testArgs)])
+                        (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgString $ argsAsSource)])
                         (contractpayloadValue p)
                         (mergeTxParams (contractpayloadTxParams p) txParams)
                         md
