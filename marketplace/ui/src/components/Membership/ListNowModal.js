@@ -16,13 +16,13 @@ const ListNowModal = ({
   getIn,
   isCreateMembershipSubmitting,
 }) => {
-  const { isInventoriesLoading, inventories } = useInventoryState();
+  const { isInventoriesLoading, inventories, isCreateInventorySubmitting } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState()
   const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user.user.user.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting } = useMembershipState();
-  const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting;
+  const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting;
 
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {

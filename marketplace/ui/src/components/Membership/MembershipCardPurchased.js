@@ -96,7 +96,7 @@ const MembershipCardPurchased = ({
       }),
       quantity: yup.number().when("isListNowModalOpen", {
         is: () => isListNowModalOpen, // Use a function to evaluate the condition
-        then: yup.number().required("Quantity is required"),
+        then: yup.number(),
       }),
     });
   };
