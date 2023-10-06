@@ -10,7 +10,6 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Source
 import qualified Data.Text as T
-import Debug.Trace
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
@@ -434,8 +433,8 @@ parseCreateArgs :: SolidityParser [Expression]
 parseCreateArgs = do
   void $ char '('
   str1 <- uncurry StringLiteral <$> withPosition parseQuotedString  -- name
-  str2 <- trace (show str1) $ uncurry StringLiteral <$> withPosition parseQuotedString  -- contract
-  str3 <- trace (show str2) $ uncurry StringLiteral <$> withPosition parseQuotedString' -- tuple
+  str2 <- uncurry StringLiteral <$> withPosition parseQuotedString  -- contract
+  str3 <- uncurry StringLiteral <$> withPosition parseQuotedString' -- tuple
   return [str1, str2, str3]
 
 parseQuotedString :: SolidityParser String
