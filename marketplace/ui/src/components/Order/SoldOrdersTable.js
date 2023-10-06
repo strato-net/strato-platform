@@ -10,7 +10,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Select } from "antd";
+import { Pagination, Button } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 
@@ -22,7 +22,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("createdDate.desc");
-  const [filter, setFilter] = useState('0')
+  const [filter, setFilter] = useState(0)
 
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
@@ -64,10 +64,6 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     });
     setdata(items);
   }, [ordersSold]);
-  
-  const customFilterFunction = (value, label) => {
-    setFilter(value);
-  };
 
   const column = [
     {
@@ -144,46 +140,55 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       ),
     },
     {
-      title: (
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div>{"status".toUpperCase()}</div>
-          <div>
-            <Select
-              defaultValue="No filter"
-              style={{ width: 120 }}
-              onChange={customFilterFunction}
-              options={[
-                {
-                  value: '1',
-                  label: 'Awaiting Fulfillment',
-                },
-                {
-                  value: '2',
-                  label: 'Awaiting Shipment',
-                },
-                {
-                  value: '3',
-                  label: 'Closed',
-                },
-                {
-                  value: '4',
-                  label: 'Canceled',
-                },
-                {
-                  value: '0',
-                  label: 'No filter',
-                }
-              ]}
-            />
-          </div>
-        </div>
-      ),
+      title: "status".toUpperCase(),
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),
+      filters: [
+        {
+          text: "Awaiting Fulfillment",
+          value: "Awaiting Fulfillment",
+        },
+        {
+          text: "Awaiting Shipment",
+          value: "Awaiting Shipment",
+        },
+        {
+          text: "Canceled",
+          value: "Canceled",
+        },
+        {
+          text: "Closed",
+          value: "Closed",
+        },
+        {
+          text: "None",
+          value: "None",
+        },
+      ],
+      onFilter: (value) => customFilterFunction(value),
+      filterSearch: false,
+      filterMultiple: false,
+      defaultFilteredValue: ["None"],
+      filterResetToDefaultFilteredValue: true,
       width: "15%",
     },
   ];
+  
+  const filterOptions = [
+    "Awaiting Fulfillment",
+    "Awaiting Shipment",
+    "Closed",
+    "Canceled",
+    "None"
+  ];
+  
+  const customFilterFunction = (value) => {
+    let index = filterOptions.indexOf(value);
+    index = index === 4 ? -1 : index;
+    setFilter(index+1);
+    return true;
+  };
 
   const statusComponent = (status) => {
     let textClass = "text-orange bg-[#FFF6EC]";
@@ -206,7 +211,6 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     setPage(page);
   };
 
-
   return (
     <div>
       <DataTableComponent
@@ -214,7 +218,6 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
         data={data}
         isLoading={isordersSoldLoading}
         pagination={false}
-        // naviroute={routes.SoldOrderDetails.url}
         scrollX="100%"
       />
       <Pagination

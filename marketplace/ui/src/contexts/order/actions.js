@@ -261,7 +261,7 @@ const actions = {
     let end = selectedDate + 86400;
     query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : query;
 
-    query = filter !== '0'  ? query.concat(`&status=${filter}`) : query;
+    query = filter !== 0  ? query.concat(`&status=${filter}`) : query;
 
     dispatch({ type: actionDescriptors.fetchOrderSold });
 
