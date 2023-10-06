@@ -7,20 +7,18 @@ pipeline {
     string(name: 'VERSION_TAG', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
   }
   stages {
-    stage('Start Step Functions Execution') {
+    sstage('Start Step Functions Execution') {
       steps {
-        sh """
+        sh """#!/bin/bash
+        
           echo 'Input JSON: {"VersionTag": "${params.VERSION_TAG}"}'
-        """
-        env.execution_arn = sh(returnStdout: true, script: """
-          \$(aws stepfunctions start-execution \
+
+          env.execution_arn=\$(aws stepfunctions start-execution \
             --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
             --input '{"VersionTag": "${params.VERSION_TAG}"}' \
             --query "executionArn" \
-            --output text).trim()
-        """)
+            --output text)
 
-        sh """
           echo "Started Step Functions execution with ARN: \$execution_arn" 
         """
       }
