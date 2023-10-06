@@ -124,7 +124,7 @@ const MembershipCardPurchased = ({
       if (formik.values.price !== "" && inventories) {
         const resalePayload = {
           productAddress: membership.productId,
-          inventory: inventories[0].address,
+          inventory: membership.inventoryId,
           updates: {
             pricePerUnit: formik.values.price,
             status: INVENTORY_STATUS.PUBLISHED,

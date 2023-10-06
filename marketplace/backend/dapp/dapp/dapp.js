@@ -1143,13 +1143,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
               }
             });
           
-          console.log("savings: ", savings)
+          // console.log("savings: ", savings)
+          let inventoryDetail = inventoriesList.find((inventory) => inventory.address === item.inventoryId);
           return {
             itemAddress: item.address,
             itemNumber: item.itemNumber,
             productId: item.productId,
+            inventoryId: item.inventoryId,
+            availableQuantity: inventoryDetail?.availableQuantity,
             fileLocation: null, // productFiles[0]?.fileLocation, // comment for resale test
-            status:inventoriesList.find((inventory)=>inventory.address===item.inventoryId)?.status,
+            status: inventoryDetail?.status,
             productName: product.name,
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,

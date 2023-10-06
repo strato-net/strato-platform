@@ -26,7 +26,8 @@ const ListNowIndex = ({
 }) => {
 
   const { inventories, isInventoriesLoading } = useInventoryState()
-  const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
+  const [availableQuantity, setAvailableQuantity] = useState('');
+  const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
   const seller = user.user.organization;
   const { cartList } = useMarketplaceState();
   const [purchasedMembershipData, setPurchasedMembershipData] = useState([]);
@@ -78,13 +79,13 @@ const ListNowIndex = ({
     transformData(purchasedMemberships)
   }, [memberships, purchasedMemberships]);
 
-  useEffect(() => {
-    if (inventories.length > 0) {
-      setInventoryId(inventories.map((item) => item.address));
-      setProductId(inventories[0]?.productId);
-      MAX_QUANTITY = inventories[0].availableQuantity;
-    }
-  }, [inventories])
+  // useEffect(() => {
+  //   if (inventories.length > 0) {
+  //     setInventoryId(inventories.map((item) => item.address));
+  //     setProductId(inventories[0]?.productId);
+  //     MAX_QUANTITY = inventories[0].availableQuantity;
+  //   }
+  // }, [inventories])
 
 
   const handleFormatter = (value) => {
@@ -110,12 +111,13 @@ const ListNowIndex = ({
   };
 
   const handleMembership = (value) => {
-    setMembershipNumber('')
-    setQuantity('')
-    setProductId(value)
+    setMembershipNumber('');
+    setQuantity('');
+    setProductId(value);
+
     // let membership = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber }))
-    setMemebershipList(purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber })))
-    inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
+    setMemebershipList(purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity })))
+    // inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
   }
 
   const selectAfter = (
@@ -159,7 +161,9 @@ const ListNowIndex = ({
         disabled={isPurchasedMembershipLoading}
         onChange={(value, obj) => {
           setMembershipNumber(obj.label)
+          setInventoryId(obj.inventoryId)
           setId(value)
+          setAvailableQuantity(obj.availableQuantity)
         }}
         options={memebershipList}
       />
