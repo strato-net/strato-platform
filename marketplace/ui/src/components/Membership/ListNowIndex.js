@@ -37,7 +37,7 @@ const ListNowIndex = ({
   const [id, setId] = useState("");
   const [membershipNumber, setMembershipNumber] = useState('')
   const [inventoryId, setInventoryId] = useState('')
-  const [quantity, setQuantity] = useState('');
+  const [quantity, setQuantity] = useState(1);
   const [taxPercentage, setTaxPercentage] = useState('');
   const [taxDollarAmount, setTaxDollarAmount] = useState(0);
   const [taxPercentageAmount, setTaxPercentageAmount] = useState(0);
@@ -112,7 +112,7 @@ const ListNowIndex = ({
 
   const handleMembership = (value) => {
     setMembershipNumber('');
-    setQuantity('');
+    setQuantity(1);
     setProductId(value);
 
     // let membership = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber }))
