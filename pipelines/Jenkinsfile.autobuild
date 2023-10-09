@@ -7,11 +7,15 @@ pipeline {
       steps {
         wrap([$class: 'BuildUser']) {
           script {
+            BUILD_USER=''
             try {
-              currentBuild.description = "Agent ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
+              BUILD_USER="${BUILD_USER_FIRST_NAME}"
             } catch (Exception e) {
-              currentBuild.description = "Agent ${env.NODE_NAME}// github"
+              BUILD_USER="github"
             }
+            MAIN_AGENT_NAME="${env.NODE_NAME}"
+            currentBuild.description = "${MAIN_AGENT_NAME} //${BUILD_USER}"
+            
             lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
           }
         }
@@ -260,8 +264,11 @@ pipeline {
                   environment(name: "CHANGE_TARGET", value: "develop")
                 }
               }
-              agent { label "testsync" } 
+              agent { label "testsync" }
               steps {
+                script {
+                  currentBuild.description = "${MAIN_AGENT_NAME}/${env.NODE_NAME} //${BUILD_USER}"
+                }
                 withCredentials([
                   usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
                 ]) {
