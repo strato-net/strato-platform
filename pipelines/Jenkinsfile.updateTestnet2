@@ -12,7 +12,6 @@ pipeline {
         script {
           def execution_arn = sh(script: """
             #!/bin/bash
-            echo 'Input JSON: {"VersionTag": "${params.VERSION_TAG}"}'
             aws stepfunctions start-execution \
               --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
               --input '{"VersionTag": "${params.VERSION_TAG}"}' \
@@ -24,7 +23,6 @@ pipeline {
           env.EXECUTION_ARN = execution_arn
         }
       }
-      
     }
     stage('Wait for Step Functions Completion') {
       steps {
