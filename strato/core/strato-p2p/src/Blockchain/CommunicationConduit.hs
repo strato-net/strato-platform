@@ -150,7 +150,6 @@ mkEthP2PEventSourceServer peerSourceConduit seqEventSource peerStr inCtx = do
                ]
              )
              4096 -- 🙏
-  _ <- liftIO $ print ("after merged (mkEthP2PEventSource)," :: String)
   return $
     merged
       .| CL.iterM recordEvent
