@@ -1,0 +1,57 @@
+.control-prev,
+.control-next {
+  background-color: grey !important;
+  height: 30px;
+  width: 30px;
+  margin-top: 30% !important;
+  border-radius: 50%;
+  /* left: -20px !important; */
+  position: relative;
+  z-index: 2;
+  top: 25px !important;
+}
+
+.control-next::before {
+  position: relative;
+  top: -10px !important;
+  margin: 1px 8px !important;
+}
+
+.control-prev::before {
+  position: relative;
+  top: -10px !important;
+  margin: 1px 0px !important;
+  left: -2px;
+}
+
+.control-dots {
+  display: none;
+}
+.ant-upload-select {
+  width: 100% !important;
+}
+.ant-upload-select > span {
+  display: block !important;
+}
+
+.ant-upload-icon {
+  font-size: 40px;
+  color: #1898ef;
+}
+
+.ant-upload-list-item-actions > button {
+  background-color: black;
+  left: 20px;
+  bottom: 35px;
+}
+.ant-upload-list-picture {
+  display: inline-block;
+}
+
+.ant-upload-list-item-container {
+  margin-left: 20px;
+}
+
+.serviceIcons {
+  margin-top: 3px;
+}

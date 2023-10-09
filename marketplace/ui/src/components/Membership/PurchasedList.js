@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import MembershipCardPurchased from "./MembershipCardPurchased";
-import { Spin } from "antd";
+import { Col, Row, Spin } from "antd";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -23,7 +23,7 @@ const PurchasedList = (
     <>
       <h2 className="text-2xl font-semibold">Purchased Memberships</h2>
       {isPurchasedMembershipLoading ? (
-        <div className="h-screen flex justify-center items-center">
+        <div className="h-screen flex justify-center items-center mx-auto">
           <Spin spinning={isPurchasedMembershipLoading} size="large" />
         </div>
       ) : purchasedMemberships.length === 0 ? (
@@ -34,21 +34,23 @@ const PurchasedList = (
           </Title>
         </div>
       ) : (
-        <div className="my-4">
+        <Row className="my-4" gutter={[32, 16]}>
           {purchasedMemberships.map((product, index) => {
             return (
-              <MembershipCardPurchased
-                user={user}
-                membership={product}
-                categorys={categorys}
-                subCategorys={subCategorys}
-                debouncedSearchTerm={debouncedSearchTerm}
-                membershipId={product.itemNumber}
-                isPurchasedList={true}
-              />
+              <Col span={12}>
+                <MembershipCardPurchased
+                  user={user}
+                  membership={product}
+                  categorys={categorys}
+                  subCategorys={subCategorys}
+                  debouncedSearchTerm={debouncedSearchTerm}
+                  membershipId={product.itemNumber}
+                  isPurchasedList={true}
+                />
+              </Col>
             );
           })}
-        </div>
+        </Row>
       )}
     </>
   );
