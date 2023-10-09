@@ -23,6 +23,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { blockappLogo } from "../../images/SVGComponents";
 
 const { Title } = Typography;
 const { Header } = Layout;
@@ -158,18 +159,20 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   }, [user])
 
   return (
-    <Header className="!bg-primary flex">
+    <Header className="!bg-white flex shadow-lg">
       <Space>
         <div
-          className="mt-6 cursor-pointer"
+          className=" cursor-pointer"
           onClick={() => { navigate(routes.Marketplace.url) }}
         >
-          <Image src={Images.logo} width={35} preview={false} />
+           {/* <Image src={Images.logo} width={35} preview={false} /> */}
+           {blockappLogo()}
         </div>
         {((roleIndex === undefined || roleIndex === 1) && !isOauth)  ? null : <div className="ml-7 w-72">
           <Input
             size="large"
             placeholder="Search"
+            className="header-search rounded-full"
             prefix={<SearchOutlined style={{ color: "#989898" }} />}
           />
         </div>}
@@ -179,7 +182,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         defaultSelectedKeys={["0"]}
         selectedKeys={[selectedTab]}
         disabledOverflow={true}
-        className="h-16 bg-primary text-tertiaryB m-auto"
+        className="h-16 decoration-black m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
           if (item.key === "0") {    
@@ -230,7 +233,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         >
           <Avatar
             style={{
-              backgroundColor: "#181EAC",
+              backgroundColor: "transparent",
+              color:'black'
             }}
             icon={<DollarOutlined />}
           />
@@ -244,7 +248,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         >
           <Avatar
             style={{
-              backgroundColor: "#181EAC",
+              backgroundColor: "transparent",
+              color:'black'
             }}
             icon={<PlusCircleOutlined />}
           />
@@ -264,7 +269,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         >
           <Avatar
             style={{
-              backgroundColor: "#181EAC",
+              backgroundColor: "transparent",
+              color:'black'
             }}
             icon={<ShoppingCartOutlined />}
           />
@@ -284,7 +290,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
               </a> : (isOauth  ?  <Title  style={{backgroundColor: 'red', border: 3, padding:10,  color: '#FFFFFF'}} level={3} >Something went wrong, try to refresh page</Title> : null)  
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
-              <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">
+              <a onClick={(e) => e.preventDefault()} className="text-base text-black" id="user-dropdown">
                 {initials}
               </a>
             </Dropdown>

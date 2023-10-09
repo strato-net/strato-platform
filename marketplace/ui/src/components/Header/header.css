@@ -3,10 +3,12 @@
   .ant-menu-item:hover:not(.ant-menu-item-selected):not(
     .ant-menu-submenu-selected
   ) {
-  color: white;
+  color: black;
   font-weight: bold;
 }
-
+.header-search,   .header-search input {
+  background-color: #f2f2f2;
+}
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
   border-width: 2px;
   border-bottom-color: white;
@@ -17,6 +19,6 @@
   border-bottom-color: white;
 }
 
-.anticon svg{
+.anticon svg {
   display: block;
 }
