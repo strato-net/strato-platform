@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
-import { Card, Popover, Spin, Button, Row, Col, Typography, Image, Modal, Table } from "antd";
+import { Card, Popover, Spin, Button, Row, Col, Typography, Image, Modal, Table, Collapse } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
@@ -218,9 +218,9 @@ const MembershipCardPurchased = ({
           <Spin />
         </div>
       ) : (
-        <Card className="w-full mt-6" id="product" key={membershipId}>
+        <Card className="w-full mt-6 border-grey" id="product" key={membershipId}>
           <Col span={24}>
-            <Row className="p-2 rounded-md" style={{ backgroundColor: "#f2f2f2" }}>
+            <Row className="p-4 rounded-md" style={{ backgroundColor: "#f2f2f2" }}>
               <Col span={20}>
                 <Row>
                   <Typography.Title level={4}>
@@ -236,13 +236,13 @@ const MembershipCardPurchased = ({
                 </Typography.Text>
               </Col>
               <Col span={4} className="text-right flex" style={{ alignItems: "center" }}>
-                <Button style={{ color: '#181eac' }} type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
+                <Button className="primary-theme-text font-bold text-lg" type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
                   Preview  &gt;&gt;
                 </Button>
               </Col>
             </Row>
             <Row className="mt-4">
-              <Col span={6} className="border border-indigo-600  rounded overflow-hidden">
+              <Col span={6} className="border-grey shadow-lg rounded overflow-hidden">
                 {/* <Image
                   className="object-covers"
                   width={'100%'}
@@ -287,37 +287,46 @@ const MembershipCardPurchased = ({
                 </Button>
                 {/* : null} */}
               </Col>
-              <Col span={17} offset={1} className="border border-indigo-600 h-48 rounded p-2">
-                <Col className="mt-3">
-                  <Paragraph style={{ marginBottom: '8px' }}>
-                    <Text>Sub Category:</Text>
-                    <Text strong className="float-right">{subCategory}</Text>
-                  </Paragraph>
-                  <Paragraph style={{ marginBottom: '8px' }}>
-                    <Text>Company Name:</Text>
-                    <Text strong className="float-right">{manufacturer}</Text>
-                  </Paragraph>
-                  <Paragraph style={{ marginBottom: '8px' }}>
-                    <Text>Duration:</Text>
-                    <Text strong className="float-right">{timePeriodInMonths} Month(s)</Text>
-                  </Paragraph>
-                  <Paragraph style={{ marginBottom: '8px' }}>
-                    <Text>Savings:</Text>
-                    <Text strong type="success" className="float-right">${savings}</Text>
-                  </Paragraph>
-                  {membershipId && <Paragraph>
-                    <Text>Membership ID:</Text>
-                    <Text strong className="float-right">{membershipId}</Text>
-                  </Paragraph>}
-                </Col>
+              <Col span={17} offset={1} className="border-grey shadow-lg leading-2 min-h-min rounded p-2 ">
+                <Paragraph >
+                  <Text disabled className="font-bold" >Sub Category</Text>
+                  <Text strong className="float-right">{subCategory}</Text>
+                </Paragraph>
+                <Paragraph >
+                  <Text disabled className="font-bold" >Company Name</Text>
+                  <Text strong className="float-right">{manufacturer}</Text>
+                </Paragraph>
+                <Paragraph >
+                  <Text disabled className="font-bold" >Duration</Text>
+                  <Text strong className="float-right">{timePeriodInMonths} Month(s)</Text>
+                </Paragraph>
+                <Paragraph >
+                  <Text disabled className="font-bold" >Savings</Text>
+                  <Text strong type="success" className="float-right">${savings}</Text>
+                </Paragraph>
+                {membershipId && <Paragraph>
+                  <Text disabled className="font-bold" >Membership ID</Text>
+                  <Text strong className="float-right">{membershipId}</Text>
+                </Paragraph>}
               </Col>
             </Row>
-            {Inventories && <Row className="mt-4">
-              <Col span={24}>
-                <Title level={5}>Inventories</Title>
-                <Table bordered pagination={false} columns={columns} dataSource={data} />
-              </Col>
-            </Row>}
+            {Inventories &&
+              <Row className="mt-4">
+                <Col span={24}>
+                  {/* <Title level={5}>Inventories</Title> */}
+                  {/* <Collapse
+                    size="large"
+                    items={[{ key: '1', label: 'This is default size panel header', children: <Table bordered pagination={false} columns={columns} dataSource={data} /> }]}
+                  /> */}
+
+                  <Collapse size="large">
+                    <Collapse.Panel key="1" header={<Title level={5}>Inventories</Title>}>
+                      <Table bordered pagination={false} columns={columns} dataSource={data} />
+                    </Collapse.Panel>
+                  </Collapse>
+
+                </Col>
+              </Row>}
           </Col>
 
           {/* {open && (
