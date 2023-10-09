@@ -377,14 +377,14 @@ const Membership = (user) => {
             )}
             <div className="pb-12"></div>
           </Row>
-          <Row>
+          {/* <Row>
             <Pagination
               current={page}
               onChange={onPageChange}
               total={total}
               className="mx-auto"
             />
-          </Row>
+          </Row> */}
         </div>
       )}
       {open && (
