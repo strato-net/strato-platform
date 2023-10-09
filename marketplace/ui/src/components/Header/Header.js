@@ -10,7 +10,7 @@ import {
   Dropdown,
   Typography,
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined, DollarOutlined} from "@ant-design/icons";
+import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined, DollarOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -45,7 +45,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
 
-  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false 
+  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
 
   const navItems = [
     {
@@ -105,7 +105,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     } else if (pathName.includes("/storage")) {
       setSelectedTab("5");
     }
-    else{
+    else {
       setSelectedTab("0");
     }
   }, [window.location.pathname]);
@@ -165,10 +165,10 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           className=" cursor-pointer"
           onClick={() => { navigate(routes.Marketplace.url) }}
         >
-           {/* <Image src={Images.logo} width={35} preview={false} /> */}
-           {blockappLogo()}
+          {/* <Image src={Images.logo} width={35} preview={false} /> */}
+          {blockappLogo()}
         </div>
-        {((roleIndex === undefined || roleIndex === 1) && !isOauth)  ? null : <div className="ml-7 w-72">
+        {((roleIndex === undefined || roleIndex === 1) && !isOauth) ? null : <div className="ml-7 w-72">
           <Input
             size="large"
             placeholder="Search"
@@ -185,37 +185,42 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         className="h-16 decoration-black m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
-          if (item.key === "0") {    
+          if (item.key === "0") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_marketplace_page',
-            },
-          });}
-          if (item.key === "1") {  
+              dataLayer: {
+                event: 'view_marketplace_page',
+              },
+            });
+          }
+          if (item.key === "1") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_orders_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_orders_page',
+              },
+            });
+          }
           if (item.key === "2") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_inventory_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_inventory_page',
+              },
+            });
+          }
           if (item.key === "3") {
             TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_products_page',
-            },
-          });}
+              dataLayer: {
+                event: 'view_products_page',
+              },
+            });
+          }
           if (item.key === "4") {
             TagManager.dataLayer({
               dataLayer: {
                 event: 'view_events_page',
               },
             });
-            navigate(navUrls[item.key], { state: { tab: "EventType" } })}
+            navigate(navUrls[item.key], { state: { tab: "EventType" } })
+          }
           else navigate(navUrls[item.key]);
           if (item.key === "5") {
             TagManager.dataLayer({
@@ -234,7 +239,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           <Avatar
             style={{
               backgroundColor: "transparent",
-              color:'black'
+              color: 'black'
             }}
             icon={<DollarOutlined />}
           />
@@ -243,13 +248,13 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           onClick={() => {
-            navigate("/memberships", { state: { isCalledFromHeader: true} });
+            navigate("/memberships", { state: { isCalledFromHeader: true } });
           }}
         >
           <Avatar
             style={{
               backgroundColor: "transparent",
-              color:'black'
+              color: 'black'
             }}
             icon={<PlusCircleOutlined />}
           />
@@ -270,7 +275,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           <Avatar
             style={{
               backgroundColor: "transparent",
-              color:'black'
+              color: 'black'
             }}
             icon={<ShoppingCartOutlined />}
           />
@@ -278,16 +283,16 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         }
         {
           roleIndex === undefined || roleIndex === 1 ? (
-            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white" 
+            loginUrl ? <a href={loginUrl} id="Login" className="text-base text-white"
               onClick={() => {
                 TagManager.dataLayer({
                   dataLayer: {
                     event: 'login_register_click'
                   }
                 })
-              } } > 
-              Login / Register 
-              </a> : (isOauth  ?  <Title  style={{backgroundColor: 'red', border: 3, padding:10,  color: '#FFFFFF'}} level={3} >Something went wrong, try to refresh page</Title> : null)  
+              }} >
+              <Typography className="primary-theme-text">Login / Register</Typography>
+            </a> : (isOauth ? <Title style={{ backgroundColor: 'red', border: 3, padding: 10, color: '#FFFFFF' }} level={3} >Something went wrong, try to refresh page</Title> : null)
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-black" id="user-dropdown">
