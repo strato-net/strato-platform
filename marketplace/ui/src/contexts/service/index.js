@@ -9,7 +9,7 @@ const ServicesProvider = ({ children }) => {
     service: null,
     isCreateServiceSubmitting: false,
     services: [],
-    isservicesLoading: false,
+    isServicesLoading: false,
     serviceDetails: null,
     isserviceDetailsLoading: false,
     serviceOwnership: null,
