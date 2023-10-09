@@ -35,7 +35,7 @@ pipeline {
                 --execution-arn "${execution_arn}" \
                 --query "status" \
                 --output text
-            """, returnStatus: true, returnStdout: true).trim()
+            """, returnStatus: true, returnStdout: true)toString().trim()
 
             if (execution_status == "SUCCEEDED") {
               echo "Step Functions execution succeeded."
