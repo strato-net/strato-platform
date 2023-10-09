@@ -35,16 +35,19 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
     const columns = [
         {
             title: "Quantity Available",
-            dataIndex: "availableQuantity"
+            dataIndex: "availableQuantity",
+            align: "center"
         },
         {
             title: "Set Quantity",
+            align: "center",
             render: () => (
                 <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
             )
         },
         {
             title: "Set Price",
+            align: "center",
             render: () => (
                 <InputNumber value={pricePerUnit} controls={false} min={pricePerUnit} onChange={(value) => setpricePerUnit(value)} />
             )
