@@ -33,7 +33,7 @@ const GiftModal = ({ open, handleCancel, inventory }) => {
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
     };
-    
+
     const usersList = users.map((record) => (user.organization !== record.organization ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
     const filteredUsersList = filterDuplicateUserAddresses(usersList);
 
@@ -47,13 +47,13 @@ const GiftModal = ({ open, handleCancel, inventory }) => {
     }, [])
 
     useEffect(() => {
-        if (quantity > inventory.availableQuantity || quantity <= 0) {
+        if (quantity > inventory.availableQuantity || quantity <= 0 || !userAddress) {
             setCanGift(false);
         }
         else {
             setCanGift(true);
         };
-    }, [quantity])
+    }, [quantity, userAddress])
 
     const columns = [
         {
@@ -96,7 +96,8 @@ const GiftModal = ({ open, handleCancel, inventory }) => {
             itemsAddress: itemsAddress,
             userAddress: userAddress
         };
-        if (quantity > 0 && quantity <= inventory.availableQuantity) {
+
+        if (quantity > 0 && quantity <= inventory.availableQuantity && userAddress) {
             console.log("Gift", body);
             // let isDone = await actions.resellInventory(inventoryDispatch, body);
             // if (isDone) {
