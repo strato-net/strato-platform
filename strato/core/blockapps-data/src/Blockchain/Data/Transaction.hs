@@ -115,8 +115,8 @@ instance TransactionLike Transaction where
   txData PrivateHashTX {} = Nothing
 
   morphTx t = case type' of
-    Message -> MessageTX n gp gl dest val dat chainId r s v md
-    ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md
+    Message -> MessageTX n gp gl dest val dat chainId r s v md Nothing --TODO: Nothing is wrong
+    ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md Nothing --TODO: Nothing is wrong
     PrivateHash -> PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger r) (unsafeCreateKeccak256FromWord256 $ fromInteger s)
     where
       type' = txType t
@@ -132,24 +132,24 @@ instance TransactionLike Transaction where
       md = txMetadata t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Code dat) cid r s v md _ _ _) =
-  MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
-rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _)
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Code dat) cid r s v md nid _ _ _) =
+  MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md) nid
+rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _ _)
   | init' == Code B.empty =
     PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val init' (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md nid _ _ _) =
+  ContractCreationTX nonce' gp gl val init' (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md) nid
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
-    (MessageTX nonce' gp gl to' val dat cid r s v md) ->
-      RawTransaction time signer nonce' gp gl (Just to') val (Code dat) (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (ContractCreationTX nonce' gp gl val init' cid r s v md) ->
-      RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+    (MessageTX nonce' gp gl to' val dat cid r s v md nid) ->
+      RawTransaction time signer nonce' gp gl (Just to') val (Code dat) (fromMaybe 0 cid) r s v (M.toList <$> md) nid (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX nonce' gp gl val init' cid r s v md nid) ->
+      RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) nid (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
-      RawTransaction time signer 0 0 0 Nothing 0 (Code B.empty) 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer 0 0 0 Nothing 0 (Code B.empty) 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing Nothing (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -229,7 +229,8 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
             transactionR = 0,
             transactionS = 0,
             transactionV = 0,
-            transactionMetadata = md
+            transactionMetadata = md,
+            transactionNetworkId = Nothing --TODO: Nothing is wrong
           }
   let theHash = partialTransactionHash unsignedTX
 
@@ -264,7 +265,8 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
             transactionR = 0,
             transactionS = 0,
             transactionV = 0,
-            transactionMetadata = md
+            transactionMetadata = md,
+            transactionNetworkId = Nothing --TODO: Nothing is wrong
           }
 
   let theHash = partialTransactionHash unsignedTX
@@ -297,15 +299,7 @@ whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub si
     sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b))
     mesg = keccak256ToByteString $ hsh
 
-{-
-whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
-whoSignedThisTransaction tx = case tx of
-  PrivateHashTX{} -> Just (Address 0)
-  t -> pubKey2Address <$> getPubKeyFromSignature xSignature (keccak256ToWord256 theHash)
-        where
-          xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
-          theHash = partialTransactionHash t
--}
+
 isContractCreationTX :: Transaction -> Bool
 isContractCreationTX ContractCreationTX {} = True
 isContractCreationTX _ = False

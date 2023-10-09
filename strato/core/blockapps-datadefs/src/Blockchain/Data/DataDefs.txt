@@ -86,6 +86,7 @@ RawTransaction
     s Integer
     v Integer
     metadata [TextPair] Maybe
+    networkId Integer Maybe
     blockNumber Int
     txHash Keccak256
     origin TXOrigin

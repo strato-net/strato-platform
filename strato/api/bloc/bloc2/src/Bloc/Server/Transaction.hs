@@ -210,7 +210,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
           postbloctransactionrawrequestR
           postbloctransactionrawrequestS
           postbloctransactionrawrequestMetadata
-      rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress tx
+      rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress (Just computeNetworkID) tx --NOTE TO AYA: don't hardcode
 
   if h
     then
@@ -1156,9 +1156,10 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
 preparePostTx ::
   UTCTime ->
   Address ->
+  Maybe Integer ->
   Transaction ->
   RawTransaction'
-preparePostTx time from tx =
+preparePostTx time from nid tx =
   flip RawTransaction' "" $
     RawTransaction
       time
@@ -1174,6 +1175,7 @@ preparePostTx time from tx =
       (fromIntegral s)
       v
       metadata
+      nid
       0
       kecc
       API
@@ -1212,6 +1214,7 @@ preparePostUnsignedRawTx time tx md =
       0
       0
       metadata
+      netId
       0
       zeroHash
       API
@@ -1224,6 +1227,7 @@ preparePostUnsignedRawTx time tx md =
     toAddr = unsignedTransactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ unsignedTransactionChainId tx
     metadata = Map.toList <$> md
+    netId = unsignedTransactionNetworkId tx
 
 addMetadata :: Maybe (Map Text Text) -> Transaction -> Transaction
 addMetadata m t = t {transactionMetadata = m}
@@ -1237,9 +1241,10 @@ signAndPrepare ::
   m RawTransaction'
 signAndPrepare jwtToken from md th = do
   let sign' = callSignature jwtToken
+      nid = transactionheaderNetworkId th
   gasLimit <- fmap gasLimit getBlocEnv
   time <- liftIO getCurrentTime
-  fmap (preparePostTx time from . addMetadata md) . sign' $ prepareUnsignedTx gasLimit th
+  fmap (preparePostTx time from nid . addMetadata md) . sign' $ prepareUnsignedTx gasLimit th
 
 prepareUnsignedRawTx ::
   (MonadIO m, HasBlocEnv m) =>

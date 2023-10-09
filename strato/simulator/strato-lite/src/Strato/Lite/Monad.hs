@@ -1769,7 +1769,8 @@ mkSignedTx privKey utx md =
                   transactionR = fromIntegral r',
                   transactionS = fromIntegral s',
                   transactionV = v',
-                  transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
+                  transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md,
+                  transactionNetworkId = (U.unsignedTransactionNetworkId utx)
                 }
         else
           ContractCreationTX
@@ -1782,7 +1783,8 @@ mkSignedTx privKey utx md =
               transactionR = fromIntegral r',
               transactionS = fromIntegral s',
               transactionV = v',
-              transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md
+              transactionMetadata = Just $ M.singleton "VM" "SolidVM" <> md,
+              transactionNetworkId = (U.unsignedTransactionNetworkId utx)
             }
 
 runConnection ::

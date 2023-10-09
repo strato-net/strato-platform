@@ -45,7 +45,7 @@ instance ToSchema RawTransaction' where
       NamedSchema (Just "RawTransaction'") mempty
 
 instance ToJSON RawTransaction' where
-  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl (Just ta) val cod cid r s v md bn h o) next) =
+  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl (Just ta) val cod cid r s v md nid bn h o) next) =
     object $
       [ "next" .= next,
         "from" .= fa,
@@ -66,7 +66,8 @@ instance ToJSON RawTransaction' where
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
-  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cid r s v md bn h o) next) =
+        ++ (("networkId" .=) <$> maybeToList nid)
+  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cid r s v md nid bn h o) next) =
     object $
       [ "next" .= next,
         "from" .= fa,
@@ -86,6 +87,7 @@ instance ToJSON RawTransaction' where
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
+        ++ (("networkdId" .=) <$> maybeToList nid)
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
 parseHexStr = fmap readHexStr
@@ -107,6 +109,7 @@ instance FromJSON RawTransaction' where
     (ts :: Integer) <- parseHexStr (t .: "s")
     (tv :: Integer) <- parseHexStr (t .:? "v" .!= "0")
     md <- t .:? "metadata"
+    nid <- t .:? "networkId"
     bn <- t .:? "blockNumber" .!= (-1)
     h <- (t .:? "hash" .!= (unsafeCreateKeccak256FromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
     -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction'
@@ -133,6 +136,7 @@ instance FromJSON RawTransaction' where
               (ts :: Integer)
               (tv :: Integer)
               (M.toList <$> md)
+              nid
               bn
               h
               o
@@ -147,7 +151,7 @@ instance ToSchema UnsignedRawTransaction' where
       NamedSchema (Just "UnsignedRawTransaction'") mempty
 
 instance ToJSON UnsignedRawTransaction' where
-  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl (Just ta) val cod cid _ _ _ md _ _ _)) =
+  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl (Just ta) val cod cid _ _ _ md nid _ _ _)) =
     object $
       [ "nonce" .= non,
         "gasPrice" .= gp,
@@ -158,7 +162,8 @@ instance ToJSON UnsignedRawTransaction' where
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
-  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl Nothing val cod cid _ _ _ md _ _ _)) =
+        ++ (("networkId" .=) <$> maybeToList nid)
+  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl Nothing val cod cid _ _ _ md nid _ _ _)) =
     object $
       [ "nonce" .= non,
         "gasPrice" .= gp,
@@ -168,6 +173,7 @@ instance ToJSON UnsignedRawTransaction' where
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
+        ++ (("networkId" .=) <$> maybeToList nid)
 
 instance FromJSON UnsignedRawTransaction' where
   parseJSON (Object t) = do
@@ -183,6 +189,7 @@ instance FromJSON UnsignedRawTransaction' where
     (ts :: Integer) <- parseHexStr (t .: "s")
     (tv :: Integer) <- parseHexStr (t .:? "v" .!= "0")
     md <- t .:? "metadata"
+    nid <- t .:? "networkId"
     bn <- t .:? "blockNumber" .!= (-1)
     h <- (t .:? "hash" .!= (unsafeCreateKeccak256FromWord256 $ fromIntegral tr)) -- when transaction is PrivateHashTX
     -- Unfortunately, time is rendered with `show` in ToJSON for UnsignedRawTransaction'
@@ -208,6 +215,7 @@ instance FromJSON UnsignedRawTransaction' where
               (ts :: Integer)
               (tv :: Integer)
               (M.toList <$> md)
+              nid
               bn
               h
               o
@@ -227,7 +235,7 @@ rtPrimeToRt (RawTransaction' x _) = x
 data Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
-  toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tcid tr ts tv md)) =
+  toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tcid tr ts tv md tnid)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -245,7 +253,8 @@ instance ToJSON Transaction' where
       ]
         ++ (("chainId" .=) <$> (maybeToList tcid))
         ++ (("metadata" .=) <$> maybeToList md)
-  toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval tcode tcid tr ts tv md)) =
+        ++ (("networkId" .=) <$> (maybeToList tnid))
+  toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval tcode tcid tr ts tv md tnid)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -262,6 +271,7 @@ instance ToJSON Transaction' where
       ]
         ++ (("chainId" .=) <$> (maybeToList tcid))
         ++ (("metadata" .=) <$> maybeToList md)
+        ++ (("networkId" .=) <$> (maybeToList tnid))
   toJSON (Transaction' tx@(PrivateHashTX th tch)) =
     object
       [ "transactionHash" .= showHex (keccak256ToWord256 th) "",
@@ -286,16 +296,17 @@ instance FromJSON Transaction' where
         ts <- parseHexStr (t .: "s")
         tv <- parseHexStr (t .:? "v" .!= "0")
         md <- t .:? "metadata"
+        tnid <- (t .:? "networkId")
 
         case tto of
           Nothing -> do
             (mti :: Maybe Code) <- (t .:? "init")
             case mti of
               Nothing -> return . Transaction' $ PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger tr) (unsafeCreateKeccak256FromWord256 $ fromInteger ts)
-              Just ti -> return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md
+              Just ti -> return . Transaction' $ ContractCreationTX tnon tgp tgl tval ti tcid tr ts tv md tnid
           (Just to') -> do
             td <- (t .: "data")
-            return . Transaction' $ MessageTX tnon tgp tgl to' tval td tcid tr ts tv md
+            return . Transaction' $ MessageTX tnon tgp tgl to' tval td tcid tr ts tv md tnid
   parseJSON _ = error "bad param when calling parseJSON for Transaction'"
 
 tToTPrime :: Transaction -> Transaction'
@@ -544,7 +555,7 @@ data TransactionType = Contract | FunctionCall | Transfer deriving (Eq, Show)
 --   toJSON x = object ["transactionType" .= show x]
 
 transactionSemantics :: Transaction -> TransactionType
-transactionSemantics (MessageTX _ _ _ (Address _) _ td _ _ _ _ _) = work
+transactionSemantics (MessageTX _ _ _ (Address _) _ td _ _ _ _ _ _) = work
   where
     work
       | (B.length td) > 0 = FunctionCall
@@ -557,7 +568,7 @@ isAddr a = case a of
   Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _) = work
+rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _ _) = work
   where
     work
       | (not (isAddr ta)) = Contract

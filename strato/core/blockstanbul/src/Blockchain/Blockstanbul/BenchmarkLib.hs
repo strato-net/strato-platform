@@ -39,7 +39,8 @@ oneTX size =
       transactionR = 1 `shiftL` 200,
       transactionS = 1 `shiftL` 133,
       transactionV = 27,
-      transactionMetadata = Nothing
+      transactionMetadata = Nothing,
+      transactionNetworkId = Nothing
     }
 
 --benchPrivateKey :: PrivateKey

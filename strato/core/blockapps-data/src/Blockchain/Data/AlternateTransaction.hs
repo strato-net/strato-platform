@@ -174,7 +174,7 @@ instance RLPEncodable UnsignedTransaction where
           [] -> (Right Nothing, Right Nothing)
           [Array [nid]] -> (Right Nothing, Just <$> rlpDecode nid)
           [cid] -> (Just <$> rlpDecode cid, Right Nothing)
-          [cid, Array nid] -> (Just <$> rlpDecode cid, Just <$> ((-1) *) <$> rlpDecode (Array nid))
+          [cid, Array [nid]] -> (Just <$> rlpDecode cid, Just <$> rlpDecode nid)
           x -> (Left $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x, Right Nothing)
     in UnsignedTransaction
       <$> rlpDecode n

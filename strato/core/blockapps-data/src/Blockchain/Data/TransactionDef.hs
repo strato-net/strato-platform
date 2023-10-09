@@ -26,7 +26,7 @@ import qualified Data.ByteString as B
 import Data.Data
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (listToMaybe, maybeToList)
+import Data.Maybe (maybeToList)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -51,7 +51,8 @@ data Transaction
         transactionR :: Integer,
         transactionS :: Integer,
         transactionV :: Integer,
-        transactionMetadata :: Maybe (Map Text Text)
+        transactionMetadata :: Maybe (Map Text Text),
+        transactionNetworkId :: Maybe Integer
       }
   | ContractCreationTX
       { transactionNonce :: Integer,
@@ -63,7 +64,8 @@ data Transaction
         transactionR :: Integer,
         transactionS :: Integer,
         transactionV :: Integer,
-        transactionMetadata :: Maybe (Map Text Text)
+        transactionMetadata :: Maybe (Map Text Text),
+        transactionNetworkId :: Maybe Integer
       }
   | PrivateHashTX
       { transactionTxHash :: Keccak256,
@@ -178,12 +180,17 @@ instance Format Transaction where
 
 instance RLPSerializable Transaction where
   rlpDecode (RLPArray (n : gp : gl : toAddr : val : i : vVal : rVal : sVal : xs)) =
-    let (cid, md) = case xs of
-          [] -> (Nothing, Nothing)
+    let rlpDecodeMap = M.fromList . map ((decodeUtf8 *** decodeUtf8) . rlpDecode)
+        (cid, md, nid) = case xs of
+          [] -> (Nothing, Nothing, Nothing)
           [c] -> case c of
-            (RLPArray a) -> (Nothing, Just . M.fromList $ map ((decodeUtf8 *** decodeUtf8) . rlpDecode) a)
-            cid' -> (Just $ rlpDecode cid', Nothing)
-          (c : (RLPArray a) : _) -> (Just $ rlpDecode c, Just . M.fromList $ map ((decodeUtf8 *** decodeUtf8) . rlpDecode) a)
+            RLPArray [nid'] -> (Nothing, Nothing, Just $ rlpDecode nid')
+            RLPArray a -> (Nothing, Just $ rlpDecodeMap a, Nothing)
+            cid' -> (Just $ rlpDecode cid', Nothing, Nothing)
+          (c : RLPArray a : RLPArray [nid'] : _) -> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
+          [RLPArray a, RLPArray [nid']] -> (Nothing, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
+          [c, RLPArray [nid']] -> (Just $ rlpDecode c, Nothing, Just $ rlpDecode nid')
+          [c, RLPArray a] -> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Nothing)
           (_ : o : _) -> error $ "rlpDecode Transaction: Expected metadata to be an RLPArray, but got: " ++ show o
      in case partial of
           PrivateHashTX {} -> case cid of
@@ -191,30 +198,35 @@ instance RLPSerializable Transaction where
             Just _ -> error "rlpDecode Transaction: PrivateHashTX transactions can't have a chainId"
           p@MessageTX {} ->
             p
-              { transactionV = fromInteger $ rlpDecode vVal,
+              { transactionV = rlpDecode vVal,
                 transactionR = rlpDecode rVal,
                 transactionS = rlpDecode sVal,
                 transactionChainId = cid,
-                transactionMetadata = md
+                transactionMetadata = md,
+                transactionNetworkId = nid
               }
           p@ContractCreationTX {} ->
             p
-              { transactionV = fromInteger $ rlpDecode vVal,
+              { transactionV = rlpDecode vVal,
                 transactionR = rlpDecode rVal,
                 transactionS = rlpDecode sVal,
                 transactionChainId = cid,
-                transactionMetadata = md
+                transactionMetadata = md,
+                transactionNetworkId = nid
               }
     where
       partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i]
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecodeq: " ++ show x)
 
   rlpEncode t = case r of
-    RLPArray (n : gp : gl : toAddr : val : i : cid) ->
-      let chainId = listToMaybe cid
+    RLPArray (n : gp : gl : toAddr : val : i : rest) ->
+      let chainId = case rest of
+            [] -> Nothing
+            [RLPArray [_]] -> Nothing
+            (c : _) -> Just c
        in case t of
-            PrivateHashTX {..} -> case cid of
-              [] ->
+            PrivateHashTX {..} -> case chainId of
+              Nothing ->
                 RLPArray
                   [ n,
                     gp,
@@ -226,7 +238,7 @@ instance RLPSerializable Transaction where
                     (rlpEncode $ keccak256ToWord256 transactionTxHash),
                     (rlpEncode $ keccak256ToWord256 transactionChainHash)
                   ]
-              _ -> error "rlpEncode Transaction: PrivateHashTX transactions can't have a chainId"
+              Just _ -> error "rlpEncode Transaction: PrivateHashTX transactions can't have a chainId"
             MessageTX {..} ->
               RLPArray $
                 [ n,
@@ -235,12 +247,15 @@ instance RLPSerializable Transaction where
                   toAddr,
                   val,
                   i,
-                  rlpEncode $ toInteger transactionV,
+                  rlpEncode $ transactionV,
                   rlpEncode $ transactionR,
                   rlpEncode $ transactionS
                 ]
                   ++ (maybeToList chainId)
                   ++ (maybeToList $ fmap (RLPArray . map (rlpEncode . (encodeUtf8 *** encodeUtf8)) . M.toList) transactionMetadata)
+                  ++ case transactionNetworkId of
+                    Nothing -> []
+                    Just nid -> [RLPArray [rlpEncode nid]]
             ContractCreationTX {..} ->
               RLPArray $
                 [ n,
@@ -249,12 +264,15 @@ instance RLPSerializable Transaction where
                   toAddr,
                   val,
                   i,
-                  rlpEncode $ toInteger transactionV,
+                  rlpEncode $ transactionV,
                   rlpEncode $ transactionR,
                   rlpEncode $ transactionS
                 ]
                   ++ (maybeToList chainId)
                   ++ (maybeToList $ fmap (RLPArray . map (rlpEncode . (encodeUtf8 *** encodeUtf8)) . M.toList) transactionMetadata)
+                  ++ case transactionNetworkId of
+                    Nothing -> []
+                    Just nid -> [RLPArray [rlpEncode nid]]
     _ -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show r
     where
       r = partialRLPEncode t
@@ -295,7 +313,8 @@ partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i]) =
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode",
-      transactionMetadata = error "transactionMetadata not initialized in partialRLPDecode"
+      transactionMetadata = error "transactionMetadata not initialized in partialRLPDecode",
+      transactionNetworkId = error "transactionNetworkId not initialized in partialRLPDecode"
     }
 partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i]) =
   MessageTX
@@ -309,12 +328,13 @@ partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i]) =
       transactionR = error "transactionR not initialized in partialRLPDecode",
       transactionS = error "transactionS not initialized in partialRLPDecode",
       transactionV = error "transactionV not initialized in partialRLPDecode",
-      transactionMetadata = error "transactionMetadata not initialized in partialRLPDecode"
+      transactionMetadata = error "transactionMetadata not initialized in partialRLPDecode",
+      transactionNetworkId = error "transactionNetworkId not initialized in partialRLPDecode"
     }
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 
 partialRLPEncode :: Transaction -> RLPObject
-partialRLPEncode MessageTX {transactionNonce = n, transactionGasPrice = gp, transactionGasLimit = gl, transactionTo = to', transactionValue = v, transactionData = d, transactionChainId = cid} =
+partialRLPEncode MessageTX {transactionNonce = n, transactionGasPrice = gp, transactionGasLimit = gl, transactionTo = to', transactionValue = v, transactionData = d, transactionChainId = cid, transactionNetworkId = mNetId} =
   RLPArray $
     [ rlpEncode n,
       rlpEncode gp,
@@ -324,7 +344,10 @@ partialRLPEncode MessageTX {transactionNonce = n, transactionGasPrice = gp, tran
       rlpEncode d
     ]
       ++ (maybeToList $ fmap rlpEncode cid)
-partialRLPEncode ContractCreationTX {transactionNonce = n, transactionGasPrice = gp, transactionGasLimit = gl, transactionValue = v, transactionInit = init', transactionChainId = cid} =
+      ++ case mNetId of
+        Nothing -> []
+        Just nid -> [RLPArray [rlpEncode nid]]
+partialRLPEncode ContractCreationTX {transactionNonce = n, transactionGasPrice = gp, transactionGasLimit = gl, transactionValue = v, transactionInit = init', transactionChainId = cid, transactionNetworkId = mNetId} =
   RLPArray $
     [ rlpEncode n,
       rlpEncode gp,
@@ -334,4 +357,7 @@ partialRLPEncode ContractCreationTX {transactionNonce = n, transactionGasPrice =
       rlpEncode init'
     ]
       ++ (maybeToList $ fmap rlpEncode cid)
+      ++ case mNetId of
+        Nothing -> []
+        Just nid -> [RLPArray [rlpEncode nid]]
 partialRLPEncode _ = RLPArray . map rlpEncode $ replicate 6 (0 :: Integer) -- PrivateHashTX

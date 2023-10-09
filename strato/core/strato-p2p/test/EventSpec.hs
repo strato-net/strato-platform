@@ -1661,7 +1661,8 @@ mkSignedTx privKey utx =
                   transactionR = fromIntegral r',
                   transactionS = fromIntegral s',
                   transactionV = v',
-                  transactionMetadata = Just $ M.fromList [("VM", "SolidVM")]
+                  transactionMetadata = Just $ M.fromList [("VM", "SolidVM")],
+                  transactionNetworkId = (U.unsignedTransactionNetworkId utx)
                 }
         else
           ContractCreationTX
@@ -1674,7 +1675,8 @@ mkSignedTx privKey utx =
               transactionR = fromIntegral r',
               transactionS = fromIntegral s',
               transactionV = v',
-              transactionMetadata = Just $ M.fromList [("VM", "SolidVM")]
+              transactionMetadata = Just $ M.fromList [("VM", "SolidVM")],
+              transactionNetworkId = (U.unsignedTransactionNetworkId utx)
             }
 
 instance HasVault IO where
