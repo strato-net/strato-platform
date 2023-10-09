@@ -25,6 +25,7 @@ contract UserAddress_1 is RestStatus {
     string public billingAddressLine1;
     string public billingAddressLine2;
     uint public createdDate;
+    bool public isDeleted;
 
 
     /// @dev UserAddress to add and remove members to this shard.
@@ -67,10 +68,19 @@ contract UserAddress_1 is RestStatus {
         billingAddressLine1 = _billingAddressLine1;
         billingAddressLine2 = _billingAddressLine2;
         createdDate = _createdDate;
+        isDeleted = false;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
+    }
+
+    function deleteUserAddress() returns (uint){
+      // if(ownerOrganization != getUserOrganization(tx.origin)){
+      //   return RestStatus.FORBIDDEN;
+      // }
+        isDeleted = true;
+        return RestStatus.OK;
     }
 }

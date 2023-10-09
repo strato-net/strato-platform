@@ -186,6 +186,23 @@ async function getAll(admin, args = {}, options) {
     return userAddress.map((order) => marshalOut(order));
   }
 
+async function deleteUserAddress(args, options) {
+    console.log("deleteUserAddress", args, options)
+    // Takes the address of the userAddress contract and calls the delteUserAddress function
+    const { address, user } = args;
+
+    const userContract = await bindAddress(user.token, address, options);    
+    console.log("userContract", userContract)
+    const contractArgs = {
+        contract: userContract,
+        method: 'deleteUserAddress',
+        args: {},
+    };
+
+    const contract = await rest.call(user, contractArgs, options);
+    return contract;
+}   
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -202,6 +219,7 @@ export default {
     bindAddress,
     get,
     getAll,
+    deleteUserAddress,
     getState,
     marshalIn,
     marshalOut,

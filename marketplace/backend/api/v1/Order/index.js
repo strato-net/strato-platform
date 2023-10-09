@@ -63,6 +63,13 @@ router.post(
   OrderController.createUserAddress
 )
 
+router.post(
+  Order.deleteUserAddress,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.deleteUserAddress
+)
+
 router.get(
   Order.getAllUserAddress,
   authHandler.authorizeRequest(),

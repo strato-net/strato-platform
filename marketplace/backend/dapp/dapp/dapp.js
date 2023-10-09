@@ -1299,11 +1299,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const createdDate = Math.floor(Date.now() / 1000);
       return managers.paymentManager.createUserAddress({ ...args, createdDate: createdDate, });
-    } catch (err) {
+    } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(err)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(error)} `);
     }
   };
 
@@ -1311,6 +1311,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
     return userAddressJs.getAll(rawAdmin, { ownerOrganization: userOrganization, ...args }, getOptions);
   };
+
+  contract.deleteUserAddress = async function (args, options = defaultOptions) {
+    try {
+      console.log("dapp delete address", args)
+      return userAddressJs.deleteUserAddress(args, options)
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while deleting address: ${JSON.stringify(err)} `);
+    }
+  }
 
 
   //-----------------------------Order ends here -------------------------------

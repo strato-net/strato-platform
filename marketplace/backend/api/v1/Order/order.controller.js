@@ -73,6 +73,26 @@ class OrderController {
     }
   }
 
+  static async deleteUserAddress(req, res, next) {
+    try {
+      const { dapp, body } = req
+      console.log("body", body)
+      if (!body.address) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, 'Missing address', {
+          message: `Missing address`,
+        })
+      }
+
+      const result = await dapp.deleteUserAddress(body, options)
+
+      rest.response.status200(res, result)
+      return next()
+    } catch (e) { 
+      return next(e)
+    }
+  }
+
+
 
 
   static async updateBuyerDetails(req, res, next) {
