@@ -22,7 +22,6 @@ import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1 (getPub)
 import           Control.Concurrent
-import           Control.Concurrent.STM.Map as CCSTMM
 import           Control.Lens ((^.))
 import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Unlift
@@ -31,7 +30,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import qualified Data.Text as T
 import           Data.Traversable (for)
-import           Executable.StratoP2PClient (runEthClientConduit)
+import           Executable.StratoP2PClient (runEthServerConduit)
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
@@ -70,9 +69,6 @@ handleEvents ev sSource runner = do
             Just peer -> do
               ender <- toIO . $logInfoS "stratoP2PClientDirect/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
               void $ register ender
-              tt <- liftIO $ atomically CCSTMM.empty
-              parentthreadid <- liftIO myThreadId
-              _ <- liftIO $ atomically $ CCSTMM.insert parentthreadid parentthreadid tt
               let isRunning = pPeerActiveState peer == 1
               $logDebugS "stratoP2PClientDirect/handleEvents/isRunning" . T.pack $ show isRunning
               if isRunning
@@ -109,32 +105,18 @@ handleEvents ev sSource runner = do
                       $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
                       runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
                         let pStr = pPeerString peer -- display string will show up as dns name
-                        attempt :: (Maybe SomeException,Map ThreadId ThreadId) <-
-                          withCertifiedPeerClient peer . withActivePeer peer $
-                            runEthClientConduit
-                              parentthreadid
-                              tt
+                        attempt :: (Maybe SomeException) <-
+                          withCertifiedPeer peer . withActivePeer peer $
+                            runEthServerConduit
                               peer {pPeerPubkey = Just otherPubKey}
                               (c ^. peerSource)
                               (c ^. peerSink)
                               (c ^. seqSource)
                               pStr
                         case attempt of
-                          (Nothing,tt')  -> do $logInfoS "stratoP2PClientDirect/handleEvents" "New chain member connected successfully!"
-                                               childtoclose <- liftIO $ atomically $ CCSTMM.lookup parentthreadid tt'
-                                               case childtoclose of
-                                                 Nothing            -> return ()
-                                                 Just childtoclosef -> do $logInfoS "stratoP2PClientDirect/handleEvents" "Ensuring child thread is closed."
-                                                                          _ <- liftIO $ killThread childtoclosef
-                                                                          liftIO $ atomically $ CCSTMM.delete parentthreadid tt'
-                          (Just err,tt') -> do $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "New chain member connection was unsuccessful." ++ show (err)
-                                               childtoclose <- liftIO $ atomically $ CCSTMM.lookup parentthreadid tt'
-                                               case childtoclose of
-                                                 Nothing            -> throwIO err
-                                                 Just childtoclosef -> do $logInfoS "stratoP2PClientDirect/handleEvents" "Ensuring child thread is closed."
-                                                                          _ <- liftIO $ killThread childtoclosef
-                                                                          _ <- liftIO $ atomically $ CCSTMM.delete parentthreadid tt'
-                                                                          throwIO err
+                          Nothing  -> $logInfoS "stratoP2PClientDirect/handleEvents" "New chain member connected successfully!"
+                          Just err -> do $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "New chain member connection was unsuccessful." ++ show (err)
+                                         throwIO err
                     else $logInfoS "stratoP2PClientDirect/handleEvents" "Peer is not a member of the chain."
             Nothing -> $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "Peer/Peers doesn't exist."
     _ -> $logDebugS "stratoP2PClientDirect/handleEvents" "Skipping non-relevant events."

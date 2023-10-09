@@ -93,9 +93,9 @@ library:
   - strato-p2p
   - strato-sequencer
   - text
+  - thread-hierarchy
   - time
   - transformers
-  - ttrie
   - unliftio
   - vm-runner
   - vm-tools
@@ -163,7 +163,6 @@ tests:
       - strato-sequencer
       - text
       - transformers
-      - ttrie
       - unliftio
       - vm-runner
       - vm-tools

@@ -68,7 +68,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr ++ ". rejecting violently."
         Just _ -> do
           (attempt :: Maybe SomeException) <-
-            withCertifiedPeerServer p . withActivePeer p $
+            withCertifiedPeer p . withActivePeer p $
               runEthServerConduit p pSource pSink seqSrc peerStr
           case attempt of
             Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"

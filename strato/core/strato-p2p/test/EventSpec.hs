@@ -77,8 +77,7 @@ import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
 import Control.Applicative (liftA2)
-import Control.Concurrent (myThreadId,ThreadId)
-import Control.Concurrent.STM.Map            as CCSTMM
+import Control.Concurrent.Hierarchy
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
@@ -114,7 +113,7 @@ import Executable.EthereumDiscovery
 import Executable.EthereumVM
 import Executable.StratoP2P
 import Executable.StratoP2PClient
-import Executable.StratoP2PServer
+--import Executable.StratoP2PServer
 import Network.Socket
 import Test.Hspec
 import Text.Read (readMaybe)
@@ -1273,10 +1272,11 @@ runNode p = do
   chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
   let s = sourceTMChan chan .| (awaitForever $ either (const $ pure ()) yield)
   ctx <- newIORef $ def & unseqSink .~ p ^. p2pPeerUnseqSource
+  tm  <- newThreadMap
   concurrently_
     (runNodeWithoutP2P p)
     ( concurrently_
-        (runNoLoggingT $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
+        (runNoLoggingT $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx) tm)
         (runNoLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx))
     )
 
@@ -1523,9 +1523,9 @@ data P2PConnection = P2PConnection
     _serverP2PPeer :: P2PPeer,
     _clientP2PPeer :: P2PPeer,
     _server :: TestContextM (Maybe SomeException),
-    _client :: TestContextM (Maybe SomeException,CCSTMM.Map ThreadId ThreadId),
+    _client :: TestContextM (Maybe SomeException),
     _serverException :: TVar (Maybe SomeException),
-    _clientException :: TVar (Maybe SomeException,CCSTMM.Map ThreadId ThreadId)
+    _clientException :: TVar (Maybe SomeException)
   }
 
 makeLenses ''P2PConnection
@@ -1541,29 +1541,26 @@ createConnection server' client' = do
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
   serverCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource server'
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
-  tt <- atomically CCSTMM.empty
-  parentthreadid <- myThreadId
-  _ <- atomically $ insert parentthreadid parentthreadid tt
   serverExceptionTVar <- newTVarIO Nothing
-  clientExceptionTVar <- newTVarIO (Nothing,tt)
+  clientExceptionTVar <- newTVarIO Nothing
+  tm                  <- newThreadMap
   let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
       rServer =
-        runEthServerConduit
+        Executable.StratoP2PClient.runEthServerConduit
           (_p2pPeerPPeer client')
           (sourceTQueue clientToServerTQueue)
           (sinkTQueue serverToClientTQueue)
           (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException,CCSTMM.Map ThreadId ThreadId)
+      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
       rClient =
         runEthClientConduit
-          parentthreadid
-          tt
           (_p2pPeerPPeer server')
           (sourceTQueue serverToClientTQueue)
           (sinkTQueue clientToServerTQueue)
           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+          tm
   pure $
     P2PConnection
       serverToClientTQueue

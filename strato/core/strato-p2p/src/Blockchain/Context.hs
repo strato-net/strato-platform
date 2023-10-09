@@ -64,8 +64,7 @@ module Blockchain.Context
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
-    , withCertifiedPeerClient
-    , withCertifiedPeerServer
+    , withCertifiedPeer
     , getPeerX509
     , getMyX509
     , getPeerByParsedSet
@@ -78,10 +77,8 @@ import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Concurrent.Chan.Unagi         as CCCU
-import           Control.Concurrent.STM.Map            as CCSTMM
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
--- import           Control.Arrow                         ( (***))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
@@ -146,6 +143,7 @@ import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
 import qualified Strato.Strato23.Client                as VC
 
+import           Control.Concurrent.Hierarchy
 import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
@@ -206,13 +204,14 @@ withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) ->
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState     :: K.KafkaState
-  , contextKafkaMiddleman :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
-  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
-  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
-  , actionTimestamp       :: ActionTimestamp
-  , _blockstanbulPeerAddr :: PeerAddress
-  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
+  { contextKafkaState      :: K.KafkaState
+  , contextKafkaMiddleman  :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  , contextThreadHierarchy :: ThreadMap
+  , blockHeaders           :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders  :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
+  , actionTimestamp        :: ActionTimestamp
+  , _blockstanbulPeerAddr  :: PeerAddress
+  , _outboundWireMessages  :: S.OSet (T.Text, Keccak256)
   }
 
 makeLenses ''Context
@@ -713,9 +712,11 @@ initConfig wireMessagesRef maxHeaders = do
 initContext :: IO Context
 initContext = do
   initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  initContextThreadHierarchy <- newThreadMap:: IO ThreadMap
   return Context { actionTimestamp = emptyActionTimestamp
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextKafkaMiddleman = initContextKafkaMiddleman
+                 , contextThreadHierarchy = initContextThreadHierarchy
                  , blockHeaders = ([], jamshidBirth)
                  , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
                  , _blockstanbulPeerAddr = PeerAddress Nothing
@@ -786,11 +787,8 @@ withActivePeer p = bracket a b . const
     a = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
     b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
 
-withCertifiedPeerClient :: PPeer -> m (Maybe SomeException,Map ThreadId ThreadId) -> m (Maybe SomeException,Map ThreadId ThreadId)
-withCertifiedPeerClient = flip const
-
-withCertifiedPeerServer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
-withCertifiedPeerServer = flip const
+withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
+withCertifiedPeer = flip const
 
 toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b

@@ -40,7 +40,7 @@ initP2P = do
   context <- liftIO $ readIORef $ configContext cfg
   let contextkafkastate = contextKafkaState context
   let contextkafkamiddleman = contextKafkaMiddleman context
-  --let contextthreadtracker = contextThreadTracker context
+  let contextthreadhierarchy = contextThreadHierarchy context
   _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate ((\(a,_) -> a) contextkafkamiddleman)
   let sSource = seqEventNotificationSourceChanPour ((\(a,_) -> a) contextkafkamiddleman)
                                                    dupChan
@@ -48,4 +48,4 @@ initP2P = do
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)
-      (runLoggingT $ stratoP2P runner)
+      (runLoggingT $ stratoP2P runner contextthreadhierarchy)

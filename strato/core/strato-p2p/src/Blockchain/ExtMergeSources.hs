@@ -1,16 +1,21 @@
 {-# LANGUAGE BangPatterns              #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE KindSignatures            #-}
+{-# LANGUAGE MultiWayIf                #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE RankNTypes                #-}
 {-# LANGUAGE TemplateHaskell           #-}
+{-# LANGUAGE TypeFamilies              #-}
 
 module Blockchain.ExtMergeSources
-  ( mergeSourcesByForce
+  ( mergeSourcesByForceServer,
+    mergeSourcesByForceClientNonSeqEvent,
+    mergeSourcesByForceClientSeqEvent
   )
 where
 
+import           Control.Concurrent.Hierarchy
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
@@ -76,26 +81,80 @@ chanSink :: MonadIO m
 chanSink ch writer = CL.mapM_ $ liftIO . atomically . writer ch
 {-# INLINE chanSink #-}
 
-mergeSourcesByForce :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, MonadIO mo)
-                    => [ConduitM () a mi ()] -- sources to merge
-                    -> Int -- ^ bound of the intermediate channel
-                    -> mo (ConduitM () a mi ())
-mergeSourcesByForce sx bound = do
+mergeSourcesByForceServer :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, MonadUnliftIO mo)
+                          => [ConduitM () a mi ()] -- sources to merge
+                          -> Int -- ^ bound of the intermediate channel
+                          -> mo (ConduitM () a mi ())
+mergeSourcesByForceServer sx bound =
   return $ do
-    (chkey,c) <- allocate (liftSTM $ newTBMChan bound)
-                          (liftSTM . closeTBMChan)
-    refcount  <- liftSTM . newTVar $ length sx
-    st        <- lift $ askUnliftIO
-    regs      <- forM sx $ \s -> do
-      register . killThread =<< do
-        (liftIO $ forkIOWithUnmask $ \unmask ->
-          (unmask $ unliftIO st $
-            runConduit $ s .| chanSink c writeTBMChan)
-          `finally` (liftSTM $ decRefcount refcount c))
-    _ <- liftIO $ print ("before chanSource." :: String)
+    (chkey, c) <- allocate (liftSTM $ newTBMChan bound)
+                           (liftSTM . closeTBMChan)
+    refcount <- liftSTM . newTVar $ length sx
+    st <- lift $ askUnliftIO
+    regs <- forM sx $ \s ->
+              register . killThread =<<
+                (liftIO $ forkIOWithUnmask $ \unmask ->
+                  (unmask $ unliftIO st $
+                    runConduit $ s .| chanSink c writeTBMChan)
+                  `finally` (liftSTM $ decRefcount refcount c))
     chanSource c readTBMChan
-    _ <- liftIO $ print ("about to release chkey." :: String)
     release chkey
-    refcountr <- readTVarIO refcount
-    _ <- liftIO $ print $ "refcount: " ++ (show refcountr)
+    traverse_ release regs 
+
+mergeSourcesByForceClientNonSeqEvent :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, MonadUnliftIO mo)
+                                     => [ConduitM () a mi ()] -- sources to merge
+                                     -> Int -- ^ bound of the intermediate channel
+                                     -> mo (ConduitM () a mi ())
+mergeSourcesByForceClientNonSeqEvent sx bound =
+  return $ do
+    (chkey, c) <- allocate (liftSTM $ newTBMChan bound)
+                           (liftSTM . closeTBMChan)
+    refcount <- liftSTM . newTVar $ length sx
+    st <- lift $ askUnliftIO
+    regs <- forM sx $ \s ->
+              register . killThread =<<
+                (liftIO $ forkIOWithUnmask $ \unmask ->
+                  (unmask $ unliftIO st $
+                    runConduit $ s .| chanSink c writeTBMChan)
+                  `finally` (liftSTM $ decRefcount refcount c))
+    chanSource c readTBMChan
+    release chkey
     traverse_ release regs
+
+mergeSourcesByForceClientSeqEvent :: MonadUnliftIO m
+                                  => ConduitT () a m () -> Int -> ThreadMap -> m ()
+mergeSourcesByForceClientSeqEvent sx bound tm = do
+  st <- askUnliftIO
+  void $ liftIO $ newChild tm $ \_ -> do
+    chan <- liftSTM $ newTBMChan bound
+    (unliftIO st $ runConduit $ sx .| chanSink chan writeTBMChan)
+      `finally` (liftSTM $ closeTBMChan chan)
+
+{-
+mergeSourcesByForceClient :: (MonadResource m1, Monad m2, MonadUnliftIO m1, Traversable t)
+                          => t (ConduitT () a m1 (), Bool) -> Int -> ThreadMap -> m2 (ConduitT z a m1 ())
+mergeSourcesByForceClient sx bound tm =
+  return $ do
+    (chkey, c) <- allocate (liftSTM $ newTBMChan bound)
+                           (liftSTM . closeTBMChan)
+    refcount   <- liftSTM . newTVar $ length sx
+    st         <- lift $ askUnliftIO
+    _          <- forM_ sx $ \s ->
+                    case s of
+                      (sxf,False) -> do
+                        regs <- forM [sxf] $ \sxff ->
+                                  register . killThread =<<
+                                    (liftIO $ forkIOWithUnmask $ \unmask ->
+                                      (unmask $ unliftIO st $
+                                        runConduit $ sxff .| chanSink c writeTBMChan)
+                                      `finally` (liftSTM $ decRefcount refcount c))
+                        chanSource c readTBMChan
+                        release chkey
+                        traverse_ release regs
+                      (sxf,True)  ->
+                        void $ liftIO $ newChild tm $ \_ -> do
+                          chan <- liftSTM $ newTBMChan bound
+                          (unliftIO st $ runConduit $ sxf .| chanSink chan writeTBMChan)
+                            `finally` (liftSTM $ closeTBMChan chan)
+    return ()
+-}

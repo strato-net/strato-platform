@@ -48,7 +48,8 @@ import Blockchain.TimerSource
 import Blockchain.Watchdog
 import Conduit
 import Control.Concurrent (ThreadId)
-import Control.Concurrent.STM.Map as CCSTMM
+import Control.Concurrent.Chan.Unagi
+import Control.Concurrent.Hierarchy
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Unlift
@@ -85,6 +86,41 @@ ethVersion = 62
 blockstanbulVersion :: Int
 blockstanbulVersion = 1
 
+mkEthP2PEventSourceClient ::
+  ( MonadResource m,
+    MonadLogger m,
+    MonadUnliftIO m
+  ) =>
+  ConduitM () B.ByteString m () ->
+  ConduitM () P2pEvent m () ->
+  String ->
+  EthCryptState ->
+  ThreadMap ->
+  m (ConduitM () Event m ())
+mkEthP2PEventSourceClient peerSourceConduit seqEventSource peerStr inCtx tm = do
+  canarySource <- mkCanarySource
+  eventsourcethreadid <- myThreadId
+  recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
+  _      <- mergeSourcesByForceClientSeqEvent (seqEventSource .| CL.map NewSeqEvent)
+                                              4096 -- 🙏
+                                              tm
+  merged <- mergeSourcesByForceClientNonSeqEvent
+              ( [ peerSourceConduit
+                    .| ethDecrypt inCtx
+                    .| CL.iterM (recordTraffic Inbound)
+                    .| bytesToMessages
+                    .| CL.iterM (displayMessage Inbound peerStr)
+                    .| CL.map MsgEvt
+                    .| CL.iterM (const $ petWatchdog recvWatchdog),
+                  canarySource .| CL.map absurd,
+                  timerSource
+                ]
+              )
+              4096 -- 🙏
+  return $
+    merged
+      .| CL.iterM recordEvent
+
 mkEthP2PEventSourceServer ::
   ( MonadResource m,
     MonadLogger m,
@@ -98,65 +134,26 @@ mkEthP2PEventSourceServer ::
 mkEthP2PEventSourceServer peerSourceConduit seqEventSource peerStr inCtx = do
   canarySource <- mkCanarySource
   eventsourcethreadid <- myThreadId
-  _ <- liftIO $ print $ "Thread Id: " ++ show eventsourcethreadid
   recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
-  merged <-
-    mergeSourcesByForce
-      ( [ peerSourceConduit
-            .| ethDecrypt inCtx
-            .| CL.iterM (recordTraffic Inbound)
-            .| bytesToMessages
-            .| CL.iterM (displayMessage Inbound peerStr)
-            .| CL.map MsgEvt
-            .| CL.iterM (const $ petWatchdog recvWatchdog),
-          seqEventSource
-            .| CL.map NewSeqEvent,
-          canarySource .| CL.map absurd,
-          timerSource
-        ]
-      )
-      4096 -- 🙏
+  merged <- mergeSourcesByForceServer
+             ( [ peerSourceConduit
+                   .| ethDecrypt inCtx
+                   .| CL.iterM (recordTraffic Inbound)
+                   .| bytesToMessages
+                   .| CL.iterM (displayMessage Inbound peerStr)
+                   .| CL.map MsgEvt
+                   .| CL.iterM (const $ petWatchdog recvWatchdog),
+                 seqEventSource
+                   .| CL.map NewSeqEvent,
+                 canarySource .| CL.map absurd,
+                 timerSource
+               ]
+             )
+             4096 -- 🙏
+  _ <- liftIO $ print ("after merged (mkEthP2PEventSource)," :: String)
   return $
     merged
       .| CL.iterM recordEvent
-
-mkEthP2PEventSourceClient ::
-  ( MonadResource m,
-    MonadLogger m,
-    MonadUnliftIO m
-  ) =>
-  ThreadId ->
-  Map ThreadId ThreadId ->
-  ConduitM () B.ByteString m () ->
-  ConduitM () P2pEvent m () ->
-  String ->
-  EthCryptState ->
-  m ((ConduitM () Event m ()),Map ThreadId ThreadId)
-mkEthP2PEventSourceClient parentthreadid tt peerSourceConduit seqEventSource peerStr inCtx = do
-  canarySource <- mkCanarySource
-  eventsourcethreadid <- myThreadId
-  _ <- liftIO $ atomically $ insert parentthreadid eventsourcethreadid tt
-  _ <- liftIO $ print $ "Thread Id: " ++ show eventsourcethreadid
-  recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
-  merged <-
-    mergeSourcesByForce
-      ( [ peerSourceConduit
-            .| ethDecrypt inCtx
-            .| CL.iterM (recordTraffic Inbound)
-            .| bytesToMessages
-            .| CL.iterM (displayMessage Inbound peerStr)
-            .| CL.map MsgEvt
-            .| CL.iterM (const $ petWatchdog recvWatchdog),
-          seqEventSource
-            .| CL.map NewSeqEvent,
-          canarySource .| CL.map absurd,
-          timerSource
-        ]
-      )
-      4096 -- 🙏
-  return $
-    (merged
-      .| CL.iterM recordEvent,tt)
 
 mkCanarySource :: (MonadLogger m, MonadUnliftIO m, MonadResource m) => m (ConduitM () Void m ())
 mkCanarySource = do
