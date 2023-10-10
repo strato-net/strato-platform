@@ -1102,10 +1102,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       console.log('servicesAll:', servicesAll)
 
       // Get ProductFile where productId = Items.productId
-      // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
-      // ownedProductFiles = ownedProductFiles.filter(file =>
-      //   ownedItems.some(item => file.productId === item.productId)
-      // );
+      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
+      ownedProductFiles = ownedProductFiles.filter(file =>
+        ownedItems.some(item => file.productId === item.productId)
+      );
       console.log('ownedProductFiles', ownedProductFiles)
       // TODO: What if there are not product files? Should we throw an error?
       // TODO: What if there are multiple product files? Should we display all of them?
