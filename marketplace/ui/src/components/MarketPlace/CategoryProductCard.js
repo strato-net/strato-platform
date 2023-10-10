@@ -116,7 +116,7 @@ const CategoryProductCard = ({ product, category }) => {
   return (
     <>
       {contextHolder}
-      <Col sm={12} lg={8} xl={8} className="p-4 bg-white rounded-md shadow-md">
+      <Col sm={12} lg={8} xl={7} className="p-4 bg-white rounded-lg shadow-lg">
         <Image
           width={'100%'}
           height={200}
@@ -149,7 +149,20 @@ const CategoryProductCard = ({ product, category }) => {
               <MinusOutlined className="text-xs text-secondryD" />
             </Button>
 
-            {/* <Input className="w-16" /> */}
+            {/* <Input className="w-16"
+            onChange={e => {
+                          if (e < product.availableQuantity) {
+                            setQty(e)
+                          } else {
+                            openToast(
+                              "bottom",
+                              true,
+                              "Cannot add more than available quantity"
+                            );
+                            setQty(product.availableQuantity)
+                          }
+                        }} 
+            /> */}
             <Text className="block text-center pt-1" strong> {qty}</Text>
 
             <Button className="w-10" onClick={add}>
@@ -203,166 +216,6 @@ const CategoryProductCard = ({ product, category }) => {
         </Row>
       </Col>
 
-
-
-
-
-
-
-
-
-
-
-
-
-      {false && <Card
-        className="mb-6 cursor-pointer"
-      // onClick={() =>
-      //   navigate(`${naviroute.replace(":address", product.address)}`)
-      // }
-      >
-        <div className="flex justify-start items-center">
-          <div className="m-4">
-            <Image
-              src={product.imageUrl}
-              width={200}
-              height={180}
-              preview={false}
-              onClick={() =>
-                navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
-              }
-            />
-          </div>
-          <div>
-            <div className="flex items-baseline">
-              <Text
-                strong
-                className="text-xl text-primaryB hover:text-primary hover:underline"
-                id="prod-name"
-                onClick={() =>
-                  navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
-                }
-              >
-                {decodeURIComponent(product.name)}&nbsp;
-              </Text>
-              <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
-            </div>
-            <Paragraph
-              ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-              className="text-primaryC text-xs mt-2"
-              id="prod-desc"
-            >
-              {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                <React.Fragment key={index}>
-                  {line}
-                  <br />
-                </React.Fragment>
-              ))}
-            </Paragraph>
-            <Title level={4} className="!mt-0" id="prod-price">
-              $ {product.pricePerUnit}
-            </Title>
-            {product.availableQuantity !== 0 ?
-              (
-                <div>
-                  <div className="flex items-center my-2" id="prod-quantity">
-                    <Text className="text-primaryB text-base">Quantity</Text>
-                    <div className="ml-5 flex items-center my-2" id="prod-quantity">
-                      <div
-                        onClick={subtract}
-                        className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                        <MinusOutlined className="text-xs text-secondryD" />
-                      </div>
-                      <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
-                        onChange={e => {
-                          if (e < product.availableQuantity) {
-                            setQty(e)
-                          } else {
-                            openToast(
-                              "bottom",
-                              true,
-                              "Cannot add more than available quantity"
-                            );
-                            setQty(product.availableQuantity)
-                          }
-                        }} />
-                      <div
-                        onClick={add}
-                        className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                        <PlusOutlined className="text-xs text-secondryC" />
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    className="group w-40 h-9 border border-primary hover:bg-primary"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'add_to_cart_from_marketplace',
-                            product_name: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          },
-                        });
-                        addItemToCart();
-                      }
-                    }}>
-                    <div className="text-primary group-hover:text-white">Add To Cart</div>
-                  </Button>
-                  <Button
-                    type="primary"
-                    id={`${product.name.replace(/ /g, "_")}-buy-now`}
-                    className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'buy_now_from_marketplace',
-                            product_name: product.name,
-                            category: product.category,
-                            productId: product.productId
-                          },
-                        });
-                        addItemToCart();
-                        navigate("/checkout");
-                      }
-                    }}
-                  >
-                    Buy Now
-                  </Button>
-                </div>)
-              :
-              /* When there isnt avalialable quantity for the item */
-              <div>
-                <Button
-                  type="primary"
-                  className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
-                  href={`mailto:sales@blockapps.net`}
-                  onClick={() => {
-                    TagManager.dataLayer({
-                      dataLayer: {
-                        event: 'contact_sales_from_category_card',
-                        product_name: product.name,
-                        category: product.category,
-                        productId: product.productId
-                      },
-                    });
-                  }}>
-                  Contact to Buy
-                </Button>
-                <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">
-                  If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
-                </Paragraph>
-              </div>
-            }
-          </div>
-        </div>
-      </Card >}
     </>
   );
 };

@@ -239,14 +239,11 @@ const CategoryProductList = ({ user }) => {
 
 
       <Row className="flex justify-between mt-10">
-        {/* <div className="flex pt-4"> */}
         {/* Filter section */}
-        {/* <div className="mr-6 pt-4"> */}
-        <Col span={5}>
-          <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
-            <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
-            <Divider className="m-0 mt-3" />
-
+        <Col span={5} className="mb">
+          <Text className="text-xl font-semibold">Filters</Text>
+          <Divider className="m-0 mt-3" />
+          <Row className="shadow-lg rounded-md" style={{border:"1px solid #0000002E"}} >
             {/* Panel - Category */}
             {categorys.length > 0 && (
               <>
@@ -256,7 +253,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pl-8 pr-7"
+                  className="pr-7"
                 >
                   <Panel header={<Text strong>Categories</Text>} key="1">
                     <Checkbox.Group
@@ -284,7 +281,7 @@ const CategoryProductList = ({ user }) => {
               expandIconPosition="end"
               ghost="true"
               reverse={false}
-              className="pl-8 pr-7"
+              className="pr-7"
             >
               <Panel header={<Text strong>Price</Text>} key="1">
                 <Space>
@@ -307,7 +304,7 @@ const CategoryProductList = ({ user }) => {
               expandIconPosition="end"
               ghost="true"
               reverse={false}
-              className="pl-8 pr-7"
+              className="pr-7"
             >
               <Panel header={<Text strong>Quantity</Text>} key="1">
                 <Space>
@@ -332,7 +329,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pl-8 pr-7"
+                  className="pr-7"
                 >
                   <Panel header={<Text strong>Sub-Category</Text>} key="1">
                     <Checkbox.Group
@@ -362,7 +359,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pl-8 pr-7"
+                  className="pr-7"
                 >
                   <Panel header={<Text strong>Product</Text>} key="1">
                     <Checkbox.Group
@@ -392,7 +389,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pl-8 pr-7"
+                  className="pr-7"
                 >
                   <Panel header={<Text strong>Brand</Text>} key="1">
                     <Checkbox.Group
@@ -412,9 +409,8 @@ const CategoryProductList = ({ user }) => {
               </>
             )}
             <div className="pb-24"></div>
-          </div>
+          </Row>
         </Col>
-        {/* </div> */}
 
         {/* Product list section */}
         {isMarketplaceLoading ? (
@@ -423,11 +419,11 @@ const CategoryProductList = ({ user }) => {
           </div>
         ) : (
           <Col span={18} className="mb-8" >
-            <Text className="text-sm text-secondryB" strong>
+            <Text className="text-md" strong>
               {marketplaceList.length} Results
             </Text>
             {marketplaceList.length > 0 ? (
-              <Row gutter={[24, 12]} className="flex justify-between mt-4 mb-8 mr-10" id="product-list">
+              <Row gutter={[24, 12]} className="flex  md:gap-x-10  mt-4 mb-8 mr-10" id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
                     (c) => c.name === product.category
@@ -448,7 +444,6 @@ const CategoryProductList = ({ user }) => {
             )}
           </Col>
         )}
-        {/* </div> */}
       </Row>
     </div>
   );

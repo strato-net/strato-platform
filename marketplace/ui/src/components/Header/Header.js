@@ -156,7 +156,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   }, [user])
 
   return (
-    <Header className="!bg-white flex">
+    <Header className="!bg-white shadow-md flex">
       <Space>
         <div
           className="cursor-pointer"
@@ -244,7 +244,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         >
           <Avatar
             style={{
-              backgroundColor: "#181EAC",
+              backgroundColor: "white",
+              color:'black'
             }}
             icon={<ShoppingCartOutlined />}
           />
