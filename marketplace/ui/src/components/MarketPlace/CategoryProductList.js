@@ -7,6 +7,11 @@ import {
   Spin,
   InputNumber,
   Space,
+  Row,
+  Col,
+  Input,
+  Select,
+  Button,
 } from "antd";
 import CategoryProductCard from "./CategoryProductCard";
 //categories
@@ -32,9 +37,10 @@ import { useMatch } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { filterIcon, searchIcon } from "../../images/SVGComponents";
 
 const { Panel } = Collapse;
-const { Text } = Typography;
+const { Text, Link } = Typography;
 
 const CategoryProductList = ({ user }) => {
   const [category, setCategory] = useState("");
@@ -115,29 +121,29 @@ const CategoryProductList = ({ user }) => {
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
     if (category !== "" && hasChecked && !isAuthenticated) {
-        actions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          debouncedMinQty,
-          debouncedMaxQty,
-          debouncedMinPrice,
-          debouncedMaxPrice
-        );
+      actions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        debouncedMinQty,
+        debouncedMaxQty,
+        debouncedMinPrice,
+        debouncedMaxPrice
+      );
     } else if (category !== "") {
-        actions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          debouncedMinQty,
-          debouncedMaxQty,
-          debouncedMinPrice,
-          debouncedMaxPrice
-          );
+      actions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        debouncedMinQty,
+        debouncedMaxQty,
+        debouncedMinPrice,
+        debouncedMaxPrice
+      );
     }
   }, [
     marketplaceDispatch,
@@ -190,24 +196,53 @@ const CategoryProductList = ({ user }) => {
   //============================================================================//
 
   return (
-    <div>
-      <Breadcrumb className="text-xs ml-14 mt-14">
-      <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+    <div className="mx-16">
+      <Breadcrumb className="text-lg mt-14">
+        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>
-            <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
+            <Link underline href={routes.Marketplace.url} className="text-primary font-bold hover:bg-transparent">
               Home
-            </p>
+            </Link>
           </ClickableCell>
         </Breadcrumb.Item>
         {selectedCategories?.map((category, index) => (
-          <Breadcrumb.Item key={index} className="text-primary">
+          <Breadcrumb.Item key={index} className="text-primaryB">
             {category ? category : ""}
           </Breadcrumb.Item>
         ))}
       </Breadcrumb>
-      <div className="flex pt-4">
+      <Row className="mt-4">
+        <Col span={1} className="h-12" >
+          <Button size="large" block={true} className="h-12 pl-6" >
+            {filterIcon()}
+          </Button>
+        </Col>
+        <Col span={18}>
+          <Input type="search" prefix={searchIcon()} size="large" placeholder="Search Marketplace" className="h-12 pl-3" />
+        </Col>
+        <Col span={4}>
+          <Select
+            defaultValue="SortBy"
+            size="large"
+            // style={{ width: 120 }}
+            className="h-full w-44"
+            // onChange={handleChange}
+            options={[
+              { value: 'SortBy', label: 'SortBy' },
+              { value: 'Highest Price', label: 'Highest Price' },
+              { value: 'Lowest Price', label: 'Lowest Price' },
+              { value: 'Yiminghe', label: 'Latest' },
+            ]}
+          />
+        </Col>
+      </Row>
+
+
+      <Row className="flex justify-between mt-10">
+        {/* <div className="flex pt-4"> */}
         {/* Filter section */}
-        <div className="mr-6 pt-4">
+        {/* <div className="mr-6 pt-4"> */}
+        <Col span={5}>
           <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
             <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
             <Divider className="m-0 mt-3" />
@@ -275,7 +310,7 @@ const CategoryProductList = ({ user }) => {
               className="pl-8 pr-7"
             >
               <Panel header={<Text strong>Quantity</Text>} key="1">
-              <Space>
+                <Space>
                   <InputNumber min={0} placeholder="min" onChange={(e) => {
                     e === null ? setMinQty(0) : setMinQty(e)
                   }} />
@@ -378,7 +413,8 @@ const CategoryProductList = ({ user }) => {
             )}
             <div className="pb-24"></div>
           </div>
-        </div>
+        </Col>
+        {/* </div> */}
 
         {/* Product list section */}
         {isMarketplaceLoading ? (
@@ -386,12 +422,12 @@ const CategoryProductList = ({ user }) => {
             <Spin spinning={isMarketplaceLoading} size="large" />
           </div>
         ) : (
-          <div className="w-9/12 mb-12">
-            <Text className="text-sm text-secondryB">
-              {marketplaceList.length} Products found
+          <Col span={18} className="mb-8" >
+            <Text className="text-sm text-secondryB" strong>
+              {marketplaceList.length} Results
             </Text>
             {marketplaceList.length > 0 ? (
-              <div className="mt-4 mb-8 mr-10" id="product-list">
+              <Row gutter={[24, 12]} className="flex justify-between mt-4 mb-8 mr-10" id="product-list">
                 {marketplaceList.map((product, index) => {
                   const prodCategory = categorys.find(
                     (c) => c.name === product.category
@@ -404,15 +440,16 @@ const CategoryProductList = ({ user }) => {
                     />
                   );
                 })}
-              </div>
+              </Row>
             ) : (
               <div className="h-96 flex justify-center items-center" id="product-list">
                 No data found
               </div>
             )}
-          </div>
+          </Col>
         )}
-      </div>
+        {/* </div> */}
+      </Row>
     </div>
   );
 };

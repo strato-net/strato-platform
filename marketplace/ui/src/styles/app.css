@@ -65,7 +65,7 @@
   background-color: #101481;
 }
 
-.ant-btn-default:not(:disabled):hover{
+.ant-btn-default:not(:disabled):hover {
   color: #fff;
 }
 
@@ -104,6 +104,23 @@
   font-weight: 500;
 }
 
-:where(.css-9ntgx0).ant-checkbox-wrapper+:where(.css-9ntgx0).ant-checkbox-wrapper {
+:where(.css-9ntgx0).ant-checkbox-wrapper
+  + :where(.css-9ntgx0).ant-checkbox-wrapper {
   margin-inline-start: 0px;
+}
+
+.theme-bg {
+  background-color: #f2f2f5;
+}
+.txt-grey {
+  color: grey;
+  font-weight: 600;
+}
+.dollar-text::first-letter {
+  font-size: 10px;
+}
+
+.svgIcon {
+  margin-top: 5px;
+  margin-left: 10px;
 }

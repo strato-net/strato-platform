@@ -8,6 +8,7 @@ import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
+import HomeListSection from "./HomeScreenCards/HomeListSection";
 
 const MarketPlace = () => {
   const limit = 10, offset = 0;
@@ -19,6 +20,57 @@ const MarketPlace = () => {
   useEffect(() => {
     actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
+
+  const data = [
+    {
+      name: "Product 1",
+      price: "19.99",
+      quantity: 5,
+      image: "https://miro.medium.com/v2/resize:fit:512/1*x-EBQaqOV_clY8yVq3Wbmw.png"
+    },
+    {
+      name: "Product 2",
+      price: "29.99",
+      quantity: 10,
+      image: "https://tradingplatforms.com/wp-content/uploads/2022/04/ezgif-2-c503185458.jpg"
+    },
+    {
+      name: "Product 3",
+      price: "14.95",
+      quantity: 8,
+      image: "https://i.imgur.com/BkhrPF4.png"
+    },
+    {
+      name: "Product 4",
+      price: "39.99",
+      quantity: 3,
+      image: "https://img.freepik.com/premium-photo/cute-boy-pixar-style-cartoon-3d-illustration-generative-ai_808510-252.jpg"
+    },
+    {
+      name: "Product 5",
+      price: "9.99",
+      quantity: 15,
+      image: "https://img.freepik.com/premium-photo/funny-childish-female-young-character-light-color-background-generative-ai_58409-29585.jpg"
+    },
+    {
+      name: "Product 6",
+      price: "49.99",
+      quantity: 2,
+      image: "https://i.pinimg.com/736x/77/d4/15/77d41520a3f07995b184797a3734bf44.jpg"
+    },
+    {
+      name: "Product 7",
+      price: "24.99",
+      quantity: 7,
+      image: "https://img.freepik.com/premium-photo/illustration-boy-running-magical-land-generative-ai_7023-123664.jpg"
+    },
+    {
+      name: "Product 8",
+      price: "34.95",
+      quantity: 6,
+      image: "https://example.com/image8.jpghttps://img.freepik.com/premium-photo/3d-rendering-boy-running-road-with-schoolbag-his-back_432516-4830.jpg"
+    }
+  ];
 
   return (
     <>
@@ -45,6 +97,7 @@ const MarketPlace = () => {
       ) : (
         <div className="px-8 py-12">
           <CategoryCard />
+          <HomeListSection heading="Trending in Arts" list={data} />
           <TopSellingProductCard />
         </div>
       )}

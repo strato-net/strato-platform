@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Typography, Image, Space } from "antd";
+import { Card, Typography, Image, Space, Col, Row } from "antd";
 import { LeftArrow, RightArrow } from "../../images/SVGComponents";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -19,14 +19,13 @@ const CategoryCard = () => {
     Images.carbon,
     Images.materials,
     Images.clothing,
-    
+
   ];
-  console.log(categorys)
+
   return (
     <Card className="w-full">
-      <div className="flex justify-between mb-5">
-        <Title level={3}>Categories</Title>
-        {/* <Space size="large">
+      <Title level={2}>Categories</Title>
+      {/* <Space size="large">
           <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
             <LeftArrow />
           </div>
@@ -34,14 +33,15 @@ const CategoryCard = () => {
             <RightArrow />
           </div>
         </Space> */}
-      </div>
-      <div className="flex justify-evenly px-2">
+      <Row  className="flex justify-between" >
         {categorys.map((category, index) => {
           return (
-            <div
+            <Col
+            sm={12}
+            lg={5}
               id={category.name}
               key={index}
-              className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
+              className="gutter-row shadow-xl rounded-xl cursor-pointer overflow-hidden"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 TagManager.dataLayer({
@@ -49,24 +49,23 @@ const CategoryCard = () => {
                     event: `${category.name}_filter_homepage`
                   },
                 });
-                }
+              }
               }
             >
-              <div className="flex flex-col items-center text-center">
-                <Image
-                  src={categoryImages[index]}
-                  height={108}
-                  width={150}
-                  preview={false}
-                />
-                <Text type="secondary" className="mt-2 text-sm !text-primaryB">
-                  {category.name}
-                </Text>
-              </div>
-            </div>
+              <Image
+                src={categoryImages[index]}
+                className="object-cover"
+                width={'100%'}
+                height={'85%'}
+                preview={false}
+              />
+              <Title level={4} type="secondary" className="relative bottom-5 pl-4 !text-primaryB">
+                {category.name}
+              </Title>
+            </Col>
           );
         })}
-      </div>
+      </Row>
     </Card>
   );
 };

@@ -6,6 +6,9 @@ import {
   Button,
   notification,
   InputNumber,
+  Col,
+  Row,
+  Input,
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useState, useEffect } from "react";
@@ -18,6 +21,7 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { purpleCheckIcon } from "../../images/SVGComponents";
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -108,11 +112,59 @@ const CategoryProductCard = ({ product, category }) => {
       });
     }
   };
-
+   
   return (
-    <div>
+    <>
       {contextHolder}
-      <Card
+      <Col sm={12} lg={8} className="p-4 bg-white rounded-md shadow-md">
+        <Image
+          width={'100%'}
+          height={150}
+          preview={false}
+          className="rounded-md"
+          src={product.imageUrl}
+          fallback={'https://i.stack.imgur.com/Q3vyk.png'}
+          
+        />
+        <Row className="flex"><Title level={4}>
+          {decodeURIComponent(product.name)}  </Title> {purpleCheckIcon()} </Row>
+        <Text className="block dollar-text" strong>$ {product.pricePerUnit} </Text>
+        <Paragraph> {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+          <React.Fragment key={index}>
+            {line}
+            <br />
+          </React.Fragment>
+        ))}</Paragraph>
+        <Row className="rounded-md p-2 theme-bg">
+          <Col span={12}><Text className="block mt-2 text-center">Quantity</Text></Col>
+          <Col span={12} className="flex justify-between rounded-md bg-white p-1">
+            <Button className="w-10" onClick={subtract}>
+              <MinusOutlined className="text-xs text-secondryD" />
+            </Button>
+
+            {/* <Input className="w-16" /> */}
+            <Text className="block text-center pt-1" strong> {qty}</Text>
+
+            <Button className="w-10" onClick={add}>
+              <PlusOutlined className="text-xs text-secondryD" />
+            </Button>
+          </Col>
+        </Row>
+      </Col>
+
+
+
+
+
+
+
+
+
+
+
+
+
+      {false && <Card
         className="mb-6 cursor-pointer"
       // onClick={() =>
       //   navigate(`${naviroute.replace(":address", product.address)}`)
@@ -259,8 +311,8 @@ const CategoryProductCard = ({ product, category }) => {
             }
           </div>
         </div>
-      </Card >
-    </div >
+      </Card >}
+    </>
   );
 };
 

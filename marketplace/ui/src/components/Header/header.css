@@ -3,20 +3,31 @@
   .ant-menu-item:hover:not(.ant-menu-item-selected):not(
     .ant-menu-submenu-selected
   ) {
-  color: white;
+  /* color: black; */
   font-weight: bold;
 }
 
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
-  border-width: 2px;
+  border-width: 0px;
+  font-size: 20px;
   border-bottom-color: white;
+}
+
+.ant-menu-light.ant-menu-horizontal > .ant-menu-item {
+  color: grey;
+  font-size: 16px;
 }
 
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item:hover::after {
-  border-width: 2px;
+  border-width: 0px;
   border-bottom-color: white;
 }
 
-.anticon svg{
+.anticon svg {
   display: block;
+}
+
+.theme-bg,
+.theme-bg > input {
+  background-color: #f2f2f5;
 }
