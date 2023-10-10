@@ -276,7 +276,7 @@ pipeline {
               post {
                 always {
                   dir('strato-getting-started') {
-                    sh 'rm -rf strato_logs*'
+                    sh 'sudo rm -rf strato_logs*'
                     sh 'sudo ./fetchlogs --as-dir'
                     sh 'mv strato_logs/ strato_logs_testsync/'
                     archiveArtifacts artifacts: 'strato_logs_testsync/**', fingerprint: true, allowEmptyArchive: true
