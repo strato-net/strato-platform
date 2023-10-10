@@ -143,10 +143,10 @@ const CategoryProductCard = ({ product, category }) => {
           </React.Fragment>
         ))}</Paragraph>
         <Row className="rounded-md p-2 theme-bg">
-          <Col span={12}><Text className="block mt-2 text-center">Quantity</Text></Col>
-          <Col span={12} className="flex justify-between rounded-md bg-white p-1">
+          <Col span={14}><Text className="block mt-2 text-center">Quantity</Text></Col>
+          <Col span={10} className="flex justify-between rounded-md bg-white p-1">
             <Button className="w-10" onClick={subtract}>
-              <MinusOutlined className="text-xs text-secondryD" />
+              <MinusOutlined className="text-xs text-black" />
             </Button>
 
             {/* <Input className="w-16"
@@ -166,7 +166,7 @@ const CategoryProductCard = ({ product, category }) => {
             <Text className="block text-center pt-1" strong> {qty}</Text>
 
             <Button className="w-10" onClick={add}>
-              <PlusOutlined className="text-xs text-secondryD" />
+              <PlusOutlined className="text-xs text-black" />
             </Button>
           </Col>
         </Row>

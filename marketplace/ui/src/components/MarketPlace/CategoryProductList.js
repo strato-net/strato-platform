@@ -253,7 +253,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pr-7"
+                  className="pr-7 w-full"
                 >
                   <Panel header={<Text strong>Categories</Text>} key="1">
                     <Checkbox.Group
@@ -281,7 +281,7 @@ const CategoryProductList = ({ user }) => {
               expandIconPosition="end"
               ghost="true"
               reverse={false}
-              className="pr-7"
+              className="pr-7 w-full"
             >
               <Panel header={<Text strong>Price</Text>} key="1">
                 <Space>
@@ -304,7 +304,7 @@ const CategoryProductList = ({ user }) => {
               expandIconPosition="end"
               ghost="true"
               reverse={false}
-              className="pr-7"
+              className="pr-7 w-full"
             >
               <Panel header={<Text strong>Quantity</Text>} key="1">
                 <Space>
@@ -329,7 +329,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pr-7"
+                  className="pr-7 w-full"
                 >
                   <Panel header={<Text strong>Sub-Category</Text>} key="1">
                     <Checkbox.Group
@@ -359,7 +359,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pr-7"
+                  className="pr-7 w-full"
                 >
                   <Panel header={<Text strong>Product</Text>} key="1">
                     <Checkbox.Group
@@ -389,7 +389,7 @@ const CategoryProductList = ({ user }) => {
                   expandIconPosition="end"
                   ghost="true"
                   reverse={false}
-                  className="pr-7"
+                  className="pr-7 w-full"
                 >
                   <Panel header={<Text strong>Brand</Text>} key="1">
                     <Checkbox.Group
