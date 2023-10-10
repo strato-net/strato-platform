@@ -105,20 +105,16 @@ spec = do
       [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
 
       vehicleCreate
-        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (record_id text,
-    address text,
-    "chainId" text,
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
     block_hash text,
     block_timestamp text,
     block_number text,
     transaction_hash text,
     transaction_sender text,
-  PRIMARY KEY (record_id) );|]
+  PRIMARY KEY (address) );|]
 
       vehicleInsert
-        `shouldBe` [r|INSERT INTO "Vehicle" ("record_id",
-    "address",
-    "chainId",
+        `shouldBe` [r|INSERT INTO "Vehicle" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -132,10 +128,8 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -180,20 +174,16 @@ spec = do
         runLoggingT . runConduit $ createInserts g input .| sinkList
 
       vehicleCreate
-        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (record_id text,
-    address text,
-    "chainId" text,
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (address text,
     block_hash text,
     block_timestamp text,
     block_number text,
     transaction_hash text,
     transaction_sender text,
-  PRIMARY KEY (record_id) );|]
+  PRIMARY KEY (address) );|]
 
       historyCreate
-        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (record_id text,
-    address text NOT NULL,
-    "chainId" text NOT NULL,
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (address text NOT NULL,
     block_hash text NOT NULL,
     block_timestamp text,
     block_number text,
@@ -207,9 +197,7 @@ spec = do
         `shouldBe` [r|ALTER TABLE "history@Vehicle2" ADD PRIMARY KEY USING INDEX "index_history@Vehicle2";|]
 
       vehicleInsert
-        `shouldBe` [r|INSERT INTO "Vehicle2" ("record_id",
-    "address",
-    "chainId",
+        `shouldBe` [r|INSERT INTO "Vehicle2" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -223,10 +211,8 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -234,9 +220,7 @@ spec = do
     transaction_sender = excluded.transaction_sender;|]
 
       historyInsert
-        `shouldBe` [r|INSERT INTO "history@Vehicle2" ("record_id",
-    "address",
-    "chainId",
+        `shouldBe` [r|INSERT INTO "history@Vehicle2" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -288,20 +272,16 @@ spec = do
       [vehicleCreate, _, _, _, vehicleInsert, _] <-
         runLoggingT . runConduit $ createInserts g input .| sinkList
       vehicleCreate
-        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (record_id text,
-    address text,
-    "chainId" text,
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
     block_hash text,
     block_timestamp text,
     block_number text,
     transaction_hash text,
     transaction_sender text,
-  PRIMARY KEY (record_id) );|]
+  PRIMARY KEY (address) );|]
 
       vehicleInsert
-        `shouldBe` [r|INSERT INTO "\"Vehicle''''" ("record_id",
-    "address",
-    "chainId",
+        `shouldBe` [r|INSERT INTO "\"Vehicle''''" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -315,10 +295,8 @@ spec = do
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '0000000000000000000000000000000000000add')
-  ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -388,9 +366,7 @@ spec = do
       runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate
-      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (record_id text,
-    address text,
-    "chainId" text,
+      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (address text,
     block_hash text,
     block_timestamp text,
     block_number text,
@@ -403,12 +379,10 @@ spec = do
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  PRIMARY KEY (record_id) );|]
+  PRIMARY KEY (address) );|]
 
     swissArmyInsert
-      `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("record_id",
-    "address",
-    "chainId",
+      `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -436,10 +410,8 @@ spec = do
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -599,9 +571,7 @@ spec = do
       runLoggingT . runConduit $ createInserts g input .| sinkList
 
     swissArmyCreate
-      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (record_id text,
-    address text,
-    "chainId" text,
+      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
     block_hash text,
     block_timestamp text,
     block_number text,
@@ -614,12 +584,10 @@ spec = do
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  PRIMARY KEY (record_id) );|]
+  PRIMARY KEY (address) );|]
 
     swissArmyInsert
-      `shouldBe` [r|INSERT INTO "SwissArmy" ("record_id",
-    "address",
-    "chainId",
+      `shouldBe` [r|INSERT INTO "SwissArmy" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -647,10 +615,8 @@ spec = do
     '77714314',
     'Hello, World!',
     '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
-  ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,

@@ -216,9 +216,7 @@ outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError conn
 
 baseColumns :: TableColumns
 baseColumns =
-  [ "record_id",
-    "address",
-    "chainId",
+  [ "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -228,9 +226,7 @@ baseColumns =
 
 baseMappingColumns :: TableColumns
 baseMappingColumns =
-  [ "record_id",
-    "address",
-    "chainId",
+  [ "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -242,9 +238,7 @@ baseMappingColumns =
 
 baseAbstractColumns :: TableColumns
 baseAbstractColumns =
-  [ "record_id",
-    "address",
-    "chainId",
+  [ "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -328,7 +322,7 @@ createForeignIndexesForJoins foreignKey = do
       <> wrapDoubleQuotes (columnName foreignKey)
       <> ") REFERENCES "
       <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-      <> " (record_id);"
+      <> " (address);"
 
 notifyPostgREST ::
   OutputM m =>
@@ -363,7 +357,7 @@ getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo
 getDeferredForeignKeysForMapping tableName o a =
   [ ForeignKeyInfo
       { tableName = tableName,
-        columnName = T.pack "record_id",
+        columnName = T.pack "address",
         foreignTableName =
           indexTableName o a $
             ( \case
@@ -706,7 +700,7 @@ insertForeignKeys conn contracts = do
             <> wrapDoubleQuotes theName
             <> "="
             <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
-            <> " WHERE record_id="
+            <> " WHERE address="
             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
             <> ";"
         `catch` \(e :: SomeException) -> do
@@ -716,7 +710,7 @@ insertForeignKeys conn contracts = do
               <> tableNameToDoubleQuoteText tableName
               <> " SET "
               <> wrapDoubleQuotes theName
-              <> "=null WHERE record_id="
+              <> "=null WHERE address="
               <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
 
 insertHistoryTable ::
@@ -752,9 +746,7 @@ createIndexTableQuery contract (o, a, n) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text",
-              "\"chainId\" text",
+            [ "address text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
@@ -762,7 +754,7 @@ createIndexTableQuery contract (o, a, n) =
               "transaction_sender text"
             ]
               ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
-          ",\n  PRIMARY KEY (record_id) );"
+          ",\n  PRIMARY KEY (address) );"
         ]
 
 createMappingTableQuery :: (Text, Text, Text, Text) -> Text
@@ -773,9 +765,7 @@ createMappingTableQuery (o, a, n, m) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text",
-              "\"chainId\" text",
+            [ "address text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
@@ -786,7 +776,7 @@ createMappingTableQuery (o, a, n, m) =
               "key text",
               "value text"
             ],
-          ",\n  PRIMARY KEY (record_id, key));"
+          ",\n  PRIMARY KEY (address, key));"
         ]
 
 createAbstractTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -798,9 +788,7 @@ createAbstractTableQuery contract (o, a, n) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text",
-              "\"chainId\" text",
+            [ "address text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
@@ -810,7 +798,7 @@ createAbstractTableQuery contract (o, a, n) =
               "data jsonb"
             ]
               ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
-          ",\n  PRIMARY KEY (record_id));"
+          ",\n  PRIMARY KEY (address));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -822,9 +810,7 @@ createHistoryTableQuery contract (o, a, n) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text NOT NULL",
-              "\"chainId\" text NOT NULL",
+            [ "address text NOT NULL",
               "block_hash text NOT NULL",
               "block_timestamp text",
               "block_number text",
@@ -890,10 +876,8 @@ insertIndexTableQuery cs =
                       "\n  VALUES ",
                       inserts,
                       [r|
-  ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -943,10 +927,8 @@ insertMappingTableQuery ms =
                       "\n  VALUES ",
                       inserts,
                       [r|
-  ON CONFLICT (record_id, key) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address, key) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -995,9 +977,7 @@ insertAbstractTableQuery cs =
                       "\n  VALUES ",
                       inserts,
                       [r|
-  ON CONFLICT (record_id) DO UPDATE SET
-    address = excluded.address,
-    "chainId" = excluded."chainId",
+  ON CONFLICT (address) DO UPDATE SET
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -1085,9 +1065,7 @@ createEventTableQuery tableName ev =
           " (",
           csv $
             [ "id SERIAL NOT NULL",
-              "record_id text",
               "address text",
-              "\"chainId\" text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
