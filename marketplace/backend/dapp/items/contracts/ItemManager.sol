@@ -5,6 +5,7 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/products/contracts/Inventory.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/ProductManager.sol";
+import "/dapp/items/contracts/Transfer.sol";
 
 /// @title A representation of ItemManager to manage items
 contract ItemManager is ItemStatus, InventoryStatus {
@@ -20,14 +21,6 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string[] rawMaterialSerialNumber;
         string[] rawMaterialProductId;
     }
-
-    event ItemGifted(
-        address inventoryId,
-        uint transferDate,
-        uint quantity,
-        address newOwner,
-        address owner
-    );
 
     function addItem(
         address _productId,
@@ -258,7 +251,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             );
 
             if (_isGiftedTransfer == true) {
-                emit ItemGifted(
+                Transfer transfer = new Transfer(
                     address(inventory),
                     block.timestamp,
                     _newQuantity,
@@ -288,7 +281,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 );
             }
             if (_isGiftedTransfer == true) {
-                emit ItemGifted(
+                Transfer transfer = new Transfer(
                     address(inventory),
                     block.timestamp,
                     _newQuantity,
