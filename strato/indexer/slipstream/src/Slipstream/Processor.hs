@@ -458,9 +458,10 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                outputData conn $ createExpandAbstractTable g c nameParts cc
+                _ <- outputData conn $ createExpandAbstractTable g c nameParts cc
+                return []
               _ -> do
-                outputData conn $ createExpandIndexTable g c nameParts cc
+                outputData conn $ createExpandIndexTable g c nameParts
 
             outputData' conn $ createExpandHistoryTable g c nameParts
 
@@ -489,12 +490,12 @@ processTheMessages env conn messages = do
         mCodeCollection <- select (Proxy @CodeCollection) c' 
         deferredForeignKeys <- case (,,) <$> mStorageContract <*> mCodeContract <*> mCodeCollection of
           Nothing -> pure []
-          Just (sc, cc, cc') -> do
+          Just (sc, cc, _') -> do
             let c = cc {_contractName = _contractName sc}
                 mapNames = getMapNamesFromContract c
             nameParts <- resolveNameParts o a c
             forM_ mapNames $ outputData conn . createMappingTable g nameParts
-            deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts cc'
+            deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
             outputData' conn $ createExpandHistoryTable g c nameParts
             outputData conn $ createExpandEventTables g c nameParts
             pure deferredForeignKeys
