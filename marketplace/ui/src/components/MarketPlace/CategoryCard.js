@@ -33,11 +33,11 @@ const CategoryCard = () => {
             <RightArrow />
           </div>
         </Space> */}
-      <Row  className="flex justify-between" >
+      <Row gutter={[0,48]} className="flex justify-between" >
         {categorys.map((category, index) => {
           return (
             <Col
-            sm={12}
+            sm={11}
             lg={5}
               id={category.name}
               key={index}

@@ -21,7 +21,7 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import { purpleCheckIcon } from "../../images/SVGComponents";
+import { purpleCheckIcon, whiteCartIcon } from "../../images/SVGComponents";
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -112,22 +112,29 @@ const CategoryProductCard = ({ product, category }) => {
       });
     }
   };
-   
+
   return (
     <>
       {contextHolder}
-      <Col sm={12} lg={8} className="p-4 bg-white rounded-md shadow-md">
+      <Col sm={12} lg={8} xl={8} className="p-4 bg-white rounded-md shadow-md">
         <Image
           width={'100%'}
-          height={150}
+          height={200}
           preview={false}
-          className="rounded-md"
+          className="rounded-md cursor-pointer object-cover"
           src={product.imageUrl}
           fallback={'https://i.stack.imgur.com/Q3vyk.png'}
-          
+          onClick={() =>
+            navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+          }
         />
-        <Row className="flex"><Title level={4}>
-          {decodeURIComponent(product.name)}  </Title> {purpleCheckIcon()} </Row>
+        <Row className="flex cursor-pointer"
+          onClick={() =>
+            navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+          }
+        >
+          <Title level={4}>
+            {decodeURIComponent(product.name)}  </Title> {purpleCheckIcon()} </Row>
         <Text className="block dollar-text" strong>$ {product.pricePerUnit} </Text>
         <Paragraph> {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
           <React.Fragment key={index}>
@@ -148,6 +155,50 @@ const CategoryProductCard = ({ product, category }) => {
             <Button className="w-10" onClick={add}>
               <PlusOutlined className="text-xs text-secondryD" />
             </Button>
+          </Col>
+        </Row>
+
+        <Row className='mt-4'>
+          <Col span={18} className='bg-primary h-10 rounded-md'>
+            <Text strong className='block text-white mt-2 text-center'
+              onClick={() => {
+                if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  window.location.href = loginUrl;
+                } else {
+                  TagManager.dataLayer({
+                    dataLayer: {
+                      event: 'buy_now_from_marketplace',
+                      product_name: product.name,
+                      category: product.category,
+                      productId: product.productId
+                    },
+                  });
+                  addItemToCart();
+                  navigate("/checkout");
+                }
+              }}
+            > Buy Now </Text>
+          </Col>
+          <Col span={4} offset={2} className='bg-primary h-10 p-3 pl-3 flex justify-between rounded-md'
+            onClick={() => {
+              if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                window.location.href = loginUrl;
+              } else {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: 'add_to_cart_from_marketplace',
+                    product_name: product.name,
+                    category: product.category,
+                    productId: product.productId
+                  },
+                });
+                addItemToCart();
+              }
+            }}
+          >
+            <div className='mx-auto'>
+              {whiteCartIcon()}
+            </div>
           </Col>
         </Row>
       </Col>

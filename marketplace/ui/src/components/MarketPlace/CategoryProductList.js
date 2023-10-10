@@ -211,27 +211,27 @@ const CategoryProductList = ({ user }) => {
           </Breadcrumb.Item>
         ))}
       </Breadcrumb>
-      <Row className="mt-4">
-        <Col span={1} className="h-12" >
-          <Button size="large" block={true} className="h-12 pl-6" >
-            {filterIcon()}
+      <Row className="mt-4 flex justify-between">
+        <Col sm={2} lg={1} className="h-12" >
+          <Button size="large" block={true} className="h-12 mt-1" >
+            <Text className="mx-auto mt-1">{filterIcon()}</Text>
           </Button>
         </Col>
-        <Col span={18}>
+        <Col sm={8} md={14} lg={12} xl={18} >
           <Input type="search" prefix={searchIcon()} size="large" placeholder="Search Marketplace" className="h-12 pl-3" />
         </Col>
-        <Col span={4}>
+        <Col sm={8} md={6} lg={6} xl={4} xxl={3} >
           <Select
             defaultValue="SortBy"
             size="large"
             // style={{ width: 120 }}
-            className="h-full w-44"
+            className="py-1 w-52 float-right"
             // onChange={handleChange}
             options={[
               { value: 'SortBy', label: 'SortBy' },
               { value: 'Highest Price', label: 'Highest Price' },
               { value: 'Lowest Price', label: 'Lowest Price' },
-              { value: 'Yiminghe', label: 'Latest' },
+              // { value: 'Yiminghe', label: 'Latest' },
             ]}
           />
         </Col>
