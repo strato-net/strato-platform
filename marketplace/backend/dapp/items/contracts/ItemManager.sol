@@ -21,6 +21,14 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string[] rawMaterialProductId;
     }
 
+    event ItemGifted(
+        address inventoryId,
+        uint transferDate,
+        uint quantity,
+        address newOwner,
+        address owner
+    );
+
     function addItem(
         address _productId,
         address _inventoryId,
@@ -184,7 +192,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _newOwner,
         address _dappAddress,
         int _newQuantity,
-        uint _itemNumber
+        uint _itemNumber,
+        bool _isGiftedTransfer
     ) public returns (uint, address, address) {
         Product_3 product;
         Inventory inventory;
@@ -247,6 +256,16 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             );
+
+            if (_isGiftedTransfer == true) {
+                emit ItemGifted(
+                    address(inventory),
+                    block.timestamp,
+                    _newQuantity,
+                    _newOwner,
+                    tx.origin
+                );
+            }
             address itemContractAddress = address(itemAddr);
             itemProductIdMapping[itemContractAddress] = address(product);
             itemInventoryIdMapping[itemContractAddress] = address(inventory);
@@ -266,6 +285,15 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     _newOwner,
                     address(product),
                     address(inventory)
+                );
+            }
+            if (_isGiftedTransfer == true) {
+                emit ItemGifted(
+                    address(inventory),
+                    block.timestamp,
+                    _newQuantity,
+                    _newOwner,
+                    tx.origin
                 );
             }
         }
