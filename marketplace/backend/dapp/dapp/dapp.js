@@ -1082,18 +1082,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // ownedMemberships = ownedMemberships.filter(membership =>
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
-      // const arrayOwnedMemberships = ownedMemberships.map(obj => obj.address); // comment for resale test
+      console.log ('ownedMemberships', ownedMemberships)
+      
+      const arrayOwnedMemberships = ownedMemberships.map(obj => obj.address);
       // Get MembershipServices where membershipId = ownedMemberships.address 
       // const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: arrayOwnedMemberships }, getOptions)); // comment for resale test
       // const arrayMembershipServices = membershipServices.map(obj => obj.serviceId);// comment for resale test
       // Get all services
-      // const servicesAll = await managers.serviceManager.getAll({ address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });// comment for resale test
+      const servicesAll = await managers.serviceManager.getAll({address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
+
+      console.log ('membershipServices:', membershipServices)
+      console.log ('servicesAll:', servicesAll)
+      
       // Get ProductFile where productId = Items.productId
       // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);// comment for resale test
       // ownedProductFiles = ownedProductFiles.filter(file =>
       //   ownedItems.some(item => file.productId === item.productId)
       // );
-      // console.log('ownedProductFiles', ownedProductFiles)
+      console.log ('ownedProductFiles', ownedProductFiles)
       // TODO: What if there are not product files? Should we throw an error?
       // TODO: What if there are multiple product files? Should we display all of them?
       // Combine ownedProducts, ownedItems, ownedMemberships, and ownedProductFiles into one JSON object array
@@ -1679,7 +1685,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }));
 
     // Get all services
-    const servicesAll = await managers.serviceManager.getAll({ ownerOrganization: membership.manufacturer }, { ...options, org: managers.cirrusOrg, app: contractName, });
+    const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.manufacturer }, { ...options, org: managers.cirrusOrg, app: contractName, });
 
     // Combine the data and merge the service data into the membershipService data
     const combinedData = {
