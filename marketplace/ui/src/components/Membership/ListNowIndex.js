@@ -26,7 +26,8 @@ const ListNowIndex = ({
 }) => {
 
   const { inventories, isInventoriesLoading } = useInventoryState()
-  const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
+  const [availableQuantity, setAvailableQuantity] = useState('');
+  const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
   const seller = user.user.organization;
   const { cartList } = useMarketplaceState();
   const [purchasedMembershipData, setPurchasedMembershipData] = useState([]);
@@ -36,7 +37,7 @@ const ListNowIndex = ({
   const [id, setId] = useState("");
   const [membershipNumber, setMembershipNumber] = useState('')
   const [inventoryId, setInventoryId] = useState('')
-  const [quantity, setQuantity] = useState('');
+  const [quantity, setQuantity] = useState(1);
   const [taxPercentage, setTaxPercentage] = useState('');
   const [taxDollarAmount, setTaxDollarAmount] = useState(0);
   const [taxPercentageAmount, setTaxPercentageAmount] = useState(0);
@@ -78,13 +79,13 @@ const ListNowIndex = ({
     transformData(purchasedMemberships)
   }, [memberships, purchasedMemberships]);
 
-  useEffect(() => {
-    if (inventories.length > 0) {
-      setInventoryId(inventories.map((item) => item.address));
-      setProductId(inventories[0]?.productId);
-      MAX_QUANTITY = inventories[0].availableQuantity;
-    }
-  }, [inventories])
+  // useEffect(() => {
+  //   if (inventories.length > 0) {
+  //     setInventoryId(inventories.map((item) => item.address));
+  //     setProductId(inventories[0]?.productId);
+  //     MAX_QUANTITY = inventories[0].availableQuantity;
+  //   }
+  // }, [inventories])
 
 
   const handleFormatter = (value) => {
@@ -110,12 +111,13 @@ const ListNowIndex = ({
   };
 
   const handleMembership = (value) => {
-    setMembershipNumber('')
-    setQuantity('')
-    setProductId(value)
+    setMembershipNumber('');
+    setQuantity(1);
+    setProductId(value);
+
     // let membership = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber }))
-    setMemebershipList(purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber })))
-    inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
+    setMemebershipList(purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity })))
+    // inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
   }
 
   const selectAfter = (
@@ -159,7 +161,9 @@ const ListNowIndex = ({
         disabled={isPurchasedMembershipLoading}
         onChange={(value, obj) => {
           setMembershipNumber(obj.label)
+          setInventoryId(obj.inventoryId)
           setId(value)
+          setAvailableQuantity(obj.availableQuantity)
         }}
         options={memebershipList}
       />
@@ -174,10 +178,10 @@ const ListNowIndex = ({
             placeholder="Quantity"
             prefix={isInventoriesLoading && <Spin />}
             onWheel={(e) => e.target.blur()}
-            disabled={isInventoriesLoading || productId==''}
+            disabled={true}
             min={0}
             max={MAX_QUANTITY}
-            value={quantity}
+            value={1}
             onChange={(value) => {
               if (value > MAX_QUANTITY) {
                 setError(`Quantity cannot exceed ${MAX_QUANTITY}`);
@@ -187,7 +191,7 @@ const ListNowIndex = ({
               }
             }}
           />
-          {type === "Resale" && inventoryId!='' && <p>Available: {inventoryQuantity}</p>}
+          {type === "Resale" && inventoryId != '' && <p>Available: {inventoryQuantity}</p>}
           {error && <div style={{ color: 'red' }}>{error}</div>}
         </>
       ),
@@ -239,44 +243,19 @@ const ListNowIndex = ({
   ];
 
   const handleCreateFormSubmit = async () => {
-    const membershipBody = {
-      inventoryId: inventoryId,
+    const resalePayload = {
       productAddress: productId,
-      quantity: quantity,
-      pricePerUnit: price,
-      // Generate random code for now
-      batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-      // Status should always be published if we use List Now
-      status: INVENTORY_STATUS.PUBLISHED,
-      serialNumbers: [],
-      taxPercentageAmount: taxPercentageAmount,
-      taxDollarAmount: taxDollarAmount,
-    };
+      inventory: inventoryId,
+      updates: {
+        pricePerUnit: price,
+        status: INVENTORY_STATUS.PUBLISHED,
+        quantity: 1
+      }
+    }
 
     const resaleMembership = await membershipActions.resaleMembership(
-      membershipDispatch, membershipBody
+      membershipDispatch, resalePayload
     )
-
-    // const createInventory = await inventoryActions.createInventory(
-    //   inventoryDispatch,
-    //   inventoryBody
-    // );
-
-
-    // const updatePayload = {
-    //   productAddress: productId,
-    //   inventory: inventoryId,
-    //   updates: {
-    //     pricePerUnit: price,
-    //     status: INVENTORY_STATUS.PUBLISHED,
-    //     quantity: quantity
-    //   }
-    // }
-
-    // const updateInventory = await inventoryActions.updateInventory(
-    //   inventoryDispatch,
-    //   updatePayload
-    // );
 
     if (resaleMembership) {
       // membership.product_with_inventory = 1;

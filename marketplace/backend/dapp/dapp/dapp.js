@@ -1073,6 +1073,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       let ownedItems = await itemJs.getAll(rawAdmin, args, getOptions);
+      let inventoriesAddresses = ownedItems.map(item=>item.inventoryId) 
+      const inventoriesList = await managers.productManager.getInventories({ address: inventoriesAddresses }, getOptions);
       // Filter ownedItems based on productId and ownerOrg
       // ownedItems = ownedItems.filter(item =>
       //   ownedProducts.some(product => item.productId === product.address)
@@ -1095,10 +1097,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       console.log ('servicesAll:', servicesAll)
       
       // Get ProductFile where productId = Items.productId
-      // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);// comment for resale test
-      // ownedProductFiles = ownedProductFiles.filter(file =>
-      //   ownedItems.some(item => file.productId === item.productId)
-      // );
+      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);// comment for resale test
+      ownedProductFiles = ownedProductFiles.filter(file =>
+        ownedItems.some(item => file.productId === item.productId)
+      );
       console.log ('ownedProductFiles', ownedProductFiles)
       // TODO: What if there are not product files? Should we throw an error?
       // TODO: What if there are multiple product files? Should we display all of them?
@@ -1114,37 +1116,39 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         })
         .map(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
-          // comment for resale test
-          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
-          // comment for resale test
-          // const savings = membershipServices
-          //   .filter(
-          //     (membershipService) =>
-          //       membershipService.membershipId === memberships[0]?.address
-          //   )
-          //   .map((membershipService) => {
-          //     const matchingService = servicesAll.find(
-          //       (service) => service?.address === membershipService?.serviceId
-          //     );
+          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          const savings = membershipServices
+            .filter(
+              (membershipService) =>
+                membershipService.membershipId === memberships[0].address
+            )
+            .map((membershipService) => {
+              const matchingService = servicesAll.find(
+                (service) => service.address === membershipService.serviceId
+              );
 
-          //     if (matchingService) {
-          //       return {
-          //         savings:
-          //           membershipService.maxQuantity *
-          //           (matchingService.price - membershipService.membershipPrice),
-          //       };
-          //     } else {
-          //       return " Not found";
-          //     }
-          //   });
-
+              if (matchingService) {
+                return {
+                  savings:
+                    membershipService.maxQuantity *
+                    (matchingService.price - membershipService.membershipPrice),
+                };
+              } else {
+                return " Not found";
+              }
+            });
+          
           // console.log("savings: ", savings)
+          let inventoryDetail = inventoriesList.find((inventory) => inventory.address === item.inventoryId);
           return {
             itemAddress: item.address,
             itemNumber: item.itemNumber,
             productId: item.productId,
+            inventoryId: item.inventoryId,
+            availableQuantity: inventoryDetail?.availableQuantity,
             fileLocation: null, // productFiles[0]?.fileLocation, // comment for resale test
+            status: inventoryDetail?.status,
             productName: product.name,
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,
@@ -1363,83 +1367,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.resaleMembership = async function (args, options = defaultOptions) {
-    const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs }
-    // const [restStatus, productAddress] = await managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
-    // now we have to create membership(item) and inventory based on the productId.
-
-    // const { membershipArgs, membershipServiceArgs, productFileArgs } = args;
-
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-
-    let productDetails = await managers.productManager.getProduct({ address: args.productAddress }, getOptions)
-    let membershipDetail = await membershipJs.get(rawAdmin, { productId: args.productAddress }, { ...options, org: managers.cirrusOrg, app: contractName })
-    let membershipService = await membershipServiceJs.get(rawAdmin, { membershipId: membershipDetail.address }, { ...options, org: managers.cirrusOrg, app: "" })
-    let productFileDetail = await productFileJs.get(rawAdmin, { productId: args.productAddress }, getOptions)
-
-    const body = {
-      membershipArgs: {
-        name: productDetails.name,
-        description: productDetails.description,
-        manufacturer: productDetails.manufacturer,
-        unitOfMeasurement: 1,
-        // Generate random code for now
-        userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-        userUniqueProductCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
-        // Generate random number for now
-        uniqueProductCode: Math.floor(Math.random() * 1000000),
-        uniqueMembershipCode: Math.floor(Math.random() * 1000000),
-        leastSellableUnit: 1,
-        // TODO: This should be updated later on to use the image key from S3. This might have to be changed into an array.
-        imageKey: productDetails.imageKey,
-        category: "Membership",
-        subCategory: productDetails.subCategory,
-        createdDate: new Date().getTime(),
-        timePeriodInMonths: membershipDetail.timePeriodInMonths,
-        additionalInfo: membershipDetail.additionalInfo,
-        // If visible is true the List Now form is open and the membership is active
-        isActive: productDetails.isActive,
-      },
-      membershipServiceArgs: [{
-        serviceId: membershipService.serviceId,
-        membershipPrice: membershipService.membershipPrice,
-        discountPrice: membershipService.discountPrice,
-        maxQuantity: args.quantity,
-        createdDate: new Date().getTime(),
-        // If visible is true the List Now form is open and the membership is active
-        isActive: true,
-      }],
-      //TODO: where do I put the imageKey from the uploaded File?
-      productFileArgs: [{
-        fileLocation: `${productDetails.imageKey}`,
-        fileHash: `${productFileDetail.fileHash}`,
-        fileName: `${productFileDetail.fileName}`,
-        uploadDate: new Date().getTime(),
-        createdDate: new Date().getTime(),
-        currentSection: 1,
-        currentType: 2,
-      }],
-    };
-
-    // createMembership will create new product with the membership
-    const [status, membershipAddress, productAddress] = await managers.membershipManager.createMembership({
-      dappAddress: contract.address,
-      membershipArgs: body.membershipArgs,
-      membershipServiceArgs: body.membershipServiceArgs,
-      productFileArgs: body.productFileArgs
-    });
-
-    if (status == 200) {
-      // use create Inventory here.
-      // we have to update the inventory as well to reduce the quantity.
-
-    }
-    // create inventory for the product
-    let args1 = { ...args, productAddress: productAddress }
-    let { inventoryId, ...createInventoryArgs } = args1;
-    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...createInventoryArgs, createdDate });
-    // update the inventory which we are putting for resale.
-    const [restStatus] = await managers.productManager.updateInventoriesQuantities({ inventories: [inventoryId[0]], quantities: [args.quantity], isReduce: true });
+    // console.log("payload", args);
+    const inventoryRes = await managers.productManager.updateInventory(args);
+    return inventoryRes
   };
 
   contract.getOrder = async function (args, options = optionsNoChainIds) {

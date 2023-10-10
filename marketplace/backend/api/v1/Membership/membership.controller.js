@@ -152,39 +152,39 @@ class MembershipController {
 
   static validateCreateMembershipArgs(args) {
     const createMembershipSchema = Joi.object({
-        membershipArgs: Joi.object({
-            name: Joi.string().required(),
-            description: Joi.string().required(),
-            manufacturer: Joi.string().required(),
-            unitOfMeasurement: Joi.number().required(),
-            userUniqueMembershipCode: Joi.string().required(),
-            uniqueMembershipCode: Joi.number().required(),
-            leastSellableUnit: Joi.number().required(),
-            imageKey: Joi.string().required(),
-            isActive: Joi.boolean().required(),
-            category: Joi.string().required(),
-            subCategory: Joi.string().required(),
-            createdDate: Joi.number().required(),
-            timePeriodInMonths: Joi.number().required(),
-            additionalInfo: Joi.string().required(),
-        }).required(),
-        membershipServiceArgs: Joi.array().items(Joi.object({
-            serviceId: Joi.string().required(),
-            membershipPrice: Joi.number().required(),
-            discountPrice: Joi.number().required(),
-            maxQuantity: Joi.number().required(),
-            createdDate: Joi.number().required(),
-            isActive: Joi.boolean().required(),
-        })).required(),
-        productFileArgs: Joi.array().items(Joi.object({
-            fileLocation: Joi.string().required(),
-            fileHash: Joi.string().required(),
-            fileName: Joi.string().required(),
-            uploadDate: Joi.number().required(),
-            createdDate: Joi.number().required(),
-            currentSection: Joi.number().required(),
-            currentType: Joi.number().required(),
-        })).required(),
+      membershipArgs: Joi.object({
+        name: Joi.string().required(),
+        description: Joi.string().required(),
+        manufacturer: Joi.string().required(),
+        unitOfMeasurement: Joi.number().required(),
+        userUniqueMembershipCode: Joi.string().required(),
+        uniqueMembershipCode: Joi.number().required(),
+        leastSellableUnit: Joi.number().required(),
+        imageKey: Joi.string().required(),
+        isActive: Joi.boolean().required(),
+        category: Joi.string().required(),
+        subCategory: Joi.string().required(),
+        createdDate: Joi.number().required(),
+        timePeriodInMonths: Joi.number().required(),
+        additionalInfo: Joi.string().required(),
+      }).required(),
+      membershipServiceArgs: Joi.array().items(Joi.object({
+        serviceId: Joi.string().required(),
+        membershipPrice: Joi.number().required(),
+        discountPrice: Joi.number().required(),
+        maxQuantity: Joi.number().required(),
+        createdDate: Joi.number().required(),
+        isActive: Joi.boolean().required(),
+      })).required(),
+      productFileArgs: Joi.array().items(Joi.object({
+        fileLocation: Joi.string().required(),
+        fileHash: Joi.string().required(),
+        fileName: Joi.string().required(),
+        uploadDate: Joi.number().required(),
+        createdDate: Joi.number().required(),
+        currentSection: Joi.number().required(),
+        currentType: Joi.number().required(),
+      })).required(),
     });
 
     const validation = createMembershipSchema.validate(args);
@@ -199,19 +199,14 @@ class MembershipController {
 
   static validateResaleMembershipArgs(args) {
     const resaleMembershipSchema = Joi.object({
-      inventoryId: Joi.array().items(Joi.string()),
+      inventory: Joi.string().required(),
       productAddress: Joi.string().required(),
-      quantity: Joi.number().required(),
-      pricePerUnit: Joi.number().required(),
-      // Generate random code for now
-      batchId: Joi.string().required(),
-      // Status should always be published if we use List Now
-      status: Joi.number().required(),
-      serialNumbers: Joi.array().items(Joi.string()),
-      taxPercentageAmount: Joi.number().required(),
-      taxDollarAmount: Joi.number().required(),
+      updates: {
+        quantity: Joi.number().required(),
+        pricePerUnit: Joi.number().required(),
+        status: Joi.number().required(),
+      }
     })
-
 
     const validation = resaleMembershipSchema.validate(args);
 
