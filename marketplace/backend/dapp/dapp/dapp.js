@@ -1062,6 +1062,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
+      // let check = await managers.productManager.getProducts({ owner: userAddress }, getOptions);
       let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
 
@@ -1071,7 +1072,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         productId: arrayOfAddresses,
         sort: '-createdDate',
       }
+
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
+      // let ownedMem = await membershipJs.getAll(rawAdmin, args, getOptions);
       let ownedItems = await itemJs.getAll(rawAdmin, args, getOptions);
       let inventoriesAddresses = ownedItems.map(item=>item.inventoryId) 
       const inventoriesList = await managers.productManager.getInventories({ address: inventoriesAddresses }, getOptions);
@@ -1079,8 +1082,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // ownedItems = ownedItems.filter(item =>
       //   ownedProducts.some(product => item.productId === product.address)
       // );
+      console.log("ownedItems", ownedItems)
+      
       // Get Memberhships where productId = Items.productId 
-      // let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization // comment for resale test
+      let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
       // ownedMemberships = ownedMemberships.filter(membership =>
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
@@ -1088,8 +1093,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       
       const arrayOwnedMemberships = ownedMemberships.map(obj => obj.address);
       // Get MembershipServices where membershipId = ownedMemberships.address 
-      // const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: arrayOwnedMemberships }, getOptions)); // comment for resale test
-      // const arrayMembershipServices = membershipServices.map(obj => obj.serviceId);// comment for resale test
+      const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: arrayOwnedMemberships }, getOptions));
+      const arrayMembershipServices= membershipServices.map(obj => obj.serviceId);
       // Get all services
       const servicesAll = await managers.serviceManager.getAll({address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
 
@@ -1097,10 +1102,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       console.log ('servicesAll:', servicesAll)
       
       // Get ProductFile where productId = Items.productId
-      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);// comment for resale test
-      ownedProductFiles = ownedProductFiles.filter(file =>
-        ownedItems.some(item => file.productId === item.productId)
-      );
+      // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
+      // ownedProductFiles = ownedProductFiles.filter(file =>
+      //   ownedItems.some(item => file.productId === item.productId)
+      // );
       console.log ('ownedProductFiles', ownedProductFiles)
       // TODO: What if there are not product files? Should we throw an error?
       // TODO: What if there are multiple product files? Should we display all of them?
@@ -1108,11 +1113,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const combinedData = ownedItems
         .filter(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
-          // comment for resale test
-          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
-          return product
-          //  && productFiles.length > 0 && memberships.length > 0 // comment for resale test
+          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+
+          return product && productFiles.length > 0 && memberships.length > 0
         })
         .map(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
@@ -1152,9 +1156,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             productName: product.name,
             subCategory: product.subCategory,
             manufacturer: product.manufacturer,
-            timePeriodInMonths: null, //memberships[0]?.timePeriodInMonths,  // comment for resale test
-            savings: null, //savings[0]?.savings,  // comment for resale test
-            membershipAddress: null, //memberships[0]?.address  // comment for resale test
+            timePeriodInMonths: memberships[0].timePeriodInMonths,
+            savings: savings[0]?.savings,
+            membershipAddress: memberships[0].address
           };
         });
 
@@ -1285,71 +1289,71 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           console.log("dapp orderLineItems: ", orderLineItems)
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
           console.log("dapp itemAddresses: ", itemAddresses)
-
+          
           // Get items and get the productIds
           const items = await managers.itemManager.getItems({ address: itemAddresses }, createOptions);
           console.log("dapp items: ", items)
           const productAddresses = items.map(item => item.productId);
           console.log("dapp productAddresses: ", productAddresses)
-
+          
           // Using the productIds, get the memberships
-          let memberships = await membershipJs.getAll(rawAdmin, { productId: productAddresses }, createOptions)
+          let memberships = await membershipJs.getAll(rawAdmin, {productId: productAddresses}, createOptions)
           console.log("here")
           console.log("dapp memberships:", memberships)
           const membershipAddresses = memberships.map(membership => membership.address);
-
+          
           // Transfer ownership of the items to the buyer
           const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
           console.log("dapp productId: ", productId)
           console.log("dapp inventoryId: ", inventoryId)
-
+          
           // Get all membershipServices using membershipId
-          const membershipServices = await membershipServiceJs.getAll(rawAdmin, { membershipId: membershipAddresses }, createOptions)
+          const membershipServices = await membershipServiceJs.getAll(rawAdmin, {membershipId: membershipAddresses}, createOptions)
           console.log("dapp membershipServices: ", membershipServices)
-
+          
           // Get all productFiles using productId
-          const productFiles = await productFileJs.getAll(rawAdmin, { productId: productAddresses }, createOptions)
+          const productFiles = await productFileJs.getAll(rawAdmin, {productId: productAddresses}, createOptions)
           console.log("dapp productFiles: ", productFiles)
-
-          const membershipArgs = {
+          
+        const membershipArgs = {
             createdDate: memberships[0].createdDate,
             timePeriodInMonths: memberships[0].timePeriodInMonths,
             additionalInfo: memberships[0].additionalInfo
-          }
-
-          const membershipServiceArgs = membershipServices.map((membershipService) => {
-            return {
-              serviceId: membershipService.serviceId,
-              membershipPrice: membershipService.membershipPrice,
-              discountPrice: membershipService.discountPrice,
-              maxQuantity: membershipService.maxQuantity,
-              createdDate: membershipService.createdDate,
-              isActive: membershipService.isActive,
-            };
-          });
-
-          const productFileArgs = productFiles.map((productFile) => {
-            return {
-              fileLocation: productFile.fileLocation,
-              fileHash: productFile.fileHash,
-              fileName: productFile.fileName,
-              uploadDate: productFile.uploadDate,
-              createdDate: productFile.createdDate,
-              currentSection: productFile.currentSection,
-              currentType: productFile.currentType,
-            };
-          });
-
-
+        }
+        
+        const membershipServiceArgs = membershipServices.map((membershipService) => {
+          return {
+            serviceId: membershipService.serviceId,
+            membershipPrice: membershipService.membershipPrice,
+            discountPrice: membershipService.discountPrice,
+            maxQuantity: membershipService.maxQuantity,
+            createdDate: membershipService.createdDate,
+            isActive: membershipService.isActive,
+          };
+        });
+        
+        const productFileArgs = productFiles.map((productFile) => {
+          return {
+            fileLocation: productFile.fileLocation,
+            fileHash: productFile.fileHash,
+            fileName: productFile.fileName,
+            uploadDate: productFile.uploadDate,
+            createdDate: productFile.createdDate,
+            currentSection: productFile.currentSection,
+            currentType: productFile.currentType,
+          };
+        });
+        
+        
 
           console.log("comes here")
-          const memberResponse = await managers.membershipManager.addMembershipOrderFlow({
+          const memberResponse = await managers.membershipManager.addMembershipOrderFlow({ 
             dappAddress: contract.address,
             owner: newOwner,
             productId: productId,
-            membershipArgs: membershipArgs,
-            membershipServiceArgs: membershipServiceArgs,
-            productFileArgs: productFileArgs
+            membershipArgs: membershipArgs, 
+            membershipServiceArgs: membershipServiceArgs, 
+            productFileArgs:  productFileArgs
           });
           console.log("reach here: ", memberResponse)
           result.push({ status, productId, inventoryId });
