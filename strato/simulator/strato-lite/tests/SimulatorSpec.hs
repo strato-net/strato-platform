@@ -864,7 +864,7 @@ contract B {
       client' <- createPeer' clientPKey (validatorInfos !! 1) zippedValidators certs "client" "2.2.2.2"
       connection <- createGermophobicConnection server' client'
       void . timeout (3 * 1000 * 1000) $ runConnection connection
-      clientExcept <- readTVarIO $ (connection ^. clientException)
+      clientExcept <- readTVarIO $ connection ^. clientException
       clientExcept `shouldBe` Just (toException $ HandshakeException "handshake timed out")
 
   describe "X.509 Private Chain exchange" $ do
