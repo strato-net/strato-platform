@@ -116,8 +116,8 @@ import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM
 import Executable.StratoP2P
-import Executable.StratoP2PClient
---import Executable.StratoP2PServer
+import Executable.StratoP2PClient hiding (runEthServerConduit)
+import Executable.StratoP2PServer (runEthServerConduit)
 import Network.Socket
 import Text.Read (readMaybe)
 import UnliftIO
@@ -1680,7 +1680,7 @@ createConnection server' client' = do
   tm                  <- newThreadMap
   let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
       rServer =
-        Executable.StratoP2PClient.runEthServerConduit
+        runEthServerConduit
           (_p2pPeerPPeer client')
           (sourceTQueue clientToServerTQueue)
           (sinkTQueue serverToClientTQueue)
