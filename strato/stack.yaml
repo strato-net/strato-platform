@@ -54,7 +54,7 @@ packages:
 - libs/logserver
 - libs/kafka/milena
 - libs/kafka/milena-tools
-- libs/monad-alter 
+- libs/monad-alter
 - libs/nibblestring
 - libs/partitioner
 - libs/prometheus/blockapps-init
