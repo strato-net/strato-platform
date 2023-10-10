@@ -180,17 +180,16 @@ instance Format Transaction where
 
 instance RLPSerializable Transaction where
   rlpDecode (RLPArray (n : gp : gl : toAddr : val : i : vVal : rVal : sVal : xs)) =
-    let rlpDecodeMap = M.fromList . map ((decodeUtf8 *** decodeUtf8) . rlpDecode)
-        (cid, md, nid) = case xs of
+    let (cid, md, nid) = case xs of
           [] -> (Nothing, Nothing, Nothing)
           [c] -> case c of
+            RLPArray a | isRlpMap a -> (Nothing, Just $ rlpDecodeMap a, Nothing)
             RLPArray [nid'] -> (Nothing, Nothing, Just $ rlpDecode nid')
-            RLPArray a -> (Nothing, Just $ rlpDecodeMap a, Nothing)
             cid' -> (Just $ rlpDecode cid', Nothing, Nothing)
-          (c : RLPArray a : RLPArray [nid'] : _) -> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
-          [RLPArray a, RLPArray [nid']] -> (Nothing, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
+          [RLPArray a, RLPArray [nid']] | isRlpMap a-> (Nothing, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
+          [c, RLPArray a] | isRlpMap a-> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Nothing)
           [c, RLPArray [nid']] -> (Just $ rlpDecode c, Nothing, Just $ rlpDecode nid')
-          [c, RLPArray a] -> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Nothing)
+          (c : RLPArray a : RLPArray [nid'] : _) -> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
           (_ : o : _) -> error $ "rlpDecode Transaction: Expected metadata to be an RLPArray, but got: " ++ show o
      in case partial of
           PrivateHashTX {} -> case cid of
@@ -216,6 +215,10 @@ instance RLPSerializable Transaction where
               }
     where
       partial = partialRLPDecode $ RLPArray [n, gp, gl, toAddr, val, i]
+      rlpDecodeMap = M.fromList . map ((decodeUtf8 *** decodeUtf8) . rlpDecode)
+      isRlpMap [] = True
+      isRlpMap (RLPArray [_, _] : _) = True
+      isRlpMap _ = False
   rlpDecode x = error ("rlp object has wrong format in call to rlpDecodeq: " ++ show x)
 
   rlpEncode t = case r of

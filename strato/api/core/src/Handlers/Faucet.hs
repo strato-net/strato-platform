@@ -204,7 +204,7 @@ makeSendTX maxN k a n = do
   -- with [n, n+1, n+2] has highest priority for n+2, second priority for n+1,
   -- and will only take n if both faucet(x) and faucet(y) don't.
   let gasPrice = 50000000000 - 100000 * (maxN - n)
-  liftIO $ createMessageTX n gasPrice 100000 a (1000 * ether) "" Nothing k
+  liftIO $ createMessageTX n gasPrice 100000 a (1000 * ether) "" Nothing Nothing k --TODO: is nothing ok?
 
 -- TODO(tim): Add a queryparam for contracts with variable length bin-runtimes, rather
 -- than these that have empty bin-runtimes.
@@ -214,5 +214,5 @@ makeSizedTX nonce size pk =
       gasPrice = 50000000000
       gasLimit = 100000
       val = 0
-      mk = createContractCreationTX nonce gasPrice gasLimit val code Nothing pk
+      mk = createContractCreationTX nonce gasPrice gasLimit val code Nothing Nothing pk --TODO: is nothing ok?
    in liftIO mk

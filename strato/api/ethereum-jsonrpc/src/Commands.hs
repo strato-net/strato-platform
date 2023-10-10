@@ -357,7 +357,7 @@ eth_call = toMethod "eth_call" f (Required "codeString" :+: Required "blockStrin
     f codeString blockString = do
       let id = "qqqq"
       let nope = error "jsonrpc.eth_call.createMessageTX"
-      _ <- liftIO $ createMessageTX nope nope nope nope nope nope nope nope
+      _ <- liftIO $ createMessageTX nope nope nope nope nope nope nope nope nope
       case strToByteString codeString of
         Left err -> throwError $ rpcError (-32602) $ T.pack err
         Right codeBytes -> do

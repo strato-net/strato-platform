@@ -389,7 +389,7 @@ spec = do
           getChainTx chainId = do
             tx <- runIO $ do
               pk <- newPrivateKey
-              createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId) Nothing pk
+              createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BS.empty (Just $ keccak256ToWord256 chainId) Nothing Nothing pk --TODO: nothing ok?
             let hashTx = PrivateHashTX (txHash tx) chainId
             pure (hashTx, tx)
 

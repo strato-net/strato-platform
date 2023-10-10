@@ -192,8 +192,8 @@ insertTX' mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs
 
-createMessageTX :: Integer -> Integer -> Integer -> Address -> Integer -> B.ByteString -> Maybe (Map Text Text) -> EC.PrivateKey -> IO Transaction
-createMessageTX n gp gl to' val theData md prvKey = createChainMessageTX n gp gl to' val theData Nothing md prvKey
+createMessageTX :: Integer -> Integer -> Integer -> Address -> Integer -> B.ByteString -> Maybe (Map Text Text) -> Maybe Integer -> EC.PrivateKey -> IO Transaction
+createMessageTX n gp gl to' val theData = createChainMessageTX n gp gl to' val theData Nothing
 
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
@@ -214,9 +214,10 @@ createChainMessageTX ::
   B.ByteString ->
   Maybe Word256 ->
   Maybe (Map Text Text) ->
+  Maybe Integer ->
   EC.PrivateKey ->
   IO Transaction
-createChainMessageTX n gp gl to' val theData cid md prvKey = do
+createChainMessageTX n gp gl to' val theData cid md nid prvKey = do
   let unsignedTX =
         MessageTX
           { transactionNonce = n,
@@ -230,7 +231,7 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
             transactionS = 0,
             transactionV = 0,
             transactionMetadata = md,
-            transactionNetworkId = Nothing --TODO: Nothing is wrong
+            transactionNetworkId = nid
           }
   let theHash = partialTransactionHash unsignedTX
 
@@ -240,9 +241,8 @@ createChainMessageTX n gp gl to' val theData cid md prvKey = do
     MessageTX {} -> unsignedTX {transactionR = toInteger r, transactionS = toInteger s, transactionV = v}
     _ -> error "createChainMessageTX: PrivateHashTX not supported should be impossible"
 
-createContractCreationTX :: Integer -> Integer -> Integer -> Integer -> Code -> Maybe (Map Text Text) -> EC.PrivateKey -> IO Transaction
-createContractCreationTX n gp gl val init' md prvKey = createChainContractCreationTX n gp gl val init' Nothing md prvKey
-
+createContractCreationTX :: Integer -> Integer -> Integer -> Integer -> Code -> Maybe (Map Text Text) -> Maybe Integer -> EC.PrivateKey -> IO Transaction
+createContractCreationTX n gp gl val init' = createChainContractCreationTX n gp gl val init' Nothing
 createChainContractCreationTX ::
   Integer ->
   Integer ->
@@ -251,9 +251,10 @@ createChainContractCreationTX ::
   Code ->
   Maybe Word256 ->
   Maybe (Map Text Text) ->
+  Maybe Integer ->
   EC.PrivateKey ->
   IO Transaction
-createChainContractCreationTX n gp gl val init' cid md prvKey = do
+createChainContractCreationTX n gp gl val init' cid md nid prvKey = do
   let unsignedTX =
         ContractCreationTX
           { transactionNonce = n,
@@ -266,7 +267,7 @@ createChainContractCreationTX n gp gl val init' cid md prvKey = do
             transactionS = 0,
             transactionV = 0,
             transactionMetadata = md,
-            transactionNetworkId = Nothing --TODO: Nothing is wrong
+            transactionNetworkId = nid
           }
 
   let theHash = partialTransactionHash unsignedTX

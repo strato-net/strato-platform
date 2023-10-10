@@ -88,16 +88,17 @@ instance Arbitrary Transaction where
         isMessage <- arbitrary :: Gen Bool
         chainId <- arbitrary
         md <- arbitrary
+        netId <- arbitrary
         case isMessage of
           True -> do
             to <- arbitrary
             txData <- arbitrary
             return . unsafePerformIO $
-              createChainMessageTX nonce gasPrice gasLimit to value txData chainId md prvKey
+              createChainMessageTX nonce gasPrice gasLimit to value txData chainId md netId prvKey
           False -> do
             contractCode <- arbitrary
             return . unsafePerformIO $
-              createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md prvKey
+              createChainContractCreationTX nonce gasPrice gasLimit value contractCode chainId md netId prvKey
 
 instance Arbitrary RawTransaction where
   arbitrary =
