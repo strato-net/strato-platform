@@ -5,7 +5,7 @@ import {
   MoreOutlined,
   EditOutlined,
   EyeOutlined,
-  GiftOutlined,
+  SwapOutlined,
   PieChartOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
@@ -15,7 +15,7 @@ import { UNIT_OF_MEASUREMENTS, INVENTORY_STATUS } from "../../helpers/constants"
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ResellModal from "./ResellModal";
 import routes from "../../helpers/routes";
-import GiftModal from "./GiftModal";
+import TransferModal from "./TransferModal";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -23,7 +23,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
-  const [giftModalOpen, setGiftModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
 
@@ -60,13 +60,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
     setResellModalOpen(false);
   };
 
-  const showGiftModal = () => {
+  const showTransferModal = () => {
     hide();
-    setGiftModalOpen(true);
+    setTransferModalOpen(true);
   };
 
-  const handleGiftModalClose = () => {
-    setGiftModalOpen(false);
+  const handleTransferModalClose = () => {
+    setTransferModalOpen(false);
   };
 
   const callDetailPage = () => {
@@ -120,10 +120,10 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                     </div>
                     <div
                       className="flex items-center mt-2 cursor-pointer"
-                      onClick={showGiftModal}
+                      onClick={showTransferModal}
                     >
-                      <GiftOutlined />
-                      <p className="ml-3">Gift</p>
+                      <SwapOutlined />
+                      <p className="ml-3">Transfer</p>
                     </div>
                   </div>
                 }
@@ -255,10 +255,10 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           inventory={inventory}
         />
       )}
-      {giftModalOpen && (
-        <GiftModal
-          open={giftModalOpen}
-          handleCancel={handleGiftModalClose}
+      {transferModalOpen && (
+        <TransferModal
+          open={transferModalOpen}
+          handleCancel={handleTransferModalClose}
           inventory={inventory}
         />
       )}

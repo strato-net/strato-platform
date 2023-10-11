@@ -9,14 +9,14 @@ import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 
 
-const GiftModal = ({ open, handleCancel, inventory }) => {
+const TransferModal = ({ open, handleCancel, inventory }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [userAddress, setUserAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const itemDispatch = useItemDispatch();
     const userDispatch = useUsersDispatch();
-    const [canGift, setCanGift] = useState(true);
+    const [canTransfer, setCanTransfer] = useState(true);
     // const {
     //     isReselling
     // } = useInventoryState();
@@ -48,10 +48,10 @@ const GiftModal = ({ open, handleCancel, inventory }) => {
 
     useEffect(() => {
         if (quantity > inventory.availableQuantity || quantity <= 0 || !userAddress) {
-            setCanGift(false);
+            setCanTransfer(false);
         }
         else {
-            setCanGift(true);
+            setCanTransfer(true);
         };
     }, [quantity, userAddress])
 
@@ -98,7 +98,7 @@ const GiftModal = ({ open, handleCancel, inventory }) => {
         };
 
         if (quantity > 0 && quantity <= inventory.availableQuantity && userAddress) {
-            console.log("Gift", body);
+            console.log("Transfer", body);
             // let isDone = await actions.resellInventory(inventoryDispatch, body);
             // if (isDone) {
             //     actions.fetchInventory(inventoryDispatch, 10, 0, "");
@@ -111,11 +111,11 @@ const GiftModal = ({ open, handleCancel, inventory }) => {
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`Gift - ${decodeURIComponent(inventory.name)}`}
+            title={`Transfer - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canGift} loading={false}>
-                    Gift
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={false}>
+                    Transfer
                 </Button>
             ]}
         >
@@ -129,4 +129,4 @@ const GiftModal = ({ open, handleCancel, inventory }) => {
 }
 
 
-export default GiftModal;
+export default TransferModal;
