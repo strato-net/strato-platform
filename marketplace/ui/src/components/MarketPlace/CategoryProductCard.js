@@ -111,7 +111,6 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
-  console.log("product", product)
   return (
     <div>
       {contextHolder}

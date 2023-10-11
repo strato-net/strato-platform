@@ -20,8 +20,8 @@ export const updateProductFileArgs = (address, uid) => {
       fileHash: `fileHash_${uid}`,
       fileName: `fileName_${uid}`,
       uploadDate: uid,
-      section: 1,
-      type: 2,
+      currentSection: 1,
+      currentType: 2,
     }
   };
 

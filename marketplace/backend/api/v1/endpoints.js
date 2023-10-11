@@ -163,6 +163,7 @@ export const Membership = {
   create: '/',
   purchased: '/purchased',
   issued: '/issued',
+  resale:'/resale'
   //update: '/update',
   //transferOwnership: '/transferOwnership',
 }

@@ -135,41 +135,56 @@ class MembershipController {
     }
   }
 
+  static async resale(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      MembershipController.validateResaleMembershipArgs(body)
+
+      const result = await dapp.resaleMembership(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static validateCreateMembershipArgs(args) {
     const createMembershipSchema = Joi.object({
-        membershipArgs: Joi.object({
-            name: Joi.string().required(),
-            description: Joi.string().required(),
-            manufacturer: Joi.string().required(),
-            unitOfMeasurement: Joi.number().required(),
-            userUniqueMembershipCode: Joi.string().required(),
-            uniqueMembershipCode: Joi.number().required(),
-            leastSellableUnit: Joi.number().required(),
-            imageKey: Joi.string().required(),
-            isActive: Joi.boolean().required(),
-            category: Joi.string().required(),
-            subCategory: Joi.string().required(),
-            createdDate: Joi.number().required(),
-            timePeriodInMonths: Joi.number().required(),
-            additionalInfo: Joi.string().required(),
-        }).required(),
-        membershipServiceArgs: Joi.array().items(Joi.object({
-            serviceId: Joi.string().required(),
-            membershipPrice: Joi.number().required(),
-            discountPrice: Joi.number().required(),
-            maxQuantity: Joi.number().required(),
-            createdDate: Joi.number().required(),
-            isActive: Joi.boolean().required(),
-        })).required(),
-        productFileArgs: Joi.array().items(Joi.object({
-            fileLocation: Joi.string().required(),
-            fileHash: Joi.string().required(),
-            fileName: Joi.string().required(),
-            uploadDate: Joi.number().required(),
-            createdDate: Joi.number().required(),
-            currentSection: Joi.number().required(),
-            currentType: Joi.number().required(),
-        })).required(),
+      membershipArgs: Joi.object({
+        name: Joi.string().required(),
+        description: Joi.string().required(),
+        manufacturer: Joi.string().required(),
+        unitOfMeasurement: Joi.number().required(),
+        userUniqueMembershipCode: Joi.string().required(),
+        uniqueMembershipCode: Joi.number().required(),
+        leastSellableUnit: Joi.number().required(),
+        imageKey: Joi.string().required(),
+        isActive: Joi.boolean().required(),
+        category: Joi.string().required(),
+        subCategory: Joi.string().required(),
+        createdDate: Joi.number().required(),
+        timePeriodInMonths: Joi.number().required(),
+        additionalInfo: Joi.string().required(),
+      }).required(),
+      membershipServiceArgs: Joi.array().items(Joi.object({
+        serviceId: Joi.string().required(),
+        membershipPrice: Joi.number().required(),
+        discountPrice: Joi.number().required(),
+        maxQuantity: Joi.number().required(),
+        createdDate: Joi.number().required(),
+        isActive: Joi.boolean().required(),
+      })).required(),
+      productFileArgs: Joi.array().items(Joi.object({
+        fileLocation: Joi.string().required(),
+        fileHash: Joi.string().required(),
+        fileName: Joi.string().required(),
+        uploadDate: Joi.number().required(),
+        createdDate: Joi.number().required(),
+        currentSection: Joi.number().required(),
+        currentType: Joi.number().required(),
+      })).required(),
     });
 
     const validation = createMembershipSchema.validate(args);
@@ -182,6 +197,26 @@ class MembershipController {
     }
   }
 
+  static validateResaleMembershipArgs(args) {
+    const resaleMembershipSchema = Joi.object({
+      inventory: Joi.string().required(),
+      productAddress: Joi.string().required(),
+      updates: {
+        quantity: Joi.number().required(),
+        pricePerUnit: Joi.number().required(),
+        status: Joi.number().required(),
+      }
+    })
+
+    const validation = resaleMembershipSchema.validate(args);
+
+    if (validation.error) {
+      console.log(validation.error.message);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Resale Membership Argument Validation Error`, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
 }
 
 export default MembershipController
