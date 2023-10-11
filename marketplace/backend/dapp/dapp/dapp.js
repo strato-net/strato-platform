@@ -658,10 +658,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.transferOwnershipItem = async function (args, options = defaultOptions) {
-    const { address, chainId, newOwner } = args;
-    const contract = { name: itemJs.contractName, address: address, };
-    const chainOptions = { chainIds: [chainId], ...options };
-    return itemJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
+    const itemNumber = parseInt(util.uid());
+    return managers.itemManager.transferOwnership({ ...args, dappAddress: contract.address, isGiftedTransfer: true, itemNumber: itemNumber });
   };
 
   contract.auditItem = async function (args, options = defaultOptions) {
@@ -1074,7 +1072,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         for (let orderLine of orderLines) {
           const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address }, createOptions);
           const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber });
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber, isGiftedTransfer: false });
           result.push({ status, productId, inventoryId });
         }
         return result;

@@ -28,7 +28,7 @@ router.post(
   ItemController.create
 );
 
-router.post(
+router.put(
   Item.transferOwnership,
   authHandler.authorizeRequest(),
   loadDapp,
