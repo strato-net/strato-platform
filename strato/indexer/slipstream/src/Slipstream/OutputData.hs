@@ -437,7 +437,6 @@ getDeferredForeignKeysAbstract tableName c o a cc =
       case contract of
         Just c' -> do
           (o',a',n') <- resolveNameParts o a c'
-          $logInfoS "DAVID7" . T.pack $ show (o,a,c,o',a',n')
           pure $ Just $ ForeignKeyInfo
                           { tableName = tableName,
                             columnName = labelToText theName,
@@ -757,9 +756,7 @@ insertIndexTable ::
   ConduitM () Text m ()
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
 insertIndexTable contracts = do
-  let x = insertIndexTableQuery contracts
-  $logInfoS "DAVID4'''': " $ T.pack $ "query: "++ show x
-  yieldMany $ x
+  yieldMany $ insertIndexTableQuery contracts 
 
 insertMappingTable ::
   OutputM m =>
@@ -834,9 +831,7 @@ insertAbstractTable ::
 insertAbstractTable [] = pure ()
 insertAbstractTable cs@((_, abTableName, _) : _) = do
   $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName ++ " (and potentially others)" ++ show cs
-  let x = insertAbstractTableQuery cs
-  $logInfoS "DAVID4: " $ T.pack $ "query: "++ show x
-  yieldMany $ x
+  yieldMany $ insertAbstractTableQuery cs
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
 createIndexTableQuery contract (o, a, n) =
@@ -974,11 +969,10 @@ insertIndexTableQuery cs =
                   ]
                 vals = flip map contracts $ \(row, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-                temp = flip map contracts $ \((_, contractColumns)) ->contractColumns
                 inserts = csv vals
              in (: []) $
                   T.concat
-                    [ "/* CS':", T.pack $ show cs',"TEMP: ", T.pack $ show temp," */ INSERT INTO ",
+                    [ "INSERT INTO ",
                       tableNameToDoubleQuoteText tableName,
                       " ",
                       keySt,
@@ -1078,13 +1072,12 @@ insertAbstractTableQuery cs =
                     T.pack . keccak256ToHex . E.transactionHash,
                     tshow . E.transactionSender
                   ]
-                temp = flip map contracts $ \((_, contractColumns), _) ->contractColumns
                 vals = flip map contracts $ \((row, contractColumns), _) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
                 inserts = csv vals
             in (: []) $
                   T.concat
-                    [ "/* CS':", T.pack $ show cs',"TEMP: ",T.pack $ show temp," */ INSERT INTO ",
+                    [ "INSERT INTO ",
                       abTableName,
                       " ",
                       keySt,

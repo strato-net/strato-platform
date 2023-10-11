@@ -552,7 +552,6 @@ processTheMessages env conn messages = do
                     tableNameText = tableNameToDoubleQuoteText tableName
                 mCols <- getTableColumns g tableName
                 pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
-              $logInfoS "processTheMessages" . T.pack $ "DAVID:" ++ show abstractColumns
               $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
               $logDebugLS "History inserts are: " $ show hs
               pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
@@ -569,8 +568,6 @@ processTheMessages env conn messages = do
           $ rights inserts
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   forM_ insertsByCodeHash $ \ins -> do
-    $logInfoS "processTheMessages" . T.pack $ "DAVID2:" ++ show (map indexInsert ins)
-    $logInfoS "processTheMessages" . T.pack $ "DAVID3:" ++ show (concatMap abstractInsert ins)
     unless (null ins) $ outputData conn . insertIndexTable $ map indexInsert ins
     outputData conn . insertHistoryTable $ concatMap historyInserts ins
     unless ((length (concatMap mappingInserts ins) < 1)) $ outputData conn . insertMappingTable $ concatMap mappingInserts ins
