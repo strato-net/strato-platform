@@ -38,6 +38,7 @@ import Crypto.Types.PubKey.ECC
 import Data.Binary
 import Data.Bits
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Char8 as BC
 import Data.List.Split
 import Data.Maybe
@@ -111,12 +112,12 @@ instance RLPSerializable IAddr where
   rlpEncode x@(IPV6Addr _) = error $ "case not yet covered for rlpEncode for IPV6: " ++ format x
   rlpEncode (HostName s) = rlpEncode $ (B.pack [255, 255, 255, 255] `B.append` BC.pack s)
   rlpDecode o@(RLPString s)
-    | B.length s == 4 = IPV4Addr $ fromBE32 $ rlpDecode o
+    | BSS.length s == 4 = IPV4Addr $ fromBE32 $ rlpDecode o
     --TODO- verify the order of this
-    | B.length s == 16 = IPV6Addr (fromIntegral word128, fromIntegral $ word128 `shiftR` 32, fromIntegral $ word128 `shiftR` 64, fromIntegral $ word128 `shiftR` 96)
-    | B.pack [255, 255, 255, 255] `B.isPrefixOf` s = stringToIAddr . BC.unpack $ B.drop 4 s
+    | BSS.length s == 16 = IPV6Addr (fromIntegral word128, fromIntegral $ word128 `shiftR` 32, fromIntegral $ word128 `shiftR` 64, fromIntegral $ word128 `shiftR` 96)
+    | BSS.pack [255, 255, 255, 255] `BSS.isPrefixOf` s = stringToIAddr . BC.unpack . BSS.fromShort $ BSS.drop 4 s
     --what a mess!  Sometimes address is array of address bytes, sometimes a string representation of the address.  I need to figure this out someday
-    | otherwise = stringToIAddr $ BC.unpack s
+    | otherwise = stringToIAddr $ BC.unpack $ BSS.fromShort s
     where
       word128 = rlpDecode o :: Word128
   rlpDecode x = error $ "bad type for rlpDecode for IAddr: " ++ show x

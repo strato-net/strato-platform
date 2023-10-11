@@ -44,6 +44,7 @@ import qualified Data.Bimap as Bimap
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
+import Data.ByteString.Short (toShort)
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.IntMap as I
@@ -246,11 +247,11 @@ decodeCacheValue' typeDefs'@TypeDefs {..} cache position@Storage.Position {..} v
 
         let len' = lastWord64 w `div` 2
             startingKey = getArrayStartingKey offset
-         in SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . fromMaybe 0 . cache . (startingKey +)) [0 ..] -- if the length is there, so should the data
+         in SimpleValue $ valueBytes $ toShort $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . fromMaybe 0 . cache . (startingKey +)) [0 ..] -- if the length is there, so should the data
       else --small string, less than 32 bytes
 
         let len' = lastWord64 w .&. 0xfe `div` 2
-         in SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString w
+         in SimpleValue $ valueBytes $ toShort $ ByteString.take (fromIntegral len') $ word256ToByteString w
   SimpleType TypeString ->
     let v = decodeCacheValue' typeDefs' cache position value $ SimpleType typeBytes
      in case v of
@@ -423,11 +424,11 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
     | storage offset `testBit` 0 -> --large string, 32+ bytes
       let len' = lastWord64 (storage offset) `div` 2
           startingKey = getArrayStartingKey offset
-       in Just $ SimpleValue $ valueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey +)) [0 ..]
+       in Just $ SimpleValue $ valueBytes $ toShort $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey +)) [0 ..]
   SimpleType (TypeBytes Nothing) ->
     --small string, less than 32 bytes
     let len' = lastWord64 (storage offset) .&. 0xfe `div` 2
-     in Just $ SimpleValue $ valueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
+     in Just $ SimpleValue $ valueBytes $ toShort $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
   SimpleType TypeString ->
     let bytes = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType typeBytes of
           Just (SimpleValue (ValueBytes Nothing bytes')) -> bytes'

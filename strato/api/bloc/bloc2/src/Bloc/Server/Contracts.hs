@@ -46,6 +46,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Source.Map (SourceMap)
 import Data.Text (Text)
+import Data.ByteString.Short (fromShort)
 import qualified Data.Text as Text
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Handlers.AccountInfo
@@ -57,7 +58,7 @@ import SolidVM.Model.CodeCollection.Function
 import UnliftIO
 
 hexStorageToWord256 :: HexStorage -> Word256
-hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
+hexStorageToWord256 (HexStorage bs) = bytesToWord256 $ fromShort bs
 
 getContracts ::
   ( MonadLogger m,

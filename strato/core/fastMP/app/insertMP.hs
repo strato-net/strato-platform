@@ -9,6 +9,7 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Control.Monad.Change.Alter
 import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Short as BSS
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as LDB
 import FastMP ()
@@ -45,7 +46,7 @@ main = do
           ( \lst ->
               if length lst < 2
                 then error "input list should contain exactly 2 elements"
-                else KV (map c2n $ BC.unpack (head lst)) $ Right (RLPString . LabeledError.b16Decode "insertMP.hs" $ (lst !! 1))
+                else KV (map c2n $ BC.unpack (head lst)) $ Right (RLPString . BSS.toShort . LabeledError.b16Decode "insertMP.hs" $ (lst !! 1))
           )
           c
 

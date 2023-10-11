@@ -124,6 +124,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import Data.Default
 import Data.Either.Extra
 import qualified Data.Map as M
@@ -500,7 +501,7 @@ instance (Address `A.Selectable` X509Certificate) ContextM where
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+        Just (BString bs) -> pure . eitherToMaybe $ bsToCert $ BSS.fromShort bs
         _ -> pure Nothing
 
 lookupX509AddrFromCBHash ::

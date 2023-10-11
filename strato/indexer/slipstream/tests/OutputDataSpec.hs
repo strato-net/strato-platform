@@ -15,7 +15,7 @@ import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import Conduit
 import Control.Monad
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import Data.Text (Text)
@@ -41,7 +41,7 @@ addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
 bool :: Bool -> V.Value
 bool = V.SimpleValue . V.ValueBool
 
-bytes :: B.ByteString -> V.Value
+bytes :: B.ShortByteString -> V.Value
 bytes = V.SimpleValue . V.valueBytes
 
 int :: Integer -> V.Value

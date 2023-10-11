@@ -26,6 +26,7 @@ import Control.Monad (liftM2)
 import qualified Data.Aeson as Ae
 import Data.Binary
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Lazy as LB
 import Data.Data
 import Data.Default
@@ -247,7 +248,7 @@ instance RLPSerializable WireMessage where
   rlpEncode (WireMessage (MsgAuth addr sig) (Preprepare vw blk)) =
     RLPArray
       [ rlpEncode preprepareCode,
-        RLPString . rlpSerialize . RLPArray $
+        RLPString . BSS.toShort . rlpSerialize . RLPArray $
           [ rlpEncode vw,
             rlpEncode blk
           ],
@@ -258,7 +259,7 @@ instance RLPSerializable WireMessage where
   rlpEncode (WireMessage (MsgAuth addr sig) (Prepare vw digest)) =
     RLPArray
       [ rlpEncode prepareCode,
-        RLPString . rlpSerialize . RLPArray $
+        RLPString . BSS.toShort . rlpSerialize . RLPArray $
           [ rlpEncode vw,
             rlpEncode digest
           ],
@@ -269,7 +270,7 @@ instance RLPSerializable WireMessage where
   rlpEncode (WireMessage (MsgAuth addr sig) (Commit vw digest seal)) =
     RLPArray
       [ rlpEncode commitCode,
-        RLPString . rlpSerialize . RLPArray $
+        RLPString . BSS.toShort . rlpSerialize . RLPArray $
           [ rlpEncode vw,
             rlpEncode digest
           ],
@@ -280,7 +281,7 @@ instance RLPSerializable WireMessage where
   rlpEncode (WireMessage (MsgAuth addr sig) (RoundChange vw n)) =
     RLPArray
       [ rlpEncode roundchangeCode,
-        RLPString . rlpSerialize . RLPArray $
+        RLPString . BSS.toShort . rlpSerialize . RLPArray $
           [ rlpEncode vw,
             rlpEncode n
           ],
@@ -290,7 +291,7 @@ instance RLPSerializable WireMessage where
       ]
   rlpDecode (RLPArray [code, RLPString payload, addr, sig, seals]) =
     let auth = MsgAuth (rlpDecode addr) (rlpDecode sig)
-        body = rlpDeserialize payload
+        body = rlpDeserialize $ BSS.fromShort payload
      in WireMessage auth $
           case (rlpDecode code :: Integer) of
             0 ->

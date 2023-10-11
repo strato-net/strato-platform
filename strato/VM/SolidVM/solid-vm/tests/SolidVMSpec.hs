@@ -79,7 +79,7 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as Char8
-import qualified Data.ByteString.Short as SB
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char
 import Data.Coerce
@@ -364,15 +364,15 @@ runTestWithTimeout timeout f = do
             ua = userAddress $ x509CertToCertInfoState getCert
             certsub = fromJust $ getCertSubject cert
         insert (Proxy @RawStorageValue) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> formatAddressWithoutColor ua <> ">") ((rlpWrap $ BAccount $ NamedAccount (Address 0xdeadbeef) MainChain)) --(encodeUtf8 $ T.pack (formatAddressWithoutColor (Address 0xdeadbeef)))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (rlpWrap $ BString $ BC.pack myCertString)
+        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".certificateString") (rlpWrap $ BString $ BSS.toShort $ BC.pack myCertString)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".userAddress") ((rlpWrap $ BAccount $ NamedAccount ua MainChain))
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".owner") (rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".commonName") (rlpWrap . BString . BC.pack . subCommonName $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".country") (rlpWrap . BString . BC.pack . fromJust . subCountry $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organization") (rlpWrap . BString . BC.pack . subOrg $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organizationalUnit") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".commonName") (rlpWrap . BString . BSS.toShort . BC.pack . subCommonName $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".country") (rlpWrap . BString . BSS.toShort . BC.pack . fromJust . subCountry $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organization") (rlpWrap . BString . BSS.toShort . BC.pack . subOrg $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".organizationalUnit") (rlpWrap . BString . BSS.toShort . BC.pack . fromJust . subUnit $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BSS.toShort . BC.pack . fromJust . subUnit $ certsub)
+        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . BSS.toShort . pubToBytes . subPub $ certsub)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".isValid") (rlpWrap (BBool True))
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
         f
@@ -867,10 +867,10 @@ getAll2 :: [[StoragePathPiece]] -> ContextM [BasicValue]
 getAll2 = mapM (getSolidStorageKeyVal' secondAddress . MS.fromList)
 
 getFields :: [BC.ByteString] -> ContextM [BasicValue]
-getFields = getAll . map (\t -> [Field t])
+getFields = getAll . map (\t -> [Field (BSS.toShort t)])
 
 getFields2 :: [BC.ByteString] -> ContextM [BasicValue]
-getFields2 = getAll2 . map (\t -> [Field t])
+getFields2 = getAll2 . map (\t -> [Field (BSS.toShort t)])
 
 bAddress :: Address -> BasicValue
 bAddress = BAccount . unspecifiedChain
@@ -1033,10 +1033,10 @@ spec = do
     it "can hash correctly" . runTest $ do
       runFile "testdata/Keccak256.sol"
       getFields ["buf1", "buf2", "hash1", "hash2"]
-        `shouldReturn` [ BString (B.replicate 32 0xfe),
-                         BString (BC.replicate 32 'x'),
-                         BString (LabeledError.b16Decode "SolidVMSpec.hs" "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a"),
-                         BString (LabeledError.b16Decode "SolidVMSpec.hs" "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
+        `shouldReturn` [ BString $ BSS.toShort (B.replicate 32 0xfe),
+                         BString $ BSS.toShort (BC.replicate 32 'x'),
+                         BString $ BSS.toShort (LabeledError.b16Decode "SolidVMSpec.hs" "59c3290d81fbdfe9ce1ffd3df2b61185e3089df0e3c49e0918e82a60acbed75a"),
+                         BString $ BSS.toShort (LabeledError.b16Decode "SolidVMSpec.hs" "5601c4475f2f6aa73d6a70a56f9c756f24d211a914cc7aff3fb80d2d8741c868")
                        ]
 
     it "can hash multiple arguments" . runTest $ do
@@ -1052,7 +1052,7 @@ contract qq {
   }
 }
 |]
-      getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x4ebc701886e9562cf7998b9ab563c6d3ca5ad243b547f11f31ae1ae156b2ff97]
+      getFields ["hsh"] `shouldReturn` [BString $ BSS.toShort $ word256ToBytes 0x4ebc701886e9562cf7998b9ab563c6d3ca5ad243b547f11f31ae1ae156b2ff97]
 
     it "can create a struct" . runTest $ do
       runBS
@@ -2914,13 +2914,13 @@ contract qq {
                 Action.SolidVMDiff $
                   M.singleton
                     ".s"
-                    (rlpSerialize $ rlpEncode $ bContract' "Sub" recursiveAddr)
+                    (BSS.toShort $ rlpSerialize $ rlpEncode $ bContract' "Sub" recursiveAddr)
               ),
               ( recursiveAddr,
                 Action.SolidVMDiff $
                   M.fromList
-                    [ (".x", rlpSerialize $ rlpEncode $ BInteger 20),
-                      (".y", rlpSerialize $ rlpEncode $ BInteger 80)
+                    [ (".x", BSS.toShort $ rlpSerialize $ rlpEncode $ BInteger 20),
+                      (".y", BSS.toShort $ rlpSerialize $ rlpEncode $ BInteger 80)
                     ]
               )
             ]
@@ -3074,7 +3074,7 @@ contract qq {
   }
 }|]
       `shouldReturn` Just "()"
-    getFields ["st"] `shouldReturn` [BString (UTF8.fromString "4.11 g CO₂ / t · nm")]
+    getFields ["st"] `shouldReturn` [BString $ BSS.toShort (UTF8.fromString "4.11 g CO₂ / t · nm")]
 
   it "can encode Unicode strings in Solidtiy source" . runTest $ do
     runBS
@@ -3082,7 +3082,7 @@ contract qq {
 contract qq {
   string st = "4.11 g CO₂ / t · nm";
 }|]
-    getFields ["st"] `shouldReturn` [BString (UTF8.fromString "4.11 g CO₂ / t · nm")]
+    getFields ["st"] `shouldReturn` [BString $ BSS.toShort (UTF8.fromString "4.11 g CO₂ / t · nm")]
 
   it "can accept bytes32 arguments" . runTest $ do
     runCall
@@ -4678,7 +4678,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeHashTest", "codeHashTest"]
-      `shouldReturn` [ BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract,
+      `shouldReturn` [ BString $ BSS.toShort $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract,
                        BString "75dde029db795d07c2fed3b5d14443cf540520397ffc250b19567c80ff8e17fc"
                      ]
 
@@ -4693,7 +4693,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeHashTest", "codeHashTest"]
-      `shouldReturn` [ BString $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract,
+      `shouldReturn` [ BString $ BSS.toShort $ BC.pack $ keccak256ToHex $ hash $ UTF8.fromString contract,
                        BString "bd03e87420032a4d4ac1653f8af8f4c42ae85bf8d07d02ff2433c7052d6d4fbb"
                      ]
 
@@ -4730,7 +4730,7 @@ contract qq {
 }|]
     runBS codeSnippet
     getFields ["codePiece"]
-      `shouldReturn` [BString $ UTF8.fromString testCode]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString testCode]
 
   it "can get overloaded function using the .code parameter" . runTest $ do
     let testCode :: String
@@ -4786,7 +4786,7 @@ contract qq{
 }|]
     runBS codeSnippet
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString testCode]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString testCode]
 
   it "can get events from the '.code' function" . runTest $ do
     let codeSnippet :: String
@@ -4815,7 +4815,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "can get external modifiers using the '.code' function" . runTest $ do
     let codeSnippet :: String
@@ -4861,12 +4861,12 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "can get the code for a contract if supplied an empty string" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  
+
   constructor () public {
     }
 }
@@ -4889,7 +4889,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "can search for an enum body within a codeCollection using .code" . runTest $ do
     let codeSnippet :: String
@@ -4918,7 +4918,7 @@ contract qq {
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "can search for any public variable in a contract initialized value using .code" . runTest $ do
     let codeSnippet :: String
@@ -4944,7 +4944,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "can search for a constant and get its initial code. using .code" . runTest $ do
     let codeSnippet :: String
@@ -4971,7 +4971,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "can get the current contract code without supplying anything to the code using .code" . runTest $ do
     let codeSnippet :: String
@@ -5008,7 +5008,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "Code won't return anything if the thing is not in the file, using .code" . runTest $ do
     let contract :: String
@@ -5060,7 +5060,7 @@ contract qq{
 }|]
     runBS collection
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString contractqq]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString contractqq]
 
   it "can properly add the final } to a contract without a constructor using the code member function using .code" . runTest $ do
     let myContract :: String
@@ -5088,7 +5088,7 @@ contract qq {
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString myContract]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString myContract]
 
   it "can properly add the final } to a contract with a constructor but information after the constructor using the code member function using .code" . runTest $ do
     let myContract :: String
@@ -5125,7 +5125,7 @@ contract qq {
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString myContract]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString myContract]
 
   it "Can find a function within a codeCollection using .code" . runTest $ do
     let myFunxion :: String
@@ -5165,7 +5165,7 @@ contract qq {
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString myFunxion]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString myFunxion]
 
   it "Can avoid getting confused if two functions with the same name are in the same codeCollection using .code" . runTest $ do
     let myFunxion :: String
@@ -5214,12 +5214,12 @@ contract qq {
 |]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString myFunxion]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString myFunxion]
 
   it "Can get just the contract if empty string is fed to the code function. using .code" . runTest $ do
     let codeSnippet :: String
         codeSnippet = [r|contract Test {
-  
+
   constructor () public {
     }
 }
@@ -5246,7 +5246,7 @@ contract qq{
 }|]
     runBS contract
     getFields ["codeTest"]
-      `shouldReturn` [BString $ UTF8.fromString codeSnippet]
+      `shouldReturn` [BString $ BSS.toShort $ UTF8.fromString codeSnippet]
 
   it "Can throw an error if more than one item is given to the code member function, using .code" $
     ( runTest
@@ -6399,7 +6399,7 @@ contract qq {
   }
 }
 |]
-    getFields ["hsh"] `shouldReturn` [BString $ word256ToBytes 0x5C0BE87ED7434D69005F8BBD84CAD8AE6ABFD49121B4AAEEB4C1F4A2E2987711]
+    getFields ["hsh"] `shouldReturn` [BString $ BSS.toShort $ word256ToBytes 0x5C0BE87ED7434D69005F8BBD84CAD8AE6ABFD49121B4AAEEB4C1F4A2E2987711]
 
   it "can use the builtin ripemd160 function" . runTest $ do
     runBS
@@ -6412,7 +6412,7 @@ contract qq {
     hsh = ripemd160(username);
   }
 }|]
-    getFields ["hsh"] `shouldReturn` [BString $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
+    getFields ["hsh"] `shouldReturn` [BString $ BSS.toShort $ B.pack $ word160ToBytes 0x63f4a6f6005b0ded8c5fc7e62ddf2550e9320410]
 
   it "can use the selfdestruct function" . runTest $ do
     let contract =
@@ -6763,7 +6763,7 @@ contract qq {
   constructor() {
     Divisor d =  new Divisor();
     try d.doTheDivide() returns (uint v) {
-        } catch Error(string memory amsg) { 
+        } catch Error(string memory amsg) {
             // This is executed in case
             // revert was called inside getData
             // and a reason string was provided.
@@ -7075,7 +7075,7 @@ contract qq {
   }
 }|]
     let calldataHash = fromMaybe emptyHash $ stringKeccak256 "func2(uint,string,bool)"
-    getFields ["ss"] `shouldReturn` [BString $ BC.pack $ L.take 8 $ keccak256ToHex calldataHash]
+    getFields ["ss"] `shouldReturn` [BString $ BSS.toShort $ BC.pack $ L.take 8 $ keccak256ToHex calldataHash]
 
   it "can use free functions, free functions can access this" . runTest $ do
     runBS
@@ -8461,7 +8461,7 @@ contract qq {
 }
 |]
       getFields ["b"] `shouldReturn` [BInteger 1]
-  
+
   it "can't index access a contract array from the builtin getter" $ runTest ( do
       runBS [r|
 contract SomeContract {
@@ -8518,7 +8518,7 @@ contract qq {
 }
 |]
       getFields ["b"] `shouldReturn` [BInteger 3]
-    
+
   it "can't access a contract array without any parameters" $ runTest ( do
       runBS [r|
 contract SomeContract {

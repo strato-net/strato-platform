@@ -43,6 +43,7 @@ import Data.Binary.Get
 import Data.Binary.Put
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import Data.ByteString.Arbitrary
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -91,17 +92,17 @@ instance Binary Keccak256 where
   get = Keccak256 <$> getByteString 32
 
 instance RLPSerializable Keccak256 where
-  rlpDecode (RLPString s) | B.length s == 32 = Keccak256 s
+  rlpDecode (RLPString s) | BSS.length s == 32 = Keccak256 (BSS.fromShort s)
   rlpDecode (RLPScalar 0) = unsafeCreateKeccak256FromWord256 0 --special case seems to be allowed, even if length of zeros is wrong
   rlpDecode x = error ("Missing case in rlpDecode for Keccak256: " ++ show x)
 
   --rlpEncode (Keccak256 0) = RLPNumber 0
   rlpEncode (Keccak256 val)
-    | B.length val >= 32 = RLPString $ B.take 32 val
+    | B.length val >= 32 = RLPString $ BSS.take 32 (BSS.toShort val)
     | otherwise =
       RLPString $
-        B.replicate (32 - B.length val) 0
-          `B.append` val
+        BSS.replicate (32 - B.length val) 0
+          `BSS.append` (BSS.toShort val)
 
 -- Someday we should remove the second RLP library...
 instance RLP2.RLPEncodable Keccak256 where

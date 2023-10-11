@@ -36,6 +36,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text as T
@@ -130,8 +131,8 @@ data PeerUdpDisable
   deriving (Eq, Ord)
 
 instance RLPSerializable NodeID where
-  rlpEncode (NodeID x) = RLPString x
-  rlpDecode (RLPString x) = NodeID x
+  rlpEncode (NodeID x) = RLPString $ BSS.toShort x
+  rlpDecode (RLPString x) = NodeID (BSS.fromShort x)
   rlpDecode x = error $ "unsupported rlp in rlpDecode for NodeID: " ++ show x
 
 instance Format NodeID where

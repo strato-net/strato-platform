@@ -28,6 +28,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Account
 import Control.Monad.Change.Alter (Alters)
 import Data.Bifunctor (second)
+import Data.ByteString.Short (fromShort)
 import SolidVM.Model.Storable
 
 type HasSolidStorageDB m = HasRawStorageDB m
@@ -44,7 +45,7 @@ type FullSolidStorage m =
   )
 
 toKey :: Account -> StoragePath -> RawStorageKey
-toKey = curry $ fmap unparsePath
+toKey = curry $ fmap (fromShort . unparsePath)
 
 toVal :: BasicValue -> RawStorageValue
 toVal bv =

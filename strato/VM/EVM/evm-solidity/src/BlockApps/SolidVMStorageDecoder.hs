@@ -23,6 +23,7 @@ import Control.Monad.Extra
 import Data.Bifunctor
 import Data.Bitraversable
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Char8 as C8
 import Data.Char
 import qualified Data.HashMap.Strict as HM
@@ -48,7 +49,7 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
+decodeCacheValues :: M.Map BSS.ShortByteString BSS.ShortByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
 decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _]) = True
@@ -57,11 +58,11 @@ decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf
   let pathValues' = filter (isBasic . fst) pathValues
   finalState <- bimap show HM.toList $ case prevState of
     [] -> synthesize pathValues'
-    tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
+    tvs -> replayDeltas pathValues' . HM.fromList . map (first (BSS.toShort . encodeUtf8)) $ tvs
 
   mapM (bimapM bsToText return) finalState
 
-decodeCacheValuesForMapping :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValuesForMapping :: M.Map BSS.ShortByteString BSS.ShortByteString -> [(T.Text, Value)]
 decodeCacheValuesForMapping hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForMapping: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _, MapIndex _]) = True
@@ -71,8 +72,8 @@ decodeCacheValuesForMapping hxs = either (error . (++ ": " ++ show hxs) . printf
   finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
-bsToText :: B.ByteString -> Either String T.Text
-bsToText = first show . decodeUtf8'
+bsToText :: BSS.ShortByteString -> Either String T.Text
+bsToText = first show . decodeUtf8' . BSS.fromShort
 
 -- Why another time?
 --  - original vToSV can't handle sentinels without introducing a monad
@@ -118,7 +119,7 @@ valueToSolidityValue = \case
       ValueBool True -> Right "true"
       ValueBool False -> Right "false"
 
-type TotalStorage = HM.HashMap B.ByteString V.Value
+type TotalStorage = HM.HashMap BSS.ShortByteString V.Value
 
 data ReplayFailure
   = MissingPath StoragePath
@@ -147,7 +148,7 @@ applyDelta' [] bv (SimpleValue {}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueEnum {}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueContract {}) = Right $ fromBasic bv
 applyDelta' (Field n : sp) bv (ValueStruct ss) = do
-  n' <- first (UnicodeError n) $ decodeUtf8' n
+  n' <- first (UnicodeError $ BSS.fromShort n) $ decodeUtf8' $ BSS.fromShort n
   case M.lookup n' ss of
     Just v -> ValueStruct . (\x -> M.insert n' x ss) <$> applyDelta' sp bv v
     Nothing -> Right . ValueStruct $ M.insert n' (constructFromNothing' sp bv) ss
@@ -177,7 +178,7 @@ constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
-constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
+constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 $ BSS.fromShort n) . constructFromNothing' sp
 constructFromNothing' (MapIndex n : sp) =
   ValueMapping . M.singleton (fromIndex n) . constructFromNothing' sp
 constructFromNothing' (ArrayIndex n : sp) =

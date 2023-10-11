@@ -26,6 +26,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import Data.List
 import qualified Data.Set as S
 import Data.Word
@@ -114,7 +115,7 @@ instance Format BlockHashOrNumber where
 instance RLPSerializable BlockHashOrNumber where
   rlpEncode (BlockHash x) = rlpEncode x
   rlpEncode (BlockNumber x) = rlpEncode $ toInteger x
-  rlpDecode val@(RLPString s) | B.length s == 32 = BlockHash $ rlpDecode val
+  rlpDecode val@(RLPString s) | BSS.length s == 32 = BlockHash $ rlpDecode val
   rlpDecode val = BlockNumber $ fromInteger $ rlpDecode val
 
 data Direction = Forward | Reverse deriving (Eq, Show)

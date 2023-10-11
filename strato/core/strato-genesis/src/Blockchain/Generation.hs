@@ -41,6 +41,7 @@ import qualified Data.Aeson.Key as DAK
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Bifunctor as BF
 import Data.Bits
+import Data.ByteString.Short (fromShort, toShort)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -214,7 +215,7 @@ readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $
         rlpUnwrap = rlpDecode . rlpDeserialize
     certStr <- rlpUnwrap <$> M.lookup ".certificateString" storageMap
     case certStr of
-      BString certStr' -> either (const Nothing) Just $ bsToCert certStr'
+      BString certStr' -> either (const Nothing) Just $ bsToCert $ fromShort certStr'
       _ -> Nothing
   _ -> Nothing
 
@@ -228,9 +229,9 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
     c <- rlpUnwrap <$> M.lookup ".commonName" storageMap
     case (o, u, c) of
       (BString o', BString u', BString c') -> do
-        let o'' = decodeUtf8 o'
-            u'' = decodeUtf8 u'
-            c'' = decodeUtf8 c'
+        let o'' = decodeUtf8 . fromShort $ o'
+            u'' = decodeUtf8 . fromShort $ u'
+            c'' = decodeUtf8 . fromShort $ c'
         pure $ CommonName o'' u'' c'' True
       _ -> Nothing
   _ -> Nothing
@@ -267,13 +268,13 @@ insertCertRegistryContract certs gi =
         (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
         [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
           (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) UnspecifiedChain)),
-          (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
-          (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ rootSub),
-          (".organization", rlpWrap . BString . BC.pack . subOrg $ rootSub),
-          (".group", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
-          (".organizationalUnit", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
-          (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
-          (".certificateString", rlpWrap . BString $ certToBytes rootCert),
+          (".commonName", rlpWrap . BString . toShort . BC.pack . subCommonName $ rootSub),
+          (".country", rlpWrap . BString . toShort . BC.pack . fromJust . subCountry $ rootSub),
+          (".organization", rlpWrap . BString . toShort . BC.pack . subOrg $ rootSub),
+          (".group", rlpWrap . BString . toShort . BC.pack . fromJust . subUnit $ rootSub),
+          (".organizationalUnit", rlpWrap . BString . toShort . BC.pack . fromJust . subUnit $ rootSub),
+          (".publicKey", rlpWrap . BString . toShort . pubToBytes . subPub $ rootSub),
+          (".certificateString", rlpWrap . BString . toShort $ certToBytes rootCert),
           (".isValid", rlpWrap (BBool True)),
           (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
         ]
@@ -301,13 +302,13 @@ insertCertRegistryContract certs gi =
               (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
               [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
                 (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) UnspecifiedChain)),
-                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
-                (".country", rlpWrap . BString . BC.pack . maybeCertField . subCountry $ certSub),
-                (".organization", rlpWrap . BString . BC.pack . subOrg $ certSub),
-                (".group", rlpWrap . BString . BC.pack . maybeCertField . subUnit $ certSub),
-                (".organizationalUnit", rlpWrap . BString . BC.pack . maybeCertField . subUnit $ certSub),
-                (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
-                (".certificateString", rlpWrap . BString $ certToBytes cert),
+                (".commonName", rlpWrap . BString . toShort . BC.pack . subCommonName $ certSub),
+                (".country", rlpWrap . BString . toShort . BC.pack . maybeCertField . subCountry $ certSub),
+                (".organization", rlpWrap . BString . toShort . BC.pack . subOrg $ certSub),
+                (".group", rlpWrap . BString . toShort . BC.pack . maybeCertField . subUnit $ certSub),
+                (".organizationalUnit", rlpWrap . BString . toShort . BC.pack . maybeCertField . subUnit $ certSub),
+                (".publicKey", rlpWrap . BString . toShort . pubToBytes . subPub $ certSub),
+                (".certificateString", rlpWrap . BString . toShort $ certToBytes cert),
                 (".isValid", rlpWrap (BBool True)),
                 (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) UnspecifiedChain))
               ]
@@ -324,7 +325,7 @@ contract Certificate {
     address public parent;
     address[] public children;
 
-    
+
     // Store all the fields of a certificate in a Cirrus record
     string public commonName;
     string public country;
@@ -352,23 +353,23 @@ contract Certificate {
         parent = address(parsedCert["parent"]);
         children = [];
     }
-    
+
     function addChild(address _child) public {
         require((msg.sender == owner || msg.sender == parent),"You don't have permission to CALL addChild!");
-        
+
         children.push(_child);
     }
-    
+
     function revoke() public returns (int){
         require(msg.sender == owner,"You don't have permission to CALL revoke!");
 
         isValid = false;
         return children.length;
     }
-    
+
     function getChild(int index) public returns (address){
         require(msg.sender == owner,"You don't have permission to get children!");
-        
+
         return children[index];
     }
 }
@@ -382,18 +383,18 @@ contract CertificateRegistry {
 
     event CertificateRegistered(string certificate);
     event CertificateRevoked(address userAddress);
-    
+
     function registerCertificate(string newCertificateString) returns (int) {
         mapping(string => string) parsedCert = parseCert(newCertificateString);
         address parentUserAddress = address(parsedCert["parent"]);
         Certificate parentContract = Certificate(addressToCertMap[account(parentUserAddress)]);
-        
+
         if (address(parentContract) != address(0) && parentContract.isValid() && verifyCertSignedBy(newCertificateString, parentContract.publicKey())) {
             // Create the new Certificate record
             Certificate c = new Certificate(newCertificateString);
 
             if (parentUserAddress != address(0x0)){
-                parentContract.addChild(c.userAddress());    
+                parentContract.addChild(c.userAddress());
             }
 
             addressToCertMap[c.userAddress()] = address(c);
@@ -406,15 +407,15 @@ contract CertificateRegistry {
     function getUserCert(address _address) returns (Certificate) {
         return Certificate(addressToCertMap[account(_address)]);
     }
-    
+
     function getCertByAddress(address _address) returns (Certificate) {
         return Certificate(getCertByAccount(account(_address)));
     }
-    
+
     function getCertByAccount(address _account) returns (Certificate) {
         return Certificate(addressToCertMap[account(_account)]);
     }
-    
+
     function revokeCert(address userAddress){
         Certificate myCert = Certificate(addressToCertMap[account(userAddress)]);
         require(isChild(tx.certificate, myCert.userAddress()), "You don't have permission to revoke!");
@@ -423,21 +424,21 @@ contract CertificateRegistry {
         for (int i = 0; i < childrenLength; i += 1) {
             revokeCert(myCert.getChild(i));
         }
-        
+
         emit CertificateRevoked(userAddress);
     }
-    
+
     function isChild(string pCert, address certUserAddress) returns (bool) {
         Certificate myCert = Certificate(addressToCertMap[account(certUserAddress)]);
         address parentUserAddress = myCert.parent();
         if(myCert.parent() != address(0x0) && pCert ==  Certificate(addressToCertMap[account(parentUserAddress)]).certificateString()){
             return true;
         }
-        
+
         if(myCert.parent() != address(0x0)){
             return isChild(pCert, parentUserAddress);
         }
-        
+
         return false;
     }
 }|]
@@ -508,9 +509,9 @@ insertMercataGovernanceContract validators admins gi =
                 0
                 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance))
                 [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".org", rlpWrap . BString $ encodeUtf8 o),
-                  (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-                  (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                  (".org", rlpWrap . BString .toShort $ encodeUtf8 o),
+                  (".orgUnit", rlpWrap . BString . toShort $ encodeUtf8 u),
+                  (".commonName", rlpWrap . BString . toShort $ encodeUtf8 c),
                   (".isActive", rlpWrap $ BBool True)
                 ]
             _ -> error "Invalid validator cert"
@@ -525,9 +526,9 @@ insertMercataGovernanceContract validators admins gi =
                 0
                 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance))
                 [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".org", rlpWrap . BString $ encodeUtf8 o),
-                  (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-                  (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                  (".org", rlpWrap . BString . toShort $ encodeUtf8 o),
+                  (".orgUnit", rlpWrap . BString . toShort $ encodeUtf8 u),
+                  (".commonName", rlpWrap . BString . toShort $ encodeUtf8 c),
                   (".isActive", rlpWrap $ BBool True)
                 ]
             _ -> error "Invalid admin cert"
@@ -720,7 +721,7 @@ contract MercataGovernance {
 
     event ValidatorAdded(string org, string orgUnit, string commonName);
     event ValidatorRemoved(string org, string orgUnit, string commonName);
-    
+
     function voteToAddValidator(string _org, string _orgUnit, string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a validator requires having a valid X.509 certificate");
@@ -732,10 +733,10 @@ contract MercataGovernance {
         MercataAdmin a = adminMap[originOrg][originUnit][originName];
         require(address(a) != address(0), "Only registered network admins can vote for validators");
         require(a.isActive(), "Only registered network admins can vote for validators");
-        
+
         MercataValidator v = validatorMap[_org][_orgUnit][_commonName];
         require(address(v) == address(0), "Votes to add cannot be counted for current validators");
-        
+
         uint voteIndex = validatorVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
         MercataValidatorVote newVote = new MercataValidatorVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, true);
@@ -763,7 +764,7 @@ contract MercataGovernance {
             emit ValidatorAdded(_org, _orgUnit, _commonName);
         }
     }
-    
+
     function voteToRemoveValidator(string _org, string _orgUnit, string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a validator requires having a valid X.509 certificate");
@@ -775,10 +776,10 @@ contract MercataGovernance {
         MercataAdmin a = adminMap[originOrg][originUnit][originName];
         require(address(a) != address(0), "Only registered network admins can vote for validators");
         require(a.isActive(), "Only registered network admins can vote for validators");
-        
+
         MercataValidator v = validatorMap[_org][_orgUnit][_commonName];
         require(address(v) != address(0), "Votes to remove can only be counted for current validators");
-        
+
         uint voteIndex = validatorVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
         MercataValidatorVote newVote = new MercataValidatorVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, false);
@@ -806,7 +807,7 @@ contract MercataGovernance {
             emit ValidatorRemoved(_org, _orgUnit, _commonName);
         }
     }
-    
+
     function voteToAddAdmin(string _org, string _orgUnit, string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add a network admin requires having a valid X.509 certificate");
@@ -818,10 +819,10 @@ contract MercataGovernance {
         MercataAdmin a = adminMap[originOrg][originUnit][originName];
         require(address(a) != address(0), "Only registered network admins can vote for admins");
         require(a.isActive(), "Only registered network admins can vote for admins");
-        
+
         MercataAdmin v = adminMap[_org][_orgUnit][_commonName];
         require(address(v) == address(0), "Votes to add cannot be counted for current admins");
-        
+
         uint voteIndex = adminVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
         MercataAdminVote newVote = new MercataAdminVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, true);
@@ -848,7 +849,7 @@ contract MercataGovernance {
             adminCount++;
         }
     }
-    
+
     function voteToRemoveAdmin(string _org, string _orgUnit, string _commonName) {
         Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
         require(address(c) != address(0), "Voting to add an admin requires having a valid X.509 certificate");
@@ -860,10 +861,10 @@ contract MercataGovernance {
         MercataAdmin a = adminMap[originOrg][originUnit][originName];
         require(address(a) != address(0), "Only registered network admins can vote for admins");
         require(a.isActive(), "Only registered network admins can vote for admins");
-        
+
         MercataAdmin v = adminMap[_org][_orgUnit][_commonName];
         require(address(v) != address(0), "Votes to remove can only be counted for current admins");
-        
+
         uint voteIndex = adminVoteMap[_org][_orgUnit][_commonName][originOrg][originUnit][originName];
         require(voteIndex == 0, "Vote to add already cast for " + _org + " " + _orgUnit + " " + _commonName);
         MercataAdminVote newVote = new MercataAdminVote(originOrg, originUnit, originName, _org, _orgUnit, _commonName, false);
@@ -912,7 +913,7 @@ insertUserRegistryContract certs gi =
         (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName rootSub]))
         123
         (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-        [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub)
+        [ (".commonName", rlpWrap . BString . toShort . BC.pack . subCommonName $ rootSub)
         ]
 
     userAccts =
@@ -927,7 +928,7 @@ insertUserRegistryContract certs gi =
               (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName certSub]))
               0
               (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-              [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub)
+              [ (".commonName", rlpWrap . BString . toShort . BC.pack . subCommonName $ certSub)
               ]
         )
         certs

@@ -26,7 +26,6 @@ import qualified Data.Aeson.Key as DAK
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types
 import qualified Data.Bifunctor as BF
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Short as BSS
 import Data.Foldable
@@ -127,7 +126,7 @@ emptyCallData =
 
 data DataDiff
   = EVMDiff (Map Word256 Word256)
-  | SolidVMDiff (Map B.ByteString B.ByteString)
+  | SolidVMDiff (Map BSS.ShortByteString BSS.ShortByteString)
   deriving (Eq, Show, Generic, NFData)
 
 instance Format DataDiff where
@@ -135,7 +134,7 @@ instance Format DataDiff where
   format (SolidVMDiff vals) =
     let formatVal (Left e) = "Error: " ++ show e
         formatVal (Right v) = format v
-     in "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap (formatVal . hexStorageToBasic . HexStorage) vals)) ++ "]"
+     in "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ (BC.unpack . BSS.fromShort) k ++ ", " ++ v ++ ")") (M.toList $ fmap (formatVal . hexStorageToBasic . HexStorage) vals)) ++ "]"
 
 instance ToJSON DataDiff where
   toJSON (EVMDiff m) = toJSON m
@@ -164,7 +163,7 @@ parseDiffSolidVM (Object obs) =
     . mapM (sequenceTuple . bimap (f . String) f)
     $ BF.first DAK.toText <$> KM.toList obs
   where
-    f :: Value -> Parser B.ByteString
+    f :: Value -> Parser BSS.ShortByteString
     f = parseJSON
 parseDiffSolidVM x = typeMismatch "SolidVMDiff" x
 

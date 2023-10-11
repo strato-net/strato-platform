@@ -28,6 +28,7 @@ import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as BSS
 import Data.Foldable (for_, traverse_)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -198,8 +199,8 @@ commitStorage addrID key v =
 commitSolidStorage ::
   MonadIO m =>
   SQL.Key AddressStateRef ->
-  BS.ByteString ->
-  Diff BS.ByteString 'Incremental ->
+  BSS.ShortByteString ->
+  Diff BSS.ShortByteString 'Incremental ->
   SqlDbM m ()
 commitSolidStorage addrID key v =
   let key' = HexStorage key

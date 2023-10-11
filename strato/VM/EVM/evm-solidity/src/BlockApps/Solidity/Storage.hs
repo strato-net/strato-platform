@@ -9,6 +9,7 @@ import Data.Bits (complement, shiftR, (.&.))
 import Data.Bool
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
+import Data.ByteString.Short (toShort)
 import qualified Data.IntMap as I
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -61,7 +62,7 @@ simpleToStorage = \case
   ValueAccount v -> simpleToStorage . valueUInt . fromIntegral $ _namedAccountAddress v
   ValueBytes Nothing v -> padRight32 $ ByteString.append (simpleToStorage (valueUInt (toInteger $ ByteString.length v))) v
   ValueBytes (Just _) v -> padRight32 v
-  ValueString v -> simpleToStorage . valueBytes $ Text.encodeUtf8 v
+  ValueString v -> simpleToStorage . valueBytes . toShort $ Text.encodeUtf8 v
   where
     paddingLen bs =
       let len = ByteString.length bs

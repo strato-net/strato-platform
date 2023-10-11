@@ -3,14 +3,14 @@
 module Main where
 
 import Blockchain.Data.RLP
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import Data.Word
 import Test.Framework
 import Test.Framework.Providers.HUnit
 import Test.HUnit
 import Test.Hspec
 
-rlpSerialize_list :: RLPObject -> B.ByteString
+rlpSerialize_list :: RLPObject -> B.ShortByteString
 rlpSerialize_list = B.pack . rlp2Bytes
 
 rlp2Bytes :: RLPObject -> [Word8]
@@ -38,7 +38,7 @@ testConsistent :: RLPObject -> Expectation
 testConsistent obj =
   let oldEnc = rlpSerialize_list obj
       newEnc = rlpSerialize obj
-   in newEnc `shouldBe` oldEnc
+   in newEnc `shouldBe` (B.fromShort oldEnc)
 
 main :: IO ()
 main =

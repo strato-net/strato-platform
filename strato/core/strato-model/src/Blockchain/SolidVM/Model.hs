@@ -12,7 +12,7 @@ import Control.Lens.Operators
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Binary
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import qualified Data.ByteString.Base16 as B16
 import Data.Swagger
 import Data.Swagger.Internal.Schema (named)
@@ -24,7 +24,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Arbitrary.Generic
 import Web.HttpApiData
 
-newtype HexStorage = HexStorage B.ByteString
+newtype HexStorage = HexStorage B.ShortByteString
   deriving (Eq, Ord, Show, Read, Generic)
   deriving anyclass (NFData)
 
@@ -32,25 +32,25 @@ instance ToParamSchema HexStorage where
   toParamSchema _ = mempty & type_ ?~ SwaggerString
 
 word256ToHexStorage :: Word256 -> HexStorage
-word256ToHexStorage = HexStorage . word256ToBytes
+word256ToHexStorage = HexStorage . B.toShort . word256ToBytes
 
 instance ToHttpApiData HexStorage where
-  toUrlPiece (HexStorage hs) = decodeUtf8 (B16.encode hs)
+  toUrlPiece (HexStorage hs) = decodeUtf8 (B16.encode $ B.fromShort hs)
 
 instance FromHttpApiData HexStorage where
   parseQueryParam t = case B16.decode (encodeUtf8 t) of
-    Right hs -> pure $ HexStorage hs
+    Right hs -> pure $ HexStorage (B.toShort hs)
     _ -> Left $ "non-hex string passed off as hex: " `T.append` t
 
 instance ToSchema HexStorage where
   declareNamedSchema _ = return $ named "solidvm hex storage" binarySchema
 
 instance ToJSON HexStorage where
-  toJSON (HexStorage hs) = String . decodeUtf8 . B16.encode $ hs
+  toJSON (HexStorage hs) = String . decodeUtf8 . B16.encode . B.fromShort $ hs
 
 instance FromJSON HexStorage where
   parseJSON (String t) = case B16.decode (encodeUtf8 t) of
-    Right hs -> return $ HexStorage hs
+    Right hs -> return $ HexStorage (B.toShort hs)
     _ -> fail $ "non-hex string passed off as hex: " ++ show t
   parseJSON x = typeMismatch "HexStorage" x
 

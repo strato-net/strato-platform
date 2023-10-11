@@ -11,7 +11,8 @@ import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Data.Aeson
 import Data.Aeson.QQ
-import qualified Data.ByteString as B
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Short as B
 import Data.Either
 import qualified Data.Map.Strict as M
 import qualified Data.Sequence as S
@@ -56,7 +57,7 @@ spec = describe "Action conversions" $ do
     convert emptyAction {Action._actionData = M.singleton (Account 0x988 Nothing) daytuh} `shouldSatisfy` isRight
 
   it "should convert bytestrings properly" $ do
-    toJSON ("\x80\x60\x40" :: B.ByteString) `shouldBe` String "806040"
+    toJSON ("\x80\x60\x40" :: ByteString) `shouldBe` String "806040"
 
   it "should parse any actions" $
     withMaxSuccess 25 $
@@ -99,7 +100,7 @@ spec = describe "Action conversions" $ do
            "name": "Vehicle",
            "src": "contract Vehicle {}"
          },
-         "events" : 
+         "events" :
          [ { "eventBlockHash": "0000000000000000000000000000000000000000000000000000000000000000",
              "eventContractOrganization": "BlockApps2",
              "eventContractApplication": "LogisticsEngine2",

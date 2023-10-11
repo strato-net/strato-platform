@@ -37,6 +37,7 @@ import Data.Binary
 import Data.Bits
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Internal as BI
@@ -223,9 +224,9 @@ instance FromHttpApiData Word160 where
       _ -> Left $ T.pack $ "Error parsing Word160: " ++ show v
 
 instance RLPSerializable Word512 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ BSS.toShort $ BL.toStrict $ encode val
 
-  rlpDecode (RLPString s) | B.length s == 64 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | BSS.length s == 64 = decode $ BL.fromStrict $ BSS.fromShort s
   rlpDecode x = error ("Missing case in rlp2Word512: " ++ show x)
 
 instance RLPSerializable Word256 where
@@ -233,24 +234,24 @@ instance RLPSerializable Word256 where
   rlpDecode = fromInteger . rlpDecode
 
 instance RLPSerializable Word128 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ BSS.toShort $ BL.toStrict $ encode val
 
-  rlpDecode (RLPString s) | B.null s = 0
-  rlpDecode (RLPString s) | B.length s <= 16 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | BSS.null s = 0
+  rlpDecode (RLPString s) | BSS.length s <= 16 = decode $ BL.fromStrict $ BSS.fromShort s
   rlpDecode x = error ("Missing case in rlp2Word128: " ++ show x)
 
 instance RLPSerializable Word32 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ BSS.toShort $ BL.toStrict $ encode val
 
-  rlpDecode (RLPString s) | B.null s = 0
-  rlpDecode (RLPString s) | B.length s <= 4 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | BSS.null s = 0
+  rlpDecode (RLPString s) | BSS.length s <= 4 = decode $ BL.fromStrict $ BSS.fromShort s
   rlpDecode x = error ("Missing case in rlp2Word32: " ++ show x)
 
 instance RLPSerializable Word16 where
-  rlpEncode val = RLPString $ BL.toStrict $ encode val
+  rlpEncode val = RLPString $ BSS.toShort $ BL.toStrict $ encode val
 
-  rlpDecode (RLPString s) | B.null s = 0
-  rlpDecode (RLPString s) | B.length s <= 2 = decode $ BL.fromStrict s
+  rlpDecode (RLPString s) | BSS.null s = 0
+  rlpDecode (RLPString s) | BSS.length s <= 2 = decode $ BL.fromStrict $ BSS.fromShort s
   rlpDecode x = error ("Missing case in rlp2Word16: " ++ show x)
 
 instance Format Word256 where

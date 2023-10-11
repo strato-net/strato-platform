@@ -1,7 +1,7 @@
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Account
 import Control.Monad
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import Data.Either (isLeft)
 import SolidVM.Model.Storable
 import Test.Hspec

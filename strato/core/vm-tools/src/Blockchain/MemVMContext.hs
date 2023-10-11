@@ -82,6 +82,7 @@ import Data.Either.Extra
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
+import Data.ByteString.Short (fromShort)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
@@ -320,7 +321,7 @@ instance (Address `A.Selectable` X509Certificate) MemContextM where
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
+        Just (BString bs) -> pure . eitherToMaybe $ bsToCert $ fromShort bs
         _ -> pure Nothing
 
 instance (N.NibbleString `A.Alters` N.NibbleString) MemContextM where

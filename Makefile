@@ -1,4 +1,4 @@
-REPO_URL ?= EMPTY
+REPO_URL ?= ""
 ifeq ($(REPO),local)
   REPO_URL=
 endif
@@ -7,9 +7,6 @@ ifeq ($(REPO),private)
 endif
 ifeq ($(REPO),public)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps-repo/
-endif
-ifeq ($(REPO_URL),EMPTY)
-  $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
 endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/

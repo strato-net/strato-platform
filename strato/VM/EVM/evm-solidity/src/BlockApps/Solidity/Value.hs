@@ -15,6 +15,7 @@ import qualified Data.Bimap as Bimap
 import qualified Data.Binary as Binary
 import Data.Bits (complement, shiftL, (.|.))
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString, fromShort)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
@@ -44,8 +45,8 @@ valueUInt256 = ValueInt False (Just 32)
 valueInt256 :: Integer -> SimpleValue
 valueInt256 = ValueInt False (Just 32)
 
-valueBytes :: ByteString -> SimpleValue
-valueBytes = ValueBytes Nothing
+valueBytes :: ShortByteString -> SimpleValue
+valueBytes = ValueBytes Nothing . fromShort
 
 data Value
   = SimpleValue SimpleValue

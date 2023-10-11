@@ -98,6 +98,7 @@ import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Map (Map)
@@ -552,7 +553,7 @@ getVariableOfName name = do
             Just . Constant . SReference $
               AccountPath
                 (currentAccount currentCallInfo)
-                (MS.singleton $ BC.pack $ labelToString name)
+                (MS.singleton $ BSS.toShort $ BC.pack $ labelToString name)
           else Nothing
 
       maybeThis :: Maybe Variable
@@ -816,7 +817,7 @@ getXabiType acct field = do
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
-  let field = MS.getField path
+  let field = BSS.fromShort $ MS.getField path
   mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
@@ -839,7 +840,7 @@ getXabiValueType (AccountPath loc path) = do
         let t' = getTypeOfName' s ccs
          in case (x, t') of
               (MS.Field n, StructTypo fs) ->
-                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
+                let mt'' = lookup (textToLabel $ decodeUtf8 $ BSS.fromShort n) fs
                  in case mt'' of
                       Just t'' -> CC.fieldTypeType t''
                       Nothing -> missingField "field not present in struct definition" $ show (n, fs)
@@ -865,7 +866,7 @@ initializeAction acct name appName hsh = do
 markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
-      val = rlpSerialize $ rlpEncode val'
+      val = BSS.toShort $ rlpSerialize $ rlpEncode val'
       ins = \case
         Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
         e -> internalError "SolidVM Diff executing in EVM" $ show e

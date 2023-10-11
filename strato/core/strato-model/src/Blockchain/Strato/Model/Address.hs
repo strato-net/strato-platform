@@ -42,6 +42,7 @@ import qualified Data.Aeson.Key as DAK
 import Data.Aeson.Types
 import Data.Binary
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
@@ -72,8 +73,8 @@ import Web.FormUrlEncoded
 import Web.PathPieces
 
 instance RLPSerializable Address where
-  rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
-  rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
+  rlpEncode (Address a) = RLPString $ BSS.toShort $ BL.toStrict $ encode a
+  rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict $ BSS.fromShort s
   rlpDecode x = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
 type AddressPayable = Address

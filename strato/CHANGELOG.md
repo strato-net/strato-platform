@@ -41,13 +41,15 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
+- Changed instances of ByteString to ShortByteString in VM for performance improvements
+- `REPO=` flag defaults to `REPO=local` behavior when not used
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
 - Bagger no longer crashes the VM upon encountering a transaction that exceeds the nonce or size limit
 - String formatting related errors in `.code` SolidVM tests
 - Typechecker test errors that were missing `pragma strict` and failing
 - The out-of-scope errors of storage variables for Solidity try/catch statements
-- Free function overloading conflict with the import resolver 
+- Free function overloading conflict with the import resolver
 - Account not found in call stack errors for returning arrays to another contract
 ### Removed
 - `bloc22` database removed

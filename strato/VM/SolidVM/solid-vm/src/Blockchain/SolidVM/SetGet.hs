@@ -33,6 +33,7 @@ import Blockchain.SolidVM.SM
 import Blockchain.Strato.Model.Account
 import Control.Monad
 import Control.Monad.IO.Class
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Foldable (for_)
@@ -70,7 +71,7 @@ getSolid loc key = case loc of
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
-  MS.BString s -> SString . BC.unpack $ s
+  MS.BString s -> SString . BC.unpack . BSS.fromShort $ s
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
@@ -93,7 +94,7 @@ findDefault = \case
 toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
   SInteger i -> Just $ MS.BInteger i
-  SString s -> Just $ MS.BString (BC.pack s)
+  SString s -> Just $ MS.BString $ BSS.toShort (BC.pack s)
   SBool b -> Just $ MS.BBool b
   SAccount a _ -> Just $ MS.BAccount a
   SContract n a -> Just $ MS.BContract n a
@@ -125,7 +126,7 @@ setVal (SReference dst) (SReference src) = do
     _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
-    setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
+    setVal (SReference $ dst `apSnoc` MS.Field (BSS.toShort $ BC.pack $ labelToString f)) =<< weakGetVar var
 setVal (SReference dst) (SArray _ fs) = do
   let len = length fs
   setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
@@ -153,7 +154,7 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
           case t of -- t is evaluated here because Haskell is lazy
           -- We ONLY want to evaluate it if we know src is a SString because
           -- in some non-SString cases getXabiValueType will throw an exception
-            SVMType.String {} -> Just . MS.BString . UTF8.fromString $ s
+            SVMType.String {} -> Just . MS.BString . BSS.toShort . UTF8.fromString $ s
             _ -> toBasic src
         _ -> toBasic src
   case basicSrc of
@@ -217,7 +218,7 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
     MS.BString bs -> do
       t <- getXabiValueType addressedPath
       case t of
-        SVMType.String {} -> return . SString $ UTF8.toString bs
+        SVMType.String {} -> return . SString . UTF8.toString . BSS.fromShort $ bs
         _ -> return $ fromBasic theValue
     _ -> return $ fromBasic theValue
 getVar (Constant (SStruct s ma)) = do

@@ -75,6 +75,7 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
 import Data.Bool (bool)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
@@ -654,12 +655,12 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
             case null args' of
               False -> do
                 addCallInfo to contract (functionName ++ "()") hsh cc M.empty True False
-                let valPath' = Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
+                let valPath' = Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BSS.toShort $ BC.pack $ labelToString functionName) args'
                 popCallInfo
                 return (pure valPath', OrderedVals [])
               True -> do
                 addCallInfo to contract functionName hsh cc M.empty True False
-                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
+                val <- fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BSS.toShort $ BC.pack $ labelToString functionName
                 popCallInfo
                 return (pure val, OrderedVals [])
           Nothing ->
@@ -681,12 +682,12 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         addCallInfo to contract' (stringToLabel $ labelToString (contract' ^. CC.contractName) ++ " constructor") hsh cc M.empty False False
         forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
           v <- expToVar e
-          setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+          setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BSS.toShort $ BC.pack $ labelToString n]))) =<< getVar v
         forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
           case theType of
             SVMType.Mapping _ _ _ -> return ()
             SVMType.Array _ _ -> return ()
-            _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
+            _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BSS.toShort $ BC.pack $ labelToString n]) MS.BDefault
         popCallInfo
     )
   when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack org) (T.pack parentName')
@@ -714,7 +715,7 @@ setCreator creator contract _ _ = do
   putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
   let putCreatorField org = do
         $logDebugS "setCreator/versioning" . T.pack $ "setting the org as " ++ (show org)
-        putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack org)
+        putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BSS.toShort $ BC.pack org)
 
   if _org /= ""
     then putCreatorField _org
@@ -747,7 +748,7 @@ getOrg caller = do
           case appCreator of
             MS.BString org' -> do
               $logDebugS "getOrg/versioning" . T.pack $ "Its org is " ++ show org'
-              return $ BC.unpack org'
+              return $ BC.unpack $ BSS.fromShort org'
             _ -> do
               $logDebugS "getOrg/versioning" . T.pack $ "Its org is unset. Returning empty string"
               return ""
@@ -1405,7 +1406,7 @@ doWhile condition code = do
 getIndexType :: MonadSM m => AccountPath -> m IndexType
 getIndexType (AccountPath addr p) = do
   let field = MS.getField p
-  mType <- getXabiType addr field
+  mType <- getXabiType addr (BSS.fromShort field)
   let n = MS.size p - 1
   case mType of
     Nothing -> todo "getIndexType/unknown storage reference" field
@@ -1429,7 +1430,7 @@ getIndexType (AccountPath addr p) = do
 expToPath :: MonadSM m => CC.Expression -> m AccountPath
 expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
-  let path = MS.singleton $ BC.pack $ labelToString x
+  let path = MS.singleton $ BSS.toShort $ BC.pack $ labelToString x
   case x `M.lookup` localVariables callInfo of
     Just (_, var) -> do
       val <- weakGetVar var
@@ -1462,7 +1463,7 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
     MapStringIndex -> do
       idx <- getString idxVar
       return $ case idx of
-        SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
+        SString s -> MS.MapIndex $ MS.IText $ BSS.toShort $ UTF8.fromString s
         _ -> typeError "invalid map of strings index" idx
     ArrayIndex -> do
       n <- getInt idxVar
@@ -1472,7 +1473,7 @@ expToPath (CC.MemberAccess _ parent field) = do
     parvar <- expToVar parent
     case parvar of
       _ -> expToPath parent
-  return . apSnoc apt . MS.Field $ BC.pack $ labelToString field
+  return . apSnoc apt . MS.Field $ BSS.toShort $ BC.pack $ labelToString field
 expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> m Variable
@@ -1682,7 +1683,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
               getInnerString _ = error "impossible match in CC.hs"
           return . Constant . SInteger . fromIntegral $ length $ getInnerString val
         _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
-    (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
+    (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BSS.toShort $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
     m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
 {-
@@ -2030,14 +2031,14 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) = do
                 (SContract _ toAddress', MS.Field funcName) -> do
                   fromAddress <- getCurrentAccount
                   let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                  res <- callWithResult fromAddress toAddress CC.DefaultCall Nothing (stringToLabel $ BC.unpack funcName) False args
+                  res <- callWithResult fromAddress toAddress CC.DefaultCall Nothing (stringToLabel $ BC.unpack $ BSS.fromShort funcName) False args
                   case res of
                     Just v -> return $ Constant $ v
                     Nothing -> return $ Constant SNULL
                 (SAccount toAddress' _, MS.Field funcName) -> do
                   fromAddress <- getCurrentAccount
                   let toAddress = namedAccountToAccount (fromAddress ^. accountChainId) toAddress'
-                  res <- callWithResult fromAddress toAddress CC.DefaultCall Nothing (stringToLabel $ BC.unpack funcName) False args
+                  res <- callWithResult fromAddress toAddress CC.DefaultCall Nothing (stringToLabel $ BC.unpack $ BSS.fromShort funcName) False args
                   case res of
                     Just v -> return $ Constant $ v
                     Nothing -> return $ Constant SNULL
@@ -2961,7 +2962,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
   forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
     v <- expToVar e
-    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+    setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BSS.toShort $ BC.pack $ labelToString n]))) =<< getVar v
 
   forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
     case theType of
@@ -2969,7 +2970,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
       SVMType.Array _ _ -> return ()
       t -> do
         defVal <- createDefaultValue cc contract' t
-        for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
+        for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BSS.toShort $ BC.pack $ labelToString n])
   -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
   forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do

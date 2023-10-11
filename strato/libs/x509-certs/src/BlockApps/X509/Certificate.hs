@@ -268,9 +268,9 @@ instance ToSchema Subject where
           }
 
 instance RLPSerializable X509Certificate where
-  rlpEncode = RLPString . certToBytes
+  rlpEncode = RLPString . BSS.toShort . certToBytes
 
-  rlpDecode (RLPString str) = fromRight (error "failed to rlpDecode cert") $ bsToCert str
+  rlpDecode (RLPString str) = fromRight (error "failed to rlpDecode cert") $ bsToCert $ BSS.fromShort str
   rlpDecode x = error $ "rlpDecode for SignedCertificate failed: expected RLPString, got " ++ show x
 
 instance RLPSerializable (S.Set X509Certificate) where

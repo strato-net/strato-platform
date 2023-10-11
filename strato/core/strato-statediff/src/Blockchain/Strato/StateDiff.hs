@@ -40,7 +40,9 @@ import Control.Monad (unless, when)
 import Control.Monad.Change (Alters, Modifiable, Selectable)
 import qualified Control.Monad.Change as A
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import Data.Function
 import Data.Kind (Type)
 import Data.Map (Map)
@@ -70,7 +72,7 @@ data StateDiff = StateDiff
 
 data StorageDiff (v :: Detail)
   = EVMDiff (Map Word256 (Diff Word256 v))
-  | SolidVMDiff (Map B.ByteString (Diff B.ByteString v))
+  | SolidVMDiff (Map BSS.ShortByteString (Diff BSS.ShortByteString v))
 
 class (Ord a) => StorableKey a where
   lookupStorageKey :: (MonadLogger m, HasHashDB m, HasCodeDB m) => Key -> m a
@@ -88,6 +90,12 @@ instance StorableKey B.ByteString where
   lookupStorageKey = fmap (fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
 
 instance StorableValue B.ByteString where
+  decodeMPDBValue = rlpDecode
+
+instance StorableKey BSS.ShortByteString where
+  lookupStorageKey = fmap (maybe BSS.empty BSS.toShort) . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
+
+instance StorableValue BSS.ShortByteString where
   decodeMPDBValue = rlpDecode
 
 -- | Describes all the changes to a particular account.  The address is not
@@ -157,6 +165,10 @@ instance Detailed (Diff StateRoot) where
   incrementalToEventual x = Value $ newValue x
 
 instance Detailed (Diff ByteString) where
+  incrementalToEventual Delete {} = Value $ fromString ""
+  incrementalToEventual x = Value $ newValue x
+
+instance Detailed (Diff ShortByteString) where
   incrementalToEventual Delete {} = Value $ fromString ""
   incrementalToEventual x = Value $ newValue x
 

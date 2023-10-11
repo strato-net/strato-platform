@@ -58,6 +58,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict hiding (state)
 import qualified Data.Aeson as Aeson
 import Data.Either (lefts, rights)
+import qualified Data.ByteString.Short as BSS
 import Data.Foldable (fold, for_, toList)
 import Data.Function
 import Data.IORef
@@ -423,8 +424,8 @@ resolveNameParts o a c = do
                       }
               select (Proxy @[StorageAddress]) qs >>= \case
                 Just (sa : _) -> case value sa of
-                  HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe orgHex of
-                    Just (MS.BString orgBS) -> case decodeUtf8' orgBS of
+                  HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe (BSS.fromShort orgHex) of
+                    Just (MS.BString orgBS) -> case (decodeUtf8' . BSS.fromShort) orgBS of
                       Right o' -> pure (o', T.pack appName, tName c)
                       Left _ -> do
                         $logWarnS "resolveNameParts" . T.pack $
