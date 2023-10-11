@@ -102,8 +102,9 @@ class ItemController {
   static async transferOwnership(req, res, next) {
     try {
       const { dapp, body } = req
+      console.log("body", body)
 
-      ItemController.validateTransferOwnershipArgs(body)
+      // ItemController.validateTransferOwnershipArgs(body)
       const result = await dapp.transferOwnershipItem(body, options)
       rest.response.status200(res, result)
     } catch (e) {

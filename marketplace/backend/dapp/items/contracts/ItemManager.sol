@@ -5,7 +5,6 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/products/contracts/Inventory.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/ProductManager.sol";
-import "/dapp/items/contracts/Transfer.sol";
 
 /// @title A representation of ItemManager to manage items
 contract ItemManager is ItemStatus, InventoryStatus {
@@ -21,6 +20,20 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string[] rawMaterialSerialNumber;
         string[] rawMaterialProductId;
     }
+
+    event ItemTransfer(
+        address indexed oldOwner,
+        string oldOwnerOrganization,
+        string oldOwnerOrganizationalUnit,
+        string oldOwnerCommonName,
+        address indexed newOwner,
+        string newOwnerOrganization,
+        string newOwnerOrganizationalUnit,
+        string newOwnerCommonName,
+        address indexed inventoryId,
+        uint quantity,
+        uint transferDate
+    );
 
     function addItem(
         address _productId,
@@ -192,6 +205,11 @@ contract ItemManager is ItemStatus, InventoryStatus {
         Inventory inventory;
         Item_3 item = Item_3(_itemsAddress[0]);
 
+        // get old owner organization
+        string oldOwnerOrganization = item.ownerOrganization();
+        string oldOwnerCommonName = item.ownerCommonName();
+        string oldOwnerOrganizationalUnit = item.ownerOrganizationalUnit();
+
         // get Dapp contract from dapp chain
         Dapp dapp = Dapp(address(_dappAddress));
         ProductManager productManager = dapp.productManager();
@@ -225,6 +243,12 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         Inventory oldInventory = Inventory(item.inventoryId());
 
+        // get new owner organization
+        mapping(string => string) ownerCert = getUserCert(_newOwner);
+        string newOwnerOrganization = ownerCert["organization"];
+        string newOwnerCommonName = ownerCert["commonName"];
+        string newOwnerOrganizationalUnit = ownerCert["organizationalUnit"];
+
         if (oldInventory.inventoryType() == "Batch") {
             (uint status, address inventory) = product.addInventory(
                 _newQuantity,
@@ -251,12 +275,18 @@ contract ItemManager is ItemStatus, InventoryStatus {
             );
 
             if (_isGiftedTransfer == true) {
-                Transfer transfer = new Transfer(
-                    address(inventory),
-                    block.timestamp,
-                    _newQuantity,
+                emit ItemTransfer(
+                    tx.origin,
+                    oldOwnerOrganization,
+                    oldOwnerOrganizationalUnit,
+                    oldOwnerCommonName,
                     _newOwner,
-                    tx.origin
+                    newOwnerOrganization,
+                    newOwnerOrganizationalUnit,
+                    newOwnerCommonName,
+                    address(inventory),
+                    _newQuantity,
+                    block.timestamp
                 );
             }
             address itemContractAddress = address(itemAddr);
@@ -281,12 +311,18 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 );
             }
             if (_isGiftedTransfer == true) {
-                Transfer transfer = new Transfer(
-                    address(inventory),
-                    block.timestamp,
-                    _newQuantity,
+                emit ItemTransfer(
+                    tx.origin,
+                    oldOwnerOrganization,
+                    oldOwnerOrganizationalUnit,
+                    oldOwnerCommonName,
                     _newOwner,
-                    tx.origin
+                    newOwnerOrganization,
+                    newOwnerOrganizationalUnit,
+                    newOwnerCommonName,
+                    address(inventory),
+                    _newQuantity,
+                    block.timestamp
                 );
             }
         }

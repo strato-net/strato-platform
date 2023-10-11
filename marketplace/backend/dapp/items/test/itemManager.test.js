@@ -239,12 +239,19 @@ describe('Item Manager', function () {
     it('ItemManager: Create items', async () => {
         // Create Item via itemManager
         const args = getfactoryArgs()
-        const [restStatus, itemAddresses,] = await contract.addItem(args.itemArgs);
+        console.log("args======>", args)
 
+        console.log("dapp======>", dapp)
+
+        const [restStatus, itemAddresses,] = await dapp.addItem(args.itemArgs);
+
+        console.log("itemAddresses=======>", itemAddresses)
         
         const itemAddressArr = itemAddresses.split(",") 
         const itemsArrCleaned = itemAddressArr.filter(address => address != "")
-        const items = await contract.getItems({ address: itemAddressArr }, newOptions);
+        const items = await dapp.getItems({ address: itemsArrCleaned }, newOptions);
+
+        console.log("itemsArrCleaned=======>", items)
 
         const totalItems = args.itemArgs.itemObject.length;
         // assert.equal(totalItems, items.length)

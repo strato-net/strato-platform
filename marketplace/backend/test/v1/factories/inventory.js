@@ -6,6 +6,7 @@ export const inventoryArgs = (address, uid) => {
     pricePerUnit: 20,
     batchId: `batchId_${uid}`,
     status: 1,
+    inventoryType: 'inventoryType',
     serialNumber: [ 
       {
         "itemSerialNumber": `${uid}1`,
