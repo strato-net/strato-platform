@@ -7,11 +7,15 @@ pipeline {
       steps {
         wrap([$class: 'BuildUser']) {
           script {
+            BUILD_USER=''
             try {
-              currentBuild.description = "Agent ${env.NODE_NAME}// ${BUILD_USER_FIRST_NAME}"
+              BUILD_USER="${BUILD_USER_FIRST_NAME}"
             } catch (Exception e) {
-              currentBuild.description = "Agent ${env.NODE_NAME}// github"
+              BUILD_USER="github"
             }
+            MAIN_AGENT_NAME="${env.NODE_NAME}"
+            currentBuild.description = "${MAIN_AGENT_NAME} //${BUILD_USER}"
+            
             lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
           }
         }
@@ -159,6 +163,12 @@ pipeline {
 
           // Few quick tests
           sh './check_availability.sh'
+          
+          echo "Restarting docker containers to simulate computer reboot..."
+          sh 'docker compose -p strato stop'
+          sh 'docker compose -p strato start'
+          
+          sh './check_availability.sh'
         }
 
         script {
@@ -206,18 +216,17 @@ pipeline {
       }
     }
     
-    stage('Test & Push Artifacts') {
+    stage('Test & Push') {
       parallel {
         stage(' ') { //sequentially push images then test sync
           stages {
-            stage('Push Images'){
+            stage('Push Images & YMLs'){
               steps{
                 withCredentials([
                     usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
                     usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
                 ]) {
 
-                  archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
                   sh '''#!/bin/bash -le
                     set -x
                     docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
@@ -231,8 +240,27 @@ pipeline {
                   '''
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
                 }
+                
+                // Push docker-compose files to Jenkins artifacts and AWS S3
+                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
+                withCredentials([
+                    usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                ]) {
+                  sh '''#!/bin/bash -le
+                    set -x
+                    version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
+                    AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
+                    aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
+                    aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
+                  '''
+                }
               }
             }
+            
             stage('Test Sync') {
               // only test sync for prs wanting to merge into develop
               when {
@@ -242,8 +270,11 @@ pipeline {
                   environment(name: "CHANGE_TARGET", value: "develop")
                 }
               }
-              agent { label "testsync" } 
+              agent { label "testsync" }
               steps {
+                script {
+                  currentBuild.description = "${MAIN_AGENT_NAME}/${env.NODE_NAME} //${BUILD_USER}"
+                }
                 withCredentials([
                   usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
                 ]) {
@@ -254,6 +285,7 @@ pipeline {
                   sh 'sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/'
                   sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
                   sh 'sudo ./strato --wipe'
+                  sh 'sudo ./vault --wipe'
                   sh 'mv genesis-block-official.json genesis-block.json'
                   sh './run-vault.sh'
                   // run again but connecting to mercata-hydrogen this time
@@ -264,28 +296,20 @@ pipeline {
                   script{
                     lib.runSyncTester()
                   }
-                  sh 'sudo ./strato --wipe'
                 }
               }
-            }
-          }
-        }
-        stage('Test & Push Artifacts') {
-          steps{
-            withCredentials([
-                usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
-            ]) {
-              sh '''#!/bin/bash -le
-                set -x
-                version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
-                AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
-                aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
-                aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
-              '''
+              post {
+                always {
+                  dir('strato-getting-started') {
+                    sh 'sudo rm -rf strato_logs*'
+                    sh 'sudo ./fetchlogs --as-dir'
+                    sh 'mv strato_logs/ strato_logs_testsync/'
+                    archiveArtifacts artifacts: 'strato_logs_testsync/**', fingerprint: true, allowEmptyArchive: true
+                    sh 'sudo ./strato --wipe'
+                    sh 'sudo ./vault --wipe'
+                  }
+                }
+              }
             }
           }
         }
