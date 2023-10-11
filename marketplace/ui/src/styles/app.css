@@ -80,6 +80,10 @@
   font-weight: 600;
 }
 
+.text-grey{
+  color: grey;
+}
+
 .ant-btn-primary:not(:disabled):hover {
   background-color: #101481;
 }

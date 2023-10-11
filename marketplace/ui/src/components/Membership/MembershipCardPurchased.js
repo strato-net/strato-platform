@@ -220,8 +220,8 @@ const MembershipCardPurchased = ({
       ) : (
         <Card className="w-full mt-6 border-grey" id="product" key={membershipId}>
           <Col span={24}>
-            <Row className="p-4 rounded-md" style={{ backgroundColor: "#f2f2f2" }}>
-              <Col span={20}>
+            <Row className="p-4 flex justify-between rounded-md" style={{ backgroundColor: "#f2f2f2" }}>
+              <Col >
                 <Row>
                   <Typography.Title level={4}>
                     {decodeURIComponent(membership.productName)}
@@ -229,20 +229,20 @@ const MembershipCardPurchased = ({
                 </Row>
                 <Typography.Text strong type={status == 1 ? 'success' : 'danger'} level={4}>
                   <span style={{
-                    borderRadius: '10%', backgroundColor: `${status == 1 ? 'green' : status == 2 ? 'red' : ''}`,
+                    borderRadius: '10%', backgroundColor: `${status == 1 ? 'green' : status == 2 ? 'red' : 'green'}`,
                     height: "8px", width: "8px", borderRadius: "20%"
                   }} > &nbsp; &nbsp; &nbsp;</span>
-                  {' '}{statusText[status]}
+                  {' '}{statusText[status]??"For Sale"}
                 </Typography.Text>
               </Col>
-              <Col span={4} className="text-right flex" style={{ alignItems: "center" }}>
+              <Col  className="text-right flex" style={{ alignItems: "center" }}>
                 <Button className="primary-theme-text font-bold text-lg" type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
                   Preview  &gt;&gt;
                 </Button>
               </Col>
             </Row>
             <Row className="mt-4">
-              <Col span={6} className="border-grey shadow-lg rounded overflow-hidden">
+              <Col sm={12} lg={12} xl={8} xxl={6} className="border-grey shadow-lg rounded overflow-hidden">
                 {/* <Image
                   className="object-covers"
                   width={'100%'}
@@ -251,7 +251,7 @@ const MembershipCardPurchased = ({
                   // src={membership.productImageLocation}
                   src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
                 /> */}
-                <Carousel showArrows={true} showThumbs={false} >
+                <Carousel showArrows={true} showThumbs={false} className="h-88" >
                   {[
                     "https://images.unsplash.com/photo-1612817288484-6f916006741a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmVhdXR5JTIwcHJvZHVjdHN8ZW58MHx8MHx8fDA%3D&w=1000&q=80",
                     "https://thumbs.dreamstime.com/b/set-care-beauty-products-skin-29817248.jpg",
@@ -273,7 +273,7 @@ const MembershipCardPurchased = ({
                 {/* {(!membership.product_with_inventory && isPurchasedList) ? */}
                 <Button type="primary"
                   block={true}
-                  className="text-white text-sm cursor-pointer relative rounded-none flex h-1/5"
+                  className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
@@ -283,11 +283,11 @@ const MembershipCardPurchased = ({
                     }
                   }}
                 >
-                  <Row className="mx-auto"> {tagIcon()} &nbsp; List for Sale</Row>
+                  <Row className="mx-auto flex"> {tagIcon()} &nbsp; List for Sale</Row>
                 </Button>
                 {/* : null} */}
               </Col>
-              <Col span={17} offset={1} className="border-grey shadow-lg leading-2 min-h-min rounded p-2 ">
+              <Col sm={12} lg={{span:12}} xl={{span:14, offset:1}} xxl={{span:17, offset:1}} className="border-grey shadow-lg leading-2 min-h-min rounded p-2 ">
                 <Paragraph >
                   <Text disabled className="font-bold" >Sub Category</Text>
                   <Text strong className="float-right">{subCategory}</Text>
@@ -321,7 +321,7 @@ const MembershipCardPurchased = ({
 
                   <Collapse size="large">
                     <Collapse.Panel key="1" header={<Title level={5}>Inventories</Title>}>
-                      <Table bordered pagination={false} columns={columns} dataSource={data} />
+                      <Table bordered className="inventory-table" pagination={false} columns={columns}  dataSource={data} />
                     </Collapse.Panel>
                   </Collapse>
 

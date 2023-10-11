@@ -28,7 +28,7 @@ const IssuedList = (
   }, []);
 
   const memberships_issued = memberships
-    .filter((membership_) => membership_.inventories.length > 0)
+    .filter((membership_) => membership_?.inventories?.length > 0)
     .filter(
       (membership) =>
         membership.ownerOrganization === membership?.inventories[0].manufacturer
@@ -36,12 +36,11 @@ const IssuedList = (
   const { Title } = Typography;
   return (
     <>
-      <h2 className="text-2xl font-semibold">Issued Memberships</h2>
       {isMembershipsLoading ? (
         <div className="h-screen flex justify-center items-center mx-auto">
           <Spin spinning={isMembershipsLoading} size="large" />
         </div>
-      ) : memberships_issued.length === 0 ? (
+      ) : memberships_issued?.length === 0 ? (
         <div className="h-screen justify-center flex flex-col items-center mx-auto">
           <Image src={Images.noProductSymbol} preview={false} />
           <Title level={3} className="mt-2">
@@ -49,15 +48,17 @@ const IssuedList = (
           </Title>
         </div>
       ) : (
-        <Row className="my-4" gutter={[12, 12]}>
+        <Row className="my-4 flex flex-row" gutter={[12, 12]}>
           {memberships_issued.map((item, index) => {
             // membershipId,
+            console.log("item", item.inventoryAddress);
             let transformedData = { ...item.product }
             transformedData["timePeriodInMonths"] = item.timePeriodInMonths
             transformedData["Inventories"] = item.inventories;
             transformedData["productName"] = transformedData.name;
-            transformedData["inventoryId"] = item.inventoryAddress;
+            transformedData["inventoryId"] = item.inventories[0].address;
             transformedData["membershipAddress"] = item.membershipAddress;
+            console.log("transformedData", transformedData);
             return (
               <Col span={12}>
                 <MembershipCardPurchased

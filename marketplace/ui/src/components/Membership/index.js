@@ -213,15 +213,15 @@ const Membership = (user) => {
               <Breadcrumb>
                 <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
                   <ClickableCell href={routes.Marketplace.url}>
-                    <Text className="primary-theme-text font-bold">
+                    <Text className="primary-theme-text text-md font-bold" underline>
                       Home
                     </Text>
                   </ClickableCell>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-                  {/* <p className="text-primary"> */}
+                <Text className="text-md text-grey font-bold" underline>
                     Memberships
-                    {/* </p> */}
+                    </Text>
                 </Breadcrumb.Item>
               </Breadcrumb>
             </Col>
@@ -238,7 +238,7 @@ const Membership = (user) => {
                       </Typography.Text>
                     </Row>
                     <Row>
-                      <Typography.Text className="text-xs">
+                      <Typography.Text className="text-xs text-grey font-lg">
                         {memberships.length} Issued Memberships found
                       </Typography.Text>
                     </Row>
@@ -259,7 +259,7 @@ const Membership = (user) => {
                   <Button
                     id="add-product-button"
                     type="primary"
-                    className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6 flex"
+                    className="w-50 h-9 bg-500 !hover:bg-primaryHover font-bold m-6 flex"
                     style={{
                       backgroundColor: "blue",
                       color: "white",

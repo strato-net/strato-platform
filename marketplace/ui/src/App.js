@@ -36,7 +36,7 @@ const App = () => {
   
   return (
     <BrowserRouter basename="/marketplace">
-      <Layout>
+      <Layout className="bg-white">
         <UsersProvider>
           <HeaderComponent isOauth={isAuthenticated}  user={user} users={users} loginUrl={loginUrl} />
         </UsersProvider>

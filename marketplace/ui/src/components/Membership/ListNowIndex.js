@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography } from "antd";
+import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography, Row, Col, Input } from "antd";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -12,6 +12,7 @@ import { useInventoryDispatch, useInventoryState } from "../../contexts/inventor
 import { useMarketplaceState } from "../../contexts/marketplace";
 import helperJson from "../../helpers/helper.json"
 const { columns, taxOptions } = helperJson;
+const { Text, Title } = Typography;
 
 let MAX_QUANTITY = null;
 
@@ -137,111 +138,6 @@ const ListNowIndex = ({
     />
   );
 
-
-  const data = [
-    {
-      key: "1",
-      seller: seller,
-      membership: <Select
-        style={{ width: 200 }}
-        placeholder="Membership"
-        suffixIcon={isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />}
-        disabled={isPurchasedMembershipLoading}
-        onChange={(value) => {
-          handleMembership(value)
-        }}
-        options={purchasedMembershipData}
-      />
-      ,
-      id: <Select
-        style={{ width: 200 }}
-        placeholder="Membership Id"
-        value={membershipNumber}
-        suffixIcon={isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />}
-        disabled={isPurchasedMembershipLoading}
-        onChange={(value, obj) => {
-          setMembershipNumber(obj.label)
-          setInventoryId(obj.inventoryId)
-          setId(value)
-          setAvailableQuantity(obj.availableQuantity)
-        }}
-        options={memebershipList}
-      />
-      ,
-      quantity: (
-        <>
-          <InputNumber
-            id="quantity"
-            name="quantity"
-            controls={false}
-            type="number"
-            placeholder="Quantity"
-            prefix={isInventoriesLoading && <Spin />}
-            onWheel={(e) => e.target.blur()}
-            disabled={true}
-            min={0}
-            max={MAX_QUANTITY}
-            value={1}
-            onChange={(value) => {
-              if (value > MAX_QUANTITY) {
-                setError(`Quantity cannot exceed ${MAX_QUANTITY}`);
-              } else {
-                setError('');
-                setQuantity(value);
-              }
-            }}
-          />
-          {type === "Resale" && inventoryId != '' && <p>Available: {inventoryQuantity}</p>}
-          {error && <div style={{ color: 'red' }}>{error}</div>}
-        </>
-      ),
-      percentage: (
-        <InputNumber
-          id="percentage"
-          name="percentage"
-          controls={false}
-          type="number"
-          placeholder="Percentage"
-          onWheel={(e) => e.target.blur()}
-          min={0}
-          addonAfter={selectAfter}
-          formatter={handleFormatter}
-          parser={handleParser}
-          value={taxPercentage}
-          onChange={(value) => {
-            //   formik.setFieldValue("taxPercentage", value);
-            setTaxPercentage(value)
-            isTaxPercentage
-              ? setTaxPercentageAmount(value)//formik.setFieldValue("taxPercentageAmount", value)
-              : setTaxDollarAmount(value) // formik.setFieldValue("taxDollarAmount", value);
-            !isTaxPercentage
-              ? setTaxPercentageAmount(0) //formik.setFieldValue("taxPercentageAmount", 0)
-              : setTaxDollarAmount(0) //formik.setFieldValue("taxDollarAmount", 0);
-          }}
-        />
-      ),
-      price: (
-        <InputNumber
-          id="price"
-          name="price"
-          controls={false}
-          type="number"
-          placeholder="Price"
-          onWheel={(e) => e.target.blur()}
-          min={0}
-          value={price}
-          onChange={(value) => {
-            setPrice(value)
-          }}
-        />
-      ),
-      type: purchasedMembershipData.find((membership) => membership.address === id)
-        ? "New"
-        : "Sale"
-
-    },
-  ];
-
   const handleCreateFormSubmit = async () => {
     const resalePayload = {
       productAddress: productId,
@@ -265,32 +161,147 @@ const ListNowIndex = ({
     handleCancel();
   };
 
+  const membershipType = purchasedMembershipData.find((membership) => membership.address === id)
+    ? "New"
+    : "Sale"
+
+  const selectSuffix = isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />
 
   return (
     <Modal
-      style={{ maxWidth: "1300px" }}
+      style={{ maxWidth: "720px" }}
       width="auto"
       title="Create Listing"
       open={open}
       onCancel={handleCancel}
       footer={[
-        <Button
-          key="list-now"
-          disabled={isListNow || isResaleMembershipSubmitting}
-          loading={isResaleMembershipSubmitting}
-          onClick={
-            () => {
-              handleCreateFormSubmit();
-            }
-          }
-          type="primary"
-        >
-          List Now
-        </Button>,
+        <Row>
+          <Button
+            key="list-now"
+            className="mx-auto w-52"
+            size="large"
+            disabled={isListNow || isResaleMembershipSubmitting}
+            loading={isResaleMembershipSubmitting}
+            onClick={() => { handleCreateFormSubmit() }}
+            type={(isListNow || isResaleMembershipSubmitting) ? 'default':'primary'}
+          >
+            List Now
+          </Button>
+        </Row>
       ]}
     >
-      <Form>
-        <Table columns={columns} dataSource={data} pagination={false} />
+      <Form className="mt-10">
+        <Row gutter={[48, 12]}>
+          <Col span={8}>
+            <Row> <Text strong>Seller</Text> </Row>
+            <Row><Input type="text" value={seller} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
+          </Col>
+          <Col span={8} >
+            <Row><Text strong>Membership</Text> </Row>
+            <Row> <Select
+              className="w-full mt-2"
+              size="large"
+              placeholder="Membership"
+              suffixIcon={selectSuffix}
+              disabled={isPurchasedMembershipLoading}
+              onChange={(value) => {
+                handleMembership(value)
+              }}
+              options={purchasedMembershipData}
+            /> </Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>ID</Text></Row>
+            <Row><Select
+              className="w-full mt-2"
+              size="large"
+              placeholder="Membership Id"
+              value={membershipNumber}
+              suffixIcon={selectSuffix}
+              disabled={isPurchasedMembershipLoading}
+              onChange={(value, obj) => {
+                setMembershipNumber(obj.label)
+                setInventoryId(obj.inventoryId)
+                setId(value)
+                setAvailableQuantity(obj.availableQuantity)
+              }}
+              options={memebershipList}
+            /></Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Type</Text></Row>
+            <Row><Input type="text" value={type} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Quantity</Text></Row>
+            <Row><InputNumber
+              id="quantity"
+              name="quantity"
+              size="large"
+              controls={false}
+              type="number"
+              className="w-full mt-2"
+              placeholder="Quantity"
+              prefix={isInventoriesLoading && <Spin />}
+              onWheel={(e) => e.target.blur()}
+              disabled={type === "Sale"}
+              min={0}
+              max={MAX_QUANTITY}
+              value={1}
+              onChange={(value) => {
+                setError('');
+                setQuantity(value);
+              }}
+            /> </Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Tax Percentage/Amount</Text></Row>
+            <Row> <InputNumber
+              id="percentage"
+              name="percentage"
+              className="w-full mt-2"
+              size="large"
+              controls={false}
+              type="number"
+              placeholder="Percentage"
+              onWheel={(e) => e.target.blur()}
+              min={0}
+              addonAfter={selectAfter}
+              formatter={handleFormatter}
+              parser={handleParser}
+              value={taxPercentage}
+              onChange={(value) => {
+                //   formik.setFieldValue("taxPercentage", value);
+                setTaxPercentage(value)
+                isTaxPercentage
+                  ? setTaxPercentageAmount(value)//formik.setFieldValue("taxPercentageAmount", value)
+                  : setTaxDollarAmount(value) // formik.setFieldValue("taxDollarAmount", value);
+                !isTaxPercentage
+                  ? setTaxPercentageAmount(0) //formik.setFieldValue("taxPercentageAmount", 0)
+                  : setTaxDollarAmount(0) //formik.setFieldValue("taxDollarAmount", 0);
+              }}
+            /></Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Price</Text></Row>
+            <Row><InputNumber
+              addonBefore="$"
+              className="w-full mt-2"
+              size="large"
+              id="price"
+              name="price"
+              controls={false}
+              type="number"
+              placeholder="Price"
+              onWheel={(e) => e.target.blur()}
+              min={0}
+              value={price}
+              onChange={(value) => {
+                setPrice(value)
+              }}
+            /></Row>
+          </Col>
+        </Row>
       </Form>
     </Modal>
   );

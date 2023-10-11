@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography } from "antd";
+import { Form, Modal, InputNumber, Button, Input, Spin, Select, Table, Typography, Row, Col } from "antd";
 import helperJson from "../../helpers/helper.json"
 import { useInventoryState } from "../../contexts/inventory";
 import { useMembershipState } from "../../contexts/membership";
 import { useProductState } from "../../contexts/product";
 const { columns, taxOptions } = helperJson;
-
+const { Text, Title } = Typography;
 const ListNowModal = ({
   open,
   handleCancel,
@@ -18,7 +18,7 @@ const ListNowModal = ({
 }) => {
   const { isInventoriesLoading, inventories, isCreateInventorySubmitting } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState()
-  const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
+  const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user.user.user.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting } = useMembershipState();
@@ -55,109 +55,107 @@ const ListNowModal = ({
     />
   );
 
-
-  const data = [
-    {
-      key: "1",
-      seller: seller,
-      membership: membership,
-      id: id,
-      quantity: (
-        <>
-          <InputNumber
-            id="quantity"
-            name="quantity"
-            min={0}
-            max={inventoryQuantity}
-            prefix={isInventoriesLoading && <Spin />}
-            disabled={type === "Resale"}
-            // value={1}
-            controls={false}
-            value={type === "Resale" ? 1 : formik.values.quantity}
-            onChange={(value) => {
-              formik.setFieldValue("quantity", value);
-            }}
-          />
-          {type === "Resale" && <p>Available: {inventoryQuantity}</p>}
-          {getIn(formik.touched, `quantity`) && getIn(formik.errors, `quantity`) && (
-            <span className="text-error text-xs">
-              {getIn(formik.errors, `quantity`)}
-            </span>
-          )}
-        </>
-      ),
-      percentage: (
-        <>
-          <InputNumber
-            id="percentage"
-            name="percentage"
-            min={0}
-            addonAfter={selectAfter}
-            formatter={handleFormatter}
-            controls={false}
-            parser={handleParser}
-            value={formik.values.taxPercentage}
-            onChange={(value) => {
-              formik.setFieldValue("taxPercentage", value);
-              formik.values.isTaxPercentage ?
-                (formik.setFieldValue("taxPercentageAmount", value))
-                : (formik.setFieldValue("taxDollarAmount", value))
-              !formik.values.isTaxPercentage ?
-                (formik.setFieldValue("taxPercentageAmount", 0))
-                : (formik.setFieldValue("taxDollarAmount", 0))
-            }}
-          />
-          {getIn(formik.touched, `taxPercentage`) && getIn(formik.errors, `percentage`) && (
-            <span className="text-error text-xs">
-              {getIn(formik.errors, `percentage`)}
-            </span>
-          )}
-        </>),
-      price: (
-        <>
-          <InputNumber
-            id="price"
-            name="price"
-            min={0}
-            controls={false}
-            value={formik.values.price}
-            onChange={(value) => {
-              formik.setFieldValue("price", value);
-            }}
-          />
-          {getIn(formik.touched, `price`) && getIn(formik.errors, `price`) && (
-            <span className="text-error text-xs">
-              {getIn(formik.errors, `price`)}
-            </span>
-          )}
-        </>
-      ),
-      type: type,
-    },
-  ];
-
   return (
     <Modal
       // width={800}
-      style={{ maxWidth: '1000px' }}
+      style={{ maxWidth: '720px' }}
       width="auto"
       title="Create Listing"
       open={open}
       onCancel={handleCancel}
       onOk={formik.handleSubmit}
       footer={[
-        <Button
-          key="list-now"
-          onClick={formik.handleSubmit}
-          loading={isSubmit}
-          type="primary"
-        >
-          List Now
-        </Button>,
+        <Row>
+          <Button
+            key="list-now"
+            className="mx-auto w-52"
+            onClick={formik.handleSubmit}
+            loading={isSubmit}
+            type="primary"
+          >
+            List Now
+          </Button>
+        </Row>
       ]}
     >
-      <Form>
-        <Table columns={columns} dataSource={data} pagination={false}></Table>
+      <Form className="mt-10">
+
+        <Row gutter={[48, 12]}>
+          <Col span={8}>
+            <Row> <Text strong>Seller</Text> </Row>
+            <Row><Input type="text" value={seller} size="large" disabled={true} className="w-full cursor-not-allowed" /> </Row>
+          </Col>
+          <Col span={8}>
+            <Row><Text strong>Membership</Text> </Row>
+            <Row> <Input type="text" value={membership} size="large" disabled={true} className="w-full cursor-not-allowed" /> </Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>ID</Text></Row>
+            <Row><Input type="text" value={id} size="large" disabled={true} className="w-full cursor-not-allowed" /></Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Type</Text></Row>
+            <Row><Input type="text" value={type} size="large" disabled={true} className="w-full cursor-not-allowed" /> </Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Quantity</Text></Row>
+            <Row><InputNumber
+              id="quantity"
+              name="quantity"
+              min={0}
+              max={inventoryQuantity}
+              className="w-full"
+              size="large"
+              prefix={isInventoriesLoading && <Spin />}
+              disabled={type === "Sale"}
+              // value={1}
+              controls={false}
+              value={type === "Sale" ? 1 : formik.values.quantity}
+              onChange={(value) => {
+                formik.setFieldValue("quantity", value);
+              }}
+            /></Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Tax Percentage/Amount</Text></Row>
+            <Row> <InputNumber
+              id="percentage"
+              name="percentage"
+              min={0}
+              addonAfter={selectAfter}
+              formatter={handleFormatter}
+              className="w-full"
+              size="large"
+              controls={false}
+              parser={handleParser}
+              value={formik.values.taxPercentage}
+              onChange={(value) => {
+                formik.setFieldValue("taxPercentage", value);
+                formik.values.isTaxPercentage ?
+                  (formik.setFieldValue("taxPercentageAmount", value))
+                  : (formik.setFieldValue("taxDollarAmount", value))
+                !formik.values.isTaxPercentage ?
+                  (formik.setFieldValue("taxPercentageAmount", 0))
+                  : (formik.setFieldValue("taxDollarAmount", 0))
+              }}
+            /></Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text strong>Price</Text></Row>
+            <Row><InputNumber
+              id="price"
+              name="price"
+              className="w-full"
+              min={0}
+              size="large"
+              controls={false}
+              value={formik.values.price}
+              onChange={(value) => {
+                formik.setFieldValue("price", value);
+              }}
+            /></Row>
+          </Col>
+        </Row>
       </Form>
     </Modal>
   );

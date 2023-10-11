@@ -40,7 +40,7 @@
 }
 
 .ant-upload-list-item-actions > button {
-  background-color: black;
+  background-color: transparent;
   left: 20px;
   bottom: 35px;
 }
@@ -54,4 +54,33 @@
 
 .serviceIcons {
   margin-top: 3px;
+}
+
+/* .create-modal-header{
+  background-color: #1898ef;
+} */
+
+.create-modal-header {
+background-color: red;
+}
+
+.ant-modal-close {
+  /* Add your custom styles here */
+  font-weight: 800;
+  margin-top: 10px;
+  color: black !important;
+  margin-right: 20px
+  /* You can customize the size, color, or any other CSS properties here */
+}
+
+.ant-input-number-affix-wrapper-disabled, .ant-input-number-disabled{
+  background-color: white;
+}
+
+.ant-input-number-disabled{
+  cursor: disabled;
+}
+
+.inventory-table{
+  background-color: #1898ef;
 }
