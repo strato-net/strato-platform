@@ -124,3 +124,42 @@
   margin-top: 5px;
   margin-left: 10px;
 }
+
+.ant-layout {
+  max-width: 2560px;
+  margin: auto;
+}
+
+/* .buy-btn {
+  display: none;
+}
+
+.category-card:hover .buy-btn {
+  display: flex;
+} */
+
+.buy-btn {
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  display: none;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease, visibility 0.8s ease, transform 0.8s ease;
+  cursor: pointer;
+}
+
+.qty-btn {
+  margin-top: 70px;
+}
+
+.category-card:hover .qty-btn {
+  margin-top: 0px;
+  /* transition: margin 0.3s ease,  */
+}
+
+.category-card:hover .buy-btn {
+  opacity: 1;
+  visibility: visible;
+  display: flex;
+  transform: translateY(0);
+}

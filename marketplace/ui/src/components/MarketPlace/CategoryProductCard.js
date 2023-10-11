@@ -116,7 +116,7 @@ const CategoryProductCard = ({ product, category }) => {
   return (
     <>
       {contextHolder}
-      <Col sm={12} lg={8} xl={7} className="p-4 bg-white rounded-lg shadow-lg">
+      <Col sm={12} lg={8} xl={7} className="p-4 bg-white rounded-lg shadow-lg category-card">
         <Image
           width={'100%'}
           height={200}
@@ -142,7 +142,7 @@ const CategoryProductCard = ({ product, category }) => {
             <br />
           </React.Fragment>
         ))}</Paragraph>
-        <Row className="rounded-md p-2 theme-bg">
+        <Row className="rounded-md p-2 theme-bg qty-btn">
           <Col span={14}><Text className="block mt-2 text-center">Quantity</Text></Col>
           <Col span={10} className="flex justify-between rounded-md bg-white p-1">
             <Button className="w-10" onClick={subtract}>
@@ -171,7 +171,7 @@ const CategoryProductCard = ({ product, category }) => {
           </Col>
         </Row>
 
-        <Row className='mt-4'>
+        <Row className='mt-4 buy-btn'>
           <Col span={18} className='bg-primary h-10 rounded-md'>
             <Text strong className='block text-white mt-2 text-center'
               onClick={() => {
