@@ -227,7 +227,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* <Route
         exact
         path={routes.EventList.url}
         element={
@@ -237,9 +237,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventsProvider>
           </UsersProvider>
         }
-      />
-      df
-      <Route
+      /> */}
+      {/* <Route
         exact
         path={routes.InventoryEventDetail.url}
         element={
@@ -251,7 +250,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventTypesProvider>
           </UsersProvider>
         }
-      />
+      /> */}
       <Route
         exact
         path={routes.Items.url}
@@ -331,7 +330,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
           </UsersProvider>
         }
       />
-      <Route
+      {/* <Route
         exact
         path={routes.Events.url}
         element={
@@ -351,8 +350,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </CertifiersProvider>
           </UsersProvider>
         }
-      />
-      <Route
+      /> */}
+      {/* <Route
         exact
         path={routes.EventDetail.url}
         element={
@@ -362,8 +361,8 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventsProvider>
           </UsersProvider>
         }
-      />
-      <Route
+      /> */}
+      {/* <Route
         exact
         path={routes.EventSerialNumberList.url}
         element={
@@ -373,7 +372,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventsProvider>
           </UsersProvider>
         }
-      />
+      /> */}
       <Route
         exact
         path={routes.InventoryEventSerialNumberList.url}

@@ -25,15 +25,15 @@ const SoldOrdersTable = ({ user }) => {
   const { ordersSold, isordersSoldLoading } = useOrderState();
 
   useEffect(() => {
-       actions.fetchOrderSold(
-        dispatch,
-        limit,
-        offset,
-        debouncedSearchTerm,
-        user?.organization
-      );
-    
-   
+    actions.fetchOrderSold(
+      dispatch,
+      limit,
+      offset,
+      debouncedSearchTerm,
+      user?.organization
+    );
+
+
   }, [dispatch, limit, offset, debouncedSearchTerm, user]);
 
   const navigate = useNavigate();
@@ -109,10 +109,10 @@ const SoldOrdersTable = ({ user }) => {
           });
         }}>
           <Link to={`${routes.Invoice.url.replace(":id", text.address)}`} target="_blank" >
-          <div className="flex items-center cursor-pointer hover:text-primary">
-          <EyeOutlined className="mr-2" />
-          <p>View</p>
-          </div>
+            <div className="flex items-center cursor-pointer hover:text-primary">
+              <EyeOutlined className="mr-2" />
+              <p>View</p>
+            </div>
           </Link>
         </button>
       ),

@@ -87,20 +87,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                 title={
                   <div className="font-medium">
                     <div
-                      className="flex items-center cursor-pointer"
-                      onClick={(item) => navigate(routes.EventList.url.replace(":id", inventory.address))}
-                    >
-                      <EyeOutlined />
-                      <p className="ml-3">View Event</p>
-                    </div>
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showModalEdit}
-                    >
-                      <PlusOutlined />
-                      <p className="ml-3">Add Event</p>
-                    </div>
-                    <div
                       className="flex items-center mt-2 cursor-pointer"
                       onClick={showEditModal}
                     >

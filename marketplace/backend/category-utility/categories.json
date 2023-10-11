@@ -35,6 +35,18 @@
                     "name": "Pants"
                 }
             ]
+        },
+        {
+            "name": "Materials",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Nickel Reserve"
+                },
+                {
+                    "name": "Nickel"
+                }
+            ]
         }
     ]
 }

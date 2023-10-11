@@ -33,7 +33,7 @@ const ProcessingOrder = () => {
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("cartList") ?? []);
   }, []);
-  
+
   // useEffect(() => {
   //   actions.fetchCartItems(marketplaceDispatch, cartList);
   // }, [marketplaceDispatch, cartList]);
@@ -42,7 +42,7 @@ const ProcessingOrder = () => {
     path: routes.ProcessingOrder.url,
     strict: true,
   });
-  
+
   const query = useQuery();
 
   useEffect(() => {
