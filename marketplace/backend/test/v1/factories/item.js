@@ -25,14 +25,11 @@ export const updateItemArgs = (address, uid) => {
   return args
 }
 
-export const giftItemArgs = (itemAddress, newOwner, dappAddress) => {
+export const transferItemArgs = (itemAddress, newOwner) => {
   const args = {
-    itemsAddress: [itemAddress],
-    newOwner: newOwner,
-    dappAddress: dappAddress,
+    itemsAddress: itemAddress, // array of item addresses
+    newOwner: newOwner, 
     newQuantity: 1,
-    itemNumber: 1,
-    isGiftedTransfer: true
   }
 
   return args

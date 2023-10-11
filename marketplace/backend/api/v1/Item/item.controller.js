@@ -102,9 +102,8 @@ class ItemController {
   static async transferOwnership(req, res, next) {
     try {
       const { dapp, body } = req
-      console.log("body", body)
-
-      // ItemController.validateTransferOwnershipArgs(body)
+      console.log('body', body)
+      ItemController.validateTransferOwnershipArgs(body)
       const result = await dapp.transferOwnershipItem(body, options)
       rest.response.status200(res, result)
     } catch (e) {
@@ -182,9 +181,9 @@ class ItemController {
 
   static validateTransferOwnershipArgs(args) {
     const transferOwnershipItemSchema = Joi.object({
-      address: Joi.string().required(),
-      chainId: Joi.string().required(),
-      newOwner: Joi.string().required()
+      itemsAddress: Joi.array().items(Joi.string()).required(),
+      newOwner: Joi.string().required(),
+      newQuantity: Joi.number().integer().min(1).required(),
     })
 
     const validation = transferOwnershipItemSchema.validate(args);

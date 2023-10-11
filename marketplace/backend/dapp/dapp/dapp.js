@@ -658,9 +658,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.transferOwnershipItem = async function (args, options = defaultOptions) {
-    console.log('dapp.transferOwnershipItem -------> args', args)
-    return managers.itemManager.transferOwnership({...args, dappAddress: contract.address});
-   
+    console.log('dapp.transferOwnershipItem======>', args)
+
+    // Needed for batching items in the transfer funciton. 
+    const itemNumber = parseInt(util.uid());
+    return managers.itemManager.transferOwnership({ ...args, dappAddress: contract.address, isGiftedTransfer: true, itemNumber: itemNumber });
   };
 
   contract.auditItem = async function (args, options = defaultOptions) {

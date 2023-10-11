@@ -10,7 +10,7 @@ import dappJs from '../../dapp/dapp/dapp'
 
 import { productArgs, updateProductArgs } from './factories/product'
 import { inventoryArgs } from './factories/inventory'
-import { itemArgs, giftItemArgs, updateItemArgs } from './factories/item'
+import { itemArgs, transferItemArgs, updateItemArgs } from './factories/item'
 import { Item, Product, Inventory, Organizations, Order } from '../../api/v1/endpoints'
 const options = { config }
 
@@ -51,80 +51,80 @@ describe('Item End-To-End Tests', function () {
     orgAdmin = { ...orgAdminResponse.user, ...orgAdminCredentials }
   })
 
-  // it('Get all Items', async () => {
-  //   // get items
-  //   const getItems = await get(
-  //     Item.prefix,
-  //     Item.getAll,
-  //     {},
-  //     orgAdmin.token,
-  //   )
+  it('Get all Items', async () => {
+    // get items
+    const getItems = await get(
+      Item.prefix,
+      Item.getAll,
+      {},
+      orgAdmin.token,
+    )
 
-  //   assert.equal(getItems.status, 200, 'should be 200');
-  //   assert.isDefined(getItems.body, 'body should be defined');
-  //   assert.isDefined(getItems.body.data, 'body should be defined');
-  // });
+    assert.equal(getItems.status, 200, 'should be 200');
+    assert.isDefined(getItems.body, 'body should be defined');
+    assert.isDefined(getItems.body.data, 'body should be defined');
+  });
 
-  // it('Get item ownership history', async () => {
-  //   // create product
-  //   const createProductArgs = {
-  //     ...productArgs(util.uid()),
-  //   }
+  it('Get item ownership history', async () => {
+    // create product
+    const createProductArgs = {
+      ...productArgs(util.uid()),
+    }
 
-  //   const createProductResponse = await post(
-  //     Product.prefix,
-  //     Product.create,
-  //     createProductArgs,
-  //     orgAdmin.token
-  //   )
+    const createProductResponse = await post(
+      Product.prefix,
+      Product.create,
+      createProductArgs,
+      orgAdmin.token
+    )
 
-  //   assert.equal(createProductResponse.status, 200, 'should be 200');
-  //   assert.isDefined(createProductResponse.body, 'body should be defined');
+    assert.equal(createProductResponse.status, 200, 'should be 200');
+    assert.isDefined(createProductResponse.body, 'body should be defined');
 
-  //   const productAddress = createProductResponse.body.data[1]
+    const productAddress = createProductResponse.body.data[1]
 
-  //   // create inventory
-  //   const createInventoryArgs = {
-  //     ...inventoryArgs(productAddress, util.uid()),
-  //   }
+    // create inventory
+    const createInventoryArgs = {
+      ...inventoryArgs(productAddress, util.uid()),
+    }
 
-  //   const createInventoryResponse = await post(
-  //     Inventory.prefix,
-  //     Inventory.create,
-  //     createInventoryArgs,
-  //     orgAdmin.token,
-  //   )
+    const createInventoryResponse = await post(
+      Inventory.prefix,
+      Inventory.create,
+      createInventoryArgs,
+      orgAdmin.token,
+    )
 
-  //   assert.equal(createInventoryResponse.status, 200, 'should be 200');
-  //   assert.isDefined(createInventoryResponse.body, 'body should be defined')
-  //   assert.isDefined(createInventoryResponse.body.data, 'body.data should be defined')
+    assert.equal(createInventoryResponse.status, 200, 'should be 200');
+    assert.isDefined(createInventoryResponse.body, 'body should be defined')
+    assert.isDefined(createInventoryResponse.body.data, 'body.data should be defined')
 
-  //   // get item ownership history
-  //   const getItemOwnershipHistory = await get(
-  //     Item.prefix,
-  //     Item.ownershipHistory.replace(':address', createInventoryResponse.body.data[2].split(',')[0]),
-  //     {},
-  //     orgAdmin.token,
-  //   )
+    // get item ownership history
+    const getItemOwnershipHistory = await get(
+      Item.prefix,
+      Item.ownershipHistory.replace(':address', createInventoryResponse.body.data[2].split(',')[0]),
+      {},
+      orgAdmin.token,
+    )
 
-  //   assert.equal(getItemOwnershipHistory.status, 200, 'should be 200');
-  //   assert.isDefined(getItemOwnershipHistory.body, 'body should be defined');
-  //   assert.isDefined(getItemOwnershipHistory.body.data, 'body should be defined');
-  // });
+    assert.equal(getItemOwnershipHistory.status, 200, 'should be 200');
+    assert.isDefined(getItemOwnershipHistory.body, 'body should be defined');
+    assert.isDefined(getItemOwnershipHistory.body.data, 'body should be defined');
+  });
 
-  // it('Get all Raw Materials', async () => {
-  //   // get raw materials
-  //   const getRawMaterials = await get(
-  //     Item.prefix,
-  //     Item.getRawMaterials,
-  //     {},
-  //     orgAdmin.token,
-  //   )
+  it('Get all Raw Materials', async () => {
+    // get raw materials
+    const getRawMaterials = await get(
+      Item.prefix,
+      Item.getRawMaterials,
+      {},
+      orgAdmin.token,
+    )
 
-  //   assert.equal(getRawMaterials.status, 200, 'should be 200');
-  //   assert.isDefined(getRawMaterials.body, 'body should be defined');
-  //   assert.isDefined(getRawMaterials.body.data, 'body should be defined');
-  // });
+    assert.equal(getRawMaterials.status, 200, 'should be 200');
+    assert.isDefined(getRawMaterials.body, 'body should be defined');
+    assert.isDefined(getRawMaterials.body.data, 'body should be defined');
+  });
 
   it("Transfer Ownership of an Item", async () => {
     // create product
@@ -139,14 +139,15 @@ describe('Item End-To-End Tests', function () {
       orgAdmin.token
     )
 
-    console.log("createProductResponse", createProductResponse.body.data)
+    assert.equal(createProductResponse.status, 200, 'should be 200');
+    assert.isDefined(createProductResponse.body, 'body should be defined');
+
 
     // create inventory
     const createInventoryArgs = {
       ...inventoryArgs(createProductResponse.body.data[1], util.uid()),
     }
 
-    console.log("createInventoryArgs", createInventoryArgs)
 
     const createInventoryResponse = await post(
       Inventory.prefix,
@@ -155,13 +156,21 @@ describe('Item End-To-End Tests', function () {
       orgAdmin.token,
     )
 
-    console.log("createInventoryResponse", createInventoryResponse.body.data)
+    assert.equal(createInventoryResponse.status, 200, 'should be 200');
+    assert.isDefined(createInventoryResponse.body, 'body should be defined')
 
-    const itemAddress = createInventoryResponse.body.data[2].split(',')[0]
+    // get item address
+    const itemAddress = createInventoryResponse.body.data[2].split(',')
+
+    // Remove the last item in the array which is an empty string
+    const itemsArrCleaned = itemAddress.slice(0, itemAddress.length - 1)
+
 
     // transfer ownership of item
+    let newOwner = "e8a213bc06999d704ee89b29c7262fb67e3ea72f"
     const transferOwnershipArgs = {
-      ...giftItemArgs(itemAddress, "e8a213bc06999d704ee89b29c7262fb67e3ea72f", dappJs.dappAddress),
+      // Hard coded new owner address. TODO: update this with a dynamic address
+      ...transferItemArgs(itemsArrCleaned, newOwner),
     }
 
     const transferOwnershipResponse = await put(
@@ -171,10 +180,17 @@ describe('Item End-To-End Tests', function () {
       orgAdmin.token,
     )
 
-    console.log("transferOwnershipResponse", transferOwnershipResponse.body.data)
+    const transferedItems = await get(
+      Item.prefix,
+      Item.getAll,
+      {productId: transferOwnershipResponse.body.data[1]},
+      orgAdmin.token,
+    )
 
     assert.equal(transferOwnershipResponse.status, 200, 'should be 200');
-
+    assert.isDefined(transferOwnershipResponse.body, 'body should be defined')
+    assert.isDefined(transferOwnershipResponse.body.data, 'body.data should be defined')
+    assert.equal(transferedItems.body.data[0].owner, newOwner, 'owner should be updated')
   })
 
 })
