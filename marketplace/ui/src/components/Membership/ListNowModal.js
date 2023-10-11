@@ -78,33 +78,35 @@ const ListNowModal = ({
         </Row>
       ]}
     >
+
+      <hr style={{ color: '#e6d8d8', marginTop: '5px' }} />
       <Form className="mt-10">
 
         <Row gutter={[48, 12]}>
           <Col span={8}>
-            <Row> <Text strong>Seller</Text> </Row>
-            <Row><Input type="text" value={seller} size="large" disabled={true} className="w-full cursor-not-allowed" /> </Row>
+            <Row> <Text className="font-medium">Seller</Text> </Row>
+            <Row><Input type="text" value={seller} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
           <Col span={8}>
-            <Row><Text strong>Membership</Text> </Row>
-            <Row> <Input type="text" value={membership} size="large" disabled={true} className="w-full cursor-not-allowed" /> </Row>
+            <Row><Text className="font-medium">Membership</Text> </Row>
+            <Row> <Input type="text" value={membership} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>ID</Text></Row>
-            <Row><Input type="text" value={id} size="large" disabled={true} className="w-full cursor-not-allowed" /></Row>
+            <Row> <Text className="font-medium">ID</Text></Row>
+            <Row><Input type="text" value={id} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /></Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Type</Text></Row>
-            <Row><Input type="text" value={type} size="large" disabled={true} className="w-full cursor-not-allowed" /> </Row>
+            <Row> <Text className="font-medium">Type</Text></Row>
+            <Row><Input type="text" value={type} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Quantity</Text></Row>
+            <Row> <Text className="font-medium">Quantity</Text></Row>
             <Row><InputNumber
               id="quantity"
               name="quantity"
               min={0}
               max={inventoryQuantity}
-              className="w-full"
+              className="w-full mt-2"
               size="large"
               prefix={isInventoriesLoading && <Spin />}
               disabled={type === "Sale"}
@@ -117,14 +119,14 @@ const ListNowModal = ({
             /></Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Tax Percentage/Amount</Text></Row>
+            <Row> <Text className="font-medium">Tax Percentage/Amount</Text></Row>
             <Row> <InputNumber
               id="percentage"
               name="percentage"
               min={0}
               addonAfter={selectAfter}
               formatter={handleFormatter}
-              className="w-full"
+              className="w-full mt-2"
               size="large"
               controls={false}
               parser={handleParser}
@@ -141,11 +143,12 @@ const ListNowModal = ({
             /></Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Price</Text></Row>
+            <Row> <Text className="font-medium">Price</Text></Row>
             <Row><InputNumber
+              addonBefore="$"
               id="price"
               name="price"
-              className="w-full"
+              className="w-full mt-2"
               min={0}
               size="large"
               controls={false}

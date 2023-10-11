@@ -218,7 +218,7 @@ const MembershipCardPurchased = ({
           <Spin />
         </div>
       ) : (
-        <Card className="w-full mt-6 border-grey hover:shadow-xl" id="product" key={membershipId}>
+        <Card className="w-full mt-6 border-grey card-shadow" id="product" key={membershipId}>
           <Col span={24}>
             <Row className="p-4 flex justify-between rounded-md" style={{ backgroundColor: "#f2f2f9" }}>
               <Col >
@@ -232,10 +232,10 @@ const MembershipCardPurchased = ({
                     borderRadius: '10%', backgroundColor: `${status == 1 ? 'green' : status == 2 ? 'red' : 'green'}`,
                     height: "8px", width: "8px", borderRadius: "20%"
                   }} > &nbsp; &nbsp; &nbsp;</span>
-                  {' '}{statusText[status]??"For Sale"}
+                  {' '}{statusText[status] ?? "For Sale"}
                 </Typography.Text>
               </Col>
-              <Col  className="text-right flex" style={{ alignItems: "center" }}>
+              <Col className="text-right flex" style={{ alignItems: "center" }}>
                 <Button className="primary-theme-text font-bold text-lg" type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
                   Preview  &gt;&gt;
                 </Button>
@@ -287,7 +287,7 @@ const MembershipCardPurchased = ({
                 </Button>
                 {/* : null} */}
               </Col>
-              <Col sm={12} lg={{span:12}} xl={{span:14, offset:1}} xxl={{span:17, offset:1}} className="border-grey shadow-lg leading-2 min-h-min rounded p-2 ">
+              <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17, offset: 1 }} className="border-grey shadow-lg leading-2 min-h-min rounded p-2 ">
                 <Paragraph >
                   <Text disabled className="font-bold" >Sub Category</Text>
                   <Text strong className="float-right">{subCategory}</Text>
@@ -321,7 +321,8 @@ const MembershipCardPurchased = ({
 
                   <Collapse size="large" expandIconPosition='end'>
                     <Collapse.Panel key="1" header={<Title level={5}>Inventories</Title>}>
-                      <Table bordered pagination={false} columns={columns}  dataSource={data} />
+                      <Table bordered pagination={false}
+                        rowClassName={"bg-white"} rowKey="key" columns={columns} dataSource={data} />
                     </Collapse.Panel>
                   </Collapse>
 

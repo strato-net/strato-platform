@@ -127,3 +127,7 @@
   + :where(.css-9ntgx0).ant-checkbox-wrapper {
   margin-inline-start: 0px;
 }
+
+.ant-upload-list-item{
+  margin-left: 10px;
+}

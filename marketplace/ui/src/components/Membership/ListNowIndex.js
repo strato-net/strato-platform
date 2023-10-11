@@ -178,26 +178,27 @@ const ListNowIndex = ({
         <Row>
           <Button
             key="list-now"
-            className="mx-auto w-52"
+            className="mx-auto w-52 font-bold"
             size="large"
             disabled={isListNow || isResaleMembershipSubmitting}
             loading={isResaleMembershipSubmitting}
             onClick={() => { handleCreateFormSubmit() }}
-            type={(isListNow || isResaleMembershipSubmitting) ? 'default':'primary'}
+            type={(isListNow || isResaleMembershipSubmitting) ? 'default' : 'primary'}
           >
-            List Now
+          List Now
           </Button>
         </Row>
       ]}
     >
+      <hr style={{ color: '#e6d8d8', marginTop:'5px' }} />
       <Form className="mt-10">
         <Row gutter={[48, 12]}>
           <Col span={8}>
-            <Row> <Text strong>Seller</Text> </Row>
+            <Row> <Text className="font-medium">Seller</Text> </Row>
             <Row><Input type="text" value={seller} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
           </Col>
           <Col span={8} >
-            <Row><Text strong>Membership</Text> </Row>
+            <Row><Text className="font-medium">Membership</Text> </Row>
             <Row> <Select
               className="w-full mt-2"
               size="large"
@@ -211,7 +212,7 @@ const ListNowIndex = ({
             /> </Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>ID</Text></Row>
+            <Row> <Text className="font-medium">ID</Text></Row>
             <Row><Select
               className="w-full mt-2"
               size="large"
@@ -229,11 +230,11 @@ const ListNowIndex = ({
             /></Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Type</Text></Row>
+            <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={type} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Quantity</Text></Row>
+            <Row> <Text className="font-medium">Quantity</Text></Row>
             <Row><InputNumber
               id="quantity"
               name="quantity"
@@ -255,7 +256,7 @@ const ListNowIndex = ({
             /> </Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Tax Percentage/Amount</Text></Row>
+            <Row> <Text className="font-medium">Tax Percentage/Amount</Text></Row>
             <Row> <InputNumber
               id="percentage"
               name="percentage"
@@ -283,7 +284,7 @@ const ListNowIndex = ({
             /></Row>
           </Col>
           <Col span={8}>
-            <Row> <Text strong>Price</Text></Row>
+            <Row> <Text className="font-medium">Price</Text></Row>
             <Row><InputNumber
               addonBefore="$"
               className="w-full mt-2"

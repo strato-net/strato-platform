@@ -445,10 +445,11 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
         centered
         onCancel={closeModal}
         width={1000}
+        className="create-new-modal"
         footer={[
-          <Row className="flex justify-between">
-            <div className="flex justify-end w-44 mx-auto mr-10">
-              {/* <Button
+          <Row className="mt-8 create-modal-footer-shadow">
+            <Col span={8} className="flex mx-auto mt-4">
+             {/* <Button
                 id="cancel-membership-button"
                 key="cancel"
                 type="secondary"
@@ -462,9 +463,10 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 id="create-membership-button"
                 key="submit"
                 type="primary"
+                size="large"
                 loading={isCreateMembershipSubmitting}
                 style={{ backgroundColor: "green", color: "white" }}
-                className="mx-4 px-10"
+                className="mx-4 px-10 font-bold w-56"
                 onClick={formik.handleSubmit}
                 disabled={disabled}
               >
@@ -473,25 +475,29 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
               <Button
                 id="list-membership-button"
                 key="list"
+                size="large"
                 type={isDisabled ? "default" : "primary"}
-                className="ml-4 mr-8 px-10"
+                className="ml-4 mr-8 px-10 font-bold w-56"
                 onClick={openListNowModal}
                 disabled={isDisabled}
               >
                 {disabled ? <Spin /> : "List Now"}
               </Button>
-            </div>
+            </Col>
           </Row>,
         ]}
       >
 
-        <Title level={3} style={{ backgroundColor: "#f2f2f2" }} className="p-2 rounded" >Create New Membership</Title>
-        <hr className="text-secondryD mt-3" />
+        <Row >
+          <Col className="rounded h-22 w-full" style={{ backgroundColor: "#f2f2f2" }} span={24}>
+            <Title level={3} className="p-2 mt-3 text-center" >Create New Membership</Title>
+          </Col>
+        </Row>
         <Form layout="vertical" className="mt-5">
 
-          <Card className="mt-5 shadow-lg">
-            <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Membership Details</Title></Row>
-            <Col>
+          <Card className="mt-5 shadow-md">
+            <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Membership Details</Title></Row>
+            <Col className="mt-4">
               <Row gutter={[12, 12]}>
                 <Col span={8}>
                   <Form.Item label="Membership Name" name="name">
@@ -633,8 +639,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
           </Card>
 
 
-          <Card className="mt-5 shadow-lg">
-            <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Upload Photos</Title></Row>
+          <Card className="mt-5 shadow-md">
+            <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Upload Photos</Title></Row>
             <Upload
               id="images"
               listType="picture"
@@ -659,10 +665,10 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
           </Card>
 
 
-          <Card className="mt-5 shadow-lg">
+          <Card className="mt-5 shadow-md">
             <Row>
               <Col span={12}>
-                <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Services</Title></Row>
+                <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Services</Title></Row>
               </Col>
               <Col span={12}> <Button
                 className=" float-right font-bold"
@@ -816,8 +822,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
             ))}
           </Card>
 
-          <Card className="mt-5 shadow-lg">
-            <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Upload Documents</Title></Row>
+          <Card className="mt-5 shadow-md">
+            <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Upload Documents</Title></Row>
             <Row className="mt-5">
               <Col span={24}>
                 <Upload.Dragger
@@ -829,7 +835,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 </Upload.Dragger>
               </Col> </Row>
 
-            <Card className="mt-5 shadow-lg">
+            {fileList.length > 0 && <Card className="mt-5 shadow-lg">
               <Row gutter={16}>
                 {fileList.map((file, index) => (
                   <Col span={12} key={index}>
@@ -848,7 +854,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                   </Col>
                 ))}
               </Row>
-            </Card>
+            </Card>}
           </Card>
 
         </Form>

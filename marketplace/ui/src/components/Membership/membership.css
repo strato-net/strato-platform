@@ -61,27 +61,28 @@
 } */
 
 .create-modal-header {
-background-color: red;
+  background-color: red;
 }
 
-.ant-modal-close {
-  /* Add your custom styles here */
-  font-weight: 800;
-  margin-top: 10px;
-  color: black !important;
-  margin-right: 20px
-  /* You can customize the size, color, or any other CSS properties here */
-}
-
-.ant-input-number-affix-wrapper-disabled, .ant-input-number-disabled{
+.ant-input-number-affix-wrapper-disabled,
+.ant-input-number-disabled {
   background-color: white;
 }
 
-.ant-input-number-disabled{
+.ant-input-number-disabled {
   cursor: disabled;
 }
 
+.create-new-modal > .ant-modal-content > button {
+  margin-top: 25px;
+  color: black;
+  margin-right: 20px;
+}
 
-/* .card-shadow{
-  box-shadow: ;
-} */
+.card-shadow:hover {
+  box-shadow: 0px 0px 6px 2px #0000002e;
+}
+
+.create-modal-footer-shadow{
+  box-shadow: 0px -2px 8px 0px #00000026;
+}
