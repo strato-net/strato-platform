@@ -88,7 +88,7 @@ getAccessTokenForRealm realm = do
 -- }
 
 getDefaultEmptyOrg :: String -> String -> String
-getDefaultEmptyOrg name uuid = "Mercata Account " ++ case elemIndex ' ' name of
+getDefaultEmptyOrg name uuid = case elemIndex ' ' name of
   Nothing -> head name : take 8 uuid
   Just idx ->
     let lastNs = drop (idx + 1) name
