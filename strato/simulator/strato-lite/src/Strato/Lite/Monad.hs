@@ -137,8 +137,8 @@ newVSocket :: IO VSocket
 newVSocket = liftA2 VSocket newTQueueIO newTQueueIO
 
 data Internet = Internet
-  { _tcpPorts :: Data.Map.Strict.Map (IPAsText, TCPPort) (TQueue (VSocket, IPAsText)),
-    _udpPorts :: Data.Map.Strict.Map (IPAsText, UDPPort) (TQueue (B.ByteString, SockAddr))
+  { _tcpPorts :: Map (IPAsText, TCPPort) (TQueue (VSocket, IPAsText)),
+    _udpPorts :: Map (IPAsText, UDPPort) (TQueue (B.ByteString, SockAddr))
   }
 
 makeLenses ''Internet
@@ -172,24 +172,24 @@ data TestContext = TestContext
     _connectionTimeout :: ConnectionTimeout,
     _maxReturnedHeaders :: MaxReturnedHeaders,
     _prvKey :: PrivateKey,
-    _shaBlockDataMap :: Data.Map.Strict.Map Keccak256 DataDefs.BlockData,
+    _shaBlockDataMap :: Map Keccak256 DataDefs.BlockData,
     _p2pWorldBestBlock :: WorldBestBlock,
     _bestBlock :: BestBlock,
-    _canonicalBlockDataMap :: Data.Map.Strict.Map Integer (Canonical DataDefs.BlockData),
-    _ipAddressIpChainsMap :: Data.Map.Strict.Map IPAddress IPChains,
-    _orgIdChainsMap :: Data.Map.Strict.Map OrgId OrgIdChains,
-    _shaChainTxsInBlockMap :: Data.Map.Strict.Map Keccak256 ChainTxsInBlock,
-    _chainMembersMap :: Data.Map.Strict.Map Word256 ChainMemberRSet,
-    _chainInfoMap :: Data.Map.Strict.Map Word256 ChainInfo,
-    _trueOrgNameChainsMap :: Data.Map.Strict.Map ChainMemberParsedSet TrueOrgNameChains,
-    _falseOrgNameChainsMap :: Data.Map.Strict.Map ChainMemberParsedSet FalseOrgNameChains,
+    _canonicalBlockDataMap :: Map Integer (Canonical DataDefs.BlockData),
+    _ipAddressIpChainsMap :: Map IPAddress IPChains,
+    _orgIdChainsMap :: Map OrgId OrgIdChains,
+    _shaChainTxsInBlockMap :: Map Keccak256 ChainTxsInBlock,
+    _chainMembersMap :: Map Word256 ChainMemberRSet,
+    _chainInfoMap :: Map Word256 ChainInfo,
+    _trueOrgNameChainsMap :: Map ChainMemberParsedSet TrueOrgNameChains,
+    _falseOrgNameChainsMap :: Map ChainMemberParsedSet FalseOrgNameChains,
     _p2pValidators :: Set.Set ChainMemberParsedSet,
-    _x509certMap :: Data.Map.Strict.Map Address X509CertInfoState,
-    _privateTxMap :: Data.Map.Strict.Map Keccak256 (Private (Word256, OutputTx)),
+    _x509certMap :: Map Address X509CertInfoState,
+    _privateTxMap :: Map Keccak256 (Private (Word256, OutputTx)),
     _genesisBlockHash :: GenesisBlockHash,
     _bestBlockNumber :: BestBlockNumber,
-    _stringPPeerMap :: Data.Map.Strict.Map String PPeer,
-    _pointPPeerMap :: Data.Map.Strict.Map Point PPeer,
+    _stringPPeerMap :: Map String PPeer,
+    _pointPPeerMap :: Map Point PPeer,
     _pbftMessages :: S.OSet Keccak256,
     _unseqEvents :: [IngestEvent],
     _sequencerContext :: SequencerContext,
@@ -197,9 +197,9 @@ data TestContext = TestContext
     _roundPeriod :: RoundPeriod,
     _timeoutChan :: TMChan RoundNumber,
     _vmContext :: MemContext,
-    _apiChainInfoMap :: Data.Map.Strict.Map Word256 ChainInfo,
-    _parsedSetMap :: Data.Map.Strict.Map ChainMemberParsedSet [ChainMemberParsedSet],
-    _parsedSetToX509Map :: Data.Map.Strict.Map ChainMemberParsedSet X509CertInfoState
+    _apiChainInfoMap :: Map Word256 ChainInfo,
+    _parsedSetMap :: Map ChainMemberParsedSet [ChainMemberParsedSet],
+    _parsedSetToX509Map :: Map ChainMemberParsedSet X509CertInfoState
   }
 
 makeLenses ''TestContext
@@ -461,7 +461,7 @@ instance MonadIO m => HasPrivateHashDB (MonadTest m) where
 
 genericTestLookup ::
   (State.MonadState s m, Ord k) =>
-  Lens' s (Data.Map.Strict.Map k (Modification a)) ->
+  Lens' s (Map k (Modification a)) ->
   Mod.Proxy a ->
   k ->
   m (Maybe a)
@@ -472,7 +472,7 @@ genericTestLookup registry _ k =
 
 genericTestInsert ::
   (State.MonadState s m, Ord k) =>
-  Lens' s (Data.Map.Strict.Map k (Modification a)) ->
+  Lens' s (Map k (Modification a)) ->
   Mod.Proxy a ->
   k ->
   a ->
@@ -481,7 +481,7 @@ genericTestInsert registry _ k a = registry . at k ?= Modification a
 
 genericTestDelete ::
   (State.MonadState s m, Ord k) =>
-  Lens' s (Data.Map.Strict.Map k (Modification a)) ->
+  Lens' s (Map k (Modification a)) ->
   Mod.Proxy a ->
   k ->
   m ()
@@ -1337,12 +1337,12 @@ postEvent e p = atomically $ writeTQueue (_p2pPeerUnseqSource p) [e]
 postEvents :: [SeqLoopEvent] -> P2PPeer -> IO ()
 postEvents es p = atomically $ writeTQueue (_p2pPeerUnseqSource p) es
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Data.Map.Strict.Map MP.StateRoot MP.NodeData)) where
+instance (MP.StateRoot `A.Alters` MP.NodeData) (State.State (a, Map MP.StateRoot MP.NodeData)) where
   lookup _ k = M.lookup k <$> State.gets snd
   insert _ k v = State.modify' $ \(a, b) -> (a, M.insert k v b)
   delete _ k = State.modify' $ \(a, b) -> (a, M.delete k b)
 
-type CertMap = Data.Map.Strict.Map Address (Modification X509CertInfoState)
+type CertMap = Map Address (Modification X509CertInfoState)
 
 addValidatorsToCertMap :: [(Address, ChainMemberParsedSet)] -> CertMap -> CertMap
 addValidatorsToCertMap vals m =
@@ -1393,7 +1393,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
   cache <- TRC.new 64
   let vals = snd <$> initialValidators'
       gi = insertMercataGovernanceContract vals (take 1 vals) $ insertCertRegistryContract extraCerts defaultGenesisInfo
-      (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Data.Map.Strict.Map MP.StateRoot MP.NodeData) $ do
+      (stateRoot, mpMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
         MP.initializeBlank
         for_ initialValidators $ \addr -> do
           sr <- State.gets fst
@@ -1424,7 +1424,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
             sr' <- MP.putKeyVal sr key val
             State.modify' $ \(_, b) -> (sr', b)
           ContractWithStorage address balance' codeHash' slots -> do
-            let (contractRoot', storageMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Data.Map.Strict.Map MP.StateRoot MP.NodeData) $ do
+            let (contractRoot', storageMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
                   MP.initializeBlank
                   for_ slots $ \(key, val) -> do
                     sr <- State.gets fst
@@ -1442,7 +1442,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
             sr' <- MP.putKeyVal sr key val
             State.modify' $ \(_, b) -> (sr', b <> storageMap)
           SolidVMContractWithStorage address balance' codeHash' slots -> do
-            let (contractRoot', storageMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Data.Map.Strict.Map MP.StateRoot MP.NodeData) $ do
+            let (contractRoot', storageMap) = flip State.execState (MP.emptyTriePtr, M.empty :: Map MP.StateRoot MP.NodeData) $ do
                   MP.initializeBlank
                   for_ slots $ \(key, val) -> do
                     sr <- State.gets fst
@@ -1750,7 +1750,7 @@ signChain privKey u =
       chainSig = ChainSignature r' s' v'
    in ChainInfo u chainSig
 
-mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Data.Map.Strict.Map Text Text -> Transaction
+mkSignedTx :: PrivateKey -> U.UnsignedTransaction -> Map Text Text -> Transaction
 mkSignedTx privKey utx md =
   let Nonce n = U.unsignedTransactionNonce utx
       Gas gl = U.unsignedTransactionGasLimit utx
@@ -1804,16 +1804,16 @@ runConnection connection = do
   concurrently_ rServer rClient
 
 data Network = Network
-  { _nodes :: Data.Map.Strict.Map Text P2PPeer,
-    _connections :: Data.Map.Strict.Map (Text, Text) P2PConnection,
+  { _nodes :: Map Text P2PPeer,
+    _connections :: Map (Text, Text) P2PConnection,
     _internet :: TVar Internet
   }
 
 makeLenses ''Network
 
 data ThreadPool = ThreadPool
-  { _nodeThreads :: Data.Map.Strict.Map Text (Async ()),
-    _connectionThreads :: Data.Map.Strict.Map (Text, Text) (Async ())
+  { _nodeThreads :: Map Text (Async ()),
+    _connectionThreads :: Map (Text, Text) (Async ())
   }
 
 makeLenses ''ThreadPool
