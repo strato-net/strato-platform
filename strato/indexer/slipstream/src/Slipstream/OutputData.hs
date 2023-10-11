@@ -80,7 +80,6 @@ import Slipstream.SolidityValue
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
-import Text.Format
 import Text.Printf
 import Text.RawString.QQ
 import UnliftIO.Exception (SomeException, catch, handle)
@@ -98,7 +97,6 @@ data ProcessedMappingRow = ProcessedMappingRow
     application :: Text,
     contractname :: Text,
     mapname :: Text,
-    chain :: Text,
     blockHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
@@ -138,15 +136,6 @@ partialParseTableColumns = concat . mapM (fmap unwrapDoubleQuotes . listToMaybe 
 makeAccount :: Text -> Address -> Text
 makeAccount "" addr = tshow $ addr
 makeAccount chain addr =
-  T.concat
-    [ tshow $ addr,
-      ":",
-      chain
-    ]
-
-makeAccountM :: ProcessedMappingRow -> Text
-makeAccountM ProcessedMappingRow {chain = "", address = addr} = tshow $ addr
-makeAccountM ProcessedMappingRow {chain = chain, address = addr} =
   T.concat
     [ tshow $ addr,
       ":",
@@ -854,9 +843,7 @@ insertIndexTableQuery cs =
                     (E.contractName x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
                 baseVals =
-                  [ \c -> makeAccount (E.chain c) (E.address c),
-                    tshow . E.address,
-                    E.chain,
+                  [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
@@ -904,9 +891,7 @@ insertMappingTableQuery ms =
                     (mapname x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list)
                 baseVals =
-                  [ makeAccountM,
-                    tshow . address,
-                    chain,
+                  [ tshow . address,
                     T.pack . keccak256ToHex . blockHash,
                     tshow . blockTimestamp,
                     tshow . blockNumber,
@@ -956,9 +941,7 @@ insertAbstractTableQuery cs =
                 list' = (map fst $ fillFirstEmptyEntries $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) list))
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ list'
                 baseVals =
-                  [ \c -> makeAccount (E.chain c) (E.address c),
-                    tshow . E.address,
-                    E.chain,
+                  [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
@@ -1004,9 +987,7 @@ insertHistoryTableQuery cs =
                     (E.contractName x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
                 baseVals =
-                  [ \c -> makeAccount (E.chain c) (E.address c),
-                    tshow . E.address,
-                    E.chain,
+                  [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
@@ -1151,9 +1132,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
       keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumns) ++ filledArgs
       baseVals =
-        [ \e -> makeAccount (T.pack . maybe "" format $ (Action.evContractAccount $ eventEvent e) ^. accountChainId) ((Action.evContractAccount $ eventEvent e) ^. accountAddress),
-          tshow . _accountAddress . Action.evContractAccount . eventEvent,
-          T.pack . maybe "" format . _accountChainId . Action.evContractAccount . eventEvent,
+        [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
