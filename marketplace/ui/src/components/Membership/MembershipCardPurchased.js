@@ -148,7 +148,7 @@ const MembershipCardPurchased = ({
   </Row>)
 
   const callDetailPage = (index, address) => {
-    navigate(`${naviroute.replace(":id", address)}`, { state: { isCalledFromMembership: true, inventoryId: address ?? null } });
+    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
   }
 
   const previewCol = (indx, address) => (<Button type="text"
