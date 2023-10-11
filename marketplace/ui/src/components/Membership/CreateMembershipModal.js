@@ -489,7 +489,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
         <hr className="text-secondryD mt-3" />
         <Form layout="vertical" className="mt-5">
 
-          <Card className="mt-5">
+          <Card className="mt-5 shadow-lg">
             <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Membership Details</Title></Row>
             <Col>
               <Row gutter={[12, 12]}>
@@ -633,7 +633,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
           </Card>
 
 
-          <Card className="mt-5">
+          <Card className="mt-5 shadow-lg">
             <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Upload Photos</Title></Row>
             <Upload
               id="images"
@@ -659,7 +659,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
           </Card>
 
 
-          <Card className="mt-5">
+          <Card className="mt-5 shadow-lg">
             <Row>
               <Col span={12}>
                 <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Services</Title></Row>
@@ -816,7 +816,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
             ))}
           </Card>
 
-          <Card className="mt-5">
+          <Card className="mt-5 shadow-lg">
             <Row className="flex">{checkPrimary()} &nbsp; <Title level={4}> Upload Documents</Title></Row>
             <Row className="mt-5">
               <Col span={24}>
@@ -829,7 +829,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 </Upload.Dragger>
               </Col> </Row>
 
-            <Card className="mt-5">
+            <Card className="mt-5 shadow-lg">
               <Row gutter={16}>
                 {fileList.map((file, index) => (
                   <Col span={12} key={index}>

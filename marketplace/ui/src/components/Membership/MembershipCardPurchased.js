@@ -218,9 +218,9 @@ const MembershipCardPurchased = ({
           <Spin />
         </div>
       ) : (
-        <Card className="w-full mt-6 border-grey" id="product" key={membershipId}>
+        <Card className="w-full mt-6 border-grey hover:shadow-xl" id="product" key={membershipId}>
           <Col span={24}>
-            <Row className="p-4 flex justify-between rounded-md" style={{ backgroundColor: "#f2f2f2" }}>
+            <Row className="p-4 flex justify-between rounded-md" style={{ backgroundColor: "#f2f2f9" }}>
               <Col >
                 <Row>
                   <Typography.Title level={4}>
@@ -319,9 +319,9 @@ const MembershipCardPurchased = ({
                     items={[{ key: '1', label: 'This is default size panel header', children: <Table bordered pagination={false} columns={columns} dataSource={data} /> }]}
                   /> */}
 
-                  <Collapse size="large">
+                  <Collapse size="large" expandIconPosition='end'>
                     <Collapse.Panel key="1" header={<Title level={5}>Inventories</Title>}>
-                      <Table bordered className="inventory-table" pagination={false} columns={columns}  dataSource={data} />
+                      <Table bordered pagination={false} columns={columns}  dataSource={data} />
                     </Collapse.Panel>
                   </Collapse>
 
