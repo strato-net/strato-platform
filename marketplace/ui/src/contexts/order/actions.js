@@ -226,10 +226,12 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, queryValue, organization, order, selectedDate) => {
+  fetchOrder: async (dispatch, limit, offset, queryValue, organization, order, selectedDate, filter) => {
     let query = queryValue ? `&orderId=${queryValue}` : "";
     let end = selectedDate + 86400;
-    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "";
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "query";
+    
+    query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
     
     dispatch({ type: actionDescriptors.fetchOrder });
 
@@ -256,11 +258,12 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order, selectedDate) => {
+  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order, selectedDate, filter) => {
     let query = queryValue ? `&orderId=${queryValue}` : "";
     let end = selectedDate + 86400;
-    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "";
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : query;
 
+    query = filter !== 0  ? query.concat(`&status=${filter}`) : query;
 
     dispatch({ type: actionDescriptors.fetchOrderSold });
 
