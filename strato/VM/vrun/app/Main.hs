@@ -87,7 +87,7 @@ main = do
           1 --value
           (Code pushLarges)
           Nothing
-          Nothing --TODO: is nothign ok?
+          Nothing
           secretKey
 
   signedTransaction' <- liftIO t

@@ -63,7 +63,8 @@ createBlocEnv = liftIO $ do
         txTBQueue = error ("txTBQueue shouldn't be needed in slipstream, it is undefined"),
         userRegistryAddress = 0x0,
         userRegistryCodeHash = Nothing,
-        useWalletsByDefault = error "useWalletsByDefault shouldn't be needed in slipstream"
+        useWalletsByDefault = error "useWalletsByDefault shouldn't be needed in slipstream",
+        useNetworkIdByDefault = error "useNetworkIdByDefault shouldn't be needed in slipstream"
       }
 
 connectToCirrus :: MonadIO m => m PGConnection

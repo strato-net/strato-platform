@@ -63,7 +63,8 @@ data BlocEnv = BlocEnv
     txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
-    useWalletsByDefault :: Bool
+    useWalletsByDefault :: Bool,
+    useNetworkIdByDefault :: Bool
   }
 
 --------------------------------------------------------------------------------

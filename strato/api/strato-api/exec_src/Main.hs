@@ -335,7 +335,8 @@ main = do
             txTBQueue = tbqueue,
             userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
-            useWalletsByDefault = flags_useWalletsByDefault
+            useWalletsByDefault = flags_useWalletsByDefault,
+            useNetworkIdByDefault = flags_useNetworkIdByDefault
           }
   run 3000 $ app env theDoc
 

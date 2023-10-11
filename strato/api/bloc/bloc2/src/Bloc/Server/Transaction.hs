@@ -197,6 +197,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
 
   -- construct the Transaction
   time <- liftIO getCurrentTime
+  useNetworkId <- useNetworkIdByDefault <$> getBlocEnv
   let tx =
         Transaction
           postbloctransactionrawrequestNonce
@@ -210,7 +211,8 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
           postbloctransactionrawrequestR
           postbloctransactionrawrequestS
           postbloctransactionrawrequestMetadata
-      rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress (Just computeNetworkID) tx --NOTE TO AYA: don't hardcode
+      nid = bool Nothing (Just computeNetworkID) useNetworkId
+      rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress nid tx
 
   if h
     then
@@ -265,7 +267,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
     TRANSFER -> do
       txs' <- mapM fromTransfer txs
       -- check all are going to the right network
-      when (any (/= computeNetworkID) $ mapMaybe transferpayloadNetworkid txs') $ throwIO $ InvalidArgs "Incorrect network id provided"
+      when (any (/= computeNetworkID) $ mapMaybe transferpayloadNetworkid txs') $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
       let ts = map (\(TransferPayload t v x c m n) -> SendTransaction t v (mergeTxParams x txParams) c m n) txs'
           txsWithChainids = map (sendtransactionChainid %~ (<|> cid)) ts
       txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionChainid sendtransactionTxParams txsWithChainids
@@ -288,7 +290,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
     CONTRACT -> do
       ps <- mapM fromContract txs
       -- check all are going to the right network
-      when (any (/= computeNetworkID) $ mapMaybe contractpayloadNetworkid ps) $ throwIO $ InvalidArgs "Incorrect network id provided"
+      when (any (/= computeNetworkID) $ mapMaybe contractpayloadNetworkid ps) $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
       let srcMap :: ContractPayload -> Maybe SourceMap
           srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
           src' :: ContractPayload -> Maybe SourceMap
@@ -345,7 +347,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
     FUNCTION -> do
       p <- mapM fromFunction txs
       -- check all are going to the right network
-      when (any (/= computeNetworkID) $ mapMaybe functionpayloadNetworkid p) $ throwIO $ InvalidArgs "Incorrect network id provided"
+      when (any (/= computeNetworkID) $ mapMaybe functionpayloadNetworkid p) $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
       let mapMethodCalls = map (\(FunctionPayload a m r v x c md n) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md n) p
           txsWithChainids = map (methodcallChainid %~ (<|> cid)) mapMethodCalls
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
@@ -422,7 +424,8 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
   fmap join . forM txList $ \tx -> case transactionType tx of
     TRANSFER -> do
       tx' <- fromTransfer tx
-      when (any (/= computeNetworkID) $ mapMaybe transferpayloadNetworkid [tx']) $ throwIO $ InvalidArgs "Incorrect network id provided" --TODO: come back and make prettier
+      -- check going to the right network
+      when (any (/= computeNetworkID) $ maybeToList $ transferpayloadNetworkid tx') $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
       let t = (\(TransferPayload t' v x c m n) -> SendTransaction t' v (mergeTxParams x txParams) c m n) tx'
           txWithChainid = (sendtransactionChainid %~ (<|> cid)) t
       txsWithParams <- genNonces (Don't CacheNonce) addr sendtransactionChainid sendtransactionTxParams [txWithChainid]
@@ -442,7 +445,8 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
         txsWithParams
     CONTRACT -> do
       ps <- fromContract tx
-      when (any (/= computeNetworkID) $ mapMaybe contractpayloadNetworkid [ps]) $ throwIO $ InvalidArgs "Incorrect network id provided" --TODO: come back and make prettier
+      -- check going to the right network
+      when (any (/= computeNetworkID) $ maybeToList $ contractpayloadNetworkid ps) $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
       let srcMap :: ContractPayload -> Maybe SourceMap
           srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
           src' :: ContractPayload -> Maybe SourceMap
@@ -496,7 +500,8 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                 netid
     FUNCTION -> do
       p <- fromFunction tx
-      when (any (/= computeNetworkID) $ mapMaybe functionpayloadNetworkid [p]) $ throwIO $ InvalidArgs "Incorrect network id provided" --TODO: come back and make prettier
+      -- check going to the right network
+      when (any (/= computeNetworkID) $ maybeToList $ functionpayloadNetworkid p) $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
       let mapMethodCalls = (\(FunctionPayload a m r v x c md n) -> MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md n) p 
           txWithChainids = (methodcallChainid %~ (<|> cid)) mapMethodCalls
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
@@ -641,6 +646,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
         Nothing -> fmap unAddress . blocVaultWrapper $ getKey (Just jwtToken) Nothing
         Just addr' -> return addr'
       walletFlag <- useWalletsByDefault <$> getBlocEnv
+      useNetworkId <- useNetworkIdByDefault <$> getBlocEnv
       let useWallet = fromMaybe walletFlag mUseWallet
       userContractAddr <- if useWallet
         then do
@@ -666,146 +672,81 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
           srcMap p = join $ liftA2 Map.lookup (contractpayloadContract p) msrcs
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
       fmap join . forM (partitionWith transactionType txs') $ \(ttype, txs) -> case ttype of
-        TRANSFER -> case txs of
-          [] -> return []
-          [x] -> do
-            p <- fromTransfer x
-            let btp =
-                  TransferParameters
-                    addr
-                    (transferpayloadToAddress p)
-                    (transferpayloadValue p)
-                    (mergeTxParams (transferpayloadTxParams p) txParams)
-                    (transferpayloadMetadata p)
-                    (transferpayloadChainid p <|> chainId)
-                    (transferpayloadNetworkid p)
-                    resolve
-            fmap ((: []) . BlocTxResult) $ postUsersSend' cacheNonce btp jwtToken
-          xs -> do
-            p <- mapM fromTransfer xs
-            let btlp =
-                  TransferListParameters
-                    addr
-                    (map (\(TransferPayload t v x c m n) -> SendTransaction t v (mergeTxParams x txParams) c m n) p)
-                    chainId
-                    resolve
-            fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp jwtToken
-        CONTRACT -> case txs of
-          [] -> return []
-          [x] -> do
-            p <- fromContract x
-            let md = contractpayloadMetadata p
-                cn = fromMaybe "unnamed_contract" (contractpayloadContract p)
-                bcp =
-                  ContractParameters
-                    addr
-                    (getSrc p)
-                    (contractpayloadContract p)
-                    (contractpayloadArgs p)
-                    (contractpayloadValue p)
-                    (mergeTxParams (contractpayloadTxParams p) txParams)
-                    -- History tables are always enabled. 'contractpayloadContract p' should
-                    -- always return a name but in the case that it doesn't it will go in the
-                    -- history table unnamed.
-                    ( case md of
-                        Nothing -> Just $ Map.singleton "history" cn
-                        Just m -> Just $ Map.insert "history" cn m
-                    )
-                    (contractpayloadChainid p <|> chainId)
-                    (contractpayloadNetworkid p)
-                    resolve
-                poster = postUsersContractSolidVM'
-            fmap ((: []) . BlocTxResult) $ poster cacheNonce bcp jwtToken
-          xs -> do
-            ps <- mapM fromContract xs
-            let bclp =
-                  ContractListParameters
-                    addr
-                    ( map
-                        ( \p@(ContractPayload _ c a v x cid m nid) -> do
-                            let cn = fromMaybe "unnamed_contract" c
-                            UploadListContract
-                              (fromJust c)
-                              (getSrc p)
-                              (fromMaybe Map.empty a)
-                              (mergeTxParams x txParams)
-                              v
-                              cid
-                              ( case m of
-                                  Nothing -> Just $ Map.singleton "history" cn
-                                  Just h -> Just $ Map.insert "history" cn h
-                              )
-                              nid
-                        )
-                        ps
-                    )
-                    chainId
-                    resolve
-                poster = postUsersUploadListSolidVM'
-            fmap BlocTxResult <$> poster cacheNonce bclp jwtToken
-        FUNCTION -> case txs of
-          [] -> return []
-          [x] -> do
-            p <- fromFunction x
-            let bfp = FunctionParameters
-                        addr
-                        (functionpayloadContractAddress p)
-                        (functionpayloadMethod p)
-                        (functionpayloadArgs p)
-                        (functionpayloadValue p)
-                        (mergeTxParams (functionpayloadTxParams p) txParams)
-                        (functionpayloadMetadata p)
-                        (functionpayloadChainid p <|> chainId)
-                        (functionpayloadNetworkid p)
-                        resolve
-            let bfpWallet = FunctionParameters
-                        addr
-                        userContractAddr
-                        "callContract"
-                        (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
-                        (functionpayloadValue p)
-                        (mergeTxParams (functionpayloadTxParams p) txParams)
-                        (functionpayloadMetadata p)
-                        (functionpayloadChainid p <|> chainId)
-                        (functionpayloadNetworkid p)
-                        resolve
-            -- NOTE TO AYA: would be nice to do this instead
-            -- let bfpWallet = bfp{
-            --             contractAddr = userContractAddr,
-            --             funcName = "callContract",
-            --             args = (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show $ functionpayloadContractAddress p), ("functionName",ArgString $ functionpayloadMethod p), ("args", ArgArray $ V.fromList $ M.elems $ functionpayloadArgs p)])
-            --           }
-            let bfp' = bool bfp bfpWallet useWallet
-            fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bfp' jwtToken
-          xs -> do
-            p <- mapM fromFunction xs
-            let bflp = FunctionListParameters
-                        addr
-                        (map (\(FunctionPayload a m r v x c md n) ->
-                          MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md n) p)
-                        chainId
-                        resolve
-            let bflpWallet = FunctionListParameters
-                        addr
-                        (map (\(FunctionPayload a m r v x c md n) ->
-                                MethodCall 
-                                  userContractAddr 
-                                  "callContract"  
-                                  (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
-                                  (fromMaybe (Strung 0) v) 
-                                  (mergeTxParams x txParams) 
-                                  c 
-                                  md
-                                  n
-                              ) p)
-                        chainId
-                        resolve
-            let bflp' = bool bflp bflpWallet useWallet
-            fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp' jwtToken
-        GENESIS -> case txs of
-          [] -> return []
-          xs -> do
-            chainInputs <- traverse fromGenesis xs
+        TRANSFER -> do
+          ps <- mapM fromTransfer txs
+          -- check all are going to the right network
+          -- then overwrite with network id if that is default behavior
+          when (any (/= computeNetworkID) $ mapMaybe transferpayloadNetworkid ps) $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
+          let ps' = map (\t-> bool t t{transferpayloadNetworkid = Just computeNetworkID} useNetworkId) ps
+              btlp =
+                TransferListParameters
+                  addr
+                  (map (\(TransferPayload t v x c m n) -> SendTransaction t v (mergeTxParams x txParams) c m n) ps')
+                  chainId
+                  resolve
+          fmap BlocTxResult <$> postUsersSendList' cacheNonce btlp jwtToken
+        CONTRACT -> do
+          ps <- mapM fromContract txs
+          -- check all are going to the right network
+          -- then overwrite with network id if that is default behavior
+          when (any (/= computeNetworkID) $ mapMaybe contractpayloadNetworkid ps) $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
+          let ps' = map (\c -> bool c c{contractpayloadNetworkid = Just computeNetworkID} useNetworkId) ps
+              bclp =
+                ContractListParameters
+                  addr
+                  ( map
+                      ( \p@(ContractPayload _ c a v x cid m nid) -> do
+                          let cn = fromMaybe "unnamed_contract" c
+                          UploadListContract
+                            (fromJust c)
+                            (getSrc p)
+                            (fromMaybe Map.empty a)
+                            (mergeTxParams x txParams)
+                            v
+                            cid
+                            ( case m of
+                              Nothing -> Just $ Map.singleton "history" cn
+                              Just h -> Just $ Map.insert "history" cn h
+                            )
+                            nid
+                      )
+                    ps'
+                  )
+                  chainId
+                  resolve
+              poster = postUsersUploadListSolidVM'
+          fmap BlocTxResult <$> poster cacheNonce bclp jwtToken
+        FUNCTION -> do
+          ps <- mapM fromFunction txs
+          -- check all are going to the right network
+          -- then overwrite with network id if that is default behavior
+          when (any (/= computeNetworkID) $ mapMaybe functionpayloadNetworkid ps) $ throwIO $ InvalidArgs $ "Incorrect network id provided; doesn't match " ++ show computeNetworkID
+          let ps' = map (\f -> bool f f{functionpayloadNetworkid = Just computeNetworkID} useNetworkId) ps
+          let bflp = FunctionListParameters
+                      addr
+                      (map (\(FunctionPayload a m r v x c md n) ->
+                        MethodCall a m r (fromMaybe (Strung 0) v) (mergeTxParams x txParams) c md n) ps')
+                      chainId
+                      resolve
+          let bflpWallet = FunctionListParameters
+                      addr
+                      (map (\(FunctionPayload a m r v x c md n) ->
+                              MethodCall 
+                                userContractAddr 
+                                "callContract"  
+                                (M.fromList $ [("contractToCall",ArgString $ Text.pack $ show a), ("functionName",ArgString m), ("args", ArgArray $ V.fromList $ M.elems r)])
+                                (fromMaybe (Strung 0) v) 
+                                (mergeTxParams x txParams) 
+                                c 
+                                md
+                                n
+                            ) ps')
+                      chainId
+                      resolve
+          let bflp' = bool bflp bflpWallet useWallet
+          fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp' jwtToken
+        GENESIS -> do
+            chainInputs <- traverse fromGenesis txs
             let chainInputSrc :: ChainInput -> Maybe SourceMap
                 chainInputSrc p =
                   if chaininputSrc p == mempty
