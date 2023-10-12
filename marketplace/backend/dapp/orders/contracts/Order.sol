@@ -206,7 +206,7 @@ contract Order is OrderStatus {
       string orderLineQuantities = "";
       for(uint i=0;i<orderLines.length;i++){
         OrderLine_2 orderLine = OrderLine_2(address(orderLines[i]));
-        Inventory inventory = Inventory(address(orderLine.inventoryId()));
+        Inventory_2 inventory = Inventory_2(address(orderLine.inventoryId()));
         inventories += string(address(orderLine.inventoryId())) + ",";
         orderLineQuantities += string(orderLine.quantity()) + ",";
       }

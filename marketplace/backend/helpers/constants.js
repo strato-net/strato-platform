@@ -37,8 +37,8 @@ export const STRIPE_ENV = {
   },
   ACCOUNT_ONBOARDING: {
     TYPE: 'accountOnboarding',
-    REFRESH_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories/stripe/onboarding`,
-    RETURN_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/inventories`
+    REFRESH_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/memberships/stripe/onboarding`,
+    RETURN_URL: `${config.serverHost}${config.marketplaceUiUrlPrefix}/memberships`
   }
 }
 Object.freeze(STRIPE_ENV)
@@ -81,4 +81,3 @@ export const SERVICE_PROVIDERS = {}
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
-

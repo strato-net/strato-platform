@@ -3,6 +3,7 @@ import OrderController from "./order.controller";
 import { Order } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
+import { sendEmail } from '../services/sendGridService';
 
 const router = express.Router();
 
@@ -26,7 +27,6 @@ router.post(
   loadDapp,
   OrderController.create
 );
-
 
 router.put(
   Order.updateBuyerDetails,
@@ -70,5 +70,14 @@ router.get(
   OrderController.getAllUserAddress
 )
 
+router.post('/send-email', async (req, res) => {
+  const { to, subject, htmlContent } = req.body;
+  try {
+    await sendEmail(to, subject, htmlContent);
+    res.status(200).send({ message: 'Email sent successfully!' });
+  } catch (error) {
+    res.status(500).send({ error: 'Failed to send email.' });
+  }
+});
 
 export default router;

@@ -26,6 +26,9 @@ import userAddressJs from "/dapp/addresses/userAddress.js";
 import paymentManagerJs from "/dapp/payments/paymentManager";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import orderManagerJs from '/dapp/orders/orderManager';
+import membershipJs from "../membership/membership";
+import membershipServiceJs from "../membershipService/membershipService";
+import membershipManagerJs from "../membership/membershipManager";
 
 const allAssetNames = [
   orderJs.contractName,
@@ -129,12 +132,14 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   const itemManager = await itemManagerJs.bindAddress(admin, state["itemManager"], options);
   const productManager = await productManagerJs.bindAddress(admin, state["productManager"], options);
   const eventTypeManager = await eventTypeManagerJs.bindAddress(admin, state.eventTypeManager, options);
+  const serviceManager = await serviceManagerJS.bindAddress(admin, state.serviceManager, options)
   const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options)
   const orderManager = await orderManagerJs.bindAddress(admin, state.orderManager, options)
+  const membershipManager = await membershipManagerJs.bindAddress(admin, state.membershipManager, options)
 
   const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
 
-  return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
+  return { cirrusOrg, productManager, eventTypeManager, serviceManager, itemManager, paymentManager, orderManager, membershipManager };
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
@@ -944,7 +949,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const taxRate = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount : inventory.taxDollarAmount) / 100;
           acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: inventory.taxDollarAmount === 0, data: [] };
         }
-        acc[inventory.ownerOrganization].data.push(inventory);
+        acc[inventory.productId].data.push(inventory);
         return acc;
       }, {});
 
@@ -1051,15 +1056,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
       let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
-      console.log('ownedProducts', ownedProducts)
 
       const arrayOfAddresses = ownedProducts.map(obj => obj.address);
-      console.log("arrayOfAddresses", arrayOfAddresses);
       const args = {
         ownerOrganization: userOrganization,
         productId: arrayOfAddresses
       }
-      console.log("args", args);
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       let ownedItems = await itemJs.getAll(rawAdmin, args, getOptions);
@@ -1067,41 +1069,127 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // ownedItems = ownedItems.filter(item =>
       //   ownedProducts.some(product => item.productId === product.address)
       // );
-
       console.log("ownedItems", ownedItems)
-
+      
       // Get Memberhships where productId = Items.productId 
       let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
       // ownedMemberships = ownedMemberships.filter(membership =>
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
-      console.log('ownedMemberships', ownedMemberships)
+      console.log ('ownedMemberships', ownedMemberships)
+      
+      const arrayOwnedMemberships = ownedMemberships.map(obj => obj.address);
+      // Get MembershipServices where membershipId = ownedMemberships.address 
+      const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: arrayOwnedMemberships }, getOptions));
+      const arrayMembershipServices= membershipServices.map(obj => obj.serviceId);
+      // Get all services
+      const servicesAll = await managers.serviceManager.getAll({address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
 
+      console.log ('membershipServices:', membershipServices)
+      console.log ('servicesAll:', servicesAll)
+      
       // Get ProductFile where productId = Items.productId
-      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
+      // let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
       // ownedProductFiles = ownedProductFiles.filter(file =>
       //   ownedItems.some(item => file.productId === item.productId)
       // );
-      console.log('ownedProductFiles', ownedProductFiles)
-
+      console.log ('ownedProductFiles', ownedProductFiles)
+      // TODO: What if there are not product files? Should we throw an error?
+      // TODO: What if there are multiple product files? Should we display all of them?
       // Combine ownedProducts, ownedItems, ownedMemberships, and ownedProductFiles into one JSON object array
       const combinedData = ownedItems
         .filter(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
-          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+
+          return product && productFiles.length > 0 && memberships.length > 0
+        })
+        .map(item => {
+          const product = ownedProducts.find(p => p.address === item.productId);
+          const memberships = ownedMemberships.filter(m => m.productId === item.productId);
+          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          const savings = membershipServices
+            .filter(
+              (membershipService) =>
+                membershipService.membershipId === memberships[0].address
+            )
+            .map((membershipService) => {
+              const matchingService = servicesAll.find(
+                (service) => service.address === membershipService.serviceId
+              );
+
+              if (matchingService) {
+                return {
+                  savings:
+                    membershipService.maxQuantity *
+                    (matchingService.price - membershipService.membershipPrice),
+                };
+              } else {
+                return " Not found";
+              }
+            });
+          
+          console.log("savings: ", savings)
+          return {
+            itemAddress: item.address,
+            itemNumber: item.itemNumber,
+            productId: item.productId,
+            fileLocation: productFiles[0].fileLocation,
+            productName: product.name,
+            subCategory: product.subCategory,
+            manufacturer: product.manufacturer,
+            timePeriodInMonths: memberships[0].timePeriodInMonths,
+            savings: savings[0]?.savings,
+            membershipAddress: memberships[0].address
+          };
+        });
+
+      return combinedData;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getPurchasedMemberships");
+    }
+
+  };
+
+  contract.getIssuedMemberships = async function (args, options = defaultOptions) {
+    try {
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+      let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions);
+
+      const arrayOfAddresses = issuedProducts.map(obj => obj.address);
+      const args = {
+        notEqualsField: 'ownerOrganization',
+        notEqualsValue: userOrganization,
+        productId: arrayOfAddresses
+      }
+
+      // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
+      let issuedItems = await itemJs.getAll(rawAdmin, args, getOptions);
+
+      // Combine issuedProducts, issuedItems, issuedMemberships, and issuedProductFiles into one JSON object array
+      const combinedData = issuedItems
+        .filter(item => {
+          const product = issuedProducts.find(p => p.address === item.productId);
+          // const memberships = issuedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = issuedProductFiles.filter(file => file.productId === item.productId);
 
           return product //&& productFiles.length > 0; //&& memberships.length > 0
         })
         .map(item => {
-          const product = ownedProducts.find(p => p.address === item.productId);
-          // const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          // const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          const product = issuedProducts.find(p => p.address === item.productId);
+          // const memberships = issuedMemberships.filter(m => m.productId === item.productId);
+          // const productFiles = issuedProductFiles.filter(file => file.productId === item.productId);
 
           return {
             itemAddress: item.address,
             itemNumber: item.itemNumber,
             productId: item.productId,
+            owner: item.owner,
+            ownerCommonName: item.ownerCommonName,
             fileLocation: null,//productFiles[0].fileLocation,
             productName: product.name,
             subCategory: product.subCategory,
@@ -1110,22 +1198,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             savings: null, //memberships[0].savings,
             membershipAddress: null //memberships[0].address
           };
-        });
-      console.log('combinedData', combinedData);
+        }) //.filter((item) => item.manufacturer === userOrganization)
 
       return combinedData;
     } catch (error) {
-      console.log('error123', error)
       if (error.response) {
-        console.log('error.response', error.response)
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getPurchasedMemberships");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error at getIssuedMemberships");
     }
 
   };
-
-
 
   contract.updateBuyerDetails = async function (args, options = defaultOptions) {
     try {
@@ -1185,8 +1268,76 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         for (let orderLineAddress of orderLinesAddresses) {
           const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
+          console.log("dapp orderLineItems: ", orderLineItems)
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
+          console.log("dapp itemAddresses: ", itemAddresses)
+          
+          // Get items and get the productIds
+          const items = await managers.itemManager.getItems({ address: itemAddresses }, createOptions);
+          console.log("dapp items: ", items)
+          const productAddresses = items.map(item => item.productId);
+          console.log("dapp productAddresses: ", productAddresses)
+          
+          // Using the productIds, get the memberships
+          let memberships = await membershipJs.getAll(rawAdmin, {productId: productAddresses}, createOptions)
+          console.log("here")
+          console.log("dapp memberships:", memberships)
+          const membershipAddresses = memberships.map(membership => membership.address);
+          
+          // Transfer ownership of the items to the buyer
           const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
+          console.log("dapp productId: ", productId)
+          console.log("dapp inventoryId: ", inventoryId)
+          
+          // Get all membershipServices using membershipId
+          const membershipServices = await membershipServiceJs.getAll(rawAdmin, {membershipId: membershipAddresses}, createOptions)
+          console.log("dapp membershipServices: ", membershipServices)
+          
+          // Get all productFiles using productId
+          const productFiles = await productFileJs.getAll(rawAdmin, {productId: productAddresses}, createOptions)
+          console.log("dapp productFiles: ", productFiles)
+          
+        const membershipArgs = {
+            createdDate: memberships[0].createdDate,
+            timePeriodInMonths: memberships[0].timePeriodInMonths,
+            additionalInfo: memberships[0].additionalInfo
+        }
+        
+        const membershipServiceArgs = membershipServices.map((membershipService) => {
+          return {
+            serviceId: membershipService.serviceId,
+            membershipPrice: membershipService.membershipPrice,
+            discountPrice: membershipService.discountPrice,
+            maxQuantity: membershipService.maxQuantity,
+            createdDate: membershipService.createdDate,
+            isActive: membershipService.isActive,
+          };
+        });
+        
+        const productFileArgs = productFiles.map((productFile) => {
+          return {
+            fileLocation: productFile.fileLocation,
+            fileHash: productFile.fileHash,
+            fileName: productFile.fileName,
+            uploadDate: productFile.uploadDate,
+            createdDate: productFile.createdDate,
+            currentSection: productFile.currentSection,
+            currentType: productFile.currentType,
+          };
+        });
+        
+        
+
+          console.log("comes here")
+          const memberResponse = await managers.membershipManager.addMembershipOrderFlow({ 
+            dappAddress: contract.address,
+            owner: newOwner,
+            productId: productId,
+            membershipArgs: membershipArgs, 
+            membershipServiceArgs: membershipServiceArgs, 
+            productFileArgs:  productFileArgs
+          });
+          console.log("reach here: ", memberResponse)
           result.push({ status, productId, inventoryId });
         }
         return result;
@@ -1444,7 +1595,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: membership.address }, { ...options, org: managers.cirrusOrg, app: contractName }));
 
     // Get all services
-    const servicesAll = await managers.serviceManager.getAll({ ownerOrganization: membership.ownerOrganization }, { ...options, org: managers.cirrusOrg, app: contractName, });
+    const servicesAll = await managers.serviceManager.getAll({ownerOrganization: membership.manufacturer }, { ...options, org: managers.cirrusOrg, app: contractName, });
 
     // Combine the data and merge the service data into the membershipService data
     const combinedData = {
@@ -1774,40 +1925,66 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
+    const getOptions = { ...options, org: managers.cirrusOrg, app: '' };
+
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
+      ...args,
+      sort: '-createdDate',
+      // owner: userAddress, 
+      // ownerOrganization: userOrganization,
+      bookedUserAddress: userAddress
+    }, getOptions);
+
     const memberships = await contract.getPurchasedMemberships();
-    const data = serviceUsage.map((item, index) => {
-      let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-      return { ...item, provider: result.manufacturer }
-    })
-    return data
+    const services = await contract.getServices();
+    const users = await contract.getCertificates();
+
+    const data = serviceUsage['serviceUsage'].map((item) => ({
+      ...item,
+      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+      bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
+    }));
+
+    return { result: data, total: serviceUsage.total };
   };
 
   contract.getProvidedServiceUsages = async function (args = {}, options = optionsNoChainIds) {
-
-    // product table where category = membership, manufacturer = loggedin user organization currntly blockapps
-    // Items productId and ownerAddress = loggedin user address
     const getOptions1 = { ...options, org: managers.cirrusOrg, app: contractName, };
-    let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
+    let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
 
-    const arrayOfAddresses = ownedProducts.map(obj => obj.address);
+    const arrayOfProductAddresses = issuedProducts.map(obj => obj.address);
 
     const arg = {
-      ownerOrganization: userOrganization,
-      productId: arrayOfAddresses
+      productId: arrayOfProductAddresses,
+      notEqualsValue: userOrganization,
+      notEqualsField: 'ownerOrganization',
+    };
+
+    let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
+    let itemAddressList = issuedItems.map(item => item.address);
+    const args1 = {
+      // ownerOrganization: userOrganization,
+      // providerLastUpdated:userAddress,
+      itemId: itemAddressList
     }
 
-    let ownedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
-
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
-    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args, sort: '-createdDate', owner: userAddress }, getOptions)
-    const memberships = await contract.getPurchasedMemberships();
-    const data = serviceUsage.map((item, index) => {
-      let result = memberships.find((mItem) => mItem.itemAddress === item.itemId) ?? '';
-      return { ...item, provider: result.manufacturer }
-    })
-    return { 'ownedProducts': ownedProducts, 'ownedItems': ownedItems }
+    const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
+    const services = await contract.getServices();
+    const memberships = await contract.getIssuedMemberships();
+    const users = await contract.getCertificates()
+    const data = serviceUsage['serviceUsage'].map((item) => ({
+      ...item,
+      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+      bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
+    }));
+
+    return { result: data, total: serviceUsage.total };
+
   };
 
   contract.updateServiceUsage = async function (args, options = defaultOptions) {
@@ -1817,12 +1994,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       name: serviceUsageJs.contractName,
       address: address,
     };
-
     // const chainOptions = { chainIds: [chainId], ...options };
-
     return serviceUsageJs.update(rawAdmin, contract, updates, options);
   };
-
   return contract;
 }
 

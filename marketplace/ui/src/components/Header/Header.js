@@ -10,7 +10,7 @@ import {
   Dropdown,
   Typography,
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined, DollarOutlined} from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
 import { useNavigate } from "react-router-dom";
@@ -52,10 +52,11 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       items: [
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
-        { label: <div id="Inventory">Inventory</div>, key: '2' },
-        { label: <div id="Products">Products</div>, key: '3' },
-        // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
-        // showStorage && { label: <div id="Storage">Storage</div>, key: '5' }, //hiding storage tab
+        // { label: <div id="Inventory">Inventory</div>, key: '2' },
+        // { label: <div id="Products">Products</div>, key: '3' },
+        { label: <div id="Products">Memberships</div>, key: '5' },
+        // { label: <div id="Events">Events</div>, key: '4' },        
+        // showStorage && { label: <div id="Storage">Storage</div>, key: '5' },
       ]
     },
     {
@@ -72,6 +73,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
+    routes.Memberships.url,
     routes.Storage.url,
   ];
 
@@ -95,6 +97,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
+    } else if (pathName.includes("/memberships")) {
+      setSelectedTab("5");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
     } else if (pathName.includes("/storage")) {
@@ -221,6 +225,31 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         items={navItems[roleIndex]?.items}
       />
       <Space size="large">
+        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
+          className="cursor-pointer"
+        >
+          <Avatar
+            style={{
+              backgroundColor: "#181EAC",
+            }}
+            icon={<DollarOutlined />}
+          />
+        </Badge>
+        }
+        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
+          className="cursor-pointer"
+          onClick={() => {
+            navigate("/memberships", { state: { isCalledFromHeader: true} });
+          }}
+        >
+          <Avatar
+            style={{
+              backgroundColor: "#181EAC",
+            }}
+            icon={<PlusCircleOutlined />}
+          />
+        </Badge>
+        }
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           count={cartList.length}

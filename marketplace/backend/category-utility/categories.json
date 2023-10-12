@@ -15,9 +15,39 @@
             "subCategories": [
                 {
                     "name": "Carbon Credit"
+                }
+            ]
+        },
+        {
+            "name": "Real Estate",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "House"
                 },
                 {
-                    "name": "Membership DAO"
+                    "name": "Apartment"
+                },
+                {
+                    "name": "Townhouse"
+                }
+            ]
+        },
+        {
+            "name": "Membership",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Health"
+                },
+                {
+                    "name": "Fitness"
+                },
+                {
+                    "name": "Travel"
+                },
+                {
+                    "name": "Social"
                 }
             ]
         }

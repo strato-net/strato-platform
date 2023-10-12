@@ -39,6 +39,8 @@
     "test:api:membership": "yarn mocha-babel test/v1/membership.test.js -b",
     "test:api:membershipService": "yarn mocha-babel test/v1/membershipService.test.js -b",
     "test:api:serviceUsage": "yarn mocha-babel test/v1/serviceUsage.test.js -b",
+    "test:api:service": "yarn mocha-babel test/v1/service.test.js -b",
+    "test:api:productFile": "yarn mocha-babel test/v1/productFile.test.js -b",
     "test:api": "yarn mocha-babel test/v1/ -b",
     "addToDapp": "babel-node membership-utility/addToDapp.js",
     "clean": "rm -f ${CONFIG_DIR_PATH:-config}/*.deploy.yaml ${CONFIG_DIR_PATH:-config}/testdeploy.*"
@@ -50,6 +52,7 @@
   "private": true,
   "dependencies": {
     "@hapi/joi": "^17.1.1",
+    "@sendgrid/mail": "^7.7.0",
     "aws-sdk": "^2.1284.0",
     "babel-plugin-module-resolver": "^4.1.0",
     "blockapps-rest": "8.1.0",
@@ -70,6 +73,7 @@
     "jpeg-js": "^0.4.4",
     "jwt-decode": "^3.1.2",
     "kafkajs": "^2.2.4",
+    "mocha": "^10.2.0",
     "moment": "^2.29.4",
     "multer": "^1.4.5-lts.1",
     "ramda": "^0.28.0",

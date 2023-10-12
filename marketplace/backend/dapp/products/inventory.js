@@ -4,7 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
 
-const contractName = 'Inventory';
+const contractName = 'Inventory_2';
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 
 /** 
@@ -53,7 +53,9 @@ async function uploadContract(user, _constructorArgs, options) {
 function marshalIn(_args) {
     const defaultArgs = {
         pricePerUnit: 0,
-        status: 0
+        status: 0,
+        taxPercentageAmount: 0,
+        taxDollarAmount: 0,
     };
 
     const args = {
