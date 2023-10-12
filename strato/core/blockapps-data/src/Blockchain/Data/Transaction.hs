@@ -94,6 +94,9 @@ instance TransactionLike Transaction where
   txChainId = \case
     PrivateHashTX {} -> Nothing
     t -> transactionChainId t
+  txNetworkId = \case 
+    PrivateHashTX {} -> Nothing 
+    t -> transactionNetworkId t
   txMetadata = \case
     PrivateHashTX {} -> Nothing
     t -> transactionMetadata t
@@ -115,8 +118,8 @@ instance TransactionLike Transaction where
   txData PrivateHashTX {} = Nothing
 
   morphTx t = case type' of
-    Message -> MessageTX n gp gl dest val dat chainId r s v md Nothing --TODO: Nothing is wrong
-    ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md Nothing --TODO: Nothing is wrong
+    Message -> MessageTX n gp gl dest val dat chainId r s v md netId
+    ContractCreation -> ContractCreationTX n gp gl val code chainId r s v md netId
     PrivateHash -> PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger r) (unsafeCreateKeccak256FromWord256 $ fromInteger s)
     where
       type' = txType t
@@ -129,6 +132,7 @@ instance TransactionLike Transaction where
       code = fromJust (txCode t)
       (r, s, v) = txSignature t
       chainId = txChainId t
+      netId = txNetworkId t
       md = txMetadata t
 
 rawTX2TX :: RawTransaction -> Transaction
@@ -235,7 +239,7 @@ createChainMessageTX n gp gl to' val theData cid md nid prvKey = do
           }
   let theHash = partialTransactionHash unsignedTX
 
-  let (r, s, v) = getSigVals (EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash) Nothing --TODO: DON'T HARDCODE
+  let (r, s, v) = getSigVals (EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash) nid
 
   return $ case unsignedTX of
     MessageTX {} -> unsignedTX {transactionR = toInteger r, transactionS = toInteger s, transactionV = v}
@@ -272,7 +276,7 @@ createChainContractCreationTX n gp gl val init' cid md nid prvKey = do
 
   let theHash = partialTransactionHash unsignedTX
 
-  let (r, s, v) = getSigVals (EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash) Nothing
+  let (r, s, v) = getSigVals (EC.signMsg prvKey $ word256ToBytes $ keccak256ToWord256 theHash) nid
 
   return $ case unsignedTX of
     ContractCreationTX {} -> unsignedTX {transactionR = toInteger r, transactionS = toInteger s, transactionV = v}
@@ -290,14 +294,17 @@ whoSignedThisTransaction tx = case tx of
   t -> fromPublicKey <$> EC.recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (fromInteger ((transactionV t + 1) `mod` 2) :: Word8))
+      dif = case transactionNetworkId t of 
+        Nothing -> 27
+        Just nid -> 2 * nid + 35
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (fromInteger (transactionV t - dif) :: Word8))
       mesg = keccak256ToByteString $ partialTransactionHash t
 
 whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address
 whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
   where
     intToBSS = BSS.toShort . word256ToBytes . fromInteger
-    sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b))
+    sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b)) --TODO: how to get netid?
     mesg = keccak256ToByteString $ hsh
 
 

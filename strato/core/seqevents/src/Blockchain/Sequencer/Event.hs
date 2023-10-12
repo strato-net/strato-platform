@@ -527,6 +527,7 @@ instance TransactionLike OutputTx where
   txCode = txCode . otBaseTx
   txData = txData . otBaseTx
   txChainId = txChainId . otBaseTx
+  txNetworkId = txNetworkId . otBaseTx
   txMetadata = txMetadata . otBaseTx
 
   morphTx t =

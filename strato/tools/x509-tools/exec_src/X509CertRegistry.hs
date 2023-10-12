@@ -154,7 +154,7 @@ optionsToTX priv nonce =
           }
       txHash = rlpHash unsignedTx
       sig = signMsg priv txHash
-      (rr, s, v) = getSigVals sig Nothing --TODO: don't hardcode
+      (rr, s, v) = getSigVals sig Nothing
    in PostBlocTransactionRawRequest
         (fromPrivateKey priv)
         (unsignedTransactionNonce unsignedTx)
@@ -187,11 +187,11 @@ initializeCertificateRegistryTX priv addr certs nonce =
             unsignedTransactionValue = Wei 0,
             unsignedTransactionInitOrData = Code $ B.empty,
             unsignedTransactionChainId = Nothing,
-            unsignedTransactionNetworkId = Nothing --NOTE TO AYA: DO I NEED THIS? WAS IT NECESSARY TO UPDATE UNSIGNED TX?
+            unsignedTransactionNetworkId = Nothing
           }
       txHash = rlpHash unsignedTx
       sig = signMsg priv txHash
-      (rr, s, v) = getSigVals sig Nothing --TODO: don't hardcode?
+      (rr, s, v) = getSigVals sig Nothing
    in PostBlocTransactionRawRequest
         (fromPrivateKey priv)
         (unsignedTransactionNonce unsignedTx)
