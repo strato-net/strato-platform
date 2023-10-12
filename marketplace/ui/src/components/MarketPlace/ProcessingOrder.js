@@ -137,6 +137,8 @@ const ProcessingOrder = () => {
       if (cartData.orderList.length > 1) {
         htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
       }
+    } else {
+      htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
     }
 
     // Prepare order data to be sent to order controller
