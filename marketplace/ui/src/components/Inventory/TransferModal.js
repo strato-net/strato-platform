@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as itemActions } from "../../contexts/item/actions";
 import { actions as userActions } from "../../contexts/users/actions";
-import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useInventoryDispatch } from "../../contexts/inventory";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -17,11 +17,9 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
     const itemDispatch = useItemDispatch();
     const userDispatch = useUsersDispatch();
     const [canTransfer, setCanTransfer] = useState(true);
-    // const {
-    //     isReselling
-    // } = useInventoryState();
     const {
-        items
+        items,
+        isTransferringItems
     } = useItemState();
     const {
         user
@@ -88,22 +86,29 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
 
 
     const handleSubmit = async () => {
-        const itemsAddress = items.map((item) => item.address)
+        let itemsAddress = [];
+        if (inventory.inventoryType === "Individual") {
+            for (let i = 0; i < quantity; i++) {
+                itemsAddress.push(items[i].address);
+            }
+        }
+        else {
+            itemsAddress.push(items[0].address);
+        }
 
         const body = {
             inventoryId: inventory.address,
-            quantity: quantity,
             itemsAddress: itemsAddress,
-            userAddress: userAddress
+            newOwner: userAddress,
+            newQuantity: quantity
         };
 
         if (quantity > 0 && quantity <= inventory.availableQuantity && userAddress) {
-            console.log("Transfer", body);
-            // let isDone = await actions.resellInventory(inventoryDispatch, body);
-            // if (isDone) {
-            //     actions.fetchInventory(inventoryDispatch, 10, 0, "");
-            //     handleCancel();
-            // }
+            let isDone = await itemActions.transferOwnership(itemDispatch, body);
+            if (isDone) {
+                actions.fetchInventory(inventoryDispatch, 10, 0, "");
+                handleCancel();
+            }
         }
     }
 
@@ -114,7 +119,7 @@ const TransferModal = ({ open, handleCancel, inventory }) => {
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={false}>
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferringItems}>
                     Transfer
                 </Button>
             ]}

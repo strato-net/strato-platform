@@ -16,7 +16,10 @@ const actionDescriptors = {
   fetchItemRawMaterials: "fetch_item_raw_materials",
   fetchItemRawMaterialsSuccessful: "fetch_item_raw_materials_successful",
   fetchItemRawMaterialsFailed: "fetch_item_raw_materials_failed",
-  setActualRawMaterials: "set_actual_raw_materials"
+  setActualRawMaterials: "set_actual_raw_materials",
+  transferOwnership: "transfer_ownership",
+  transferOwnershipSuccessful: "transfer_ownership_successful",
+  transferOwnershipFailed: "transfer_ownership_failed",
 };
 
 const actions = {
@@ -32,7 +35,7 @@ const actions = {
     dispatch({
       type: actionDescriptors.setActualRawMaterials,
       payload: payload,
-   });  
+    });
   },
 
   fetchSerialNumbers: async (dispatch, id) => {
@@ -120,19 +123,19 @@ const actions = {
           payload: body.data,
         });
         return;
-      }else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ 
-          type: actionDescriptors.fetchItemRawMaterialsFailed, 
-          error: "Error while fetching item raw materials" 
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchItemRawMaterialsFailed,
+          error: "Error while fetching item raw materials"
         });
         return;
       }
 
       dispatch({ type: actionDescriptors.fetchItemRawMaterialsFailed, error: body.error });
     } catch (err) {
-      dispatch({ 
-        type: actionDescriptors.fetchItemRawMaterialsFailed, 
-        error: "Error while fetching item raw materials" 
+      dispatch({
+        type: actionDescriptors.fetchItemRawMaterialsFailed,
+        error: "Error while fetching item raw materials"
       });
     }
   },
@@ -163,7 +166,54 @@ const actions = {
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchItemFailed, error: undefined });
     }
-  }
+  },
+
+  transferOwnership: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.transferOwnership });
+
+    try {
+      const response = await fetch(`${apiUrl}/item/transferOwnership`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.transferOwnershipSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Items transferred successfully", true);
+        return true;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.transferOwnershipFailed,
+          error: "Error while transferring Items",
+        });
+        actions.setMessage(dispatch, "Error while transferring Items");
+        return false;;
+      }
+
+      dispatch({
+        type: actionDescriptors.transferOwnershipFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, "Error while transferring Items");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.transferOwnershipFailed,
+        error: "Error while transferring Items",
+      });
+      actions.setMessage(dispatch, "Error while transferring Items");
+    }
+  },
 };
 
 export { actionDescriptors, actions };

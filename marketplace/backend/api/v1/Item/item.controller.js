@@ -181,6 +181,7 @@ class ItemController {
 
   static validateTransferOwnershipArgs(args) {
     const transferOwnershipItemSchema = Joi.object({
+      inventoryId: Joi.string().required(),
       itemsAddress: Joi.array().items(Joi.string()).required(),
       newOwner: Joi.string().required(),
       newQuantity: Joi.number().integer().min(1).required(),
