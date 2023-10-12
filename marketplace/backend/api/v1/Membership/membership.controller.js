@@ -62,7 +62,10 @@ class MembershipController {
       let memberships = await dapp.getMemberships({ ...query })
       //Get image location associated with each membership/product
       memberships = memberships.map((membership) => {
-        const img = getSignedUrlFromS3(membership.productImage.fileLocation, req.app.get(constants.s3ParamName));
+        var img = ''
+        if (membership.productImage?.fileLocation !== null && membership.productImage?.fileLocation !== undefined) {
+          img = getSignedUrlFromS3(membership.productImage.fileLocation, req.app.get(constants.s3ParamName));
+        }
         return { ...membership, productImageLocation: img }
       });
       rest.response.status200(res, memberships)
@@ -212,7 +215,7 @@ class MembershipController {
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Resale Membership Argument Validation Error`, {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Resale Membership Argument Validation Error ${validation.error.message}`, {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
