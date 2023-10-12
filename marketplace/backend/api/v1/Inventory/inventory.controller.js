@@ -136,7 +136,7 @@ class InventoryController {
 
     if (validation.error) {
       console.log('validation error: ', validation.error)
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Inventory Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Create Inventory Argument Validation Error`, {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
@@ -148,7 +148,8 @@ class InventoryController {
       inventory: Joi.string(),
       updates: Joi.object({
         pricePerUnit: Joi.number().integer().greater(0).required(),
-        status: Joi.number().integer().min(1).max(2)
+        status: Joi.number().integer().min(1).max(2),
+        quantity: Joi.number().integer().min(0)
       }).required()
     });
 

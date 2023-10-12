@@ -27,12 +27,13 @@ contract Membership_2 {
 
 
     constructor(
-            address _productId
+            address _owner
+        ,   address _productId
         ,   int _timePeriodInMonths
         ,   string _additionalInfo
         ,   uint _createdDate
     ) public {
-        owner = tx.origin;
+        owner = _owner;
         
         productId = _productId;
         timePeriodInMonths = _timePeriodInMonths;

@@ -1,7 +1,10 @@
 import React, { useState } from "react";
-import { Form, Modal, InputNumber, Button, Spin,  Select, Table } from "antd";
-
-const { Option } = Select;
+import { Form, Modal, InputNumber, Button, Spin, Select, Table, Typography } from "antd";
+import helperJson from "../../helpers/helper.json"
+import { useInventoryState } from "../../contexts/inventory";
+import { useMembershipState } from "../../contexts/membership";
+import { useProductState } from "../../contexts/product";
+const { columns, taxOptions } = helperJson;
 
 const ListNowModal = ({
   open,
@@ -13,9 +16,14 @@ const ListNowModal = ({
   getIn,
   isCreateMembershipSubmitting,
 }) => {
+  const { isInventoriesLoading, inventories, isCreateInventorySubmitting } = useInventoryState();
+  const { isuploadImageSubmitting } = useProductState()
+  const inventoryQuantity = type == 'Resale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user.user.user.organization;
   const membership = formik.values.name;
-  
+  let { isResaleMembershipSubmitting } = useMembershipState();
+  const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting;
+
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {
       return '0.00';
@@ -39,52 +47,14 @@ const ListNowModal = ({
   };
 
   const selectAfter = (
-  <Select 
-    defaultValue="1"
-    onChange={(value) => {formik.setFieldValue("isTaxPercentage", value === "1" )}}
-    style={{ width: 60 }}>
-      <Option value="0">$</Option>
-      <Option value="1">%</Option>
-  </Select>
-);
+    <Select
+      defaultValue="1"
+      onChange={(value) => { formik.setFieldValue("isTaxPercentage", value === "1") }}
+      style={{ width: 60 }}
+      options={taxOptions}
+    />
+  );
 
-  const columns = [
-    {
-      title: "Seller",
-      dataIndex: "seller",
-      key: "seller",
-    },
-    {
-      title: "Membership",
-      dataIndex: "membership",
-      key: "membership",
-    },
-    {
-      title: "Id",
-      dataIndex: "id",
-      key: "id",
-    },
-    {
-      title: "Quantity",
-      dataIndex: "quantity",
-      key: "quantity",
-    },
-    {
-      title: "Tax Percentage/Amount",
-      dataIndex: "percentage",
-      key: "precentage",
-    },
-    {
-      title: "Price",
-      dataIndex: "price",
-      key: "price",
-    },
-    {
-      title: "Type",
-      dataIndex: "type",
-      key: "type",
-    },
-  ];
 
   const data = [
     {
@@ -98,11 +68,17 @@ const ListNowModal = ({
             id="quantity"
             name="quantity"
             min={0}
-            value={formik.values.quantity}
+            max={inventoryQuantity}
+            prefix={isInventoriesLoading && <Spin />}
+            disabled={type === "Resale"}
+            // value={1}
+            controls={false}
+            value={type === "Resale" ? 1 : formik.values.quantity}
             onChange={(value) => {
               formik.setFieldValue("quantity", value);
             }}
           />
+          {type === "Resale" && <p>Available: {inventoryQuantity}</p>}
           {getIn(formik.touched, `quantity`) && getIn(formik.errors, `quantity`) && (
             <span className="text-error text-xs">
               {getIn(formik.errors, `quantity`)}
@@ -118,17 +94,17 @@ const ListNowModal = ({
             min={0}
             addonAfter={selectAfter}
             formatter={handleFormatter}
+            controls={false}
             parser={handleParser}
             value={formik.values.taxPercentage}
             onChange={(value) => {
               formik.setFieldValue("taxPercentage", value);
-              formik.values.isTaxPercentage  ? 
-                  (formik.setFieldValue("taxPercentageAmount", value))
-                  :  (formik.setFieldValue("taxDollarAmount", value))
-              !formik.values.isTaxPercentage ? 
-                  (formik.setFieldValue("taxPercentageAmount", 0))
-                  :  (formik.setFieldValue("taxDollarAmount", 0))
-              console.log(formik.values);
+              formik.values.isTaxPercentage ?
+                (formik.setFieldValue("taxPercentageAmount", value))
+                : (formik.setFieldValue("taxDollarAmount", value))
+              !formik.values.isTaxPercentage ?
+                (formik.setFieldValue("taxPercentageAmount", 0))
+                : (formik.setFieldValue("taxDollarAmount", 0))
             }}
           />
           {getIn(formik.touched, `taxPercentage`) && getIn(formik.errors, `percentage`) && (
@@ -143,6 +119,7 @@ const ListNowModal = ({
             id="price"
             name="price"
             min={0}
+            controls={false}
             value={formik.values.price}
             onChange={(value) => {
               formik.setFieldValue("price", value);
@@ -172,7 +149,7 @@ const ListNowModal = ({
         <Button
           key="list-now"
           onClick={formik.handleSubmit}
-          loading={isCreateMembershipSubmitting}
+          loading={isSubmit}
           type="primary"
         >
           List Now

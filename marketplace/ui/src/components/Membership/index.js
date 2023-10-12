@@ -231,15 +231,14 @@ const Membership = (user) => {
               </div>
             </Col>
             {/* <Col>
-
-                                    <Dropdown.Button
-                                        style={{ margin: '10px' }}
-                                        icon={<DownOutlined />}
-                                        menu={{ dummyData }}
-                                    >
-                                        All
-                                    </Dropdown.Button>
-                                </Col> */}
+                    <Dropdown.Button
+                        style={{ margin: '10px' }}
+                        icon={<DownOutlined />}
+                        menu={{ dummyData }}
+                    >
+                        All
+                    </Dropdown.Button>
+                </Col> */}
             <div className="flex">
               <Button
                 id="add-product-button"
@@ -296,7 +295,7 @@ const Membership = (user) => {
                   margin: "10px",
                 }}
                 className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                onClick={() => navigate("/memberships/serviceUsage")}
+                onClick={() => navigate("/memberships/serviceUsage/booked")}
               >
                 Service Usage
               </Button>
@@ -372,10 +371,10 @@ const Membership = (user) => {
           open={open}
           user={user}
           handleCancel={handleCancel}
-          //   categorys={categorys}
-          //   resetPage={onPageChange}
-          //   page={page}
-          //   debouncedSearchTerm={debouncedSearchTerm}
+        //   categorys={categorys}
+        //   resetPage={onPageChange}
+        //   page={page}
+        //   debouncedSearchTerm={debouncedSearchTerm}
         />
       )}
       {visible && (
@@ -385,10 +384,10 @@ const Membership = (user) => {
           handleCancel={closeSellModal}
           onClick={openSellModal}
           // formik={formik}
-          // type="New"
-          // id="None"
-          // getIn={getIn}
-          // isCreateMembershipSubmitting={isCreateInventorySubmitting}
+          type="Resale"
+        // id="None"
+        // getIn={getIn}
+        // isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
       {message && openToast("bottom")}

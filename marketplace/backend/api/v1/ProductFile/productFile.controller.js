@@ -106,8 +106,8 @@ class ProductFileController {
       fileHash: Joi.string().required(),
       fileName: Joi.string().required(),
       uploadDate: Joi.number().required(),
-      section: Joi.number().required(),
-      type: Joi.number().required(),
+      currentSection: Joi.number().required(),
+      currentType: Joi.number().required(),
     });
     console.log("args: ", args)
     const validation = createProductFileSchema.validate(args);
