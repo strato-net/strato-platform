@@ -157,6 +157,7 @@ postBlocTransactionRaw ::
 postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
   checkIsSynced
   txSizeLimit <- fmap txSizeLimit getBlocEnv
+  useNetworkId <- useNetworkIdByDefault <$> getBlocEnv
   -- as a requirement for Pepsi, we have to be able to accept non-rec sigs
   -- so, if 'v' is not provided, we have to figure out what 'v' is here
 
@@ -180,7 +181,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
               postbloctransactionrawrequestValue
               postbloctransactionrawrequestInitOrData
               postbloctransactionrawrequestChainId
-              (Just computeNetworkID) --NOTE TO AYA: dont hardcode
+              (bool Nothing (Just computeNetworkID) useNetworkId)
           txHash = rlpHash unsignedTX
 
           -- try both 27 and 28, see what matches
@@ -197,7 +198,6 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
 
   -- construct the Transaction
   time <- liftIO getCurrentTime
-  useNetworkId <- useNetworkIdByDefault <$> getBlocEnv
   let tx =
         Transaction
           postbloctransactionrawrequestNonce
@@ -304,7 +304,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               ( \p@(ContractPayload _ c a v x cid' m nid) -> do
                   let cn = fromMaybe "unnamed_contract" c
                   UploadListContract
-                    (fromJust c)
+                    c
                     (getSrc p)
                     (fromMaybe Map.empty a)
                     (mergeTxParams x txParams)
@@ -324,7 +324,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
           (src, contract) <- do
             cd <-
               fmap snd . lift $
-                getContractDetailsForContract srcs (Just name) >>= \case
+                getContractDetailsForContract srcs name >>= \case
                   Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
                   Just x -> pure x
             at name <?= (srcs, cd)
@@ -333,7 +333,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
-          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", Text.pack $ _contractName contract), ("args", argsAsSource)]
           tx <- lift . signAndPrepare jwt addr metadata' $
               TransactionHeader
                 Nothing
@@ -459,7 +459,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
             ( \p@(ContractPayload _ c a v x cid' m nid) -> do
                 let cn = fromMaybe "unnamed_contract" c
                 UploadListContract
-                  (fromJust c)
+                  c
                   (getSrc p)
                   (fromMaybe Map.empty a)
                   (mergeTxParams x txParams)
@@ -479,7 +479,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
           (src, contract) <- do
             cd <-
               fmap snd . lift $
-                getContractDetailsForContract srcs (Just name) >>= \case
+                getContractDetailsForContract srcs name >>= \case
                   Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
                   Just x -> pure x
             at name <?= (srcs, cd)
@@ -488,7 +488,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
               xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
           (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
-          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+          let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", Text.pack $ _contractName contract), ("args", argsAsSource)]
           lift . prepareUnsignedRawTx metadata' $
               TransactionHeader
                 Nothing
@@ -698,7 +698,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                       ( \p@(ContractPayload _ c a v x cid m nid) -> do
                           let cn = fromMaybe "unnamed_contract" c
                           UploadListContract
-                            (fromJust c)
+                            c
                             (getSrc p)
                             (fromMaybe Map.empty a)
                             (mergeTxParams x txParams)
@@ -901,7 +901,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
       (src, contract) <- do
         cd <-
           fmap snd . lift $
-            getContractDetailsForContract srcs (Just name) >>= \case
+            getContractDetailsForContract srcs name >>= \case
               Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
               Just x -> pure x
         at name <?= (srcs, cd)
@@ -910,7 +910,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
           xabiArgs = Map.fromList . catMaybes . maybe [] (map f . _funcArgs) $ _constructor contract
       (_, argsAsSource) <- lift $ constructArgValuesAndSource (Just args) xabiArgs
 
-      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", name), ("args", argsAsSource)]
+      let metadata' = Just $ fromMaybe Map.empty md `Map.union` Map.fromList [("name", Text.pack $ _contractName contract), ("args", argsAsSource)]
       tx <-
         lift . signAndPrepare jwtToken fromAddr metadata' $
           TransactionHeader

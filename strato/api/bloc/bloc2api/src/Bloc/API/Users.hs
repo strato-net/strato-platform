@@ -372,7 +372,7 @@ data ContractParameters = ContractParameters
 
 --------------------------------------------------------------------------------
 data UploadListContract = UploadListContract
-  { uploadlistcontractContractName :: Text,
+  { uploadlistcontractContractName :: Maybe Text,
     uploadlistcontractSrc :: SourceMap,
     uploadlistcontractArgs :: Map Text ArgValue,
     _uploadlistcontractTxParams :: Maybe TxParams,
@@ -411,7 +411,7 @@ instance ToSchema UploadListContract where
       ex :: UploadListContract
       ex =
         UploadListContract
-          { uploadlistcontractContractName = "SampleContract",
+          { uploadlistcontractContractName = Just $ "SampleContract",
             uploadlistcontractSrc = mempty,
             uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 1)],
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
