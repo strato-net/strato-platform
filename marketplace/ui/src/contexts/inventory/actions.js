@@ -1,5 +1,5 @@
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { apiUrl, cirrusUrl, assetTableName, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
   createInventory: "create_inventory",
@@ -91,7 +91,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
+        `${cirrusUrl}/${assetTableName}?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -102,7 +102,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,
-          payload: body.data,
+          payload: body,
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
@@ -113,7 +113,7 @@ const actions = {
       }
       dispatch({
         type: actionDescriptors.fetchInventoryFailed,
-        error: body.error,
+        error: body,
       });
     } catch (err) {
       dispatch({
