@@ -97,18 +97,14 @@ const ProcessingOrder = () => {
 
 
   const handleOrderConfirm = async (cartData) => {
-
+    let htmlContents = [];
+    
+    let customerFirstName = cartData.user.split(" ")[0];
+    
     // Construct Email with order details
     let concatenatedOrderString = "";
-    let nickel = {}
     let orderTotal = 0; 
     for (let i = 0; i < cartData.orderList.length; i++) {
-      if("Nickel Reserve" === cartData.orderList[i].subCategory && "Materials" === cartData.orderList[i].category){
-        let orderItem = cartData.orderList[i];
-        nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
-        nickel.itemQty = orderItem.quantity;
-        nickel.itemName = orderItem.name;
-      }
       let orderItem = cartData.orderList[i];
       let itemName = orderItem.name.replace(/%20/g, ' '); 
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
@@ -126,27 +122,31 @@ const ProcessingOrder = () => {
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }
     }
-
-    let customerFirstName = cartData.user.split(" ")[0];
     
-    let htmlContent = "";
+    // const allItemsAreNickelReserve = cartData.orderList.every((obj) => obj.subCategory === "Nickel Reserve");
+    const index = cartData.orderList.findIndex(obj => obj.subCategory === "Nickel Reserve");
+    
+    if (index !== -1) {
+      let nickel = {};
+      let orderItem = cartData.orderList[index];
+      nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
+      nickel.itemQty = orderItem.quantity;
+      nickel.itemName = orderItem.name;
+      htmlContents.push(generateHtmlContentNickel(customerFirstName, nickel ));
+      // if cartData orderlist has more than one item, use generateHtmlContent to populate htmlContents
+      if (cartData.orderList.length > 1) {
+        htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+      }
+    }
 
     // Prepare order data to be sent to order controller
     const orderList = cartData.orderList.map(c => {
-      if (c.category === "Materials" && c.subCategory === "Nickel Reserve") {
-        htmlContent = generateHtmlContentNickel(customerFirstName, nickel );
-      }
       return {
         inventoryId: c.inventoryId,
         quantity: c.quantity,
-        category: c.category,
         subCategory: c.subCategory
       }
     });
-    
-    if (htmlContent === "") {
-      htmlContent = generateHtmlContent(customerFirstName, concatenatedOrderString);
-    }
     
     const body = {
       buyerOrganization: cartData.buyerOrganization,
@@ -156,7 +156,7 @@ const ProcessingOrder = () => {
       shippingAddress: cartData.shippingAddress,
       to: cartData.email,
       subject: "Your Order Confirmation",
-      htmlContent: htmlContent,
+      htmlContents: htmlContents,
     };
 
 
