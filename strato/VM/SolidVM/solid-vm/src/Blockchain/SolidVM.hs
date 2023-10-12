@@ -257,13 +257,15 @@ create ::
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash' chainId' metadata = do
+  isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
           { Env.blockHeader = blockData,
             Env.sender = sender',
             Env.origin = origin',
             Env.txHash = txHash',
-            Env.metadata = metadata
+            Env.metadata = metadata,
+            Env.runningTests = isRunningTests
           }
   let gasInfo' =
         GasInfo
@@ -429,13 +431,15 @@ call ::
 call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' txHash' chainId' metadata = do
   recordCall
 
+  isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
           { Env.blockHeader = blockData,
             Env.sender = sender',
             Env.origin = origin',
             Env.txHash = txHash',
-            Env.metadata = metadata
+            Env.metadata = metadata,
+            Env.runningTests = isRunningTests
           }
 
   let gasInfo' =
@@ -2793,22 +2797,23 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   theEnv <- getEnv
   let origin = Env.origin theEnv
       metadata = Env.metadata theEnv
+      isRunningTests = Env.runningTests theEnv
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (\_ -> True) maybeUseWallet
   org <- getOrg origin
   case erNewContractAccount execResults of
     Just nca -> do
-      void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                     (T.pack contractSrc) 
-                                     (SolidVMCode contractName' hsh) 
-                                     (T.pack org) 
-                                     (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
-                                     ( case join $ fmap (M.lookup "history") (metadata) of
-                                         Nothing -> []
-                                         Just v -> (T.splitOn "," v)
-                                     )
-                                     []
-                                  ]
+      when (not isRunningTests) $ void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+                                                           (T.pack contractSrc) 
+                                                           (SolidVMCode contractName' hsh) 
+                                                           (T.pack org) 
+                                                           (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
+                                                           ( case join $ fmap (M.lookup "history") (metadata) of
+                                                               Nothing -> []
+                                                               Just v -> (T.splitOn "," v)
+                                                           )
+                                                           []
+                                                        ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SString argString] _ = do
@@ -2834,22 +2839,23 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   theEnv <- getEnv
   let origin = Env.origin theEnv
       metadata = Env.metadata theEnv
+      isRunningTests = Env.runningTests theEnv
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (\_ -> True) maybeUseWallet
   org <- getOrg origin
   case erNewContractAccount execResults of
     Just nca -> do
-      void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                     (T.pack contractSrc) 
-                                     (SolidVMCode contractName' hsh) 
-                                     (T.pack org) 
-                                     (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
-                                     ( case join $ fmap (M.lookup "history") (metadata) of
-                                         Nothing -> []
-                                         Just v -> (T.splitOn "," v)
-                                     )
-                                     []
-                                  ]
+      when (not isRunningTests) $ void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+                                                           (T.pack contractSrc) 
+                                                           (SolidVMCode contractName' hsh) 
+                                                           (T.pack org) 
+                                                           (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
+                                                           ( case join $ fmap (M.lookup "history") (metadata) of
+                                                               Nothing -> []
+                                                               Just v -> (T.splitOn "," v)
+                                                           )
+                                                           []
+                                                        ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin x args _ = unknownFunction ("callBuiltin " ++ show args) x
