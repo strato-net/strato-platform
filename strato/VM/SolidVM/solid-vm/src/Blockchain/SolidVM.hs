@@ -57,6 +57,7 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
+import Blockchain.Stream.VMEvent as VME
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
@@ -347,9 +348,20 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
   -- popcallinfo to remove info from stack
   popCallInfo
 
-  org <- getOrg creator
+  env <- getEnv
+  let maybeUseWallet = M.lookup "useWallet" =<< metadata
+      !useWallet = maybe False (\_ -> True) maybeUseWallet
+      origin' = Env.origin env
+      metadata = Env.metadata env
+  
+  org <- bool (getOrg creator) (getOrg origin') useWallet
+  let parentName' = bool parentName "" (useWallet && parentName == "User")
+
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
+
+  when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
+    Action.actionData %= M.adjust (Action.actionDataApplication .~ (T.pack "")) newAccount
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName), "Org: " ++ (C.yellow org)]
@@ -357,7 +369,6 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
   solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
-
   return
     ExecResults
       { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -373,7 +384,7 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
         erKind = SolidVM,
         erPragmas = CC._pragmas cc,
         erOrgName = org,
-        erAppName = parentName
+        erAppName = parentName'
       }
 
 {-
@@ -2764,6 +2775,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
   creator <- getCurrentAccount
+  currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
   -- Because of the current testnet stateroot problem with contracts using an older version of
   -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
@@ -2778,14 +2790,32 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
         Right parsedArgs -> parsedArgs
         _ -> internalError "Failed to parse constructor args in a create builtin call" argString
   execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
-  return $
-    ((flip SAccount) False) . accountOnUnspecifiedChain $
-      fromMaybe (internalError "a call to create did not create an address" execResults) $
-        erNewContractAccount execResults
+  theEnv <- getEnv
+  let origin = Env.origin theEnv
+      metadata = Env.metadata theEnv
+      maybeUseWallet = M.lookup "useWallet" =<< metadata
+      !useWallet = maybe False (\_ -> True) maybeUseWallet
+  org <- getOrg origin
+  case erNewContractAccount execResults of
+    Just nca -> do
+      void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+                                     (T.pack contractSrc) 
+                                     (SolidVMCode contractName' hsh) 
+                                     (T.pack org) 
+                                     (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
+                                     ( case join $ fmap (M.lookup "history") (metadata) of
+                                         Nothing -> []
+                                         Just v -> (T.splitOn "," v)
+                                     )
+                                     []
+                                  ]
+      pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
+    Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SString argString] _ = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
   creator <- getCurrentAccount
+  currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
   -- Because of the current testnet stateroot problem with contracts using an older version of
   -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
@@ -2801,10 +2831,27 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   constructorArgVals <- OrderedVals <$> mapM (getVar <=< expToVar) constructorArgs
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   execResults <- create' creator newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
-  return $
-    ((flip SAccount) False) . accountOnUnspecifiedChain $
-      fromMaybe (internalError "a call to create did not create an address" execResults) $
-        erNewContractAccount execResults
+  theEnv <- getEnv
+  let origin = Env.origin theEnv
+      metadata = Env.metadata theEnv
+      maybeUseWallet = M.lookup "useWallet" =<< metadata
+      !useWallet = maybe False (\_ -> True) maybeUseWallet
+  org <- getOrg origin
+  case erNewContractAccount execResults of
+    Just nca -> do
+      void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+                                     (T.pack contractSrc) 
+                                     (SolidVMCode contractName' hsh) 
+                                     (T.pack org) 
+                                     (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet)
+                                     ( case join $ fmap (M.lookup "history") (metadata) of
+                                         Nothing -> []
+                                         Just v -> (T.splitOn "," v)
+                                     )
+                                     []
+                                  ]
+      pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
+    Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin x args _ = unknownFunction ("callBuiltin " ++ show args) x
 
 certificateMap :: Maybe String -> CC.Contract -> Value

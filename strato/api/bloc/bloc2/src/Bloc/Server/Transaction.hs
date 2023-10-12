@@ -680,6 +680,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
             case useWallet of
               True -> do
                 let contractSrc = getSrc p
+                    contractSrcText = sourceBlob $ contractSrc
                     contractArgs = contractpayloadArgs p
                     contractName' = contractpayloadContract p
                 (_, Contract {..}) <-
@@ -695,10 +696,15 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         addr
                         userContractAddr
                         "createContract"
-                        (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgString $ argsAsSource)])
+                        (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ contractSrcText), ("args", ArgString $ argsAsSource)])
                         (contractpayloadValue p)
                         (mergeTxParams (contractpayloadTxParams p) txParams)
-                        md
+                        ( case md of
+                            Nothing -> Just $ M.fromList [("history", cn), ("useWallet", Text.pack "true")]
+                            Just m -> do
+                              let m' = Map.insert "useWallet" (Text.pack "true") m
+                              Just $ Map.insert "history" cn m'
+                        )
                         (contractpayloadChainid p <|> chainId)
                         resolve
                 fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bcp jwtToken
@@ -723,30 +729,65 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                 fmap ((: []) . BlocTxResult) $ postUsersContractSolidVM' cacheNonce bcp jwtToken
           xs -> do
             ps <- mapM fromContract xs
-            let bclp =
-                  ContractListParameters
-                    addr
-                    ( map
-                        ( \p@(ContractPayload _ c a v x cid m) -> do
-                            let cn = fromMaybe "unnamed_contract" c
-                            UploadListContract
-                              (fromJust c)
-                              (getSrc p)
-                              (fromMaybe Map.empty a)
-                              (mergeTxParams x txParams)
-                              v
-                              cid
-                              ( case m of
-                                  Nothing -> Just $ Map.singleton "history" cn
-                                  Just h -> Just $ Map.insert "history" cn h
-                              )
+            case useWallet of
+              True -> do
+                methodList <- mapM (\p@(ContractPayload _ c a v x cid m) -> do
+                                  let contractSrc = getSrc p
+                                      cn = fromMaybe "unnamed_contract" c
+                                  (_, Contract {..}) <-
+                                    getContractDetailsForContract contractSrc c >>= \case
+                                      Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
+                                      Just x' -> pure x'
+
+                                  let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
+                                      xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
+                                  (_, argsAsSource) <- constructArgValuesAndSource a xabiArgs
+                                  pure $ MethodCall 
+                                    userContractAddr 
+                                    "createContract"  
+                                    (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ sourceBlob $ contractSrc), ("args", ArgString $ argsAsSource)])
+                                    (fromMaybe (Strung 0) v) 
+                                    (mergeTxParams x txParams) 
+                                    cid
+                                    ( case m of
+                                        Nothing -> Just $ Map.fromList [("history", cn), ("useWallet", "true")]
+                                        Just m' -> do
+                                          let m'' = Map.insert "useWallet" (Text.pack "true") m' 
+                                          Just $ Map.insert "history" cn m''
+                                    )
+                              ) ps
+                let bcp = 
+                      FunctionListParameters
+                        addr
+                        methodList
+                        chainId
+                        resolve
+                fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bcp jwtToken
+              False -> do
+                let bclp = 
+                      ContractListParameters
+                        addr
+                        ( map
+                            ( \p@(ContractPayload _ c a v x cid m) -> do
+                                let cn = fromMaybe "unnamed_contract" c
+                                UploadListContract
+                                  (fromJust c)
+                                  (getSrc p)
+                                  (fromMaybe Map.empty a)
+                                  (mergeTxParams x txParams)
+                                  v
+                                  cid
+                                  ( case m of
+                                      Nothing -> Just $ Map.singleton "history" cn
+                                      Just h -> Just $ Map.insert "history" cn h
+                                  )
+                            )
+                            ps
                         )
-                        ps
-                    )
-                    chainId
-                    resolve
-                poster = postUsersUploadListSolidVM'
-            fmap BlocTxResult <$> poster cacheNonce bclp jwtToken
+                        chainId
+                        resolve
+                    poster = postUsersUploadListSolidVM'
+                fmap BlocTxResult <$> poster cacheNonce bclp jwtToken
         FUNCTION -> case txs of
           [] -> return []
           [x] -> do

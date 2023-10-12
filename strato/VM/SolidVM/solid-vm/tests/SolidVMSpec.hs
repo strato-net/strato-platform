@@ -8342,6 +8342,8 @@ contract qq {
   it "can use create and create2 built-in function calls" . runTest $ do
     runBS
       [r|
+pragma builtinCreates;
+
 contract qq {
   account a;
   account b;
