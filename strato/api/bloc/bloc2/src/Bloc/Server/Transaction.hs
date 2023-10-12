@@ -164,13 +164,13 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
   v <- case postbloctransactionrawrequestV of
     Just v' -> return v'
     Nothing -> do
-      let makeSigFromVals :: (Word256, Word256, Word8) -> Signature
+      let makeSigFromVals :: (Word256, Word256, Integer) -> Signature
           makeSigFromVals (r', s', v') =
             Signature
               ( S.CompactRecSig
                   (BSS.toShort $ word256ToBytes r')
                   (BSS.toShort $ word256ToBytes s')
-                  (v' - 0x1b)
+                  (fromInteger ((v' + 1) `mod` 2) :: Word8)
               )
           unsignedTX =
             UnsignedTransaction
@@ -181,19 +181,22 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
               postbloctransactionrawrequestValue
               postbloctransactionrawrequestInitOrData
               postbloctransactionrawrequestChainId
-              (bool Nothing (Just computeNetworkID) useNetworkId)
+              (bool postbloctransactionrawrequestNetworkid (Just computeNetworkID) useNetworkId)
           txHash = rlpHash unsignedTX
 
-          -- try both 27 and 28, see what matches
-          sig1 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 27)
+          -- try both 27 / 28 or 2 * networkid + 35 / 36, see what matches
+          (tryV1, tryV2) = case postbloctransactionrawrequestNetworkid of 
+            Nothing -> (27, 28)
+            Just nid -> (2 * nid + 35, 2 * nid + 36)
+          sig1 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, tryV1)
           address1 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig1 txHash
-          sig2 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, 28)
+          sig2 = makeSigFromVals (postbloctransactionrawrequestR, postbloctransactionrawrequestS, tryV2)
           address2 = fromMaybe (Address 0x0) $ fmap fromPublicKey $ recoverPub sig2 txHash
       if address1 == postbloctransactionrawrequestAddress
-        then return 27
+        then return tryV1
         else
           if address2 == postbloctransactionrawrequestAddress
-            then return 28
+            then return tryV2
             else throwIO $ UserError $ Text.pack "Couldn't calculate 'v' for transaction signature - must be a bad signature"
 
   -- construct the Transaction
@@ -211,7 +214,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
           postbloctransactionrawrequestR
           postbloctransactionrawrequestS
           postbloctransactionrawrequestMetadata
-      nid = bool Nothing (Just computeNetworkID) useNetworkId
+      nid = bool postbloctransactionrawrequestNetworkid (Just computeNetworkID) useNetworkId
       rawTx@(RawTransaction' raw _) = preparePostTx time postbloctransactionrawrequestAddress nid tx
 
   if h
