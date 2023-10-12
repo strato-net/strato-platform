@@ -131,7 +131,9 @@ function generateHtmlContentNickel(customerFirstName, nickel ) {
             
             <p>STRATO Mercata Materials has received your deposit of $${nickel.orderTotal} for your reservation of ${weight}kg of ${itemName}. When our current bulk purchasing round is fully subscribed, you will receive an email. You will then have 72 hours to transfer the remainder of the money you committed. If you fail to pay your full balance, you will lose your deposit.</p>
             
-            <p> You may receive a full refund for your deposit (net fees from the payment processor) at any time up until the purchasing round is fully subscribed. You can check how close we are to becoming fully subscribed by looking at the progress bar on the ${itemName} page [INSERT LINK] on the STRATO Mercata marketplace.</p>
+            <p>Nickel prices may change between now and then, so make sure you keep an eye on the prices to ensure they are still at levels you would be happy to buy at. Your deposit should constitute roughly 20% of the full purchase price, but market fluctuations may change that ratio. You can track current nickel spot prices on <a href="https://www.lme.com/en/metals/non-ferrous/lme-nickel#Trading+day+summary" target="_blank">the LME website</a>.</p>
+            
+            <p>You may receive a full refund for your deposit (net fees from the payment processor) at any time up until the buying window opens. If you wish for a refund, please send us an email.</p>
             
             <p>Thank you for your commitment!.</p>
             
