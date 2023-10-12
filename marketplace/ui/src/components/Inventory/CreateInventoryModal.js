@@ -368,25 +368,24 @@ const CreateInventoryModal = ({
                     onChange={(value) => {
                       let selectedProduct = { address: "" };
                       if (value) {
-                        selectedProduct = categoryBasedProducts.find(
-                          (e) => e.name === value
+                        selectedProduct = categoryBasedProducts.productsWithImageUrl.find(
+                          (e) => e.address === value
+                          );
+                        }
+                        formik.setFieldValue("productName.name", selectedProduct.name);
+                        formik.setFieldValue(
+                          "productName.address",
+                          selectedProduct.address
                         );
-                      }
-                      formik.setFieldValue("productName.name", value);
-                      formik.setFieldValue(
-                        "productName.address",
-                        selectedProduct.address
-                      );
-                      formik.setFieldTouched("productName.name", false, false);
-                    }}
-                  >
-                    {categoryBasedProducts.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {decodeURIComponent(e.name)}
-                      </Option>
-                    ))}
-                  </Select>
-
+                        formik.setFieldTouched("productName.name", false, false);
+                      }}
+                    >
+                      {categoryBasedProducts.productsWithImageUrl && categoryBasedProducts.productsWithImageUrl.map((e, index) => (
+                        <Option value={e.address} key={index}>
+                          {decodeURIComponent(e.name)}
+                        </Option>
+                      ))}
+                    </Select>
                   {getIn(formik.touched, "productName.name") &&
                     getIn(formik.errors, "productName.name") && (
                       <span className="text-error text-xs">

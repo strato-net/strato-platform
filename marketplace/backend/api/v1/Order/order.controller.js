@@ -61,7 +61,7 @@ class OrderController {
       rest.response.status200(res, result)
 
       // Only send email if order is created successfully
-      if (res.statusCode === 200) {
+      if (res.statusMessage === "OK") {
         await sendEmail(to, subject, htmlContent);
       }
 

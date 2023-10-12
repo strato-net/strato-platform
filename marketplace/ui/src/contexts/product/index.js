@@ -9,6 +9,7 @@ const ProductsProvider = ({ children }) => {
     product: null,
     isCreateProductSubmitting: false,
     products: [],
+    productsTotal: 10,
     isProductsLoading: false,
     isProductsForFilterLoading: false,
     productsForFilter:[],
