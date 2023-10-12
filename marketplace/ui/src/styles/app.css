@@ -84,6 +84,10 @@
   color: rgba(0, 0, 0, 0.4);
 }
 
+.text-dark-grey {
+  color: rgba(0, 0, 0, 0.5);
+}
+
 .ant-btn-primary:not(:disabled):hover {
   background-color: #101481;
 }

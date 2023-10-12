@@ -232,12 +232,19 @@ const MembershipCardPurchased = ({
                   &nbsp; {statusText[status] ?? "For Sale"}
                 </Row>
               </Col>
-              <Col className="text-right flex" style={{ alignItems: "center" }}>
-                <Row type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
-                  <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin"> Preview  </Text>
-                  <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
-                </Row>
-              </Col>
+              {isPurchasedList
+                ? (<Col className="text-right flex" style={{ alignItems: "center" }}>
+                  <Row type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
+                    <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
+                    <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
+                  </Row>
+                </Col>)
+                : (<Col span={24} className="mt-2">
+                  <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
+                  <Paragraph className="text-sm mt-2 text-dark-grey font-normal leading-5 font-poppin">
+                    Hamrah Aesthetics is a world-class cosmetic service provider led by Dr. Daria Hamrah. Their clinic and MediSpa facilities are located in McLean, VA.
+                  </Paragraph>
+                </Col>)}
             </Row>
             <Row className="mt-4">
               <Col sm={12} lg={12} xl={8} xxl={6} className="border-grey shadow-lg h-52 rounded overflow-hidden">
@@ -322,8 +329,9 @@ const MembershipCardPurchased = ({
                   /> */}
 
                   <Collapse size="large" expandIconPosition='end'>
-                    <Collapse.Panel key="1" header={<Title level={5}>Inventories</Title>}>
+                    <Collapse.Panel key="1" header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>}>
                       <Table pagination={false}
+                        className="inventory-table"
                         rowClassName={"bg-white"} rowKey="key" columns={columns} dataSource={data} />
                     </Collapse.Panel>
                   </Collapse>

@@ -51,14 +51,12 @@ const IssuedList = (
         <Row className="my-4 flex flex-row" gutter={[12, 12]}>
           {memberships_issued.map((item, index) => {
             // membershipId,
-            console.log("item", item.inventoryAddress);
             let transformedData = { ...item.product }
             transformedData["timePeriodInMonths"] = item.timePeriodInMonths
             transformedData["Inventories"] = item.inventories;
             transformedData["productName"] = transformedData.name;
             transformedData["inventoryId"] = item.inventories[0].address;
             transformedData["membershipAddress"] = item.membershipAddress;
-            console.log("transformedData", transformedData);
             return (
               <Col span={12}>
                 <MembershipCardPurchased

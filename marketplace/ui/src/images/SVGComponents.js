@@ -314,3 +314,26 @@ export const forwardArrowIcon = () => {
     </svg>
   )
 }
+
+export const CarouselNextIcon = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="34" viewBox="0 0 36 34" fill="none">
+      <g filter="url(#filter0_d_51_14236)">
+        <rect x="4.89917" y="3.27344" width="26.1111" height="25.5941" rx="12.797" fill="white" />
+      </g>
+      <path d="M17.1629 10.4997L16.9187 10.2539L15.5811 11.4043L20.2181 16.0707L15.5811 20.7372L16.9187 21.8876L22.1263 16.6456L22.4742 16.2984L22.7023 16.0708L22.1252 15.4949L17.1629 10.4997Z" fill="#181EAC" />
+      <defs>
+        <filter id="filter0_d_51_14236" x="0.89917" y="0.273438" width="34.1111" height="33.5938" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+          <feFlood flood-opacity="0" result="BackgroundImageFix" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dy="1" />
+          <feGaussianBlur stdDeviation="2" />
+          <feComposite in2="hardAlpha" operator="out" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.17 0" />
+          <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_51_14236" />
+          <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_51_14236" result="shape" />
+        </filter>
+      </defs>
+    </svg>
+  )
+} 

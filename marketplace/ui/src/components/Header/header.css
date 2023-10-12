@@ -7,7 +7,8 @@
   font-weight: bold;
   border: none;
 }
-.header-search,   .header-search input {
+.header-search,
+.header-search input {
   background-color: #f2f2f2;
 }
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
@@ -23,3 +24,7 @@
 .anticon svg {
   display: block;
 }
+.bg-1 {
+  background-color: #f2f2f2;
+}
+
