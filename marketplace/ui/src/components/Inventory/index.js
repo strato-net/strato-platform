@@ -21,9 +21,9 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import { Images } from "../../images";
-//events
-import { actions as eventActions } from "../../contexts/event/actions";
-import { useEventDispatch, useEventState } from "../../contexts/event";
+//items
+import { actions as itemActions } from "../../contexts/item/actions";
+import { useItemDispatch, useItemState} from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -52,12 +52,12 @@ const Inventory = ({ user }) => {
   const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
   useInventoryState();
 
-  //events
-  const eventsDispatch = useEventDispatch();
+  //items
+  const itemDispatch = useItemDispatch();
   const {
-    message: eventMsg,
-    success: eventSuccess
-  } = useEventState();
+    message: itemMsg,
+    success: itemSuccess
+  } = useItemState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -110,18 +110,18 @@ const Inventory = ({ user }) => {
     setPage(page);
   };
 
-  const eventToast = (placement) => {
-    if (eventSuccess) {
+  const itemToast = (placement) => {
+    if (itemSuccess) {
       api.success({
-        message: eventMsg,
-        onClose: eventActions.resetMessage(eventsDispatch),
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 3,
       });
     } else {
       api.error({
-        message: eventMsg,
-        onClose: eventActions.resetMessage(eventsDispatch),
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 4,
       });
@@ -266,7 +266,7 @@ const Inventory = ({ user }) => {
         />
       )}
       {message && openToast("bottom")}
-      {eventMsg && eventToast("bottom")}
+      {itemMsg && itemToast("bottom")}
     </>
   );
 };
