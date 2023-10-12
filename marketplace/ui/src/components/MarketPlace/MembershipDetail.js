@@ -12,6 +12,9 @@ import {
   notification,
   InputNumber,
   Carousel,
+  Col,
+  Card,
+  Table,
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -45,12 +48,12 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
-
+import { watchIcon } from "../../images/SVGComponents";
 
 const MembershipDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
   const [inventoryId, setInventoryId] = useState(state?.inventoryId);
-  
+
   let isCalledFromMembership = false;
 
   if (state !== null && state !== undefined) {
@@ -75,12 +78,12 @@ const MembershipDetails = ({ user, users }) => {
   const [visible, setVisible] = useState(false);
   const limit = 10, offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { membershipServices, membership, isMembershipLoading, productFiles} =
-  useMembershipState();
+  const { membershipServices, membership, isMembershipLoading, productFiles } =
+    useMembershipState();
   const serviceDispatch = useMembershipDispatch();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  
+
   useEffect(() => {
     if (user) {
       if (Id !== undefined) {
@@ -88,13 +91,13 @@ const MembershipDetails = ({ user, users }) => {
       }
     }
   }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user])
-  
+
   useEffect(() => {
     let services = [];
     let savings = [];
     membershipServices?.forEach(element => {
-      services.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceDesc": element.serviceDescription, "memberPrice": element.membershipPrice, "nonMemberPrice": element.servicePrice, "uses": element.maxQuantity},)
-      savings.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceCost": element.savings},)
+      services.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceDesc": element.serviceDescription, "memberPrice": element.membershipPrice, "nonMemberPrice": element.servicePrice, "uses": element.maxQuantity },)
+      savings.push({ "key": element.serviceName, "serviceName": element.serviceName, "serviceCost": element.savings },)
     });
     let total = 0;
     savings.forEach(element => {
@@ -104,29 +107,29 @@ const MembershipDetails = ({ user, users }) => {
     setServiceList(services);
     setSavingsList(savings);
   }, [membershipServices])
-  
+
   useEffect(() => {
     setMembershipDetails(membership)
   }, [membership])
-  
+
   useEffect(() => {
     setAllProductFiles(productFiles)
   }, [productFiles])
-  
+
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
       name: yup.string().required("Membership name is required"),
       price: yup.number().when("isListNowModalOpen", {
-          is: () => isListNowModalOpen, // Use a function to evaluate the condition
-          then: yup.number().required("Price is required"),
-        }),
+        is: () => isListNowModalOpen, // Use a function to evaluate the condition
+        then: yup.number().required("Price is required"),
+      }),
       quantity: yup.number().when("isListNowModalOpen", {
         is: () => isListNowModalOpen, // Use a function to evaluate the condition
         then: yup.number().required("Quantity is required"),
       }),
     });
   };
-  
+
   const formik = useFormik({
     initialValues: initialValues,
     validationSchema: getSchema(visible),
@@ -145,7 +148,7 @@ const MembershipDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { inventoryDetails, inventories, isInventoryDetailsLoading, inventory, isCreateInventorySubmitting } = useInventoryState();
   const productDispatch = useProductDispatch();
-  const {productDetails} = useProductState();
+  const { productDetails } = useProductState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
@@ -165,7 +168,7 @@ const MembershipDetails = ({ user, users }) => {
     else setId(routeMatch?.params?.address);
   }, [routeMatch, routeMatch1]);
 
-    
+
   useEffect(() => {
     if (inventory !== null && inventory !== undefined) {
       setInventoryId(inventory[1]);
@@ -176,15 +179,15 @@ const MembershipDetails = ({ user, users }) => {
     if (Id !== undefined && inventoryId) {
       actions.fetchInventoryDetail(dispatch, inventoryId);
     }
-    else if (Id !== undefined && membershipDetails){
-      
+    else if (Id !== undefined && membershipDetails) {
+
       const inventoryResult = Promise.resolve(actions.fetchInventory(dispatch, 10, 0, membershipDetails?.productId));
 
       inventoryResult.then((value) => {
         if (inventories.length > 0) {
           setInventoryId(inventories[0].address);
         }
-        else{
+        else {
           productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
         }
       }).catch(err => {
@@ -198,10 +201,10 @@ const MembershipDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   let details = undefined;
-  if(inventoryId && inventoryDetails){
+  if (inventoryId && inventoryDetails) {
     details = inventoryDetails;
   }
-  else if(!inventoryId && productDetails) {
+  else if (!inventoryId && productDetails) {
     details = productDetails;
   }
 
@@ -237,12 +240,12 @@ const MembershipDetails = ({ user, users }) => {
     }
   };
 
-  
+
   useEffect(() => {
     if (user && user.organization && (inventoryDetails === null || inventoryDetails === undefined)) {
       setOwnerSameAsUser(false);
     }
-    else{
+    else {
       setOwnerSameAsUser(true);
     }
   }, [inventoryDetails, details])
@@ -295,10 +298,10 @@ const MembershipDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">EFFECTIVE COST SAVINGS FROM MEMBERSHIP </Text>,
       dataIndex: "serviceCost",
       key: "serviceCost",
-      render: (text) => <p style={{ textAlign: 'center'}}>${decodeURIComponent(text)}</p>,
+      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
     },
   ];
-  
+
   const serviceColumn = [
     {
       title: <Text className="text-primaryC text-[13px]">NAME</Text>,
@@ -316,19 +319,19 @@ const MembershipDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">MEMBER PRICE</Text>,
       dataIndex: "memberPrice",
       key: "memberPrice",
-      render: (text) => <p style={{ textAlign: 'center'}}>${decodeURIComponent(text)}</p>,
+      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">NON-MEMBER PRICE</Text>,
       dataIndex: "nonMemberPrice",
       key: "nonMemberPrice",
-      render: (text) => <p style={{ textAlign: 'center'}}>${decodeURIComponent(text)}</p>,
+      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">USES</Text>,
       dataIndex: "uses",
       key: "uses",
-      render: (text) => <p style={{ textAlign: 'center'}}>{decodeURIComponent(text)}</p>,
+      render: (text) => <p style={{ textAlign: 'center' }}>{decodeURIComponent(text)}</p>,
     },
   ];
 
@@ -372,7 +375,7 @@ const MembershipDetails = ({ user, users }) => {
       if (isServiceSelected) setIsServiceSelected(false)
     }
   }
-  
+
   const closeListNowModal = () => {
     setVisible(false);
   };
@@ -380,7 +383,7 @@ const MembershipDetails = ({ user, users }) => {
   const openListNowModal = () => {
     setVisible(true);
   };
-  
+
   const handleCreateFormSubmit = async (values) => {
     if (user) {
       if (Id !== undefined) {
@@ -400,81 +403,254 @@ const MembershipDetails = ({ user, users }) => {
             dispatch,
             inventoryBody
           );
-          
+
           if (createInventory) {
             formik.resetForm();
           }
           setVisible(false);
-          
+
         }
       }
     }
   };
+
+  const DetailTabCard = () => {
+    return (
+      <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17 }} className="border-grey shadow-lg leading-2 min-h-min rounded p-2 ">
+
+        <Paragraph >
+          <Text disabled className="font-bold" >Seller</Text>
+          <Text strong className="float-right">{details?.ownerOrganization}</Text>
+        </Paragraph>
+        <Paragraph >
+          <Text disabled className="font-bold" >Sub-Category</Text>
+          <Text strong className="float-right">{details?.subCategory}</Text>
+        </Paragraph>
+        <Paragraph >
+          <Text disabled className="font-bold" >Time in Months</Text>
+          <Text strong className="float-right">{membershipDetails?.timePeriodInMonths ?? "--"} &nbsp; Month(s)</Text>
+        </Paragraph>
+        <Paragraph >
+          <Text disabled className="font-bold" >Additional Info</Text>
+          <Text strong type="success" className="float-right">{membershipDetails?.additionalInfo ?? "--"}</Text>
+        </Paragraph>
+        {/* {true && <Paragraph>
+          <Text disabled className="font-bold" >Membership ID</Text>
+          <Text strong className="float-right">membershipId</Text>
+        </Paragraph>} */}
+      </Col>
+    )
+  }
+
+  const ServiceTabCard = () => {
+    return (
+      <Row>
+        <Title level={4} className="mt-5">Services</Title>
+        <Col span={24}>
+          <DataTableComponent
+            columns={serviceColumn}
+            data={serviceList}
+            scrollX="100%"
+            isLoading={isMembershipLoading}
+            pagination={false}
+          />
+        </Col>
+        <Title level={4} className="mt-10">Savings</Title>
+        <hr style={{ color: "grey" }} />
+        <Col span={24} className="mt-10">
+          <Col span={8} className="">
+            <Card className="shadow-md">
+              <Row className="mt-2">
+                <Col span={24}><Text className="block text-grey">Name</Text></Col>
+                <Col span={24}><Text className="block" strong>Name</Text></Col>
+              </Row>
+              <Row className="mt-2">
+                <Col span={24}><Text className="block text-grey">Effective Cost Saving</Text></Col>
+                <Col span={24}><Text className="block" style={{ color: 'green' }} strong>Name</Text></Col>
+              </Row>
+            </Card>
+          </Col>
+        </Col>
+      </Row>
+
+    )
+  }
+
 
   return (
     <>
       {contextHolder}
       {details === null ||
         isInventoryDetailsLoading ? (
-        <div className="h-screen flex justify-center items-center">
+        <div className="h-screen flex justify-center mx-auto items-center">
           <Spin spinning={isInventoryDetailsLoading} size="large" />
         </div>
       ) : (
         <div>
-          <Row>
-            <Breadcrumb className="text-xs mt-14 mb-8 ml-16">
-              <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                <ClickableCell href={routes.Marketplace.url}>
-                  <p
-                    className="text-primaryB hover:bg-transparent"
-                  >
-                    Home
-                  </p>
-                </ClickableCell>
-              </Breadcrumb.Item>
-              {
-                isCalledFromMembership ?
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <Row className="mx-16 h-20">
+            <Col span={24} className="mt-10" >
+              <Breadcrumb>
+                <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+                  <ClickableCell href={routes.Marketplace.url}>
+                    <Text className="text-primary text-md font-bold" underline>
+                      Home
+                    </Text>
+                  </ClickableCell>
+                </Breadcrumb.Item>
+                {isCalledFromMembership &&
+                  <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
                     <ClickableCell href={routes.Inventories.url}>
-                      <p
-                        className="text-primaryB hover:bg-transparent"
-                      >
+                      <Text className="text-primary text-md text-grey font-bold" underline>
                         Inventory
-                      </p>
+                      </Text>
                     </ClickableCell>
-                  </Breadcrumb.Item> : null
-              }
-              <Breadcrumb.Item className="text-primary">
-                {decodeURIComponent(details?.name)}
-              </Breadcrumb.Item>
-            </Breadcrumb>
+                  </Breadcrumb.Item>}
+                <Breadcrumb.Item className="text-grey">
+                  {decodeURIComponent(details?.name)}
+                </Breadcrumb.Item>
+              </Breadcrumb>
+            </Col>
           </Row>
 
-          <div className="flex mx-16">
+          {/* style={{border:"1px solid blue"}} */}
+          <Row className="max-w-4xl mx-auto mt-10">
+            <Col span={10} className="rounded-md" style={{ border: "1px solid #181EAC" }}>
+              {allProductFiles && allProductFiles.length > 0 ? (
+                <Carousel>
+                  {allProductFiles.map((file, index) =>
+                    <div key={index} className="h-96">
+                      <Image
+                        height={"100%"}
+                        width={"100%"}
+                        style={{ objectFit: "contain" }}
+                        src={file.imageUrl}
+                      />
+                    </div>
+                  )}
+                </Carousel>
+              ) : (
+                <Image
+                  height={"100%"}
+                  width={"100%"}
+                  style={{ objectFit: "contain" }}
+                  src={null}
+                />
+              )}
+            </Col>
+
+
+            <Col span={14} className="px-2 h-full bg-red">
+              <Card className="h-80">
+                <Title level={3}> {decodeURIComponent(details?.name)} </Title>
+                <Row className="mb-1"> {watchIcon()} <Text className="ml-2"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
+                <Row className="flex justify-between h-20 mt-8">
+                  <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
+                    <Text className="block text-center text-grey font-medium" > Status </Text>
+                    <Text className="block text-center text-xl font-bold mt-2" > Not Listed </Text>
+                  </Col>
+                  <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
+                    <Text className="block text-center text-grey font-medium" > Total Savings </Text>
+                    <Text className="block text-center text-xl font-bold mt-2" style={{ color: "green" }} > ${totalSavings}  </Text>
+                  </Col>
+                </Row>
+                <Row>
+                  <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
+                  <Col span={24} className="border-t-1  h-20 mt-8">
+                    <Row className="flex justify-between h-10 mt-5">
+                      <Col span={4} className="rounded-md " >  <Button className="h-full text-center text-black" onClick={subtract}> <MinusOutlined /></Button> </Col>
+                      <Col span={16} className="border border-grayLight rounded-md text-center h-10 pt-2" > Quantity &nbsp; <Text style={{ fontWeight: 900 }}>{qty}</Text> </Col>
+                      <Col span={4} className="rounded-md " > <Button className="h-full text-center float-right" onClick={add}> <PlusOutlined /> </Button>  </Col>
+                    </Row>
+                  </Col>
+                </Row>
+              </Card>
+              <Row className="h-14 mt-4">
+                <Button type={ownerSameAsUser ? "default" : "primary"} block={true} size="large" className="font-black h-full"
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      formik.setFieldValue("name", details?.name);
+                      openListNowModal();
+                    }
+                  }}
+                  disabled={ownerSameAsUser}
+                > Sale </Button>
+              </Row>
+            </Col>
+
+          </Row>
+
+          <Row className="max-w-4xl mx-auto mt-10">
+            <Card>
+              <Title level={3}> Description  </Title>
+              <Paragraph>
+                An NFT (non-fungible token) is a digital asset that has been authenticated using blockchain technology. Digital assets are intangible the Internet... Show more
+              </Paragraph>
+            </Card>
+          </Row>
+
+          <Row className="max-w-4xl mx-auto mt-10">
+            <Card className="w-full card-shadow-2">
+              <Tabs defaultActiveKey="1" items={[{
+                key: '1',
+                label: 'Details',
+                children: DetailTabCard(),
+              },
+              {
+                key: '2',
+                label: 'Services',
+                children: ServiceTabCard(),
+              },]} />
+            </Card>
+          </Row>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+          {/* <div className="flex mx-16 mt-100">
             <div className="w-1/2">
-              
+
               <div className="items-center justify-center border border-grayLight">
                 {allProductFiles && allProductFiles.length > 0 ? (
                   <Carousel>
-                    {allProductFiles.map((file, index) => 
-                      <div key={index} className= "h-96">
+                    {allProductFiles.map((file, index) =>
+                      <div key={index} className="h-96">
                         <Image
                           height={"100%"}
                           width={"100%"}
                           style={{ objectFit: "contain" }}
                           src={file.imageUrl}
                         />
-                        
-                    </div>
+
+                      </div>
                     )}
                   </Carousel>
-                  ) : (
+                ) : (
                   <Image
-                        height={"100%"}
-                        width={"100%"}
-                        style={{ objectFit: "contain" }}
-                        src={null}
-                      />
+                    height={"100%"}
+                    width={"100%"}
+                    style={{ objectFit: "contain" }}
+                    src={null}
+                  />
                 )}
               </div>
               {details?.availableQuantity !== 0 ?
@@ -564,9 +740,9 @@ const MembershipDetails = ({ user, users }) => {
                   </div>
                 </Space>
                 :
-                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
-                If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
-              </Paragraph>
+                <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">
+                  If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+                </Paragraph>
               }
               <Tabs
                 defaultActiveKey="1"
@@ -589,32 +765,32 @@ const MembershipDetails = ({ user, users }) => {
                     children: (
                       <div>
                         <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Services</h1>
-                      <DataTableComponent
-                        columns={serviceColumn}
-                        data={serviceList}
-                        scrollX="100%"
-                        isLoading={isMembershipLoading}
-                      />
-                      <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Savings</h1>
-                       <DataTableComponent
-                        columns={savingsColumn}
-                        data={savingsList}
-                        scrollX="100%"
-                        isLoading={isMembershipLoading}
-                      />
+                        <DataTableComponent
+                          columns={serviceColumn}
+                          data={serviceList}
+                          scrollX="100%"
+                          isLoading={isMembershipLoading}
+                        />
+                        <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Savings</h1>
+                        <DataTableComponent
+                          columns={savingsColumn}
+                          data={savingsList}
+                          scrollX="100%"
+                          isLoading={isMembershipLoading}
+                        />
                       </div>
                     ),
                   }
                   ]}
               />
             </div>
-          </div>
+          </div> */}
         </div>
       )}
       {visible && (
         <ListNowModal
           open={visible}
-          user={{user}}
+          user={{ user }}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}

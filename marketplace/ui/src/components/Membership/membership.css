@@ -83,6 +83,18 @@
   box-shadow: 0px 0px 6px 2px #0000002e;
 }
 
+.card-shadow:hover {
+  box-shadow: 0px 0px 6px 2px #0000002e;
+}
+
+.card-shadow-2{
+  box-shadow: 0px 0px 6px 0px #00000026;
+}
+
 .create-modal-footer-shadow{
   box-shadow: 0px -2px 8px 0px #00000026;
+}
+
+.ant-tabs-top > .ant-tabs-nav::before {
+  border-bottom: 2px solid rgba(5, 5, 5, 0.06);
 }

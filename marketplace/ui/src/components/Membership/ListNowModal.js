@@ -96,10 +96,6 @@ const ListNowModal = ({
             <Row><Input type="text" value={id} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /></Row>
           </Col>
           <Col span={8}>
-            <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={type} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
-          </Col>
-          <Col span={8}>
             <Row> <Text className="font-medium">Quantity</Text></Row>
             <Row><InputNumber
               id="quantity"
@@ -157,6 +153,10 @@ const ListNowModal = ({
                 formik.setFieldValue("price", value);
               }}
             /></Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text className="font-medium">Type</Text></Row>
+            <Row><Input type="text" value={type} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
         </Row>
       </Form>

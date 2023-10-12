@@ -185,11 +185,11 @@ const Membership = (user) => {
   const items = [
     {
       key: "purchase",
-      label: "Purchased",
+      label: <Text className="text-xl font-bold leading-6" style={{ color: typeDisplay === "purchase" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Purchased</Text>,
     },
     {
       key: "issued",
-      label: "Issued",
+      label: <Text className="text-xl font-bold leading-6" style={{ color: typeDisplay === "issued" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Issued</Text>,
     },
   ];
   const closeSellModal = () => {
@@ -219,27 +219,27 @@ const Membership = (user) => {
                   </ClickableCell>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-                <Text className="text-md text-grey font-bold" underline>
+                  <Text className="text-md font-bold">
                     Memberships
-                    </Text>
+                  </Text>
                 </Breadcrumb.Item>
               </Breadcrumb>
             </Col>
           </Row>
 
-          <Col className="mt-2 h-20 pt-5 bg-red-800" style={{ backgroundColor: '#F2F2F2' }}>
-            <Row className="mx-16">
-              <Col span={8}>
+          <Col className="mt-2 h-24 py-5 bg-red-800" style={{ backgroundColor: '#F2F2F2' }}>
+            <Row className="mx-16 flex justify-between item-center">
+              <Col span={8} >
                 <Row>
-                  <Col>
+                  <Col className="space-y-2.5">
                     <Row>
                       <Typography.Text className="text-2xl font-bold">
                         Memberships
                       </Typography.Text>
                     </Row>
                     <Row>
-                      <Typography.Text className="text-xs text-grey font-lg">
-                        {memberships.length} Issued Memberships found
+                      <Typography.Text className="text-sm font-medium text-grey">
+                        {memberships.length} {typeDisplay} Memberships found
                       </Typography.Text>
                     </Row>
                   </Col>
@@ -254,16 +254,15 @@ const Membership = (user) => {
                         All
                     </Dropdown.Button>
                 </Col> */}
-              <Col span={16}>
-                <Col className="flex float-right">
+              <Col span={14} className="py-0 m-0 pt-1">
+                <Col className="flex justify-between">
                   <Button
                     id="add-product-button"
                     type="primary"
-                    className="w-50 h-9 bg-500 !hover:bg-primaryHover font-bold m-6 flex"
+                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold flex"
                     style={{
                       backgroundColor: "blue",
                       color: "white",
-                      margin: "10px",
                     }}
                     onClick={() => {
                       if (
@@ -285,9 +284,8 @@ const Membership = (user) => {
                     style={{
                       // backgroundColor: "green",
                       color: "black",
-                      margin: "10px",
                     }}
-                    className="w-50 h-9 bg-white align-middle !hover:bg-primaryHover m-6 flex"
+                    className="py-3 px-6 h-12 bg-white align-middle font-semibold !hover:bg-primaryHover flex"
                     onClick={() => {
                       if (
                         hasChecked &&
@@ -308,9 +306,9 @@ const Membership = (user) => {
                     style={{
                       // backgroundColor: "orange",
                       color: "black",
-                      margin: "10px",
+
                     }}
-                    className="w-50 h-9 bg-white !hover:bg-primaryHover m-6 flex"
+                    className="py-3 px-6 h-12 bg-white !hover:bg-primaryHover font-semibold flex"
                     onClick={() => navigate("/memberships/serviceUsage/booked")}
                   >
                     {servicesIcon()} &nbsp; Services
@@ -321,17 +319,17 @@ const Membership = (user) => {
                     style={{
                       // backgroundColor: "red",
                       color: "black",
-                      margin: "10px",
+
                     }}
-                    className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
+                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold"
                   >
                     Manage Services
                   </Button>
                   <Button
                     id="add-product-button"
                     type="primary"
-                    style={{ color: "white", margin: "10px", fontWeight: "bold" }}
-                    className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40"
+                    style={{ color: "white", fontWeight: "bold" }}
+                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold"
                     disabled={stripeStatus.detailsSubmitted}
                     onClick={() => {
                       if (
@@ -357,7 +355,9 @@ const Membership = (user) => {
             </Row>
           </Col>
           <Row className="mx-16">
-            <Tabs defaultActiveKey="1" size='large' items={items} onChange={onChange} />
+            <Col span={24}>
+              <Tabs defaultActiveKey="1" size="large" items={items} onChange={onChange} />
+            </Col>
           </Row>
           <Row className="mx-16">
             {typeDisplay === "purchase" ? (

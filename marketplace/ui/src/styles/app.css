@@ -64,7 +64,7 @@
 .primary-theme-text {
   color: #181eac !important;
 }
-.border-grey{
+.border-grey {
   border: 1px solid #00000033;
 }
 
@@ -80,8 +80,8 @@
   font-weight: 600;
 }
 
-.text-grey{
-  color: grey;
+.text-grey {
+  color: rgba(0, 0, 0, 0.4);
 }
 
 .ant-btn-primary:not(:disabled):hover {
@@ -128,6 +128,22 @@
   margin-inline-start: 0px;
 }
 
-.ant-upload-list-item{
+.ant-upload-list-item {
   margin-left: 10px;
+}
+
+.font-poppin {
+  font-family: Poppins;
+}
+.lh-28 {
+  line-height: 28px;
+}
+.lh-20 {
+  line-height: 20px;
+}
+.m-tp-5 {
+  margin-top: 5px;
+}
+.m-tp-2 {
+  margin-top: 2px;
 }

@@ -185,12 +185,12 @@ const ListNowIndex = ({
             onClick={() => { handleCreateFormSubmit() }}
             type={(isListNow || isResaleMembershipSubmitting) ? 'default' : 'primary'}
           >
-          List Now
+            List Now
           </Button>
         </Row>
       ]}
     >
-      <hr style={{ color: '#e6d8d8', marginTop:'5px' }} />
+      <hr style={{ color: '#e6d8d8', marginTop: '5px' }} />
       <Form className="mt-10">
         <Row gutter={[48, 12]}>
           <Col span={8}>
@@ -228,10 +228,6 @@ const ListNowIndex = ({
               }}
               options={memebershipList}
             /></Row>
-          </Col>
-          <Col span={8}>
-            <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={type} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Quantity</Text></Row>
@@ -285,22 +281,28 @@ const ListNowIndex = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Price</Text></Row>
-            <Row><InputNumber
-              addonBefore="$"
-              className="w-full mt-2"
-              size="large"
-              id="price"
-              name="price"
-              controls={false}
-              type="number"
-              placeholder="Price"
-              onWheel={(e) => e.target.blur()}
-              min={0}
-              value={price}
-              onChange={(value) => {
-                setPrice(value)
-              }}
-            /></Row>
+            <Row>
+              <InputNumber
+                addonBefore="$"
+                className="w-full mt-2"
+                size="large"
+                id="price"
+                name="price"
+                controls={false}
+                type="number"
+                placeholder="Price"
+                onWheel={(e) => e.target.blur()}
+                min={0}
+                value={price}
+                onChange={(value) => {
+                  setPrice(value)
+                }}
+              />
+            </Row>
+          </Col>
+          <Col span={8}>
+            <Row> <Text className="font-medium">Type</Text></Row>
+            <Row><Input type="text" value={type} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
           </Col>
         </Row>
       </Form>
