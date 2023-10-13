@@ -147,7 +147,8 @@ const TopSellingProductCard = () => {
                         className="cursor-pointer"
                         src={topSellingProduct.imageUrl}
                         height={230}
-                        style={{ maxWidth: '100%'}}
+                        width={230}
+                        style={{ objectFit: "contain" }}
                         preview={false}
                         onClick={() =>
                           navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })

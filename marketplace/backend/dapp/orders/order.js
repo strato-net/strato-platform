@@ -241,28 +241,22 @@ async function getAll(admin, args = {}, options) {
     admin
   );
 
-  const queryArgs = setSearchQueryOptionsPrime({
+  const queryArgs = await searchAllWithQueryArgs(
+    contractName,
+    {
     ...args,
     limit: undefined,
     offset: 0,
     order: undefined,
-  });
-
-  const totalResult = await searchAll(
-    contractName,
-    {
-      ...queryArgs,
-      sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
-      queryOptions: {
-        ...queryArgs.queryOptions,
-        select: "count",
-      },
+    queryOptions: {
+      select: "count",
+      }
     },
     options,
     admin
   );
 
-  return { orders: orders.map((order) => marshalOut(order)), total: totalResult[0].count}
+  return { orders: orders.map((order) => marshalOut(order)), total: queryArgs[0].count}
 }
 
 /**
