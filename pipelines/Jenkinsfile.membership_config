@@ -1,0 +1,23 @@
+withCredentials([
+    usernamePassword(credentialsId: 'membership-mercata-testnet2-keycloak-client', passwordVariable: 'MEMBERSHIP_MERCATA_TESTNET2_KEYCLOAK_CLIENT_SECRET', usernameVariable: 'MEMBERSHIP_MERCATA_TESTNET2_KEYCLOAK_CLIENT_ID'),
+]) {
+  NODE_DATA = [
+      //MONITOR: [
+      //  NETWORK_HEALTH_URL: 'https://monitor.example.com/health'
+      //],
+      NODE1: [
+          NUMBER             : "1",
+          APP_HOST           : "membership.mercata-testnet2.blockapps.net",
+          APP_IP             : "44.194.147.96",
+          STRATO_HOSTNAME    : "membership.mercata-testnet2.blockapps.net",
+          STRATO_PORT        : 443,
+          //STRATO_LOCAL_IP    : '172.17.0.1',  // Only enable when running STRATO node locally
+          //BOOTNODE_IP        : "",    // Enable when setting up new STRATO node conected to Mercata
+          OAUTH_DISCOVERY_URL: "https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration",
+          OAUTH_CLIENT_ID    : "${MEMBERSHIP_MERCATA_TESTNET2_KEYCLOAK_CLIENT_ID}",
+          OAUTH_CLIENT_SECRET: "${MEMBERSHIP_MERCATA_TESTNET2_KEYCLOAK_CLIENT_SECRET}",
+      ],
+  ]
+}
+
+return this
