@@ -6,7 +6,6 @@ import { getStringDate } from "../../helpers/utils";
 // import { useNavigate, Link } from "react-router-dom";
 import { actions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
-import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination } from "antd";
 // import TagManager from "react-gtm-module";
@@ -40,6 +39,7 @@ const TransfersTable = ({ user }) => {
         address: transfer.address,
         key: transfer.address,
         inventoryId: transfer.inventoryId,
+        productName: decodeURIComponent(transfer.productName),
         newOwner: transfer.newOwner,
         newOwnerCommonName: transfer.newOwnerCommonName,
         newOwnerOrganization: transfer.newOwnerOrganization,
@@ -48,16 +48,19 @@ const TransfersTable = ({ user }) => {
         oldOwnerOrganization: transfer.oldOwnerOrganization,
         quantity: transfer.quantity,
         transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
+        transferNumber: transfer.transferNumber,
       });
     });
     setdata(items);
+    console.log("items", items); 
   }, [itemTransfers]);
-
+  console.log("data", data);
+  
   const column = [
     {
       title: "TRANSFER NUMBER",
-      dataIndex: "address",
-      key: "address",
+      dataIndex: "transferNumber",
+      key: "transferNumber",
       render: (text) => <p>{text}</p>,
     },
     {
@@ -91,8 +94,8 @@ const TransfersTable = ({ user }) => {
     },
     {
       title: "PRODUCT NAME",
-      dataIndex: "inventoryId",
-      key: "inventoryId",
+      dataIndex: "productName",
+      key: "productName",
       render: (text) => <p>{text}</p>,
     },
     {

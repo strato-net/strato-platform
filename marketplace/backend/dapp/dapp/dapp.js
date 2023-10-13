@@ -664,7 +664,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const itemNumber = parseInt(util.uid());
 
     await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantityArray, isReduce: true })
-    return managers.itemManager.transferOwnership({ ...newArgs, dappAddress: contract.address, isGiftedTransfer: true, itemNumber: itemNumber, newQuantity: newQuantity });
+    return managers.itemManager.transferOwnership({ ...newArgs, dappAddress: contract.address, isGiftedTransfer: true, itemNumber: itemNumber, newQuantity: newQuantity, transferNumber: util.uid() });
   };
 
   contract.getAllItemTransferEvents = function (args, options = optionsNoChainIds) {

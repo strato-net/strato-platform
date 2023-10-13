@@ -10,7 +10,7 @@ import rawMaterialJs from 'dapp/items/rawMaterials/rawMaterial';
 
 const contractName = 'ItemManager';
 const contractFilename = `${util.cwd}/dapp/items/contracts/ItemManager.sol`
-const contractEvents = { ITEM_TRANSFER: "ItemTransfer" }
+const contractEvents = { ITEM_TRANSFER: "ItemTransfers" }
 
 /**
  * Upload a new Product manager 
@@ -281,10 +281,9 @@ async function getState(user, contract, options) {
 }
 
 async function getAllItemTransferEvents(admin, args = {}, options) {
-
-
     const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
-    return itemTransferEvents.map((item) => marshalOut(item))
+    const total  = await searchAllWithQueryArgs( `${contractName}.${contractEvents.ITEM_TRANSFER}`, { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count", } }, options, admin );
+    return { transfers: itemTransferEvents.map((item) => marshalOut(item)), total: total[0].count };
 }
 
 export default {

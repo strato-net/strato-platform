@@ -73,8 +73,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchItemTransfersSuccessful:
       return {
         ...state,
-        itemTransfers: action.payload,
-        totalItemsTransfered: action.payload.length,
+        itemTransfers: action.payload.transfers,
+        totalItemsTransfered: action.payload.total,
         isFetchingItemTransfers: false,
       };
     case actionDescriptors.fetchItemTransfersFailed:

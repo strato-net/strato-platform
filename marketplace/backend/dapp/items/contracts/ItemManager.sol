@@ -21,7 +21,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string[] rawMaterialProductId;
     }
 
-    event ItemTransfer(
+    event ItemTransfers(
         address indexed oldOwner,
         string oldOwnerOrganization,
         string oldOwnerOrganizationalUnit,
@@ -31,6 +31,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string newOwnerOrganizationalUnit,
         string newOwnerCommonName,
         address indexed inventoryId,
+        string productName,
+        uint transferNumber,
         uint quantity,
         uint transferDate
     );
@@ -199,16 +201,13 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _dappAddress,
         int _newQuantity,
         uint _itemNumber,
-        bool _isGiftedTransfer
+        bool _isGiftedTransfer,
+        uint _transferNumber
     ) public returns (uint, address, address) {
         Product_3 product;
         Inventory inventory;
         Item_3 item = Item_3(_itemsAddress[0]);
 
-        // get old owner organization
-        string oldOwnerOrganization = item.ownerOrganization();
-        string oldOwnerCommonName = item.ownerCommonName();
-        string oldOwnerOrganizationalUnit = item.ownerOrganizationalUnit();
 
         // get Dapp contract from dapp chain
         Dapp dapp = Dapp(address(_dappAddress));
@@ -242,6 +241,13 @@ contract ItemManager is ItemStatus, InventoryStatus {
         }
 
         Inventory oldInventory = Inventory(item.inventoryId());
+
+        // Old Owner Org will taken from the sender of the transaction. This will help clarify who sent the transaction
+        mapping (string => string) oldOwnerCert = getUserCert(msg.sender);
+        string oldOwnerOrganization = oldOwnerCert["organization"];
+        string oldOwnerCommonName = oldOwnerCert["commonName"];
+        string oldOwnerOrganizationalUnit = oldOwnerCert["organizationalUnit"];
+
 
         // get new owner organization
         mapping(string => string) ownerCert = getUserCert(_newOwner);
@@ -297,7 +303,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         }
 
         if (_isGiftedTransfer == true) {
-            emit ItemTransfer(
+            emit ItemTransfers(
                 tx.origin,
                 oldOwnerOrganization,
                 oldOwnerOrganizationalUnit,
@@ -307,6 +313,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 newOwnerOrganizationalUnit,
                 newOwnerCommonName,
                 address(inventory),
+                product.name(),
+                _transferNumber,
                 _newQuantity,
                 block.timestamp
             );
