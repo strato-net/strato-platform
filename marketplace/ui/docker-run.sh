@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 # Creating .env file if using the relevant flags
 if [ -n "${ASSET_TABLE_NAME}" ] || [ -n "${SALE_TABLE_NAME}" ]; then

@@ -1,24 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main (
-  main
-  ) where
+module Main
+  ( main,
+  )
+where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
+import Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia as MP
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Resource
 import qualified Data.ByteString.Base16 as B16
-import           Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as LDB
-
-import Blockchain.Data.RLP
-import KV
 import FastMP
+import KV
 import ReverseOrderedKVs
 import Text.Format
-
-import qualified Blockchain.Database.MerklePatricia as MP
 
 decodeKV :: [ByteString] -> ([N.Nibble], MP.Val)
 decodeKV [k, x] =
@@ -32,9 +31,9 @@ main = do
   c <- fmap (map BC.words . BC.lines) $ BC.getContents
   let input = map (uncurry KV . fmap Right . decodeKV) c
 
-  output <- 
+  output <-
     runResourceT $ do
-      ldb <- LDB.open "abcd2" LDB.defaultOptions{LDB.createIfMissing=True}
+      ldb <- LDB.open "abcd2" LDB.defaultOptions {LDB.createIfMissing = True}
       liftIO $ createMPFast ldb $ iPromiseTheseKVsAreOrdered input
 
   putStrLn $ "final stateroot: " ++ format output

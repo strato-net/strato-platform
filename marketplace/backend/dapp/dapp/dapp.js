@@ -1083,21 +1083,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       //   ownedProducts.some(product => item.productId === product.address)
       // );
       console.log("ownedItems", ownedItems)
-
+      
       // Get Memberhships where productId = Items.productId 
       let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
       // ownedMemberships = ownedMemberships.filter(membership =>
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
-      console.log('ownedMemberships', ownedMemberships)
-
+      console.log ('ownedMemberships', ownedMemberships)
+      
       const arrayOwnedMemberships = ownedMemberships.map(obj => obj.address);
       // Get MembershipServices where membershipId = ownedMemberships.address 
       const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: arrayOwnedMemberships }, getOptions));
-      const arrayMembershipServices = membershipServices.map(obj => obj.serviceId);
+      const arrayMembershipServices= membershipServices.map(obj => obj.serviceId);
       // Get all services
-      const servicesAll = await managers.serviceManager.getAll({ address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
-
+      const servicesAll = await managers.serviceManager.getAll({address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
+      
       console.log('membershipServices:', membershipServices)
       console.log('servicesAll:', servicesAll)
 
@@ -1289,7 +1289,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           console.log("dapp orderLineItems: ", orderLineItems)
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
           console.log("dapp itemAddresses: ", itemAddresses)
-
           // Get items and get the productIds
           const items = await managers.itemManager.getItems({ address: itemAddresses }, createOptions);
           console.log("dapp items: ", items)

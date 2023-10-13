@@ -97,6 +97,8 @@ extra-deps:
 - servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
 - saltine-0.2.0.1@sha256:8b41875d2dcd2b27bf87e1b8b19fc290d07262d7fa0565663db5709fe5c86f50,5221
 - aeson-2.1.1.0@sha256:103ceb1421cd0ffa810bfb1acb1261d60addbde1a041fb5cce0056ff7d7dcdc2,5980
+- lens-family-th-0.5.2.1@sha256:24338a7a9bb8c8bca0d5e713ce62df066058bad6c15e6eb609593fd7fe93b3cf,1294
+- servant-auth-server-0.4.8.0@sha256:b9137bebf5ca56e4fd20402680e71f5734a6f511f0464e8eff6577aa9947ce35,5521
 - generically-0.1
 - ghc-debug-stub-0.4.0.0
 - ghc-debug-convention-0.4.0.0
@@ -124,7 +126,7 @@ nix:
   # See https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
   shell-file: nix/stack-integration.nix
 
-resolver: lts-20.10 #also duplicated in docker section below
+resolver: lts-21.12 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -149,7 +151,7 @@ ghc-options:
 
 docker:
   enable: true
-  image: "strato-buildbase:lts-20.10"
+  image: "strato-buildbase:lts-21.12"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
 

@@ -1,9 +1,9 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Options where
 
-import           HFlags
+import HFlags
 
 --defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 --defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"

@@ -1,31 +1,28 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Display (
-  displayMessage,
-  MsgDirection(..)
-  ) where
+module Blockchain.Display
+  ( displayMessage,
+    MsgDirection (..),
+  )
+where
 
-
-import qualified Data.Text                   as T
-
-import           BlockApps.Logging
-
-import           Blockchain.Data.BlockHeader
-import           Blockchain.Data.Wire
-
-import qualified Text.Colors                 as CL
-import           Text.Format
+import BlockApps.Logging
+import Blockchain.Data.BlockHeader
+import Blockchain.Data.Wire
+import qualified Data.Text as T
+import qualified Text.Colors as CL
+import Text.Format
 
 data MsgDirection = Inbound | Outbound deriving (Eq, Ord)
 
 prefix :: MsgDirection -> String -> String
-prefix Outbound ""        = CL.green "msg send: "
-prefix Inbound ""       = CL.cyan  "msg recv: "
-prefix Outbound peerName  = CL.green $ peerName ++ " send: "
-prefix Inbound peerName = CL.cyan  $ peerName ++ " recv: "
+prefix Outbound "" = CL.green "msg send: "
+prefix Inbound "" = CL.cyan "msg recv: "
+prefix Outbound peerName = CL.green $ peerName ++ " send: "
+prefix Inbound peerName = CL.cyan $ peerName ++ " recv: "
 
-displayMessage :: MonadLogger m => MsgDirection-> String -> Message -> m ()
+displayMessage :: MonadLogger m => MsgDirection -> String -> Message -> m ()
 displayMessage _ _ Ping = return ()
 displayMessage _ _ Pong = return ()
 displayMessage dir peerName (Transactions transactions) = do
@@ -38,13 +35,21 @@ displayMessage dir peerName (GetBlockBodies hashes) =
   $logInfoS "displayMessage" $ T.pack $ prefix dir peerName ++ CL.blue "GetBlockBodies" ++ " (" ++ show (length hashes) ++ " hashes)"
 displayMessage dir peerName (BlockBodies bodies) = do
   let transactionCount = length $ concat $ map fst bodies
-  $logInfoS "displayMessage" $ T.pack $ prefix dir peerName ++ CL.blue "BlockBodies: "
-    ++ "(" ++ show (length bodies)
-    ++ " bodies, includes " ++ show transactionCount
-    ++ " transaction" ++ (if transactionCount == 1 then "" else "s") ++ ")"
+  $logInfoS "displayMessage" $
+    T.pack $
+      prefix dir peerName ++ CL.blue "BlockBodies: "
+        ++ "("
+        ++ show (length bodies)
+        ++ " bodies, includes "
+        ++ show transactionCount
+        ++ " transaction"
+        ++ (if transactionCount == 1 then "" else "s")
+        ++ ")"
 displayMessage dir peerName (ChainDetails cInfos) = do
   let chainIds = fst <$> cInfos
-  $logInfoS "displayMessage" $ T.pack $ prefix dir peerName ++ CL.blue "ChainDetails: "
-    ++ concat (map (\cId -> "\n  " ++ format cId) chainIds)
+  $logInfoS "displayMessage" $
+    T.pack $
+      prefix dir peerName ++ CL.blue "ChainDetails: "
+        ++ concat (map (\cId -> "\n  " ++ format cId) chainIds)
 displayMessage dir peerName msg =
   $logInfoS "displayMessage" $ T.pack $ (prefix dir peerName) ++ format msg
