@@ -59,11 +59,9 @@ class ItemController {
 
   static async getAllItemTransferEvents(req, res, next) {
     try {
-      const { dapp, params } = req
-      // ItemController.validateGetItemOwnershipHistoryArgs(params)
-      // const { address } = params
+      const { dapp, query } = req
 
-      const itemTransfers = await dapp.getAllItemTransferEvents()
+      const itemTransfers = await dapp.getAllItemTransferEvents(query)
       rest.response.status200(res, itemTransfers)
 
       return next()

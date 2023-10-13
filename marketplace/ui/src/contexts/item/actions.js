@@ -106,12 +106,13 @@ const actions = {
     }
   },
 
-  fetchItemTransfers: async (dispatch) => {
+  fetchItemTransfers: async (dispatch, payload = {}) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
     try {
-      const response = await fetch(`${apiUrl}/item/transfers`, {
+      const response = await fetch(`${apiUrl}/item/transfers?or=(oldOwner.eq.${payload},newOwner.eq.${payload})`, {
         method: HTTP_METHODS.GET,
+
       });
 
       const body = await response.json();

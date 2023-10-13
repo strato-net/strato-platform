@@ -669,7 +669,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getAllItemTransferEvents = function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.itemManager.getAllItemTransferEvents(rawAdmin, {}, getOptions);
+    return managers.itemManager.getAllItemTransferEvents(args, getOptions);
   };
 
   contract.auditItem = async function (args, options = defaultOptions) {

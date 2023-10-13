@@ -127,7 +127,7 @@ function bind(user, _contract, options) {
     contract.getAllOwnershipEvents = async (args, options) => itemJs.getAllOwnershipEvents(user, args, options);
     contract.addItem = async (args) => addItem(user, contract, args, options);
     contract.transferOwnership = async (args) => transferOwnership(user, contract, args, options);
-    contract.getAllItemTransferEvents = async (args) => getAllItemTransferEvents(user, args, options);
+    contract.getAllItemTransferEvents = async (args, options) => getAllItemTransferEvents(user, args, options);
     contract.updateItem = async (args) => updateItem(user, contract, args, options);
     contract.addEvent = async (args) => addEvent(user, contract, args, options);
     contract.certifyEvent = async (args) => certifyEvent(user, contract, args, options);
@@ -281,6 +281,9 @@ async function getState(user, contract, options) {
 }
 
 async function getAllItemTransferEvents(admin, args = {}, options) {
+
+    console.log("args here ======>", args)
+
     const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
     return itemTransferEvents.map((item) => marshalOut(item))
 }

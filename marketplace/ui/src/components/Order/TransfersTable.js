@@ -32,20 +32,8 @@ const TransfersTable = ({ user, selectedDate }) => {
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
   useEffect(() => {
-    actions.fetchOrderSold(
-      dispatch,
-      limit,
-      offset,
-      debouncedSearchTerm,
-      user?.organization,
-      order,
-      selectedDate,
-      filter
-    );
-
-    itemActions.fetchItemTransfers(itemDispatch);
-
-  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
+    itemActions.fetchItemTransfers(itemDispatch, user.userAddress);
+  }, [itemDispatch, user]);
 
   useEffect(() => {
     setPage(1);
