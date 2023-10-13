@@ -19,7 +19,9 @@ const ItemsProvider = ({ children }) => {
     rawMaterials:[],
     isRawMaterialsLoading: false,
     actualRawMaterials: [],
-    isTransferringItems: false
+    isTransferringItems: false,
+    itemTransfers: [],
+    isFetchingItemTransfers: false
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

@@ -602,7 +602,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
       getOptions
     );
-    return {products: products, productCount: productCount}
+    return { products: products, productCount: productCount }
   };
   contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
@@ -662,9 +662,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const inventoryIdArray = [inventoryId];
     const quantityArray = [newQuantity];
     const itemNumber = parseInt(util.uid());
-    
+
     await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantityArray, isReduce: true })
     return managers.itemManager.transferOwnership({ ...newArgs, dappAddress: contract.address, isGiftedTransfer: true, itemNumber: itemNumber, newQuantity: newQuantity });
+  };
+
+  contract.getAllItemTransferEvents = function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return managers.itemManager.getAllItemTransferEvents(rawAdmin, {}, getOptions);
   };
 
   contract.auditItem = async function (args, options = defaultOptions) {

@@ -1,6 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
+import { searchAllWithQueryArgs } from '/helpers/utils';
 
 import itemJs from 'dapp/items/item';
 import eventJs from 'dapp/items/event';
@@ -9,7 +10,7 @@ import rawMaterialJs from 'dapp/items/rawMaterials/rawMaterial';
 
 const contractName = 'ItemManager';
 const contractFilename = `${util.cwd}/dapp/items/contracts/ItemManager.sol`
-
+const contractEvents = { ITEM_TRANSFER: "ItemTransfer" }
 
 /**
  * Upload a new Product manager 
@@ -126,6 +127,7 @@ function bind(user, _contract, options) {
     contract.getAllOwnershipEvents = async (args, options) => itemJs.getAllOwnershipEvents(user, args, options);
     contract.addItem = async (args) => addItem(user, contract, args, options);
     contract.transferOwnership = async (args) => transferOwnership(user, contract, args, options);
+    contract.getAllItemTransferEvents = async (args) => getAllItemTransferEvents(user, args, options);
     contract.updateItem = async (args) => updateItem(user, contract, args, options);
     contract.addEvent = async (args) => addEvent(user, contract, args, options);
     contract.certifyEvent = async (args) => certifyEvent(user, contract, args, options);
@@ -178,7 +180,7 @@ async function transferOwnership(admin, contract, _args, baseOptions) {
  * Update Item
  */
 async function updateItem(admin, contract, _args, baseOptions) {
-    
+
     const scheme = Object.keys(_args).reduce((agg, key) => {
         const base = 1
         switch (key) {
@@ -239,8 +241,8 @@ async function certifyEvent(admin, contract, _args, baseOptions) {
         eventAddress: _args.eventAddress,
         certifiedDate: _args.certifiedDate,
         ..._args.updates,
-      };
-      
+    };
+
     const scheme = Object.keys(_args).reduce((agg, key) => {
         const base = 1
         switch (key) {
@@ -278,12 +280,18 @@ async function getState(user, contract, options) {
     return marshalOut(state);
 }
 
+async function getAllItemTransferEvents(admin, args = {}, options) {
+    const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
+    return itemTransferEvents.map((item) => marshalOut(item))
+}
+
 export default {
     bindAddress,
     uploadContract,
     contractName,
     contractFilename,
     marshalOut,
+    getAllItemTransferEvents,
     addItem,
     updateItem,
     addEvent,

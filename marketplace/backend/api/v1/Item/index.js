@@ -21,6 +21,13 @@ router.get(
   ItemController.getOwnershipHistory
 );
 
+router.get(
+  Item.transfers,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  ItemController.getAllItemTransferEvents
+);
+
 router.post(
   Item.create,
   authHandler.authorizeRequest(),
