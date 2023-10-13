@@ -18,8 +18,8 @@ where
 
 --import           Data.List.Split                       (chunksOf)
 
+import BlockApps.Crossmon
 import BlockApps.Logging
-import Blockapps.Crossmon
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain

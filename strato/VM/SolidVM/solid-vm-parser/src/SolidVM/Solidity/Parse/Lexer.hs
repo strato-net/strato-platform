@@ -148,7 +148,7 @@ solidityLanguage =
           "years",
           --The following are protected as they are also names for cirrus columns
           --"block_number", "block_timestamp", "block_hash",
-          --"record_id", "transaction_hash", "transaction_sender"
+          --"transaction_hash", "transaction_sender"
           "receive",
           "fallback",
           "virtual",

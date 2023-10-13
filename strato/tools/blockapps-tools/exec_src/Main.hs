@@ -3,42 +3,42 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
-import Block
-import BlockGO
+import BlockApps.Tools.Block as Block
+import BlockApps.Tools.BlockGO as BlockGO
+import BlockApps.Tools.CanonRedis
+import BlockApps.Tools.ChainHash
+import BlockApps.Tools.Checkpoints
+import BlockApps.Tools.Code as Code
+import BlockApps.Tools.DumpKafkaBlocks
+import BlockApps.Tools.DumpKafkaRaw
+import BlockApps.Tools.DumpKafkaSequencer
+import BlockApps.Tools.DumpKafkaStateDiff
+import BlockApps.Tools.DumpKafkaUnSequencer
+import BlockApps.Tools.DumpKafkaVMEvents
+import BlockApps.Tools.DumpRedis
+import BlockApps.Tools.FRawMP as FRawMP
+import BlockApps.Tools.Hash as Hash
+import BlockApps.Tools.InsertP2P
+import BlockApps.Tools.InsertSeq
+import BlockApps.Tools.InsertTX
+import BlockApps.Tools.Kafka
+import BlockApps.Tools.Privacy
+import BlockApps.Tools.Psql
+import BlockApps.Tools.RLP as RLP
+import BlockApps.Tools.Raw as Raw
+import BlockApps.Tools.RawMP as RawMP
+import BlockApps.Tools.Redis
+import BlockApps.Tools.State as State
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
-import CanonRedis
-import ChainHash
-import Checkpoints
-import Code
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Int
 import qualified Data.Text as T
-import DumpKafkaBlocks
-import DumpKafkaRaw
-import DumpKafkaSequencer
-import DumpKafkaStateDiff
-import DumpKafkaUnSequencer
-import DumpKafkaVMEvents
-import DumpRedis
-import FRawMP
-import Hash
-import InsertP2P
-import InsertSeq
-import InsertTX
-import Kafka
 import qualified LabeledError
-import Privacy
-import Psql
-import RLP
-import Raw
-import RawMP
-import Redis
-import State
 import System.Console.CmdArgs
 
 data Options

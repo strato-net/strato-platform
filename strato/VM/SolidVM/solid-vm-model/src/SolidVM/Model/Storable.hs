@@ -109,6 +109,9 @@ getField path = error "StoragePath must begin with field" path
 snoc :: StoragePath -> StoragePathPiece -> StoragePath
 snoc (StoragePath p) piece = StoragePath $ p ++ [piece]
 
+snocList :: StoragePath -> [StoragePathPiece] -> StoragePath
+snocList (StoragePath p) pieces = StoragePath $ p ++ pieces
+
 toList :: StoragePath -> [StoragePathPiece]
 toList (StoragePath p) = p
 

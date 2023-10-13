@@ -2,6 +2,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_HADDOCK hide, prune #-}
 
 module BatchMerge
   ( putManyKeyVal,

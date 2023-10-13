@@ -1,27 +1,33 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
-import BlockApps.Init
-import BlockApps.Logging
-import Blockchain.Context
-import Blockchain.Options
-import Blockchain.Participation (p2pApp, setParticipationMode)
-import Blockchain.SeqEventNotify
-import Blockchain.Strato.Discovery.Data.Peer (resetPeers)
-import Blockchain.Strato.Model.Options ()
-import Blockchain.VMOptions ()
-import Control.Concurrent.Async.Lifted.Safe
-import Control.Monad.IO.Class
-import Data.IORef
-import Data.Set.Ordered (empty)
-import Executable.StratoP2P
-import HFlags
-import Network.Wai.Handler.Warp
-import Network.Wai.Middleware.Prometheus
+import           Control.Concurrent.Chan.Unagi
+import           Control.Monad.IO.Class
+import           Control.Concurrent.Async.Lifted.Safe
+import           Blockchain.VMOptions       ()
+
+import           HFlags
+
+import           Network.Wai.Handler.Warp
+import           Network.Wai.Middleware.Prometheus
+
+import           Blockchain.Context
+import           Blockchain.Options
+import           Blockchain.Strato.Model.Options()
+import           Blockchain.Participation (p2pApp, setParticipationMode)
+import           Blockchain.SeqEventNotify
+import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
+import           Executable.StratoP2P
+import           BlockApps.Init
+import           BlockApps.Logging as BL
+import           Data.IORef
+import           Data.Set.Ordered (empty)
 
 main :: IO ()
-main = do
-  runLoggingT initP2P
+main = runLoggingT initP2P
 
 initP2P :: LoggingT IO ()
 initP2P = do
@@ -31,7 +37,12 @@ initP2P = do
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
-  let sSource = seqEventNotificationSource $ contextKafkaState initContext
+  context <- liftIO $ readIORef $ configContext cfg
+  let contextkafkastate = contextKafkaState context
+  let contextkafkamiddleman = contextKafkaMiddleman context
+  _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate ((\(a,_) -> a) contextkafkamiddleman)
+  let sSource = seqEventNotificationSourceChanPour ((\(a,_) -> a) contextkafkamiddleman)
+                                                   dupChan
       runner f = runContextM cfg $ f sSource
   liftIO $
     race_
