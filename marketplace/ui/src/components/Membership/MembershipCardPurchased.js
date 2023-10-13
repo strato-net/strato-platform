@@ -92,7 +92,9 @@ const MembershipCardPurchased = ({
     membershipAddress,
     inventoryId,
     Inventories,
-    status
+    status,
+    description,
+    productImageLocation
   } = membership;
 
   const [state, setState] = useState(null);
@@ -242,7 +244,7 @@ const MembershipCardPurchased = ({
                 : (<Col span={24} className="mt-2">
                   <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
                   <Paragraph className="text-sm mt-2 text-dark-grey font-normal leading-5 font-poppin">
-                    Hamrah Aesthetics is a world-class cosmetic service provider led by Dr. Daria Hamrah. Their clinic and MediSpa facilities are located in McLean, VA.
+                    {description}
                   </Paragraph>
                 </Col>)}
             </Row>
@@ -253,8 +255,8 @@ const MembershipCardPurchased = ({
                   width={'100%'}
                   height={'90%'}
                   preview={false}
-                  // src={membership.productImageLocation}
-                  src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
+                  src={productImageLocation}
+                  // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
                 /> */}
                 <Carousel showArrows={true} showThumbs={false} className="h-full" >
                   {[
@@ -319,7 +321,7 @@ const MembershipCardPurchased = ({
                 </Paragraph>}
               </Col>
             </Row>
-            {Inventories &&
+            {Inventories && Inventories?.length > 0 &&
               <Row className="mt-4">
                 <Col span={24}>
                   {/* <Title level={5}>Inventories</Title> */}

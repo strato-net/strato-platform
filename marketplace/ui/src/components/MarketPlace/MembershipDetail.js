@@ -146,9 +146,9 @@ const MembershipDetails = ({ user, users }) => {
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { inventoryDetails, inventories, isInventoryDetailsLoading, inventory, isCreateInventorySubmitting } = useInventoryState();
+  const { inventoryDetails, inventories, isInventoryDetailsLoading,isInventoriesLoading, inventory, isCreateInventorySubmitting } = useInventoryState();
   const productDispatch = useProductDispatch();
-  const { productDetails } = useProductState();
+  const { productDetails, isProductDetailsLoading } = useProductState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
@@ -223,6 +223,8 @@ const MembershipDetails = ({ user, users }) => {
       openToast("bottom", true, "Cannot add more than available quantity");
     }
   };
+
+  const isLoading = isMembershipLoading || isInventoriesLoading || isProductDetailsLoading;
 
   const openToast = (placement, isError, msg) => {
     if (isError) {
@@ -481,9 +483,9 @@ const MembershipDetails = ({ user, users }) => {
     <>
       {contextHolder}
       {details === null ||
-        isInventoryDetailsLoading ? (
+        isLoading ? (
         <div className="h-screen flex justify-center mx-auto items-center">
-          <Spin spinning={isInventoryDetailsLoading} size="large" />
+          <Spin spinning={isLoading} size="large" />
         </div>
       ) : (
         <div>
@@ -582,10 +584,18 @@ const MembershipDetails = ({ user, users }) => {
           </Row>
 
           <Row className="max-w-4xl mx-auto mt-10">
-            <Card>
+            <Card className="w-full">
               <Title level={3}> Description  </Title>
-              <Paragraph>
-                An NFT (non-fungible token) is a digital asset that has been authenticated using blockchain technology. Digital assets are intangible the Internet... Show more
+              <Paragraph
+                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
+                className="text-primaryC text-[13px] mt-2"
+              >
+                {decodeURIComponent(details?.description ?? "").replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
               </Paragraph>
             </Card>
           </Row>

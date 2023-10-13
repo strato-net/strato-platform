@@ -27,12 +27,13 @@ const IssuedList = (
     actions.fetchMembership(dispatch);
   }, []);
 
-  const memberships_issued = memberships
-    .filter((membership_) => membership_?.inventories?.length > 0)
-    .filter(
-      (membership) =>
-        membership.ownerOrganization === membership?.inventories[0].manufacturer
-    );
+  const memberships_issued = memberships;
+
+    // .filter((membership_) => membership_?.inventories?.length > 0)
+    // .filter(
+    //   (membership) =>
+    //     membership.ownerOrganization === membership?.inventories[0].manufacturer
+    // );
   const { Title } = Typography;
   return (
     <>
@@ -53,10 +54,14 @@ const IssuedList = (
             // membershipId,
             let transformedData = { ...item.product }
             transformedData["timePeriodInMonths"] = item.timePeriodInMonths
-            transformedData["Inventories"] = item.inventories;
+            transformedData["Inventories"] = item?.inventories;
             transformedData["productName"] = transformedData.name;
-            transformedData["inventoryId"] = item.inventories[0].address;
+            if(item.inventories && item.inventories?.length>0){
+              transformedData["inventoryId"] = item.inventories[0]?.address;
+            }
+            transformedData["inventoryId"] = '';
             transformedData["membershipAddress"] = item.membershipAddress;
+            transformedData["productImageLocation"] = item.productImageLocation;
             return (
               <Col span={12}>
                 <MembershipCardPurchased
