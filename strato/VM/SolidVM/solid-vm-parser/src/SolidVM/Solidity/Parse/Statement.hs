@@ -432,22 +432,30 @@ parseArgs = (try $ parens $ commaSep literal) <|> parseCreateArgs
 parseCreateArgs :: SolidityParser [Expression]
 parseCreateArgs = do
   void $ char '('
-  str1 <- uncurry StringLiteral <$> withPosition parseQuotedString  -- name
-  str2 <- uncurry StringLiteral <$> withPosition parseQuotedString  -- contract
-  str3 <- uncurry StringLiteral <$> withPosition parseQuotedString' -- tuple
+  str1 <- uncurry StringLiteral <$> withPosition stringLiteral  -- name
+  void $ char ','
+  str2 <- uncurry StringLiteral <$> withPosition parseCreateContractSrc  -- contract src
+  str3 <- uncurry StringLiteral <$> withPosition parseCreateConstructArgs -- constructor args
   return [str1, str2, str3]
 
-parseQuotedString :: SolidityParser String
-parseQuotedString = do
+parseCreateContractSrc :: SolidityParser String
+parseCreateContractSrc = do
+  srcLength <- getContractSrcLength
   void $ string "\""
-  content <- manyTill anyChar (try (void $ string "\","))
-  return content
+  case srcLength of
+    0 -> manyTill anyChar (try (void $ string "\",\"("))
+    _ -> count srcLength anyChar
 
-parseQuotedString' :: SolidityParser String
-parseQuotedString' = do
-  void $ string "\""
-  content <- manyTill anyChar (try (string "\")" <* eof))
-  return content
+parseCreateConstructArgs :: SolidityParser String
+parseCreateConstructArgs = do
+  srcLength <- getContractSrcLength
+  case srcLength of
+    0 -> do
+      content <- manyTill anyChar (try $ (void $ string "\")") <* eof)
+      return ('(' : content)
+    _ -> do
+      void $ string "\",\""
+      manyTill anyChar (try $ (void $ string "\")") <* eof)
 
 parseExternalCallArgs :: SolidityParser (SolidString, [SVMType.Type])
 parseExternalCallArgs = do

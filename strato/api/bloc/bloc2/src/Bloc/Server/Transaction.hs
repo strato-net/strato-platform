@@ -681,6 +681,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
               True -> do
                 let contractSrc = getSrc p
                     contractSrcText = sourceBlob $ contractSrc
+                    srcLength = Text.length contractSrcText
                     contractArgs = contractpayloadArgs p
                     contractName' = contractpayloadContract p
                 (_, Contract {..}) <-
@@ -700,10 +701,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         (contractpayloadValue p)
                         (mergeTxParams (contractpayloadTxParams p) txParams)
                         ( case md of
-                            Nothing -> Just $ M.fromList [("history", cn), ("useWallet", Text.pack "true")]
-                            Just m -> do
-                              let m' = Map.insert "useWallet" (Text.pack "true") m
-                              Just $ Map.insert "history" cn m'
+                            Nothing -> Just $ M.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
+                            Just m -> Just $ (Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]) `Map.union` m
                         )
                         (contractpayloadChainid p <|> chainId)
                         resolve
@@ -733,6 +732,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
               True -> do
                 methodList <- mapM (\p@(ContractPayload _ c a v x cid m) -> do
                                   let contractSrc = getSrc p
+                                      contractSrcText = sourceBlob $ contractSrc
+                                      srcLength = Text.length contractSrcText
                                       cn = fromMaybe "unnamed_contract" c
                                   (_, Contract {..}) <-
                                     getContractDetailsForContract contractSrc c >>= \case
@@ -750,10 +751,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                                     (mergeTxParams x txParams) 
                                     cid
                                     ( case m of
-                                        Nothing -> Just $ Map.fromList [("history", cn), ("useWallet", "true")]
-                                        Just m' -> do
-                                          let m'' = Map.insert "useWallet" (Text.pack "true") m' 
-                                          Just $ Map.insert "history" cn m''
+                                        Nothing -> Just $ Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
+                                        Just m' -> Just $ (Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]) `Map.union` m'
                                     )
                               ) ps
                 let bcp = 
