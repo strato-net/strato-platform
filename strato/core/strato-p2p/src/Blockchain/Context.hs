@@ -203,13 +203,13 @@ withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) ->
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState      :: K.KafkaState
-  , contextKafkaMiddleman  :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
-  , blockHeaders           :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
-  , remainingBlockHeaders  :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
-  , actionTimestamp        :: ActionTimestamp
-  , _blockstanbulPeerAddr  :: PeerAddress
-  , _outboundWireMessages  :: S.OSet (T.Text, Keccak256)
+  { contextKafkaState     :: K.KafkaState
+  , contextKafkaMiddleman :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
+  , actionTimestamp       :: ActionTimestamp
+  , _blockstanbulPeerAddr :: PeerAddress
+  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
   }
 
 makeLenses ''Context
