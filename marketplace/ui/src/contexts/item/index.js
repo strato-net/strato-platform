@@ -21,6 +21,7 @@ const ItemsProvider = ({ children }) => {
     actualRawMaterials: [],
     isTransferringItems: false,
     itemTransfers: [],
+    totalItemsTransfered: 0,
     isFetchingItemTransfers: false
   };
 

@@ -74,6 +74,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         itemTransfers: action.payload,
+        totalItemsTransfered: action.payload.length,
         isFetchingItemTransfers: false,
       };
     case actionDescriptors.fetchItemTransfersFailed:

@@ -1,99 +1,80 @@
 import React, { useEffect, useState } from "react";
-import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled} from "@ant-design/icons";
-import routes from "../../helpers/routes";
+import { DownOutlined, UpOutlined } from "@ant-design/icons";
+// import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus } from "./constant";
 import { getStringDate } from "../../helpers/utils";
-import { useNavigate, Link } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import { actions as itemActions } from "../../contexts/item/actions";
+// import { useNavigate, Link } from "react-router-dom";
+import { actions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Radio, Space} from "antd";
-import TagManager from "react-gtm-module";
+import { Pagination } from "antd";
+// import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 
 
-const TransfersTable = ({ user, selectedDate }) => {
-  const dispatch = useOrderDispatch();
-  const itemDispatch = useItemDispatch();
-  const debouncedSearchTerm = useDebounce("", 1000);
+const TransfersTable = ({ user }) => {
+  const dispatch = useItemDispatch();
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("createdDate.desc");
-  const [filter, setFilter] = useState(0)
-  const [selectedValue, setSelectedValue] = useState(null);
-  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useItemState();
 
-  const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
+  console.log("itemTransfers", itemTransfers);
 
   useEffect(() => {
-    itemActions.fetchItemTransfers(itemDispatch, user.userAddress);
-  }, [itemDispatch, user]);
+    actions.fetchItemTransfers(dispatch, limit, offset, user.userAddress);
+  }, [dispatch, limit, offset, user]);
 
   useEffect(() => {
     setPage(1);
     setOffset(0);
-  }, [orderSoldTotal]);
+  }, [totalItemsTransfered]);
 
-  const navigate = useNavigate();
   const [data, setdata] = useState([]);
   useEffect(() => {
     let items = [];
-    ordersSold.forEach((order) => {
+    itemTransfers.forEach((transfer) => {
       items.push({
-        address: order.address,
-        chainId: order.chainId,
-        key: order.address,
-        orderNumber: order,
-        buyerOrganization: order.buyerOrganization,
-        orderTotal: order.orderTotal,
-        date: getStringDate(order.orderDate, US_DATE_FORMAT),
-        status: getStatus(parseInt(order.status)),
-        invoice: order,
+        address: transfer.address,
+        key: transfer.address,
+        inventoryId: transfer.inventoryId,
+        newOwner: transfer.newOwner,
+        newOwnerCommonName: transfer.newOwnerCommonName,
+        newOwnerOrganization: transfer.newOwnerOrganization,
+        oldOwner: transfer.oldOwner,
+        oldOwnerCommonName: transfer.oldOwnerCommonName,
+        oldOwnerOrganization: transfer.oldOwnerOrganization,
+        quantity: transfer.quantity,
+        transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
       });
     });
     setdata(items);
-  }, [ordersSold]);
+  }, [itemTransfers]);
 
   const column = [
     {
       title: "TRANSFER NUMBER",
-      dataIndex: "orderNumber",
-      key: "orderNumber",
-      render: (order) => (
-        <p
-          id={order.orderId}
-          onClick={() => {
-            navigate(
-              `${routes.SoldOrderDetails.url.replace(":id", order.address)}`
-            );
-          }}
-          className="text-primary hover:text-primaryHover cursor-pointer"
-        >
-          {`#${order.orderId}`}
-        </p>
-      ),
+      dataIndex: "address",
+      key: "address",
+      render: (text) => <p>{text}</p>,
     },
     {
       title: "FROM",
-      dataIndex: "buyerOrganization",
-      key: "buyerOrganization",
+      dataIndex: "oldOwnerCommonName",
+      key: "oldOwnerCommonName",
       render: (text) => <p>{text}</p>,
     },
     {
       title: "TO",
-      dataIndex: "orderTotal",
-      key: "orderTotal",
+      dataIndex: "newOwnerCommonName",
+      key: "newOwnerCommonName",
       render: (text) => <p>{text}</p>,
     },
     {
-      dataIndex: "date",
-      key: "date",
+      dataIndex: "transferDate",
+      key: "transferDate",
       render: (text) => <p>{text}</p>,
       title: (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -110,105 +91,19 @@ const TransfersTable = ({ user, selectedDate }) => {
     },
     {
       title: "PRODUCT NAME",
-      dataIndex: "invoice",
-      key: "invoice",
-      render: (text) => (
-        <button
-          onClick={() => {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: "view_invoice_in_orders_sold",
-              },
-            });
-          }}
-        >
-          <Link
-            to={`${routes.Invoice.url.replace(":id", text.address)}`}
-            target="_blank"
-          >
-            <div className="flex items-center cursor-pointer hover:text-primary">
-              <EyeOutlined className="mr-2" />
-              <p>View</p>
-            </div>
-          </Link>
-        </button>
-      ),
+      dataIndex: "inventoryId",
+      key: "inventoryId",
+      render: (text) => <p>{text}</p>,
     },
     {
       title: "QUANTITY",
-      dataIndex: "status",
-      key: "status",
-      render: (text) => statusComponent(text),
-      filterDropdown: ({confirm}) => ( dropdownVisible && (
-        <div style={{ padding: 8 }}>
-          <Radio.Group
-            onChange={(e) => {
-              setSelectedValue(e.target.value);
-            }}
-            value={selectedValue}
-            vertical={true}
-          >
-            <Space direction="vertical">
-              <Radio value={1}>Awaiting Fulfillment</Radio>
-              <Radio value={2}>Awaiting Shipment</Radio>
-              <Radio value={3}>Closed</Radio>
-              <Radio value={4}>Canceled</Radio>
-            </Space>
-          </Radio.Group>
-          <div className="mt-2" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Button
-              type="primary"
-              onClick={() => {
-                setFilter(0);
-                setSelectedValue(null);
-                setDropdownVisible(false);
-                confirm();
-              }}
-              style={{ marginRight: 8 }}
-            >
-              Reset
-            </Button>
-            <Button
-              type="primary"
-              onClick={() => {
-                if (selectedValue === null) {
-                  setFilter(0);
-                }
-                else {
-                  setFilter(selectedValue);
-                }
-                confirm();
-              }}
-            >
-              OK
-            </Button>
-          </div>
-        </div>
-      )),
-      filterIcon: () => (<FilterFilled style={{ color: filter !== 0 ? '#1890ff' : undefined }}/>),
-      onFilterDropdownOpenChange: (visible) => {setDropdownVisible(visible)},
-      filterSearch: true,
-      filterMultiple: false,
-      filterResetToDefaultFilteredValue: true,
+      dataIndex: "quantity",
+      key: "quantity",
+      render: (text) => <p>{text}</p>,
       width: "15%",
     },
   ];
 
-  const statusComponent = (status) => {
-    let textClass = "text-orange bg-[#FFF6EC]";
-    if (status === "Awaiting Shipment") {
-      textClass = "text-blue  bg-[#EBF7FF]";
-    } else if (status === "Closed") {
-      textClass = "text-success  bg-[#EAFFEE]";
-    } else if (status === "Canceled") {
-      textClass = "text-error  bg-[#FFF0F0]";
-    }
-    return (
-      <div className={classNames(textClass, "text-center py-1 rounded")}>
-        <p>{status}</p>
-      </div>
-    );
-  };
 
   const onPageChange = (page) => {
     setOffset((page - 1) * limit);
@@ -220,14 +115,14 @@ const TransfersTable = ({ user, selectedDate }) => {
       <DataTableComponent
         columns={column}
         data={data}
-        isLoading={isordersSoldLoading}
+        isLoading={isFetchingItemTransfers}
         pagination={false}
         scrollX="100%"
       />
       <Pagination
         current={page}
         onChange={onPageChange}
-        total={orderSoldTotal}
+        total={totalItemsTransfered}
         showSizeChanger={false}
         className="flex justify-center my-5 "
       />

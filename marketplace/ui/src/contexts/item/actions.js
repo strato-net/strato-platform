@@ -106,11 +106,11 @@ const actions = {
     }
   },
 
-  fetchItemTransfers: async (dispatch, payload = {}) => {
+  fetchItemTransfers: async (dispatch, limit, offset, owner = {}) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
     try {
-      const response = await fetch(`${apiUrl}/item/transfers?or=(oldOwner.eq.${payload},newOwner.eq.${payload})`, {
+      const response = await fetch(`${apiUrl}/item/transfers?limit=${limit}&offset=${offset}&or=(oldOwner.eq.${owner},newOwner.eq.${owner})`, {
         method: HTTP_METHODS.GET,
 
       });

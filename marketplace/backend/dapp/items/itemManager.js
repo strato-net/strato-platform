@@ -282,7 +282,6 @@ async function getState(user, contract, options) {
 
 async function getAllItemTransferEvents(admin, args = {}, options) {
 
-    console.log("args here ======>", args)
 
     const itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
     return itemTransferEvents.map((item) => marshalOut(item))
