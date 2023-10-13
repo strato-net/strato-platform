@@ -1272,11 +1272,10 @@ runNode p = do
   chan <- atomically . dupTMChan $ p ^. p2pPeerSeqP2pSource
   let s = sourceTMChan chan .| (awaitForever $ either (const $ pure ()) yield)
   ctx <- newIORef $ def & unseqSink .~ p ^. p2pPeerUnseqSource
-  tm  <- newThreadMap
   concurrently_
     (runNodeWithoutP2P p)
     ( concurrently_
-        (runNoLoggingT $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx) tm)
+        (runNoLoggingT $ stratoP2P (\f -> runResourceT . flip runReaderT p $ runReaderT (f s) ctx))
         (runNoLoggingT $ ethereumDiscovery (\f -> runResourceT . flip runReaderT p $ runReaderT (f 100) ctx))
     )
 

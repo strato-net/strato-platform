@@ -6,7 +6,6 @@
 module Executable.StratoP2P where
 
 import           Control.Concurrent.Async.Lifted.Safe(Concurrently(..),runConcurrently)
-import           Control.Concurrent.Hierarchy
 import           Control.Exception hiding (catch)
 import           Control.Exception.Lifted (catch)
 import           Control.Monad.Logger
@@ -26,9 +25,9 @@ stratoP2P :: ( MonadP2P n
              , RunsClient n
              , RunsServer n (BL.LoggingT IO)
              )
-          => PeerRunner n (BL.LoggingT IO) () -> ThreadMap -> BL.LoggingT IO ()
-stratoP2P runner tm =
-  raceAll [ stratoP2PLoopback runner    `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
-          , stratoP2PClient   runner tm `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
-          , stratoP2PServer   runner    `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
+          => PeerRunner n (BL.LoggingT IO) () -> BL.LoggingT IO ()
+stratoP2P runner =
+  raceAll [ stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
+          , stratoP2PClient   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
+          , stratoP2PServer   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
           ]

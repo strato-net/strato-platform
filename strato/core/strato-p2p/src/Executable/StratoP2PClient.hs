@@ -163,8 +163,8 @@ runPeerInList thePeer sSource tm = do
     liftIO $ threadDelay $ 10 * 1000 * 1000
   withAsync (runPeer thePeer sSource tm) $ \res -> waitCatch res
 
-stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> ThreadMap -> LoggingT IO ()
-stratoP2PClient runner tm = runner $ \sSource -> do
+stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+stratoP2PClient runner = runner $ \sSource -> do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
@@ -175,20 +175,21 @@ stratoP2PClient runner tm = runner $ \sSource -> do
         $logErrorS "stratoP2PClient" . T.pack $ "Could not fetch peers: " ++ show err
         liftIO $ threadDelay 1000000
       Right peers -> do
-        _ <- async (multiThreadedClient peers activePeersSem sSource tm)
+        _ <- async (multiThreadedClient peers activePeersSem sSource)
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
         liftIO $ threadDelay 5000000
   where
-    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent m () -> ThreadMap -> m ()
-    multiThreadedClient [] _ _ _ = do
+    multiThreadedClient :: (MonadP2P m, RunsClient m) => [PPeer] -> SSem -> ConduitM () P2pEvent m () -> m ()
+    multiThreadedClient [] _ _ = do
       $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
       liftIO $ threadDelay 10000000
-    multiThreadedClient peers sem sSource tmm = void . forConcurrently peers $ \p -> do
+    multiThreadedClient peers sem sSource = void . forConcurrently peers $ \p -> do
       let isRunning = pPeerActiveState p == 1
       unless isRunning $ do
         (liftIO (SSem.tryWait sem)) >>= \case
           Nothing -> return ()
           Just _ -> do
+            tmm    <- liftIO newThreadMap
             _      <- void $ liftIO $ newChild tmm $ \_ -> return ()
             result <- runPeerInList p sSource tmm
             _      <- liftIO $ killThreadHierarchy tmm

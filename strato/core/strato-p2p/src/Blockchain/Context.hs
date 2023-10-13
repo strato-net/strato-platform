@@ -143,7 +143,6 @@ import           Servant.Client
 import qualified Strato.Strato23.API                   as VC
 import qualified Strato.Strato23.Client                as VC
 
-import           Control.Concurrent.Hierarchy
 import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
@@ -206,7 +205,6 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 data Context = Context
   { contextKafkaState      :: K.KafkaState
   , contextKafkaMiddleman  :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
-  , contextThreadHierarchy :: ThreadMap
   , blockHeaders           :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders  :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp        :: ActionTimestamp
@@ -712,11 +710,9 @@ initConfig wireMessagesRef maxHeaders = do
 initContext :: IO Context
 initContext = do
   initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
-  initContextThreadHierarchy <- newThreadMap:: IO ThreadMap
   return Context { actionTimestamp = emptyActionTimestamp
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextKafkaMiddleman = initContextKafkaMiddleman
-                 , contextThreadHierarchy = initContextThreadHierarchy
                  , blockHeaders = ([], jamshidBirth)
                  , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
                  , _blockstanbulPeerAddr = PeerAddress Nothing
