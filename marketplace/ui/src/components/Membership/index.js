@@ -12,6 +12,7 @@ import {
   Typography,
   Pagination,
   Tabs,
+  Row,
 } from "antd";
 import { DownOutlined } from "@ant-design/icons";
 import MembershipCard from "./MembershipCard";
@@ -36,6 +37,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
 import ListNowIndex from "./ListNowIndex";
+import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -183,11 +185,11 @@ const Membership = (user) => {
   const items = [
     {
       key: "purchase",
-      label: "Purchased",
+      label: <Text className="text-xl font-bold leading-6" style={{ color: typeDisplay === "purchase" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Purchased</Text>,
     },
     {
       key: "issued",
-      label: "Issued",
+      label: <Text className="text-xl font-bold leading-6" style={{ color: typeDisplay === "issued" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Issued</Text>,
     },
   ];
   const closeSellModal = () => {
@@ -201,36 +203,49 @@ const Membership = (user) => {
     <>
       {contextHolder}
       {stripeStatus === null || isLoadingStripeStatus ? (
-        <div className="h-screen flex justify-center items-center">
+        <div className="h-screen flex justify-center items-center mx-auto">
           <Spin spinning={isLoadingStripeStatus} size="large" />
         </div>
       ) : (
-        <div className="mx-16 mt-14 h-screen">
-          <div className="flex justify-between">
-            <Col>
+        <div className=" mt-14 min-h-full">
+          <Row className="mx-16">
+            <Col span={22}>
               <Breadcrumb>
                 <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
                   <ClickableCell href={routes.Marketplace.url}>
-                    Home
+                    <Text className="primary-theme-text text-md font-bold" underline>
+                      Home
+                    </Text>
                   </ClickableCell>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-                  <p className="text-primary">Memberships</p>
+                  <Text className="text-md font-bold">
+                    Memberships
+                  </Text>
                 </Breadcrumb.Item>
               </Breadcrumb>
-              <Typography.Text className="text-2xl">
-                Memberships
-              </Typography.Text>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <Typography.Text
-                  style={{ fontSize: "10px", marginRight: "80px" }}
-                >
-                  {memberships.length} Issued Memberships found
-                </Typography.Text>
-                <Tabs defaultActiveKey="1" items={items} onChange={onChange} />
-              </div>
             </Col>
-            {/* <Col>
+          </Row>
+
+          <Col className="mt-2 h-24 py-5 bg-red-800" style={{ backgroundColor: '#F2F2F2' }}>
+            <Row className="mx-16 flex justify-between item-center">
+              <Col span={8} >
+                <Row>
+                  <Col className="space-y-2.5">
+                    <Row>
+                      <Typography.Text className="text-2xl font-bold">
+                        Memberships
+                      </Typography.Text>
+                    </Row>
+                    <Row>
+                      <Typography.Text className="text-sm font-medium text-grey">
+                        {memberships.length} {typeDisplay} Memberships found
+                      </Typography.Text>
+                    </Row>
+                  </Col>
+                </Row>
+              </Col>
+              {/* <Col>
                     <Dropdown.Button
                         style={{ margin: '10px' }}
                         icon={<DownOutlined />}
@@ -239,131 +254,137 @@ const Membership = (user) => {
                         All
                     </Dropdown.Button>
                 </Col> */}
-            <div className="flex">
-              <Button
-                id="add-product-button"
-                type="primary"
-                className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                style={{
-                  backgroundColor: "blue",
-                  color: "white",
-                  margin: "10px",
-                }}
-                onClick={() => {
-                  if (
-                    hasChecked &&
-                    !isAuthenticated &&
-                    loginUrl !== undefined
-                  ) {
-                    window.location.href = loginUrl;
-                  } else {
-                    showModal();
-                  }
-                }}
-              >
-                Create New Membership
-              </Button>
-              <Button
-                id="add-product-button"
-                type="primary"
-                style={{
-                  backgroundColor: "green",
-                  color: "white",
-                  margin: "10px",
-                }}
-                className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                onClick={() => {
-                  if (
-                    hasChecked &&
-                    !isAuthenticated &&
-                    loginUrl !== undefined
-                  ) {
-                    window.location.href = loginUrl;
-                  } else {
-                    openSellModal();
-                  }
-                }}
-              >
-                Sell Existing Membership{" "}
-              </Button>
-              <Button
-                id="add-product-button"
-                type="primary"
-                style={{
-                  backgroundColor: "orange",
-                  color: "white",
-                  margin: "10px",
-                }}
-                className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-                onClick={() => navigate("/memberships/serviceUsage/booked")}
-              >
-                Service Usage
-              </Button>
-              <Button
-                id="add-product-button"
-                type="primary"
-                style={{
-                  backgroundColor: "red",
-                  color: "white",
-                  margin: "10px",
-                }}
-                className="w-50 h-9 bg-500 !hover:bg-primaryHover m-6"
-              >
-                Manage Services
-              </Button>
-              <Button
-                id="add-product-button"
-                type="primary"
-                style={{ color: "white", margin: "10px", fontWeight: "bold" }}
-                className="w-50 h-9 bg-500 !hover:bg-primaryHover ml-40"
-                disabled={stripeStatus.detailsSubmitted}
-                onClick={() => {
-                  if (
-                    hasChecked &&
-                    !isAuthenticated &&
-                    loginUrl !== undefined
-                  ) {
-                    window.location.href = loginUrl;
-                  } else {
-                    onboardSeller();
-                  }
-                }}
-              >
-                <span style={{ fontWeight: "normal" }}> Setup </span>
-                <span style={{ fontWeight: "900", margin: "0 5px" }}>
-                  {" "}
-                  Stripe{" "}
-                </span>
-                <span style={{ fontWeight: "normal" }}> Account</span>
-              </Button>
-            </div>
-          </div>
-          <>
-            <>
-              {typeDisplay === "purchase" ? (
-                <PurchasedList
-                  user={user}
-                  categorys={categorys}
-                  subCategorys={subCategorys}
-                  debouncedSearchTerm={debouncedSearchTerm}
-                />
-              ) : (
-                <IssuedList
-                  user={user}
-                  categorys={categorys}
-                  subCategorys={subCategorys}
-                  debouncedSearchTerm={debouncedSearchTerm}
-                />
-              )}
-              <Pagination
-                current={page}
-                onChange={onPageChange}
-                total={total}
-                className="flex justify-center my-5 "
+              <Col span={14} className="py-0 m-0 pt-1">
+                <Col className="flex justify-between">
+                  <Button
+                    id="add-product-button"
+                    type="primary"
+                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold flex"
+                    style={{
+                      backgroundColor: "blue",
+                      color: "white",
+                    }}
+                    onClick={() => {
+                      if (
+                        hasChecked &&
+                        !isAuthenticated &&
+                        loginUrl !== undefined
+                      ) {
+                        window.location.href = loginUrl;
+                      } else {
+                        showModal();
+                      }
+                    }}
+                  >
+                    {createServiceIcon()} &nbsp; New Membership
+                  </Button>
+                  <Button
+                    id="add-product-button"
+                    // type="primary"
+                    style={{
+                      // backgroundColor: "green",
+                      color: "black",
+                    }}
+                    className="py-3 px-6 h-12 bg-white align-middle font-semibold !hover:bg-primaryHover flex"
+                    onClick={() => {
+                      if (
+                        hasChecked &&
+                        !isAuthenticated &&
+                        loginUrl !== undefined
+                      ) {
+                        window.location.href = loginUrl;
+                      } else {
+                        setVisible(true);
+                      }
+                    }}
+                  >
+                    {sellServicesIcon()}  &nbsp; Sell Membership
+                  </Button>
+                  <Button
+                    id="add-product-button"
+                    // type="primary"
+                    style={{
+                      // backgroundColor: "orange",
+                      color: "black",
+
+                    }}
+                    className="py-3 px-6 h-12 bg-white !hover:bg-primaryHover font-semibold flex"
+                    onClick={() => navigate("/memberships/serviceUsage/booked")}
+                  >
+                    {servicesIcon()} &nbsp; Services
+                  </Button>
+                  <Button
+                    id="add-product-button"
+                    // type="primary"
+                    style={{
+                      // backgroundColor: "red",
+                      color: "black",
+
+                    }}
+                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold"
+                  >
+                    Manage Services
+                  </Button>
+                  <Button
+                    id="add-product-button"
+                    type="primary"
+                    style={{ color: "white", fontWeight: "bold" }}
+                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold"
+                    disabled={stripeStatus.detailsSubmitted}
+                    onClick={() => {
+                      if (
+                        hasChecked &&
+                        !isAuthenticated &&
+                        loginUrl !== undefined
+                      ) {
+                        window.location.href = loginUrl;
+                      } else {
+                        onboardSeller();
+                      }
+                    }}
+                  >
+                    <span style={{ fontWeight: "normal" }}> Setup </span>
+                    <span style={{ fontWeight: "900", margin: "0 5px" }}>
+                      {" "}
+                      Stripe{" "}
+                    </span>
+                    <span style={{ fontWeight: "normal" }}> Account</span>
+                  </Button>
+                </Col>
+              </Col>
+            </Row>
+          </Col>
+          <Row className="mx-16">
+            <Col span={24}>
+              <Tabs defaultActiveKey="1" size="large" items={items} onChange={onChange} />
+            </Col>
+          </Row>
+          <Row className="mx-16">
+            {typeDisplay === "purchase" ? (
+              <PurchasedList
+                user={user}
+                categorys={categorys}
+                subCategorys={subCategorys}
+                debouncedSearchTerm={debouncedSearchTerm}
               />
-              <div className="pb-12"></div>
-            </>
-          </>
+            ) : (
+              <IssuedList
+                user={user}
+                categorys={categorys}
+                subCategorys={subCategorys}
+                debouncedSearchTerm={debouncedSearchTerm}
+              />
+            )}
+            <div className="pb-12"></div>
+          </Row>
+          {/* <Row>
+            <Pagination
+              current={page}
+              onChange={onPageChange}
+              total={total}
+              className="mx-auto"
+            />
+          </Row> */}
         </div>
       )}
       {open && (
@@ -382,9 +403,9 @@ const Membership = (user) => {
           open={visible}
           user={user}
           handleCancel={closeSellModal}
-          onClick={openSellModal}
+          onClick={() => { setVisible(true) }}
           // formik={formik}
-          type="Resale"
+          type="Sale"
         // id="None"
         // getIn={getIn}
         // isCreateMembershipSubmitting={isCreateInventorySubmitting}

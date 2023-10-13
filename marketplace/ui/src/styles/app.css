@@ -58,14 +58,41 @@
 }
 
 .ant-btn-primary {
-  background-color: #181eac;
+  background-color: #181eac !important;
+}
+
+.primary-theme-text {
+  color: #181eac !important;
+}
+.border-grey {
+  border: 1px solid #00000033;
+}
+
+/* .theme-text-color */
+.ant-tabs-tab-active {
+  color: #181eac !important;
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.ant-tabs-tab-btn {
+  color: grey;
+  font-weight: 600;
+}
+
+.text-grey {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.text-dark-grey {
+  color: rgba(0, 0, 0, 0.5);
 }
 
 .ant-btn-primary:not(:disabled):hover {
   background-color: #101481;
 }
 
-.ant-btn-default:not(:disabled):hover{
+.ant-btn-default:not(:disabled):hover {
   color: #fff;
 }
 
@@ -104,6 +131,27 @@
   font-weight: 500;
 }
 
-:where(.css-9ntgx0).ant-checkbox-wrapper+:where(.css-9ntgx0).ant-checkbox-wrapper {
+:where(.css-9ntgx0).ant-checkbox-wrapper
+  + :where(.css-9ntgx0).ant-checkbox-wrapper {
   margin-inline-start: 0px;
+}
+
+.ant-upload-list-item {
+  margin-left: 10px;
+}
+
+.font-poppin {
+  font-family: Poppins;
+}
+.lh-28 {
+  line-height: 28px;
+}
+.lh-20 {
+  line-height: 20px;
+}
+.m-tp-5 {
+  margin-top: 5px;
+}
+.m-tp-2 {
+  margin-top: 2px;
 }

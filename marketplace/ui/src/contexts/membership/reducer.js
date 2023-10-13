@@ -127,19 +127,19 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchMembershipDetails:
       return {
         ...state,
-        ismembershipDetailsLoading: true
+        isMembershipDetailsLoading: true
       };
     case actionDescriptors.fetchMembershipDetailsSuccessful:
       return {
         ...state,
         membershipDetails: action.payload,
-        ismembershipDetailsLoading: false
+        isMembershipDetailsLoading: false
       };
     case actionDescriptors.fetchMembershipDetailsFailed:
       return {
         ...state,
         error: action.error,
-        ismembershipDetailsLoading: false
+        isMembershipDetailsLoading: false
       };
     case actionDescriptors.transferMembershipOwnership:
       return {

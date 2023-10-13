@@ -15,7 +15,7 @@ const ProductsProvider = ({ children }) => {
     categoryBasedProducts: [],
     isCategoryBasedProductsLoading: false,
     productDetails: null,
-    isproductDetailsLoading: false,
+    isProductDetailsLoading: false,
     isProductDeleting: false,
     productDeleteObject: null,
     uploadedImg : null,

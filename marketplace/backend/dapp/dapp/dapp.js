@@ -1653,7 +1653,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
     // Get all memberships
-    let memberships = await membershipJs.getAll(rawAdmin, { ...args }, newOptions)
+    let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort:'-createdDate' }, newOptions)
 
     //filter out memberships with null productIds and memberships that don't belong to the user's organization
     memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization)

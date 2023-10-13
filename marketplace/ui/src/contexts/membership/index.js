@@ -19,7 +19,7 @@ const MembershipsProvider = ({ children }) => {
     memberships: [],
     ismembershipsLoading: false,
     membershipDetails: null,
-    ismembershipDetailsLoading: false,
+    isMembershipDetailsLoading: false,
     membershipOwnership: null,
     isOwnershipmembershipTransferring: false,
     membershipUpdateObject: null,

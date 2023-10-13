@@ -3,20 +3,28 @@
   .ant-menu-item:hover:not(.ant-menu-item-selected):not(
     .ant-menu-submenu-selected
   ) {
-  color: white;
+  color: black;
   font-weight: bold;
+  border: none;
 }
-
+.header-search,
+.header-search input {
+  background-color: #f2f2f2;
+}
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected::after {
-  border-width: 2px;
-  border-bottom-color: white;
+  border-width: 0px;
+  border-bottom-color: transparent;
 }
 
 .ant-menu-light.ant-menu-horizontal > .ant-menu-item:hover::after {
-  border-width: 2px;
-  border-bottom-color: white;
+  border-width: 0px;
+  border-bottom-color: transparent;
 }
 
-.anticon svg{
+.anticon svg {
   display: block;
 }
+.bg-1 {
+  background-color: #f2f2f2;
+}
+

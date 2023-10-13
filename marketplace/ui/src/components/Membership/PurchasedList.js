@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import MembershipCardPurchased from "./MembershipCardPurchased";
-import { Spin } from "antd";
+import { Col, Input, Row, Select, Spin } from "antd";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -8,6 +8,7 @@ import {
 import { actions } from "../../contexts/membership/actions";
 import { Image, Typography } from "antd";
 import { Images } from "../../images";
+import { SearchOutlined } from "@ant-design/icons";
 
 const PurchasedList = (
   user,
@@ -21,35 +22,74 @@ const PurchasedList = (
   const { Title } = Typography;
   return (
     <>
-      <h2 className="text-2xl font-semibold">Purchased Memberships</h2>
       {isPurchasedMembershipLoading ? (
-        <div className="h-screen flex justify-center items-center">
+        <div className="h-screen flex justify-center items-center mx-auto">
           <Spin spinning={isPurchasedMembershipLoading} size="large" />
         </div>
       ) : purchasedMemberships.length === 0 ? (
-        <div className="h-screen justify-center flex flex-col items-center">
-          <Image src={Images.noProductSymbol} preview={false} />
-          <Title level={3} className="mt-2">
-            No product found
-          </Title>
+        <div className="h-screen w-full justify-center flex flex-col items-center">
+          <div className="text-center">
+            <Image src={Images.noProductSymbol} preview={false} />
+            <Title level={3} className="mt-2 text-center">
+              No product found
+            </Title>
+          </div>
         </div>
       ) : (
-        <div className="my-4">
-          {purchasedMemberships.map((product, index) => {
-            return (
-              <MembershipCardPurchased
-                user={user}
-                membership={product}
-                categorys={categorys}
-                subCategorys={subCategorys}
-                debouncedSearchTerm={debouncedSearchTerm}
-                membershipId={product.itemNumber}
-                isPurchasedList={true}
+        <>
+
+          {/* <Row className="flex justify-start w-full">
+            <Col span={12} className="flex justify-between">
+            <Col span={8}>
+              <Input
+                size="large"
+                placeholder="Search Purchased Membership"
+                className="header-search rounded-full"
+                prefix={<SearchOutlined style={{ color: "#989898" }} />}
               />
-            );
-          })}
-        </div>
+            </Col>
+            <Col span={6} className="rounded-full">
+              <Select
+                defaultValue="lucy"
+                size="large"
+                className="rounded-full"
+                style={{ width: '100%', borderRadius:'50% !important' }}
+                disabled
+                options={[{ value: 'category', label: 'Category' }]}
+              />
+            </Col>
+            <Col span={6}>
+              <Select
+                defaultValue="lucy"
+                size="large"
+                className="rounded-full"
+                style={{ width: '100%' }}
+                disabled
+                options={[{ value: 'duration', label: 'Duration' }]}
+              />
+            </Col>
+            </Col>
+          </Row> */}
+          <Row className="my-4" gutter={[32, 16]}>
+            {purchasedMemberships.map((product, index) => {
+              return (
+                <Col span={12}>
+                  <MembershipCardPurchased
+                    user={user}
+                    membership={product}
+                    categorys={categorys}
+                    subCategorys={subCategorys}
+                    debouncedSearchTerm={debouncedSearchTerm}
+                    membershipId={product.itemNumber}
+                    isPurchasedList={true}
+                  />
+                </Col>
+              );
+            })}
+          </Row>
+        </>
       )}
+
     </>
   );
 };

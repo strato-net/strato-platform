@@ -337,7 +337,6 @@ const actions = {
       });
 
       const body = await response.json();
-      console.log("fetchMembershipFromDetails response: ", body.data)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchMembershipFromDetailsSuccessful,

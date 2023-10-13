@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
-import { Card, Popover, Spin, Button } from "antd";
+import { Card, Popover, Spin, Button, Row, Col, Typography, Image, Modal, Table, Collapse } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
+import "./membership.css";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -12,9 +13,66 @@ import * as yup from "yup";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useMembershipDispatch } from "../../contexts/membership";
+import { Carousel } from 'react-responsive-carousel';
+import { forwardArrowIcon, tag, tagIcon } from "../../images/SVGComponents";
 
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import 'react-responsive-carousel/lib/styles/carousel.min.css';
+
+
+const { Text, Paragraph, Title } = Typography;
+
+const statusText = {
+  1: 'For Sale',
+  2: 'Not For Sale'
+}
+
+const columns = [
+
+  {
+    title: 'Date',
+    dataIndex: 'name',
+    key: 'name',
+    width: '30%',
+    color: "red",
+    // ...getColumnSearchProps('name'),
+  },
+  {
+    title: 'Quantity',
+    dataIndex: 'age',
+    key: 'age',
+    width: '15%',
+    // ...getColumnSearchProps('age'),
+  },
+  {
+    title: 'Status',
+    dataIndex: 'published',
+    key: 'published',
+    width: '20%',
+    // ...getColumnSearchProps('age'),
+  },
+  {
+    title: 'Price',
+    dataIndex: 'address',
+    key: 'address',
+    width: '20%',
+    // ...getColumnSearchProps('address'),
+  },
+  {
+    title: 'Preview',
+    dataIndex: 'preview',
+    key: 'preview',
+    width: '7%',
+  }
+];
+
+const initialValues = {
+  name: "",
+  price: "",
+  quantity: ""
+};
+
 
 const MembershipCardPurchased = ({
   user,
@@ -25,60 +83,27 @@ const MembershipCardPurchased = ({
   isPurchasedList
 }) => {
   const membershipDispatch = useMembershipDispatch();
+  const {
+    subCategory,
+    manufacturer,
+    timePeriodInMonths,
+    savings,
+    // membershipId,
+    membershipAddress,
+    inventoryId,
+    Inventories,
+    status,
+    description,
+    productImageLocation
+  } = membership;
+
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const [carouselModel, setCarouselModel] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
-
-
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { isCreateInventorySubmitting, inventories } = useInventoryState();
-
-
-  const showModal = () => {
-    hide();
-    setOpen(true);
-  };
-
-  const handleCancel = () => {
-    setOpen(false);
-  };
-
-  const [openPop, setOpenPop] = useState(false);
-  const hide = () => {
-    setOpenPop(false);
-  };
-  const handleOpenChange = (newOpen) => {
-    setOpenPop(newOpen);
-  };
-
-  const showEditModal = () => {
-    hide();
-    setEditModalOpen(true);
-  };
-
-  const handleEditModalClose = () => {
-    setEditModalOpen(false);
-  };
-
-  useEffect(() => {
-    setState(membership);
-  }, [membership]);
-
-
-  const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
-  }
-
-  const closeListNowModal = () => {
-    setVisible(false);
-  };
-
-  const openListNowModal = () => {
-    setVisible(true);
-  };
 
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
@@ -94,11 +119,6 @@ const MembershipCardPurchased = ({
     });
   };
 
-  const initialValues = {
-    name: "",
-    price: "",
-    quantity: ""
-  };
 
   const formik = useFormik({
     initialValues: initialValues,
@@ -111,6 +131,59 @@ const MembershipCardPurchased = ({
     },
     enableReinitialize: true,
   });
+
+
+  const updateCol = (inv, texts) => (<Row
+    style={{ justifyContent: 'space-between' }}>
+    <p>{texts} </p>
+    <EditOutlined onClick={() => {
+      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+        window.location.href = loginUrl;
+      } else {
+        formik.setFieldValue("name", membership.product.name);
+        formik.setFieldValue("tempInv", inv);
+        openListNowModal();
+      }
+    }} />
+  </Row>)
+
+  const callDetailPage = (index, address) => {
+    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
+  }
+
+  const previewCol = (indx, address) => (<Button type="text"
+    className="text-primary text-sm cursor-pointer"
+    onClick={callDetailPage.bind(this, indx, address)}
+  >
+    Preview
+  </Button>)
+
+
+  let data = Inventories?.map((inventory, index) => {
+    return {
+      key: index,
+      name: inventory.block_timestamp,
+      age: inventory.availableQuantity,
+      published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
+      preview: previewCol(index, inventory.address),
+      address: "$ " + String(inventory.pricePerUnit)
+    }
+  });
+
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { isCreateInventorySubmitting, inventories } = useInventoryState();
+
+  useEffect(() => {
+    setState(membership);
+  }, [membership]);
+
+  const closeListNowModal = () => {
+    setVisible(false);
+  };
+
+  const openListNowModal = () => {
+    setVisible(true);
+  };
 
   const handleCreateFormSubmit = async (values) => {
     if (user) {
@@ -133,7 +206,6 @@ const MembershipCardPurchased = ({
           formik.resetForm();
         }
         setVisible(false);
-
       }
     }
   };
@@ -146,133 +218,130 @@ const MembershipCardPurchased = ({
           <Spin />
         </div>
       ) : (
-        <Card className="w-full mt-6" id="product" key={membershipId}>
-          <div className="flex">
-            <div className="text-center py-1 rounded w-24 text-sm mt-2.5">
-              <img
-                className="w-52 object-cover"
-                alt=""
-                src={membership.productImageLocation}
-              />
-              {/* {membership.product_with_inventory ?
-                (membership.isInventoryAvailable ?
-                  (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px" }}> For Sale </Button>)
-                  : (<Button type="primary" shape="round" style={{ background: "red", marginTop: "10px" }}> Retained </Button>))
-                : (<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> Not for Sale </Button>)} */}
-              {membership?.status == 1 && <Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> For Sale </Button>}
-              {membership?.status == 2 && <Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> Not for Sale </Button>}
-            </div>
-            <div className="ml-12 w-full">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center">
-                  <h3 className="font-semibold text-primaryB text-xl">
+        <Card className="w-full mt-6 border-grey card-shadow " id="product" key={membershipId}>
+          <Col span={24} style={{ padding: "0px" }}>
+            <Row className="p-4 flex justify-between item-center rounded-md" style={{ backgroundColor: "#f2f2f9" }}>
+              <Col >
+                <Row>
+                  <Text level={4} className="font-poppin text-2xl lh-28">
                     {decodeURIComponent(membership.productName)}
-                  </h3>
-                </div>
-                <div className="flex items-center">
-                  {(!membership.product_with_inventory && isPurchasedList) ?
-                    <Button type="text"
-                      className="text-primary text-sm cursor-pointer"
-                      onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          window.location.href = loginUrl;
-                        } else {
-                          formik.setFieldValue("name", membership.productName);
-                          openListNowModal();
-                        }
-                      }}
-                    >
-                      List for Sale
-                    </Button>
-                    : null}
-                  <Button type="text"
-                    className="text-primary text-sm cursor-pointer"
-                    onClick={callDetailPage}
-                  >
-                    Preview
-                  </Button>
+                  </Text>
+                </Row>
+                <Row strong className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>
+                  <Col className="m-tp-5 w-2.5 h-2.5 rounded-md" style={{
+                    borderRadius: '10%', backgroundColor: `${status == 1 ? 'green' : status == 2 ? 'red' : 'green'}`,
+                  }} > </Col>
+                  &nbsp; {statusText[status] ?? "For Sale"}
+                </Row>
+              </Col>
+              <Col className="text-right flex" style={{ alignItems: "center" }}>
+                <Row type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
+                  <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
+                  <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
+                </Row>
+              </Col>
+              {!isPurchasedList &&
+                (<Col span={24} className="mt-2">
+                  <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
+                  <Paragraph className="text-sm mt-2 text-dark-grey font-normal leading-5 font-poppin">
+                    {description}
+                  </Paragraph>
+                </Col>)}
+            </Row>
+            <Row className="mt-4">
+              <Col sm={12} lg={12} xl={8} xxl={6} className="border-grey shadow-lg h-52 rounded overflow-hidden">
+                {/* <Image
+                  className="object-covers"
+                  width={'100%'}
+                  height={'90%'}
+                  preview={false}
+                  src={productImageLocation}
+                  // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
+                /> */}
+                <Carousel showArrows={true} showThumbs={false} className="h-full" >
+                  {[
+                    "https://images.unsplash.com/photo-1612817288484-6f916006741a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmVhdXR5JTIwcHJvZHVjdHN8ZW58MHx8MHx8fDA%3D&w=1000&q=80",
+                    "https://thumbs.dreamstime.com/b/set-care-beauty-products-skin-29817248.jpg",
+                    "https://thumbs.dreamstime.com/z/bath-beauty-products-24145725.jpg"
+                  ].map((item) => {
+                    return <Image
+                      key={item}
+                      className="object-covers"
+                      width={'100%'}
+                      height={'100%'}
+                      preview={false}
+                      onClick={() => { setCarouselModel(true) }}
+                      src={item}
+                    // src={membership.productImageLocation}
+                    />
+                  })}
+                </Carousel>
 
-                  {/* <Popover
-                  placement="bottomLeft"
-                  open={openPop}
-                  onOpenChange={handleOpenChange}
-                  title={
-                    <div className="font-medium">
-                      <div
-                        className="flex items-center cursor-pointer"
-                        onClick={showEditModal}
-                        id="edit-button"
-                      >
-                        <EditOutlined />
-                        <p className="ml-3">Edit</p>
-                      </div>
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showModal}
-                        id="delete-button"
-                      >
-                        <DeleteOutlined />
-                        <p className="ml-3">Delete</p>
-                      </div>
-                    </div>
-                  }
-                  trigger="click"
+                {/* {(!membership.product_with_inventory && isPurchasedList) ? */}
+                <Button type="primary"
+                  block={true}
+                  className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      formik.setFieldValue("name", membership.productName);
+                      openListNowModal();
+                    }
+                  }}
                 >
-                  <MoreOutlined />
-                </Popover> */}
-                </div>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Sub Category</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {membership.subCategory}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Company Name</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {membership.manufacturer}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">
-                  Duration
-                </p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {membership.timePeriodInMonths} Month(s)
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">
-                  Savings
-                </p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p style={{ color: "green" }} className="text-primaryB font-bold text-sm ml-3">
-                  $ {membership.savings}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Membership ID</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {membershipId}
-                </p>
-              </div>
-            </div>
-          </div>
+                  <Row className="mx-auto w-full px-8 flex justify-between item-center font-poppin text-sm font-semibold">
+                    <Text>{tagIcon()}</Text>
+                    <Text className="text-white ">List for Sale</Text>
+                  </Row>
+                </Button>
+                {/* : null} */}
+              </Col>
+              <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17, offset: 1 }}
+                className={`border-grey shadow-lg leading-2 min-h-min rounded p-4 ${isPurchasedList ? "h-52" : "h-40"}`}>
+                <Paragraph >
+                  <Text className="font-normal text-grey leading-5 font-poppin" >Sub Category</Text>
+                  <Text className="float-right font-poppin leading-5">{subCategory}</Text>
+                </Paragraph>
+                <Paragraph >
+                  <Text className="font-normal text-grey leading-5 font-poppin" >Company Name</Text>
+                  <Text className="float-right font-poppin leading-5">{manufacturer}</Text>
+                </Paragraph>
+                <Paragraph >
+                  <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
+                  <Text className="float-right font-poppin leading-5">{timePeriodInMonths} Month(s)</Text>
+                </Paragraph>
+                <Paragraph >
+                  <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
+                  <Text type="success" className="float-right font-poppin leading-5">${savings ?? 0}</Text>
+                </Paragraph>
+                {membershipId && <Paragraph>
+                  <Text className="font-normal text-grey leading-5 font-poppin" >Membership ID</Text>
+                  <Text className="float-right font-poppin leading-5">{membershipId}</Text>
+                </Paragraph>}
+              </Col>
+            </Row>
+            {Inventories && Inventories?.length > 0 &&
+              <Row className="mt-4">
+                <Col span={24}>
+                  {/* <Title level={5}>Inventories</Title> */}
+                  {/* <Collapse
+                    size="large"
+                    items={[{ key: '1', label: 'This is default size panel header', children: <Table bordered pagination={false} columns={columns} dataSource={data} /> }]}
+                  /> */}
+
+                  <Collapse size="large" expandIconPosition='end'>
+                    <Collapse.Panel key="1" header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>}>
+                      <Table pagination={false}
+                        className="inventory-table"
+                        rowClassName={"bg-white"} rowKey="key" columns={columns} dataSource={data} />
+                    </Collapse.Panel>
+                  </Collapse>
+
+                </Col>
+              </Row>}
+          </Col>
+
           {/* {open && (
             <DeleteProductModal
               open={open}
@@ -299,12 +368,42 @@ const MembershipCardPurchased = ({
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
-          type="Resale"
+          type="Sale"
           id={membershipId}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
+
+      <Modal
+        title=""
+        centered
+        open={carouselModel}
+        closeIcon={false}
+        footer={null}
+        onOk={() => setCarouselModel(false)}
+        onCancel={() => setCarouselModel(false)}
+        width={1000}
+      >
+        <Carousel showArrows={true} showThumbs={false}  >
+          {[
+            "https://images.unsplash.com/photo-1612817288484-6f916006741a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmVhdXR5JTIwcHJvZHVjdHN8ZW58MHx8MHx8fDA%3D&w=1000&q=80",
+            "https://thumbs.dreamstime.com/b/set-care-beauty-products-skin-29817248.jpg",
+            "https://thumbs.dreamstime.com/z/bath-beauty-products-24145725.jpg"
+          ].map((item) => {
+            return <Image
+              key={item}
+              className="object-covers"
+              width={'100%'}
+              height={'96%'}
+              preview={false}
+              src={item}
+            // src={membership.productImageLocation}
+            />
+          })}
+        </Carousel>
+      </Modal>
+
     </>
   );
 };
