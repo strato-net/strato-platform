@@ -62,6 +62,18 @@ class StripeService {
         }
     }
 
+    static async getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+            stripeAccount: CONNECTED_ACCOUNT_ID
+          });
+          return paymentIntent;
+        } catch (error) {
+          console.error(`Stripe error: ${error.message}`);
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${error.message}`);
+        }
+      }
+
     static generateStripeAccountId(type = 'standard') {
         try {
             return stripe.accounts.create({ type });
