@@ -1,20 +1,21 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Strato.Strato23.Client
-  ( getPing
-  , getKey
-  , postKey
-  , getSharedKey
-  , getUsers
-  , postSignature
-  , postPassword
-  , verifyPassword
-  ) where
+  ( getPing,
+    getKey,
+    postKey,
+    getSharedKey,
+    getUsers,
+    postSignature,
+    postPassword,
+    verifyPassword,
+  )
+where
 
-import           Servant.Client
-import           Data.Proxy
-import           Data.Text
-import           Strato.Strato23.API
+import Data.Proxy
+import Data.Text
+import Servant.Client
+import Strato.Strato23.API
 
 getPing :: ClientM Version
 getPing = client (Proxy @GetPing)

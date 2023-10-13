@@ -1,25 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+
 module SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables
-  ( detector
-  ) where
+  ( detector,
+  )
+where
 
 import qualified Data.Map.Strict as M
-import           Data.Source
-import           Data.Text       (Text)
-import           SolidVM.Model.CodeCollection
-import           SolidVM.Solidity.StaticAnalysis.Types
+import Data.Source
+import Data.Text (Text)
+import SolidVM.Model.CodeCollection
+import SolidVM.Solidity.StaticAnalysis.Types
 
 -- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
-detector CodeCollection{..} = concat $ contractHelper <$> M.elems _contracts
+detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
 contractHelper :: Contract -> [SourceAnnotation Text]
-contractHelper Contract{..} =
+contractHelper Contract {..} =
   concat $ functionHelper <$> M.elems _functions
 
 functionHelper :: Func -> [SourceAnnotation Text]
-functionHelper Func{..} = case _funcContents of
+functionHelper Func {..} = case _funcContents of
   Nothing -> []
   Just stmts -> concat $ statementHelper <$> stmts
 
@@ -36,7 +38,6 @@ statementHelper (SolidityTryCatchStatement _ _ successStatements catchesMap _) =
   let ts = concat $ statementHelper <$> successStatements
       cs = concat $ statementHelper <$> (concatMap (snd . snd) (M.toList catchesMap))
    in concat [ts, cs]
-
 statementHelper (WhileStatement _ body _) =
   concat $ statementHelper <$> body
 statementHelper (ForStatement mInit _ _ body a) =
@@ -58,13 +59,14 @@ statementHelper (UncheckedStatement body _) =
 statementHelper (AssemblyStatement _ _) = []
 statementHelper (SimpleStatement stmt a) = simpleStatementHelper a stmt
 
-simpleStatementHelper :: SourceAnnotation ()
-                      -> SimpleStatement
-                      -> [SourceAnnotation Text]
+simpleStatementHelper ::
+  SourceAnnotation () ->
+  SimpleStatement ->
+  [SourceAnnotation Text]
 simpleStatementHelper a (VariableDefinition xs Nothing) =
-  let getAnn BlankEntry      x        = x
-      getAnn VarDefEntry{..} Nothing  = Just vardefContext
-      getAnn VarDefEntry{..} (Just w) = Just $ vardefContext <> w
+  let getAnn BlankEntry x = x
+      getAnn VarDefEntry {..} Nothing = Just vardefContext
+      getAnn VarDefEntry {..} (Just w) = Just $ vardefContext <> w
    in case foldr getAnn Nothing xs of
         Nothing -> [const "Redundant statement." <$> a]
         Just ann -> [const "Uninitialized local variable." <$> ann]

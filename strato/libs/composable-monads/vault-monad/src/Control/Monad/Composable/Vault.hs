@@ -5,17 +5,13 @@
 
 module Control.Monad.Composable.Vault where
 
-import           Control.Monad.Reader
+import Control.Monad.Change.Modify
+import Control.Monad.Reader
+import Network.HTTP.Client
+import Servant.Client
 
-import           Control.Monad.Change.Modify
-
-import           Network.HTTP.Client
-
-import           Servant.Client
-
-data VaultData =
-  VaultData {
-    urlVaultWrapper :: BaseUrl,
+data VaultData = VaultData
+  { urlVaultWrapper :: BaseUrl,
     httpManager :: Manager
   }
 
@@ -29,4 +25,3 @@ runVaultM url f = do
   vaultWrapperUrl <- liftIO $ parseBaseUrl url
 
   runReaderT f $ VaultData vaultWrapperUrl mgr
-

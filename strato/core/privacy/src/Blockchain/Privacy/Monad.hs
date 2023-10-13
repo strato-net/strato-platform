@@ -1,42 +1,45 @@
-{-# LANGUAGE DeriveAnyClass         #-}
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE RecordWildCards        #-}
-{-# LANGUAGE StrictData             #-}
-{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Privacy.Monad where
 
-import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.RLP
-import           Blockchain.Sequencer.Event
-import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.ExtendedWord (Word256)
-import           Blockchain.Strato.Model.Keccak256
-import           Control.Lens
-import           Data.Aeson
-import           Data.Binary
-import           Data.Default
-import           Data.Foldable                 (toList)
-import           Data.Function                 (on)
-import qualified Data.Map.Strict               as M
-import           Data.Maybe                    (maybeToList)
-import qualified Data.Sequence                 as Q
-import           Data.Set                      (Set)
-import qualified Data.Set                      as S
-import           GHC.Generics
-import qualified Text.Colors                   as CL
-import           Text.Format
-import           Text.Tools
+import Blockchain.Data.ChainInfo
+import Blockchain.Data.RLP
+import Blockchain.Sequencer.Event
+import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.ExtendedWord (Word256)
+import Blockchain.Strato.Model.Keccak256
+import Control.Lens
+import Data.Aeson
+import Data.Binary
+import Data.Default
+import Data.Foldable (toList)
+import Data.Function (on)
+import qualified Data.Map.Strict as M
+import Data.Maybe (maybeToList)
+import qualified Data.Sequence as Q
+import Data.Set (Set)
+import qualified Data.Set as S
+import GHC.Generics
+import qualified Text.Colors as CL
+import Text.Format
+import Text.Tools
 
 data CircularBuffer a = CircularBuffer
-  { _capacity :: Int
-  , _size     :: Int
-  , _queue    :: Q.Seq a
-  } deriving (Show, Generic, Binary)
+  { _capacity :: Int,
+    _size :: Int,
+    _queue :: Q.Seq a
+  }
+  deriving (Show, Generic, Binary)
+
 makeLenses ''CircularBuffer
 
-instance ToJSON a => ToJSON (CircularBuffer a) where
-instance FromJSON a => FromJSON (CircularBuffer a) where
+instance ToJSON a => ToJSON (CircularBuffer a)
+
+instance FromJSON a => FromJSON (CircularBuffer a)
 
 maxBufferCapacity :: Int
 maxBufferCapacity = 4096
@@ -48,63 +51,75 @@ instance Default (CircularBuffer a) where
   def = emptyCircularBuffer
 
 instance Format a => Format (CircularBuffer a) where
-  format CircularBuffer{..} = unlines
-    [ "CircularBuffer"
-    , "--------------"
-    , tab' $ "Capacity: " ++ show _capacity
-    , tab' $ "Size:     " ++ show _size
-    , tab' $ "Queue:    " ++ format (toList _queue)
-    ]
+  format CircularBuffer {..} =
+    unlines
+      [ "CircularBuffer",
+        "--------------",
+        tab' $ "Capacity: " ++ show _capacity,
+        tab' $ "Size:     " ++ show _size,
+        tab' $ "Queue:    " ++ format (toList _queue)
+      ]
 
 data BlockInfo = BlockInfo
-  { _bhash     :: Keccak256
-  , _bordering :: Integer
-  } deriving (Eq, Show, Generic, Binary)
+  { _bhash :: Keccak256,
+    _bordering :: Integer
+  }
+  deriving (Eq, Show, Generic, Binary)
+
 makeLenses ''BlockInfo
 
-instance ToJSON BlockInfo where
-instance FromJSON BlockInfo where
+instance ToJSON BlockInfo
+
+instance FromJSON BlockInfo
 
 instance Format BlockInfo where
-  format BlockInfo{..} = unlines
-    [ "BlockInfo"
-    , "---------"
-    , tab' $ "Block hash:     " ++ format _bhash
-    , tab' $ "Block ordering: " ++ show _bordering
-    ]
+  format BlockInfo {..} =
+    unlines
+      [ "BlockInfo",
+        "---------",
+        tab' $ "Block hash:     " ++ format _bhash,
+        tab' $ "Block ordering: " ++ show _bordering
+      ]
 
 instance Ord BlockInfo where
   compare = compare `on` _bordering
 
 data EmittedBlock = EmittedBlock
-  { _emitted :: Bool
-  , _blockDependentChains :: M.Map Word256 ChainInfo
-  } deriving (Eq, Show, Generic, Binary)
+  { _emitted :: Bool,
+    _blockDependentChains :: M.Map Word256 ChainInfo
+  }
+  deriving (Eq, Show, Generic, Binary)
+
 makeLenses ''EmittedBlock
 
 alreadyEmittedBlock :: EmittedBlock
 alreadyEmittedBlock = EmittedBlock True M.empty
 
-instance ToJSON EmittedBlock where
-instance FromJSON EmittedBlock where
+instance ToJSON EmittedBlock
+
+instance FromJSON EmittedBlock
 
 instance Format EmittedBlock where
-  format EmittedBlock{..} = unlines
-    [ "EmittedBlock"
-    , "---------"
-    , tab' $ "Emitted:          " ++ show _emitted
-    , tab' $ "Dependent chains: " ++ show _blockDependentChains
-    ]
+  format EmittedBlock {..} =
+    unlines
+      [ "EmittedBlock",
+        "---------",
+        tab' $ "Emitted:          " ++ show _emitted,
+        tab' $ "Dependent chains: " ++ show _blockDependentChains
+      ]
 
 data ChainHashEntry = ChainHashEntry
-  { _used         :: Bool
-  , _onChainId    :: Maybe Word256
-  , _inBlock      :: Maybe BlockInfo
-  } deriving (Show, Generic, Binary)
+  { _used :: Bool,
+    _onChainId :: Maybe Word256,
+    _inBlock :: Maybe BlockInfo
+  }
+  deriving (Show, Generic, Binary)
+
 makeLenses ''ChainHashEntry
 
-instance ToJSON ChainHashEntry where
-instance FromJSON ChainHashEntry where
+instance ToJSON ChainHashEntry
+
+instance FromJSON ChainHashEntry
 
 blankChainHashEntry :: ChainHashEntry
 blankChainHashEntry = ChainHashEntry False Nothing Nothing
@@ -113,13 +128,14 @@ instance Default ChainHashEntry where
   def = blankChainHashEntry
 
 instance Format ChainHashEntry where
-  format ChainHashEntry{..} = unlines
-    [ "ChainHashEntry"
-    , "--------------"
-    , tab' $ "Used:      " ++ show _used
-    , tab' $ "On chain:  " ++ CL.yellow (format _onChainId)
-    , tab' $ "In block:  " ++ format (maybeToList _inBlock)
-    ]
+  format ChainHashEntry {..} =
+    unlines
+      [ "ChainHashEntry",
+        "--------------",
+        tab' $ "Used:      " ++ show _used,
+        tab' $ "On chain:  " ++ CL.yellow (format _onChainId),
+        tab' $ "In block:  " ++ format (maybeToList _inBlock)
+      ]
 
 chainHashEntryUsed :: ChainHashEntry
 chainHashEntryUsed = ChainHashEntry True Nothing Nothing
@@ -131,32 +147,36 @@ chainHashEntryInBlock :: BlockInfo -> ChainHashEntry
 chainHashEntryInBlock bInfo = ChainHashEntry True Nothing (Just bInfo)
 
 data ChainIdEntry = ChainIdEntry
-  { _chainIdInfo :: Maybe ChainInfo
-  , _chainHashes :: CircularBuffer Keccak256
-  , _blocksToRun :: Set BlockInfo
-  , _chainDependentChains :: M.Map Word256 ChainInfo
-  } deriving (Show, Generic, Binary)
+  { _chainIdInfo :: Maybe ChainInfo,
+    _chainHashes :: CircularBuffer Keccak256,
+    _blocksToRun :: Set BlockInfo,
+    _chainDependentChains :: M.Map Word256 ChainInfo
+  }
+  deriving (Show, Generic, Binary)
+
 makeLenses ''ChainIdEntry
 
-instance ToJSON ChainIdEntry where
-instance FromJSON ChainIdEntry where
+instance ToJSON ChainIdEntry
+
+instance FromJSON ChainIdEntry
 
 chainIdEntry :: ChainInfo -> ChainIdEntry
 chainIdEntry cInfo = ChainIdEntry (Just cInfo) emptyCircularBuffer S.empty M.empty
 
 instance Format ChainIdEntry where
-  format ChainIdEntry{..} = unlines
-    [ "ChainIdEntry"
-    , "------------"
-    , tab' $ "Chain info:"
-    , tab' $ format _chainIdInfo
-    , tab' $ "Chain hashes:  " ++ format _chainHashes
-    , tab' $ "Blocks to run: " ++ format (toList _blocksToRun)
-    ]
+  format ChainIdEntry {..} =
+    unlines
+      [ "ChainIdEntry",
+        "------------",
+        tab' $ "Chain info:",
+        tab' $ format _chainIdInfo,
+        tab' $ "Chain hashes:  " ++ format _chainHashes,
+        tab' $ "Blocks to run: " ++ format (toList _blocksToRun)
+      ]
 
 class HasPrivateHashDB m where
-  requestChain             :: Word256 -> m ()
-  requestTransaction       :: Keccak256 -> m ()
+  requestChain :: Word256 -> m ()
+  requestTransaction :: Keccak256 -> m ()
 
 getChainId :: ChainInfo -> Keccak256
 getChainId = hash . rlpSerialize . rlpEncode
@@ -172,4 +192,4 @@ generateChainHashes tx =
       cId = txChainId tx
       rs = hash . rlpSerialize $ RLPArray [rlpEncode r, rlpEncode s, rlpEncode cId]
       sr = hash . rlpSerialize $ RLPArray [rlpEncode s, rlpEncode r, rlpEncode cId]
-   in [rs,sr]
+   in [rs, sr]

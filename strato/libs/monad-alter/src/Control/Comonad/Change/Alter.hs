@@ -1,8 +1,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Control.Comonad.Change.Alter
-  ( CoAlters(..)
-  ) where
+  ( CoAlters (..),
+  )
+where
 
 import Control.Comonad
 import Control.Monad (void)
@@ -22,8 +23,8 @@ class (Ord k, Comonad w) => CoAlters k a w where
 
   coupdate :: Proxy a -> k -> (w a -> Maybe a) -> w (Maybe a)
   coupdate p k f = coalter p k $ \wma -> case extract wma of
-                                          Nothing -> Nothing
-                                          Just _ -> f (fromJust <$> wma)
+    Nothing -> Nothing
+    Just _ -> f (fromJust <$> wma)
 
   coupdate_ :: Proxy a -> k -> (w a -> Maybe a) -> w ()
   coupdate_ p k = void . coupdate p k

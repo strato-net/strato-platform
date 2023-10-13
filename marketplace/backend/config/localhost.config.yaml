@@ -14,7 +14,7 @@ marketplaceUiUrlPrefix: "/marketplace"
 
 nodes:
   - id: 0
-    label: mercata-testnet2-node1
+    label: localhost
     url: https://node1.mercata-testnet2.blockapps.net
     port: 30303
     oauth:

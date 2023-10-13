@@ -1,64 +1,63 @@
-{-# LANGUAGE BangPatterns          #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Setup (
-  oneTimeSetup
-  ) where
+module Blockchain.Setup
+  ( oneTimeSetup,
+  )
+where
 
-import           Control.Concurrent
-import           Control.Monad
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                    as B
-import           Data.FileEmbed
-import qualified Data.Map                           as Map
-import           Data.String
-import qualified Data.Text                          as T
-import           Data.Yaml
-import           Database.Persist.Postgresql        hiding (get)
-import           Network.Kafka
-import           Network.Kafka.Protocol
-import           System.Directory
-import           System.Exit
-import           System.FilePath
-import           Turtle (chmod, roo, fromText)
+import BlockApps.Logging
+import Blockchain.Constants
+import Blockchain.DB.CodeDB
+import Blockchain.Data.Blockchain as Blockchain
+import qualified Blockchain.Data.DataDefs as DataDefs
+import Blockchain.EthConf
+import Blockchain.GenesisBlock
+import Blockchain.Init.EthConf
+import Blockchain.Init.Monad
+import Blockchain.Init.Options
+import Blockchain.KafkaTopics
+import qualified Blockchain.Network as Net
+import Control.Concurrent
+import Control.Monad
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Resource
+import qualified Data.ByteString as B
+import Data.FileEmbed
+import qualified Data.Map as Map
+import Data.String
+import qualified Data.Text as T
+import Data.Yaml
+import Database.Persist.Postgresql hiding (get)
+import qualified Executable.EthDiscoverySetup as EthDiscovery
+import Network.Kafka
+import Network.Kafka.Protocol
+import System.Directory
+import System.Exit
+import System.FilePath
+import qualified Text.Colors as CL
+import Turtle (chmod, fromText, roo)
 
-import           BlockApps.Logging
-import           Blockchain.Constants
-import           Blockchain.Data.Blockchain         as Blockchain
-import qualified Blockchain.Data.DataDefs           as DataDefs
-import           Blockchain.DB.CodeDB
-import           Blockchain.EthConf
-import           Blockchain.GenesisBlock
-import           Blockchain.Init.EthConf
-import           Blockchain.Init.Monad
-import           Blockchain.Init.Options
-import           Blockchain.KafkaTopics
-import qualified Blockchain.Network                 as Net
-
-import qualified Executable.EthDiscoverySetup       as EthDiscovery
-
-import qualified Text.Colors                        as CL
-
-createKafkaTopic  ::  TopicName -> IO ()
+createKafkaTopic :: TopicName -> IO ()
 createKafkaTopic topic = do
   result <- runKafka (mkKafkaState "strato-setup" (fromString flags_kafkahost, 9092)) $ updateMetadata topic
   case result of
-   Left err -> error $ "error connecting to kafka at host '" ++ flags_kafkahost ++ "': " ++ show err
-   _        -> return ()
+    Left err -> error $ "error connecting to kafka at host '" ++ flags_kafkahost ++ "': " ++ show err
+    _ -> return ()
 
-topics  ::  [String]
-topics = ["statediff"
-         , "seq_vm_events"
-         , "seq_p2p_events"
-         , "unseqevents"
-         , "jsonrpcresponse"
-         , "indexevents"
-         , "block" -- todo: delet this.
-         ]
+topics :: [String]
+topics =
+  [ "statediff",
+    "seq_vm_events",
+    "seq_p2p_events",
+    "unseqevents",
+    "jsonrpcresponse",
+    "indexevents",
+    "block" -- todo: delet this.
+  ]
 
 genesisFiles :: [(FilePath, B.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
@@ -66,7 +65,7 @@ genesisFiles = $(embedDir "genesisBlocks")
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo . fromText . T.pack
 
-addStandardGenesisBlockIfNeeded :: String->IO ()
+addStandardGenesisBlockIfNeeded :: String -> IO ()
 addStandardGenesisBlockIfNeeded genesisBlockName = do
   let genesisFileName = genesisBlockName ++ "Genesis.json"
       maybeJSON = lookup genesisFileName genesisFiles
@@ -76,16 +75,18 @@ addStandardGenesisBlockIfNeeded genesisBlockName = do
   jsonExists <- doesFileExist genesisFileName
 
   case (jsonExists, maybeJSON) of
-   (True, _) -> return ()
-   (_, Just contents) -> B.writeFile genesisFileName contents >> makeReadOnly genesisFileName
-   _ -> error $ "Search for genesis file has failed.  You need to supply a file named '" ++ genesisFileName ++ "'"
+    (True, _) -> return ()
+    (_, Just contents) -> B.writeFile genesisFileName contents >> makeReadOnly genesisFileName
+    _ -> error $ "Search for genesis file has failed.  You need to supply a file named '" ++ genesisFileName ++ "'"
 
   infoExists <- doesFileExist accountInfoFileName
   case (infoExists, maybeInfo) of
     (True, _) -> return ()
     (_, Just contents) -> B.writeFile accountInfoFileName contents >> makeReadOnly accountInfoFileName
-    _ -> putStrLn "No account info file found. Will proceed without it\
-                  \ and assume Genesis.json is self contained."
+    _ ->
+      putStrLn
+        "No account info file found. Will proceed without it\
+        \ and assume Genesis.json is self contained."
 
 {-
   CONFIG:
@@ -99,8 +100,7 @@ addStandardGenesisBlockIfNeeded genesisBlockName = do
   Preconditions: installed LevelDB, Postgres, Kafka, Redis.
 -}
 
-
-oneTimeSetup  ::  String -> IO ()
+oneTimeSetup :: String -> IO ()
 oneTimeSetup genesisBlockName = do
   dirExists <- doesDirectoryExist ".ethereumH"
 
@@ -108,23 +108,21 @@ oneTimeSetup genesisBlockName = do
     then die ".ethereumH exists, unsafe to run setup"
     else do
       bootnodes <- case (flags_addBootnodes, filter (not . null) flags_stratoBootnode) of
-                     (False, _)               -> return Nothing
-                     (True, [])               -> fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
-                     (True, stratoBootnodes') -> return $ Just stratoBootnodes'
-                     
+        (False, _) -> return Nothing
+        (True, []) -> fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
+        (True, stratoBootnodes') -> return $ Just stratoBootnodes'
+
       liftIO $ putStrLn $ CL.red ">>>> Bootnodes: " ++ show bootnodes
 
-     {- CONFIG create default config files -}
+      {- CONFIG create default config files -}
 
       addStandardGenesisBlockIfNeeded genesisBlockName
 
       putStrLn "writing config"
 
-
       createDirectoryIfMissing True $ dbDir "h"
 
-
-     {- CONFIG: create database and write default config files, including strato-api -}
+      {- CONFIG: create database and write default config files, including strato-api -}
 
       ethconf <- genEthConf
 
@@ -136,8 +134,8 @@ oneTimeSetup genesisBlockName = do
       currPath <- getCurrentDirectory
 
       let pgconf = sqlConfig ethconf
-          rawConn = postgreSQLConnectionString pgconf{database = ""}
-          globalConn = postgreSQLConnectionString pgconf{database = "blockchain"}
+          rawConn = postgreSQLConnectionString pgconf {database = ""}
+          globalConn = postgreSQLConnectionString pgconf {database = "blockchain"}
           localConn = postgreSQLConnectionString pgconf
           db = database pgconf
       Blockchain.migrateDB globalConn
@@ -163,21 +161,23 @@ oneTimeSetup genesisBlockName = do
 
       liftIO $ threadDelay 1000000 --Kafka needs this delay after creating topics!  Without this, when we send a message the program will crash for a short duration.  The choice of 1 second is empirically determined, if we are unlucky the number may need to be higher on other machines.
 
-     {- CONFIG: define tables and indices -}
-     {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
+      {- CONFIG: define tables and indices -}
+      {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
 
-      runLoggingT $ withPostgresqlConn localConn $ runReaderT $ do
-         liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
-         liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show localConn
-         runMigration DataDefs.migrateAll
-         liftIO $ putStrLn $ CL.yellow ">>>> Indexing SQL DB"
-         runMigration DataDefs.indexAll
+      runLoggingT $
+        withPostgresqlConn localConn $
+          runReaderT $ do
+            liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
+            liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show localConn
+            runMigration DataDefs.migrateAll
+            liftIO $ putStrLn $ CL.yellow ">>>> Indexing SQL DB"
+            runMigration DataDefs.indexAll
 
-         liftIO $ putStrLn $ CL.yellow ">>>> Inserting bootnodes"
-         EthDiscovery.setup bootnodes
+            liftIO $ putStrLn $ CL.yellow ">>>> Inserting bootnodes"
+            EthDiscovery.setup bootnodes
 
       void . runLoggingT . runResourceT . runSetupDBM $ do
-         liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
-         void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
-         liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
-         initializeGenesisBlock genesisBlockName
+        liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
+        void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
+        liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
+        initializeGenesisBlock genesisBlockName

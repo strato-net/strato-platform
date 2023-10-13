@@ -1,22 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Blockchain.VMMetrics where
 
+import Blockchain.Bagger.BaggerState
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Int
 import qualified Data.Map.Strict as M
-import qualified Data.Text as T
 import qualified Data.Set as S
+import qualified Data.Text as T
 import Prometheus
-
-import Blockchain.Bagger.BaggerState
 
 {-# NOINLINE vmBlocksProcessed #-}
 vmBlocksProcessed :: Counter
 vmBlocksProcessed = unsafeRegister $ counter (Info "vm_blocks_processed" "evm counter for blocks processed")
 
 {-# NOINLINE vmBlocksMined #-}
-vmBlocksMined:: Counter
+vmBlocksMined :: Counter
 vmBlocksMined = unsafeRegister $ counter (Info "vm_blocks_mined" "evm counter for blocks mined")
 
 {-# NOINLINE vmBlocksUnmined #-}
@@ -57,7 +57,7 @@ vmBlockInsertionMined = unsafeRegister $ gauge (Info "vm_block_insertion_mined" 
 
 {-# NOINLINE vmTxMined #-}
 vmTxMined :: Gauge
-vmTxMined= unsafeRegister $ gauge (Info "vm_tx_mined" "evm gauge for tx mined")
+vmTxMined = unsafeRegister $ gauge (Info "vm_tx_mined" "evm gauge for tx mined")
 
 {-# NOINLINE vmTxMining #-}
 vmTxMining :: Gauge
@@ -65,23 +65,25 @@ vmTxMining = unsafeRegister $ gauge (Info "vm_tx_mining" "evm gauge for transact
 
 {-# NOINLINE opTiming #-}
 opTiming :: Vector T.Text Summary
-opTiming = unsafeRegister
-         . vector "operation_constructor"
-         . flip summary defaultQuantiles
-         $ Info "opcode_timing" "Measured duration in ns for different opcodes"
-
+opTiming =
+  unsafeRegister
+    . vector "operation_constructor"
+    . flip summary defaultQuantiles
+    $ Info "opcode_timing" "Measured duration in ns for different opcodes"
 
 recordOpTiming :: (MonadIO m) => T.Text -> Int64 -> m ()
 --recordOpTiming :: (MonadIO m) => Operation -> Int64 -> m ()
-recordOpTiming op t = liftIO $
-  withLabel opTiming op (flip observe (fromIntegral t))
+recordOpTiming op t =
+  liftIO $
+    withLabel opTiming op (flip observe (fromIntegral t))
 
 {-# NOINLINE vmBaggerTxs #-}
-vmBaggerTxs:: Vector T.Text Gauge
-vmBaggerTxs = unsafeRegister
-            . vector "group"
-            . gauge
-            $ Info "vm_bagger_txs" "Count of pending transactions in bagger"
+vmBaggerTxs :: Vector T.Text Gauge
+vmBaggerTxs =
+  unsafeRegister
+    . vector "group"
+    . gauge
+    $ Info "vm_bagger_txs" "Count of pending transactions in bagger"
 
 recordBaggerMetrics :: (MonadIO m) => BaggerState -> m ()
 recordBaggerMetrics bs = liftIO $ do
@@ -93,16 +95,17 @@ recordBaggerMetrics bs = liftIO $ do
 
 {-# NOINLINE numTxrsFlushed #-}
 numTxrsFlushed :: Counter
-numTxrsFlushed = unsafeRegister
-              . counter
-              $ Info "vm_txrs_flushed" "Number of transaction results flushed"
+numTxrsFlushed =
+  unsafeRegister
+    . counter
+    $ Info "vm_txrs_flushed" "Number of transaction results flushed"
 
 {-# NOINLINE txrQueueLength #-}
 txrQueueLength :: Gauge
-txrQueueLength = unsafeRegister
-               . gauge
-               $ Info "vm_txr_queue_length" "Number of queued transactions"
-
+txrQueueLength =
+  unsafeRegister
+    . gauge
+    $ Info "vm_txr_queue_length" "Number of queued transactions"
 
 recordTxrFlush :: MonadIO m => Int -> m ()
 recordTxrFlush n = liftIO $ do
@@ -114,12 +117,13 @@ recordTxrEnqueue = liftIO . addGauge txrQueueLength . fromIntegral
 
 {-# NOINLINE seqEventCount #-}
 seqEventCount :: Vector T.Text Counter
-seqEventCount = unsafeRegister
-              . vector "event"
-              . counter
-              $ Info "vm_seqevents_count" "Count of seqevents read"
+seqEventCount =
+  unsafeRegister
+    . vector "event"
+    . counter
+    $ Info "vm_seqevents_count" "Count of seqevents read"
 
 recordSeqEventCount :: MonadIO m => Int -> Int -> m ()
 recordSeqEventCount bLen tLen = liftIO $ do
-  withLabel seqEventCount "block"  $ void . flip addCounter (fromIntegral bLen)
-  withLabel seqEventCount "tx"  $ void . flip addCounter (fromIntegral tLen)
+  withLabel seqEventCount "block" $ void . flip addCounter (fromIntegral bLen)
+  withLabel seqEventCount "tx" $ void . flip addCounter (fromIntegral tLen)

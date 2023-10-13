@@ -7,15 +7,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Data.Source.Position
-  ( SourcePosition(..)
-  , sourcePositionName
-  , sourcePositionLine
-  , sourcePositionColumn
-  , initialPosition
-  , toSourcePosition
-  , fromSourcePosition
-  , getSourcePosition
-  ) where
+  ( SourcePosition (..),
+    sourcePositionName,
+    sourcePositionLine,
+    sourcePositionColumn,
+    initialPosition,
+    toSourcePosition,
+    fromSourcePosition,
+    getSourcePosition,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Control.Lens hiding ((.=))
@@ -24,23 +25,25 @@ import Data.Data
 import Data.Default
 import GHC.Generics
 import Test.QuickCheck
-import Text.Parsec.Pos
 import Text.Parsec
+import Text.Parsec.Pos
 
 data SourcePosition = SourcePosition
-  { _sourcePositionName   :: String
-  , _sourcePositionLine   :: !Int
-  , _sourcePositionColumn :: !Int
-  } deriving (Show, Eq, Ord, Generic, Data, NFData)
+  { _sourcePositionName :: String,
+    _sourcePositionLine :: !Int,
+    _sourcePositionColumn :: !Int
+  }
+  deriving (Show, Eq, Ord, Generic, Data, NFData)
 
 makeLenses ''SourcePosition
 
 instance ToJSON SourcePosition where
-  toJSON pos = object [
-    "name" .= _sourcePositionName pos,
-    "line" .= _sourcePositionLine pos,
-    "column" .= _sourcePositionColumn pos
-    ]
+  toJSON pos =
+    object
+      [ "name" .= _sourcePositionName pos,
+        "line" .= _sourcePositionLine pos,
+        "column" .= _sourcePositionColumn pos
+      ]
 
 instance FromJSON SourcePosition where
   parseJSON (Object o) = do
@@ -60,9 +63,11 @@ initialPosition :: String -> SourcePosition
 initialPosition name = SourcePosition name 0 0
 
 toSourcePosition :: SourcePos -> SourcePosition
-toSourcePosition pos = SourcePosition (sourceName pos)
-                                      (sourceLine pos)
-                                      (sourceColumn pos)
+toSourcePosition pos =
+  SourcePosition
+    (sourceName pos)
+    (sourceLine pos)
+    (sourceColumn pos)
 
 fromSourcePosition :: SourcePosition -> SourcePos
 fromSourcePosition (SourcePosition n l c) = newPos n l c
