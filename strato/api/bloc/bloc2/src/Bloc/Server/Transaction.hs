@@ -684,6 +684,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                     srcLength = Text.length contractSrcText
                     contractArgs = contractpayloadArgs p
                     contractName' = contractpayloadContract p
+                    metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
+
                 (_, Contract {..}) <-
                   getContractDetailsForContract contractSrc contractName' >>= \case
                     Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
@@ -692,6 +694,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                 let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
                     xabiArgs = Map.fromList . catMaybes $ maybe [] (map f . _funcArgs) _constructor
                 (_, argsAsSource) <- constructArgValuesAndSource contractArgs xabiArgs
+
                 let bcp =
                       FunctionParameters
                         addr
@@ -700,10 +703,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                         (M.fromList $ [("contractName", ArgString cn), ("contractSrc", ArgString $ contractSrcText), ("args", ArgString $ argsAsSource)])
                         (contractpayloadValue p)
                         (mergeTxParams (contractpayloadTxParams p) txParams)
-                        ( case md of
-                            Nothing -> Just $ M.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-                            Just m -> Just $ (Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]) `Map.union` m
-                        )
+                        (maybe (Just metadata) (\m -> Just $ metadata `Map.union` m) md)
                         (contractpayloadChainid p <|> chainId)
                         resolve
                 fmap ((:[]) . BlocTxResult) $ postUsersContractMethod' cacheNonce bcp jwtToken
@@ -735,6 +735,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                                       contractSrcText = sourceBlob $ contractSrc
                                       srcLength = Text.length contractSrcText
                                       cn = fromMaybe "unnamed_contract" c
+                                      metadata = Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
                                   (_, Contract {..}) <-
                                     getContractDetailsForContract contractSrc c >>= \case
                                       Nothing -> throwIO $ UserError "You need to supply at least one contract in the source" --remove
@@ -750,10 +751,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                                     (fromMaybe (Strung 0) v) 
                                     (mergeTxParams x txParams) 
                                     cid
-                                    ( case m of
-                                        Nothing -> Just $ Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]
-                                        Just m' -> Just $ (Map.fromList [("history", cn), ("useWallet", Text.pack "true"), ("srcLength", Text.pack $ show srcLength)]) `Map.union` m'
-                                    )
+                                    (maybe (Just metadata) (\m' -> Just $ metadata `Map.union` m') m)
                               ) ps
                 let bcp = 
                       FunctionListParameters

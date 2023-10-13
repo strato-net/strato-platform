@@ -432,10 +432,10 @@ parseArgs = (try $ parens $ commaSep literal) <|> parseCreateArgs
 parseCreateArgs :: SolidityParser [Expression]
 parseCreateArgs = do
   void $ char '('
-  str1 <- uncurry StringLiteral <$> withPosition stringLiteral  -- name
+  str1 <- uncurry StringLiteral <$> withPosition stringLiteral  -- Contract Name
   void $ char ','
-  str2 <- uncurry StringLiteral <$> withPosition parseCreateContractSrc  -- contract src
-  str3 <- uncurry StringLiteral <$> withPosition parseCreateConstructArgs -- constructor args
+  str2 <- uncurry StringLiteral <$> withPosition parseCreateContractSrc  -- Contract Src
+  str3 <- uncurry StringLiteral <$> withPosition parseCreateConstructArgs -- Constructor Args
   return [str1, str2, str3]
 
 parseCreateContractSrc :: SolidityParser String

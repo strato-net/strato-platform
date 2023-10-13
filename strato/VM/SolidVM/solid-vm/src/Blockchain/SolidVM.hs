@@ -57,7 +57,7 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
-import Blockchain.Stream.VMEvent as VME
+import qualified Blockchain.Stream.VMEvent as VME
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
@@ -351,13 +351,13 @@ create' creator newAccount ch cc contractName' argExps createBuiltinCall = do
   popCallInfo
 
   env <- getEnv
-  let maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (\_ -> True) maybeUseWallet
-      origin' = Env.origin env
+  let origin' = Env.origin env
       metadata = Env.metadata env
+      maybeUseWallet = M.lookup "useWallet" =<< metadata
+      !useWallet = maybe False (const True) maybeUseWallet
+      parentName' = bool parentName "" (useWallet && parentName == "User")
   
   org <- bool (getOrg creator) (getOrg origin') useWallet
-  let parentName' = bool parentName "" (useWallet && parentName == "User")
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= M.adjust (Action.actionDataOrganization .~ (T.pack org)) newAccount
@@ -2780,9 +2780,11 @@ callBuiltin "parseCert" [SString cert] _ = do
 callBuiltin "create" args@[SString contractName', SString contractSrc, SString argString] _ = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
+
   creator <- getCurrentAccount
   currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
+
   -- Because of the current testnet stateroot problem with contracts using an older version of
   -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
   -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
@@ -2801,29 +2803,32 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
       metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
       maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (\_ -> True) maybeUseWallet
+      !useWallet = maybe False (const True) maybeUseWallet
   org <- getOrg origin
   case erNewContractAccount execResults of
     Just nca -> do
-      when (not isRunningTests) $ void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                                           (T.pack contractSrc) 
-                                                           (SolidVMCode contractName' hsh) 
-                                                           (T.pack org) 
-                                                           (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
-                                                           ( case join $ fmap (M.lookup "history") (metadata) of
-                                                               Nothing -> []
-                                                               Just v -> (T.splitOn "," v)
-                                                           )
-                                                           []
-                                                        ]
+      when (not isRunningTests) $ 
+        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+                                     (T.pack contractSrc) 
+                                     (SolidVMCode contractName' hsh) 
+                                     (T.pack org) 
+                                     (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
+                                     ( case join $ fmap (M.lookup "history") (metadata) of
+                                         Nothing -> []
+                                         Just v -> (T.splitOn "," v)
+                                     )
+                                     []
+                                   ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SString argString] _ = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
+
   creator <- getCurrentAccount
   currentContract <- getCurrentContract
   (_, parentCC) <- getCurrentCodeCollection
+
   -- Because of the current testnet stateroot problem with contracts using an older version of
   -- create/create2 with incomplete codeptrs, this pragma will allow new contract using the
   -- create/create2 features to work correctly but unfortunately, even without the pragma, the contracts
@@ -2843,21 +2848,22 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
       metadata = Env.metadata theEnv
       isRunningTests = Env.runningTests theEnv
       maybeUseWallet = M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (\_ -> True) maybeUseWallet
+      !useWallet = maybe False (const True) maybeUseWallet
   org <- getOrg origin
   case erNewContractAccount execResults of
     Just nca -> do
-      when (not isRunningTests) $ void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                                           (T.pack contractSrc) 
-                                                           (SolidVMCode contractName' hsh) 
-                                                           (T.pack org) 
-                                                           (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
-                                                           ( case join $ fmap (M.lookup "history") (metadata) of
-                                                               Nothing -> []
-                                                               Just v -> (T.splitOn "," v)
-                                                           )
-                                                           []
-                                                        ]
+      when (not isRunningTests) $ 
+        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
+                                      (T.pack contractSrc) 
+                                      (SolidVMCode contractName' hsh) 
+                                      (T.pack org) 
+                                      (bool (T.pack $ CC._contractName currentContract) (T.pack contractName') useWallet) 
+                                      ( case join $ fmap (M.lookup "history") (metadata) of
+                                          Nothing -> []
+                                          Just v -> (T.splitOn "," v)
+                                      )
+                                      []
+                                   ]
       pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin x args _ = unknownFunction ("callBuiltin " ++ show args) x
