@@ -74,8 +74,10 @@ export const Order = {
   updateSellerDetails: '/updateSellerDetails',
   payment: '/payment',
   paymentSession: '/payment/session/:session_id',
+  paymentIntent: '/payment/intent/sessions/:session_id',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
+  updateOrderStatus: '/updateOrderStatus'
 }
 
 export const OrderLine = {
