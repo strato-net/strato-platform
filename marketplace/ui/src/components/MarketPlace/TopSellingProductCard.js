@@ -148,6 +148,7 @@ const TopSellingProductCard = () => {
                         src={topSellingProduct.imageUrl}
                         height={230}
                         width={230}
+                        style={{ objectFit: "contain" }}
                         preview={false}
                         onClick={() =>
                           navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })

@@ -4,54 +4,54 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   parameters {
-    string(name: 'VersionTag', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
-  }
-  environment {
-    execution_arn = ""
+    string(name: 'VERSION_TAG', defaultValue: '', description: 'The STRATO version tag for the version to release to Testnet2. i.e. 9.0.0-753c6527e')
   }
   stages {
     stage('Start Step Functions Execution') {
       steps {
-        sh '''#!/bin/bash
-          VERSION_TAG="$VersionTag"
+        script {
+          def execution_arn = sh(script: """
+            #!/bin/bash
+            aws stepfunctions start-execution \
+              --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
+              --input '{"VersionTag": "${params.VERSION_TAG}"}' \
+              --query "executionArn" \
+              --output text
+          """, returnStdout: true).trim()
 
-          execution_arn=$(aws stepfunctions start-execution \
-            --state-machine-arn arn:aws:states:us-east-1:406773134706:stateMachine:UpgradeTestnet2 \
-            --input "{\"VersionTag\": \"$VERSION_TAG\"}" \
-            --query "executionArn" \
-            --output text)
-
-          echo "Started Step Functions execution"
-        '''
+          // Set the execution_arn as an environment variable
+          env.EXECUTION_ARN = execution_arn
+        }
       }
     }
     stage('Wait for Step Functions Completion') {
       steps {
-        sh '''#!/bin/bash
-          while true; do
-            execution_status=$(aws stepfunctions describe-execution \
-              --execution-arn "$execution_arn" \
-              --query "status" \
-              --output text)
-          
-            if [ "$execution_status" == "SUCCEEDED" ]; then
+        script {
+          def execution_arn = env.EXECUTION_ARN
+          while (true) {
+            def execution_status = sh(script: """
+              #!/bin/bash
+              aws stepfunctions describe-execution \
+                --execution-arn "${execution_arn}" \
+                --query "status" \
+                --output text
+            """, returnStdout: true).trim()
+
+            if (execution_status == "SUCCEEDED") {
               echo "Step Functions execution succeeded."
-              exit 0
-            elif [ "$execution_status" == "FAILED" ]; then
-              echo "Step Functions execution failed."
-              exit 1 
-            elif [ "$execution_status" == "TIMED_OUT" ]; then
-              echo "Step Functions execution timed out."
-              exit 1  
-            elif [ "$execution_status" == "RUNNING" ]; then
+              break
+            } else if (execution_status == "FAILED" || execution_status == "TIMED_OUT") {
+              echo "Step Functions execution failed or timed out."
+              error("Step Functions execution failed or timed out.")
+            } else if (execution_status == "RUNNING") {
               echo "Step Functions execution is still running. Waiting..."
-              sleep 30
-            else
-              echo "Unknown execution status: $execution_status"
-              exit 1  
-            fi
-          done
-        '''
+              sleep(60)
+            } else {
+              echo "Unknown execution status: ${execution_status}"
+              error("Unknown execution status: ${execution_status}")
+            }
+          }
+        }
       }
     }
   }

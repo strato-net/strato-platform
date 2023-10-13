@@ -198,7 +198,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
 }
 
 export const setSearchQueryOptionsPrime = (args) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', , 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key)) {
       if (Array.isArray(args[key])) {
@@ -238,6 +238,11 @@ export const setSearchQueryOptionsPrime = (args) => {
         }
       }
     }
+    
+    if (key === 'notEqualsValue') {
+      const { notEqualsField, notEqualsValue } = args
+      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+    }
 
     return result
   }, []))
@@ -256,15 +261,6 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         ...agg,
         [key]: value
       }
-    }
-    let dotIndex = value.indexOf('.')
-    if (dotIndex >= 0) {
-      // split the value on a period, allows to directly pass postgrest operators
-      // to this API via ?key=<operator>.<value>
-      // and not setting the <operator> will default to the 'like' operator
-      // This should only be used for simpler queries not things like 'in' or 'or'
-      predicate = value.substring(0, dotIndex)
-      value = value.substring(dotIndex + 1) 
     }
     let option = {}
     if (predicate === 'or') {
@@ -286,6 +282,10 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
         [predicate]: `(${valueArray.join(',')})`,
       } 
       
+    } else if (value === "true" || value === "false" || typeof value == 'boolean') {
+      option = {
+        [key]: `eq.${value}`,
+      }
     } else {
       let searchedValue = value
       if (predicate === 'like') {

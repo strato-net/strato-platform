@@ -108,7 +108,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
         isActive: true,
         isDeleted: false,
         isInventoryAvailable: true,
-        limit: 12,
+        limit: 350,
         ...restArgs
     }, options);
 
