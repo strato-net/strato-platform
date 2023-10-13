@@ -20,126 +20,131 @@
 {-# OPTIONS -fno-warn-missing-methods #-}
 
 module Blockchain.Context
-  ( All,
-    All2,
-    Stacks (..),
-    MonadP2P,
-    TcpPortNumber (..),
-    Inbound (..),
-    Outbound (..),
-    IsValidator (..),
-    Context (..),
-    Config (..),
-    ContextM,
-    P2pConduits (..),
-    peerSource,
-    peerSink,
-    seqSource,
-    RunsClient (..),
-    RunsServer (..),
-    ActionTimestamp (..),
-    emptyActionTimestamp,
-    RemainingBlockHeaders (..),
-    MaxReturnedHeaders (..),
-    ConnectionTimeout (..),
-    PeerAddress (..),
-    GenesisBlockHash (..),
-    BestBlockNumber (..),
-    TrueOrgNameChains (..),
-    FalseOrgNameChains (..),
-    ChainInfo (..),
-    PeerRunner,
-    initConfig,
-    initContext,
-    runContextM,
-    blockstanbulPeerAddr,
-    getBlockHeaders,
-    putBlockHeaders,
-    getRemainingBHeaders,
-    putRemainingBHeaders,
-    stampActionTimestamp,
-    getActionTimestamp,
-    clearActionTimestamp,
-    getPeerByIP,
-    setPeerAddrIfUnset,
-    shouldSendToPeer,
-    withActivePeer,
-    withCertifiedPeer,
-    getPeerX509,
-    getMyX509,
-    getPeerByParsedSet,
-    getPeersByParsedSets,
-    toMaybe,
-  )
-where
+    ( All
+    , All2
+    , Stacks(..)
+    , MonadP2P
+    , TcpPortNumber(..)
+    , Inbound(..)
+    , Outbound(..)
+    , IsValidator(..)
+    , Context(..)
+    , Config(..)
+    , ContextM
+    , P2pConduits(..)
+    , peerSource
+    , peerSink
+    , seqSource
+    , RunsClient(..)
+    , RunsServer(..)
+    , ActionTimestamp(..)
+    , emptyActionTimestamp
+    , RemainingBlockHeaders(..)
+    , MaxReturnedHeaders(..)
+    , ConnectionTimeout(..)
+    , PeerAddress(..)
+    , GenesisBlockHash(..)
+    , BestBlockNumber(..)
+    , TrueOrgNameChains(..)
+    , FalseOrgNameChains(..)
+    , ChainInfo(..)
+    , PeerRunner
+    , initConfig
+    , initContext
+    , runContextM
+    , blockstanbulPeerAddr
+    , getBlockHeaders
+    , putBlockHeaders
+    , getRemainingBHeaders
+    , putRemainingBHeaders
+    , stampActionTimestamp
+    , getActionTimestamp
+    , clearActionTimestamp
+    , getPeerByIP
+    , setPeerAddrIfUnset
+    , shouldSendToPeer
+    , withActivePeer
+    , withCertifiedPeer
+    , getPeerX509
+    , getMyX509
+    , getPeerByParsedSet
+    , getPeersByParsedSets
+    , toMaybe
+    ) where
 
+
+import           Conduit
+import           Control.Applicative
+import           Control.Concurrent
+import           Control.Concurrent.Chan.Unagi        as CCCU
+import           Control.Exception                     hiding (bracket)
+import           Control.Lens                          hiding (Context)
 -- import           Control.Arrow                         ( (***))
+import qualified Control.Monad.Change.Alter            as A
+import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Reader
+import           Crypto.Types.PubKey.ECC
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Char8                 as BC
+import           Data.Conduit.Network
+import           Data.Default
+import           Data.Int                              (Int64)
+import qualified Data.Kind                             as DK
+import           Data.Foldable                         (toList)
+import qualified Data.Map.Strict                       as M
+import           Data.Maybe
+import           Data.Proxy
+import           Data.Ranged
+import qualified Data.Set.Ordered                      as S
+import qualified Data.Text                             as T
+import           Data.Time.Clock
+import           GHC.Exts                              (Constraint)
 
-import BlockApps.Logging
-import BlockApps.X509.Certificate
-import Blockchain.Blockstanbul (WireMessage)
-import Blockchain.DB.DetailsDB
-import Blockchain.DB.SQLDB
-import Blockchain.DBM
-import Blockchain.Data.Block
-import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Enode
-import Blockchain.Data.PubKey
-import Blockchain.EthConf
-import qualified Blockchain.MilenaTools as K
-import Blockchain.Options
-import Blockchain.P2PUtil
-import Blockchain.Sequencer.Event
-import qualified Blockchain.Sequencer.Kafka as SK
-import Blockchain.Strato.Discovery.ContextLite ()
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock (..))
-import Blockchain.Stream.VMOutput
-  ( VMOutput (..),
-    fetchLastVMOutputs,
-    getBestKafkaBlockNumber,
-    produceVMOutputsM,
-  )
-import Blockchain.TCPClientWithTimeout
-import Conduit
-import Control.Applicative
-import Control.Concurrent
-import Control.Exception hiding (bracket)
-import Control.Lens hiding (Context)
-import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Reader
-import Crypto.Types.PubKey.ECC
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import Data.Conduit.Network
-import Data.Default
-import Data.Foldable (toList)
-import qualified Data.Kind as DK
-import qualified Data.Map.Strict as M
-import Data.Maybe
-import Data.Proxy
-import Data.Ranged
-import qualified Data.Set.Ordered as S
-import qualified Data.Text as T
-import Data.Time.Clock
-import qualified Database.Persist.Sql as SQL
-import qualified Database.Redis as Redis
-import GHC.Exts (Constraint)
-import Network.HTTP.Client (defaultManagerSettings, newManager)
-import qualified Network.Kafka as K
-import Network.Wai.Handler.Warp.Internal (setSocketCloseOnExec)
-import Servant.Client
-import qualified Strato.Strato23.API as VC
-import qualified Strato.Strato23.Client as VC
-import UnliftIO
+import           BlockApps.Logging
+import           BlockApps.X509.Certificate
+
+import           Blockchain.Blockstanbul               (WireMessage)
+import           Blockchain.Data.Block
+import           Blockchain.Data.ChainInfo
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Enode
+import           Blockchain.Data.PubKey
+import           Blockchain.DB.DetailsDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.EthConf
+import           Blockchain.Options
+import           Blockchain.P2PUtil
+import           Blockchain.Sequencer.Event
+import qualified Blockchain.Sequencer.Kafka            as SK
+
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.ContextLite ()
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Stream.VMOutput            ( VMOutput(..)
+                                                       , fetchLastVMOutputs
+                                                       , getBestKafkaBlockNumber
+                                                       , produceVMOutputsM
+                                                       )
+
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
+import           Blockchain.TCPClientWithTimeout
+import qualified Database.Persist.Sql                  as SQL
+import qualified Database.Redis                        as Redis
+import qualified Network.Kafka                         as K
+import qualified Blockchain.MilenaTools                as K
+import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
+import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
+import           Servant.Client
+import qualified Strato.Strato23.API                   as VC
+import qualified Strato.Strato23.Client                as VC
+
+import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
 --       but merging in the latest monad-alter will take some additional work
@@ -199,12 +204,13 @@ withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) ->
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState :: K.KafkaState,
-    blockHeaders :: ([BlockData], UTCTime), -- keep track when last updated global headers cache
-    remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime), -- keep track when last updated global headers cache
-    actionTimestamp :: ActionTimestamp,
-    _blockstanbulPeerAddr :: PeerAddress,
-    _outboundWireMessages :: S.OSet (T.Text, Keccak256)
+  { contextKafkaState     :: K.KafkaState
+  , contextKafkaMiddleman :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
+  , actionTimestamp       :: ActionTimestamp
+  , _blockstanbulPeerAddr :: PeerAddress
+  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
   }
 
 makeLenses ''Context
@@ -689,29 +695,30 @@ initConfig wireMessagesRef maxHeaders = do
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient
 
-  initState <- newIORef initContext
-  return $
-    Config
-      { configSQLDB = sqlDB' dbs,
-        configRedisBlockDB = RBDB.RedisConnection redisBDBPool,
-        configConnectionTimeout = ConnectionTimeout flags_connectionTimeout,
-        configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders,
-        configVaultClient = vaultClient,
-        configContext = initState,
-        configBlockstanbulWireMessages = wireMessagesRef,
-        configPubKey = nodePubKey
-      }
-
-initContext :: Context
-initContext =
-  Context
-    { actionTimestamp = emptyActionTimestamp,
-      contextKafkaState = mkConfiguredKafkaState "strato-p2p",
-      blockHeaders = ([], jamshidBirth),
-      remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth),
-      _blockstanbulPeerAddr = PeerAddress Nothing,
-      _outboundWireMessages = S.empty
+  initState  <- liftIO $ initContext
+  initStateF <- newIORef initState
+  return $ Config
+    { configSQLDB = sqlDB' dbs
+    , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
+    , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
+    , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
+    , configVaultClient = vaultClient
+    , configContext = initStateF
+    , configBlockstanbulWireMessages = wireMessagesRef
+    , configPubKey = nodePubKey
     }
+
+initContext :: IO Context
+initContext = do
+  initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  return Context { actionTimestamp = emptyActionTimestamp
+                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
+                 , contextKafkaMiddleman = initContextKafkaMiddleman
+                 , blockHeaders = ([], jamshidBirth)
+                 , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
+                 , _blockstanbulPeerAddr = PeerAddress Nothing
+                 , _outboundWireMessages = S.empty
+                 }
 
 getPeerByIP ::
   A.Selectable IPAsText PPeer m =>

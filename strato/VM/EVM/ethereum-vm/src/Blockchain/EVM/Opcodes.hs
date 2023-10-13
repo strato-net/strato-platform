@@ -15,7 +15,7 @@ import Data.Maybe
 import Data.Primitive.ByteArray
 import Foreign.Ptr
 import Foreign.Storable
-import GHC.Exts
+import GHC.Exts hiding (LT,GT, EQ)
 import GHC.Num.BigNat
 import GHC.Num.Integer
 import GHC.Word
@@ -336,7 +336,7 @@ fastExtractSingle !code !off !len = unsafePerformIO . BU.unsafeUseAsCString code
   -- those garbage bytes are truncated by the shift.
   !rawBits <- peekByteOff offPtr off
   let !(W64# w#) = toBE64 rawBits `shiftR` delta
-  return $! BigWord (IS (word2Int# w#))
+  return $! BigWord (IS (word2Int# (word64ToWord# w#)))
 
 -- Used to push 25-32 bytes
 fastExtractQuad :: B.ByteString -> Int -> Int -> Word256

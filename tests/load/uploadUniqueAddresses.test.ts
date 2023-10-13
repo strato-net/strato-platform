@@ -35,7 +35,7 @@ describe('Unique addresses', function () {
   before(async() => {
     console.log(`Creating admin user and contract`);
     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
-    const ouser = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
+    const ouser = await oauth.getAccessTokenByResourceOwnerCredential("user3", "1234", "strato-devel");
     admin = await rest.createUser(ouser, options);
 //    await rest.createContract(admin, {name: contractName, source: await importer.combine(contractFilename), args: {}}, options);
   });

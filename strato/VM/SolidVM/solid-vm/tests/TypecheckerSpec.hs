@@ -24,6 +24,7 @@ import qualified Data.Text as T
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker as Typechecker
 import Test.Hspec
 import Text.RawString.QQ
+import Debug.Trace
 
 instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (MainChainT (MemAddressStateDB m)) where
   lookup p = lift . lift . A.lookup p
@@ -182,10 +183,9 @@ contract B {
 
     length anns `shouldBe` 0
   it "cannot call private contract functions" $ do
-    anns <-
-      liftIO $
-        runTypechecker
-          [r|
+    anns <- liftIO $ runTypechecker [r|
+pragma strict;
+
 contract A {
   function realFunction() private {
   }
@@ -200,10 +200,9 @@ contract B {
 
     length anns `shouldBe` 1
   it "cannot call internal contract functions" $ do
-    anns <-
-      liftIO $
-        runTypechecker
-          [r|
+    anns <- liftIO $ runTypechecker [r|
+pragma strict;
+
 contract A {
   function realFunction() internal {
   }
@@ -1812,10 +1811,8 @@ contract qq {
       anns `shouldBe` []
 
     it "can't call own external function" $ do
-      anns <-
-        liftIO $
-          runTypechecker
-            [r|
+      anns <- liftIO $ runTypechecker [r|
+pragma strict;
 
 contract qq {
   uint x = 7;
@@ -1878,10 +1875,8 @@ contract qq {
       length anns `shouldBe` 0
 
     it "can't call an inherited private function" $ do
-      anns <-
-        liftIO $
-          runTypechecker
-            [r|
+      anns <- liftIO $ runTypechecker [r|
+pragma strict;
 
 contract Parent {
   uint x = 7;
@@ -1903,10 +1898,8 @@ contract qq is Parent {
       length anns `shouldBe` 1
 
     it "can't call an inherited external function" $ do
-      anns <-
-        liftIO $
-          runTypechecker
-            [r|
+      anns <- liftIO $ runTypechecker [r|
+pragma strict;
 
 contract Parent {
   uint x = 7;
@@ -1978,10 +1971,8 @@ contract qq is Parent {
       length anns `shouldBe` 0
 
     it "can't call a private function in another contract" $ do
-      anns <-
-        liftIO $
-          runTypechecker
-            [r|
+      anns <- liftIO $ runTypechecker [r|
+pragma strict;
 
 contract Parent {
   uint x = 7;
@@ -2022,10 +2013,8 @@ contract qq {
       length anns `shouldBe` 0
 
     it "can't call an internal function from another contract" $ do
-      anns <-
-        liftIO $
-          runTypechecker
-            [r|
+      anns <- liftIO $ runTypechecker [r|
+pragma strict;
 
 contract Parent {
   uint x = 7;
@@ -2064,3 +2053,73 @@ contract qq {
 }
 |]
       length anns `shouldBe` 0
+    
+    it "can't use index access on an array accessor" $ do
+      anns <-
+        liftIO $
+          runTypechecker
+            [r|
+
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  constructor() {
+      SomeContract p = new SomeContract();
+      p.x()[0];
+  }
+}
+|]
+      length anns `shouldBe` 1
+    
+    it "can index access a contract array returned from a function" $ do
+      anns <-
+        liftIO $
+          runTypechecker
+            [r|
+
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+
+  function get() returns (uint[]) {
+    return x;
+  }
+}
+
+contract qq {
+  constructor() {
+      SomeContract p = new SomeContract();
+      p.get()[0];
+  }
+}
+|]
+      length anns `shouldBe` 0
+
+    it "can pass in the index as a parameter to access a contract array" $ do
+      anns <-
+        liftIO $
+          runTypechecker
+            [r|
+
+contract SomeContract {
+  uint[] public x;
+  constructor() public {
+    x.push(8);
+  }
+}
+
+contract qq {
+  constructor() {
+      SomeContract p = new SomeContract();
+      p.x(0);
+  }
+}
+|]
+      trace (show anns) $ length anns `shouldBe` 0

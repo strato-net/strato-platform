@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 
 import Blockchain.Options ()
+import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
 import Control.Monad
 import Executable.EVMFlags ()

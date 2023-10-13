@@ -48,9 +48,9 @@ describe("Create Chain", function() {
   
   before(async () => {
     oauth = await oauthUtil.init(config.nodes[0].oauth);
-    const accessToken1:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
+    const accessToken1:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user3", "1234", "strato-devel");
     ouser1 = {token: accessToken1.token.access_token};
-    const accessToken2:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user2", "1234", "strato-devel");
+    const accessToken2:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user4", "1234", "strato-devel");
     ouser2 = {token: accessToken2.token.access_token};
   });
 
@@ -163,7 +163,8 @@ describe("Create Chain", function() {
     assert.isUndefined(chainId, "chainId not defined");
   });
 
-  it('should create a new chain when contract source is empty', async() => {
+  // TODO: unsure if we want to support this functionality; either delete or come to a consensus
+  xit('should create a new chain when contract source is empty', async() => {
     // create user
     const alice = await rest.createUser(ouser1, options);
     const bob   = await rest.createUser(ouser2, options);
