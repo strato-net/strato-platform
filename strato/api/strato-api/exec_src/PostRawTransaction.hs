@@ -55,6 +55,7 @@ data Options = Options
     optSourceCode :: Maybe SourceMap,
     optAddress :: Maybe Address,
     optChainId :: Maybe ChainId,
+    optNetworkId :: Maybe Integer,
     optFunctionName :: Maybe String,
     optFunctionArgs :: Maybe [String],
     optMetadata :: M.Map T.Text T.Text,
@@ -74,6 +75,7 @@ defaultOptions =
       optSourceCode = Nothing,
       optAddress = Nothing,
       optChainId = Nothing,
+      optNetworkId = Nothing,
       optFunctionName = Nothing,
       optFunctionArgs = Nothing,
       optMetadata = M.empty,
@@ -170,6 +172,18 @@ options =
           "ChainId"
       )
       "The chainId on which to create the contract, of the contract you want to call, or of the user to send value to",
+    Option
+      ['w']
+      ["networkId"]
+      ( OptArg
+          ( \mW opts ->
+              case mW of
+                Nothing -> return opts
+                Just n -> return opts {optNetworkId = Just $ read n}
+          )
+          "NetworkId (an Integer)"
+      )
+      "The networkId of the network you want to post to",
     Option
       ['m']
       ["funcName"]
@@ -329,11 +343,11 @@ main = do
             unsignedTransactionValue = optValue,
             unsignedTransactionInitOrData = txData,
             unsignedTransactionChainId = optChainId,
-            unsignedTransactionNetworkId = Nothing --TODO: DONT HARDCODE
+            unsignedTransactionNetworkId = optNetworkId
           }
       txHash = rlpHash unsignedTx
       sig = signMsg optKey txHash
-      (r, s, v) = getSigVals sig Nothing --TODO: DONT HARDCODE; update PostBlocTransactionRawRequest instead
+      (r, s, v) = getSigVals sig optNetworkId
 
       -- create the API request body
       request =
@@ -350,6 +364,7 @@ main = do
           s
           (if optOmitV then Nothing else Just v)
           (Just metadata')
+          (unsignedTransactionNetworkId unsignedTx)
 
   putStrLn $ "Transaction Hash: " ++ format txHash
 

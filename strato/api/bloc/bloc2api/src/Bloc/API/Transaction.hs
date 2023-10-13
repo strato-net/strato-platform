@@ -144,7 +144,8 @@ data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
     postbloctransactionrawrequestR :: Word256,
     postbloctransactionrawrequestS :: Word256,
     postbloctransactionrawrequestV :: Maybe Integer, -- we can infer from Address if necessary
-    postbloctransactionrawrequestMetadata :: Maybe (Map Text Text)
+    postbloctransactionrawrequestMetadata :: Maybe (Map Text Text),
+    postbloctransactionrawrequestNetworkid :: Maybe Integer
   }
   deriving (Eq, Show, Generic)
 
@@ -173,6 +174,7 @@ instance ToSample PostBlocTransactionRawRequest where
         (42 :: Word256)
         Nothing
         Nothing
+        Nothing
 
 instance ToSchema PostBlocTransactionRawRequest where
   declareNamedSchema proxy =
@@ -194,6 +196,7 @@ instance ToSchema PostBlocTransactionRawRequest where
           Nothing
           (21 :: Word256)
           (42 :: Word256)
+          Nothing
           Nothing
           Nothing
 

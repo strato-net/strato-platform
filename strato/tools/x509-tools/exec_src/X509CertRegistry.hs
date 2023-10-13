@@ -175,6 +175,7 @@ optionsToTX priv nonce =
                 ("args", "()")
               ]
         )
+        Nothing
 
 initializeCertificateRegistryTX :: PrivateKey -> Address -> [X509Certificate] -> Nonce -> PostBlocTransactionRawRequest
 initializeCertificateRegistryTX priv addr certs nonce =
@@ -205,6 +206,7 @@ initializeCertificateRegistryTX priv addr certs nonce =
         s
         (Just v)
         (Just $ M.fromList [("VM", "SolidVM"), ("funcName", "initializeCertificateRegistry"), ("args", T.pack $ "(" <> show (fmap certToBytes certs) <> ")")])
+        Nothing
 
 certificateRegistryContract :: T.Text
 certificateRegistryContract =
