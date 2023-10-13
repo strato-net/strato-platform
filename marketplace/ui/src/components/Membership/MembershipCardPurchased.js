@@ -234,14 +234,14 @@ const MembershipCardPurchased = ({
                   &nbsp; {statusText[status] ?? "For Sale"}
                 </Row>
               </Col>
-              {isPurchasedList
-                ? (<Col className="text-right flex" style={{ alignItems: "center" }}>
-                  <Row type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
-                    <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
-                    <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
-                  </Row>
-                </Col>)
-                : (<Col span={24} className="mt-2">
+              <Col className="text-right flex" style={{ alignItems: "center" }}>
+                <Row type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
+                  <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
+                  <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
+                </Row>
+              </Col>
+              {!isPurchasedList &&
+                (<Col span={24} className="mt-2">
                   <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
                   <Paragraph className="text-sm mt-2 text-dark-grey font-normal leading-5 font-poppin">
                     {description}
