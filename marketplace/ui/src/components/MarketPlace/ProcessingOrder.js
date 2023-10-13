@@ -1,7 +1,7 @@
 import { Spin, notification } from "antd";
 import React, { useEffect, useState, useMemo } from "react";
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { ORDER_STATUS, apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import { useNavigate, useMatch, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { actions as orderActions } from "../../contexts/order/actions";
@@ -26,7 +26,7 @@ const ProcessingOrder = () => {
   // const { cartList } = useMarketplaceState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const [error, seterror] = useState(null)
-  const { message, success } = useOrderState();
+  const { order, message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
 
 
@@ -72,7 +72,12 @@ const ProcessingOrder = () => {
         if (JSON.parse(body.data.metadata.cart) !== {}) {
           if (body.data["payment_status"] === "paid") {
             const cart = JSON.parse(body.data.metadata.cart);
-            let object = { paymentSessionId: sessionId, ...cart };
+            let object = { paymentSessionId: sessionId, status: ORDER_STATUS.AWAITING_FULFILLMENT, ...cart };
+            handleOrderConfirm(object);
+          }
+          else if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+            const cart = JSON.parse(body.data.metadata.cart);
+            let object = { paymentSessionId: sessionId, status:ORDER_STATUS.PAYMENT_PENDING, ...cart };
             handleOrderConfirm(object);
           }
         }
@@ -206,6 +211,7 @@ const ProcessingOrder = () => {
       orderTotal: cartData.orderTotal,
       paymentSessionId: cartData.paymentSessionId,
       shippingAddress: cartData.shippingAddress,
+      status:cartData.status,
       to: cartData.email,
       subject: "Your Order Confirmation",
       htmlContent: htmlContent,

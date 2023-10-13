@@ -13,6 +13,11 @@ import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination, Button, Radio, Space} from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
+import { STRIPE_ENV, apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import RestStatus from "http-status-codes";
+
+// const Stripe = require('stripe');
+
 
 
 const SoldOrdersTable = ({ user, selectedDate }) => {
@@ -50,23 +55,65 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
   useEffect(() => {
-    let items = [];
-    ordersSold.forEach((order) => {
-      items.push({
-        address: order.address,
-        chainId: order.chainId,
-        key: order.address,
-        orderNumber: order,
-        buyerOrganization: order.buyerOrganization,
-        orderTotal: order.orderTotal,
-        date: getStringDate(order.orderDate, US_DATE_FORMAT),
-        status: getStatus(parseInt(order.status)),
-        invoice: order,
-      });
-    });
-    setdata(items);
-  }, [ordersSold]);
+    const fetchData = async () => {
+      const updatedData = await Promise.all(
+        ordersSold.map(async (order) => {
+          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
+            try {
+              const response = await fetch(
+                `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
+                {
+                  method: HTTP_METHODS.GET,
+                }
+              );
+  
+              const body = await response.json();
 
+              const intentResponse = await fetch(
+                `${apiUrl}/order/payment/intent/sessions/${order.paymentSessionId}`,
+                {
+                  method: HTTP_METHODS.GET,
+                }
+              );
+  
+              const intentBody = await intentResponse.json();
+  
+              if (response.status === RestStatus.OK) {
+                if (
+                  body.data["payment_status"] === "paid" &&
+                  getStatus(parseInt(order.status)) === "Payment Pending"
+                ) {
+                  // Update payment status
+                  const isDone = await actions.updateOrderStatus(dispatch, {
+                    orderAddress: order.address,
+                    status: 1,
+                  });
+                }
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          }
+          return {
+            address: order.address,
+            chainId: order.chainId,
+            key: order.address,
+            orderNumber: order,
+            buyerOrganization: order.buyerOrganization,
+            orderTotal: order.orderTotal,
+            date: getStringDate(order.orderDate, US_DATE_FORMAT),
+            status: getStatus(parseInt(order.status)),
+            invoice: order,
+          };
+        })
+      );
+  
+      setdata(updatedData);
+    };
+  
+    fetchData();
+  }, [ordersSold]);
+  
   const column = [
     {
       title: "Order Number".toUpperCase(),
@@ -160,6 +207,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
               <Radio value={2}>Awaiting Shipment</Radio>
               <Radio value={3}>Closed</Radio>
               <Radio value={4}>Canceled</Radio>
+              <Radio value={5}>Payment Pending</Radio>
             </Space>
           </Radio.Group>
           <div className="mt-2" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -209,6 +257,8 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       textClass = "text-success  bg-[#EAFFEE]";
     } else if (status === "Canceled") {
       textClass = "text-error  bg-[#FFF0F0]";
+    } else if (status === "Payment Pending") {
+      textClass = "text-orange bg-[#FFF6EC]";
     }
     return (
       <div className={classNames(textClass, "text-center py-1 rounded")}>
@@ -221,7 +271,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     setOffset((page - 1) * limit);
     setPage(page);
   };
-
+console.log("J=HEYY",data)
   return (
     <div>
       <DataTableComponent
