@@ -32,6 +32,8 @@ contract Certificate {
     }
 
     function initializeCertificate (string _certificateString) {
+        require(msg.sender == owner,"You don't have permission to CALL initializeCertificate!");
+
         mapping(string => string) parsedCert = parseCert(_certificateString);
 
         userAddress = address(parsedCert["userAddress"]);
@@ -68,7 +70,6 @@ contract Certificate {
 }
 
 contract CertificateRegistry {
-    address public owner;
 
     event CertificateRegistered(string certificate);
     event CertificateRevoked(address userAddress);
