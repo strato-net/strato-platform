@@ -124,6 +124,7 @@ const CategoryProductCard = ({ product, category }) => {
               src={product.imageUrl}
               width={200}
               height={180}
+              style={{ objectFit: "contain" }}
               preview={false}
               onClick={() =>
                 navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })

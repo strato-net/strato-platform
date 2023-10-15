@@ -267,6 +267,7 @@ contract ProductManager is
             );
             for (int i = 0; i < _quantity; i++) {
                 Item_3 _item = Item_3(_itemsAddress[i]);
+                _item.update(ItemStatus.PUBLISHED, _item.comment(), 1);
                 _item.transferOwnership(
                     tx.origin,
                     address(product),
