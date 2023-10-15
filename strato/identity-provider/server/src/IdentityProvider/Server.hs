@@ -191,7 +191,7 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
   let realm = extractRealmName $ T.unpack idProv
-      json = T.pack
+      json = T.concat
            [ "{\"user\":\""
            , uuid
            , "\",\"realm\":\""
