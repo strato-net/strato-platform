@@ -1,0 +1,150 @@
+contract MarketplaceItem is Asset{
+    address item_owner;
+    string item_ownerOrganization;
+    string item_ownerOrganizationalUnit;
+    string item_ownerCommonName;
+    address item_productId;
+    address item_inventoryId;
+    string item_serialNumber;
+    string item_comment;
+    uint item_itemNumber;
+    uint item_createdDate;
+
+    // Events
+        /// @dev Events to add and remove members to this shard.
+    event ItemOrgAdded(string orgName);
+    event ItemOrgUnitAdded(string orgName, string orgUnit);
+    event ItemCommonNameAdded(string orgName, string orgUnit, string commonName);
+
+    event ItemOrgRemoved(string orgName);
+    event ItemOrgUnitRemoved(string orgName, string orgUnit);
+    event ItemCommonNameRemoved(string orgName, string orgUnit, string commonName);
+
+    event ItemOwnershipUpdate(address seller, address newOwner, uint ownershipStartDate, address itemAddress);
+
+    constructor(
+        address _owner,
+        address _productId,
+        address _inventoryId,
+        string memory _serialNumber,
+        string memory _comment,
+        uint _itemNumber,
+        uint _createdDate
+    ) public {
+        item = new Item();
+        item_owner = _owner;
+        item_productId = _productId;
+        item_inventoryId = _inventoryId;
+        item_serialNumber = _serialNumber;
+        item_comment = _comment;
+        item_itemNumber = _itemNumber;
+        item_createdDate = _createdDate;
+
+        mapping(string => string) ownerCert = getUserCert(owner);
+
+        item_ownerOrganization = ownerCert["organization"];
+        item_ownerOrganizationalUnit = ownerCert["organizationalUnit"];
+        item_ownerCommonName = ownerCert["commonName"];
+
+        // Emit an event to indicate the creation of a new Item
+        emit ItemOwnershipUpdate(address(0), _owner, block.timestamp, msg.sender);
+
+        if (_rawMaterialSerialNumber.length > 0) {
+            addRawMaterials(
+                _uniqueProductCode,
+                _rawMaterialProductName,
+                _rawMaterialSerialNumber,
+                _rawMaterialProductId
+            );
+        }
+    }
+
+    // Function to update an Item
+    function itemUpdate(
+        ItemStatus _status,
+        string _comment,
+        uint _scheme
+    ) returns (uint) {
+        if (item_ownerOrganization != getUserOrganization(tx.origin)) {
+            return RestStatus.FORBIDDEN;
+        }
+
+        if (_scheme == 0) {
+            return RestStatus.OK;
+        }
+
+        if ((_scheme & (1 << 0)) == (1 << 0)) {
+            status = _status;
+        }
+        if ((_scheme & (1 << 1)) == (1 << 1)) {
+            comment = _comment;
+        }
+
+        return RestStatus.OK;
+    }
+
+    // Get the userOrganization
+    function getUserOrganization(address caller) public returns (string) {
+        mapping(string => string) ownerCert = getUserCert(caller);
+        string userOrganization = ownerCert["organization"];
+        return userOrganization;
+    }
+
+    function generateOwnershipHistory(
+        string _seller,
+        string _newOwner,
+        uint _ownershipStartDate,
+        address _itemAddress
+    ) returns (uint) {
+        Item item = items[_itemAddress]
+        if (item_ownerOrganization != getUserOrganization(tx.origin)) {
+            return RestStatus.FORBIDDEN;
+        }
+        emit ItemOwnershipUpdate(
+            _seller,
+            _newOwner,
+            _ownershipStartDate,
+            _itemAddress
+        );
+        return RestStatus.OK;
+    }
+
+    // Function to transfer the ownership of a Item
+    function transferOwnership(
+        address _itemAddress,
+        address _addr,
+        address _productId,
+        address _inventoryId
+    ) public returns (uint256) {
+        Item item = items[_itemAddress];
+        // caller must be current owner to transfer ownership
+        if (item_ownerOrganization != getUserOrganization(tx.origin)) {
+            return RestStatus.FORBIDDEN;
+        }
+
+        // fetch new owner cert details (org and unit)
+        mapping(string => string) newOwnerCert = getUserCert(_addr);
+        string newOwnerOrganization = newOwnerCert["organization"];
+        string newOwnerOrganizationalUnit = newOwnerCert["organizationalUnit"];
+        string newOwnerCommonName = newOwnerCert["commonName"];
+
+        // add new owner org (and maybe unit)
+        if (newOwnerOrganization == "") return RestStatus.NOT_FOUND;
+
+        generateOwnershipHistory(
+            ownerOrganization,
+            newOwnerOrganization,
+            block.timestamp,
+            _itemAddress
+        );
+        // set newOwner as asset owner
+        item_owner = _addr;
+        item_ownerOrganization = newOwnerOrganization;
+        item_ownerOrganizationalUnit = newOwnerOrganizationalUnit;
+        item_ownerCommonName = newOwnerCommonName;
+        item_productId = _productId;
+        item_inventoryId = _inventoryId;
+        return RestStatus.OK;
+    }
+
+}
