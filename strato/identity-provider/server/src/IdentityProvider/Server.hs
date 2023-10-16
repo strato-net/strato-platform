@@ -194,6 +194,17 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
       (hasOrgName, org) = case mCo of
         Just o | o /= "" -> (True, T.unpack o)
         _ -> (False, orgNew)
+      jsonLogMsg = T.concat
+           [ "{\"user\":\""
+           , uuid
+           , "\",\"realm\":\""
+           , T.pack realm
+           , "\",\"name\":\""
+           , name
+           , maybe "" ("\",\"organization\":\"" <>) mCo
+           , "\"}"
+           ]
+  $logInfoS "putIdentity/json" jsonLogMsg
   getVaultKey accessToken >>= \case
     Just (AddressAndKey a k) -> do
       -- has vault key, confirm also has cert
