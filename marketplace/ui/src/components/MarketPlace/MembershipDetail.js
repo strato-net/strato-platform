@@ -53,6 +53,7 @@ import { INVENTORY_STATUS } from "../../helpers/constants";
 import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 
 const MembershipDetails = ({ user, users }) => {
+
   const { state, pathname } = useLocation();
   const [inventoryId, setInventoryId] = useState(state?.inventoryId);
 
@@ -67,7 +68,7 @@ const MembershipDetails = ({ user, users }) => {
   const initialValues = {
     name: "",
     price: "",
-    quantity: ""
+    quantity: 1
   };
   const [activeTab, setActiveTab] = useState("Details");
   const [serviceList, setServiceList] = useState([])
@@ -309,34 +310,34 @@ const MembershipDetails = ({ user, users }) => {
 
   const serviceColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">NAME</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">NAME</Text>,
       dataIndex: "serviceName",
       key: "name",
       render: (text) => <p>{decodeURIComponent(text)}</p>
     },
     {
-      title: <Text className="text-primaryC text-[13px]">DESCRIPTION</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">DESCRIPTION</Text>,
       dataIndex: "serviceDesc",
       key: "serviceDesc",
       render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">MEMBER PRICE</Text>,
       dataIndex: "memberPrice",
       key: "memberPrice",
-      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
+      render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">NON-MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">NON-MEMBER PRICE</Text>,
       dataIndex: "nonMemberPrice",
       key: "nonMemberPrice",
-      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
+      render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">USES</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">USES</Text>,
       dataIndex: "uses",
       key: "uses",
-      render: (text) => <p style={{ textAlign: 'center' }}>{decodeURIComponent(text)}</p>,
+      render: (text) => <p className="text-left">{decodeURIComponent(text)}</p>,
     },
   ];
 
@@ -372,7 +373,16 @@ const MembershipDetails = ({ user, users }) => {
             status: INVENTORY_STATUS.PUBLISHED,
             serialNumber: [],
           };
-
+          const resalePayload = {
+            // itemAddress: id,
+            productAddress: membershipDetails.productId,
+            inventory: inventoryId,
+            updates: {
+              pricePerUnit: formik.values.price,
+              status: INVENTORY_STATUS.PUBLISHED,
+              quantity: formik.values.quantity
+            }
+          }
           const createInventory = await actions.createInventory(
             dispatch,
             inventoryBody
@@ -390,6 +400,11 @@ const MembershipDetails = ({ user, users }) => {
 
   const handleTabChange = (label) => {
     setActiveTab(label)
+  }
+
+  const StatusValue = {
+    1: "Listed",
+    2: "Not Listed"
   }
 
   const DetailTabCard = () => {
@@ -428,14 +443,10 @@ const MembershipDetails = ({ user, users }) => {
     return (
       <Row>
         <Text className="leading-6 text-lg block font-semibold pb-3">Services</Text>
-        <Col span={24} className="service-table">
-          {/* <Table columns={serviceColumn} data={serviceList} /> */}
-          <DataTableComponent
-            columns={serviceColumn}
-            data={serviceList}
-            scrollX="100%"
-            isLoading={isMembershipLoading}
+        <Col span={24} >
+          <Table className="inventory-table" columns={serviceColumn} dataSource={serviceList}
             pagination={false}
+            scroll={{ y: 300 }}
           />
         </Col>
         <Text className="leading-6 text-lg block font-semibold pb-3 mt-4">Savings</Text>
@@ -446,7 +457,7 @@ const MembershipDetails = ({ user, users }) => {
               return <Col span={8} className="">
                 <Card className="shadow-md m-2">
                   <Row className="mt-2">
-                    <Col span={24}><Text className="block text-base text-grey">Name</Text></Col>
+                    <Col span={24}><Text className="block text-base text-grey font-medium">Name</Text></Col>
                     <Col span={24}><Text className="block text-lg ">{serviceName}</Text></Col>
                   </Row>
                   <Row className="mt-2">
@@ -510,6 +521,7 @@ const MembershipDetails = ({ user, users }) => {
                         height={"100%"}
                         width={"100%"}
                         fallback={noPreview}
+                        preview={false}
                         style={{ objectFit: "contain" }}
                         src={file.imageUrl}
                       />
@@ -521,6 +533,7 @@ const MembershipDetails = ({ user, users }) => {
                   height={"100%"}
                   width={"100%"}
                   fallback={noPreview}
+                  preview={false}
                   style={{ objectFit: "contain" }}
                   src={null}
                 />
@@ -534,7 +547,7 @@ const MembershipDetails = ({ user, users }) => {
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" > Status </Text>
-                    <Text className="block text-center text-xl font-bold mt-2" > {details?.status === 1 ? "Listed" : "Not Listed"} </Text>
+                    <Text className="block text-center text-xl font-bold mt-2" > {StatusValue[details?.status] ?? "--"} </Text>
                   </Col>
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" > Total Savings </Text>
@@ -545,19 +558,19 @@ const MembershipDetails = ({ user, users }) => {
                   <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
                   <Col span={24} className="border-t-1 h-20 mt-8">
                     <Row className="flex justify-between h-10 mt-5">
-                      <Col span={4} className="rounded-md h-12" >  <Button className="h-full text-center add-sub-btn " onClick={subtract}>
+                      <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn " onClick={subtract}>
                         {minusIcon()}
                       </Button> </Col>
                       <Col span={16} className="border border-grayLight rounded-md align-middle text-center h-14 py-2" >
-                        <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold pt-2">{qty}</Text>
+                        <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{qty}</Text>
                       </Col>
-                      <Col span={4} className="rounded-md h-12" > <Button className="h-full text-center float-right add-sub-btn" onClick={add}> {plusIcon()} </Button>  </Col>
+                      <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn" onClick={add}> {plusIcon()} </Button>  </Col>
                     </Row>
                   </Col>
                 </Row>
               </Card>
               <Row className="h-14 mt-4">
-                <Button type={ownerSameAsUser ? "default" : "primary"} block={true} size="large" className=" h-full px-92 py-4 h-px-56"
+                <Button type={ownerSameAsUser ? "default" : "primary"} block={true} size="large" className=" h-full  py-4 h-px-56"
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
@@ -566,8 +579,8 @@ const MembershipDetails = ({ user, users }) => {
                       openListNowModal();
                     }
                   }}
-                  disabled={ownerSameAsUser}
-                > Sale </Button>
+                  // disabled={ownerSameAsUser}
+                > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text> </Button>
               </Row>
             </Col>
 
@@ -580,9 +593,9 @@ const MembershipDetails = ({ user, users }) => {
                 ellipsis={{ rows: 2, expandable: true, symbol: <Text strong>Show more</Text> }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(details?.description ?? "").replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                {decodeURIComponent(details?.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
                   <React.Fragment key={index}>
-                    {line & line?.length > 0 ? line : "--"}
+                    {line ?? "--"}
                     <br />
                   </React.Fragment>
                 ))}
@@ -797,6 +810,8 @@ const MembershipDetails = ({ user, users }) => {
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
+          type="Sale"
+          id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}

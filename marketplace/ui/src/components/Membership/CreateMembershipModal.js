@@ -445,7 +445,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
         centered
         onCancel={closeModal}
         width={'100%'}
-        className="create-new-modal mt-20"
+        className="create-new-modal mt-14"
         footer={[
           <Row className="mt-8 create-modal-footer-shadow">
             <Col span={8} className="flex mx-auto mt-4 py-5">

@@ -153,19 +153,19 @@ const reducer = (state, action) => {
     case actionDescriptors.updateSellerDetails:
       return {
         ...state,
-        issellerDetailsUpdating: true,
+        isSellerDetailsUpdating: true,
       };
     case actionDescriptors.updateSellerDetailsSuccessful:
       return {
         ...state,
         sellerUpdateObject: action.payload,
-        issellerDetailsUpdating: false,
+        isSellerDetailsUpdating: false,
       };
     case actionDescriptors.updateSellerDetailsFailed:
       return {
         ...state,
         error: action.error,
-        issellerDetailsUpdating: false,
+        isSellerDetailsUpdating: false,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

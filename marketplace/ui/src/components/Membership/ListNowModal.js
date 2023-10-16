@@ -19,7 +19,7 @@ const ListNowModal = ({
   const { isInventoriesLoading, inventories, isCreateInventorySubmitting } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState()
   const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
-  const seller = user?.user?.user?.organization;
+  const seller = user?.user?.user?.organization || user?.user?.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting } = useMembershipState();
   const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting;

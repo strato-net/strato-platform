@@ -206,8 +206,8 @@ const Membership = (user) => {
           <Spin spinning={isLoadingStripeStatus} size="large" />
         </div>
       ) : (
-        <div className=" mt-14 min-h-full">
-          <Row className="mx-16">
+        <div className=" mt-10 min-h-full">
+          <Row className="mx-16 mb-4">
             <Col span={22}>
               <Breadcrumb>
                 <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>

@@ -23,7 +23,7 @@ const OrdersProvider = ({ children }) => {
     message: null,
     isbuyerDetailsUpdating: false,
     buyerUpdateObject: null,
-    issellerDetailsUpdating: false,
+    isSellerDetailsUpdating: false,
     sellerUpdateObject: null,
     isCreateOrderLineItem: false,
     item: null,

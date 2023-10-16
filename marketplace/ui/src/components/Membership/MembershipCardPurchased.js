@@ -212,6 +212,19 @@ const MembershipCardPurchased = ({
     }
   };
 
+  // const renderCustomPrevArrow = (clickHandler, hasPrev, label) => (
+  //   <button onClick={clickHandler} disabled={!hasPrev} className="custom-arrow .custom-prev-mem-carousel">
+  //     Previous
+  //   </button>
+  // );
+
+  // const renderCustomNextArrow = (clickHandler, hasNext, label) => (
+  //   <button onClick={clickHandler} disabled={!hasNext} className="custom-arrow custom-next-mem-carousel">
+  //     Next
+  //   </button>
+  // );
+
+
 
   return (
     <>
@@ -264,7 +277,7 @@ const MembershipCardPurchased = ({
                     src={productImageLocation[0]}
                   // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
                   />
-                  : <Carousel showArrows={true} showThumbs={false} className="h-full" >
+                  : <Carousel showArrows={true} showThumbs={false} className="h-full mem-card-carousel" >
                     {productImageLocation && productImageLocation?.map((item) => {
                       return <Image
                         key={item}
@@ -293,9 +306,11 @@ const MembershipCardPurchased = ({
                     }
                   }}
                 >
-                  <Row className="mx-auto w-full px-8 flex justify-between item-center font-poppin text-sm font-semibold">
-                    <Text>{tagIcon()}</Text>
-                    <Text className="text-white ">List for Sale</Text>
+                  <Row className="mx-auto w-full px-8  font-poppin text-sm font-semibold">
+                    <Col className="w-32 flex justify-between item-center">
+                      <Text>{tagIcon()}</Text>
+                      <Text className="text-white ">List for Sale</Text>
+                    </Col>
                   </Row>
                 </Button>
                 {/* : null} */}
@@ -379,32 +394,38 @@ const MembershipCardPurchased = ({
       )}
 
       <Modal
-        title=""
+        title={<Text className="h-44"> &nbsp;</Text>}
         centered
         open={carouselModel}
         closeIcon={false}
         footer={null}
         onOk={() => setCarouselModel(false)}
         onCancel={() => setCarouselModel(false)}
-        width={1000}
+        width={1100}
+      // height={'100%'}
       >
-        <Carousel showArrows={true} showThumbs={false}  >
-          {[
-            "https://images.unsplash.com/photo-1612817288484-6f916006741a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmVhdXR5JTIwcHJvZHVjdHN8ZW58MHx8MHx8fDA%3D&w=1000&q=80",
-            "https://thumbs.dreamstime.com/b/set-care-beauty-products-skin-29817248.jpg",
-            "https://thumbs.dreamstime.com/z/bath-beauty-products-24145725.jpg"
-          ].map((item) => {
-            return <Image
-              key={item}
-              className="object-covers"
-              width={'100%'}
-              height={'96%'}
-              preview={false}
-              src={item}
-            // src={membership.productImageLocation}
-            />
-          })}
-        </Carousel>
+        <Row>
+          <Col span={16} className="mx-auto ">
+            <Carousel showArrows={true} showThumbs={false}
+            // renderArrowPrev={renderCustomPrevArrow}
+            // renderArrowNext={renderCustomNextArrow}
+            >
+              {productImageLocation && productImageLocation?.map((item) => {
+                return <Image
+                  key={item}
+                  className="object-covers"
+                  width={'100%'}
+                  // height={390}
+                  preview={false}
+                  onClick={() => { setCarouselModel(true) }}
+                  src={item}
+                  fallback={noPreview}
+                // src={membership.productImageLocation}
+                />
+              })}
+            </Carousel>
+          </Col>
+        </Row>
       </Modal>
 
     </>

@@ -72,7 +72,7 @@ const SoldOrderDetails = ({ user, users }) => {
     isorderDetailsLoading,
     ordersAudit,
     message,
-    issellerDetailsUpdating,
+    isSellerDetailsUpdating,
     success,
     isCreateOrderLineItem,
   } = useOrderState();
@@ -461,10 +461,10 @@ const SoldOrderDetails = ({ user, users }) => {
   return (
     <div>
       {contextHolder}
-      {details === null || isorderDetailsLoading || issellerDetailsUpdating || isLoadingPaymentStatus ? (
+      {details === null || isorderDetailsLoading || isSellerDetailsUpdating || isLoadingPaymentStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin
-            spinning={isorderDetailsLoading || issellerDetailsUpdating || isLoadingPaymentStatus}
+            spinning={isorderDetailsLoading || isSellerDetailsUpdating || isLoadingPaymentStatus}
             size="large"
           />
         </div>
