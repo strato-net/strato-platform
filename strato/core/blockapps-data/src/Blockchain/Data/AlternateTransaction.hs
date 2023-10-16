@@ -22,10 +22,10 @@ module Blockchain.Data.AlternateTransaction
   )
 where
 
+import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
@@ -34,44 +34,14 @@ import Blockchain.Strato.Model.Wei
 import Control.DeepSeq (NFData)
 import qualified Data.Aeson as A
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as Char8
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
 import Data.Maybe
-import Data.RLP
-import qualified Data.RLP as RLP (RLPObject (..))
 import Data.Text (Text)
-import qualified Data.Text as Text
 import GHC.Generics
+import GHC.Natural
 import Generic.Random
 import Test.QuickCheck hiding ((.&.))
 import Test.QuickCheck.Instances ()
-
-instance RLPEncodable CodePtr where
-  rlpEncode (EVMCode codeHash) = rlpEncode codeHash
-  rlpEncode (SolidVMCode n ch) =
-    RLP.Array
-      [ RLP.String $ Char8.pack "SolidVM",
-        rlpEncode n,
-        rlpEncode ch
-      ]
-  rlpEncode (CodeAtAccount a n) =
-    RLP.Array
-      [ RLP.String $ Char8.pack "AtAccount",
-        rlpEncode a,
-        rlpEncode n
-      ]
-
-  rlpDecode (RLP.Array [RLP.String "SolidVM", n, ch]) = SolidVMCode <$> rlpDecode n <*> rlpDecode ch
-  rlpDecode (RLP.Array [RLP.String "AtAccount", a, n]) = CodeAtAccount <$> rlpDecode a <*> rlpDecode n
-  rlpDecode ch = EVMCode <$> rlpDecode ch
-
-instance RLPEncodable Code where
-  rlpEncode (Code cb) = rlpEncode cb
-  rlpEncode (PtrToCode cp) = RLP.Array [rlpEncode cp]
-
-  rlpDecode (RLP.Array [x]) = PtrToCode <$> rlpDecode x
-  rlpDecode x = Code <$> rlpDecode x
 
 --------------------------------------------------------------------------------
 
@@ -83,24 +53,16 @@ data Transaction = Transaction
     transactionValue :: Wei,
     transactionInitOrData :: Code,
     transactionChainId :: Maybe ChainId,
-    transactionV :: Integer,
+    transactionV :: Natural,
     transactionR :: Word256,
     transactionS :: Word256,
     transactionMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic, NFData)
 
-instance RLPEncodable Text where
-  rlpEncode = rlpEncode . Text.unpack
-  rlpDecode = fmap Text.pack . rlpDecode
-
-instance (Ord k, RLPEncodable k, RLPEncodable v) => RLPEncodable (Map k v) where
-  rlpEncode = rlpEncode . M.toList
-  rlpDecode = fmap M.fromList <$> rlpDecode
-
-instance RLPEncodable Transaction where
+instance RLPSerializable Transaction where
   rlpEncode Transaction {..} =
-    Array $
+    RLPArray $
       [ rlpEncode transactionNonce,
         rlpEncode transactionGasPrice,
         rlpEncode transactionGasLimit,
@@ -119,26 +81,26 @@ instance RLPEncodable Transaction where
                Nothing -> []
                Just md -> [rlpEncode md]
            )
-  rlpDecode (Array (n : gp : gl : to' : va : iod : v' : r' : s' : rest)) =
+  rlpDecode (RLPArray (n : gp : gl : to' : va : iod : v' : r' : s' : rest)) =
     let (cid, md) = case rest of
-          [] -> (Right Nothing, Right Nothing)
+          [] -> (Nothing, Nothing)
           [c] -> case c of
-            a@(Array _) -> (Right Nothing, Just <$> rlpDecode a)
-            cid' -> (Just <$> rlpDecode cid', Right Nothing)
-          (c : m : _) -> (Just <$> rlpDecode c, Just <$> rlpDecode m)
+            a@(RLPArray _) -> (Nothing, Just $ rlpDecode a)
+            cid' -> (Just $ rlpDecode cid', Nothing)
+          (c : m : _) -> (Just $ rlpDecode c, Just $ rlpDecode m)
      in Transaction
-          <$> rlpDecode n
-          <*> rlpDecode gp
-          <*> rlpDecode gl
-          <*> rlpDecode to'
-          <*> rlpDecode va
-          <*> rlpDecode iod
-          <*> cid
-          <*> rlpDecode v'
-          <*> rlpDecode r'
-          <*> rlpDecode s'
-          <*> md
-  rlpDecode x = Left $ "rlpDecode Transaction: Got " ++ show x
+          (rlpDecode n)
+          (rlpDecode gp)
+          (rlpDecode gl)
+          (rlpDecode to')
+          (rlpDecode va)
+          (rlpDecode iod)
+          cid
+          (rlpDecode v')
+          (rlpDecode r')
+          (rlpDecode s')
+          md
+  rlpDecode x = error $ "rlpDecode Transaction: Got " ++ show x
 
 data UnsignedTransaction = UnsignedTransaction
   { unsignedTransactionNonce :: Nonce,
@@ -148,16 +110,16 @@ data UnsignedTransaction = UnsignedTransaction
     unsignedTransactionValue :: Wei,
     unsignedTransactionInitOrData :: Code,
     unsignedTransactionChainId :: Maybe ChainId,
-    unsignedTransactionNetworkId :: Maybe Integer
+    unsignedTransactionNetworkId :: Maybe Natural
   }
   deriving (Eq, Show, Generic, A.ToJSON, A.FromJSON)
 
 instance Arbitrary UnsignedTransaction where
   arbitrary = genericArbitrary uniform
 
-instance RLPEncodable UnsignedTransaction where
+instance RLPSerializable UnsignedTransaction where
   rlpEncode UnsignedTransaction {..} =
-    Array $
+    RLPArray $
       [ rlpEncode unsignedTransactionNonce,
         rlpEncode unsignedTransactionGasPrice,
         rlpEncode unsignedTransactionGasLimit,
@@ -168,28 +130,28 @@ instance RLPEncodable UnsignedTransaction where
         ++ (maybeToList $ fmap rlpEncode unsignedTransactionChainId)
         ++ case unsignedTransactionNetworkId of
             Nothing -> []
-            Just nid -> [Array [rlpEncode nid]]
-  rlpDecode (Array (n : gp : gl : to' : va : iod : rest)) =
+            Just nid -> [RLPArray [rlpEncode nid]]
+  rlpDecode (RLPArray (n : gp : gl : to' : va : iod : rest)) =
     let (chainid, netid) = case rest of 
-          [] -> (Right Nothing, Right Nothing)
-          [Array [nid]] -> (Right Nothing, Just <$> rlpDecode nid)
-          [cid] -> (Just <$> rlpDecode cid, Right Nothing)
-          [cid, Array [nid]] -> (Just <$> rlpDecode cid, Just <$> rlpDecode nid)
-          x -> (Left $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x, Right Nothing)
+          [] -> (Nothing, Nothing)
+          [RLPArray [nid]] -> (Nothing, Just $ rlpDecode nid)
+          [cid] -> (Just $ rlpDecode cid, Nothing)
+          [cid, RLPArray [nid]] -> (Just $ rlpDecode cid, Just $ rlpDecode nid)
+          x -> error $ "rlpDecode UnsignedTransaction: Too many entries, got: " ++ show x
     in UnsignedTransaction
-      <$> rlpDecode n
-      <*> rlpDecode gp
-      <*> rlpDecode gl
-      <*> rlpDecode to'
-      <*> rlpDecode va
-      <*> rlpDecode iod
-      <*> chainid 
-      <*> netid
-  rlpDecode x = Left $ "rlpDecode UnsignedTransaction: Got " ++ show x
+      (rlpDecode n)
+      (rlpDecode gp)
+      (rlpDecode gl)
+      (rlpDecode to')
+      (rlpDecode va)
+      (rlpDecode iod)
+      chainid
+      netid
+  rlpDecode x = error $ "rlpDecode UnsignedTransaction: Got " ++ show x
 
-rlpHash :: RLPEncodable x => x -> ByteString
+rlpHash :: RLPSerializable x => x -> ByteString
 rlpHash =
   keccak256ToByteString
     . hash
-    . packRLP
+    . rlpSerialize
     . rlpEncode

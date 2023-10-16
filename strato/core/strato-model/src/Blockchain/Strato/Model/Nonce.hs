@@ -11,7 +11,7 @@ import Control.DeepSeq (NFData)
 import Control.Lens.Operators
 import Data.Aeson hiding (Array, String)
 import Data.Proxy
-import Data.RLP
+import Blockchain.Data.RLP
 import Data.Swagger
 import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
@@ -43,9 +43,9 @@ instance ToSchema Nonce where
 
 instance Arbitrary Nonce where arbitrary = Nonce . fromInteger <$> arbitrary
 
-instance RLPEncodable Nonce where
+instance RLPSerializable Nonce where
   rlpEncode (Nonce n) = rlpEncode $ toInteger n
-  rlpDecode obj = Nonce . fromInteger <$> rlpDecode obj
+  rlpDecode obj = Nonce . fromInteger $ rlpDecode obj
 
 incrNonce :: Nonce -> Nonce
 incrNonce (Nonce n) = Nonce (n + 1)

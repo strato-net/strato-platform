@@ -143,9 +143,9 @@ data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
     postbloctransactionrawrequestChainId :: Maybe ChainId,
     postbloctransactionrawrequestR :: Word256,
     postbloctransactionrawrequestS :: Word256,
-    postbloctransactionrawrequestV :: Maybe Integer, -- we can infer from Address if necessary
+    postbloctransactionrawrequestV :: Maybe Natural, -- we can infer from Address if necessary
     postbloctransactionrawrequestMetadata :: Maybe (Map Text Text),
-    postbloctransactionrawrequestNetworkid :: Maybe Integer
+    postbloctransactionrawrequestNetworkid :: Maybe Natural
   }
   deriving (Eq, Show, Generic)
 
@@ -291,7 +291,7 @@ data ContractPayload = ContractPayload
     contractpayloadTxParams :: Maybe TxParams,
     contractpayloadChainid :: Maybe ChainId,
     contractpayloadMetadata :: Maybe (Map Text Text),
-    contractpayloadNetworkid :: Maybe Integer
+    contractpayloadNetworkid :: Maybe Natural
   }
   deriving (Eq, Show, Generic)
 
@@ -301,7 +301,7 @@ data TransferPayload = TransferPayload
     transferpayloadTxParams :: Maybe TxParams,
     transferpayloadChainid :: Maybe ChainId,
     transferpayloadMetadata :: Maybe (Map Text Text),
-    transferpayloadNetworkid :: Maybe Integer
+    transferpayloadNetworkid :: Maybe Natural
   }
   deriving (Eq, Show, Generic)
 
@@ -313,7 +313,7 @@ data FunctionPayload = FunctionPayload
     functionpayloadTxParams :: Maybe TxParams,
     functionpayloadChainid :: Maybe ChainId,
     functionpayloadMetadata :: Maybe (Map Text Text),
-    functionpayloadNetworkid :: Maybe Integer
+    functionpayloadNetworkid :: Maybe Natural
   }
   deriving (Eq, Show, Generic)
 

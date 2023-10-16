@@ -32,6 +32,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Database.Persist.TH
 import GHC.Generics
+import GHC.Natural
 import qualified Text.Colors as CL
 import Text.Format
 import Text.ShortDescription
@@ -50,9 +51,9 @@ data Transaction
         transactionChainId :: Maybe Word256,
         transactionR :: Integer,
         transactionS :: Integer,
-        transactionV :: Integer,
+        transactionV :: Natural,
         transactionMetadata :: Maybe (Map Text Text),
-        transactionNetworkId :: Maybe Integer
+        transactionNetworkId :: Maybe Natural
       }
   | ContractCreationTX
       { transactionNonce :: Integer,
@@ -63,9 +64,9 @@ data Transaction
         transactionChainId :: Maybe Word256,
         transactionR :: Integer,
         transactionS :: Integer,
-        transactionV :: Integer,
+        transactionV :: Natural,
         transactionMetadata :: Maybe (Map Text Text),
-        transactionNetworkId :: Maybe Integer
+        transactionNetworkId :: Maybe Natural
       }
   | PrivateHashTX
       { transactionTxHash :: Keccak256,
@@ -187,10 +188,10 @@ instance RLPSerializable Transaction where
             RLPArray [nid'] -> (Nothing, Nothing, Just $ rlpDecode nid')
             cid' -> (Just $ rlpDecode cid', Nothing, Nothing)
           [RLPArray a, RLPArray [nid']] | isRlpMap a-> (Nothing, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
-          [c, RLPArray a] | isRlpMap a-> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Nothing)
+          [c, RLPArray a] | isRlpMap a -> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Nothing)
           [c, RLPArray [nid']] -> (Just $ rlpDecode c, Nothing, Just $ rlpDecode nid')
           (c : RLPArray a : RLPArray [nid'] : _) -> (Just $ rlpDecode c, Just $ rlpDecodeMap a, Just $ rlpDecode nid')
-          (_ : o : _) -> error $ "rlpDecode Transaction: Expected metadata to be an RLPArray, but got: " ++ show o
+          x -> error $ "rlpDecode Transaction: Unexpected format for Maybe parameters; got: " ++ show x
      in case partial of
           PrivateHashTX {} -> case cid of
             Nothing -> PrivateHashTX (unsafeCreateKeccak256FromWord256 $ rlpDecode rVal) (unsafeCreateKeccak256FromWord256 $ rlpDecode sVal)

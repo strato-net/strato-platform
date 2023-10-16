@@ -8,7 +8,7 @@ module Blockchain.Strato.Model.Gas where
 import Control.DeepSeq (NFData)
 import Control.Lens.Operators
 import Data.Aeson hiding (Array, String)
-import Data.RLP
+import Blockchain.Data.RLP
 import Data.Swagger
 import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
@@ -47,6 +47,6 @@ instance ToSchema Gas where
             & description ?~ "Number of Gas units"
         )
 
-instance RLPEncodable Gas where
+instance RLPSerializable Gas where
   rlpEncode (Gas n) = rlpEncode n
-  rlpDecode obj = Gas <$> rlpDecode obj
+  rlpDecode obj = Gas $ rlpDecode obj

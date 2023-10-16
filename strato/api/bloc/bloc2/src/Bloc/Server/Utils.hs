@@ -43,6 +43,7 @@ import qualified Data.Text.Encoding as Text
 import Data.Time (UTCTime)
 import Data.Traversable (for)
 import qualified Database.Esqueleto.Legacy as E
+import GHC.Natural
 import Handlers.BatchTransactionResult
 import Handlers.Chain
 import Handlers.Transaction
@@ -164,14 +165,15 @@ waitFor action = go 20
 
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
--- TODO: DELETE THIS FUNC AS IT IT REPETATIVE
-getSigVals :: Signature -> Maybe Integer -> (Word256, Word256, Integer)
+-- TODO: delete this func as it is repetative with what's in blockapps-data
+getSigVals :: Signature -> Maybe Natural -> (Word256, Word256, Natural)
 getSigVals (Signature (S.CompactRecSig r s v)) mNetId =
   let convert = bytesToWord256 . BSS.fromShort
+      convert' = naturalFromInteger . toInteger
       addend = case mNetId of
         Nothing -> 27
         Just netid -> netid * 2 + 35
-   in (convert r, convert s, toInteger v + addend)
+   in (convert r, convert s, convert' v + addend)
 
 getBlockTimestamp :: HasSQL m => Integer -> m UTCTime
 getBlockTimestamp n = do

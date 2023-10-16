@@ -11,6 +11,7 @@ import qualified Data.ByteString as B
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.Time
+import GHC.Natural
 
 class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
   blockHeader :: b -> h
@@ -100,7 +101,7 @@ class (RLPSerializable t) => TransactionLike t where
   txSigner :: t -> Maybe Address
   txNonce :: t -> Integer
   txType :: t -> TransactionType
-  txSignature :: t -> (Integer, Integer, Integer)
+  txSignature :: t -> (Integer, Integer, Natural)
   txValue :: t -> Integer
   txDestination :: t -> Maybe Address
   txGasPrice :: t -> Integer
@@ -108,7 +109,7 @@ class (RLPSerializable t) => TransactionLike t where
   txCode :: t -> Maybe Code
   txData :: t -> Maybe B.ByteString -- todo make a `Code` newtype
   txChainId :: t -> Maybe Word256
-  txNetworkId :: t -> Maybe Integer
+  txNetworkId :: t -> Maybe Natural
   txMetadata :: t -> Maybe (Map Text Text)
 
   morphTx :: (TransactionLike t2) => t2 -> t
@@ -138,5 +139,5 @@ class (RLPSerializable t) => TransactionLike t where
   txSigS :: t -> Integer
   txSigS t = let (_, s, _) = txSignature t in s
 
-  txSigV :: t -> Integer
+  txSigV :: t -> Natural
   txSigV t = let (_, _, v) = txSignature t in v

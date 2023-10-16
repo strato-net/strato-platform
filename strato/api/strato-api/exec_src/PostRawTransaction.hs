@@ -30,6 +30,7 @@ import Data.Proxy
 import Data.Source.Map
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import GHC.Natural
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
 import System.Console.GetOpt
@@ -55,7 +56,7 @@ data Options = Options
     optSourceCode :: Maybe SourceMap,
     optAddress :: Maybe Address,
     optChainId :: Maybe ChainId,
-    optNetworkId :: Maybe Integer,
+    optNetworkId :: Maybe Natural,
     optFunctionName :: Maybe String,
     optFunctionArgs :: Maybe [String],
     optMetadata :: M.Map T.Text T.Text,

@@ -39,6 +39,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Word
 import GHC.Generics
+import GHC.Natural
 import Numeric
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
@@ -182,6 +183,14 @@ instance RLPSerializable Integer where
   rlpDecode (RLPString s) = byteString2Integer s
   rlpDecode (RLPArray [x]) = -rlpDecode x
   rlpDecode (RLPArray _) = error "rlpDecode called for Integer for array of wrong size"
+
+instance RLPSerializable Natural where
+  rlpEncode 0 = RLPString B.empty
+  rlpEncode x | x < 128 = RLPScalar . fromInteger $ naturalToInteger x
+  rlpEncode x = RLPString . B.pack . integer2Bytes $ naturalToInteger x
+  rlpDecode (RLPScalar x) = naturalFromInteger $ fromIntegral x
+  rlpDecode (RLPString s) = naturalFromInteger $ byteString2Integer s
+  rlpDecode x = error $ "rlpDecode for Natural not definded for: " ++ show x
 
 instance {-# OVERLAPPING #-} RLPSerializable String where
   rlpEncode = rlpEncode . T.pack

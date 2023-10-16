@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BlockArguments #-}
 
 {-# OPTIONS  -fno-warn-orphans     #-}
 module Blockchain.Data.Transaction
@@ -59,6 +60,7 @@ import Data.Text (Text)
 import Data.Time.Clock
 import Data.Word
 import qualified Database.Persist.Postgresql as SQL
+import GHC.Natural
 import System.Clock
 
 -- import Data.ByteString (ByteString)
@@ -137,21 +139,21 @@ instance TransactionLike Transaction where
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Code dat) cid r s v md nid _ _ _) =
-  MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md) nid
+  MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s (naturalFromInteger v) (M.fromList <$> md) (naturalFromInteger <$> nid)
 rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _ _)
   | init' == Code B.empty =
     PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md nid _ _ _) =
-  ContractCreationTX nonce' gp gl val init' (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md) nid
+  ContractCreationTX nonce' gp gl val init' (if (0 == cid) then Nothing else Just cid) r s (naturalFromInteger v) (M.fromList <$> md) (naturalFromInteger <$> nid)
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     (MessageTX nonce' gp gl to' val dat cid r s v md nid) ->
-      RawTransaction time signer nonce' gp gl (Just to') val (Code dat) (fromMaybe 0 cid) r s v (M.toList <$> md) nid (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce' gp gl (Just to') val (Code dat) (fromMaybe 0 cid) r s (toInteger v) (M.toList <$> md) (toInteger <$> nid) (fromIntegral blkNum) (txHash tx) origin
     (ContractCreationTX nonce' gp gl val init' cid r s v md nid) ->
-      RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) nid (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s (toInteger v) (M.toList <$> md) (toInteger <$> nid) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
       RawTransaction time signer 0 0 0 Nothing 0 (Code B.empty) 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing Nothing (fromIntegral blkNum) (txHash tx) origin
   where
@@ -196,18 +198,19 @@ insertTX' mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs
 
-createMessageTX :: Integer -> Integer -> Integer -> Address -> Integer -> B.ByteString -> Maybe (Map Text Text) -> Maybe Integer -> EC.PrivateKey -> IO Transaction
+createMessageTX :: Integer -> Integer -> Integer -> Address -> Integer -> B.ByteString -> Maybe (Map Text Text) -> Maybe Natural -> EC.PrivateKey -> IO Transaction
 createMessageTX n gp gl to' val theData = createChainMessageTX n gp gl to' val theData Nothing
 
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
-getSigVals :: EC.Signature -> Maybe Integer -> (Word256, Word256, Integer)
+getSigVals :: EC.Signature -> Maybe Natural -> (Word256, Word256, Natural)
 getSigVals (EC.Signature (SEC.CompactRecSig r s v)) mNetId =
   let convert = bytesToWord256 . BSS.fromShort
+      convert' = naturalFromInteger . toInteger
       addend = case mNetId of
         Nothing -> 27
         Just netid -> netid * 2 + 35
-   in (convert r, convert s, toInteger v + addend)
+   in (convert r, convert s, convert' v + addend)
 
 createChainMessageTX ::
   Integer ->
@@ -218,7 +221,7 @@ createChainMessageTX ::
   B.ByteString ->
   Maybe Word256 ->
   Maybe (Map Text Text) ->
-  Maybe Integer ->
+  Maybe Natural ->
   EC.PrivateKey ->
   IO Transaction
 createChainMessageTX n gp gl to' val theData cid md nid prvKey = do
@@ -245,7 +248,7 @@ createChainMessageTX n gp gl to' val theData cid md nid prvKey = do
     MessageTX {} -> unsignedTX {transactionR = toInteger r, transactionS = toInteger s, transactionV = v}
     _ -> error "createChainMessageTX: PrivateHashTX not supported should be impossible"
 
-createContractCreationTX :: Integer -> Integer -> Integer -> Integer -> Code -> Maybe (Map Text Text) -> Maybe Integer -> EC.PrivateKey -> IO Transaction
+createContractCreationTX :: Integer -> Integer -> Integer -> Integer -> Code -> Maybe (Map Text Text) -> Maybe Natural -> EC.PrivateKey -> IO Transaction
 createContractCreationTX n gp gl val init' = createChainContractCreationTX n gp gl val init' Nothing
 createChainContractCreationTX ::
   Integer ->
@@ -255,7 +258,7 @@ createChainContractCreationTX ::
   Code ->
   Maybe Word256 ->
   Maybe (Map Text Text) ->
-  Maybe Integer ->
+  Maybe Natural ->
   EC.PrivateKey ->
   IO Transaction
 createChainContractCreationTX n gp gl val init' cid md nid prvKey = do
@@ -294,10 +297,11 @@ whoSignedThisTransaction tx = case tx of
   t -> fromPublicKey <$> EC.recoverPub sig mesg
     where
       intToBSS = BSS.toShort . word256ToBytes . fromInteger
+      natToWord8 = fromInteger . toInteger
       dif = case transactionNetworkId t of 
         Nothing -> 27
         Just nid -> 2 * nid + 35
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (fromInteger (transactionV t - dif) :: Word8))
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) (natToWord8 (transactionV t - dif) :: Word8))
       mesg = keccak256ToByteString $ partialTransactionHash t
 
 whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address

@@ -31,6 +31,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist hiding (get)
+import GHC.Natural (naturalFromInteger)
 
 getChainInfo :: HasSQLDB m => Maybe T.Text -> ChainId -> m (Maybe (NamedTuple "id" "info" ChainId ChainInfo))
 getChainInfo mLabel (ChainId chainId) = do
@@ -84,7 +85,7 @@ getChainInfo mLabel (ChainId chainId) = do
               ( ChainSignature
                   (fromInteger chainInfoRefR)
                   (fromInteger chainInfoRefS)
-                  chainInfoRefV
+                  (naturalFromInteger chainInfoRefV)
               )
           )
         where
@@ -166,7 +167,7 @@ getChainInfosByLabel label = do
                   ( ChainSignature
                       (fromInteger chainInfoRefR)
                       (fromInteger chainInfoRefS)
-                      chainInfoRefV
+                      (naturalFromInteger chainInfoRefV)
                   )
               )
 
@@ -235,7 +236,7 @@ putChainInfo (ChainId chainId) (ChainInfo UnsignedChainInfo {..} ChainSignature 
             chainNonce
             (toInteger chainR)
             (toInteger chainS)
-            chainV
+            (toInteger chainV)
     cirId <- E.insert chainInfoRef
     insertMany_ $ map (parseAInfo cirId) accountInfo
     insertMany_ $ map (parseCInfo cirId) codeInfo

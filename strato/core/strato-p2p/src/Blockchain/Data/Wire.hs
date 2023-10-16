@@ -29,6 +29,7 @@ import qualified Data.ByteString as B
 import Data.List
 import qualified Data.Set as S
 import Data.Word
+import GHC.Natural (Natural)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
@@ -174,7 +175,7 @@ data Message
   | --ethereum wire protocol
     Status
       { protocolVersion :: Int,
-        networkID :: Integer,
+        networkID :: Natural,
         totalDifficulty :: Integer,
         latestHash :: Keccak256,
         genesisHash :: Keccak256
@@ -183,7 +184,7 @@ data Message
 
     NewStatus
       { protocolVersion :: Int,
-        networkID :: Integer,
+        networkID :: Natural,
         totalDifficulty :: Integer,
         latestHash :: Keccak256,
         genesisHash :: Keccak256,

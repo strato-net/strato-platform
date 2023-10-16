@@ -49,6 +49,7 @@ import Blockchain.Data.AlternateTransaction
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json hiding (Contract)
+import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
 import Blockchain.Strato.Model.Account
@@ -91,7 +92,6 @@ import qualified Data.Map as M
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import Data.RLP
 import Data.Semigroup (Max (..))
 import Data.Set (isSubsetOf)
 import qualified Data.Set as S
@@ -103,6 +103,7 @@ import Data.Time.Clock
 import qualified Data.Vector as V
 import Data.Word
 import qualified Database.Esqueleto.Legacy as E
+import GHC.Natural
 import Handlers.AccountInfo ()
 import Handlers.Transaction
 import SQLM
@@ -164,13 +165,13 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
   v <- case postbloctransactionrawrequestV of
     Just v' -> return v'
     Nothing -> do
-      let makeSigFromVals :: (Word256, Word256, Integer) -> Signature
+      let makeSigFromVals :: (Word256, Word256, Natural) -> Signature
           makeSigFromVals (r', s', v') =
             Signature
               ( S.CompactRecSig
                   (BSS.toShort $ word256ToBytes r')
                   (BSS.toShort $ word256ToBytes s')
-                  (fromInteger ((v' + 1) `mod` 2) :: Word8)
+                  (fromInteger $ toInteger ((v' + 1) `mod` 2) :: Word8)
               )
           unsignedTX =
             UnsignedTransaction
@@ -210,7 +211,7 @@ postBlocTransactionRaw _ _ h resolve PostBlocTransactionRawRequest {..} = do
           postbloctransactionrawrequestValue
           postbloctransactionrawrequestInitOrData
           postbloctransactionrawrequestChainId
-          (fromInteger v) --archaic
+          v
           postbloctransactionrawrequestR
           postbloctransactionrawrequestS
           postbloctransactionrawrequestMetadata
@@ -805,7 +806,7 @@ data TransactionHeader = TransactionHeader
     transactionheaderValue :: Wei,
     transactionheaderCode :: Code,
     transactionheaderChainId :: Maybe ChainId,
-    transactionheaderNetworkId :: Maybe Integer
+    transactionheaderNetworkId :: Maybe Natural
   }
 
 postUsersSend' ::
@@ -1100,7 +1101,7 @@ prepareUnsignedTx gasLimit TransactionHeader {..} =
 preparePostTx ::
   UTCTime ->
   Address ->
-  Maybe Integer ->
+  Maybe Natural ->
   Transaction ->
   RawTransaction'
 preparePostTx time from nid tx =
@@ -1117,14 +1118,14 @@ preparePostTx time from nid tx =
       chainId
       (fromIntegral r)
       (fromIntegral s)
-      v
+      (toInteger v)
       metadata
-      nid
+      (toInteger <$> nid)
       0
       kecc
       API
   where
-    kecc = hash (rlpSerialize tx)
+    kecc = hash . rlpSerialize $ rlpEncode tx
     r = transactionR tx
     s = transactionS tx
     v = transactionV tx
@@ -1158,7 +1159,7 @@ preparePostUnsignedRawTx time tx md =
       0
       0
       metadata
-      netId
+      (toInteger <$> netId)
       0
       zeroHash
       API

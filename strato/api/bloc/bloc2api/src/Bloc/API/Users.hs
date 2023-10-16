@@ -351,7 +351,7 @@ data TransferParameters = TransferParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
-    networkId :: Maybe Integer,
+    networkId :: Maybe Natural,
     resolve :: Bool
   }
   deriving (Eq, Show, Generic)
@@ -366,7 +366,7 @@ data ContractParameters = ContractParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
-    networkId :: Maybe Integer,
+    networkId :: Maybe Natural,
     resolve :: Bool
   }
 
@@ -379,7 +379,7 @@ data UploadListContract = UploadListContract
     uploadlistcontractValue :: Maybe (Strung Natural),
     _uploadlistcontractChainid :: Maybe ChainId,
     uploadlistcontractMetadata :: Maybe (Map Text Text),
-    uploadlistcontractNetworkid :: Maybe Integer
+    uploadlistcontractNetworkid :: Maybe Natural
   }
   deriving (Eq, Show, Generic)
 
@@ -439,7 +439,7 @@ data FunctionParameters = FunctionParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
-    networkId :: Maybe Integer,
+    networkId :: Maybe Natural,
     resolve :: Bool
   }
 
@@ -450,7 +450,7 @@ data SendTransaction = SendTransaction
     _sendtransactionTxParams :: Maybe TxParams,
     _sendtransactionChainid :: Maybe ChainId,
     sendtransactionMetadata :: Maybe (Map Text Text),
-    sendtransactionNetworkid :: Maybe Integer
+    sendtransactionNetworkid :: Maybe Natural
   }
   deriving (Eq, Show, Generic)
 
@@ -687,7 +687,7 @@ data MethodCall = MethodCall
     _methodcallTxParams :: Maybe TxParams,
     _methodcallChainid :: Maybe ChainId,
     methodcallMetadata :: Maybe (Map Text Text),
-    methodcallNetworkid :: Maybe Integer
+    methodcallNetworkid :: Maybe Natural
   }
   deriving (Eq, Show, Generic)
 

@@ -60,12 +60,14 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Data.Vector as V
 import Data.Word
 import qualified GHC.Generics as GHCG
+import GHC.Natural
 import LabeledError
 import Numeric (showHex)
 import Test.QuickCheck
 import Test.QuickCheck.Arbitrary.Generic
 import Test.QuickCheck.Instances.ByteString ()
 import Test.QuickCheck.Instances.Text ()
+import Test.QuickCheck.Instances.Natural ()
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
@@ -252,7 +254,7 @@ instance Arbitrary AccountInfo where
 data ChainSignature = ChainSignature
   { chainR :: Word256,
     chainS :: Word256,
-    chainV :: Integer
+    chainV :: Natural
   }
   deriving (Eq, Show, GHCG.Generic, Data)
 
@@ -467,6 +469,7 @@ acctInfo = JS.value
 whoSignedThisChainInfo :: ChainInfo -> Maybe Address
 whoSignedThisChainInfo (ChainInfo u (ChainSignature r s v)) =
   let intToBSS = BSS.toShort . word256ToBytes
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) (fromInteger ((v + 1) `mod` 2) :: Word8))
+      natToWord8 = fromInteger . toInteger
+      sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) (natToWord8 ((v + 1) `mod` 2) :: Word8))
       mesg = keccak256ToByteString $ rlpHash u
    in fromPublicKey <$> EC.recoverPub sig mesg
