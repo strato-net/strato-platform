@@ -472,7 +472,7 @@ spec:
         - name: MP_IS_BOOTNODE
           value: "false"
         - name: MP_DAPP_ADDRESS
-          value: "b1f61d54497efa49c28059435ca47ae8e5f92e56"
+          value: "49897a6e9b7b641b2b381e3a3a923c764cf102f7"
         - name: MP_API_DEBUG
           value: "false"
         - name: MP_DELAY_DEPLOYMENT
