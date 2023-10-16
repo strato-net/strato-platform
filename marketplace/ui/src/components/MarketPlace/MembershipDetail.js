@@ -11,15 +11,17 @@ import {
   Spin,
   notification,
   InputNumber,
-  Carousel,
+  // Carousel,
   Col,
   Card,
   Table,
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
+import noPreview from "../../images/resources/noPreview.jpg";
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as productActions } from "../../contexts/product/actions";
+import { Carousel } from 'react-responsive-carousel';
 import {
   useInventoryDispatch,
   useInventoryState,
@@ -48,9 +50,10 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
-import { watchIcon } from "../../images/SVGComponents";
+import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 
 const MembershipDetails = ({ user, users }) => {
+
   const { state, pathname } = useLocation();
   const [inventoryId, setInventoryId] = useState(state?.inventoryId);
 
@@ -65,8 +68,9 @@ const MembershipDetails = ({ user, users }) => {
   const initialValues = {
     name: "",
     price: "",
-    quantity: ""
+    quantity: 1
   };
+  const [activeTab, setActiveTab] = useState("Details");
   const [serviceList, setServiceList] = useState([])
   const [savingsList, setSavingsList] = useState([])
   const [totalSavings, setTotalSavings] = useState(0)
@@ -146,7 +150,7 @@ const MembershipDetails = ({ user, users }) => {
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { inventoryDetails, inventories, isInventoryDetailsLoading,isInventoriesLoading, inventory, isCreateInventorySubmitting } = useInventoryState();
+  const { inventoryDetails, inventories, isInventoryDetailsLoading, isInventoriesLoading, inventory, isCreateInventorySubmitting } = useInventoryState();
   const productDispatch = useProductDispatch();
   const { productDetails, isProductDetailsLoading } = useProductState();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -306,70 +310,39 @@ const MembershipDetails = ({ user, users }) => {
 
   const serviceColumn = [
     {
-      title: <Text className="text-primaryC text-[13px]">NAME</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">NAME</Text>,
       dataIndex: "serviceName",
       key: "name",
       render: (text) => <p>{decodeURIComponent(text)}</p>
     },
     {
-      title: <Text className="text-primaryC text-[13px]">DESCRIPTION</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">DESCRIPTION</Text>,
       dataIndex: "serviceDesc",
       key: "serviceDesc",
       render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">MEMBER PRICE</Text>,
       dataIndex: "memberPrice",
       key: "memberPrice",
-      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
+      render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">NON-MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">NON-MEMBER PRICE</Text>,
       dataIndex: "nonMemberPrice",
       key: "nonMemberPrice",
-      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
+      render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">USES</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">USES</Text>,
       dataIndex: "uses",
       key: "uses",
-      render: (text) => <p style={{ textAlign: 'center' }}>{decodeURIComponent(text)}</p>,
+      render: (text) => <p className="text-left">{decodeURIComponent(text)}</p>,
     },
   ];
 
   const DescTitle = ({ text }) => {
     return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
-  };
-
-  const DescriptionComponent = () => {
-    return (
-      <Space direction="vertical">
-        <Space>
-          <DescTitle text="Seller" />
-          <DescTitle text="                                :" />
-          <Text className="text-[13px]">{details?.ownerOrganization}</Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Sub-Category" />
-          <DescTitle text="                :" />
-          <Text className="text-[13px]">{details?.subCategory}</Text>
-        </Space>
-        <Space>
-          <DescTitle text="Time in Months" />
-          <DescTitle text="            :" />
-          <Text className="text-[13px]">{membershipDetails?.timePeriodInMonths ?? ""}</Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Additional Info" />
-          <DescTitle text="              :" />
-          <Text className="text-[13px]">
-            {membershipDetails?.additionalInfo ?? ""}
-          </Text>
-        </Space>
-      </Space>
-    );
   };
 
   const onTabChange = (tab) => {
@@ -400,7 +373,16 @@ const MembershipDetails = ({ user, users }) => {
             status: INVENTORY_STATUS.PUBLISHED,
             serialNumber: [],
           };
-
+          const resalePayload = {
+            // itemAddress: id,
+            productAddress: membershipDetails.productId,
+            inventory: inventoryId,
+            updates: {
+              pricePerUnit: formik.values.price,
+              status: INVENTORY_STATUS.PUBLISHED,
+              quantity: formik.values.quantity
+            }
+          }
           const createInventory = await actions.createInventory(
             dispatch,
             inventoryBody
@@ -416,62 +398,76 @@ const MembershipDetails = ({ user, users }) => {
     }
   };
 
+  const handleTabChange = (label) => {
+    setActiveTab(label)
+  }
+
+  const StatusValue = {
+    1: "Listed",
+    2: "Not Listed"
+  }
+
   const DetailTabCard = () => {
     return (
-      <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17 }} className="border-grey shadow-lg leading-2 min-h-min rounded p-2 ">
-
-        <Paragraph >
-          <Text disabled className="font-bold" >Seller</Text>
-          <Text strong className="float-right">{details?.ownerOrganization}</Text>
-        </Paragraph>
-        <Paragraph >
-          <Text disabled className="font-bold" >Sub-Category</Text>
-          <Text strong className="float-right">{details?.subCategory}</Text>
-        </Paragraph>
-        <Paragraph >
-          <Text disabled className="font-bold" >Time in Months</Text>
-          <Text strong className="float-right">{membershipDetails?.timePeriodInMonths ?? "--"} &nbsp; Month(s)</Text>
-        </Paragraph>
-        <Paragraph >
-          <Text disabled className="font-bold" >Additional Info</Text>
-          <Text strong type="success" className="float-right">{membershipDetails?.additionalInfo ?? "--"}</Text>
-        </Paragraph>
-        {/* {true && <Paragraph>
+      <>
+        <Text className="leading-6 text-lg block font-semibold pb-3"> Information </Text>
+        <Col xl={{ span: 14 }} className="border-grey shadow-lg leading-2 w-full rounded-md p-4 " style={{ height: 'auto', display: 'inline-block' }}>
+          <Paragraph >
+            <Text disabled className="font-bold font-poppin" >Seller</Text>
+            <Text strong className="float-right">{details?.ownerOrganization ?? "--"}</Text>
+          </Paragraph>
+          <Paragraph >
+            <Text disabled className="font-bold font-poppin" >Sub-Category</Text>
+            <Text strong className="float-right">{details?.subCategory ?? "--"}</Text>
+          </Paragraph>
+          <Paragraph >
+            <Text disabled className="font-bold font-poppin" >Time in Months</Text>
+            <Text strong className="float-right">{membershipDetails?.timePeriodInMonths ?? "--"} &nbsp; Month(s)</Text>
+          </Paragraph>
+          <Paragraph >
+            <Text disabled className="font-bold font-poppin" >Additional Info</Text>
+            <Paragraph ellipsis={{ rows: 2, expandable: true, symbol: <Text strong>more</Text> }} className="float-right text-md font-regular h-auto">
+              {membershipDetails?.additionalInfo ?? "--"}
+            </Paragraph>
+          </Paragraph>
+          {/* {true && <Paragraph>
           <Text disabled className="font-bold" >Membership ID</Text>
           <Text strong className="float-right">membershipId</Text>
         </Paragraph>} */}
-      </Col>
+        </Col>
+      </>
     )
   }
 
   const ServiceTabCard = () => {
     return (
       <Row>
-        <Title level={4} className="mt-5">Services</Title>
-        <Col span={24}>
-          <DataTableComponent
-            columns={serviceColumn}
-            data={serviceList}
-            scrollX="100%"
-            isLoading={isMembershipLoading}
+        <Text className="leading-6 text-lg block font-semibold pb-3">Services</Text>
+        <Col span={24} >
+          <Table className="inventory-table" columns={serviceColumn} dataSource={serviceList}
             pagination={false}
+            scroll={{ y: 300 }}
           />
         </Col>
-        <Title level={4} className="mt-10">Savings</Title>
+        <Text className="leading-6 text-lg block font-semibold pb-3 mt-4">Savings</Text>
         <hr style={{ color: "grey" }} />
-        <Col span={24} className="mt-10">
-          <Col span={8} className="">
-            <Card className="shadow-md">
-              <Row className="mt-2">
-                <Col span={24}><Text className="block text-grey">Name</Text></Col>
-                <Col span={24}><Text className="block" strong>Name</Text></Col>
-              </Row>
-              <Row className="mt-2">
-                <Col span={24}><Text className="block text-grey">Effective Cost Saving</Text></Col>
-                <Col span={24}><Text className="block" style={{ color: 'green' }} strong>Name</Text></Col>
-              </Row>
-            </Card>
-          </Col>
+        <Col span={24} className="">
+          <Row>
+            {savingsList.map(({ serviceName, serviceCost }, index) => {
+              return <Col span={8} className="">
+                <Card className="shadow-md m-2">
+                  <Row className="mt-2">
+                    <Col span={24}><Text className="block text-base text-grey font-medium">Name</Text></Col>
+                    <Col span={24}><Text className="block text-lg ">{serviceName}</Text></Col>
+                  </Row>
+                  <Row className="mt-2">
+                    <Col span={24}><Text className="block text-base text-grey font-medium">Effective Cost Saving</Text></Col>
+                    <Col span={24}><Text className="block text-lg font-bold" style={{ color: 'green' }}>$ {serviceCost ?? "--"}</Text></Col>
+                  </Row>
+                </Card>
+              </Col>
+            })}
+          </Row>
         </Col>
       </Row>
 
@@ -482,8 +478,8 @@ const MembershipDetails = ({ user, users }) => {
   return (
     <>
       {contextHolder}
-      {details === null ||
-        isLoading ? (
+      {details === null || (true &&
+        isLoading) ? (
         <div className="h-screen flex justify-center mx-auto items-center">
           <Spin spinning={isLoading} size="large" />
         </div>
@@ -515,8 +511,8 @@ const MembershipDetails = ({ user, users }) => {
           </Row>
 
           {/* style={{border:"1px solid blue"}} */}
-          <Row className="max-w-4xl mx-auto mt-10">
-            <Col span={10} className="rounded-md" style={{ border: "1px solid #181EAC" }}>
+          <Row justify={'space-betweem'} className="max-w-4xl mx-auto mt-10 h-92" >
+            <Col span={10} className="rounded-md border-1-primary h-px-390">
               {allProductFiles && allProductFiles.length > 0 ? (
                 <Carousel>
                   {allProductFiles.map((file, index) =>
@@ -524,6 +520,8 @@ const MembershipDetails = ({ user, users }) => {
                       <Image
                         height={"100%"}
                         width={"100%"}
+                        fallback={noPreview}
+                        preview={false}
                         style={{ objectFit: "contain" }}
                         src={file.imageUrl}
                       />
@@ -534,40 +532,45 @@ const MembershipDetails = ({ user, users }) => {
                 <Image
                   height={"100%"}
                   width={"100%"}
+                  fallback={noPreview}
+                  preview={false}
                   style={{ objectFit: "contain" }}
                   src={null}
                 />
               )}
             </Col>
 
-
-            <Col span={14} className="px-2 h-full bg-red">
-              <Card className="h-80">
-                <Title level={3}> {decodeURIComponent(details?.name)} </Title>
-                <Row className="mb-1"> {watchIcon()} <Text className="ml-2"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
+            <Col span={13} className="ml-3 px-2 h-96 w-px-455">
+              <Card className="h-80 shadow-md">
+                <Text className="text-2xl leading-8 font-semibold font-poppin"> {decodeURIComponent(details?.name ?? "--")} </Text>
+                <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
-                    <Text className="block text-center text-grey font-medium" > Status </Text>
-                    <Text className="block text-center text-xl font-bold mt-2" > Not Listed </Text>
+                    <Text className="block text-center text-grey text-base font-poppin font-normal" > Status </Text>
+                    <Text className="block text-center text-xl font-bold mt-2" > {StatusValue[details?.status] ?? "--"} </Text>
                   </Col>
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
-                    <Text className="block text-center text-grey font-medium" > Total Savings </Text>
-                    <Text className="block text-center text-xl font-bold mt-2" style={{ color: "green" }} > ${totalSavings}  </Text>
+                    <Text className="block text-center text-grey text-base font-poppin font-normal" > Total Savings </Text>
+                    <Text className="block text-center text-xl font-bold mt-2 leading-6" style={{ color: "green" }} > $ {totalSavings}  </Text>
                   </Col>
                 </Row>
                 <Row>
                   <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
-                  <Col span={24} className="border-t-1  h-20 mt-8">
+                  <Col span={24} className="border-t-1 h-20 mt-8">
                     <Row className="flex justify-between h-10 mt-5">
-                      <Col span={4} className="rounded-md " >  <Button className="h-full text-center text-black" onClick={subtract}> <MinusOutlined /></Button> </Col>
-                      <Col span={16} className="border border-grayLight rounded-md text-center h-10 pt-2" > Quantity &nbsp; <Text style={{ fontWeight: 900 }}>{qty}</Text> </Col>
-                      <Col span={4} className="rounded-md " > <Button className="h-full text-center float-right" onClick={add}> <PlusOutlined /> </Button>  </Col>
+                      <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn " onClick={subtract}>
+                        {minusIcon()}
+                      </Button> </Col>
+                      <Col span={16} className="border border-grayLight rounded-md align-middle text-center h-14 py-2" >
+                        <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{qty}</Text>
+                      </Col>
+                      <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn" onClick={add}> {plusIcon()} </Button>  </Col>
                     </Row>
                   </Col>
                 </Row>
               </Card>
               <Row className="h-14 mt-4">
-                <Button type={ownerSameAsUser ? "default" : "primary"} block={true} size="large" className="font-black h-full"
+                <Button type={ownerSameAsUser ? "default" : "primary"} block={true} size="large" className=" h-full  py-4 h-px-56"
                   onClick={() => {
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
@@ -576,23 +579,23 @@ const MembershipDetails = ({ user, users }) => {
                       openListNowModal();
                     }
                   }}
-                  disabled={ownerSameAsUser}
-                > Sale </Button>
+                  // disabled={ownerSameAsUser}
+                > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text> </Button>
               </Row>
             </Col>
 
           </Row>
 
           <Row className="max-w-4xl mx-auto mt-10">
-            <Card className="w-full">
+            <Card className="w-full shadow-md">
               <Title level={3}> Description  </Title>
               <Paragraph
-                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
+                ellipsis={{ rows: 2, expandable: true, symbol: <Text strong>Show more</Text> }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(details?.description ?? "").replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                {decodeURIComponent(details?.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
                   <React.Fragment key={index}>
-                    {line}
+                    {line ?? "--"}
                     <br />
                   </React.Fragment>
                 ))}
@@ -600,18 +603,20 @@ const MembershipDetails = ({ user, users }) => {
             </Card>
           </Row>
 
-          <Row className="max-w-4xl mx-auto mt-10">
+          <Row className="max-w-4xl mx-auto mt-10 mb-20">
             <Card className="w-full card-shadow-2">
               <Tabs defaultActiveKey="1" items={[{
-                key: '1',
-                label: 'Details',
+                key: 'Details',
+                label: <Text className="text-xl font-bold leading-6" style={{ color: activeTab === "Details" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Details</Text>,
                 children: DetailTabCard(),
               },
               {
-                key: '2',
-                label: 'Services',
+                key: 'Services',
+                label: <Text className="text-xl font-bold leading-6" style={{ color: activeTab === "Services" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Services</Text>,
                 children: ServiceTabCard(),
-              },]} />
+              },]}
+                onChange={handleTabChange}
+              />
             </Card>
           </Row>
 
@@ -805,6 +810,8 @@ const MembershipDetails = ({ user, users }) => {
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
+          type="Sale"
+          id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}

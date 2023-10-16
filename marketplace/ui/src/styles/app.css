@@ -155,3 +155,14 @@
 .m-tp-2 {
   margin-top: 2px;
 }
+.bg.theme-F2F2F5 {
+  background-color: #f2f2f5 !important;
+}
+
+.h-px-390 {
+  height: 390px;
+}
+
+.ant-image{
+  height: 50%;
+}

@@ -72,7 +72,7 @@ const SoldOrderDetails = ({ user, users }) => {
     isorderDetailsLoading,
     ordersAudit,
     message,
-    issellerDetailsUpdating,
+    isSellerDetailsUpdating,
     success,
     isCreateOrderLineItem,
   } = useOrderState();
@@ -91,7 +91,7 @@ const SoldOrderDetails = ({ user, users }) => {
       } else {
         setSelectedDate(dayjs.unix(orderDetails.fullfilmentDate));
       }
-     
+
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
         items.push({
@@ -194,8 +194,8 @@ const SoldOrderDetails = ({ user, users }) => {
     setSelectedDate(date);
   };
 
-// This is checking if we need to upload serial numbers. 
-// Used to disable the sae button if the serial numbers aren't uploaded.
+  // This is checking if we need to upload serial numbers. 
+  // Used to disable the sae button if the serial numbers aren't uploaded.
   const allSerialNumbersUploaded = () => {
     let serialsUploaded = true;
     if (orderDetails === null) {
@@ -252,7 +252,7 @@ const SoldOrderDetails = ({ user, users }) => {
     } else {
       body = {
         address: Id,
-      
+
         updates: {
           sellerComments: comment,
           status: 3,
@@ -277,7 +277,7 @@ const SoldOrderDetails = ({ user, users }) => {
       }
       body = {
         address: Id,
-      
+
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
           sellerComments: comment,
@@ -287,13 +287,13 @@ const SoldOrderDetails = ({ user, users }) => {
     } else {
       body = {
         address: Id,
-        
+
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
         },
       };
     }
-   
+
     const isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(selectedStatus);
@@ -339,7 +339,7 @@ const SoldOrderDetails = ({ user, users }) => {
       key: "serialNumber",
       align: "center",
       // width: "192px",
-      
+
       // This is checking the serial number. If a serial number was uploaded at inventory creation we need to provide one here
       // If the serial number is necessary provide the upload button / view button
       // If it is not necessary provide N/A. 
@@ -457,14 +457,14 @@ const SoldOrderDetails = ({ user, users }) => {
   const handleCancel = () => {
     toggleConfirmStatusModal(false);
   };
-
+  const isDisabled = (status === getStatus(3) || allSerialNumbersUploaded() === false);
   return (
     <div>
       {contextHolder}
-      {details === null || isorderDetailsLoading || issellerDetailsUpdating || isLoadingPaymentStatus ? (
+      {details === null || isorderDetailsLoading || isSellerDetailsUpdating || isLoadingPaymentStatus ? (
         <div className="h-screen flex justify-center items-center">
           <Spin
-            spinning={isorderDetailsLoading || issellerDetailsUpdating || isLoadingPaymentStatus}
+            spinning={isorderDetailsLoading || isSellerDetailsUpdating || isLoadingPaymentStatus}
             size="large"
           />
         </div>
@@ -501,9 +501,9 @@ const SoldOrderDetails = ({ user, users }) => {
               </div>
               <Button
                 id="save-button"
-                type="primary"
+                type={isDisabled ? "default" : "primary"}
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
-                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false}
+                disabled={isDisabled}
                 onClick={() => {
                   handleUpdateComment()
                   TagManager.dataLayer({

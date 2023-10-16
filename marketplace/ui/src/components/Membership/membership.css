@@ -3,12 +3,13 @@
   background-color: grey !important;
   height: 30px;
   width: 30px;
-  margin-top: 30% !important;
+  /* margin-top: 30% !important; */
   border-radius: 50%;
   /* left: -20px !important; */
   position: relative;
   z-index: 2;
-  top: 25px !important;
+  top: 45% !important;
+  /* left: 0% !important; */
 }
 
 .control-next::before {
@@ -74,9 +75,13 @@
 }
 
 .create-new-modal > .ant-modal-content > button {
-  margin-top: 25px;
+  margin-top: 10px;
   color: black;
-  margin-right: 20px;
+  margin-right: 10px;
+}
+
+.create-new-modal > .ant-modal-content {
+  padding: 0px;
 }
 
 .card-shadow:hover {
@@ -104,8 +109,16 @@
   font-family: Poppins;
   font-weight: 400 !important;
   font-size: 14px !important;
+  text-align: left;
   /* border-top: 1px solid black; */
   /* border-bottom: 1px solid black; */
+}
+
+.h-px-56 {
+  height: 56px !important;
+}
+.border-1-primary {
+  border: 1px solid #181eac;
 }
 
 /* .inventory-table .ant-table-tbody td {
@@ -113,3 +126,21 @@
   font-weight: 400 !important;
   font-size: 14px !important;
 } */
+
+.discount-btn > div > .ant-input-number-group-addon {
+  padding: 2px !important;
+  background-color: transparent;
+  border-left: none;
+}
+
+.w-px-455{
+ width: 455px; 
+}
+
+.add-sub-btn:hover{
+  color: black !important;
+}
+
+.plusIcon{
+  margin-top: -25px;
+}
