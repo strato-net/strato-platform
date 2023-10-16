@@ -15,7 +15,7 @@ import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useMembershipDispatch } from "../../contexts/membership";
 import { Carousel } from 'react-responsive-carousel';
 import { forwardArrowIcon, tag, tagIcon } from "../../images/SVGComponents";
-
+import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
@@ -136,7 +136,7 @@ const MembershipCardPurchased = ({
   const updateCol = (inv, texts) => (<Row
     style={{ justifyContent: 'space-between' }}>
     <p>{texts} </p>
-    <EditOutlined onClick={() => {
+    {/* <EditOutlined onClick={() => {
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
@@ -144,7 +144,8 @@ const MembershipCardPurchased = ({
         formik.setFieldValue("tempInv", inv);
         openListNowModal();
       }
-    }} />
+    }} 
+    /> */}
   </Row>)
 
   const callDetailPage = (index, address) => {
@@ -189,6 +190,7 @@ const MembershipCardPurchased = ({
     if (user) {
       if (formik.values.price !== "" && inventories) {
         const resalePayload = {
+          itemAddress: membership.itemAddress,
           productAddress: membership.productId,
           inventory: membership.inventoryId,
           updates: {
@@ -243,39 +245,40 @@ const MembershipCardPurchased = ({
               {!isPurchasedList &&
                 (<Col span={24} className="mt-2">
                   <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
-                  <Paragraph className="text-sm mt-2 text-dark-grey font-normal leading-5 font-poppin">
+                  <Paragraph
+                    ellipsis={{ rows: 2, expandable: true, symbol: <Text strong>...more</Text> }}
+                    className="text-sm mt-2 text-dark-grey font-normal leading-5 font-poppin">
                     {description}
                   </Paragraph>
                 </Col>)}
             </Row>
             <Row className="mt-4">
               <Col sm={12} lg={12} xl={8} xxl={6} className="border-grey shadow-lg h-52 rounded overflow-hidden">
-                {/* <Image
-                  className="object-covers"
-                  width={'100%'}
-                  height={'90%'}
-                  preview={false}
-                  src={productImageLocation}
+                {productImageLocation.length === 0 ?
+                  <Image
+                    className="object-covers"
+                    width={'100%'}
+                    height={'90%'}
+                    preview={false}
+                    fallback={noPreview}
+                    src={productImageLocation[0]}
                   // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
-                /> */}
-                <Carousel showArrows={true} showThumbs={false} className="h-full" >
-                  {[
-                    "https://images.unsplash.com/photo-1612817288484-6f916006741a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YmVhdXR5JTIwcHJvZHVjdHN8ZW58MHx8MHx8fDA%3D&w=1000&q=80",
-                    "https://thumbs.dreamstime.com/b/set-care-beauty-products-skin-29817248.jpg",
-                    "https://thumbs.dreamstime.com/z/bath-beauty-products-24145725.jpg"
-                  ].map((item) => {
-                    return <Image
-                      key={item}
-                      className="object-covers"
-                      width={'100%'}
-                      height={'100%'}
-                      preview={false}
-                      onClick={() => { setCarouselModel(true) }}
-                      src={item}
-                    // src={membership.productImageLocation}
-                    />
-                  })}
-                </Carousel>
+                  />
+                  : <Carousel showArrows={true} showThumbs={false} className="h-full" >
+                    {productImageLocation && productImageLocation?.map((item) => {
+                      return <Image
+                        key={item}
+                        className="object-covers"
+                        width={'100%'}
+                        height={'100%'}
+                        preview={false}
+                        onClick={() => { setCarouselModel(true) }}
+                        src={item}
+                        fallback={noPreview}
+                      // src={membership.productImageLocation}
+                      />
+                    })}
+                  </Carousel>}
 
                 {/* {(!membership.product_with_inventory && isPurchasedList) ? */}
                 <Button type="primary"
@@ -301,23 +304,23 @@ const MembershipCardPurchased = ({
                 className={`border-grey shadow-lg leading-2 min-h-min rounded p-4 ${isPurchasedList ? "h-52" : "h-40"}`}>
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Sub Category</Text>
-                  <Text className="float-right font-poppin leading-5">{subCategory}</Text>
+                  <Text className="float-right font-poppin leading-5">{subCategory ?? "--"}</Text>
                 </Paragraph>
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Company Name</Text>
-                  <Text className="float-right font-poppin leading-5">{manufacturer}</Text>
+                  <Text className="float-right font-poppin leading-5">{manufacturer ?? "--"}</Text>
                 </Paragraph>
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
-                  <Text className="float-right font-poppin leading-5">{timePeriodInMonths} Month(s)</Text>
+                  <Text className="float-right font-poppin leading-5">{timePeriodInMonths ?? "--"} Month(s)</Text>
                 </Paragraph>
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
-                  <Text type="success" className="float-right font-poppin leading-5">${savings ?? 0}</Text>
+                  <Text type="success" className="float-right font-poppin leading-5">$ {savings ?? 0}</Text>
                 </Paragraph>
                 {membershipId && <Paragraph>
                   <Text className="font-normal text-grey leading-5 font-poppin" >Membership ID</Text>
-                  <Text className="float-right font-poppin leading-5">{membershipId}</Text>
+                  <Text className="float-right font-poppin leading-5">{membershipId ?? "--"}</Text>
                 </Paragraph>}
               </Col>
             </Row>

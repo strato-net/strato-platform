@@ -336,4 +336,20 @@ export const CarouselNextIcon = () => {
       </defs>
     </svg>
   )
-} 
+}
+
+export const minusIcon = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="5" viewBox="0 0 12 5" fill="none">
+      <path d="M0.255 4.734V0.469999H11.53V4.734H0.255Z" fill="black" />
+    </svg>
+  )
+}
+
+export const plusIcon = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15" fill="none" className="plusIcon">
+      <path d="M6.26 14.25V0.749999H9.47V14.25H6.26ZM0.95 9V6H14.78V9H0.95Z" fill="black" />
+    </svg>
+  )
+}

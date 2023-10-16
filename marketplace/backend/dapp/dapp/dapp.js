@@ -1062,7 +1062,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
-      // let check = await managers.productManager.getProducts({ owner: userAddress }, getOptions);
       let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
 
@@ -1085,7 +1084,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       console.log("ownedItems", ownedItems)
 
       // Get Memberhships where productId = Items.productId 
-      let ownedMemberships = await membershipJs.getAll(rawAdmin, args, getOptions); //ownerOrganization: userOrganization
+      let ownedMemberships = await membershipJs.getAll(rawAdmin, {
+        productId: arrayOfAddresses,
+        sort: '-createdDate'
+      }, getOptions); //ownerOrganization: userOrganization
       // ownedMemberships = ownedMemberships.filter(membership =>
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
@@ -1102,7 +1104,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       console.log('servicesAll:', servicesAll)
 
       // Get ProductFile where productId = Items.productId
-      let ownedProductFiles = await productFileJs.getAll(rawAdmin, args, getOptions);
+      let ownedProductFiles = await productFileJs.getAll(rawAdmin, {
+        productId: arrayOfAddresses,
+        sort: '-createdDate'
+      }, { ...options, org: managers.cirrusOrg, app: contractName, });
+
+      // { ...options, org: managers.cirrusOrg, app: contractName, }
       ownedProductFiles = ownedProductFiles.filter(file =>
         ownedItems.some(item => file.productId === item.productId)
       );
@@ -1116,12 +1123,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const memberships = ownedMemberships.filter(m => m.productId === item.productId);
           const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
 
-          return product && productFiles.length > 0 && memberships.length > 0
+          return product
+            && productFiles.length > 0 && memberships.length > 0
         })
         .map(item => {
           const product = ownedProducts.find(p => p.address === item.productId);
           const memberships = ownedMemberships.filter(m => m.productId === item.productId);
-          const productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          let productFiles = ownedProductFiles.filter(file => file.productId === item.productId);
+          if (productFiles?.length > 0) {
+            productFiles = productFiles.map(item => item.fileLocation)
+          } else {
+            productFiles = []
+          }
           const savings = membershipServices
             .filter(
               (membershipService) =>
@@ -1151,7 +1164,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             productId: item.productId,
             inventoryId: item.inventoryId,
             availableQuantity: inventoryDetail?.availableQuantity,
-            fileLocation: null, // productFiles[0]?.fileLocation, // comment for resale test
+            fileLocation: productFiles, // comment for resale test
             status: inventoryDetail?.status,
             productName: product.name,
             subCategory: product.subCategory,
@@ -1372,8 +1385,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.resaleMembership = async function (args, options = defaultOptions) {
     // console.log("payload", args);
-    const inventoryRes = await managers.productManager.updateInventory(args);
-    return inventoryRes
+    let {itemAddress, ...restArgs} = args
+    const inventoryRes = await managers.productManager.updateInventory(restArgs);
+        const [soldStatus] = await managers.itemManager.updateItem({
+        itemsAddress: [itemAddress],
+        status: ITEM_STATUS.PUBLISHED,
+        comment: "",
+      });
+    return soldStatus
   };
 
   contract.getOrder = async function (args, options = optionsNoChainIds) {
@@ -1653,17 +1672,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const oldOptions = { ...options, app: contractName }
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
+    const products = await managers.productManager.getProducts({ ownerOrganization: userOrganization }, newOptions);
+    let addressOfProducts = products.map(item => item.address)
+
     // Get all memberships
-    let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort:'-createdDate' }, newOptions)
+    let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort: '-createdDate', productId: addressOfProducts }, newOptions)
 
     //filter out memberships with null productIds and memberships that don't belong to the user's organization
     memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization)
 
     //Get the list of productIds for API calls
-    const addressOfProducts = memberships.map(membership => membership.productId);
+    // const addressOfProducts = memberships.map(membership => membership.productId);
 
     //Get Products
-    const products = await managers.productManager.getProducts({ address: addressOfProducts }, newOptions);
+    // const products = await managers.productManager.getProducts({ address: addressOfProducts }, newOptions);
 
     //Attach product to membership
     products.forEach(product => {

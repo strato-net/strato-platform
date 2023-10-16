@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { actions } from "../../contexts/marketplace/actions";
+import noPreview from "../../images/resources/noPreview.jpg";
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
@@ -123,10 +124,11 @@ const CategoryProductCard = ({ product, category }) => {
         <div className="flex justify-start items-center">
           <div className="m-4">
             <Image
-              src={product.imageUrl}
+              src={product.productImageLocation[0]}
               width={200}
               height={180}
               preview={false}
+              fallback={noPreview}
               onClick={() =>
                 product.membershipId ? 
                 navigate(naviroute2.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address} })

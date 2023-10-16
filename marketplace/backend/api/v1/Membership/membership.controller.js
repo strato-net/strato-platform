@@ -66,7 +66,7 @@ class MembershipController {
         if (membership.productImage?.fileLocation !== null && membership.productImage?.fileLocation !== undefined) {
           img = getSignedUrlFromS3(membership.productImage.fileLocation, req.app.get(constants.s3ParamName));
         }
-        return { ...membership, productImageLocation: img }
+        return { ...membership, productImageLocation: [img] }
       });
       rest.response.status200(res, memberships)
       return next()
@@ -102,7 +102,11 @@ class MembershipController {
           img = null;
         }
         else {
-          img = getSignedUrlFromS3(result.fileLocation, req.app.get(constants.s3ParamName));
+          if (result.fileLocation?.length > 0) {
+            img = result.fileLocation.map(item => {
+              return getSignedUrlFromS3(item, req.app.get(constants.s3ParamName));
+            })
+          }
         }
         return { ...result, productImageLocation: img }
       });
@@ -202,6 +206,7 @@ class MembershipController {
 
   static validateResaleMembershipArgs(args) {
     const resaleMembershipSchema = Joi.object({
+      itemAddress: Joi.string().required(),
       inventory: Joi.string().required(),
       productAddress: Joi.string().required(),
       updates: {

@@ -39,7 +39,17 @@ class MarketplaceController {
         const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
         query.manufacturer = encodedManufacturers
       }
-      const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
+      let inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query });
+
+      inventories = inventories.map((inventory) => {
+        let img = ''
+        if (inventory.productImageLocation !== null && inventory.productImageLocation !== undefined && inventory?.productImageLocation?.length>0) {
+           img = inventory.productImageLocation.map((item)=>{
+            return getSignedUrlFromS3(item , req.app.get(constants.s3ParamName));
+          })
+        }
+        return { ...inventory, productImageLocation: img }
+      });
 
       // const productsWithImageUrl = inventories
       //   .map(product => ({

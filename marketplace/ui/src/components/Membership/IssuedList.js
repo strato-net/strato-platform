@@ -60,7 +60,7 @@ const IssuedList = (
               transformedData["inventoryId"] = item.inventories[0]?.address;
             }
             transformedData["inventoryId"] = '';
-            transformedData["membershipAddress"] = item.membershipAddress;
+            transformedData["membershipAddress"] = item.address;
             transformedData["productImageLocation"] = item.productImageLocation;
             return (
               <Col span={12}>
@@ -74,14 +74,6 @@ const IssuedList = (
                   isPurchasedList={false}
                 />
               </Col>
-              // <MembershipCard
-              //   user={user}
-              //   membership={item}
-              //   categorys={categorys}
-              //   subCategorys={subCategorys}
-              //   key={index}
-              //   debouncedSearchTerm={debouncedSearchTerm}
-              // />
             );
           })}
 

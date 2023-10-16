@@ -140,6 +140,7 @@ const ListNowIndex = ({
 
   const handleCreateFormSubmit = async () => {
     const resalePayload = {
+      itemAddress: id,
       productAddress: productId,
       inventory: inventoryId,
       updates: {
@@ -171,7 +172,7 @@ const ListNowIndex = ({
     <Modal
       style={{ maxWidth: "720px" }}
       width="auto"
-      title="Create Listing"
+      title={<Text className="text-xl font-semibold">Create Listing</Text>}
       open={open}
       onCancel={handleCancel}
       footer={[
@@ -256,7 +257,16 @@ const ListNowIndex = ({
             <Row> <InputNumber
               id="percentage"
               name="percentage"
+              // addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between">
+              //   <Col span={12} className={`p-1 ${isTaxPercentage ? "bg.theme-F2F2F5":""}`} onClick={() => { setIsTaxPercentage(true) }}>
+              //     %
+              //   </Col>
+              //   <Col span={12} className={`p-1 ${!isTaxPercentage ? "bg.theme-F2F2F5":""}`} onClick={() => { setIsTaxPercentage(true) }}>
+              //     $
+              //   </Col>
+              // </Row>}
               className="w-full mt-2"
+              // className="w-full mt-2 discount-btn"
               size="large"
               controls={false}
               type="number"
@@ -305,8 +315,8 @@ const ListNowIndex = ({
             <Row><Input type="text" value={type} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
           </Col>
         </Row>
-      </Form>
-    </Modal>
+      </Form >
+    </Modal >
   );
 };
 

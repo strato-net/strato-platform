@@ -444,12 +444,12 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
         open={open}
         centered
         onCancel={closeModal}
-        width={1000}
-        className="create-new-modal"
+        width={'100%'}
+        className="create-new-modal mt-20"
         footer={[
           <Row className="mt-8 create-modal-footer-shadow">
-            <Col span={8} className="flex mx-auto mt-4">
-             {/* <Button
+            <Col span={8} className="flex mx-auto mt-4 py-5">
+              {/* <Button
                 id="cancel-membership-button"
                 key="cancel"
                 type="secondary"
@@ -493,371 +493,375 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
             <Title level={3} className="p-2 mt-3 text-center" >Create New Membership</Title>
           </Col>
         </Row>
-        <Form layout="vertical" className="mt-5">
+        <Row>
+          <Col sm={24} md={18} xl={12} className="mx-auto" >
+            <Form layout="vertical" className="mt-5">
 
-          <Card className="mt-5 shadow-md">
-            <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Membership Details</Title></Row>
-            <Col className="mt-4">
-              <Row gutter={[12, 12]}>
-                <Col span={8}>
-                  <Form.Item label="Membership Name" name="name">
-                    <Input
-                      id="name"
-                      name="name"
-                      type="text"
-                      size="large"
-                      // placeholder="Membership Name"
-                      onChange={(e) => {
-                        // formik.setFieldValue("name", e.target.value);
-                        handleInputChange("name", e)
-                      }}
-                      value={formik.values.name}
-                    />
-                    {getIn(formik.touched, "name") &&
-                      getIn(formik.errors, "name") && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, "name")}
-                        </span>
-                      )}
-                  </Form.Item>
+              <Card className="mt-8 shadow-md">
+                <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4} className="leading-6"> Membership Details</Title></Row>
+                <Col className="mt-4">
+                  <Row gutter={[12, 12]}>
+                    <Col span={8}>
+                      <Form.Item label="Membership Name" name="name">
+                        <Input
+                          id="name"
+                          name="name"
+                          type="text"
+                          size="large"
+                          // placeholder="Membership Name"
+                          onChange={(e) => {
+                            // formik.setFieldValue("name", e.target.value);
+                            handleInputChange("name", e)
+                          }}
+                          value={formik.values.name}
+                        />
+                        {getIn(formik.touched, "name") &&
+                          getIn(formik.errors, "name") && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, "name")}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item
+                        label="Sub Category"
+                        name="subCategory"
+                      >
+                        <Select
+                          id="subCategory"
+                          name="subCategory"
+                          // placeholder="Select Sub Category"
+                          size="large"
+                          suffixIcon={issubCategorysLoading ? <Spin /> : <CaretDownOutlined />}
+                          onChange={(value) => {
+                            formik.setFieldValue("subCategory", value);
+                          }}
+                          value={formik.values.category}
+                        >
+                          {!issubCategorysLoading &&
+                            subCategorys.map((subCategory) => (
+                              <Select.Option
+                                key={subCategory.name}
+                                value={subCategory.name}
+                              >
+                                {subCategory.name}
+                              </Select.Option>
+                            ))}
+                        </Select>
+                        {getIn(formik.touched, "subCategory") &&
+                          getIn(formik.errors, "subCategory") && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, "subCategory")}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item label="Duration (Months)" name="duration">
+                        <InputNumber
+                          id="duration"
+                          name="duration"
+                          // placeholder="Duration"
+                          type="number"
+                          size="large"
+                          min={0}
+                          controls={false}
+                          value={formik.values.duration}
+                          onChange={(value) => {
+                            formik.setFieldValue("duration", value);
+                          }}
+                          className="w-full"
+                        />
+                        {getIn(formik.touched, "duration") &&
+                          getIn(formik.errors, "duration") && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, "duration")}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col span={24} className="mt-2">
+                      <Form.Item
+                        label="Additional Information"
+                        name="additionalInformation"
+                      // className="col-span-2"
+                      >
+                        <Input.TextArea
+                          id="additionalInformation"
+                          name="additionalInformation"
+                          // placeholder="Additional Information"
+                          type="text"
+                          size="large"
+                          onChange={(e) => {
+                            formik.setFieldValue(
+                              "additionalInformation",
+                              e.target.value
+                            );
+                          }}
+                          value={formik.values.additionalInformation}
+                        />
+                        {getIn(formik.touched, "additionalInformation") &&
+                          getIn(formik.errors, "additionalInformation") && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, "additionalInformation")}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Row>
+                    <Col span={24} className="mt-2">
+                      <Form.Item label="Description" name="description">
+                        <Input.TextArea
+                          id="description"
+                          name="description"
+                          type="text"
+                          size="large"
+                          // placeholder="Description"
+                          onChange={(e) => {
+                            formik.setFieldValue("description", e.target.value);
+                          }}
+                          value={formik.values.description}
+                          className=""
+                        />
+                        {getIn(formik.touched, "description") &&
+                          getIn(formik.errors, "description") && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, "description")}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+                  </Row>
                 </Col>
-                <Col span={8}>
-                  <Form.Item
-                    label="Sub Category"
-                    name="subCategory"
-                  >
-                    <Select
-                      id="subCategory"
-                      name="subCategory"
-                      // placeholder="Select Sub Category"
-                      size="large"
-                      suffixIcon={issubCategorysLoading ? <Spin /> : <CaretDownOutlined />}
-                      onChange={(value) => {
-                        formik.setFieldValue("subCategory", value);
-                      }}
-                      value={formik.values.category}
-                    >
-                      {!issubCategorysLoading &&
-                        subCategorys.map((subCategory) => (
-                          <Select.Option
-                            key={subCategory.name}
-                            value={subCategory.name}
-                          >
-                            {subCategory.name}
-                          </Select.Option>
-                        ))}
-                    </Select>
-                    {getIn(formik.touched, "subCategory") &&
-                      getIn(formik.errors, "subCategory") && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, "subCategory")}
-                        </span>
-                      )}
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="Duration (Months)" name="duration">
-                    <InputNumber
-                      id="duration"
-                      name="duration"
-                      // placeholder="Duration"
-                      type="number"
-                      size="large"
-                      min={0}
-                      controls={false}
-                      value={formik.values.duration}
-                      onChange={(value) => {
-                        formik.setFieldValue("duration", value);
-                      }}
-                      className="w-full"
-                    />
-                    {getIn(formik.touched, "duration") &&
-                      getIn(formik.errors, "duration") && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, "duration")}
-                        </span>
-                      )}
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row>
-                <Col span={24} className="mt-2">
-                  <Form.Item
-                    label="Additional Information"
-                    name="additionalInformation"
-                  // className="col-span-2"
-                  >
-                    <Input.TextArea
-                      id="additionalInformation"
-                      name="additionalInformation"
-                      // placeholder="Additional Information"
-                      type="text"
-                      size="large"
-                      onChange={(e) => {
-                        formik.setFieldValue(
-                          "additionalInformation",
-                          e.target.value
-                        );
-                      }}
-                      value={formik.values.additionalInformation}
-                    />
-                    {getIn(formik.touched, "additionalInformation") &&
-                      getIn(formik.errors, "additionalInformation") && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, "additionalInformation")}
-                        </span>
-                      )}
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row>
-                <Col span={24} className="mt-2">
-                  <Form.Item label="Description" name="description">
-                    <Input.TextArea
-                      id="description"
-                      name="description"
-                      type="text"
-                      size="large"
-                      // placeholder="Description"
-                      onChange={(e) => {
-                        formik.setFieldValue("description", e.target.value);
-                      }}
-                      value={formik.values.description}
-                      className=""
-                    />
-                    {getIn(formik.touched, "description") &&
-                      getIn(formik.errors, "description") && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, "description")}
-                        </span>
-                      )}
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Col>
-          </Card>
+              </Card>
 
 
-          <Card className="mt-5 shadow-md">
-            <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Upload Photos</Title></Row>
-            <Upload
-              id="images"
-              listType="picture"
-              multiple={true}
-              fileList={imageList}
-              onPreview={handlePreview}
-              onChange={handleImageChange}
-              beforeUpload={beforeUpload}
-              accept="image/png, image/webp, image/jpeg"
-            >
-              {/* {imageList.length >= 10 ? null : uploadButton} */}
-              {uploadText(uploadImageIcon())}
-            </Upload>
-
-            {getIn(formik.touched, "images") &&
-              getIn(formik.errors, "images") && (
-                <span className="text-error text-xs">
-                  {getIn(formik.errors, "images")}
-                </span>
-              )}
-
-          </Card>
-
-
-          <Card className="mt-5 shadow-md">
-            <Row>
-              <Col span={12}>
-                <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Services</Title></Row>
-              </Col>
-              <Col span={12}> <Button
-                className=" float-right font-bold"
-                style={{ color: 'blue' }}
-                type="text"
-                size="large"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  addServiceRow();
-                  memberDiscount.push(1);
-                }}
-              >
-                Add Service
-              </Button> </Col>
-            </Row>
-            {formik.values.services.map((service, index) => (
-              <Row className="mt-2" gutter={[12, 12]}>
-                <Col span={7}>
-                  <Form.Item
-                    label="Service Name"
-                    name={`serviceName_${index}`}
-                    key={`serviceName_${index}`}
-                    value={formik.values.services[index].serviceName}
-                  >
-                    <Select
-                      id={`serviceName_${index}`}
-                      name={`serviceName_${index}`}
-                      size="large"
-                      // placeholder="Select Service"
-                      suffixIcon={isServicesLoading ? <Spin /> : <CaretDownOutlined />}
-                      onChange={(value) => {
-                        const updatedServices = [...formik.values.services];
-                        updatedServices[index] = {
-                          ...updatedServices[index],
-                          serviceName: value,
-                          serviceId: services.find(
-                            (service) => service.name === value
-                          ).address,
-                        };
-                        formik.setFieldValue("services", updatedServices);
-                      }}
-                      value={service.serviceName}
-                    >
-                      {/* TODO: We should think about how we want to load services. If its a long list it might not be the best way to display them this way. */}
-                      {isServicesLoading === false &&
-                        services.map((service) => (
-                          <Select.Option
-                            key={service.address}
-                            value={service.name}
-                          >
-                            {service.name}
-                          </Select.Option>
-                        ))}
-                    </Select>
-                    {getIn(formik.touched, `services[${index}].serviceName`) &&
-                      getIn(formik.errors, `services[${index}].serviceName`) && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, `services[${index}].serviceName`)}
-                        </span>
-                      )}
-                  </Form.Item>
-                </Col>
-                <Col span={7}>
-                  <Form.Item
-                    label="Number of Uses"
-                    name={`numberOfUses_${index}`}
-                    key={`numberOfUses_${index}`}
-                    value={service.numberOfUses}
-                  >
-                    <InputNumber
-                      id={`numberOfUses_${index}`}
-                      name={`numberOfUses_${index}`}
-                      type="number"
-                      size="large"
-                      // placeholder="Number of Uses"
-                      min={0}
-                      className="w-full"
-                      controls={false}
-                      value={service.numberOfUses}
-                      onChange={(value) => {
-                        const updatedServices = [...formik.values.services];
-                        updatedServices[index] = {
-                          ...updatedServices[index],
-                          numberOfUses: value,
-                        };
-                        formik.setFieldValue("services", updatedServices);
-                      }}
-
-                    />
-                    {getIn(formik.touched, `services[${index}].numberOfUses`) &&
-                      getIn(formik.errors, `services[${index}].numberOfUses`) && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, `services[${index}].numberOfUses`)}
-                        </span>
-                      )}
-                  </Form.Item>
-                </Col>
-
-                <Col span={7}>
-                  <Form.Item
-                    label='Discount'
-                    name={`memberPrice_${index}`}
-                    key={`memberPrice_${index}`}
-                  >
-                    <InputNumber
-                      id={`memberPrice_${index}`}
-                      name={`memberPrice_${index}`}
-                      // placeholder="Discount"
-                      type="number"
-                      size="large"
-                      addonAfter={selectAfter(index)}
-                      controls={false}
-                      min={0}
-                      value={service.memberPrice}
-                      onChange={(value) => {
-                        const updatedServices = [...formik.values.services];
-                        updatedServices[index] = {
-                          ...updatedServices[index],
-                          memberPrice: value,
-                          percentDiscount: value, // Update both fields with the same value later on we will remove the one that is not being used
-                        };
-                        formik.setFieldValue("services", updatedServices);
-                      }}
-
-                    // addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
-                    />
-                    {/* We should throw the formik error to say we need either the discount price or  */}
-                    {getIn(formik.touched, `services[${index}].memberPrice`) &&
-                      getIn(formik.errors, `services[${index}].memberPrice`) && (
-                        <span className="text-error text-xs">
-                          {getIn(formik.errors, `services[${index}].memberPrice`)}
-                        </span>
-                      )}
-                  </Form.Item>
-                </Col>
-                {/* </div> */}
-                <Col span={3}>
-                  <Button
-                    className="self-end mt-7 float-right"
-                    key={`removeService_${index}`}
-                    type="primary"
-                    size="large"
-                    icon={<MinusOutlined />}
-                    onClick={() => {
-                      removeServiceRow();
-                      memberDiscount.pop();
-                    }}
-                  ></Button>
-                </Col>
-              </Row>
-            ))}
-          </Card>
-
-          <Card className="mt-5 shadow-md">
-            <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4}> Upload Documents</Title></Row>
-            <Row className="mt-5">
-              <Col span={24}>
-                <Upload.Dragger
-                  fileList={fileList}
-                  onChange={handleChange}
-                  showUploadList={false}
+              <Card className="mt-5 shadow-md">
+                <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4} className="leading-6" > Upload Photos</Title></Row>
+                <Upload
+                  id="images"
+                  listType="picture"
+                  multiple={true}
+                  fileList={imageList}
+                  onPreview={handlePreview}
+                  onChange={handleImageChange}
+                  beforeUpload={beforeUpload}
+                  accept="image/png, image/webp, image/jpeg"
                 >
-                  {uploadText(uploadIcon2())}
-                </Upload.Dragger>
-              </Col> </Row>
+                  {/* {imageList.length >= 10 ? null : uploadButton} */}
+                  {uploadText(uploadImageIcon())}
+                </Upload>
 
-            {fileList.length > 0 && <Card className="mt-5 shadow-lg">
-              <Row gutter={16}>
-                {fileList.map((file, index) => (
-                  <Col span={12} key={index}>
-                    <Row className="border h-10 p-2 rounded border-indigo-600" gutter={[12, 12]}>
-                      <Col span={20}>{file.name}</Col>
-                      <Col span={4}>
-                        {/* <Button
+                {getIn(formik.touched, "images") &&
+                  getIn(formik.errors, "images") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "images")}
+                    </span>
+                  )}
+
+              </Card>
+
+
+              <Card className="mt-5 shadow-md">
+                <Row>
+                  <Col span={12}>
+                    <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4} className="leading-6"> Services</Title></Row>
+                  </Col>
+                  <Col span={12}> <Button
+                    className=" float-right font-bold"
+                    style={{ color: 'blue' }}
+                    type="text"
+                    size="large"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      addServiceRow();
+                      memberDiscount.push(1);
+                    }}
+                  >
+                    Add Service
+                  </Button> </Col>
+                </Row>
+                {formik.values.services.map((service, index) => (
+                  <Row className="mt-2" gutter={[12, 12]}>
+                    <Col span={7}>
+                      <Form.Item
+                        label="Service Name"
+                        name={`serviceName_${index}`}
+                        key={`serviceName_${index}`}
+                        value={formik.values.services[index].serviceName}
+                      >
+                        <Select
+                          id={`serviceName_${index}`}
+                          name={`serviceName_${index}`}
+                          size="large"
+                          // placeholder="Select Service"
+                          suffixIcon={isServicesLoading ? <Spin /> : <CaretDownOutlined />}
+                          onChange={(value) => {
+                            const updatedServices = [...formik.values.services];
+                            updatedServices[index] = {
+                              ...updatedServices[index],
+                              serviceName: value,
+                              serviceId: services.find(
+                                (service) => service.name === value
+                              ).address,
+                            };
+                            formik.setFieldValue("services", updatedServices);
+                          }}
+                          value={service.serviceName}
+                        >
+                          {/* TODO: We should think about how we want to load services. If its a long list it might not be the best way to display them this way. */}
+                          {isServicesLoading === false &&
+                            services.map((service) => (
+                              <Select.Option
+                                key={service.address}
+                                value={service.name}
+                              >
+                                {service.name}
+                              </Select.Option>
+                            ))}
+                        </Select>
+                        {getIn(formik.touched, `services[${index}].serviceName`) &&
+                          getIn(formik.errors, `services[${index}].serviceName`) && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, `services[${index}].serviceName`)}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+                    <Col span={7}>
+                      <Form.Item
+                        label="Number of Uses"
+                        name={`numberOfUses_${index}`}
+                        key={`numberOfUses_${index}`}
+                        value={service.numberOfUses}
+                      >
+                        <InputNumber
+                          id={`numberOfUses_${index}`}
+                          name={`numberOfUses_${index}`}
+                          type="number"
+                          size="large"
+                          // placeholder="Number of Uses"
+                          min={0}
+                          className="w-full"
+                          controls={false}
+                          value={service.numberOfUses}
+                          onChange={(value) => {
+                            const updatedServices = [...formik.values.services];
+                            updatedServices[index] = {
+                              ...updatedServices[index],
+                              numberOfUses: value,
+                            };
+                            formik.setFieldValue("services", updatedServices);
+                          }}
+
+                        />
+                        {getIn(formik.touched, `services[${index}].numberOfUses`) &&
+                          getIn(formik.errors, `services[${index}].numberOfUses`) && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, `services[${index}].numberOfUses`)}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+
+                    <Col span={7}>
+                      <Form.Item
+                        label='Discount'
+                        name={`memberPrice_${index}`}
+                        key={`memberPrice_${index}`}
+                      >
+                        <InputNumber
+                          id={`memberPrice_${index}`}
+                          name={`memberPrice_${index}`}
+                          // placeholder="Discount"
+                          type="number"
+                          size="large"
+                          addonAfter={selectAfter(index)}
+                          controls={false}
+                          min={0}
+                          value={service.memberPrice}
+                          onChange={(value) => {
+                            const updatedServices = [...formik.values.services];
+                            updatedServices[index] = {
+                              ...updatedServices[index],
+                              memberPrice: value,
+                              percentDiscount: value, // Update both fields with the same value later on we will remove the one that is not being used
+                            };
+                            formik.setFieldValue("services", updatedServices);
+                          }}
+
+                        // addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
+                        />
+                        {/* We should throw the formik error to say we need either the discount price or  */}
+                        {getIn(formik.touched, `services[${index}].memberPrice`) &&
+                          getIn(formik.errors, `services[${index}].memberPrice`) && (
+                            <span className="text-error text-xs">
+                              {getIn(formik.errors, `services[${index}].memberPrice`)}
+                            </span>
+                          )}
+                      </Form.Item>
+                    </Col>
+                    {/* </div> */}
+                    <Col span={3}>
+                      <Button
+                        className="self-end mt-7 float-right"
+                        key={`removeService_${index}`}
+                        type="primary"
+                        size="large"
+                        icon={<MinusOutlined />}
+                        onClick={() => {
+                          removeServiceRow();
+                          memberDiscount.pop();
+                        }}
+                      ></Button>
+                    </Col>
+                  </Row>
+                ))}
+              </Card>
+
+              <Card className="mt-5 shadow-md">
+                <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4} className="leading-6"> Upload Documents</Title></Row>
+                <Row className="mt-5">
+                  <Col span={24}>
+                    <Upload.Dragger
+                      fileList={fileList}
+                      onChange={handleChange}
+                      showUploadList={false}
+                    >
+                      {uploadText(uploadIcon2())}
+                    </Upload.Dragger>
+                  </Col> </Row>
+
+                {fileList.length > 0 && <Card className="mt-5 shadow-lg">
+                  <Row gutter={16}>
+                    {fileList.map((file, index) => (
+                      <Col span={12} key={index}>
+                        <Row className="border h-10 p-2 rounded border-indigo-600" gutter={[12, 12]}>
+                          <Col span={20}>{file.name}</Col>
+                          <Col span={4}>
+                            {/* <Button
                           className="float-right"
                           type="link"
                           icon={<DeleteOutlined />}
                           onClick={() => handleRemove(file)}
                         /> */}
-                        <span className="float-right">{checkSuccess()}</span>
+                            <span className="float-right">{checkSuccess()}</span>
+                          </Col>
+                        </Row>
                       </Col>
-                    </Row>
-                  </Col>
-                ))}
-              </Row>
-            </Card>}
-          </Card>
+                    ))}
+                  </Row>
+                </Card>}
+              </Card>
 
-        </Form>
+            </Form>
+          </Col>
+        </Row>
       </Modal>
       {visible && (
         <ListNowModal

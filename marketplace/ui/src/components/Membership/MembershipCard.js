@@ -68,7 +68,6 @@ const MembershipCard = ({
     setEditModalOpen(false);
   };
 
-  console.log("membership", state);
 
   useEffect(() => {
     setState(membership);
@@ -77,7 +76,15 @@ const MembershipCard = ({
 
   const callDetailPage = (index, address) => {
     if (state !== null && state !== undefined) {
-      navigate(`${naviroute.replace(":id", state.address)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
+      navigate(`${naviroute.replace(":id", state.address)}`,
+        {
+          state: {
+            isCalledFromMembership: true,
+            inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null)
+              ? state.inventoryAddress
+              : null
+          }
+        });
     }
 
   }

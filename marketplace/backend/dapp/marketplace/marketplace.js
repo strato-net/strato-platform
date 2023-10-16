@@ -2,16 +2,17 @@ import { util, rest, importer } from "/blockapps-rest-plus";
 import config from "/load.config";
 import RestStatus from "http-status-codes";
 import {
-  setSearchQueryOptions,
-  searchOne,
-  searchAll,
-  searchAllWithQueryArgs,
+    setSearchQueryOptions,
+    searchOne,
+    searchAll,
+    searchAllWithQueryArgs,
 } from "/helpers/utils";
 import dayjs from "dayjs";
 
 import productJs from "/dapp/products/product";
 import inventoryJs from "/dapp/products/inventory";
 import membershipJs from "/dapp/membership/membership";
+import productFile from "../productFile/productFile";
 import membershipServiceJs from "../membershipService/membershipService";
 import serviceJs from "../service/service";
 import constants, { inventoryStatus } from "/helpers/constants";
@@ -28,20 +29,20 @@ import constants, { inventoryStatus } from "/helpers/constants";
  * @param args - Contract state
  */
 function marshalIn(_args) {
-  const defaultArgs = {
-    quantity: 0,
-    pricePerUnit: 0,
-    batchId: "",
-    availableQuantity: 0,
-    status: "",
-    createdDate: 0,
-  };
+    const defaultArgs = {
+        quantity: 0,
+        pricePerUnit: 0,
+        batchId: "",
+        availableQuantity: 0,
+        status: "",
+        createdDate: 0,
+    };
 
-  const args = {
-    ...defaultArgs,
-    ..._args,
-  };
-  return args;
+    const args = {
+        ...defaultArgs,
+        ..._args,
+    };
+    return args;
 }
 
 /**
@@ -56,10 +57,10 @@ function marshalIn(_args) {
  * @param _args - Contract state
  */
 function marshalOut(_args) {
-  const args = {
-    ..._args,
-  };
-  return args;
+    const args = {
+        ..._args,
+    };
+    return args;
 }
 
 function calculateServiceDiscount(servicePrice, membershipPrice, maxQuantity) {
@@ -80,6 +81,10 @@ async function getAll(admin, args = {}, options) {
         isInventoryAvailable: true,
         ...restArgs
     }, options);
+
+    const productAddressList = products.map((item) => item.address);
+
+    let ownedProductFiles = await productFile.getAll(admin, { productId: productAddressList }, options);
 
     // We will make a map of products with memberships and products without memberships
     const productsWithMembershipsMap = new Map(
@@ -138,9 +143,11 @@ async function getAll(admin, args = {}, options) {
     inventoryWithoutMembershipResults.forEach((inventoryBatch, batchIx) => {
         inventoryBatch.forEach(inventory => {
             const product = productsWithoutMembershipsMap.get(inventory.productId);
+            const productImageLocation = ownedProductFiles.filter((item)=>item.productId === inventory.productId ).map(item=>item.fileLocation);
             productWithoutMembership.push({
                 ...product,
                 ...inventory,
+                productImageLocation
             });
         });
     });
@@ -169,28 +176,28 @@ async function getAll(admin, args = {}, options) {
         inventoryBatch.forEach(inventory => {
             // Find the product for this inventory
             const product = productsWithMembershipsMap.get(inventory.productId);
-            
+            const productImageLocation = ownedProductFiles.filter((item)=>item.productId === inventory.productId ).map(item=>item.fileLocation);
             // Find the membership for this product
             const membership = membershipMap.get(product.address);
 
             // If there is a membership for this product
-            if (! (membership === null || membership === undefined)){
+            if (!(membership === null || membership === undefined)) {
 
-                    // Get all the membership services for this membership
-                    const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
+                // Get all the membership services for this membership
+                const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
 
-                    // Build the service data for each membership service
-                    const membershipData = {
-                        services: membershipServices.map(service => {
-                            const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
-                            const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
+                // Build the service data for each membership service
+                const membershipData = {
+                    services: membershipServices.map(service => {
+                        const servicePrice = serviceMap.get(service.serviceId)?.price || 0;
+                        const serviceDiscount = calculateServiceDiscount(servicePrice, service.membershipPrice, service.maxQuantity);
 
-                            return {
-                                ...service,
-                                servicePrice,
-                                serviceDiscount
-                            };
-                        }),
+                        return {
+                            ...service,
+                            servicePrice,
+                            serviceDiscount
+                        };
+                    }),
                 }
 
                 // Calculate the total savings for this membership
@@ -202,16 +209,17 @@ async function getAll(admin, args = {}, options) {
                     ...inventory,
                     membershipId: membership.address,
                     totalSavings: totalSavings,
-                    taxes:  inventory.taxDollarAmount === 0 ? (
-                        inventory.taxPercentageAmount === 0 ? 0  :inventory.taxPercentageAmount/10000)
-                        :  inventory.taxDollarAmount,
-                    isTaxPercentage :  inventory.taxDollarAmount === 0
+                    taxes: inventory.taxDollarAmount === 0 ? (
+                        inventory.taxPercentageAmount === 0 ? 0 : inventory.taxPercentageAmount / 10000)
+                        : inventory.taxDollarAmount,
+                    isTaxPercentage: inventory.taxDollarAmount === 0,
+                    productImageLocation
                 });
-            } 
+            }
         });
 
     });
-    
+
     return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
 }
 
@@ -315,12 +323,11 @@ async function getTopSellingProducts(admin, args = {}, options) {
         inventoryBatch.forEach(inventory => {
             // Find the product for this inventory
             const product = productsWithMembershipsMap.get(inventory.productId);
-            
             // Find the membership for this product
             const membership = membershipMap.get(product.address);
 
             // Get all the membership services for this membership
-            const membershipServices = allMembershipServices.filter(service => service.membershipId === membership.address);
+            const membershipServices = allMembershipServices?.filter(service => service.membershipId === membership.address);
 
             // Build the service data for each membership service
             const membershipData = {
@@ -345,22 +352,22 @@ async function getTopSellingProducts(admin, args = {}, options) {
                 ...inventory,
                 membershipId: membership.address,
                 totalSavings: totalSavings,
-                taxes:  inventory.taxDollarAmount === 0 ? (
-                inventory.taxPercentageAmount === 0 ? 0  : inventory.taxPercentageAmount/10000)
-                        :  inventory.taxDollarAmount,
-                isTaxPercentage :  inventory.taxDollarAmount === 0
+                taxes: inventory.taxDollarAmount === 0 ? (
+                    inventory.taxPercentageAmount === 0 ? 0 : inventory.taxPercentageAmount / 10000)
+                    : inventory.taxDollarAmount,
+                isTaxPercentage: inventory.taxDollarAmount === 0
             });
         });
     });
-    
+
     return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
 }
 
 
 
 export default {
-  getAll,
-  getTopSellingProducts,
-  marshalIn,
-  marshalOut,
+    getAll,
+    getTopSellingProducts,
+    marshalIn,
+    marshalOut,
 };

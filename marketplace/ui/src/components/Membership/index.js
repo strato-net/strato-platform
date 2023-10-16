@@ -175,7 +175,6 @@ const Membership = (user) => {
   ];
   const onChange = (key) => {
     setTypeDisplay(key);
-    typeDisplay = key;
   };
 
   useEffect(() => {
