@@ -1,4 +1,9 @@
-contract MarketplaceItem is Asset{
+import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
+import "/dapp/dapp/contracts/Dapp.sol";
+import "/dapp/items/contracts/ItemStatus.sol";
+import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
+
+contract MarketplaceItem is Asset, ItemStatus{
     address item_owner;
     string item_ownerOrganization;
     string item_ownerOrganizationalUnit;
@@ -9,6 +14,7 @@ contract MarketplaceItem is Asset{
     string item_comment;
     uint item_itemNumber;
     uint item_createdDate;
+    ItemStatus public item_status;
 
     // Events
         /// @dev Events to add and remove members to this shard.
@@ -29,7 +35,8 @@ contract MarketplaceItem is Asset{
         string memory _serialNumber,
         string memory _comment,
         uint _itemNumber,
-        uint _createdDate
+        uint _createdDate,
+        ItemStatus _itemStatus
     ) public {
         item = new Item();
         item_owner = _owner;
@@ -39,6 +46,7 @@ contract MarketplaceItem is Asset{
         item_comment = _comment;
         item_itemNumber = _itemNumber;
         item_createdDate = _createdDate;
+        item_status = _itemStatus;
 
         mapping(string => string) ownerCert = getUserCert(owner);
 
@@ -74,10 +82,10 @@ contract MarketplaceItem is Asset{
         }
 
         if ((_scheme & (1 << 0)) == (1 << 0)) {
-            status = _status;
+            item_status = _status;
         }
         if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
+            item_comment = _comment;
         }
 
         return RestStatus.OK;

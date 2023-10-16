@@ -1,5 +1,5 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-import "/dapp/items/contracts/Item.sol";
+import "/dapp/items/contracts/MarketplaceItem.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/products/contracts/Inventory.sol";
