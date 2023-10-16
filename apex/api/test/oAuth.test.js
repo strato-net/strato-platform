@@ -3,7 +3,6 @@ const chai = require('chai');
 const chaiHttp = require('chai-http');
 const assert = chai.assert;
 const process = require('process');
-const co = require('co');
 
 const RestStatus = require(`${process.cwd()}/lib/rest-utils/rest-constants`);
 const oAuth = require(`${process.cwd()}/lib/oAuth/oAuth`);
@@ -65,7 +64,7 @@ describe('OAuth tests', function () {
 
   it('creates new user', async function () {
     const _username = username + new Date()
-    const user = await co.wrap(oAuth.createKey)(_username);
+    const user = await oAuth.createKey(_username);
 
     assert.equal(user.status,RestStatus.OK,'user created')
   });
@@ -73,14 +72,14 @@ describe('OAuth tests', function () {
 
   it('finds existing user', async function () {
     const _username = username + new Date()
-    const result = await co.wrap(oAuth.createKey)(_username);
+    const result = await oAuth.createKey(_username);
 
     if(result.status == RestStatus.OK){ //user created, faucet em
       userAccountAddress = result.user.address;
       await waitFaucet(userAccountAddress);
     }
 
-    const user = await co.wrap(oAuth.getKey)(_username)
+    const user = await oAuth.getKey(_username)
 
     assert.equal(user.status,RestStatus.OK,'user found')
   });

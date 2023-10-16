@@ -12,80 +12,83 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Handlers.Faucet
-  ( API
-  , server
-  , postFaucet
-  , postFaucetMultipart
-  , postDataFaucet
-  ) where
+  ( API,
+    server,
+    postFaucet,
+    postFaucetMultipart,
+    postDataFaucet,
+  )
+where
 
-import           Control.Monad
-import           Control.Monad.Change.Alter
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class
-import qualified Data.ByteString                       as B
-import           Data.Conduit
-import           Data.Maybe
-import           Data.Text                             (Text)
-import qualified Data.Text                             as T
-import qualified Database.Esqueleto.Legacy             as E
-import           Numeric
-import           Servant
-import           Servant.Multipart
-import           Servant.Multipart.Client              ()
-import           System.IO.Unsafe
-import           Text.Printf
+import BlockApps.Logging
+import Blockchain.Constants
+import Blockchain.DB.SQLDB
+import Blockchain.Data.DataDefs
+import Blockchain.Data.TXOrigin
+import Blockchain.Data.Transaction
+import Blockchain.EthConf (runKafkaConfigured)
+import Blockchain.Sequencer.Event (IngestEvent (IETx), IngestTx (..))
+import Blockchain.Sequencer.Kafka (writeUnseqEvents)
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
+import Blockchain.Strato.Model.Secp256k1
+import Control.Monad
+import Control.Monad.Change.Alter
+import Control.Monad.Composable.SQL
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
+import qualified Data.ByteString as B
+import Data.Conduit
+import Data.Maybe
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Database.Esqueleto.Legacy as E
+import FaucetKey
+import Numeric
+import SQLM
+import Servant
+import Servant.Multipart
+import Servant.Multipart.Client ()
+import System.IO.Unsafe
+import Text.Format
+import Text.Printf
+import UnliftIO
 
-import           BlockApps.Logging
-import           Blockchain.Constants
-import           Blockchain.Data.DataDefs
-import           Blockchain.Data.Transaction
-import           Blockchain.Data.TXOrigin
-import           Blockchain.DB.SQLDB
-import           Blockchain.EthConf             (runKafkaConfigured)
-import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
-import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.Class
-import           Blockchain.Strato.Model.Code
-import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.MicroTime   (getCurrentMicrotime)
-import           Blockchain.Strato.Model.Secp256k1
-import           Control.Monad.Composable.SQL
-
-import           Text.Format
-
-import           FaucetKey
-import           SQLM
-import           UnliftIO
-
-type API = 
+type API =
   "faucet" :> ReqBody '[FormUrlEncoded] Address
-           :> Post '[JSON] [Keccak256]
-  :<|>
-  "faucet" :> MultipartForm Mem (MultipartData Mem)
-           :> Post '[JSON] [Keccak256]
-  :<|>
-  "dataFaucet" :> QueryParam "size" Int
-               :> QueryParam "count" Int
-               :> Get '[JSON] [Keccak256]
+    :> Post '[JSON] [Keccak256]
+    :<|> "faucet" :> MultipartForm Mem (MultipartData Mem)
+      :> Post '[JSON] [Keccak256]
+    :<|> "dataFaucet" :> QueryParam "size" Int
+      :> QueryParam "count" Int
+      :> Get '[JSON] [Keccak256]
 
 server :: (MonadLogger m, HasSQL m) => ServerT API m
-server  = postFaucet
-     :<|> postFaucetMultipart
-     :<|> postDataFaucet
+server =
+  postFaucet
+    :<|> postFaucetMultipart
+    :<|> postDataFaucet
 
-postFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
-           => Address -> m [Keccak256]
+postFaucet ::
+  (MonadIO m, MonadLogger m, Selectable Address Integer m) =>
+  Address ->
+  m [Keccak256]
 postFaucet a = runConduit $ postFaucetC a `fuseUpstream` emitKafkaTransactions
 
-postFaucetMultipart :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
-                    => MultipartData Mem -> m [Keccak256]
+postFaucetMultipart ::
+  (MonadIO m, MonadLogger m, Selectable Address Integer m) =>
+  MultipartData Mem ->
+  m [Keccak256]
 postFaucetMultipart a = runConduit $ postFaucetMultipartC a `fuseUpstream` emitKafkaTransactions
 
-
-postDataFaucet :: (MonadIO m, MonadLogger m, Selectable Address Integer m) 
-               => Maybe Int -> Maybe Int -> m [Keccak256]
+postDataFaucet ::
+  (MonadIO m, MonadLogger m, Selectable Address Integer m) =>
+  Maybe Int ->
+  Maybe Int ->
+  m [Keccak256]
 postDataFaucet a b = runConduit $ postDataFaucetC a b `fuseUpstream` emitKafkaTransactions
 
 -----------------------------------------
@@ -98,8 +101,10 @@ appFaucetNonce = unsafePerformIO (newIORef 0)
 
 ---------------
 
-postFaucetC :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
-            => Address -> ConduitT a IngestEvent m [Keccak256]
+postFaucetC ::
+  (MonadIO m, MonadLogger m, Selectable Address Integer m) =>
+  Address ->
+  ConduitT a IngestEvent m [Keccak256]
 postFaucetC target = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
   minNonce <- lift . lookupNonce $ fromPrivateKey key
@@ -114,8 +119,10 @@ postFaucetC target = do
       yield . IETx ts $ IngestTx API tx
       pure $ txHash tx
 
-postFaucetMultipartC :: (MonadIO m, MonadLogger m, Selectable Address Integer m)
-                     => MultipartData Mem -> ConduitT a IngestEvent m [Keccak256]
+postFaucetMultipartC ::
+  (MonadIO m, MonadLogger m, Selectable Address Integer m) =>
+  MultipartData Mem ->
+  ConduitT a IngestEvent m [Keccak256]
 postFaucetMultipartC multipartData = do
   case lookupInput "address" multipartData of
     Right a ->
@@ -130,9 +137,11 @@ toAddr v =
     [(wd160, "")] -> Right $ Address wd160
     _ -> Left $ "Can't convert text to Address: " ++ show v
 
-
-postDataFaucetC :: (MonadIO m, Selectable Address Integer m) 
-                => Maybe Int -> Maybe Int -> ConduitT a IngestEvent m [Keccak256]
+postDataFaucetC ::
+  (MonadIO m, Selectable Address Integer m) =>
+  Maybe Int ->
+  Maybe Int ->
+  ConduitT a IngestEvent m [Keccak256]
 postDataFaucetC mSize mCountOf = do
   key <- liftIO $ fmap (fromMaybe $ error "missing faucet key") getFaucetKey
   minNonce <- lift . lookupNonce $ fromPrivateKey key
@@ -144,7 +153,6 @@ postDataFaucetC mSize mCountOf = do
     tx <- makeSizedTX maxN size key
     yield . IETx ts $ IngestTx API tx
     pure $ txHash tx
-
 
 {-
 initialMaxNonce :: MonadIO m => m (IORef Integer)
@@ -158,31 +166,34 @@ acquireNewMaxNonce minNonce = do
       -- just be starting up, so always give at least the minNonce.
       findNext maxNonce =
         let next = 1 + max minNonce maxNonce
-        in (next, next)
+         in (next, next)
   liftIO $ atomicModifyIORef' appFaucetNonce findNext
 
 instance HasSQL m => Selectable Address Integer m where
-  select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $ E.select $
-    E.from $ \accStateRef -> do
-    E.where_ ((accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
-        E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
-    return accStateRef
+  select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $
+    E.select $
+      E.from $ \accStateRef -> do
+        E.where_
+          ( (accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
+              E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr
+          )
+        return accStateRef
 
 lookupNonce :: Selectable Address Integer m => Address -> m Integer
-lookupNonce addr' = fromMaybe 0 <$> select (Proxy @Integer)  addr'
+lookupNonce addr' = fromMaybe 0 <$> select (Proxy @Integer) addr'
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
 emitKafkaTransactions = loop id
   where
     -- this is essentially the same as sinkList,
     -- except emitting to Kafka instead of returning the list
-    loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x:))
+    loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x :))
     emit txs = do
       $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
       rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents txs
       case rets of
-          Left e      -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
-          Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+        Left e -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
+        Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 makeSendTX :: MonadIO m => Integer -> PrivateKey -> Address -> Integer -> m Transaction
 makeSendTX maxN k a n = do
@@ -193,7 +204,7 @@ makeSendTX maxN k a n = do
   -- with [n, n+1, n+2] has highest priority for n+2, second priority for n+1,
   -- and will only take n if both faucet(x) and faucet(y) don't.
   let gasPrice = 50000000000 - 100000 * (maxN - n)
-  liftIO $ createMessageTX n gasPrice 100000 a (1000*ether) "" Nothing k
+  liftIO $ createMessageTX n gasPrice 100000 a (1000 * ether) "" Nothing k
 
 -- TODO(tim): Add a queryparam for contracts with variable length bin-runtimes, rather
 -- than these that have empty bin-runtimes.
@@ -204,4 +215,4 @@ makeSizedTX nonce size pk =
       gasLimit = 100000
       val = 0
       mk = createContractCreationTX nonce gasPrice gasLimit val code Nothing pk
-  in liftIO mk
+   in liftIO mk

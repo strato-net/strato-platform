@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Flags where
 
-import           Blockchain.Constants
-import           Blockchain.Sequencer.Constants
-import           Blockchain.Strato.Model.Address
-import           HFlags
+import Blockchain.Constants
+import Blockchain.Sequencer.Constants
+import Blockchain.Strato.Model.Address
 import qualified Data.Text as T
-import           Prometheus
+import HFlags
+import Prometheus
 
 -- core flags
 defineFlag "q:txdedupwindow" (2000 :: Int) "Transaction window to deduplicate any given Tx (i.e., after N transactions have passed, a previously seen Tx can be reemitted)"
-
 
 -- leveldb related flags
 defineFlag "b:depblockdbpath" (dbDir "h" ++ sequencerDependentBlockDBPath) "Where to store/load the dependent block db"
@@ -30,9 +30,11 @@ defineFlag "network" ("" :: String) "The network that strato will join"
 defineFlag "certInfo" ("{\"access\":false}" :: String) "JSON encoded ChainMemberParsedSet representing this node's identity"
 defineFlag "genesisBlockName" ("livenet" :: String) "use the alternate stablenet genesis block"
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
-defineFlag "blockstanbul_round_period_s" (10 :: Int)
+defineFlag
+  "blockstanbul_round_period_s"
+  (10 :: Int)
   "Maximum seconds that one validator will remain the proposer"
-defineFlag "blockstanbul_port" (8050:: Int) "The port serving blockstanbul's admin server"
+defineFlag "blockstanbul_port" (8050 :: Int) "The port serving blockstanbul's admin server"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
 defineFlag "validatorBehavior" (True :: Bool) "Whether to disable validator behavior if enabled"
 
@@ -40,12 +42,11 @@ defineFlag "seq_debug_mode" (True :: Bool) "Whether to run sequencer debug mode"
 defineFlag "seq_max_events_per_iter" (500 :: Int) "How many elements to wait for in each sequencer iteration"
 defineFlag "seq_max_us_per_iter" (50000 :: Int) "How many μs to spend waiting for elements"
 
-
 flags :: Vector (T.Text, T.Text) Counter
-flags = unsafeRegister
-      . vector ("flag_name", "flag_value")
-      $ counter $ Info "sequencer_flags" "A pseudo counter recording flags defined for this process"
-
+flags =
+  unsafeRegister
+    . vector ("flag_name", "flag_value")
+    $ counter $ Info "sequencer_flags" "A pseudo counter recording flags defined for this process"
 
 exportFlagsAsMetrics :: IO ()
 exportFlagsAsMetrics = do
@@ -63,7 +64,7 @@ exportFlagsAsMetrics = do
   set "blockstanbul_round_period_s" $ show flags_blockstanbul_round_period_s
   set "blockstanbul_port" $ show flags_blockstanbul_port
   set "vaultWrapperUrl" $ flags_vaultWrapperUrl
-  set "validatorBehavior" $ show flags_validatorBehavior 
+  set "validatorBehavior" $ show flags_validatorBehavior
   set "seq_debug_mode" $ show flags_seq_debug_mode
   set "seq_max_events_per_iter" $ show flags_seq_max_events_per_iter
   set "seq_max_us_per_iter" $ show flags_seq_max_us_per_iter

@@ -366,8 +366,8 @@ async function getTopSellingProducts(admin, args = {}, options) {
 
 
 export default {
-    getAll,
-    getTopSellingProducts,
-    marshalIn,
-    marshalOut,
+  getAll,
+  getTopSellingProducts,
+  marshalIn,
+  marshalOut,
 };

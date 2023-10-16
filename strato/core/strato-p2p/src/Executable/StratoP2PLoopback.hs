@@ -3,13 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
-module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
-import Conduit
-import qualified Control.Monad.Change.Alter            as A
-import qualified Data.Text as T
-import Prometheus
-import Text.Format
+module Executable.StratoP2PLoopback (stratoP2PLoopback) where
 
 import BlockApps.Logging
 import Blockchain.Blockstanbul (WireMessage)
@@ -17,13 +12,19 @@ import Blockchain.Context
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256
+import Conduit
+import qualified Control.Monad.Change.Alter as A
+import qualified Data.Text as T
+import Prometheus
+import Text.Format
 
 {-# NOINLINE loopbackEvents #-}
 loopbackEvents :: Vector T.Text Counter
-loopbackEvents = unsafeRegister
-               . vector "direction"
-               . counter
-               $ Info "p2p_loopback_events" "Counts of events reflected back to the sequencer"
+loopbackEvents =
+  unsafeRegister
+    . vector "direction"
+    . counter
+    $ Info "p2p_loopback_events" "Counts of events reflected back to the sequencer"
 
 recordEvent :: MonadIO m => T.Text -> m ()
 recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
@@ -47,8 +48,8 @@ stratoP2PLoopback runner = do
           _ -> pure Nothing
 
     runConduit $
-         sSource
-      .| iterMC (const $ recordEvent "in")
-      .| concatMapMC toWireMessage
-      .| iterMC (const $ recordEvent "out")
-      .| mapM_C emitBlockstanbulMsg
+      sSource
+        .| iterMC (const $ recordEvent "in")
+        .| concatMapMC toWireMessage
+        .| iterMC (const $ recordEvent "out")
+        .| mapM_C emitBlockstanbulMsg

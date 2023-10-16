@@ -1,17 +1,11 @@
-REPO_URL ?= EMPTY
-ifeq ($(REPO),local)
-  REPO_URL=
-endif
+REPO_URL ?= 
 ifeq ($(REPO),private)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps/
 endif
 ifeq ($(REPO),public)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps-repo/
 endif
-ifeq ($(REPO_URL),EMPTY)
-  $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
-endif
-$(info REPO_URL is "${REPO_URL}" (${REPO}))
+$(info REPO_URL is "${REPO_URL}" (REPO: "${REPO}"))
 REPO_AWS_ECR_URL=406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
 $(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
@@ -96,6 +90,19 @@ build_common_profiled: build_buildbase
 	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
+pretty: build_buildbase
+	@echo formatting STRATO Haskell code...
+	cd strato && \
+		gen-hie > hie.yaml && \
+		ormolu --mode inplace `git ls-files '*.hs'`
+
+hoogle: build_buildbase
+	@echo generating and serving STRATO documentation...
+	cd strato && \
+		stack build --haddock && \
+		stack hoogle generate --rebuild -- --local && \
+		stack hoogle -- server --local
 
 strato: build_common
 	@echo Now building core-strato...

@@ -5,22 +5,16 @@
 
 module Control.Monad.Composable.Identity where
 
-import           Control.Monad.Reader
+import Control.Monad.Change.Modify
+import Control.Monad.Reader
+import Network.HTTP.Client
+import Network.HTTP.Client.TLS
+import Servant.Client
 
-import           Control.Monad.Change.Modify
-
-import           Network.HTTP.Client
-
-import           Network.HTTP.Client.TLS
-
-import           Servant.Client
-
-data IdentityData =
-  IdentityData {
-    urlIdentityServer :: BaseUrl,
-    httpManager' :: Manager 
+data IdentityData = IdentityData
+  { urlIdentityServer :: BaseUrl,
+    httpManager' :: Manager
   }
-
 
 type IdentityM = ReaderT IdentityData
 
@@ -30,6 +24,6 @@ runIdentitytM :: MonadIO m => String -> IdentityM m a -> m a
 runIdentitytM urlIdentity f = do
   identityUrl <- liftIO $ parseBaseUrl urlIdentity
   mgr <- liftIO $ case baseUrlScheme identityUrl of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings 
+    Http -> newManager defaultManagerSettings
+    Https -> newManager tlsManagerSettings
   runReaderT f $ IdentityData identityUrl mgr

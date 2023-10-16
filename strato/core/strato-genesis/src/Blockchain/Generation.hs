@@ -1,80 +1,81 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TupleSections #-}
 
+module Blockchain.Generation
+  ( encodeAllRecords,
+    encodeJSON,
+    encodeJSONHashMaps,
+    insertContractsCount,
+    insertContractsJSON,
+    insertContractsJSONHashMaps,
+    insertContracts,
+    insertCertRegistryContract,
+    insertUserRegistryContract,
+    insertMercataGovernanceContract,
+    readCertsFromGenesisInfo,
+    readValidatorsFromGenesisInfo,
+    Records (..),
+    RecordsHashMap (..),
+    Type (..),
+    TypeHashMap (..),
+  )
+where
 
-module Blockchain.Generation (
-  encodeAllRecords,
-  encodeJSON,
-  encodeJSONHashMaps,
-  insertContractsCount,
-  insertContractsJSON,
-  insertContractsJSONHashMaps,
-  insertContracts,
-  insertCertRegistryContract,
-  insertUserRegistryContract,
-  insertMercataGovernanceContract,
-  readCertsFromGenesisInfo,
-  readValidatorsFromGenesisInfo,
-  Records(..),
-  RecordsHashMap(..),
-  Type(..),
-  TypeHashMap(..)
-) where
-
+import BlockApps.X509.Certificate
+import BlockApps.X509.Keys (pubToBytes, rootPubKey)
+import Blockchain.Data.ChainInfo
+import Blockchain.Data.GenesisInfo
+import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.ExtendedWord
+import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
+import Blockchain.Strato.Model.UserRegistry
 import qualified Data.Aeson as Ae
-import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Aeson.Key as DAK
-import qualified Data.JsonStream.Parser as JS
-import Data.Bits
-import Data.Maybe
+import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Bifunctor as BF
-import qualified Data.ByteString.Lazy as L
+import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as L
+import qualified Data.JsonStream.Parser as JS
 import qualified Data.List as List
 import qualified Data.Map.Strict as M
+import Data.Maybe
 import Data.Scientific (floatingOrInteger)
-import           Data.Text (Text)
-import qualified Data.Vector as V
+import Data.Text (Text)
 import Data.Text.Encoding
+import qualified Data.Vector as V
 import GHC.Generics
+import SolidVM.Model.Storable hiding (size)
+import SolidVM.Model.Value
 import Text.RawString.QQ
 
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
-import           Blockchain.Strato.Model.CodePtr
-import qualified Blockchain.Strato.Model.Keccak256              as KECCAK256
-import           Blockchain.Strato.Model.ExtendedWord
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.UserRegistry
-import           Blockchain.Data.GenesisInfo
-import           Blockchain.Data.RLP
-import           Blockchain.Data.ChainInfo
-
-import           SolidVM.Model.Storable         hiding (size)
-import           BlockApps.X509.Certificate
-import           BlockApps.X509.Keys             (pubToBytes, rootPubKey)
-
-data Type = Number Integer
-          | Stryng Text
-          | List (V.Vector Type)
-          | Struct [Type]
-          -- TODO(tim): Make the key type generic over hashable things.
-          | Mapping (KM.KeyMap Type)
+data Type
+  = Number Integer
+  | Stryng Text
+  | List (V.Vector Type)
+  | Struct [Type]
+  | -- TODO(tim): Make the key type generic over hashable things.
+    Mapping (KM.KeyMap Type)
   deriving (Eq, Show, Generic)
 
 instance Ae.FromJSON Type where
   parseJSON (Ae.String s) = return . Stryng $ s
   parseJSON (Ae.Number x) = case floatingOrInteger x :: Either Double Integer of
-                                Left f -> fail $ "must be int or string: " ++ show f
-                                Right n -> return . Number $ n
+    Left f -> fail $ "must be int or string: " ++ show f
+    Right n -> return . Number $ n
   parseJSON (Ae.Array as) = List <$> V.mapM Ae.parseJSON as
-  parseJSON (Ae.Object ss) = let a `cmp` b = fst a `compare` fst b
-                             in Struct <$> (mapM (Ae.parseJSON . snd) . List.sortBy cmp . KM.toList $ ss)
+  parseJSON (Ae.Object ss) =
+    let a `cmp` b = fst a `compare` fst b
+     in Struct <$> (mapM (Ae.parseJSON . snd) . List.sortBy cmp . KM.toList $ ss)
   parseJSON (Ae.Bool b) = return . Number $ if b then 1 else 0
   parseJSON _ = fail "unknown aeson type"
 
@@ -92,28 +93,31 @@ instance Ae.FromJSON TypeHashMap where
   parseJSON (Ae.Object ss) = MappingHashMap <$> traverse Ae.parseJSON ss
   parseJSON v = Type <$> Ae.parseJSON v
 
-
 newtype Records = Records [[Type]] deriving (Eq, Show, Generic)
+
 instance Ae.FromJSON Records
 
 newtype RecordsHashMap = RecordsHashMap [[TypeHashMap]] deriving (Eq, Show, Generic)
+
 instance Ae.FromJSON RecordsHashMap
 
 equalChunksOf :: Int -> BS.ByteString -> [BS.ByteString]
-equalChunksOf n ws | BS.length ws == 0 = []
-                   | BS.length ws <= n = [ws <> BS.replicate (n - BS.length ws) 0]
-                   | otherwise = let (car, cdr) = BS.splitAt n ws
-                                 in car : (equalChunksOf n cdr)
+equalChunksOf n ws
+  | BS.length ws == 0 = []
+  | BS.length ws <= n = [ws <> BS.replicate (n - BS.length ws) 0]
+  | otherwise =
+    let (car, cdr) = BS.splitAt n ws
+     in car : (equalChunksOf n cdr)
 
 hash :: Word256 -> Word256
 hash = bytesToWord256 . KECCAK256.keccak256ToByteString . KECCAK256.hash . word256ToBytes
 
 encodeSequentially :: Word256 -> [Type] -> ([(Word256, Word256)], Word256)
 encodeSequentially k [] = ([], k)
-encodeSequentially k (t:ts) =
+encodeSequentially k (t : ts) =
   let (tSlots, k') = encodeType k t
       (tsSlots, k'') = encodeSequentially k' ts
-  in (tSlots ++ tsSlots, k'')
+   in (tSlots ++ tsSlots, k'')
 
 mapHash :: Word256 -> Word256 -> Word256
 mapHash x y = bytesToWord256 . KECCAK256.keccak256ToByteString $ KECCAK256.hash $ word256ToBytes x <> word256ToBytes y
@@ -121,47 +125,51 @@ mapHash x y = bytesToWord256 . KECCAK256.keccak256ToByteString $ KECCAK256.hash 
 -- First return value is the slots for this value, and the second return value
 -- is the next available slot.
 encodeType :: Word256 -> Type -> ([(Word256, Word256)], Word256)
-encodeType k (Number n) | n >= 0 && n <= (2 ^ (256 :: Integer)) = ([(k, fromIntegral n)], k + 1)
-                        | otherwise = error "unimplemented for negative numbers"
+encodeType k (Number n)
+  | n >= 0 && n <= (2 ^ (256 :: Integer)) = ([(k, fromIntegral n)], k + 1)
+  | otherwise = error "unimplemented for negative numbers"
 encodeType k (Stryng s) =
   if BS.length payload < 32
-      then let pad = BS.replicate (31 - BS.length payload) 0
-               size = BS.singleton . fromIntegral $ BS.length payload `shiftL` 1
-           in ([(k, bytesToWord256 $ payload <> pad <> size)], k+1)
-      else let size = fromIntegral $ (BS.length payload `shiftL` 1) .|. 1
-               pointer = (k, size)
-               start = hash k
-               packets = zip (map (start+) [0..]) . map bytesToWord256 . equalChunksOf 32 $ payload
-           in (pointer:packets, k + 1)
-  where payload = encodeUtf8 s
+    then
+      let pad = BS.replicate (31 - BS.length payload) 0
+          size = BS.singleton . fromIntegral $ BS.length payload `shiftL` 1
+       in ([(k, bytesToWord256 $ payload <> pad <> size)], k + 1)
+    else
+      let size = fromIntegral $ (BS.length payload `shiftL` 1) .|. 1
+          pointer = (k, size)
+          start = hash k
+          packets = zip (map (start +) [0 ..]) . map bytesToWord256 . equalChunksOf 32 $ payload
+       in (pointer : packets, k + 1)
+  where
+    payload = encodeUtf8 s
 encodeType k (List payload) =
   let size = fromIntegral . length $ payload
       pointer = (k, size)
       start = hash k
       (packets, _) = encodeSequentially start (V.toList payload)
-  in (pointer:packets, k + 1)
+   in (pointer : packets, k + 1)
 encodeType k (Struct ts) = encodeSequentially k ts
 encodeType p (Mapping hm) =
   let pointer = (p, 0)
       -- This is very specific to the case of using bytes32 as keys.
       -- Using strings as key hashes the whole string, rather than
       -- slicing to 32 bytes and extending by 0s.
-      payload s = let raw = encodeUtf8 s
-                  in if BS.length raw < 33
-                        then raw <> BS.replicate (32 - BS.length raw) 0
-                        else BS.take 32 raw
+      payload s =
+        let raw = encodeUtf8 s
+         in if BS.length raw < 33
+              then raw <> BS.replicate (32 - BS.length raw) 0
+              else BS.take 32 raw
       -- For a mapping value located in contract slot p with key s
       -- the slot is keccak256(s <> p)
       trieKey s = mapHash (bytesToWord256 . payload $ s) p
       place (s, v) = fst . encodeType (trieKey s) $ v
-  in (pointer:(concatMap place . fmap (BF.first DAK.toText) . KM.toList $ hm), p+1)
+   in (pointer : (concatMap place . fmap (BF.first DAK.toText) . KM.toList $ hm), p + 1)
 
 encodeRecord :: Word256 -> [Type] -> [(Word256, Word256)]
 encodeRecord k = fst . encodeSequentially k
 
 encodeAllRecords :: Records -> [[(Word256, Word256)]]
 encodeAllRecords (Records recs) = map (encodeRecord 0) recs
-
 
 encodeJSON :: L.ByteString -> [[(Word256, Word256)]]
 encodeJSON = encodeAllRecords . Records . JS.parseLazyByteString (JS.arrayOf JS.value)
@@ -192,10 +200,12 @@ insertContracts slotss name src code start gi =
           _ -> error ("bytecode not encoded in base16:" ++ show code)
       codeHash = KECCAK256.hash decoded
       mkContract (addr, slots) = ContractWithStorage addr 0 (EVMCode codeHash) slots
-      addrs = map (start+) [0..]
+      addrs = map (start +) [0 ..]
       addrsAndSlots = zip addrs slotss
-  in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
-         genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src $ Just name]}
+   in gi
+        { genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
+          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src $ Just name]
+        }
 
 readCertsFromGenesisInfo :: GenesisInfo -> [X509Certificate]
 readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
@@ -216,7 +226,7 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
     o <- rlpUnwrap <$> M.lookup ".org" storageMap
     u <- rlpUnwrap <$> M.lookup ".orgUnit" storageMap
     c <- rlpUnwrap <$> M.lookup ".commonName" storageMap
-    case (o,u,c) of
+    case (o, u, c) of
       (BString o', BString u', BString c') -> do
         let o'' = decodeUtf8 o'
             u'' = decodeUtf8 u'
@@ -229,54 +239,67 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
 -- | Accepts a list of X509 certificates, if there are any that need to be initialized at init besides root
 insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertCertRegistryContract certs gi =
-    gi {genesisInfoAccountInfo = initialAccounts ++ registryAcct:rootAcct:certAccts,
-        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]}
-    where 
-        initialAccounts = genesisInfoAccountInfo gi
-        initialCode     = genesisInfoCodeInfo gi
+  gi
+    { genesisInfoAccountInfo = initialAccounts ++ registryAcct : rootAcct : certAccts,
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]
+    }
+  where
+    initialAccounts = genesisInfoAccountInfo gi
+    initialCode = genesisInfoCodeInfo gi
 
-        rlpWrap         = rlpSerialize . rlpEncode
-        encodedRegistry = encodeUtf8 certificateRegistryContract
+    rlpWrap = rlpSerialize . rlpEncode
+    encodedRegistry = encodeUtf8 certificateRegistryContract
 
-        rootAddress'    = fromPublicKey rootPubKey
-        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
-        rootSub         = fromJust $ getCertSubject rootCert
+    rootAddress' = fromPublicKey rootPubKey
+    rootAddress = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
+    rootSub = fromJust $ getCertSubject rootCert
 
-        certSub' crt =
-            case getCertSubject crt of
-                Just s -> s
-                Nothing -> error "Certificate requires a subject"
-        maybeCertField = fromMaybe ""
-        certUserAddress = fromPublicKey . subPub . certSub'
-        rootAcct = SolidVMContractWithStorage 0x1337 1337
-            (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
-                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) UnspecifiedChain)),
-                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
-                (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ rootSub),
-                (".organization", rlpWrap . BString . BC.pack . subOrg $ rootSub),
-                (".group", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
-                (".organizationalUnit", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
-                (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
-                (".certificateString", rlpWrap . BString $ certToBytes rootCert),
-                (".isValid", rlpWrap (BBool True)),
-                (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
-            ]
+    certSub' crt =
+      case getCertSubject crt of
+        Just s -> s
+        Nothing -> error "Certificate requires a subject"
+    maybeCertField = fromMaybe ""
+    certUserAddress = fromPublicKey . subPub . certSub'
+    rootAcct =
+      SolidVMContractWithStorage
+        0x1337
+        1337
+        (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
+        [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+          (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) UnspecifiedChain)),
+          (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
+          (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ rootSub),
+          (".organization", rlpWrap . BString . BC.pack . subOrg $ rootSub),
+          (".group", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
+          (".organizationalUnit", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
+          (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
+          (".certificateString", rlpWrap . BString $ certToBytes rootCert),
+          (".isValid", rlpWrap (BBool True)),
+          (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
+        ]
 
-        -- Reversing the cert user address to create a placeholder Certificate contract address
-        reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
-        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
-        registryAcct = SolidVMContractWithStorage 0x509 509
-            (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry)) $
-            [
-                (".owner", rootAddress),
-                (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx "1337")
-            ] ++ map (\c -> (BC.pack $ ".addressToCertMap<a:" ++ show (certUserAddress c)  ++ ">", addrToCertIdx . show . reverseAddr $ c)) certs
+    -- Reversing the cert user address to create a placeholder Certificate contract address
+    reverseAddr = Address . bytesToWord160 . reverse . word160ToBytes . unAddress . certUserAddress
+    addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
+    registryAcct =
+      SolidVMContractWithStorage
+        0x509
+        509
+        (SolidVMCode "CertificateRegistry" (KECCAK256.hash encodedRegistry))
+        $ [ (".owner", rootAddress),
+            (BC.pack $ ".addressToCertMap<a:" ++ show rootAddress' ++ ">", addrToCertIdx "1337")
+          ]
+          ++ map (\c -> (BC.pack $ ".addressToCertMap<a:" ++ show (certUserAddress c) ++ ">", addrToCertIdx . show . reverseAddr $ c)) certs
 
-        certAccts = map (\cert -> do
+    certAccts =
+      map
+        ( \cert -> do
             let certSub = certSub' cert
-            SolidVMContractWithStorage (reverseAddr cert) 0 (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+            SolidVMContractWithStorage
+              (reverseAddr cert)
+              0
+              (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
+              [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
                 (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) UnspecifiedChain)),
                 (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
                 (".country", rlpWrap . BString . BC.pack . maybeCertField . subCountry $ certSub),
@@ -286,11 +309,14 @@ insertCertRegistryContract certs gi =
                 (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
                 (".certificateString", rlpWrap . BString $ certToBytes cert),
                 (".isValid", rlpWrap (BBool True)),
-                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) UnspecifiedChain))]
-            ) certs
+                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) UnspecifiedChain))
+              ]
+        )
+        certs
 
 certificateRegistryContract :: Text
-certificateRegistryContract = [r|
+certificateRegistryContract =
+  [r|
 contract Certificate {
     address owner;  // The CertificateRegistry Contract
 
@@ -419,64 +445,98 @@ contract CertificateRegistry {
 -- | Inserts a Governance contract into the genesis block with the BlockApps root cert as owner
 insertMercataGovernanceContract :: [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
 insertMercataGovernanceContract validators admins gi =
-    gi {genesisInfoAccountInfo = initialAccounts ++ govAcct:(validatorAccts ++ adminAccts),
-        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedGovernance governanceSrc (Just "MercataGovernance")]}
-    where 
-        initialAccounts = genesisInfoAccountInfo gi
-        initialCode     = genesisInfoCodeInfo gi
+  gi
+    { genesisInfoAccountInfo = initialAccounts ++ govAcct : (validatorAccts ++ adminAccts),
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedGovernance governanceSrc (Just "MercataGovernance")]
+    }
+  where
+    initialAccounts = genesisInfoAccountInfo gi
+    initialCode = genesisInfoCodeInfo gi
 
-        rlpWrap         = rlpSerialize . rlpEncode
-        governanceSrc = certificateRegistryContract <> "\n\n" <> mercataGovernanceContract
-        encodedGovernance = encodeUtf8 governanceSrc
+    rlpWrap = rlpSerialize . rlpEncode
+    governanceSrc = certificateRegistryContract <> "\n\n" <> mercataGovernanceContract
+    encodedGovernance = encodeUtf8 governanceSrc
 
-        rootAddress'    = fromPublicKey rootPubKey
-        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
-        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
-        valIx = zip [0..] validators
-        adminIx = zip [0..] admins
-        validatorOffset = 0x56616c696461746f7273
-        adminOffset = 0x41646d696e73
-        validatorAddr i = Address . fromInteger $ validatorOffset + i
-        adminAddr i = Address . fromInteger $ adminOffset + i
-        govAcct = SolidVMContractWithStorage 0x100 0x426c6f636b61707073205374617274696e6672042616c616e6365
-          (SolidVMCode "MercataGovernance" (KECCAK256.hash encodedGovernance)) $
-          [ (".owner", rootAddress),
+    rootAddress' = fromPublicKey rootPubKey
+    rootAddress = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
+    addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+    valIx = zip [0 ..] validators
+    adminIx = zip [0 ..] admins
+    validatorOffset = 0x56616c696461746f7273
+    adminOffset = 0x41646d696e73
+    validatorAddr i = Address . fromInteger $ validatorOffset + i
+    adminAddr i = Address . fromInteger $ adminOffset + i
+    govAcct =
+      SolidVMContractWithStorage
+        0x100
+        0x426c6f636b61707073205374617274696e6672042616c616e6365
+        (SolidVMCode "MercataGovernance" (KECCAK256.hash encodedGovernance))
+        $ [ (".owner", rootAddress),
             (".validatorCount", rlpWrap . BInteger . toInteger $ length validators),
             (".adminCount", rlpWrap . BInteger . toInteger $ length admins)
-          ] 
-            -- ++ map (\(i, CommonName o u c True) ->
-            --          ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-            --          , addrToCertIdx . show $ validatorAddr i)) valIx
-            -- ++ map (\(i, CommonName o u c True) ->
-            --          ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-            --          , addrToCertIdx . show $ adminAddr i)) adminIx
-            ++ map (\case
-                        (i, CommonName o u c True) -> ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-                                                    , addrToCertIdx . show $ validatorAddr i)
-                        _ -> error "Invalid validator cert") valIx
-            ++ map (\case
-                        (i, CommonName o u c True) -> ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
-                                                    , addrToCertIdx . show $ adminAddr i)
-                        _ -> error "Invalid admin cert") adminIx
-        validatorAccts = map (\case 
-                                (i, CommonName o u c True) -> SolidVMContractWithStorage (validatorAddr i) 0 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance)) [
-                                    (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                                    (".org", rlpWrap . BString $ encodeUtf8 o),
-                                    (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-                                    (".commonName", rlpWrap . BString $ encodeUtf8 c),
-                                    (".isActive", rlpWrap $ BBool True)]
-                                _ -> error "Invalid validator cert") valIx
-        adminAccts = map (\case
-                                (i, CommonName o u c True) -> SolidVMContractWithStorage (adminAddr i) 0 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance)) [
-                                    (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                                    (".org", rlpWrap . BString $ encodeUtf8 o),
-                                    (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-                                    (".commonName", rlpWrap . BString $ encodeUtf8 c),
-                                    (".isActive", rlpWrap $ BBool True)]
-                                _ -> error "Invalid admin cert") adminIx
+          ]
+          -- ++ map (\(i, CommonName o u c True) ->
+          --          ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+          --          , addrToCertIdx . show $ validatorAddr i)) valIx
+          -- ++ map (\(i, CommonName o u c True) ->
+          --          ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+          --          , addrToCertIdx . show $ adminAddr i)) adminIx
+          ++ map
+            ( \case
+                (i, CommonName o u c True) ->
+                  ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">",
+                    addrToCertIdx . show $ validatorAddr i
+                  )
+                _ -> error "Invalid validator cert"
+            )
+            valIx
+          ++ map
+            ( \case
+                (i, CommonName o u c True) ->
+                  ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">",
+                    addrToCertIdx . show $ adminAddr i
+                  )
+                _ -> error "Invalid admin cert"
+            )
+            adminIx
+    validatorAccts =
+      map
+        ( \case
+            (i, CommonName o u c True) ->
+              SolidVMContractWithStorage
+                (validatorAddr i)
+                0
+                (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance))
+                [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                  (".org", rlpWrap . BString $ encodeUtf8 o),
+                  (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
+                  (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                  (".isActive", rlpWrap $ BBool True)
+                ]
+            _ -> error "Invalid validator cert"
+        )
+        valIx
+    adminAccts =
+      map
+        ( \case
+            (i, CommonName o u c True) ->
+              SolidVMContractWithStorage
+                (adminAddr i)
+                0
+                (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance))
+                [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                  (".org", rlpWrap . BString $ encodeUtf8 o),
+                  (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
+                  (".commonName", rlpWrap . BString $ encodeUtf8 c),
+                  (".isActive", rlpWrap $ BBool True)
+                ]
+            _ -> error "Invalid admin cert"
+        )
+        adminIx
 
 mercataGovernanceContract :: Text
-mercataGovernanceContract = [r|
+mercataGovernanceContract =
+  [r|
 contract MercataValidator {
     address public owner;
 
@@ -835,43 +895,46 @@ contract MercataGovernance {
 -- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
 insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertUserRegistryContract certs gi =
-    gi {genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
-        genesisInfoCodeInfo    = initialCode ++ [CodeInfo encodedRegistry userRegistryContract (Just "UserRegistry")]}
-    where 
-        addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
-        initialAccounts = genesisInfoAccountInfo gi
-        initialCode     = genesisInfoCodeInfo gi
+  gi
+    { genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedRegistry userRegistryContract (Just "UserRegistry")]
+    }
+  where
+    initialAccounts = genesisInfoAccountInfo gi
+    initialCode = genesisInfoCodeInfo gi
 
-        rlpWrap         = rlpSerialize . rlpEncode
-        encodedRegistry = encodeUtf8 userRegistryContract
+    rlpWrap = rlpSerialize . rlpEncode
+    encodedRegistry = encodeUtf8 userRegistryContract
 
-        rootAddress'    = fromPublicKey rootPubKey
-        rootAddress     = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
-        rootSub         = fromJust $ getCertSubject rootCert
-        rootAcct = SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing Nothing) 123
-            (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
-                (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
-                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
-                (".isActive", rlpWrap $ BBool True),
-                (BC.pack $ ".userCertificates<a:" ++ (show rootAddress') ++ ">", addrToCertIdx "1337")
-            ]
+    rootSub = fromJust $ getCertSubject rootCert
+    rootAcct =
+      SolidVMContractWithStorage
+        (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName rootSub]))
+        123
+        (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
+        [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub)
+        ]
 
-        userAccts = map (\cert -> do
-                let certSub' crt =
-                        case getCertSubject crt of
-                            Just s -> s
-                            Nothing -> error "Certificate requires a subject"
-                    certUserAddress = fromPublicKey . subPub . certSub'
-                    certSub = certSub' cert
-                    reverseAddr = Address . bytesToWord160 .  reverse . word160ToBytes . unAddress . certUserAddress
-                SolidVMContractWithStorage (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing Nothing) 0 
-                    (SolidVMCode "User" (KECCAK256.hash encodedRegistry)) [
-                        (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "720") UnspecifiedChain)),
-                        (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
-                        (".isActive", rlpWrap $ BBool True),
-                        (BC.pack $ ".userCertificates<a:" ++ (show $ certUserAddress cert) ++ ">", addrToCertIdx . show . reverseAddr $ cert)]
-            ) certs
+    userAccts =
+      map
+        ( \cert -> do
+            let certSub' crt =
+                  case getCertSubject crt of
+                    Just s -> s
+                    Nothing -> error "Certificate requires a subject"
+                certSub = certSub' cert
+            SolidVMContractWithStorage
+              (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName certSub]))
+              0
+              (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
+              [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub)
+              ]
+        )
+        certs
 
-        registryAcct = SolidVMContractWithStorage 0x720 720
-            (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry)) $
-            [(".owner", rootAddress)]
+    registryAcct =
+      SolidVMContractWithStorage
+        0x720
+        720
+        (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry))
+        $ []

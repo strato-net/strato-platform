@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+
 -- |
 -- Module: File
 -- Description: Parses anything that can appear at the top level of
@@ -11,54 +12,55 @@
 -- imports.
 module SolidVM.Solidity.Parse.File where
 
-import           Prelude                               hiding (lookup)
+import Control.DeepSeq
+import Control.Monad
+import Data.Either.Extra
+import Data.Maybe
+import Data.SemVer
+import qualified Data.Text as T
+import GHC.Generics
+import SolidVM.Solidity.Parse.Alias
+import SolidVM.Solidity.Parse.Declarations
+import SolidVM.Solidity.Parse.Imports
+import SolidVM.Solidity.Parse.Lexer
+import SolidVM.Solidity.Parse.ParserTypes
+import SolidVM.Solidity.Parse.Pragmas
+import Text.Parsec
+import Prelude hiding (lookup)
 
-import           Control.Monad
-import           Control.DeepSeq
-import           Data.Either.Extra
-import           Data.Maybe
-import           Data.SemVer
-import qualified Data.Text                             as T
-import           GHC.Generics
-import           Text.Parsec
-
-
-import           SolidVM.Solidity.Parse.Alias
-import           SolidVM.Solidity.Parse.Declarations
-import           SolidVM.Solidity.Parse.Imports
-import           SolidVM.Solidity.Parse.Lexer
-import           SolidVM.Solidity.Parse.ParserTypes
-import           SolidVM.Solidity.Parse.Pragmas
-
-newtype File = File {
-  unsourceUnits :: [SourceUnit]
-} deriving (Show, Generic, NFData)
+newtype File = File
+  { unsourceUnits :: [SourceUnit]
+  }
+  deriving (Show, Generic, NFData)
 
 solidityFile :: SolidityParser File
 solidityFile = do
   whiteSpace
-  units <- many (   solidityPragma 
-                <|> solidityImport 
-                <|> solidityFLError
-                <|>  solidityAlias 
-                <|> solidityFreeFunction 
-                <|> solidityContract 
-                <|> solidityFLConstant 
-                <|> solidityFLStruct 
-                <|> solidityFLEnum
-                )
+  units <-
+    many
+      ( solidityPragma
+          <|> solidityImport
+          <|> solidityFLError
+          <|> solidityAlias
+          <|> solidityFreeFunction
+          <|> solidityContract
+          <|> solidityFLConstant
+          <|> solidityFLStruct
+          <|> solidityFLEnum
+      )
   eof
   return . File $ units
 
 decideVersion :: File -> SolcVersion
-decideVersion = maximum . (ZeroPointFour:) . mapMaybe go . unsourceUnits
-  where go :: SourceUnit -> Maybe SolcVersion
-        go (Pragma _ pragmaName rest) = do
-          guard $ pragmaName == "solidity"
-          rng <- eitherToMaybe . parseSemVerRange . T.strip . T.pack $ rest
-          -- It would be much better to check for a nonempty intersection of ranges,
-          -- but this simple enough that its hard to be wrong.
-          let possibilities = [semver 0 5 n | n <- [0..99]]
-          guard $ any (matchesSimple rng) possibilities
-          return ZeroPointFive
-        go _ = Nothing
+decideVersion = maximum . (ZeroPointFour :) . mapMaybe go . unsourceUnits
+  where
+    go :: SourceUnit -> Maybe SolcVersion
+    go (Pragma _ pragmaName rest) = do
+      guard $ pragmaName == "solidity"
+      rng <- eitherToMaybe . parseSemVerRange . T.strip . T.pack $ rest
+      -- It would be much better to check for a nonempty intersection of ranges,
+      -- but this simple enough that its hard to be wrong.
+      let possibilities = [semver 0 5 n | n <- [0 .. 99]]
+      guard $ any (matchesSimple rng) possibilities
+      return ZeroPointFive
+    go _ = Nothing

@@ -1,21 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
-import Data.ByteString.Lazy.Internal (ByteString(..))
-import Data.Char
+
+import Data.BloomFilter.Hash
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
-import Data.BloomFilter.Hash
+import Data.ByteString.Lazy.Internal (ByteString (..))
+import Data.Char
 import Data.String
 
 instance IsString L.ByteString where
-    fromString = L.pack
+  fromString = L.pack
 
 instance IsString S.ByteString where
-    fromString = S.pack
+  fromString = S.pack
 
 reindex s = (L.mapIndexed go s, map S.length (L.toChunks s))
-    where go k _ = case chr (fromIntegral k `mod` 10 + ord 'a') of
-                     'j' -> ' '
-                     c -> c
+  where
+    go k _ = case chr (fromIntegral k `mod` 10 + ord 'a') of
+      'j' -> ' '
+      c -> c
 
 main = do
   let a = Chunk "abcdefghi ab" (Chunk "cdefghi abcd" Empty)

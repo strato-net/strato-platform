@@ -153,6 +153,11 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
           </div>
         </div>
         <div className=\\"row\\">
+          <div className=\\"col-sm-9 smd-pad-4\\">
+            <Blueprint.Switch checked={false} onChange={[Function]} label=\\"Use Wallet\\" />
+          </div>
+        </div>
+        <div className=\\"row\\">
           <div className=\\"col-sm-9\\">
             <Blueprint.Button onClick={[Function: onClick]}>
               Show Function Source Code
@@ -165,12 +170,11 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
               <pre>
                 function 
                 setX
-                (int a)
+                (undefined)
                  
                  {
                 
                 	
-                Error loading function body
                 
                 
                 }
@@ -200,11 +204,10 @@ exports[`ContractMethodCall: index renders contracts card (Oauth mode) 1`] = `
               </thead>
               <tbody>
                 <tr>
-                  <td style={{...}}>
-                    a
-                  </td>
-                  <td>
-                    <Field name=\\"a\\" component=\\"input\\" type=\\"text\\" placeholder=\\"int\\" className=\\"pt-input\\" required={true} />
+                  <td className=\\"text-center\\" colSpan={3}>
+                    <i>
+                      This method has no params
+                    </i>
                   </td>
                 </tr>
               </tbody>

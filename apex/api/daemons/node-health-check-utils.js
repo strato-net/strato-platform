@@ -4,7 +4,7 @@ const Promise = require('bluebird');
 const rp = require('request-promise');
 const moment = require('moment');
 const si = require('systeminformation');
-const disk = require('diskusage');
+const diskusage = require('diskusage-ng');
 const config = require('../config/app.config');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
@@ -249,13 +249,13 @@ async function checkSystemInfo(isGlobalPasswordSet) {
     }
     // FIXME: the callback function is async and the response may come late and be unprocessed!
     // Why checking the disk space with both - `diskspace` and `si` ?? Can we fully remove this faulty `diskspace` code block?
-    disk.check('/', function (err, info) {
+    diskusage('/', function (err, info) {
       if (err) {
         winston.warn("Error when checking for disk usage", err);
         isHealthy = false;
         additional_info.push("Could not check disk space")
       } else {
-        const diskUsageRatio = info.free / info.total * 100;
+        const diskUsageRatio = info.available / info.total * 100;
         sysInfoCollected.disk_usage = diskUsageRatio;
         if (diskUsageRatio < config.healthCheck.diskUsageBound) {
           isHealthy = false;

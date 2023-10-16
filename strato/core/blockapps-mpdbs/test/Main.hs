@@ -1,5 +1,4 @@
 import StorageSpec
-
 import Test.Hspec
 
 main :: IO ()
