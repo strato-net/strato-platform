@@ -17,15 +17,6 @@ contract MarketplaceItem is Asset, ItemStatus{
     ItemStatus public item_status;
 
     // Events
-        /// @dev Events to add and remove members to this shard.
-    event ItemOrgAdded(string orgName);
-    event ItemOrgUnitAdded(string orgName, string orgUnit);
-    event ItemCommonNameAdded(string orgName, string orgUnit, string commonName);
-
-    event ItemOrgRemoved(string orgName);
-    event ItemOrgUnitRemoved(string orgName, string orgUnit);
-    event ItemCommonNameRemoved(string orgName, string orgUnit, string commonName);
-
     event ItemOwnershipUpdate(address seller, address newOwner, uint ownershipStartDate, address itemAddress);
 
     constructor(
