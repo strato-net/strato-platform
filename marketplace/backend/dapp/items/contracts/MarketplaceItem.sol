@@ -2,8 +2,9 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
+import "/dapp/products/contracts/InventoryStatus.sol";
 
-contract MarketplaceItem is Asset, ItemStatus{
+contract MarketplaceItem is Asset, ItemStatus, InventoryStatus{
     address item_owner;
     string item_ownerOrganization;
     string item_ownerOrganizationalUnit;
@@ -16,6 +17,22 @@ contract MarketplaceItem is Asset, ItemStatus{
     uint item_createdDate;
     ItemStatus public item_status;
 
+    // Inventory
+    int public inventory_availableQuantity;
+    string public inventory_batchId;
+    string public inventory_category;
+    uint public inventory_createdDate;
+    address public inventory_owner;
+    string public inventory_ownerCommonName;
+    string public inventory_ownerOrganization;
+    string public inventory_ownerOrganizationalUnit;
+    int public inventory_pricePerUnit;
+    address public inventory_productId;
+    int public inventory_quantity;
+    InventoryStatus public inventory_status;
+    string public inventory_subCategory;
+    string public inventory_type;
+
     // Events
     event ItemOwnershipUpdate(address seller, address newOwner, uint ownershipStartDate, address itemAddress);
 
@@ -27,8 +44,20 @@ contract MarketplaceItem is Asset, ItemStatus{
         string memory _comment,
         uint _itemNumber,
         uint _createdDate,
-        ItemStatus _itemStatus
+        ItemStatus _itemStatus,
+        int _inventory_availableQuantity,
+        string _inventory_batchId,
+        string _inventory_category,
+        uint _inventory_createdDate,
+        address _inventory_owner,
+        int _inventory_pricePerUnit,
+        address _inventory_productId,
+        InventoryStatus _inventory_status,
+        string _inventory_subCategory,
+        string _inventory_type
     ) public {
+        mapping(string => string) ownerCert = getUserCert(_owner);
+
         item = new Item();
         item_owner = _owner;
         item_productId = _productId;
@@ -38,15 +67,28 @@ contract MarketplaceItem is Asset, ItemStatus{
         item_itemNumber = _itemNumber;
         item_createdDate = _createdDate;
         item_status = _itemStatus;
-
-        mapping(string => string) ownerCert = getUserCert(owner);
-
         item_ownerOrganization = ownerCert["organization"];
         item_ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         item_ownerCommonName = ownerCert["commonName"];
 
         // Emit an event to indicate the creation of a new Item
         emit ItemOwnershipUpdate(address(0), _owner, block.timestamp, msg.sender);
+
+        // Initialize product
+        inventory_availableQuantity = _inventory_availableQuantity;
+        inventory_batchId = _inventory_batchId;
+        inventory_category = _inventory_category;
+        inventory_createdDate = _inventory_createdDate;
+        inventory_owner = _inventory_owner;
+        inventory_pricePerUnit = _inventory_pricePerUnit;
+        inventory_productId = _inventory_productId;
+        inventory_quantity = _inventory_availableQuantity;
+        inventory_status = _inventory_status;
+        inventory_subCategory = _inventory_subCategory;
+        inventory_type = _inventory_type;
+        inventory_ownerCommonName = ownerCert["commonName"];
+        inventory_ownerOrganization = ownerCert["organization"];
+        inventory_ownerOrganizationalUnit = ownerCert["organizationalUnit"];
 
         if (_rawMaterialSerialNumber.length > 0) {
             addRawMaterials(
@@ -80,6 +122,36 @@ contract MarketplaceItem is Asset, ItemStatus{
         }
 
         return RestStatus.OK;
+    }
+
+    // Function to update the Inventory
+    function updateInventory(
+        int _pricePerUnit
+    ,   InventoryStatus _status
+    ,   uint _scheme
+    ) returns (uint) {
+      if(inventory_ownerOrganization != getUserOrganization(tx.origin)){
+        return RestStatus.FORBIDDEN;
+      }
+
+      if (_scheme == 0) {
+        return RestStatus.OK;
+      }
+
+      if ((_scheme & (1 << 0)) == (1 << 0)) {
+        inventory_pricePerUnit = _pricePerUnit;
+      }
+      if ((_scheme & (1 << 1)) == (1 << 1)) {
+        inventory_status = _status;
+      }
+
+      return RestStatus.OK;
+    }
+
+    // Function to update the quantity of the Inventory
+    function updateQuantity(int _quantity) returns(uint){
+      inventory_availableQuantity = _quantity;
+      return RestStatus.OK;
     }
 
     // Get the userOrganization
