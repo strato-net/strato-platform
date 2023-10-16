@@ -162,3 +162,7 @@
 .h-px-390 {
   height: 390px;
 }
+
+.ant-image{
+  height: 50%;
+}

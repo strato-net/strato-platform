@@ -1082,7 +1082,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       //   ownedProducts.some(product => item.productId === product.address)
       // );
       console.log("ownedItems", ownedItems)
-      
+
       // Get Memberhships where productId = Items.productId 
       let ownedMemberships = await membershipJs.getAll(rawAdmin, {
         productId: arrayOfAddresses,
@@ -1091,15 +1091,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // ownedMemberships = ownedMemberships.filter(membership =>
       //   ownedItems.some(item => membership.productId === item.productId)
       // );
-      console.log ('ownedMemberships', ownedMemberships)
-      
+
       const arrayOwnedMemberships = ownedMemberships.map(obj => obj.address);
       // Get MembershipServices where membershipId = ownedMemberships.address 
       const membershipServices = (await membershipServiceJs.getAll(rawAdmin, { membershipId: arrayOwnedMemberships }, getOptions));
-      const arrayMembershipServices= membershipServices.map(obj => obj.serviceId);
+      const arrayMembershipServices = membershipServices.map(obj => obj.serviceId);
       // Get all services
-      const servicesAll = await managers.serviceManager.getAll({address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
-      
+      const servicesAll = await managers.serviceManager.getAll({ address: arrayMembershipServices }, { ...options, org: managers.cirrusOrg, app: contractName, });
+
       console.log('membershipServices:', membershipServices)
       console.log('servicesAll:', servicesAll)
 
@@ -1384,13 +1383,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.resaleMembership = async function (args, options = defaultOptions) {
     // console.log("payload", args);
-    let {itemAddress, ...restArgs} = args
+    let { itemAddress, ...restArgs } = args
     const inventoryRes = await managers.productManager.updateInventory(restArgs);
-        const [soldStatus] = await managers.itemManager.updateItem({
-        itemsAddress: [itemAddress],
-        status: ITEM_STATUS.PUBLISHED,
-        comment: "",
-      });
+    const [soldStatus] = await managers.itemManager.updateItem({
+      itemsAddress: [itemAddress],
+      status: ITEM_STATUS.PUBLISHED,
+      comment: "",
+    });
     return soldStatus
   };
 
@@ -1668,84 +1667,91 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   //Note that memberships should be surjective to Products (some data has ProductId as null)
   //Also note that there maybe multiple inventories that map to a single product that correspond to a single membership
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const oldOptions = { ...options, app: contractName }
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
     const products = await managers.productManager.getProducts({ ownerOrganization: userOrganization }, newOptions);
     let addressOfProducts = products.map(item => item.address)
 
-    // Get all memberships
-    let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort: '-createdDate', productId: addressOfProducts }, newOptions)
+    // Set the batch size for addressOfProducts processing
+    const batchSize = 100;
 
-    //filter out memberships with null productIds and memberships that don't belong to the user's organization
-    memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization)
+    // Initialize an array to store all memberships
+    let allMemberships = [];
 
-    //Get the list of productIds for API calls
-    // const addressOfProducts = memberships.map(membership => membership.productId);
+    for (let i = 0; i < addressOfProducts.length; i += batchSize) {
+      const batch = addressOfProducts.slice(i, i + batchSize);
 
-    //Get Products
-    // const products = await managers.productManager.getProducts({ address: addressOfProducts }, newOptions);
+      // Get memberships for the current batch
+      let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort: '-createdDate', productId: batch }, newOptions);
 
-    //Attach product to membership
-    products.forEach(product => {
-      memberships = memberships.map(membership => {
-        return (membership.productId === product.address) ?
-          { ...membership, product: product, productImage: null, inventories: [] } : membership;
-      })
-    })
+      // Filter and process memberships
+      memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
 
-    //Get Product Image Info
-    const productImageInfo = await productFileJs.getAll(rawAdmin, { productId: addressOfProducts }, { ...options, org: managers.cirrusOrg, app: contractName });
+      // Attach product information
+      products.forEach(product => {
+        memberships = memberships.map(membership => {
+          return (membership.productId === product.address) ?
+            { ...membership, product: product, productImage: null, inventories: [] } : membership;
+        })
+      });
 
-    //Attach Product Image Info to Corresponding Membership
-    productImageInfo.forEach(productImage => {
-      memberships = memberships.map(membership => {
-        return (membership.productId === productImage.productId) ?
-          { ...membership, productImage: productImage } : membership;
-      })
-    })
+      // Attach Product Image Info
+      const productImageInfo = await productFileJs.getAll(rawAdmin, { productId: batch }, { ...options, org: managers.cirrusOrg, app: contractName });
 
-    //Get inventories using the corresponding ProductIds
-    const inventories = await managers.productManager.getInventories({ productId: addressOfProducts }, newOptions);
+      productImageInfo.forEach(productImage => {
+        memberships = memberships.map(membership => {
+          return (membership.productId === productImage.productId) ?
+            { ...membership, productImage: productImage } : membership;
+        })
+      });
 
-    //iterate through the list of inventories and attach the inventory status to the membership object
-    inventories.forEach(inventory => {
-      memberships = memberships.map(membership => {
-        let transformedData = { inventories: [], ...membership }
-        return (membership.productId === inventory.productId) ?
-          { ...membership, inventories: [...transformedData.inventories, inventory] } : membership;
-      })
-    })
+      // Get inventories using the corresponding ProductIds
+      const inventories = await managers.productManager.getInventories({ productId: batch }, newOptions);
 
-    const membershipAddressList = memberships.map(membership => membership.address);
-    //Get Services for price savings
-    const membershipServices = await membershipServiceJs.getAll(rawAdmin, { membershipId: membershipAddressList }, { ...options, org: managers.cirrusOrg, app: contractName });
+      // Iterate through the list of inventories and attach the inventory status to the membership object
+      inventories.forEach(inventory => {
+        memberships = memberships.map(membership => {
+          let transformedData = { inventories: [], ...membership }
+          return (membership.productId === inventory.productId) ?
+            { ...membership, inventories: [...transformedData.inventories, inventory] } : membership;
+        })
+      });
 
-    const serviceAddresses = membershipServices.map(membershipService => membershipService.serviceId);
+      const membershipAddressList = memberships.map(membership => membership.address);
+      // Get Services for price savings
+      const membershipServices = await membershipServiceJs.getAll(rawAdmin, { membershipId: membershipAddressList }, { ...options, org: managers.cirrusOrg, app: contractName });
 
-    // const servicesAll = await managers.serviceManager.getAll({ownerOrganization: userOrganization  }, { ...options, org: managers.cirrusOrg, app: contractName, });
-    const servicesAll = await managers.serviceManager.getAll({ address: serviceAddresses }, { ...options, org: managers.cirrusOrg, app: contractName, });
-    membershipServices.forEach(membershipService => {
-      servicesAll.forEach(service => {
-        if (service.address === membershipService.serviceId) {
-          memberships = memberships.map(membership => {
-            return ((membership.address === membershipService.membershipId)) ?
-              {
-                ...membership,
-                //Note we might have multiple service per membership
-                savings: (membership.hasOwnProperty('savings') ?
-                  membership.savings : 0) + (service.price - membershipService.membershipPrice)
-              }
-              : membership;
-          })
-        }
-      })
-    })
+      const serviceAddresses = membershipServices.map(membershipService => membershipService.serviceId);
 
-    console.log("Dapp-getMemberships memberships: ", memberships)
+      const servicesAll = await managers.serviceManager.getAll({ address: serviceAddresses }, { ...options, org: managers.cirrusOrg, app: contractName });
 
-    return memberships;
+      // Process savings for memberships
+      membershipServices.forEach(membershipService => {
+        servicesAll.forEach(service => {
+          if (service.address === membershipService.serviceId) {
+            memberships = memberships.map(membership => {
+              return ((membership.address === membershipService.membershipId)) ?
+                {
+                  ...membership,
+                  // Note we might have multiple services per membership
+                  savings: (membership.hasOwnProperty('savings') ?
+                    membership.savings : 0) + (service.price - membershipService.membershipPrice)
+                }
+                : membership;
+            })
+          }
+        })
+      });
+
+      // Add the batch of memberships to the allMemberships array
+      allMemberships = allMemberships.concat(memberships);
+    }
+
+    console.log("Dapp-getMemberships memberships: ", allMemberships);
+
+    return allMemberships;
   }
+
 
   contract.transferOwnershipMembership = async function (args, options = defaultOptions) {
     const { address, chainId, newOwner } = args

@@ -448,7 +448,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
         className="create-new-modal mt-14"
         footer={[
           <Row className="mt-8 create-modal-footer-shadow">
-            <Col span={8} className="flex mx-auto mt-4 py-5">
+            <Col span={8} className="flex justify-center mx-auto mt-4 py-5">
               {/* <Button
                 id="cancel-membership-button"
                 key="cancel"
