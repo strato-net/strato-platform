@@ -415,7 +415,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/order/userAddresses/user`,
+        `${apiUrl}/order/userAddresses/user?isDeleted=false&order=createdDate.desc`,
         {
           method: HTTP_METHODS.GET,
         }

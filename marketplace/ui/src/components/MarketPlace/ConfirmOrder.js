@@ -35,7 +35,7 @@ import ConfirmOrderModel from "./ConfirmOrderModel";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
-import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
+import { PlusCircleOutlined, MinusCircleOutlined, DeleteOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
 
 
@@ -318,45 +318,52 @@ const ConfirmOrder = () => {
     },
   ];
 
+  // const navigate = useNavigate();
 
+  // const handleOrderConfirm = async () => {
+  //   handleCancel();
+  //   let orderList = [];
+  //   let orderItemAddress = [];
+  //   confirmOrderList.forEach((item) => {
+  //     orderList.push({ inventoryId: item.key, quantity: item.qty });
+  //     orderItemAddress.push(item.key);
+  //   });
+  //   const body = {
+  //     buyerOrganization: userOrganization,
+  //     orderList,
+  //     orderTotal: total + tax + shipping,
+  //     shippingAddress: userAddresses[selectedAddress].address,
+  //   };
 
-  const navigate = useNavigate();
+  //   TagManager.dataLayer({
+  //     dataLayer: {
+  //       event: 'pay_later_button',
+  //     },
+  //   });
+  //   let isDone = await orderActions.createOrder(orderDispatch, body);
+  //   if (isDone) {
+  //     let updatedCart = [];
+  //     cartList.forEach(cart => {
+  //       if (!orderItemAddress.includes(cart.product.address)) {
+  //         updatedCart.push(cart);
+  //       }
+  //     });
+  //     actions.addItemToCart(marketplaceDispatch, updatedCart);
+  //     setTimeout(function () {
+  //       navigate(`/orders`, { state: { defaultKey: "Bought" } });
+  //     }, 2000);
+  //   }
+  // };
 
-
-  const handleOrderConfirm = async () => {
-    handleCancel();
-    let orderList = [];
-    let orderItemAddress = [];
-    confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
-      orderItemAddress.push(item.key);
-    });
-    const body = {
-      buyerOrganization: userOrganization,
-      orderList,
-      orderTotal: total + tax + shipping,
-      shippingAddress: userAddresses[selectedAddress].address,
-    };
-
-    TagManager.dataLayer({
-      dataLayer: {
-        event: 'pay_later_button',
-      },
-    });
-    let isDone = await orderActions.createOrder(orderDispatch, body);
-    if (isDone) {
-      let updatedCart = [];
-      cartList.forEach(cart => {
-        if (!orderItemAddress.includes(cart.product.address)) {
-          updatedCart.push(cart);
-        }
-      });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
-      setTimeout(function () {
-        navigate(`/orders`, { state: { defaultKey: "Bought" } });
-      }, 2000);
+  const handleDeleteAddress = async (_address) => {
+    const deleteAddress = await orderActions.deleteUserAddress(orderDispatch, {address: _address});
+    if (deleteAddress) {
+      await actions.fetchUserAddresses(marketplaceDispatch);
+      message.success("Address deleted successfully");
+    } else {
+      message.error("Error while deleting address");
     }
-  };
+  }
 
   const handlePaymentConfirm = async () => {
     let orderList = [];
@@ -614,12 +621,36 @@ const ConfirmOrder = () => {
                       {
                         userAddresses.map((add, index) =>
                           <div key={index}>
-                            <Card className={index !== selectedAddress ? "w-96 cursor-pointer" : "w-96 border border-primary cursor-pointer"} onClick={() => { setSelectedAddress(index) }}>
+                            <Card className={`w-max h-full hover:shadow-xl ${index !== selectedAddress ? "" : "border-primary"} hover:opacity-80`} onClick={() => { setSelectedAddress(index) }}>
+                              <div className="flex justify-end ">  
+                                <button onClick={()=> handleDeleteAddress(add.address)}> <DeleteOutlined className=" h-5 hover:text-error text-lg hover:text-xl" /> </button>
+                              </div>
                               <AddressComponent userAddress={add} />
                             </Card>
                           </div>
                         )
                       }
+                      {/* 
+                                {
+                        userAddresses.map((add, index) => {
+                            if (add.isDeleted === false) {
+                              return (
+                                <div key={index}>
+                                  <Card className={`w-max h-full hover:shadow-xl ${index !== selectedAddress ? "" : "border-primary"} hover:opacity-80`} onClick={() => { setSelectedAddress(index) }}>
+                                    <div className="flex justify-end ">  
+                                      <button onClick={()=> handleDeleteAddress(add.address)}> <DeleteOutlined className=" h-5 hover:text-error text-lg hover:text-xl" /> </button>
+                                    </div>
+                                    <AddressComponent userAddress={add} />
+                                  </Card>
+                                </div>
+                              )
+                            } else {
+                              return null;
+                            }
+                          }
+                        )
+                      }
+                       */}
                     </div>
                     :
                     <Card className="w-3/5 mt-4">

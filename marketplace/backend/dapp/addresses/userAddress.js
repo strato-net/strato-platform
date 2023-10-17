@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 // import dayjs from 'dayjs';
 
 
-const contractName = 'UserAddress_1';
+const contractName = 'UserAddress_2';
 const contractFilename = `${util.cwd}/dapp/addresses/contracts/UserAddress.sol`;
 
 /** 
@@ -127,6 +127,7 @@ function bind(user, _contract, options) {
     contract.getState = async () => getState(user, contract, options);
     contract.getMembers = async () => getMembers(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
+    contract.deleteUserAddress = async (args) => deleteUserAddress(user, args, options);
     contract.chainIds = options.chainIds;
 
     return contract;
@@ -186,20 +187,22 @@ async function getAll(admin, args = {}, options) {
     return userAddress.map((order) => marshalOut(order));
   }
 
-async function deleteUserAddress(args, options) {
-    console.log("deleteUserAddress", args, options)
-    // Takes the address of the userAddress contract and calls the delteUserAddress function
-    const { address, user } = args;
-
-    const userContract = await bindAddress(user.token, address, options);    
-    console.log("userContract", userContract)
-    const contractArgs = {
-        contract: userContract,
+async function deleteUserAddress(admin, args, baseOptions) {
+    const callArgs = {
+        contract: {
+            name: contractName,
+            address: args.address,
+        },
         method: 'deleteUserAddress',
         args: {},
     };
 
-    const contract = await rest.call(user, contractArgs, options);
+    const options = {
+        ...baseOptions,
+        history: [contractName],
+    };
+
+    const contract = await rest.call(admin, callArgs, options);
     return contract;
 }   
 

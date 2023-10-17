@@ -29,6 +29,9 @@ const actionDescriptors = {
   updateSellerDetails: "update_seller_details",
   updateSellerDetailsSuccessful: "update_seller_details_successful",
   updateSellerDetailsFailed: "update_seller_details_failed",
+  deleteUserAddress: "delete_user_address", 
+  deleteUserAddressSuccessful: "delete_user_address_successful",
+  deleteUserAddressFailed: "delete_user_address_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
 };
@@ -371,7 +374,48 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while updating Order");
     }
-  }
+  },
+
+  deleteUserAddress: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.deleteUserAddress });
+    console.log("payload", payload);
+    try {
+      const response = await fetch(`${apiUrl}/order/userAddress/delete`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.deleteUserAddressSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Address has been deleted", true);
+        return true;
+      }
+
+      dispatch({
+        type: actionDescriptors.deleteUserAddressFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.deleteUserAddressFailed,
+        error: "Error while deleting Address",
+      });
+      actions.setMessage(dispatch, "Error while deleting Address");
+    }
+  },
+
 };
 
 export { actionDescriptors, actions };

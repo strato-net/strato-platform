@@ -169,6 +169,23 @@ const reducer = (state, action) => {
         error: action.error,
         issellerDetailsUpdating: false,
       };
+    case actionDescriptors.deleteUserAddress:
+      return {
+        ...state,
+        isUserAddressDeleting: true,
+      };
+    case actionDescriptors.deleteUserAddressSuccessful:
+      return {
+        ...state,
+        userAddressDeleteObject: action.payload,
+        isUserAddressDeleting: false,
+      };
+    case actionDescriptors.deleteUserAddressFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUserAddressDeleting: false,
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

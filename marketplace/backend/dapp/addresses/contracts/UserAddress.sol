@@ -5,7 +5,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of UserAddress assets
-contract UserAddress_1 is RestStatus {
+contract UserAddress_2 is RestStatus {
 
     address public owner;
     string public ownerOrganization;
@@ -76,7 +76,7 @@ contract UserAddress_1 is RestStatus {
         ownerCommonName = ownerCert["commonName"];
     }
 
-    function deleteUserAddress() returns (uint){
+    function deleteUserAddress() public returns (uint){
     //   if(ownerOrganization != getUserOrganization(tx.origin)){
     //     return RestStatus.FORBIDDEN;
     //   }

@@ -4,7 +4,6 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/orders/contracts/Order.sol";
 import "./OrderStatus.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
-import "dapp/addresses/contracts/UserAddress.sol";
 
 contract OrderManager is RestStatus,OrderStatus{
   
@@ -50,10 +49,5 @@ contract OrderManager is RestStatus,OrderStatus{
     function addOrderLineItems(address _orderLineId,string[] _items, uint _createdDate) public  returns(uint256, string, string){
         OrderLine_2 orderLine = OrderLine_2(_orderLineId);
         return orderLine.addOrderLineItems(_orderLineId,_items,_createdDate);
-    }
-
-    function deleteUserAddress(address _userAddress) public returns(uint256){
-        UserAddress_1 userAddress = UserAddress_1(_userAddress);
-        return userAddress.deleteUserAddress();
     }
 }

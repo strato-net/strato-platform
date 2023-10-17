@@ -21,7 +21,7 @@ contract PaymentManager is PaymentServices {
     }
 
     function createUserAddress(string _shippingName, string _shippingZipcode, string _shippingState, string _shippingCity, string _shippingAddressLine1, string _shippingAddressLine2, string _billingName, string _billingZipcode, string _billingState, string _billingCity, string _billingAddressLine1, string _billingAddressLine2, uint _createdDate) public returns(uint,address){
-        UserAddress_1 userAddress = new UserAddress_1(_shippingName,_shippingZipcode,_shippingState,_shippingCity,_shippingAddressLine1,_shippingAddressLine2,_billingName,_billingZipcode,_billingState,_billingCity,_billingAddressLine1,_billingAddressLine2,_createdDate);
+        UserAddress_2 userAddress = new UserAddress_2(_shippingName,_shippingZipcode,_shippingState,_shippingCity,_shippingAddressLine1,_shippingAddressLine2,_billingName,_billingZipcode,_billingState,_billingCity,_billingAddressLine1,_billingAddressLine2,_createdDate);
         return (RestStatus.CREATED, address(userAddress));
     }
 

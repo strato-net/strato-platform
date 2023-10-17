@@ -134,8 +134,6 @@ function bind(user, _contract, options) {
     orderLineItemJs.get(user, args, options);
   contract.getOrderLineItems = async (args,options=defaultOptions) =>
     orderLineItemJs.getAll(user, args, options);
-  contract.deleteUserAddress = async (args, options=defaultOptions) => 
-    deleteUserAddress(user, contract, args, options);
   return contract;
 }
 
@@ -318,28 +316,6 @@ async function createOrder(admin, contract, _args, baseOptions) {
     throw new rest.RestError(restStatus, 0, { callArgs });
 
   return [restStatus, orderLineItemAddress];
-}
-
-async function deleteUserAddress(admin, contract, _args, baseOptions) {
-  callArgs = {
-    contract,
-    method: "deleteUserAddress",
-    args: util.usc({
-      ..._args,
-    }),
-  };
-
-  const options = {
-    ...baseOptions,
-    history: [contractName],
-  };
-
-  const [restStatus] = await rest.call(admin, callArgs, options);
-
-  if (parseInt(restStatus, 10) !== RestStatus.OK)
-    throw new rest.RestError(restStatus, 0, { callArgs });
-
-  return restStatus;
 }
 
 /**
