@@ -399,7 +399,7 @@ spec = do
     '564',
     '77714314',
     'Hello, World!',
-    '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
+    '{"first_field":"887","second_field":"CLOROX DISINFECTING WIPES"}')
   ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
     block_hash = excluded.block_hash,
@@ -602,7 +602,7 @@ spec = do
     '564',
     '77714314',
     'Hello, World!',
-    '[["first_field","887"],["second_field","CLOROX DISINFECTING WIPES"]]')
+    '{"first_field":"887","second_field":"CLOROX DISINFECTING WIPES"}')
   ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
     block_hash = excluded.block_hash,
