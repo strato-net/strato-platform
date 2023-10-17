@@ -310,31 +310,31 @@ const MembershipDetails = ({ user, users }) => {
 
   const serviceColumn = [
     {
-      title: <Text className="text-primaryC font-semibold text-base">NAME</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Name</Text>,
       dataIndex: "serviceName",
       key: "name",
       render: (text) => <p>{decodeURIComponent(text)}</p>
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">DESCRIPTION</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Description</Text>,
       dataIndex: "serviceDesc",
       key: "serviceDesc",
       render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Membership Price</Text>,
       dataIndex: "memberPrice",
       key: "memberPrice",
       render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">NON-MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Non-Memberhsip Price</Text>,
       dataIndex: "nonMemberPrice",
       key: "nonMemberPrice",
       render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">USES</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Uses</Text>,
       dataIndex: "uses",
       key: "uses",
       render: (text) => <p className="text-left">{decodeURIComponent(text)}</p>,
@@ -557,33 +557,59 @@ const MembershipDetails = ({ user, users }) => {
                 <Row>
                   <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
                   <Col span={24} className="border-t-1 h-20 mt-8">
-                    <Row className="flex justify-between h-10 mt-5">
-                      <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn " onClick={subtract}>
-                        {minusIcon()}
-                      </Button> </Col>
-                      <Col span={16} className="border border-grayLight rounded-md align-middle text-center h-14 py-2" >
-                        <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{qty}</Text>
-                      </Col>
-                      <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn" onClick={add}> {plusIcon()} </Button>  </Col>
-                    </Row>
+                    {details?.availableQuantity != 0
+                      ? <Row className="flex justify-between h-10 mt-5">
+                        <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn " onClick={subtract}>
+                          {minusIcon()}
+                        </Button> </Col>
+                        <Col span={16} className="border border-grayLight rounded-md align-middle text-center h-14 py-2" >
+                          <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{qty}</Text>
+                        </Col>
+                        <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn" onClick={add}> {plusIcon()} </Button>  </Col>
+                      </Row>
+                      : <Paragraph style={{ color: 'red' }} className="mt-5 text-sm decoration-red-700" id="prod-price">
+                        If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+                      </Paragraph>}
                   </Col>
                 </Row>
               </Card>
               <Row className="h-14 mt-4">
-                <Button type={ownerSameAsUser ? "default" : "primary"} block={true} size="large" className=" h-full  py-4 h-px-56"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      formik.setFieldValue("name", details?.name);
-                      openListNowModal();
-                    }
-                  }}
-                  // disabled={ownerSameAsUser}
-                > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text> </Button>
+                {details?.availableQuantity == 0 ?
+                  <Button
+                    block={true}
+                    type="primary"
+                    size="large"
+                    className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
+                    href={`mailto:sales@blockapps.net`}
+                  // onClick={() => {
+                  //   TagManager.dataLayer({
+                  //     dataLayer: {
+                  //       event: 'contact_sales_from_category_card',
+                  //       product_name: product.name,
+                  //       category: product.category,
+                  //       productId: product.productId
+                  //     },
+                  //   });
+                  // }}
+                  >
+                    Contact to Buy
+                  </Button> :
+                  <Button
+                    type={ownerSameAsUser ? "default" : "primary"}
+                    block={true} size="large" className=" h-full py-4 h-px-56"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        window.location.href = loginUrl;
+                      } else {
+                        formik.setFieldValue("name", details?.name);
+                        openListNowModal();
+                      }
+                    }}
+                    disabled={ownerSameAsUser}
+                  > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
+                  </Button>}
               </Row>
             </Col>
-
           </Row>
 
           <Row className="max-w-4xl mx-auto mt-10">

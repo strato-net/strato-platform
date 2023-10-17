@@ -203,7 +203,7 @@ const ListNowIndex = ({
             <Row> <Select
               className="w-full mt-2"
               size="large"
-              placeholder="Membership"
+              // placeholder="Membership"
               suffixIcon={selectSuffix}
               disabled={isPurchasedMembershipLoading}
               onChange={(value) => {
@@ -217,7 +217,7 @@ const ListNowIndex = ({
             <Row><Select
               className="w-full mt-2"
               size="large"
-              placeholder="Membership Id"
+              // placeholder="Membership Id"
               value={membershipNumber}
               suffixIcon={selectSuffix}
               disabled={isPurchasedMembershipLoading}
@@ -239,7 +239,7 @@ const ListNowIndex = ({
               controls={false}
               type="number"
               className="w-full mt-2"
-              placeholder="Quantity"
+              // placeholder="Quantity"
               prefix={isInventoriesLoading && <Spin />}
               onWheel={(e) => e.target.blur()}
               disabled={type === "Sale"}
@@ -257,23 +257,23 @@ const ListNowIndex = ({
             <Row> <InputNumber
               id="percentage"
               name="percentage"
-              // addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between">
-              //   <Col span={12} className={`p-1 ${isTaxPercentage ? "bg.theme-F2F2F5":""}`} onClick={() => { setIsTaxPercentage(true) }}>
-              //     %
-              //   </Col>
-              //   <Col span={12} className={`p-1 ${!isTaxPercentage ? "bg.theme-F2F2F5":""}`} onClick={() => { setIsTaxPercentage(true) }}>
-              //     $
-              //   </Col>
-              // </Row>}
-              className="w-full mt-2"
+              addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
+                <Col span={12} className="p-1" style={{ backgroundColor: isTaxPercentage ? "#F2F2F5" : "" }} onClick={() => { setIsTaxPercentage(true) }}>
+                  %
+                </Col>
+                <Col span={12} className="p-1" style={{ backgroundColor: !isTaxPercentage ? "#F2F2F5" : "" }} onClick={() => { setIsTaxPercentage(false) }}>
+                  $
+                </Col>
+              </Row>}
+              className="w-full mt-2 h-12 addon-custom"
               // className="w-full mt-2 discount-btn"
               size="large"
               controls={false}
               type="number"
-              placeholder="Percentage"
+              // placeholder="Percentage"
               onWheel={(e) => e.target.blur()}
               min={0}
-              addonAfter={selectAfter}
+              // addonAfter={selectAfter}
               formatter={handleFormatter}
               parser={handleParser}
               value={taxPercentage}
@@ -300,7 +300,7 @@ const ListNowIndex = ({
                 name="price"
                 controls={false}
                 type="number"
-                placeholder="Price"
+                // placeholder="Price"
                 onWheel={(e) => e.target.blur()}
                 min={0}
                 value={price}

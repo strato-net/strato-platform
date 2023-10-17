@@ -1682,10 +1682,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const batch = addressOfProducts.slice(i, i + batchSize);
 
       // Get memberships for the current batch
-      let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort: '-createdDate', productId: batch }, newOptions);
+      let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort: '-createdDate', productId: batch, ownerOrganization: userOrganization }, newOptions);
 
       // Filter and process memberships
-      memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
+      // memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
+      memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined);
 
       // Attach product information
       products.forEach(product => {

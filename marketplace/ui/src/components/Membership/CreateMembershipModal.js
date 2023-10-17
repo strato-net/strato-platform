@@ -781,6 +781,18 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                           // placeholder="Discount"
                           type="number"
                           size="large"
+                          // addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
+                          //   <Col span={12} className="p-1" 
+                          //   style={{ backgroundColor: isTaxPercentage ? "#F2F2F5" : "" }} 
+                          //   onClick={() => { handleDiscountType("Percent", index) }}>
+                          //     %
+                          //   </Col>
+                          //   <Col span={12} className="p-1" 
+                          //   style={{ backgroundColor: !isTaxPercentage ? "#F2F2F5" : "" }} 
+                          //   onClick={() => { handleDiscountType("Dollar", index) }}>
+                          //     $
+                          //   </Col>
+                          // </Row>}
                           addonAfter={selectAfter(index)}
                           controls={false}
                           min={0}

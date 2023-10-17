@@ -104,6 +104,7 @@ const MembershipCardPurchased = ({
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
+  const InventoriesLen = Inventories?.length > 0;
 
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
@@ -224,7 +225,11 @@ const MembershipCardPurchased = ({
   //   </button>
   // );
 
-
+  const statusColor = {
+    1: 'green',
+    2: "red"
+  }
+  const inventoriesCol = (Inventories && Inventories.length == 0) ? "red" : "green";
 
   return (
     <>
@@ -244,9 +249,9 @@ const MembershipCardPurchased = ({
                 </Row>
                 <Row strong className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>
                   <Col className="m-tp-5 w-2.5 h-2.5 rounded-md" style={{
-                    borderRadius: '10%', backgroundColor: `${status == 1 ? 'green' : status == 2 ? 'red' : 'green'}`,
+                    borderRadius: '10%', backgroundColor: `${(status && statusColor[status]) ?? inventoriesCol} `,
                   }} > </Col>
-                  &nbsp; {statusText[status] ?? "For Sale"}
+                  &nbsp; {statusText[status] ?? (Inventories?.length > 0 ? "For Sale" : "Not for Sale")}
                 </Row>
               </Col>
               <Col className="text-right flex" style={{ alignItems: "center" }}>

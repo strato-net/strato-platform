@@ -103,6 +103,7 @@ const Membership = (user) => {
   let {
     memberships,
     ismembershipsLoading,
+    purchasedMemberships,
     message,
     success,
     stripeStatus,
@@ -238,7 +239,7 @@ const Membership = (user) => {
                     </Row>
                     <Row>
                       <Typography.Text className="text-sm font-medium text-grey">
-                        {memberships.length} {typeDisplay} Memberships found
+                        {typeDisplay === "purchase" ? purchasedMemberships?.length : memberships?.length} {typeDisplay} Memberships found
                       </Typography.Text>
                     </Row>
                   </Col>
