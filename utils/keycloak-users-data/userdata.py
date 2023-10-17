@@ -166,6 +166,6 @@ if __name__ == '__main__':
         },
     ]
     if 'SLACK_DISABLED' not in os.environ or os.environ['SLACK_DISABLED'] != 'true':
-        UserData.slack_send(channel=credentials.SLACK['ops_channel_id'], file_uploads_data=file_uploads)
+        UserData.slack_send(channel=credentials.SLACK['stats_channel_id'], file_uploads_data=file_uploads)
     else:
         print('SLACK_DISABLED is true, skipping slack send')
