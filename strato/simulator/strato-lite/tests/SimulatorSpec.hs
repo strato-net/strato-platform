@@ -54,6 +54,7 @@ import Control.Lens hiding (Context, view)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Reader
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Short as BSS
 import Data.Foldable (for_)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as Set
@@ -293,7 +294,7 @@ spec = do
                     U.unsignedTransactionGasLimit = Gas 1000000000,
                     U.unsignedTransactionTo = Nothing,
                     U.unsignedTransactionValue = Wei 0,
-                    U.unsignedTransactionInitOrData = Code $ BC.pack registry,
+                    U.unsignedTransactionInitOrData = Code $ BSS.toShort $ BC.pack registry,
                     U.unsignedTransactionChainId = Nothing
                   }
               )
@@ -613,7 +614,7 @@ contract RegisterCert {
                 U.unsignedTransactionGasLimit = Gas 1000000000,
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
-                U.unsignedTransactionInitOrData = Code $ BC.pack src,
+                U.unsignedTransactionInitOrData = Code $ BSS.toShort $ BC.pack src,
                 U.unsignedTransactionChainId = Nothing
               }
           txMd addr cert = M.fromList [("src", src), ("name", contractName), ("args", args addr cert)]
@@ -828,7 +829,7 @@ contract B {
                 U.unsignedTransactionGasLimit = Gas 1000000000,
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
-                U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc,
+                U.unsignedTransactionInitOrData = Code $ BSS.toShort $ BC.pack mainChainSrc,
                 U.unsignedTransactionChainId = Nothing
               }
           mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]
@@ -1055,7 +1056,7 @@ contract C {
                 U.unsignedTransactionGasLimit = Gas 1000000000,
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
-                U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrc,
+                U.unsignedTransactionInitOrData = Code $ BSS.toShort $ BC.pack mainChainSrc,
                 U.unsignedTransactionChainId = Nothing
               }
           mainChainUtx2 =
@@ -1065,7 +1066,7 @@ contract C {
                 U.unsignedTransactionGasLimit = Gas 1000000000,
                 U.unsignedTransactionTo = Nothing,
                 U.unsignedTransactionValue = Wei 0,
-                U.unsignedTransactionInitOrData = Code $ BC.pack mainChainSrcC,
+                U.unsignedTransactionInitOrData = Code $ BSS.toShort $ BC.pack mainChainSrcC,
                 U.unsignedTransactionChainId = Nothing
               }
           mainChainTxMd = M.fromList [("src", mainChainSrc), ("name", mainChainContractName), ("args", mainChainArgs)]

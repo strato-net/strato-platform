@@ -66,7 +66,7 @@ import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 import qualified Data.ByteString.Char8               as C8
-import qualified Data.ByteString.Short               as S
+import qualified Data.ByteString.Short               as BSS
 import qualified LabeledError
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.RequestLogger
@@ -390,7 +390,7 @@ spec = do
           getChainTx chainId = do
             tx <- runIO $ do
               pk <- newPrivateKey
-              createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 S.empty (Just $ keccak256ToWord256 chainId) Nothing pk
+              createChainMessageTX 0 1 1 (Address 0xdeadbeef) 0 BSS.empty (Just $ keccak256ToWord256 chainId) Nothing pk
             let hashTx = PrivateHashTX (txHash tx) chainId
             pure (hashTx, tx)
 

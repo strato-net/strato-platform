@@ -405,7 +405,7 @@ rethrowEx _ = return ()
 --Adds a contract to the 0xfeedbeef chain
 runArgsWithSenderBeef :: Account -> T.Text -> String -> ContextM ExecResults
 runArgsWithSenderBeef acc args bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ BSS.toShort $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -459,7 +459,7 @@ runArgsWithSenderBeef acc args bs = do
 --Adds contract to the "main chain"
 runArgsWithSender :: Account -> T.Text -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ BSS.toShort $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -512,7 +512,7 @@ runArgsWithSender acc args bs = do
 
 runArgsWithOrigin :: Account -> Account -> T.Text -> String -> ContextM ExecResults
 runArgsWithOrigin orig acc args bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ BSS.toShort $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
@@ -631,7 +631,7 @@ runArgsBeef = runArgsWithSenderBeef sender
 
 runCall :: T.Text -> T.Text -> String -> ContextM (Maybe String)
 runCall funcName callArgs bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ BSS.toShort $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       isRCC = False
@@ -715,7 +715,7 @@ runCall funcName callArgs bs = do
 -- compare the returned value (but got) with expected value (expected) in the test case
 runCall' :: T.Text -> T.Text -> String -> ContextM (Maybe String)
 runCall' funcName callArgs bs = do
-  let code = Code $ UTF8.fromString bs
+  let code = Code $ BSS.toShort $ UTF8.fromString bs
       isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
       isRCC = False
