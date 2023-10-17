@@ -143,7 +143,6 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-    console.log(contractName);
     const { org, ...modifiedOptions } = options;
     const { uniqueInventoryID, address, ownerOrganization, ...restArgs } = args;
     let inventory;
@@ -166,7 +165,6 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    console.log(contractName);
     const { org, ...modifiedOptions } = options;
     const {ownerOrganization, ...modifiedArgs} = args
     const inventories = await searchAllWithQueryArgs(contractName, modifiedArgs, modifiedOptions, admin)
