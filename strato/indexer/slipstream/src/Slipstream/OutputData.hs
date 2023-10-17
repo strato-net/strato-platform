@@ -1167,7 +1167,7 @@ solidityTypeToSQLType (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
 solidityTypeToSQLType (SVMType.UnknownLabel _ _) = Just "text"
 --solidityTypeToSQLType (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
 solidityTypeToSQLType (SVMType.Struct _ _) = Just "jsonb"
-solidityTypeToSQLType (SVMType.Enum _ _ _) = Just "text"
+solidityTypeToSQLType (SVMType.Enum _ _ _) = Just "jsonb"
 solidityTypeToSQLType (SVMType.Contract _) = Just "text"
 solidityTypeToSQLType (SVMType.Error _ _) = Just "text"
 solidityTypeToSQLType SVMType.Variadic = Nothing
@@ -1206,6 +1206,6 @@ valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueArrayFixed _ _) = Nothing
 valueToSQLText (ValueArrayDynamic _) = Nothing
---valueToSQLText (ValueStruct namedItems) = Nothing
+valueToSQLText struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
 
 valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
