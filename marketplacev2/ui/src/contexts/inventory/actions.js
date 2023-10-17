@@ -102,7 +102,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,
-          payload: body,
+          payload: body.data,
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
