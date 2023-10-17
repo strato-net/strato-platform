@@ -1,5 +1,5 @@
 import RestStatus from "http-status-codes";
-import { apiUrl, cirrusUrl, assetTableName, HTTP_METHODS } from "../../helpers/constants";
+import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
   createInventory: "create_inventory",
@@ -91,7 +91,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${cirrusUrl}/${assetTableName}?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -102,7 +102,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,
-          payload: body,
+          payload: body.data,
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
@@ -113,7 +113,7 @@ const actions = {
       }
       dispatch({
         type: actionDescriptors.fetchInventoryFailed,
-        error: body,
+        error: body.error,
       });
     } catch (err) {
       dispatch({
@@ -191,7 +191,7 @@ const actions = {
           type: actionDescriptors.resellInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory created successfully to resell", true);
+        actions.setMessage(dispatch, "Resale inventory was successfully created", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.resellInventoryFailed, error: body.error.message });

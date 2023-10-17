@@ -1,0 +1,90 @@
+# Adding Notifications/Live UI Updates to the Marketplace Frontend
+This write up explains how to add notifications or have the UI update in some way without the user needing to refresh the page. 
+
+### Prerequisites
+This feature relies on events emitted in SolidVM. In order to use data to customize the frontend, it must be emitted from the relevant contract. Ex:
+```
+contract Item {
+  event OwnershipUpdate(string seller, string newOwner, ..);
+  
+  function transferOwnership(address _newOwner) public returns (uint) {
+      emit OwnershipUpdate(tx.organization, _newOwner, ..);
+      // some code here
+    }
+}
+```
+If there is no event emitted, _you will not get any notification data_. Please be sure you meet this prerequisite to avoid some lengthy debugging sessions.
+
+### Getting Started
+You can get updates about events emitted on the blockchain by subscribing to the websocket server hosted on the marketplace backend's `/eventstream` endpoint. This server forwards SolidVM events as they are emitted on the blockchain (see Prerequisites section above). Here is an example of what the data streaming from the websocket server looks like:
+
+```
+{
+  "eventBlockHash" : "660e3af16f3fe5f0b5d88b30a6604772aa186a235b884b340d3511a7f4331a33",
+  "eventBlockNumber": "2566",
+  "eventTxHash" : "ae3bcd5c3091fc4346753731005ff885bb4df9c3079d1c79ede5c30dae81d5ac",
+  "eventBlockTimestamp" : "2023-08-10T16:48:24Z",
+  "eventTxSender" : "99bb4ca635913202b0cb0dfe252bb2a41caabfe0", // can match to user by cirrus Certificate's userAddress
+  "eventEvent" : {
+      "eventContractAccount": "e72a9698dd1389f918553d6941a7a67886aa1dda",
+      "eventContractOrganization" : "BlockApps",
+      "eventContractApplication" : "Dapp"
+      "eventContractName" : "Item_3",
+      "eventName" : "OwnershipUpdate",
+      "eventArgs" : [
+        ["arg_1_name", "arg_1_value"],
+        ["arg_2_name", "arg_2_vaule"],
+        ...
+      ],
+      "eventBlockHash": "660e3af16f3fe5f0b5d88b30a6604772aa186a235b884b340d3511a7f4331a33"
+  }
+}
+```
+
+There is a helper function called `useEventStream` within `marketplace/ui/src/helpers/websocket.js` that will handle websocket setup and configuration for you. `useEventStream` will return the following values (taken from the documentation of [react-use-websocket](https://github.com/robtaussig/react-use-websocket#readme), which is the main dependency for `useEventStream`):
+```{
+  sendMessage: (message: string, keep: boolean = true) => void,
+  //jsonMessage must be JSON-parsable
+  sendJsonMessage: (jsonMessage: T, keep: boolean = true) => void,
+  //null before first received message
+  lastMessage: WebSocketEventMap['message'] | null,
+  //null before first received message. If message.data is not JSON parsable, then this will be a static empty object
+  lastJsonMessage: T | null,
+  // -1 if uninstantiated, otherwise follows WebSocket readyState mapping: 0: 'Connecting', 1 'OPEN', 2: 'CLOSING', 3: 'CLOSED'
+  readyState: number,
+  // If using a shared websocket, return value will be a proxy-wrapped websocket, with certain properties/methods protected
+  getWebSocket: () => (WebSocketLike | null),
+}
+```
+However, you will likely only want to use `lastMessage` or `lastJsonMessage` (returns `lastMessage.data` as a JSON-parsed object). Both will be null until the first message is received. Optionally, you can provide a filter function, which will cause `lastMessage`/`lastJsonMessage` to only update when the filter function returns true. For example, if we only cared about new certificates registered, we could do
+```
+const { lastMessage } = useEventStream((msg) => 
+    JSON.parse(msg.data)?.eventEvent?.eventName === "CertificateRegistered");
+```
+(be sure to do `JSON.parse(msg.data)` because the filter function will be applied to the raw message data). The filter function allows for rich customization. For example, if we wanted to provide a live view of what assets our company owns, we could do
+```
+const [myOrgsAssets, setMyOrgsAssets] = useState([somestuff]);
+const myOrg = "BlockApps";
+function myOrgsAssetsFilter(msg){
+  const event = JSON.parse(msg.data);
+  return event?.eventEvent?.eventName === "OwnershipUpdate"
+    && event?.eventEvent?.eventArgs.some(arrElem => arrElem[0] === 'newOwner' && arrElem[1] === myOrg);
+}
+const { lastJsonMessage: lastAssetBought } = useEventStream(myOrgsAssetsFilter);
+
+useEffect(() => {
+  if (lastAssetBought !== null){
+    setMyOrgsAssets(prev => prev.concat(lastAssetBought));
+  }
+}, [lastAssetBought, setMyOrgsAssets]);
+```
+
+### Current Limitations
+This system currently has the following limitations:
+
+- *Can only get events that occur during the session*: this system currently can only notify of events that occur during the user's session. If an event (such as an item being sold) occurs while the user is not logged in, the system currently has no way of keeping track what was the last event they viewed. It has no way of knowing what past events are and aren't news to the user.
+
+- *Cannot send email notifications*: supporting email notifications will require platform-level changes since we currently do not store users' emails anywhere on-chain, in vault, or in the marketplace backend.
+
+### Where Can I Find More Information?
+This information is also located in Confluence at https://blockapps.atlassian.net/l/cp/C8QrEQPR
