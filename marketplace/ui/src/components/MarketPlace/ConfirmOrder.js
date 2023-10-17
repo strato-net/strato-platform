@@ -359,10 +359,7 @@ const ConfirmOrder = () => {
     const deleteAddress = await orderActions.deleteUserAddress(orderDispatch, {address: _address});
     if (deleteAddress) {
       await actions.fetchUserAddresses(marketplaceDispatch);
-      message.success("Address deleted successfully");
-    } else {
-      message.error("Error while deleting address");
-    }
+    } 
   }
 
   const handlePaymentConfirm = async () => {
