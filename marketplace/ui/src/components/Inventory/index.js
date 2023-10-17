@@ -72,7 +72,7 @@ const Inventory = ({ user }) => {
   }, [dispatch, user]);
 
   useEffect(() => {
-    let len = inventories ? inventories.length : 0;
+    let len = inventories.length;
     let total;
     if (len === limit) total = page * 10 + limit;
     else total = (page - 1) * 10 + limit;
@@ -143,7 +143,7 @@ const Inventory = ({ user }) => {
         </div>
       ) : (
         <div className="mx-16 mt-14">
-          {(inventories && inventories.length === 0) && offset === 0 ? (
+          {inventories.length === 0 && offset === 0 ? (
             <div className="h-screen justify-center flex flex-col items-center">
               <Image src={Images.noProductSymbol} preview={false} />
               <Title level={3} className="mt-2">
@@ -223,7 +223,7 @@ const Inventory = ({ user }) => {
                 </div>
               </div>
               <>
-                {inventories && inventories.length !== 0 ? (
+                {inventories.length !== 0 ? (
                   <div className="my-4" id="inventory-list">
                     {inventories.map((inventory, index) => {
                       let category = categorys.find(

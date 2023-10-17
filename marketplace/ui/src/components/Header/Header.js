@@ -55,6 +55,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         { label: <div id="Inventory">Inventory</div>, key: '2' },
         { label: <div id="Products">Products</div>, key: '3' },
         // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
+        // showStorage && { label: <div id="Storage">Storage</div>, key: '5' }, //hiding storage tab
       ]
     },
     {
@@ -71,6 +72,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
+    routes.Storage.url,
   ];
 
   const logout = () => {
@@ -95,7 +97,9 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
-    } 
+    } else if (pathName.includes("/storage")) {
+      setSelectedTab("5");
+    }
     else {
       setSelectedTab("0");
     }
@@ -211,6 +215,13 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             navigate(navUrls[item.key], { state: { tab: "EventType" } })
           }
           else navigate(navUrls[item.key]);
+          if (item.key === "5") {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: 'view_storage_page',
+              }
+            });
+          }
         }}
         items={navItems[roleIndex]?.items}
       />
