@@ -91,7 +91,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${cirrusUrl}/${assetTableName}?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
