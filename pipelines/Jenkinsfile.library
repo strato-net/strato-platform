@@ -1262,4 +1262,70 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
     '''
 }
 
+/**
+ * Test to see if a node can complete a full sync
+ * Prereqs: this script assumes you already started up a strato node!
+ * Keep in mind this script will not wipe the strato node at the end, 
+ * nor will it post any txs to the blockchain. It simply passively checks
+ * for a completed sync or for any potential failures along the way
+ */
+def runSyncTester() {
+  sh '''#!/usr/bin/env bash
+  counter=0
+  # make sure started syncing (have 1+ active connections to peers)
+  ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
+  NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+  until [[ -n $ETH_DB_NAME && $NUM_ACTIVE_PEERS -gt 0 ]]
+  do
+      if (( $counter >= 120 )) ; then
+          echo "Failure: STRATO node did not connect to any peers in 2 minutes. Something is preventing sync from starting"
+          exit 3
+      fi
+      sleep 1
+      ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
+      NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+      counter=$((++counter))
+  done
+
+  WAIT_TIME=30
+  STALLED_INTERVALS=0
+  MAX_STALLED_INTERVALS=10
+
+  LAST_VM_BLOCK_NUM=0
+  LAST_SEQ_BLOCK_NUM=0
+
+  METADATA=$(sudo ./strato --get-metadata)
+  IS_SYNCED=$(jq -r .isSynced <<< ${METADATA})
+  while [ "$IS_SYNCED" != true ]; do
+      echo "**************************************"
+      if [[ $(sudo docker ps | grep unhealthy) ]]; then
+          echo "Failure: one or more docker containers became unhealthy during sync"
+          exit 2
+      fi
+      STATUS=$(sudo docker exec strato-apex-1 curl -s -f http://localhost:3009/status )
+      CUR_VM_BLOCK_NUM=$(jq -r .lastBlock.number <<< ${STATUS})
+      CUR_SEQ_BLOCK_NUM=$(jq -r .pbftData.sequence_number <<< ${STATUS})
+      echo "prev vm block #: ${LAST_VM_BLOCK_NUM}, cur vm block #: ${CUR_VM_BLOCK_NUM}"
+      echo "prev seq block #: ${LAST_SEQ_BLOCK_NUM}, cur seq block #: ${CUR_SEQ_BLOCK_NUM}"
+      if [[ $CUR_VM_BLOCK_NUM == $LAST_VM_BLOCK_NUM && $CUR_SEQ_BLOCK_NUM == $LAST_SEQ_BLOCK_NUM ]] ; then
+          # VM and Sequencer not gone forward. Perhaps stalled
+          if (( $STALLED_INTERVALS < $MAX_STALLED_INTERVALS )) ; then 
+              STALLED_INTERVALS=$((++STALLED_INTERVALS))
+          else
+              echo "Failure: node stalled during sync; went $(( MAX_STALLED_INTERVALS * WAIT_TIME )) seconds without increasing block number"
+              exit 1
+          fi
+      else
+          STALLED_INTERVALS=0
+      fi
+      sleep $WAIT_TIME
+      IS_SYNCED=$(sudo ./strato --get-metadata | jq -r .isSynced)
+      LAST_VM_BLOCK_NUM=$CUR_VM_BLOCK_NUM
+      LAST_SEQ_BLOCK_NUM=$CUR_SEQ_BLOCK_NUM
+  done
+  echo "Sync successful!"
+  exit 0
+'''
+}
+
 return this
