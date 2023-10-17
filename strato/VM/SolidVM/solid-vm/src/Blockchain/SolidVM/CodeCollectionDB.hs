@@ -44,7 +44,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import qualified Data.Aeson as Aeson
 import Data.Bifunctor (bimap, first)
-import qualified Data.ByteString as B
+import Data.ByteString.Short (ShortByteString, toShort, fromShort)
 import qualified Data.ByteString.Lazy as BL
 -- import           System.Clock
 -- import qualified Data.Cache                          as DC
@@ -210,14 +210,14 @@ codeCollectionFromSource ::
     -- , HasCodeCollectionDB m
   ) =>
   Bool ->
-  B.ByteString ->
+  ShortByteString ->
   m (Keccak256, CodeCollection)
 codeCollectionFromSource typeCheck initCode = do
-  let initList = case Aeson.decode $ BL.fromStrict initCode of
+  let initList = case Aeson.decode $ BL.fromStrict $ fromShort initCode of
         Just l -> l
-        Nothing -> case Aeson.decode $ BL.fromStrict initCode of
+        Nothing -> case Aeson.decode $ BL.fromStrict $ fromShort initCode of
           Just m -> M.toList m
-          Nothing -> [(T.empty, decodeUtf8 initCode)] -- for backwards compatibility
+          Nothing -> [(T.empty, decodeUtf8 . fromShort $ initCode)] -- for backwards compatibility
       initMap = M.fromList initList
       canonicalInitCode = case initList of
         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
@@ -231,7 +231,7 @@ codeCollectionFromSource typeCheck initCode = do
       return (hsh, cc)
     (_, Nothing) -> do
       recordCacheEvent StorageWrite
-      hsh' <- addCode SolidVM canonicalInitCode
+      hsh' <- addCode SolidVM $ toShort canonicalInitCode
       ecc <- compileSource typeCheck initMap
       let cc = case ecc of
             Right a -> a
@@ -275,9 +275,9 @@ codeCollectionFromHashNoCache typeCheck hsh =
   getCode hsh >>= \case
     Nothing -> internalError "unknown code hash" hsh
     Just (_, initCode) -> do
-      let initMap = case Aeson.decode $ BL.fromStrict initCode of
+      let initMap = case Aeson.decode $ BL.fromStrict $ fromShort initCode of
             Just l -> M.fromList l
-            Nothing -> M.singleton T.empty (decodeUtf8 initCode)
+            Nothing -> M.singleton T.empty (decodeUtf8 . fromShort $ initCode)
       ecc <- compileSource typeCheck initMap
       case ecc of
         Right a -> pure a

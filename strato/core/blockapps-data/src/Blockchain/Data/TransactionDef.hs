@@ -22,7 +22,7 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((***))
 import Control.DeepSeq
 import Data.Binary
-import qualified Data.ByteString as B
+import Data.ByteString.Short (ShortByteString, fromShort)
 import Data.Data
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -46,7 +46,7 @@ data Transaction
         transactionGasLimit :: Integer,
         transactionTo :: Address,
         transactionValue :: Integer,
-        transactionData :: B.ByteString,
+        transactionData :: {-# UNPACK #-} !ShortByteString,
         transactionChainId :: Maybe Word256,
         transactionR :: Integer,
         transactionS :: Integer,
@@ -122,7 +122,7 @@ instance Format Transaction where
               ++ show v
               ++ "\n"
               ++ "tData: "
-              ++ ("\n" ++ format d)
+              ++ ("\n" ++ (format . fromShort) d)
               ++ "\n"
               ++ "chainId: "
               ++ formatChainId cid
@@ -173,7 +173,7 @@ instance Format Transaction where
               ++ "\n"
           )
       where
-        codeToString (Code init') = format init'
+        codeToString (Code init') = format . fromShort $ init'
         codeToString (PtrToCode codePtr) = "PtrToCode: " ++ format codePtr
 
 instance RLPSerializable Transaction where

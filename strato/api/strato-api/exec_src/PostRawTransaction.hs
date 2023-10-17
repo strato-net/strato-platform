@@ -21,6 +21,7 @@ import Blockchain.Strato.Model.Wei
 import Control.Exception
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as S
 import qualified Data.ByteString.Lazy as BL
 import Data.Foldable (foldlM)
 import Data.List (intercalate)
@@ -289,7 +290,7 @@ main = do
 
   -- parse TX type and figure out what to put for the metadata and txdata
   let (metadata, txData) = case optTxType of
-        TRANSFER -> (M.empty, Code $ B.empty)
+        TRANSFER -> (M.empty, Code $ S.empty)
         CONTRACT -> case (optSourceCode, optContractName) of
           (Just src, Just name) ->
             let baseTup@(md, cd) =
@@ -297,7 +298,7 @@ main = do
                       [ ("VM", "SolidVM"),
                         ("name", T.pack name)
                       ],
-                    Code $ T.encodeUtf8 $ serializeSourceMap src
+                    Code $ S.toShort $ T.encodeUtf8 $ serializeSourceMap src
                   )
              in case optFunctionArgs of
                   Nothing -> baseTup
@@ -307,14 +308,14 @@ main = do
           case optFunctionName of
             Nothing -> throw $ userError "need a function name to call a function!"
             Just name -> case optFunctionArgs of
-              Nothing -> (M.fromList $ [("VM", "SolidVM")], Code $ B.empty)
+              Nothing -> (M.fromList $ [("VM", "SolidVM")], Code $ S.empty)
               Just args ->
                 ( M.fromList $
                     [ ("VM", "SolidVM"),
                       ("funcName", T.pack name),
                       ("args", T.pack $ makeArgs args)
                     ],
-                  Code $ B.empty
+                  Code $ S.empty
                 )
         _ -> error "a logical impossibility! We parsed this TX as a GENESIS tx???"
   let metadata' = M.union metadata optMetadata

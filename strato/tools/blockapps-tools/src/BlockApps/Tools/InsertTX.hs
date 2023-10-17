@@ -11,7 +11,7 @@ import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Secp256k1
 import Control.Monad
 import qualified Data.Binary as BN
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Time.Clock
 import qualified Database.Persist.Postgresql as SQL

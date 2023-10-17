@@ -4,23 +4,23 @@ module Blockchain.EVM.Code where
 
 import Blockchain.EVM.Opcodes
 import Blockchain.Strato.Model.Code
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import qualified Data.IntSet as I
 import Numeric
 import Text.Format
 import Text.PrettyPrint.ANSI.Leijen
 
 getOperationAt :: Code -> CodePointer -> (Operation, CodePointer)
-getOperationAt (Code bytes) p = opCode2Op bytes p
+getOperationAt (Code bytes) p = opCode2Op (B.fromShort bytes) p
 getOperationAt _ _ = error "getOperationAt: called with PtrToCode"
 
-safeIntDrop :: Int -> B.ByteString -> B.ByteString
+safeIntDrop :: Int -> B.ShortByteString -> B.ShortByteString
 safeIntDrop i s | i > B.length s = B.empty
 safeIntDrop i s = B.drop i s
 
 showCode :: CodePointer -> Code -> String
 showCode _ (Code bytes) | B.null bytes = ""
-showCode lineNumber c@(Code rom) = showHex lineNumber "" ++ " " ++ format (B.pack $ op2OpCode op) ++ " " ++ show (pretty op) ++ "\n" ++ showCode (lineNumber + nextP) (Code (safeIntDrop nextP rom))
+showCode lineNumber c@(Code rom) = showHex lineNumber "" ++ " " ++ format (B.fromShort $ B.pack $ op2OpCode op) ++ " " ++ show (pretty op) ++ "\n" ++ showCode (lineNumber + nextP) (Code (safeIntDrop nextP rom))
   where
     (op, nextP) = getOperationAt c 0
 showCode _ (PtrToCode _) = error "showCode: called with PtrToCode"

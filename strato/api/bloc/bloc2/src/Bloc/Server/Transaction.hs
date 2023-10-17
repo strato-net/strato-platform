@@ -76,6 +76,7 @@ import Control.Monad.Trans.State.Lazy
 import qualified Crypto.Secp256k1 as S
 import Data.Bool
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString, toShort)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Short as BSS
 import qualified Data.Cache as Cache
@@ -275,7 +276,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                       addr
                       (fromMaybe emptyTxParams params)
                       (Wei $ fromIntegral value)
-                      (Code ByteString.empty)
+                      (Code BSS.empty)
                       cid'
               signAndPrepare jwt addr md header
           )
@@ -331,7 +332,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
                 addr
                 (fromMaybe emptyTxParams params)
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                (Code . toShort $ Text.encodeUtf8 $ serializeSourceMap src)
                 cid'
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     FUNCTION -> do
@@ -368,7 +369,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
               addr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (Code $ sel <> argsBin)
+              (Code . toShort $ sel <> argsBin)
               _methodcallChainid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
@@ -422,7 +423,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                     addr
                     (fromMaybe emptyTxParams params)
                     (Wei $ fromIntegral value)
-                    (Code ByteString.empty)
+                    (Code BSS.empty)
                     cid'
             prepareUnsignedRawTx md header
         )
@@ -476,7 +477,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
                 addr
                 (fromMaybe emptyTxParams params)
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-                (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+                (Code . toShort $ Text.encodeUtf8 $ serializeSourceMap src)
                 cid'
     FUNCTION -> do
       p <- fromFunction tx
@@ -513,7 +514,7 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
               addr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (Code $ sel <> argsBin)
+              (Code . toShort $ sel <> argsBin)
               _methodcallChainid
     GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where fromTransfer = \case
@@ -856,7 +857,7 @@ postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
         fromAddress
         params
         (Wei (fromIntegral $ unStrung value))
-        (Code ByteString.empty)
+        (Code BSS.empty)
         chainId
   txHash <- postTransaction (Just txSizeLimit) tx
   getResultAndRespond [txHash] resolve
@@ -897,7 +898,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
         fromAddr
         params
         (Wei (fromIntegral (maybe 0 unStrung value)))
-        (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+        (Code $ toShort $ Text.encodeUtf8 $ serializeSourceMap src)
         chainId
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
@@ -944,7 +945,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             fromAddr
             (fromMaybe emptyTxParams params)
             (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-            (Code $ Text.encodeUtf8 $ serializeSourceMap src)
+            (Code $ toShort $ Text.encodeUtf8 $ serializeSourceMap src)
             cid
       return (name, tx)
   let txs = map snd namesTxs
@@ -977,7 +978,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
                   fromAddr
                   (fromMaybe emptyTxParams params)
                   (Wei $ fromIntegral value)
-                  (Code ByteString.empty)
+                  (Code BSS.empty)
                   cid
           signAndPrepare jwtToken fromAddr md header
       )
@@ -1035,7 +1036,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
               fromAddr
               (fromMaybe emptyTxParams _methodcallTxParams)
               (Wei (fromIntegral $ unStrung methodcallValue))
-              (Code $ sel <> argsBin)
+              (Code . toShort $ sel <> argsBin)
               _methodcallChainid
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
           return (tx, methodcallMethodName)
@@ -1075,7 +1076,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
         (A.Proxy @Contract)
         (Account contractAddr (unChainId <$> chainId))
   sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
-    Just _ -> return $ Text.encodeUtf8 funcName
+    Just _ -> return $ toShort $ Text.encodeUtf8 funcName
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
 
   let f = sequence . ((Text.pack . fromMaybe "") *** indexedTypeToEvmIndexedType)
@@ -1093,7 +1094,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
         fromAddr
         params
         (Wei (maybe 0 (fromIntegral . unStrung) value))
-        (Code $ (sel::ByteString) <> (argsBin::ByteString))
+        (Code $ (sel::ShortByteString) <> (toShort argsBin::ShortByteString))
         chainId
   $logDebugLS "postUsersContractMethod'/tx" tx
   txHash <- postTransaction (Just txSizeLimit) tx

@@ -59,7 +59,7 @@ data CallData = CallData
     _callDataOwner :: Account,
     _callDataGasPrice :: Integer,
     _callDataValue :: Integer,
-    _callDataInput :: BSS.ShortByteString,
+    _callDataInput :: {-# UNPACK #-} !BSS.ShortByteString,
     _callDataOutput :: Maybe BSS.ShortByteString
   }
   deriving (Eq, Show, Generic, NFData)

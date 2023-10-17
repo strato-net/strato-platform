@@ -50,6 +50,7 @@ import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
 import Crypto.Util (i2bs_unsized)
 import Data.ByteString as BS hiding (map, zip)
+import Data.ByteString.Short as BSS  hiding (map)
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.List.Split (chunksOf)
 import qualified Data.Map as Map
@@ -212,9 +213,9 @@ parseHex theString =
 
 initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
 initializeCodeDB "EVM" x = do
-  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
+  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> BSS.toShort bin)) x
 initializeCodeDB "SolidVM" x = do
-  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> T.encodeUtf8 src)) x
+  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> BSS.toShort $ T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
 chainInfoToGenesisState ::
@@ -336,7 +337,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) org app = do
   let resolveAndProduce cp =
         resolveCodePtr chainId cp >>= \case
           Just (SolidVMCode name ch) ->
-            fmap (T.decodeUtf8' . snd) <$> getCode ch >>= \case
+            fmap (T.decodeUtf8' . fromShort . snd) <$> getCode ch >>= \case
               Just (Right src) -> void $ produceVMEvents [CodeCollectionAdded src (SolidVMCode name ch) org app [] []]
               _ -> pure ()
           _ -> pure ()

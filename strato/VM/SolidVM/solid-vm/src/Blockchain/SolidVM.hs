@@ -75,6 +75,7 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
 import Data.Bool (bool)
 import qualified Data.ByteString as B
+import Data.ByteString.Short (ShortByteString, toShort)
 import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -407,7 +408,7 @@ call ::
   Account ->
   Word256 ->
   Word256 ->
-  B.ByteString ->
+  ShortByteString ->
   Gas ->
   Account ->
   Keccak256 ->
@@ -2421,7 +2422,7 @@ evaluateAccountMember a _ "code" = do
   let cd' = case cd of
         Just (_, bs) -> bs
         Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
-  let decodeCD = DT.decodeUtf8 cd'
+  let decodeCD = DT.decodeUtf8 $ BSS.fromShort cd'
   -- Format the result
   return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "balance" = do
@@ -2773,7 +2774,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource True $ toShort . BC.pack $ contractSrc
   newAddress <- getNewAddress creator
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
         Right parsedArgs -> parsedArgs
@@ -2795,7 +2796,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  (hsh, cc) <- codeCollectionFromSource True $ toShort . BC.pack $ contractSrc
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
         Right parsedArgs -> parsedArgs
         _ -> internalError "Failed to parse constructor args in a create builtin call" argString

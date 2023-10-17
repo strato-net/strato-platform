@@ -40,7 +40,7 @@ import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as S
 import Data.Conduit
 import Data.Maybe
 import Data.Text (Text)
@@ -210,7 +210,7 @@ makeSendTX maxN k a n = do
 -- than these that have empty bin-runtimes.
 makeSizedTX :: MonadIO m => Integer -> Int -> PrivateKey -> m Transaction
 makeSizedTX nonce size pk =
-  let code = Code $ B.replicate size 0x0
+  let code = Code $ S.replicate size 0x0
       gasPrice = 50000000000
       gasLimit = 100000
       val = 0

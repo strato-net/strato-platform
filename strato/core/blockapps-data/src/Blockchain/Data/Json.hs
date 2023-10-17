@@ -21,6 +21,7 @@ import Blockchain.Strato.Model.Keccak256
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as S
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Swagger hiding (format)
@@ -548,7 +549,7 @@ transactionSemantics :: Transaction -> TransactionType
 transactionSemantics (MessageTX _ _ _ (Address _) _ td _ _ _ _ _) = work
   where
     work
-      | (B.length td) > 0 = FunctionCall
+      | (S.length td) > 0 = FunctionCall
       | otherwise = Transfer
 transactionSemantics _ = Contract
 
@@ -562,7 +563,7 @@ rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _) = w
   where
     work
       | (not (isAddr ta)) = Contract
-      | (isAddr ta) && ((B.length cod) > 0) = FunctionCall
+      | (isAddr ta) && ((S.length cod) > 0) = FunctionCall
       | otherwise = Transfer
     cod = case code of
       Code c -> c

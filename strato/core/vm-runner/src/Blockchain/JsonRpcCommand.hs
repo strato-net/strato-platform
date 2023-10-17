@@ -24,7 +24,7 @@ import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Data.Binary
-import qualified Data.ByteString as B
+import Data.ByteString.Short (ShortByteString, toShort)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
@@ -34,7 +34,7 @@ import Prelude hiding (id)
 
 -- TODO: Add private chain functionality to JSON RPC commands
 
-produceResponse :: String -> B.ByteString -> IO ()
+produceResponse :: String -> ShortByteString -> IO ()
 produceResponse id theData = do
   ret <-
     liftIO $
@@ -65,14 +65,14 @@ runJsonRpcCommand' ::
     (Account `A.Alters` AddressState) m
   ) =>
   JsonRpcCommand ->
-  m (String, B.ByteString)
+  m (String, ShortByteString)
 runJsonRpcCommand' c@JRCGetBalance {jrcAddress = address, jrcId = id} = do
   $logInfoS "runJsonRpcCommand.JRCGetBalance" . T.pack $ "running command: " ++ show c
   response <-
     show . addressStateBalance
       <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
   $logInfoS "runJsonRpcCommand'.JRCGetBalance" $ T.pack response
-  return (id, BC.pack response)
+  return (id, toShort $ BC.pack response)
 runJsonRpcCommand' c@JRCGetCode {jrcAddress = address, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetCode" . T.pack $ "running command: " ++ show c
   codeHash <-
@@ -89,10 +89,10 @@ runJsonRpcCommand' c@JRCGetTransactionCount {jrcAddress = address, jrcId = id} =
     show . addressStateNonce
       <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
   $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" $ T.pack response
-  return (id, BC.pack response)
+  return (id, toShort $ BC.pack response)
 runJsonRpcCommand' c@JRCGetStorageAt {jrcAddress = address, jrcKey = key, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ "running command: " ++ show c
   value <- getStorageKeyVal' (Account address Nothing) $ bytesToWord256 $ key
   $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ show value
-  return (id, word256ToBytes value)
+  return (id, toShort $ word256ToBytes value)
 runJsonRpcCommand' (JRCCall _ _ _) = error "unsupported RPC command call"

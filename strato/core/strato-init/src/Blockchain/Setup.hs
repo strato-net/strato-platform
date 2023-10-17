@@ -26,6 +26,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as S
 import Data.FileEmbed
 import qualified Data.Map as Map
 import Data.String
@@ -178,6 +179,6 @@ oneTimeSetup genesisBlockName = do
 
       void . runLoggingT . runResourceT . runSetupDBM $ do
         liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
-        void $ addCode EVM B.empty --blank code is the default for Accounts, but gets added nowhere else.
+        void $ addCode EVM S.empty --blank code is the default for Accounts, but gets added nowhere else.
         liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
         initializeGenesisBlock genesisBlockName

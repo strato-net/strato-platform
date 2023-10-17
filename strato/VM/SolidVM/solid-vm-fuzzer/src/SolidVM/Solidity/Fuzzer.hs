@@ -22,6 +22,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader
 import qualified Data.Aeson as Aeson
 import Data.Bool (bool)
+import Data.ByteString.Short (toShort)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, maybeToList)
@@ -155,7 +156,7 @@ runFuzzerOnce ctx = do
       svmErr (Right e) = InternalError "SolidVM for non-solidvm code" (show e)
       txArgs =
         def & createNewAddress .~ contractAddress
-          & createCode .~ (Code . BL.toStrict $ Aeson.encode _fuzzerArgsSrc)
+          & createCode .~ (Code . toShort $ BL.toStrict $ Aeson.encode _fuzzerArgsSrc)
           & createArgs . argsMetadata ?~ M.empty
           & createArgs . argsMetadata . _Just . at "name" ?~ labelToText _fuzzerArgsContractName
           & createArgs . argsMetadata . _Just . at "args" ?~ _fuzzerArgsCreateArgs

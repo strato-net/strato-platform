@@ -96,8 +96,8 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
@@ -353,7 +353,7 @@ runSM ::
     Mod.Modifiable ContextState m,
     Mod.Modifiable GasCap m
   ) =>
-  (Maybe ByteString) ->
+  (Maybe ShortByteString) ->
   Env.Environment ->
   GasInfo ->
   Maybe Word256 ->
@@ -401,7 +401,7 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe ByteString -> Env.Environment -> Maybe Word256 -> Action
+startingAction :: Maybe ShortByteString -> Env.Environment -> Maybe Word256 -> Action
 startingAction maybeCode env' chainId' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
@@ -414,7 +414,7 @@ startingAction maybeCode env' chainId' =
       _metadata =
         case maybeCode of
           Just theCode ->
-            Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
+            Just $ M.insert "src" (T.pack $ UTF8.toString $ BSS.fromShort theCode) $ fromMaybe M.empty $ Env.metadata env'
           Nothing -> Env.metadata env',
       _events = Q.empty,
       _delegatecalls = Q.empty

@@ -62,6 +62,7 @@ library:
   - type-lits
   - unliftio
   - unliftio-core
+  - utf8-string
   - vector
 
 executables:

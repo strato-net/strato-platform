@@ -34,6 +34,7 @@ import Blockchain.Strato.Model.Wei
 import Control.DeepSeq (NFData)
 import qualified Data.Aeson as A
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (fromShort, toShort)
 import qualified Data.ByteString.Char8 as Char8
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -68,11 +69,11 @@ instance RLPEncodable CodePtr where
   rlpDecode ch = EVMCode <$> rlpDecode ch
 
 instance RLPEncodable Code where
-  rlpEncode (Code cb) = rlpEncode cb
+  rlpEncode (Code cb) = rlpEncode (fromShort cb)
   rlpEncode (PtrToCode cp) = RLP.Array [rlpEncode cp]
 
   rlpDecode (RLP.Array [x]) = PtrToCode <$> rlpDecode x
-  rlpDecode x = Code <$> rlpDecode x
+  rlpDecode x = Code . toShort <$> rlpDecode x
 
 --------------------------------------------------------------------------------
 

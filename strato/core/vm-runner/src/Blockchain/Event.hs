@@ -29,7 +29,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
 import Blockchain.Stream.Action (Action)
-import qualified Data.ByteString as B
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.DList as DL
 import Data.Map (Map)
 import Data.Text (Text)
@@ -68,7 +68,7 @@ data VmOutEvent
   | OutEvent EventDB
   | OutTXR TransactionResult
   | OutASM (Map Account AddressStateModification)
-  | OutJSONRPC String B.ByteString
+  | OutJSONRPC String {-# UNPACK #-} !ShortByteString
 
 data VmOutEventBatch = OutBatch
   { outActions :: DL.DList Action,
@@ -81,7 +81,7 @@ data VmOutEventBatch = OutBatch
     outEvents :: DL.DList EventDB,
     outTXRs :: DL.DList TransactionResult,
     outASMs :: DL.DList (Map Account AddressStateModification),
-    outJSONRPCs :: DL.DList (String, B.ByteString)
+    outJSONRPCs :: DL.DList (String, ShortByteString)
   }
 
 newOutBatch :: VmOutEventBatch

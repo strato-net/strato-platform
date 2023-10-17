@@ -7,6 +7,7 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString as B
 import Data.Map.Strict (Map)
 import Data.Text (Text)
@@ -107,7 +108,7 @@ class (RLPSerializable t) => TransactionLike t where
   txGasPrice :: t -> Integer
   txGasLimit :: t -> Integer
   txCode :: t -> Maybe Code
-  txData :: t -> Maybe B.ByteString -- todo make a `Code` newtype
+  txData :: t -> Maybe ShortByteString -- todo make a `Code` newtype
   txChainId :: t -> Maybe Word256
   txMetadata :: t -> Maybe (Map Text Text)
 

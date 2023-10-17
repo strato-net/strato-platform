@@ -25,6 +25,7 @@ import Blockchain.VMOptions ()
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as S
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
 import Data.Time.Clock.POSIX
@@ -85,7 +86,7 @@ main = do
           1 --gas price
           1000000000000000000 --gas limit
           1 --value
-          (Code pushLarges)
+          (Code $ S.toShort pushLarges)
           Nothing
           secretKey
 

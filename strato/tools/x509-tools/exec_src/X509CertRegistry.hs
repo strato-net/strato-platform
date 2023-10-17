@@ -17,6 +17,7 @@ import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Wei
 import qualified Data.Aeson as Ae
+import qualified Data.ByteString.Short as S
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as M
@@ -148,7 +149,7 @@ optionsToTX priv nonce =
             unsignedTransactionGasLimit = Gas 29000000000, -- default val
             unsignedTransactionTo = Nothing,
             unsignedTransactionValue = Wei 0,
-            unsignedTransactionInitOrData = Code $ T.encodeUtf8 $ serializeSourceMap $ namedSource "" certificateRegistryContract,
+            unsignedTransactionInitOrData = Code $ S.toShort $ T.encodeUtf8 $ serializeSourceMap $ namedSource "" certificateRegistryContract,
             unsignedTransactionChainId = Nothing
           }
       txHash = rlpHash unsignedTx
@@ -184,7 +185,7 @@ initializeCertificateRegistryTX priv addr certs nonce =
             unsignedTransactionGasLimit = Gas 29000000000, -- default val
             unsignedTransactionTo = Just addr,
             unsignedTransactionValue = Wei 0,
-            unsignedTransactionInitOrData = Code $ B.empty,
+            unsignedTransactionInitOrData = Code $ S.empty,
             unsignedTransactionChainId = Nothing
           }
       txHash = rlpHash unsignedTx

@@ -67,6 +67,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Short as BSS
+import Data.ByteString.Short (ShortByteString)
 import Data.Char
 import Data.Data
 import Data.Foldable (traverse_)
@@ -297,7 +298,7 @@ runOperation CODECOPY = do
         Code c' -> c'
         PtrToCode _ -> ""
 
-  mStoreByteString memP $ safeTake size $ safeDrop codeP $ c
+  mStoreByteString memP $ safeTake size $ safeDrop codeP $ (BSS.fromShort c)
 runOperation GASPRICE = pushEnvVar envGasPrice
 runOperation EXTCODESIZE = do
   address <- pop
@@ -307,7 +308,7 @@ runOperation EXTCODESIZE = do
     addressStateCodeHash
       <$> A.lookupWithDefault (A.Proxy @AddressState) account
   code <- getEVMCode' codeHash
-  push $ (fromIntegral (B.length code) :: Word256)
+  push $ (fromIntegral (BSS.length code) :: Word256)
 runOperation EXTCODECOPY = do
   address <- pop
   account <- Account address <$> getEnvVar envChainId
@@ -320,7 +321,7 @@ runOperation EXTCODECOPY = do
     addressStateCodeHash
       <$> A.lookupWithDefault (A.Proxy @AddressState) account
   code <- getEVMCode' codeHash
-  mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
+  mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ BSS.fromShort code)
 runOperation RETURNDATASIZE = do
   ret <- getReturnVal
   let len = (fromIntegral . B.length $ ret) :: Word256
@@ -471,7 +472,7 @@ runOperation CREATE = do
   result <-
     case (callDepth > 1023, debugCallCreates vmState) of
       (True, _) -> return Nothing
-      (_, Nothing) -> create_debugWrapper block owner value initCodeBytes
+      (_, Nothing) -> create_debugWrapper block owner value (BSS.toShort initCodeBytes)
       (_, Just _) -> do
         (nonce, balance) <-
           (addressStateNonce &&& addressStateBalance)
@@ -1158,32 +1159,32 @@ create' = do
 
   vmState <- vmstateGet
 
-  let codeBytes = fromMaybe B.empty $ returnVal vmState
-  vmstateModify $ action . Action.actionData . at owner . mapped . Action.actionDataCodeHash .~ EVMCode (hash codeBytes)
+  let codeBytes = BSS.toShort $ fromMaybe B.empty $ returnVal vmState
+  vmstateModify $ action . Action.actionData . at owner . mapped . Action.actionDataCodeHash .~ EVMCode (hash $ BSS.fromShort codeBytes)
   when flags_debug $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
   gr <- getGasRemaining
   $logInfoS "create'" "Trying to create contract"
-  $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * fromIntegral (B.length codeBytes))
+  $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * fromIntegral (BSS.length codeBytes))
   $logInfoS "create'" . T.pack $ "The amount of ether you have: " ++ show gr
 
-  if (not $ vmIsHomestead vmState) && (gr < gCREATEDATA * fromIntegral (B.length codeBytes))
+  if (not $ vmIsHomestead vmState) && (gr < gCREATEDATA * fromIntegral (BSS.length codeBytes))
     then do
       $logInfoS "create'/lowGas" . T.pack $ CL.red "Not enough gas to create contract, contract being thrown away (account was created though)"
-      $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * fromIntegral (B.length codeBytes))
+      $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * fromIntegral (BSS.length codeBytes))
       $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show gr
       vmstatePut vmState {returnVal = Nothing}
       assignCode "" owner
       assignDetails
       return $ Code ""
     else do
-      useGas $ gCREATEDATA * fromIntegral (B.length codeBytes)
+      useGas $ gCREATEDATA * fromIntegral (BSS.length codeBytes)
       assignCode codeBytes owner
       assignDetails
       return $ Code codeBytes
   where
-    assignCode :: EVMBase m => B.ByteString -> Account -> VMM m ()
+    assignCode :: EVMBase m => ShortByteString -> Account -> VMM m ()
     assignCode codeBytes account = do
       hsh <- addCode EVM codeBytes
       A.adjustWithDefault_ (A.Proxy @AddressState) account $ \newAddressState ->
@@ -1209,7 +1210,7 @@ call ::
   Account ->
   Word256 ->
   Word256 ->
-  B.ByteString ->
+  ShortByteString ->
   Gas ->
   Account ->
   Keccak256 ->
@@ -1241,7 +1242,7 @@ call
               envBlockHeader = b,
               envOwner = receiveAddress,
               envOrigin = origin,
-              envInputData = theData,
+              envInputData = (BSS.fromShort theData),
               envSender = sender,
               envValue = fromIntegral value,
               envCode = code,
@@ -1263,7 +1264,7 @@ call
         runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env code) availableGas $
           call' noValueTransfer
 
-call' :: EVMBase m => Bool -> VMM m B.ByteString
+call' :: EVMBase m => Bool -> VMM m BSS.ShortByteString
 call' noValueTransfer = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
@@ -1293,9 +1294,9 @@ call' noValueTransfer = do
     action . Action.actionData . at envOwner . mapped . Action.actionDataCallTypes
       %~ (:) Action.Update
 
-  return (fromMaybe B.empty $ returnVal vmState)
+  return (BSS.toShort $ fromMaybe B.empty $ returnVal vmState)
 
-callPrecompiled' :: EVMBase m => Bool -> PrecompiledCode -> VMM m B.ByteString
+callPrecompiled' :: EVMBase m => Bool -> PrecompiledCode -> VMM m BSS.ShortByteString
 callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
@@ -1316,9 +1317,9 @@ callPrecompiled' noValueTransfer precompiled = do
     action . Action.actionData . at envOwner . mapped . Action.actionDataCallTypes
       %~ (:) Action.Update
 
-  return (fromMaybe B.empty $ returnVal vmState)
+  return (BSS.toShort $ fromMaybe B.empty $ returnVal vmState)
 
-create_debugWrapper :: EVMBase m => BlockData -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
+create_debugWrapper :: EVMBase m => BlockData -> Account -> Word256 -> BSS.ShortByteString -> VMM m (Maybe Account)
 create_debugWrapper block owner value initCodeBytes = do
   balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
@@ -1407,7 +1408,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
         sender
         value
         (fromIntegral $ envGasPrice env)
-        inputData
+        (BSS.toShort inputData)
         gas
         (envOrigin env)
         (envTxHash env)
@@ -1475,6 +1476,6 @@ vmStateToExecResults vmState = do
         erAppName = ""
       }
 
-getEVMCode' :: HasCodeDB m => CodePtr -> m BC.ByteString
+getEVMCode' :: HasCodeDB m => CodePtr -> m ShortByteString
 getEVMCode' (EVMCode ch) = getEVMCode ch
 getEVMCode' _ = error "internal error- the EVM was called for non-evm code"

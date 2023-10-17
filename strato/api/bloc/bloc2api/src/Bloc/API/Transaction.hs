@@ -32,7 +32,7 @@ import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing
-import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe

@@ -145,7 +145,7 @@ instance MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
   select _ = Account.getCodeFromPostgres
 
 instance MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
-  lookup _ k = fmap (SolidVM,) <$> Account.getCodeByteStringFromPostgres k
+  lookup _ k = fmap ((SolidVM,) . BSS.toShort) <$> Account.getCodeByteStringFromPostgres k
   insert _ _ _ = error "Slipstream: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "Slipstream: Keccak256 `Alters` DBCode delete"
 

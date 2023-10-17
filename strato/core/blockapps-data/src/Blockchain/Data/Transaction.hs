@@ -50,8 +50,8 @@ import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Reader
 import qualified Crypto.Secp256k1 as SEC
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Short as BSS
+import Data.ByteString.Short (ShortByteString, toShort, fromShort)
+import qualified Data.ByteString.Short as B
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -192,14 +192,14 @@ insertTX' mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   insertRawTX' mode rawTXs
 
-createMessageTX :: Integer -> Integer -> Integer -> Address -> Integer -> B.ByteString -> Maybe (Map Text Text) -> EC.PrivateKey -> IO Transaction
+createMessageTX :: Integer -> Integer -> Integer -> Address -> Integer -> ShortByteString -> Maybe (Map Text Text) -> EC.PrivateKey -> IO Transaction
 createMessageTX n gp gl to' val theData md prvKey = createChainMessageTX n gp gl to' val theData Nothing md prvKey
 
 -- so we can convert R and S from the signature, and add 27 to V, per
 -- Ethereum protocol (and backwards compatibility)
 getSigVals :: EC.Signature -> (Word256, Word256, Word8)
 getSigVals (EC.Signature (SEC.CompactRecSig r s v)) =
-  let convert = bytesToWord256 . BSS.fromShort
+  let convert = bytesToWord256 . fromShort
    in (convert r, convert s, v + 0x1b)
 
 createChainMessageTX ::
@@ -208,7 +208,7 @@ createChainMessageTX ::
   Integer ->
   Address ->
   Integer ->
-  B.ByteString ->
+  ShortByteString ->
   Maybe Word256 ->
   Maybe (Map Text Text) ->
   EC.PrivateKey ->
@@ -283,14 +283,14 @@ whoSignedThisTransaction tx = case tx of
   PrivateHashTX {} -> Just (Address 0)
   t -> fromPublicKey <$> EC.recoverPub sig mesg
     where
-      intToBSS = BSS.toShort . word256ToBytes . fromInteger
+      intToBSS = toShort . word256ToBytes . fromInteger
       sig = EC.Signature (SEC.CompactRecSig (intToBSS $ transactionR t) (intToBSS $ transactionS t) ((transactionV t) - 0x1b))
       mesg = keccak256ToByteString $ partialTransactionHash t
 
 whoSignedThisTransactionEcrecover :: Keccak256 -> Integer -> Integer -> Integer -> Maybe Address
 whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
   where
-    intToBSS = BSS.toShort . word256ToBytes . fromInteger
+    intToBSS = toShort . word256ToBytes . fromInteger
     sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b))
     mesg = keccak256ToByteString $ hsh
 

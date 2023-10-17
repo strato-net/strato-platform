@@ -91,6 +91,7 @@ import Crypto.Types.PubKey.ECC
 import Data.Bifunctor (first)
 import Data.Bits
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Conduit.TMChan
@@ -1518,7 +1519,7 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
         setStateDBStateRoot Nothing stateRoot
         writeBlockSummary genesisOutputBlock
         for_ (M.toList mpMap) $ \(k, v) -> A.insert (A.Proxy @MP.NodeData) k v
-        for_ (genesisInfoCodeInfo gi) $ \(CodeInfo _ src _) -> addCode SolidVM $ Text.encodeUtf8 src
+        for_ (genesisInfoCodeInfo gi) $ \(CodeInfo _ src _) -> addCode SolidVM $ BSS.toShort $ Text.encodeUtf8 src
         (BlockHashRoot bhr) <- bootstrapChainDB genHash [(Nothing, stateRoot)]
         putContextBestBlockInfo $ ContextBestBlockInfo genHash genesisBlock 0 0 0
         Mod.put (Mod.Proxy @BlockHashRoot) $ BlockHashRoot bhr

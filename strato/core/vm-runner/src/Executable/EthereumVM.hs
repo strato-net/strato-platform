@@ -77,6 +77,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader (ask, runReaderT)
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
+import Data.ByteString.Short (fromShort)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.DList as DL
 import Data.Foldable hiding (fold)
@@ -426,7 +427,7 @@ runChainConstructors cId cInfo = do
               EVMCode h -> Just h
               CodeAtAccount _ _ -> Nothing
           (MaybeT $ pure $ M.lookup hsh codeHashMap)
-            <|> MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
+            <|> MaybeT (fmap (T.pack . BC.unpack . fromShort . snd) <$> getCode hsh)
         pure $ Just (a, msrc)
       sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
   curBlockHash <- Mod.get (Mod.Proxy @CurrentBlockHash)

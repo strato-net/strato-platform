@@ -48,7 +48,7 @@ import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 -- End users will not need to directly create objects of this type (an 'RLPObject' can be created using 'rlpEncode'),
 -- however the designer of a new type will need to create conversion code by making their type an instance
 -- of the RLPSerializable class.
-data RLPObject = RLPScalar Word8 | RLPString BSS.ShortByteString | RLPArray [RLPObject] deriving (Show, Eq, Ord, Generic)
+data RLPObject = RLPScalar Word8 | RLPString {-# UNPACK #-} !BSS.ShortByteString | RLPArray [RLPObject] deriving (Show, Eq, Ord, Generic)
 
 instance NFData RLPObject
 

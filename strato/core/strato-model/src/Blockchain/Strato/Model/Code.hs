@@ -11,7 +11,8 @@ import Control.DeepSeq
 import Control.Lens.Operators
 import Data.Aeson
 import Data.Binary
-import qualified Data.ByteString as B
+import Data.ByteString.Short (ShortByteString, toShort, fromShort)
+import qualified Data.ByteString.Short as B
 import qualified Data.ByteString.Base16 as B16
 import Data.Data
 import Data.Swagger
@@ -24,7 +25,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 data Code
-  = Code {codeBytes :: B.ByteString}
+  = Code {codeBytes :: ShortByteString}
   | PtrToCode {ptrToCode :: CodePtr}
   deriving (Show, Eq, Read, Ord, Generic, Data)
 
@@ -55,11 +56,11 @@ instance ToSchema Code where
         )
 
 instance ToJSON Code where
-  toJSON (Code bytes) = String . decodeUtf8 . B16.encode $ bytes
+  toJSON (Code bytes) = String . decodeUtf8 . B16.encode . fromShort $ bytes
   toJSON (PtrToCode codePtr) = toJSON codePtr
 
 instance FromJSON Code where
-  parseJSON (String text) = return . Code . LabeledError.b16Decode "FromJSON<Code>" . encodeUtf8 . drop0x $ text
+  parseJSON (String text) = return . Code . toShort . LabeledError.b16Decode "FromJSON<Code>" . encodeUtf8 . drop0x $ text
     where
       drop0x :: T.Text -> T.Text
       drop0x t =
