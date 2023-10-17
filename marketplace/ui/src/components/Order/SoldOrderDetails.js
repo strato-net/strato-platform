@@ -503,7 +503,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
                 loading={issellerDetailsUpdating || isCreateOrderLineItem}
-                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false }
+                disabled={status === getStatus(3) || status === getStatus(5) || allSerialNumbersUploaded() === false }
                 onClick={() => {
                   handleUpdateComment()
                   TagManager.dataLayer({
