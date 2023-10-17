@@ -5,9 +5,9 @@ import base64
 import csv
 from datetime import datetime
 import os
+import pytz
 import requests
 import slack_sdk
-from zoneinfo import ZoneInfo
 
 import credentials
 
@@ -127,7 +127,7 @@ class UserData:
 
     @staticmethod
     def generate_csv():
-        current_date = datetime.now().astimezone(ZoneInfo('US/Eastern'))
+        current_date = datetime.now().astimezone(pytz.timezone('US/Eastern'))
         csv_dir = 'csv_archive'
         csv_filename_prefix = current_date.strftime("%Y%m%d_%H%M%S")
         csv_path = '%s/%s_mercata_users.csv' % (csv_dir, csv_filename_prefix)
