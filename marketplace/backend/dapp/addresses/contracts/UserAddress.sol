@@ -77,9 +77,9 @@ contract UserAddress_1 is RestStatus {
     }
 
     function deleteUserAddress() returns (uint){
-      // if(ownerOrganization != getUserOrganization(tx.origin)){
-      //   return RestStatus.FORBIDDEN;
-      // }
+    //   if(ownerOrganization != getUserOrganization(tx.origin)){
+    //     return RestStatus.FORBIDDEN;
+    //   }
         isDeleted = true;
         return RestStatus.OK;
     }
