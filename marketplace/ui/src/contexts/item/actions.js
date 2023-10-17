@@ -110,7 +110,7 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
     try {
-      const response = await fetch(`${apiUrl}/item/transfers?limit=${limit}&offset=${offset}&or=(oldOwner.eq.${owner},newOwner.eq.${owner})`, {
+      const response = await fetch(`${apiUrl}/item/transfers?limit=${limit}&order=transferDate.desc&offset=${offset}&or=(oldOwner.eq.${owner},newOwner.eq.${owner})`, {
         method: HTTP_METHODS.GET,
 
       });
