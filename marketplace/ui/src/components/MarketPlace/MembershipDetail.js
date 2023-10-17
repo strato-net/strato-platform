@@ -310,31 +310,31 @@ const MembershipDetails = ({ user, users }) => {
 
   const serviceColumn = [
     {
-      title: <Text className="text-primaryC font-semibold text-base">NAME</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Name</Text>,
       dataIndex: "serviceName",
       key: "name",
       render: (text) => <p>{decodeURIComponent(text)}</p>
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">DESCRIPTION</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Description</Text>,
       dataIndex: "serviceDesc",
       key: "serviceDesc",
       render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Membership Price</Text>,
       dataIndex: "memberPrice",
       key: "memberPrice",
       render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">NON-MEMBER PRICE</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Non-Memberhsip Price</Text>,
       dataIndex: "nonMemberPrice",
       key: "nonMemberPrice",
       render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">USES</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Uses</Text>,
       dataIndex: "uses",
       key: "uses",
       render: (text) => <p className="text-left">{decodeURIComponent(text)}</p>,
@@ -595,10 +595,8 @@ const MembershipDetails = ({ user, users }) => {
                     Contact to Buy
                   </Button> :
                   <Button
-                    type={ownerSameAsUser
-                      ? "default"
-                      : "primary"
-                    } block={true} size="large" className=" h-full py-4 h-px-56"
+                    type={ownerSameAsUser ? "default" : "primary"}
+                    block={true} size="large" className=" h-full py-4 h-px-56"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
@@ -607,7 +605,7 @@ const MembershipDetails = ({ user, users }) => {
                         openListNowModal();
                       }
                     }}
-                  // disabled={ownerSameAsUser}
+                    disabled={ownerSameAsUser}
                   > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
                   </Button>}
               </Row>
