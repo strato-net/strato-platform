@@ -1315,7 +1315,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.deleteUserAddress = async function (args, options = defaultOptions) {
     try {
       console.log("dapp delete address", args)
-      return userAddressJs.deleteUserAddress(args, options)
+      return managers.OrderManager.deleteUserAddress(args, options)
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
