@@ -29,7 +29,6 @@ import BlockApps.X509 hiding (isValid)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.Vault
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson
