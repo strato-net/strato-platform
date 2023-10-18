@@ -2,13 +2,11 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
-import "/dapp/products/contracts/Product.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 
 contract MarketplaceItem is Asset, 
                             ItemStatus, 
-                            InventoryStatus, 
-                            Product {
+                            InventoryStatus {
     
     // Item
     address item_owner;
