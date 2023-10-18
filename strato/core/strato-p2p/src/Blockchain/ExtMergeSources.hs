@@ -104,7 +104,7 @@ mergeSourcesByForceClient :: (MonadResource mi, Monad mo, MonadUnliftIO mi)
                           => [ConduitM () a mi ()]
                           -> Int
                           -> ThreadMap
-                          -> mo (ConduitM z a mi ())
+                          -> mo (ConduitM () a mi ())
 mergeSourcesByForceClient sx bound tm =
   return $ do
     (chkey,c) <- allocate (liftSTM $ newTBMChan bound)
