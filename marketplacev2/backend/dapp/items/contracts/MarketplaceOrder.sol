@@ -5,7 +5,7 @@ import "./OrderStatus.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
 
 /// @title A representation of Order assets
-contract Order is OrderStatus {
+contract MarketplaceOrder is OrderStatus, Sale {
 
     address public owner; 
     string public ownerOrganization;
@@ -28,7 +28,8 @@ contract Order is OrderStatus {
     string public paymentSessionId;
     address public shippingAddress;
 
-    address[] orderLines;
+    OrderLine_2[] orderLines;
+
     /// @dev Events to add and remove members to this shard.
     event OrgAdded(string orgName);
     event OrgUnitAdded(string orgName, string orgUnit);
@@ -170,7 +171,7 @@ contract Order is OrderStatus {
 
       OrderLine_2 orderLine=new OrderLine_2(_orderAddress, _productId, _inventoryId, _quantity, _pricePerUnit, _shippingCharges
       , _tax, _createdDate);
-      orderLines.push(address(orderLine));
+      orderLines.push(orderLine);
       return (RestStatus.OK,address(orderLine));
     }
 
@@ -203,7 +204,7 @@ contract Order is OrderStatus {
       string inventories = "";
       string orderLineQuantities = "";
       for(uint i=0;i<orderLines.length;i++){
-        OrderLine_2 orderLine = OrderLine_2(address(orderLines[i]));
+        OrderLine_2 orderLine = orderLines[i];
         Inventory inventory = Inventory(address(orderLine.inventoryId()));
         inventories += string(address(orderLine.inventoryId())) + ",";
         orderLineQuantities += string(orderLine.quantity()) + ",";

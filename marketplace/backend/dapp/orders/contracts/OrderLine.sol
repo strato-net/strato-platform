@@ -1,5 +1,3 @@
- 
-
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "./OrderLineItem.sol";
@@ -9,7 +7,7 @@ import "/dapp/items/contracts/Item.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets
-contract OrderLine_2 is ItemStatus,OrderStatus{
+contract OrderLine_2 is ItemStatus, OrderStatus{
 
     address public owner;
     string public ownerOrganization;
