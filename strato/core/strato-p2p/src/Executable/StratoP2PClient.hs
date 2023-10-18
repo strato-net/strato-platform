@@ -14,8 +14,7 @@
 
 module Executable.StratoP2PClient
   ( stratoP2PClient,
-    runEthClientConduit,
-    runEthServerConduit
+    runEthClientConduit
   )
 where
 
@@ -116,30 +115,6 @@ runEthClientConduit peer pSource pSink seqSrc peerStr tm = do
     Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
       !eventSource <- mkEthP2PEventSourceClient pSource seqSrc peerStr inCtx tm
-      !eventSink   <- mkEthP2PEventConduit peerStr outCtx
-      fmap (either Just (const Nothing)) . try . runConduit $
-        eventSource
-           .| handleMsgClientConduit myPublic peer
-           .| eventSink
-           .| pSink
-
-runEthServerConduit ::
-  MonadP2P m =>
-  PPeer ->
-  ConduitM () B.ByteString m () ->
-  ConduitM B.ByteString Void m () ->
-  ConduitM () P2pEvent m () ->
-  String ->
-  m (Maybe SomeException)
-runEthServerConduit peer pSource pSink seqSrc peerStr = do
-  myPublic' <- getPub
-  let myPublic = secPubKeyToPoint myPublic'
-      otherPubKey = fromMaybe (error "programmer error: runEthClientConduit was called without a pubkey") $ pPeerPubkey peer
-  mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptConnect otherPubKey `fuseUpstream` pSink
-  case mConnectionResult of
-    Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
-    Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSourceServer pSource seqSrc peerStr inCtx
       !eventSink   <- mkEthP2PEventConduit peerStr outCtx
       fmap (either Just (const Nothing)) . try . runConduit $
         eventSource

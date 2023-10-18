@@ -116,7 +116,7 @@ import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM
 import Executable.StratoP2P
-import Executable.StratoP2PClient hiding (runEthServerConduit)
+import Executable.StratoP2PClient 
 import Executable.StratoP2PServer (runEthServerConduit)
 import Network.Socket
 import Text.Read (readMaybe)

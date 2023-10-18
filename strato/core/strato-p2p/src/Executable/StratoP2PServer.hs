@@ -45,8 +45,9 @@ runEthServer ::
   Int ->
   PeerRunner n m () ->
   m ()
-runEthServer listenPort runner = runServer (TCPPort listenPort) runner $ \c a ->
-  ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
+runEthServer listenPort runner =
+  runServer (TCPPort listenPort) runner $ \c a ->
+    ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
 
 ethServerHandler ::
   MonadP2P m =>
@@ -154,5 +155,4 @@ stratoP2PServer ::
 stratoP2PServer runner = do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
-
   runEthServer flags_listen runner

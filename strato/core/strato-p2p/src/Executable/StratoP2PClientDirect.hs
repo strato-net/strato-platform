@@ -22,6 +22,7 @@ import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1 (getPub)
 import           Control.Concurrent
+import           Control.Concurrent.Hierarchy
 import           Control.Lens ((^.))
 import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Unlift
@@ -30,7 +31,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import qualified Data.Text as T
 import           Data.Traversable (for)
-import           Executable.StratoP2PClient (runEthServerConduit)
+import           Executable.StratoP2PClient (runEthClientConduit)
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
@@ -62,9 +63,12 @@ handleEvents ev sSource runner = do
       $logDebugS "stratoP2PClientDirect/handleEvents" . T.pack $ show peers
       void . for peers $ \p -> do
         void . liftIO . forkIO . runLoggingT . runner $ \_ -> do
-          runPeer p
+          tmm    <- liftIO newThreadMap
+          _      <- void $ liftIO $ newChild tmm $ \_ -> return ()
+          runPeer p tmm
+          liftIO $ killThreadHierarchy tmm
       where
-        runPeer thePeer = do
+        runPeer thePeer tm = do
           case thePeer of
             Just peer -> do
               ender <- toIO . $logInfoS "stratoP2PClientDirect/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
@@ -107,12 +111,13 @@ handleEvents ev sSource runner = do
                         let pStr = pPeerString peer -- display string will show up as dns name
                         attempt :: (Maybe SomeException) <-
                           withCertifiedPeer peer . withActivePeer peer $
-                            runEthServerConduit
+                            runEthClientConduit
                               peer {pPeerPubkey = Just otherPubKey}
                               (c ^. peerSource)
                               (c ^. peerSink)
                               (c ^. seqSource)
                               pStr
+                              tm
                         case attempt of
                           Nothing  -> $logInfoS "stratoP2PClientDirect/handleEvents" "New chain member connected successfully!"
                           Just err -> do $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "New chain member connection was unsuccessful." ++ show (err)
