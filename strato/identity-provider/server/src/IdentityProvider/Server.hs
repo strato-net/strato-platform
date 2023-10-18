@@ -29,6 +29,7 @@ import BlockApps.X509 hiding (isValid)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.Vault
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson
@@ -38,6 +39,7 @@ import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Time (getCurrentTime)
 import GHC.Generics
 import qualified IdentityProvider.API as IDAPI
 import IdentityProvider.Email
@@ -184,6 +186,7 @@ putIdentity ::
   Maybe Text ->
   m Address
 putIdentity accessToken uuid idProv name mEmail mCo = do
+  time' <- liftIO getCurrentTime
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
   let realm = extractRealmName $ T.unpack idProv
@@ -194,17 +197,14 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
       (hasOrgName, org) = case mCo of
         Just o | o /= "" -> (True, T.unpack o)
         _ -> (False, orgNew)
-      jsonLogMsg = T.concat
-           [ "{\"user\":\""
-           , uuid
-           , "\",\"realm\":\""
+      csvLogMsg = T.intercalate ","
+           [ time'
            , T.pack realm
-           , "\",\"name\":\""
+           , uuid
            , name
-           , maybe "" ("\",\"organization\":\"" <>) mCo
-           , "\"}"
+           , org
            ]
-  $logInfoS "putIdentity/json" jsonLogMsg
+  $logInfoS "putIdentity/csv" csvLogMsg
   getVaultKey accessToken >>= \case
     Just (AddressAndKey a k) -> do
       -- has vault key, confirm also has cert
