@@ -1,10 +1,8 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-import "./Product.sol";
-import "./Inventory.sol";
-import "/dapp/items/contracts/Item.sol";
+import "/dapp/items/contracts/MarketplaceItem.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/products/contracts/UnitOfMeasurement.sol";
-import "/dapp/products/contracts/InventoryStatus.sol";
+import "/dapp/items/contracts/UnitOfMeasurement.sol";
+import "/dapp/items/contracts/InventoryStatus.sol";
 
 /// @title A representation of ProductManager to manage product and inventory
 contract ProductManager is
