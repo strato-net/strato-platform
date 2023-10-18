@@ -6,6 +6,9 @@ pipeline {
   stages {
     stage('Prepare') {
       steps {
+        script {
+          currentBuild.description = "Agent ${env.NODE_NAME}"
+        }
         sh '''#!/bin/bash -le
           set -x
           docker rm -f $(docker ps -aq) || true
@@ -104,7 +107,7 @@ pipeline {
           sh 'docker ps'
 
           // Few quick tests
-          sh '''#!/bin/bash -le
+          writeFile file: "check_availability.sh", text: '''#!/bin/bash -le
             check_availability() {
               counter=0
               until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
@@ -122,6 +125,10 @@ pipeline {
 
             check_availability
           '''
+          sh 'chmod +x check_availability.sh'
+          sh './check_availability.sh'
+          // don't want it to get overwritten
+          sh "cp genesis-block.json genesis-block-official.json"
         }
 
         script {
@@ -136,30 +143,13 @@ pipeline {
           sh 'docker ps'
 
           // Few quick tests
-          sh '''#!/bin/bash -le
-            check_availability() {
-              counter=0
-              until curl --silent --fail --location $(</host)/health | jq .healthInfo.isHealthy | grep true
-              do
-                if [[ "$counter" -gt 120 ]]; then
-                  echo "STRATO node took longer than 2 minutes to initialize! aborting."
-                  exit 73
-                fi
-                echo "waiting for STRATO health endpoint to be available through nginx"
-                counter=$((counter+1))
-                sleep 1
-              done
-              echo "STRATO health endpoint is available through nginx - node is running"
-            }
+          sh './check_availability.sh'
 
-            check_availability
+          echo "Restarting docker containers to simulate computer reboot..."
+          sh 'docker compose -p strato stop'
+          sh 'docker compose -p strato start'
 
-            echo "Restarting docker containers to simulate computer restart..."
-            docker compose -p strato stop
-            docker compose -p strato start
-
-            check_availability
-          '''
+          sh './check_availability.sh'
         }
 
         script {
@@ -170,6 +160,14 @@ pipeline {
               'dev',
               'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f',
               'user1',
+              '1234'
+          )
+          lib.registerTestUserCert(
+              'strato-worktree',
+              'https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration',
+              'dev',
+              'd5e67b8c-4fbf-42c6-a8d9-29a4dd13575f',
+              'user3',
               '1234'
           )
           lib.registerTestUserCert(
@@ -198,82 +196,138 @@ pipeline {
       }
     }
 
-//    stage('Test and Push Images') {
-    stage('Push Images & Artifacts') {
-      steps {
-        parallel (
-          'Push Images': {
-            withCredentials([
-                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-                usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
-            ]) {
-              dir ('strato-worktree') {
+    stage('Test & Push') {
+      parallel {
+        stage(' ') { //sequentially push images then test sync
+          stages {
+            stage('Push Images & YMLs') {
+              steps {
+                withCredentials([
+                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                    usernamePassword(credentialsId: 'aws-ecr-write-access-account', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                ]) {
+                  dir('strato-worktree') {
+                    sh '''#!/bin/bash -le
+                      set -x
+                      docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                      docker compose -f docker-compose.push.yml push 2>&1
+                      docker compose -f docker-compose.vault.push.yml push 2>&1
+                      docker compose -f docker-compose.identity.push.yml push 2>&1
+                      AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
+                      docker compose -f docker-compose.push.ecr.yml push 2>&1
+                      docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
+                      docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
+                    '''
+                  }
+                  stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
+                }
+                
+                // Push docker-compose files to Jenkins artifacts and AWS S3
                 archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
-                sh '''#!/bin/bash -le
-                  set -x
-                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                  docker compose -f docker-compose.push.yml push 2>&1
-                  docker compose -f docker-compose.vault.push.yml push 2>&1
-                  docker compose -f docker-compose.identity.push.yml push 2>&1
-                  AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-                  docker compose -f docker-compose.push.ecr.yml push 2>&1
-                  docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
-                  docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
-                '''
+                withCredentials([
+                    usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                ]) {
+                  dir ('strato-worktree') {
+                    sh '''#!/bin/bash -le
+                      set -x
+                      version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
+                      AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
+                      aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
+                    '''
+                  }
+                }
               }
             }
-          },
-          'Push Artifacts': {
-            withCredentials([
-                usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
-            ]) {
-              dir ('strato-worktree') {
-                sh '''#!/bin/bash -le
-                  set -x
-                  version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
-                  AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1"
-                  aws s3 cp docker-compose.yml s3://blockapps-build-artifacts/${version}/
-                  aws s3 cp docker-compose.vault.yml s3://blockapps-build-artifacts/${version}/
-                  aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
-                  aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
-                  aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
-                  aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
-                '''
+            
+            stage('Test Sync') {
+              agent { label "testsync" }
+              steps {
+                script {
+                  currentBuild.description = "${currentBuild.description} / ${env.NODE_NAME}"
+                }
+                withCredentials([
+                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                ]) {
+                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+                }
+                unstash 'stratoGettingStarted'
+                dir("strato-getting-started") {
+                  sh 'sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/'
+                  sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
+                  sh 'sudo ./strato --wipe'
+                  sh 'sudo ./vault --wipe'
+                  sh 'mv genesis-block-official.json genesis-block.json'
+                  sh './run-vault.sh'
+                  // run again but connecting to mercata-hydrogen this time
+                  sh 'sed -i "s|./strato --single|network=mercata-hydrogen networkID=7596898649924658542 ./strato|" run.sh'
+                  sh './run.sh'
+                  sh './check_availability.sh'
+                  sh 'sudo docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
+                  script {
+                    lib.runSyncTester()
+                  }
+                }
+              }
+              post {
+                always {
+                  dir('strato-getting-started') {
+                    sh 'sudo rm -rf strato_logs*'
+                    sh 'sudo ./fetchlogs --as-dir'
+                    sh 'mv strato_logs/ strato_logs_testsync/'
+                    archiveArtifacts artifacts: 'strato_logs_testsync/**', fingerprint: true, allowEmptyArchive: true
+                    sh 'sudo ./strato --wipe'
+                    sh 'sudo ./vault --wipe'
+                  }
+                }
               }
             }
-          },
-          'Apex tests': {
+          }
+        }
+
+        stage('Apex tests') {
+          steps{
             sh '''#!/bin/bash -le
               set -x
               echo "Running apex unit tests"
               APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'apex.*1')
-# TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
+              # TEMPORARY DISABLING APEX TESTS UNTIL THEY ARE CLEANED UP AND FIXED
               # docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
             '''
-          },
+          }
+        }
 
-          'Strato unit tests': {
+        stage('Strato unit tests') {
+          steps {
             sh '''#!/bin/bash -le
               set -x
               echo "Running unit tests"
-	      cd strato-worktree
+              cd strato-worktree
               ./run_unit_tests.sh --coverage
             '''
-            dir ('strato-worktree/strato') {
+            dir('strato-worktree/strato') {
               archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
             }
-          },
+          }
+        }
 
-          'SMD tests': {
+        stage('SMD tests') {
+          steps{
             sh '''#!/bin/bash -le
               set -x
               echo 'Running SMD tests'
               cd strato-worktree/smd-ui
               docker build --target test .
             '''
-          },
+          }
+        }
 
-          'STRATO API Tests': {
+        stage('STRATO API Tests') {
+          steps{
             withCredentials([
               usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')
             ]) {
@@ -295,9 +349,11 @@ pipeline {
                   strato-api-tests
               '''
             }
-          },
+          }
+        }
 
-          'BA-Rest Tests': {
+        stage('BA-Rest Tests') {
+          steps{
             sh '''#!/bin/bash -le
               set -x
               echo "Running ba-rest E2E tests"
@@ -305,19 +361,22 @@ pipeline {
               DOCKER_HOST=172.17.0.1 # on "Docker for Mac" use "docker.for.mac.localhost" special reserved ip instead
               docker build -f Dockerfile.test --build-arg host=${DOCKER_HOST} --no-cache .
             '''
-          },
+          }
+        }
 
-          'Integration tests' : {
+        stage('Integration tests') {
+          steps{
             dir ('strato-worktree/tests') {
               sh 'rm -rf node_modules'
               sh 'npm install'
               sh 'npm run test'
               //sh 'npm run test:long' // TODO: revise tests, determine the long test suite and uncomment line
             }
-          },
-        )
+          }
+        }
       }
     }
+/*
     stage('Test dev docs') {
       steps {
         withCredentials([
@@ -360,6 +419,7 @@ module.exports = {
         }
       }
     }
+*/
   }
 
   post {

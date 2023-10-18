@@ -51,6 +51,7 @@ const CategoryProductList = ({ user }) => {
   const debouncedMinQty = useDebounce(minQty, 1000);
   const debouncedMaxPrice = useDebounce(maxPrice, 1000);
   const debouncedMinPrice = useDebounce(minPrice, 1000);
+  const [subCategories, setSubCategories] = useState([]);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -70,7 +71,7 @@ const CategoryProductList = ({ user }) => {
   const onChangeCategory = (checkedValues) => {
     setSelectedCategories(checkedValues);
     currentCategory = categorys.find((c) => c.name === checkedValues);
-    if (checkedValues.length) clearSelection();
+    if (checkedValues.length === 0) clearSelection();
   };
 
   useEffect(() => {
@@ -87,6 +88,10 @@ const CategoryProductList = ({ user }) => {
 
   const subCategoryDispatch = useSubCategoryDispatch();
   const { subCategorys } = useSubCategoryState();
+  
+  useEffect(() => {
+    setSubCategories(subCategorys);
+  }, [subCategorys]);
 
   useEffect(() => {
     let categorys = null;
@@ -172,6 +177,7 @@ const CategoryProductList = ({ user }) => {
     setSelectedSubCategories([]);
     setSelectedProducts([]);
     setSelectedBrands([]);
+    setSubCategories([]);
   };
 
   //=============================================================================//
@@ -305,7 +311,7 @@ const CategoryProductList = ({ user }) => {
                       value={selectedSubCategories}
                     >
                       <div className="flex flex-col gap-3">
-                        {subCategorys.map((subcategory, index) => (
+                        {subCategories.map((subcategory, index) => (
                           <Checkbox value={subcategory.name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
                             {subcategory.name}
                           </Checkbox>

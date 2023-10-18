@@ -88,7 +88,7 @@ getAccessTokenForRealm realm = do
 -- }
 
 getDefaultEmptyOrg :: String -> String -> String
-getDefaultEmptyOrg name uuid = case elemIndex ' ' name of
+getDefaultEmptyOrg name uuid = "Mercata Account " ++ case elemIndex ' ' name of
   Nothing -> head name : take 8 uuid
   Just idx ->
     let lastNs = drop (idx + 1) name
@@ -191,6 +191,17 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
   let realm = extractRealmName $ T.unpack idProv
+      jsonLogMsg = T.concat
+           [ "{\"user\":\""
+           , uuid
+           , "\",\"realm\":\""
+           , T.pack realm
+           , "\",\"name\":\""
+           , name
+           , maybe "" ("\",\"organization\":\"" <>) mCo
+           , "\"}"
+           ]
+  $logInfoS "putIdentity/json" jsonLogMsg
   getVaultKey accessToken >>= \case
     Just (AddressAndKey a k) -> do
       -- has vault key, confirm also has cert

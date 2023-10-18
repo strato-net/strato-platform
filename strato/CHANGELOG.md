@@ -36,6 +36,7 @@ so that they could be properly moved to their respective version's subsection.
 - new `solidvmevents` kafka topic for emitted solidvm events
 - `pretty` Makefile command that triggers the `ormolu` code formatter
 - `hoogle` Makefile command that generates Haddock documentation and serves through local Hoogle instance
+- new built-in accessor functions for arrays
 
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
@@ -47,6 +48,7 @@ so that they could be properly moved to their respective version's subsection.
 - Typechecker test errors that were missing `pragma strict` and failing
 - The out-of-scope errors of storage variables for Solidity try/catch statements
 - Free function overloading conflict with the import resolver 
+- Account not found in call stack errors for returning arrays to another contract
 ### Removed
 - `bloc22` database removed
 

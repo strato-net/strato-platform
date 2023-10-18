@@ -20,7 +20,7 @@ const App = () => {
 
   TagManager.initialize(tagManagerArgs);
 
-  const {user, loginUrl, users, isAuthenticated } =
+  const { user, loginUrl, users, isAuthenticated } =
     useAuthenticateState();
 
   
@@ -36,13 +36,26 @@ const App = () => {
       window.location.href = "/marketplace";
     }
   }, []);
-  
-  
+
+  useEffect(() => {
+    const referrer = document.referrer;
+    const specificReferralURL = 'https://mercatacarbon.com/';
+
+    if (referrer === specificReferralURL) {
+      TagManager.dataLayer({
+        dataLayer: {
+          event: 'redirected_from_mercata_carbon',
+        },
+      });
+    }
+  }, [])
+
+
   return (
     <BrowserRouter basename="/marketplace">
       <Layout>
         <UsersProvider>
-          <HeaderComponent isOauth={isAuthenticated}  user={user} users={users} loginUrl={loginUrl} />
+          <HeaderComponent isOauth={isAuthenticated} user={user} users={users} loginUrl={loginUrl} />
         </UsersProvider>
         <Content>
           <AuthenticatedRoutes user={user} users={users} />

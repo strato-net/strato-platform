@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined  } from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus } from "./constant";
@@ -10,7 +10,7 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button} from "antd";
+import { Pagination, Button, Radio, Space} from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 
@@ -22,6 +22,9 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [order, setOrder] = useState("createdDate.desc");
+  const [filter, setFilter] = useState(0)
+  const [selectedValue, setSelectedValue] = useState(null);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
   const { orders, isordersLoading, orderBoughtTotal} = useOrderState();
 
@@ -33,9 +36,10 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       debouncedSearchTerm,
       user?.organization,
       order,
-      selectedDate
+      selectedDate,
+      filter
     );
-  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
   
   useEffect(() => {
     setPage(1);
@@ -45,7 +49,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
   useEffect(() => {
-    
+
     let items = [];
     orders.forEach((order) => {
       items.push({
@@ -142,26 +146,57 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),
-      filters: [
-        {
-          text: "Awaiting Fulfillment",
-          value: "Awaiting Fulfillment",
-        },
-        {
-          text: "Awaiting Shipment",
-          value: "Awaiting Shipment",
-        },
-        {
-          text: "Canceled",
-          value: "Canceled",
-        },
-        {
-          text: "Closed",
-          value: "Closed",
-        },
-      ],
-      onFilter: (value, record) => record.status.startsWith(value),
+      filterDropdown: ({confirm}) => ( dropdownVisible && (
+        <div style={{ padding: 8 }}>
+          <Radio.Group
+            onChange={(e) => {
+              setSelectedValue(e.target.value);
+            }}
+            value={selectedValue}
+            vertical={true}
+          >
+            <Space direction="vertical">
+              <Radio value={1}>Awaiting Fulfillment</Radio>
+              <Radio value={2}>Awaiting Shipment</Radio>
+              <Radio value={3}>Closed</Radio>
+              <Radio value={4}>Canceled</Radio>
+            </Space>
+          </Radio.Group>
+          <div className="mt-2" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button
+              type="primary"
+              onClick={() => {
+                setFilter(0);
+                setSelectedValue(null);
+                setDropdownVisible(false);
+                confirm();
+              }}
+              style={{ marginRight: 8 }}
+            >
+              Reset
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                if (selectedValue === null) {
+                  setFilter(0);
+                }
+                else {
+                  setFilter(selectedValue);
+                }
+                confirm();
+              }}
+            >
+              OK
+            </Button>
+          </div>
+        </div>
+      )),
+      filterIcon: () => (<FilterFilled style={{ color: filter !== 0 ? '#1890ff' : undefined }}/>),
+      onFilterDropdownOpenChange: (visible) => {setDropdownVisible(visible)},
       filterSearch: true,
+      filterMultiple: false,
+      filterResetToDefaultFilteredValue: true,
       width: "15%",
     },
   ];
@@ -195,7 +230,6 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         data={data}
         pagination={false}
         isLoading={isordersLoading}
-        // naviroute={routes.BoughtOrderDetails.url}
         scrollX="100%"
       />
       <Pagination

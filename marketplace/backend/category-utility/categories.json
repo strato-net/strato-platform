@@ -22,6 +22,21 @@
             ]
         },
         {
+            "name": "Materials",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Nickel Reserve"
+                },
+                {
+                    "name": "Nickel"
+                },
+                {
+                    "name": "Silver"
+                }
+            ]
+        },
+        {
             "name": "Clothing",
             "imageKey": "",
             "subCategories": [
