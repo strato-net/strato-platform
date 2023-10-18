@@ -11,6 +11,7 @@ import { actions as membershipActions } from "../../contexts/membership/actions"
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useMarketplaceState } from "../../contexts/marketplace";
 import helperJson from "../../helpers/helper.json"
+import { useParams } from "react-router-dom";
 const { columns, taxOptions } = helperJson;
 const { Text, Title } = Typography;
 
@@ -21,14 +22,15 @@ const ListNowIndex = ({
   handleCancel,
   user,
   //   formik,
-  type,
+  // type,
+  // tab
   //   getIn,
   //   isCreateMembershipSubmitting,
 }) => {
-
+  const { type } = useParams();
   const { inventories, isInventoriesLoading } = useInventoryState()
   const [availableQuantity, setAvailableQuantity] = useState('');
-  const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
+  // const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
   const seller = user.user.organization;
   const { cartList } = useMarketplaceState();
   const [purchasedMembershipData, setPurchasedMembershipData] = useState([]);
@@ -48,6 +50,7 @@ const ListNowIndex = ({
   const inventoryDispatch = useInventoryDispatch();
 
   const isListNow = (!productId || !id || !inventoryId || !quantity || !price);
+  const isIssued = type === 'issued';
 
   let {
     memberships,
@@ -63,7 +66,12 @@ const ListNowIndex = ({
 
     data.forEach((item) => {
       const productId = item.productId;
-      const productName = item.productName;
+      let productName;
+      if (isIssued) {
+        productName = item.product.name;
+      }else{
+        productName = item.productName;
+      }
 
       if (!uniqueMembership[productId]) {
         uniqueMembership[productId] = true; // Mark this product ID as seen
@@ -77,7 +85,7 @@ const ListNowIndex = ({
 
   useEffect(() => {
     // setPurchasedMembershipData(purchasedMemberships);
-    transformData(purchasedMemberships)
+    transformData(isIssued ? memberships : purchasedMemberships);
   }, [memberships, purchasedMemberships]);
 
   // useEffect(() => {
@@ -116,8 +124,14 @@ const ListNowIndex = ({
     setQuantity(1);
     setProductId(value);
 
+    let idList
+    if(isIssued){
+      idList = memberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity }))
+    }else{
+      idList = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity }))
+    }
     // let membership = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber }))
-    setMemebershipList(purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity })))
+    setMemebershipList(idList)
     // inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
   }
 
@@ -196,7 +210,7 @@ const ListNowIndex = ({
         <Row gutter={[48, 12]}>
           <Col span={8}>
             <Row> <Text className="font-medium">Seller</Text> </Row>
-            <Row><Input type="text" value={seller} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
+            <Row><Input type="text" value={seller} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
           </Col>
           <Col span={8} >
             <Row><Text className="font-medium">Membership</Text> </Row>
@@ -242,7 +256,7 @@ const ListNowIndex = ({
               // placeholder="Quantity"
               prefix={isInventoriesLoading && <Spin />}
               onWheel={(e) => e.target.blur()}
-              disabled={type === "Sale"}
+              disabled={true}
               min={0}
               max={MAX_QUANTITY}
               value={1}
@@ -294,7 +308,7 @@ const ListNowIndex = ({
             <Row>
               <InputNumber
                 addonBefore="$"
-                className="w-full mt-2"
+                className="w-full mt-2 h-12"
                 size="large"
                 id="price"
                 name="price"
@@ -312,7 +326,7 @@ const ListNowIndex = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={type} size="large" disabled={true} className="cursor-not-allowed mt-2" /> </Row>
+            <Row><Input type="text" value={'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
           </Col>
         </Row>
       </Form >

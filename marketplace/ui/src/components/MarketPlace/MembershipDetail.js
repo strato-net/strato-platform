@@ -454,7 +454,7 @@ const MembershipDetails = ({ user, users }) => {
         <hr style={{ color: "grey" }} />
         <Col span={24} className="max-h-96 overflow-y-auto">
           <Row className="">
-            {serviceList.map(({ serviceName, serviceCost }, index) => {
+            {savingsList.map(({ serviceName, serviceCost }, index) => {
               return <Col span={8} className="">
                 <Card className="shadow-md m-2">
                   <Row className="mt-2">
