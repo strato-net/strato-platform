@@ -1182,7 +1182,7 @@ solidityValueToText (SolidityBool x) = tshow x
 solidityValueToText (SolidityNum x) = tshow x
 solidityValueToText (SolidityBytes x) = escapeQuotes $ tshow x
 solidityValueToText (SolidityArray x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
-solidityValueToText (SolidityObject x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText x@(SolidityObject _) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 valueToSQLTextFilterContract :: Value -> Maybe Text
 valueToSQLTextFilterContract (ValueContract _) = Just "NULL"
@@ -1206,6 +1206,6 @@ valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
 valueToSQLText (ValueArrayFixed _ _) = Nothing
 valueToSQLText (ValueArrayDynamic _) = Nothing
---valueToSQLText (ValueStruct namedItems) = Nothing
+valueToSQLText struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
 
 valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x
