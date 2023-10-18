@@ -198,7 +198,7 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
         Just o | o /= "" -> (True, T.unpack o)
         _ -> (False, orgNew)
       csvLogMsg = T.intercalate ","
-           [ time'
+           [ T.pack $ show time'
            , T.pack realm
            , uuid
            , name
