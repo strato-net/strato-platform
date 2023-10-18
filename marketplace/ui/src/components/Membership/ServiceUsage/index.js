@@ -31,7 +31,7 @@ import {
 } from "../../../contexts/membership";
 import moment from "moment";
 import { useServiceDispatch, useServiceState } from "../../../contexts/service";
-
+import BreadCrumbComponent from "../../BreadCrumb/BreadCrumbComponent";
 import { actions as serviceUsageActions } from "../../../contexts/serviceUsage/actions";
 import { actions as servicesActions } from "../../../contexts/service/actions";
 import { actions as userAuthActions } from "../../../contexts/authentication/actions";
@@ -464,6 +464,7 @@ const ServiceTable = () => {
   return (
     <>
       {contextHolder}
+      <BreadCrumbComponent />
       <Row className="mt-2">
         <Col span={22} className="m-auto">
           <Tabs activeKey={serviceType} onChange={handleChangeServiceUsageType}>

@@ -89,6 +89,7 @@ const MembershipCardPurchased = ({
     timePeriodInMonths,
     savings,
     // membershipId,
+    availableQuantity,
     membershipAddress,
     inventoryId,
     Inventories,
@@ -148,9 +149,9 @@ const MembershipCardPurchased = ({
     }} 
     /> */}
   </Row>)
-
   const callDetailPage = (index, address) => {
-    navigate(`${naviroute.replace(":id", state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
+    let route = `/memberships/${isPurchasedList ? "purchased" : "issued"}/:id`
+    navigate(`${route.replace(`:id`, state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
   }
 
   const previewCol = (indx, address) => (<Button type="text"
@@ -238,7 +239,7 @@ const MembershipCardPurchased = ({
           <Spin />
         </div>
       ) : (
-        <Card className="w-full mt-6 border-grey card-shadow " id="product" key={membershipId}>
+        <Card className="w-full mt-6 border-grey card-shadow" id="product" key={membershipId}>
           <Col span={24} style={{ padding: "0px" }}>
             <Row className="p-4 flex justify-between item-center rounded-md" style={{ backgroundColor: "#f2f2f9" }}>
               <Col >
@@ -282,7 +283,8 @@ const MembershipCardPurchased = ({
                     src={productImageLocation[0]}
                   // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
                   />
-                  : <Carousel showArrows={true} showThumbs={false} className="h-full mem-card-carousel" >
+                  : 
+                  <Carousel showArrows={true} showThumbs={false} className="h-full mem-card-carousel" >
                     {productImageLocation && productImageLocation?.map((item) => {
                       return <Image
                         key={item}
@@ -299,7 +301,7 @@ const MembershipCardPurchased = ({
                   </Carousel>}
 
                 {/* {(!membership.product_with_inventory && isPurchasedList) ? */}
-                <Button type="primary"
+                {availableQuantity == 0 ? "" : <Button 
                   block={true}
                   className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
                   onClick={() => {
@@ -310,14 +312,16 @@ const MembershipCardPurchased = ({
                       openListNowModal();
                     }
                   }}
+                  type={availableQuantity == 0 ? "default" : "primary"}
+                  disabled={availableQuantity == 0 ? true : false}
                 >
                   <Row className="mx-auto w-full px-8  font-poppin text-sm font-semibold">
                     <Col className="w-32 flex justify-between item-center">
                       <Text>{tagIcon()}</Text>
-                      <Text className="text-white ">List for Sale</Text>
+                      <Text className="text-white">List for Sale</Text>
                     </Col>
                   </Row>
-                </Button>
+                </Button>}
                 {/* : null} */}
               </Col>
               <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17, offset: 1 }}
@@ -338,7 +342,7 @@ const MembershipCardPurchased = ({
                   <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
                   <Text type="success" className="float-right font-poppin leading-5">$ {savings ?? 0}</Text>
                 </Paragraph>
-                {membershipId && <Paragraph>
+                {membershipId && isPurchasedList && <Paragraph>
                   <Text className="font-normal text-grey leading-5 font-poppin" >Membership ID</Text>
                   <Text className="float-right font-poppin leading-5">{membershipId ?? "--"}</Text>
                 </Paragraph>}
@@ -407,6 +411,7 @@ const MembershipCardPurchased = ({
         onOk={() => setCarouselModel(false)}
         onCancel={() => setCarouselModel(false)}
         width={1100}
+        className="gallary-modal"
       // height={'100%'}
       >
         <Row>

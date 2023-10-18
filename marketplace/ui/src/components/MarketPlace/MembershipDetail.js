@@ -51,6 +51,7 @@ import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 
 const MembershipDetails = ({ user, users }) => {
 
@@ -451,8 +452,8 @@ const MembershipDetails = ({ user, users }) => {
         </Col>
         <Text className="leading-6 text-lg block font-semibold pb-3 mt-4">Savings</Text>
         <hr style={{ color: "grey" }} />
-        <Col span={24} className="">
-          <Row>
+        <Col span={24} className="max-h-96 overflow-y-auto">
+          <Row className="">
             {savingsList.map(({ serviceName, serviceCost }, index) => {
               return <Col span={8} className="">
                 <Card className="shadow-md m-2">
@@ -485,30 +486,7 @@ const MembershipDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <Row className="mx-16 h-20">
-            <Col span={24} className="mt-10" >
-              <Breadcrumb>
-                <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-                  <ClickableCell href={routes.Marketplace.url}>
-                    <Text className="text-primary text-md font-bold" underline>
-                      Home
-                    </Text>
-                  </ClickableCell>
-                </Breadcrumb.Item>
-                {isCalledFromMembership &&
-                  <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-                    <ClickableCell href={routes.Inventories.url}>
-                      <Text className="text-primary text-md text-grey font-bold" underline>
-                        Inventory
-                      </Text>
-                    </ClickableCell>
-                  </Breadcrumb.Item>}
-                <Breadcrumb.Item className="text-grey">
-                  {decodeURIComponent(details?.name)}
-                </Breadcrumb.Item>
-              </Breadcrumb>
-            </Col>
-          </Row>
+          <BreadCrumbComponent name={details?.name} />
 
           {/* style={{border:"1px solid blue"}} */}
           <Row justify={'space-betweem'} className="max-w-4xl mx-auto mt-10 h-92" >

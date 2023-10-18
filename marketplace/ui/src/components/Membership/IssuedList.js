@@ -70,7 +70,7 @@ const IssuedList = (
                   categorys={categorys}
                   subCategorys={subCategorys}
                   debouncedSearchTerm={debouncedSearchTerm}
-                  membershipId={null}
+                  membershipId={item.address}
                   isPurchasedList={false}
                 />
               </Col>

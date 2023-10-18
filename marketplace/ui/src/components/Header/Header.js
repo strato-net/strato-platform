@@ -74,7 +74,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
-    routes.Memberships.url,
+    // routes.Memberships.url,
+    '/memberships/purchased',
     routes.Storage.url,
   ];
 

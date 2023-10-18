@@ -1669,7 +1669,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
-    const products = await managers.productManager.getProducts({ ownerOrganization: userOrganization }, newOptions);
+    const products = await managers.productManager.getProducts({ manufacturer: userOrganization }, newOptions);
     let addressOfProducts = products.map(item => item.address)
 
     // Set the batch size for addressOfProducts processing
@@ -1687,7 +1687,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Filter and process memberships
       // memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
       memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined);
-
+      // let productArr = memberships.map((item) => item.productId)
       // Attach product information
       products.forEach(product => {
         memberships = memberships.map(membership => {
@@ -1709,10 +1709,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Get inventories using the corresponding ProductIds
       const inventories = await managers.productManager.getInventories({ productId: batch }, newOptions);
 
+      // const itemsList = await itemJs.getAll(rawAdmin, { productId: productArr }, newOptions);
       // Iterate through the list of inventories and attach the inventory status to the membership object
       inventories.forEach(inventory => {
         memberships = memberships.map(membership => {
           let transformedData = { inventories: [], ...membership }
+          // let item = itemsList.filter((item) => item.productId == membership.productId)
+          // let itemNumber = ''
+          // if (item) {
+          //   itemNumber = item[0]?.itemNumber;
+          // }
           return (membership.productId === inventory.productId) ?
             { ...membership, inventories: [...transformedData.inventories, inventory] } : membership;
         })

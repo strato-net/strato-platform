@@ -266,7 +266,7 @@ const CategoryProductList = ({ user }) => {
             <Divider className="m-0" />
 
             {/* Panel - Quantity */}
-            <Collapse
+            {/* <Collapse
               bordered={false}
               defaultActiveKey={1}
               expandIconPosition="end"
@@ -285,7 +285,7 @@ const CategoryProductList = ({ user }) => {
                   }} />
                 </Space>
               </Panel>
-            </Collapse>
+            </Collapse> */}
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}

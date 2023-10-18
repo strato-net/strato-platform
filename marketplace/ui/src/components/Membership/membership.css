@@ -47,10 +47,11 @@
 }
 .ant-upload-list-picture {
   display: inline-block;
+  margin-top: 20px;
 }
 
 .ant-upload-list-item-container {
-  margin-left: 20px;
+  margin: 15px;
 }
 
 .serviceIcons {
@@ -147,4 +148,12 @@
 
 .addon-custom{
   padding: 3px;
+}
+
+.mem-card-carousel > .carousel-slider{
+  height: 185px;
+}
+
+.gallary-modal{
+  /* background-color: #1898ef; */
 }
