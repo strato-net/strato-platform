@@ -1,0 +1,38 @@
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Breadcrumb, Col, Row, Typography } from 'antd'
+import React from 'react'
+import ClickableCell from '../ClickableCell'
+const { Text } = Typography;
+
+const BreadCrumbComponent = ({ name }) => {
+  const navigate = useNavigate();
+  const { state, pathname } = useLocation();
+  const routesArray = pathname.split("/")
+  const handleRedirect = (e, item) => {
+    e.preventDefault()
+    navigate(item)
+  }
+
+  return (
+    <>
+      <Row className="mx-16 h-20">
+        <Col span={24} className="mt-10" >
+          <Breadcrumb>
+            {routesArray.map((item, index) => {
+              let len = routesArray.length - 1
+              return <Breadcrumb.Item key={index} href="" onClick={(e) => handleRedirect(e, routesArray.slice(0, index + 1).join('/'))}>
+                <ClickableCell>
+                  <Text className={`${len == index ? "" : "text-primary"} text-md font-bold`} underline>
+                    {item == "" ? "Home" : ((name && index == len) ? name : item)}
+                  </Text>
+                </ClickableCell>
+              </Breadcrumb.Item>
+            })}
+          </Breadcrumb>
+        </Col>
+      </Row>
+    </>
+  )
+}
+
+export default BreadCrumbComponent

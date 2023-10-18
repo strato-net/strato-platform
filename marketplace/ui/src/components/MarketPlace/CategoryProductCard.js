@@ -42,7 +42,7 @@ const CategoryProductCard = ({ product, category }) => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductDetail.url;
   const naviroute2 = routes.MembershipDetail.url;
-  
+
   const [qty, setQty] = useState(1);
 
   const subtract = () => {
@@ -112,6 +112,14 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
+  const handleRedirect = () => {
+    let route = `/memberships/market/:id`
+    product.membershipId ?
+      navigate(route.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address } })
+      :
+      navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+  }
+
   return (
     <div>
       {contextHolder}
@@ -129,12 +137,7 @@ const CategoryProductCard = ({ product, category }) => {
               height={180}
               preview={false}
               fallback={noPreview}
-              onClick={() =>
-                product.membershipId ? 
-                navigate(naviroute2.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address} })
-                :
-                navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
-            }
+              onClick={() =>{handleRedirect()} }
             />
           </div>
           <div>
@@ -143,12 +146,7 @@ const CategoryProductCard = ({ product, category }) => {
                 strong
                 className="text-xl text-primaryB hover:text-primary hover:underline"
                 id="prod-name"
-                onClick={() =>
-                  product.membershipId ? 
-                  navigate(naviroute2.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address} })
-                  :
-                  navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
-                }
+                onClick={() =>{handleRedirect()} }
               >
                 {decodeURIComponent(product.name)}&nbsp;
               </Text>

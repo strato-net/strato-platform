@@ -3,7 +3,7 @@
   .ant-menu-item:hover:not(.ant-menu-item-selected):not(
     .ant-menu-submenu-selected
   ) {
-  color: black;
+  /* color: black; */
   font-weight: bold;
   border: none;
 }

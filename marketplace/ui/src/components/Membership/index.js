@@ -31,22 +31,26 @@ import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useSubCategoryState } from "../../contexts/subCategory";
 import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
+import "./membership.css";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
 import ListNowIndex from "./ListNowIndex";
 import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
 
 const Membership = (user) => {
+  const { type } = useParams();
   let { state } = useLocation();
   const [open, setOpen] = useState(
     state && user.user ? state.isCalledFromHeader : false
   );
+
   useEffect(() => {
     if (state && user.user) {
       setOpen(state.isCalledFromHeader);
@@ -65,7 +69,7 @@ const Membership = (user) => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(10);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  let [typeDisplay, setTypeDisplay] = useState("purchase");
+  // let [typeDispay, setTypeDisplay] = useState("purchased");
   const [visible, setVisible] = useState(false);
 
   //Categories
@@ -175,21 +179,18 @@ const Membership = (user) => {
     },
   ];
   const onChange = (key) => {
-    setTypeDisplay(key);
+    navigate(`/memberships/${key}`)
   };
 
-  useEffect(() => {
-    setTypeDisplay(typeDisplay);
-  });
 
   const items = [
     {
-      key: "purchase",
-      label: <Text className="text-xl font-bold leading-6" style={{ color: typeDisplay === "purchase" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Purchased</Text>,
+      key: "purchased",
+      label: <Text className="text-xl font-bold leading-6" style={{ color: type === "purchased" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Purchased</Text>,
     },
     {
       key: "issued",
-      label: <Text className="text-xl font-bold leading-6" style={{ color: typeDisplay === "issued" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Issued</Text>,
+      label: <Text className="text-xl font-bold leading-6" style={{ color: type === "issued" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Issued</Text>,
     },
   ];
   const closeSellModal = () => {
@@ -208,24 +209,7 @@ const Membership = (user) => {
         </div>
       ) : (
         <div className=" mt-10 min-h-full">
-          <Row className="mx-16 mb-4">
-            <Col span={22}>
-              <Breadcrumb>
-                <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-                  <ClickableCell href={routes.Marketplace.url}>
-                    <Text className="primary-theme-text text-md font-bold" underline>
-                      Home
-                    </Text>
-                  </ClickableCell>
-                </Breadcrumb.Item>
-                <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-                  <Text className="text-md font-bold">
-                    Memberships
-                  </Text>
-                </Breadcrumb.Item>
-              </Breadcrumb>
-            </Col>
-          </Row>
+          <BreadCrumbComponent />
 
           <Col className="mt-2 h-24 py-5 bg-red-800" style={{ backgroundColor: '#F2F2F2' }}>
             <Row className="mx-16 flex justify-between item-center">
@@ -239,7 +223,7 @@ const Membership = (user) => {
                     </Row>
                     <Row>
                       <Typography.Text className="text-sm font-medium text-grey">
-                        {typeDisplay === "purchase" ? purchasedMemberships?.length : memberships?.length} {typeDisplay} Memberships found
+                        {type === "purchased" ? purchasedMemberships?.length : memberships?.length} {type} Memberships found
                       </Typography.Text>
                     </Row>
                   </Col>
@@ -254,7 +238,7 @@ const Membership = (user) => {
                         All
                     </Dropdown.Button>
                 </Col> */}
-              <Col span={14} className="py-0 m-0 pt-1">
+              <Col  md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 11 }}  className="py-0 m-0 pt-1">
                 <Col className="flex justify-between">
                   <Button
                     id="add-product-button"
@@ -313,7 +297,7 @@ const Membership = (user) => {
                   >
                     {servicesIcon()} &nbsp; Services
                   </Button>
-                  <Button
+                  {/* <Button
                     id="add-product-button"
                     // type="primary"
                     style={{
@@ -324,7 +308,7 @@ const Membership = (user) => {
                     className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold"
                   >
                     Manage Services
-                  </Button>
+                  </Button> */}
                   <Button
                     id="add-product-button"
                     type="primary"
@@ -356,11 +340,11 @@ const Membership = (user) => {
           </Col>
           <Row className="mx-16">
             <Col span={24}>
-              <Tabs defaultActiveKey="1" size="large" items={items} onChange={onChange} />
+              <Tabs defaultActiveKey={type} size="large" items={items} onChange={onChange} />
             </Col>
           </Row>
           <Row className="mx-16">
-            {typeDisplay === "purchase" ? (
+            {type === "purchased" ? (
               <PurchasedList
                 user={user}
                 categorys={categorys}
