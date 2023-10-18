@@ -2,59 +2,64 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
-import "/dapp/products/contracts/Product.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
+
 
 contract MarketplaceItem is Asset, 
                             ItemStatus, 
-                            InventoryStatus, 
-                            Product {
-    
-    // Item
-    address item_owner;
-    string item_ownerOrganization;
-    string item_ownerOrganizationalUnit;
-    string item_ownerCommonName;
-    address item_productId;
-    address item_inventoryId;
-    string item_serialNumber;
-    string item_comment;
-    uint item_itemNumber;
-    uint item_createdDate;
-    ItemStatus public item_status;
+                            InventoryStatus
+                             {
+     // Item
+    struct Item{
+    address owner;
+    string ownerOrganization;
+    string ownerOrganizationalUnit;
+    string ownerCommonName;
+    address productId;
+    address inventoryId;
+    string serialNumber;
+    string comment;
+    uint itemNumber;
+    uint createdDate;
+    ItemStatus status;}
 
     // Inventory
-    int public inventory_availableQuantity;
-    string public inventory_batchId;
-    string public inventory_category;
-    uint public inventory_createdDate;
-    address public inventory_owner;
-    string public inventory_ownerCommonName;
-    string public inventory_ownerOrganization;
-    string public inventory_ownerOrganizationalUnit;
-    int public inventory_pricePerUnit;
-    address public inventory_productId;
-    int public inventory_quantity;
-    InventoryStatus public inventory_status;
-    string public inventory_subCategory;
-    string public inventory_type;
+    struct Inventory{
+    int availableQuantity;
+    string batchId;
+    string category;
+    uint createdDate;
+    address owner;
+    string ownerCommonName;
+    string ownerOrganization;
+    string ownerOrganizationalUnit;
+    int pricePerUnit;
+    address productId;
+    int quantity;
+    InventoryStatus status;
+    string subCategory;
+    string inventoryType;}
 
-    // Product 
-    string public product_name;
-    string public product_description;
-    string public product_manufacturer;
-    UnitOfMeasurement public product_unitOfMeasurement;
-    string public product_userUniqueProductCode;
-    uint public product_uniqueProductCode;
-    int public product_leastSellableUnit;
-    string public product_imageKey;
-    bool public product_isActive;
-    string public product_category;
-    string public product_subCategory;
-    uint public product_createdDate;
-    bool public product_isDeleted; 
-    bool public product_isInventoryAvailable;
+    // Product
+    struct Product{ 
+    string name;
+    string description;
+    string manufacturer;
+    UnitOfMeasurement unitOfMeasurement;
+    string userUniqueProductCode;
+    uint uniqueProductCode;
+    int leastSellableUnit;
+    string imageKey;
+    bool isActive;
+    string category;
+    string subCategory;
+    uint createdDate;
+    bool isDeleted; 
+    bool isInventoryAvailable;}
+
+    Item item;
     Product product;
+    Inventory inventory;
 
     // Events
     event ItemOwnershipUpdate(address seller, address newOwner, uint ownershipStartDate, address itemAddress);
@@ -67,41 +72,65 @@ contract MarketplaceItem is Asset,
         string memory _comment,
         uint _itemNumber,
         uint _createdDate,
-        ItemStatus _itemStatus
-    ) public {
-        mapping(string => string) ownerCert = getUserCert(_owner);
-
-        item = new Item();
-        item_owner = _owner;
-        item_productId = _productId;
-        item_inventoryId = _inventoryId;
-        item_serialNumber = _serialNumber;
-        item_comment = _comment;
-        item_itemNumber = _itemNumber;
-        item_createdDate = _createdDate;
-        item_status = _itemStatus;
-        item_ownerOrganization = ownerCert["organization"];
-        item_ownerOrganizationalUnit = ownerCert["organizationalUnit"];
-        item_ownerCommonName = ownerCert["commonName"];
+        ItemStatus _itemStatus,
+        uint _uniqueProductCode,
+        string[] _rawMaterialProductName,
+        string[] _rawMaterialSerialNumber,
+        string[] _rawMaterialProductId,
+        int _availableQuantity,
+        string _batchId,
+        string _category,
+        int _pricePerUnit,
+        int _quantity,
+        InventoryStatus _inventoryStatus,
+        string _subCategory,
+        string _inventoryType,
+        string _name,
+        string _description,
+        string _manufacturer,
+        UnitOfMeasurement _unitOfMeasurement,
+        string _userUniqueProductCode,
+        int _leastSellableUnit,
+        string _imageKey,
+        bool _isActive,
+        string _category,
+        bool _isDeleted,
+        bool _isInventoryAvailable
+    ) Asset() public {
+        item = Item(
+            _owner,
+            _productId,
+            _inventoryId,
+            _serialNumber,
+            _comment,
+            _itemNumber,
+            _createdDate,
+            _itemStatus,
+            ownerOrganization,
+            ownerOrganizationalUnit,
+            ownerCommonName
+        );
 
         // Emit an event to indicate the creation of a new Item
         emit ItemOwnershipUpdate(address(0), _owner, block.timestamp, msg.sender);
 
-        // Initialize product
-        inventory_availableQuantity = _inventory_availableQuantity;
-        inventory_batchId = _inventory_batchId;
-        inventory_category = _inventory_category;
-        inventory_createdDate = _inventory_createdDate;
-        inventory_owner = _inventory_owner;
-        inventory_pricePerUnit = _inventory_pricePerUnit;
-        inventory_productId = _inventory_productId;
-        inventory_quantity = _inventory_availableQuantity;
-        inventory_status = _inventory_status;
-        inventory_subCategory = _inventory_subCategory;
-        inventory_type = _inventory_type;
-        inventory_ownerCommonName = ownerCert["commonName"];
-        inventory_ownerOrganization = ownerCert["organization"];
-        inventory_ownerOrganizationalUnit = ownerCert["organizationalUnit"];
+        // Initialize inventory
+        inventory = Inventory(
+            _availableQuantity,
+            _batchId,
+            _category,
+            _createdDate,
+            _owner,
+            ownerOrganization,
+            ownerOrganizationalUnit,
+            ownerCommonName,
+            _pricePerUnit,
+            _productId,
+            _availableQuantity,
+            _inventoryStatus,
+            _subCategory,
+            _inventoryType
+        );
 
         if (_rawMaterialSerialNumber.length > 0) {
             addRawMaterials(
@@ -111,32 +140,30 @@ contract MarketplaceItem is Asset,
                 _rawMaterialProductId
             );
         }
-
-        // Product 
-        // todo: figure out where most of these _variables are gonna come from
-        product_name = _product_name;
-        product_description = _product_description;
-        product_manufacturer = _product_manufacturer;
-        product_unitOfMeasurement = _product_unitOfMeasurement;
-        product_userUniqueProductCode = _product_userUniqueProductCode;
-        product_uniqueProductCode = _product_uniqueProductCode;
-        product_leastSellableUnit = _product_leastSellableUnit;
-        product_imageKey = _product_imageKey;
-        product_isActive = _product_isActive;
-        product_category = _product_category;
-        product_subCategory = _product_subCategory;
-        product_createdDate = _product_createdDate;
-        product_isDeleted = _product_isDeleted;
-        product_isInventoryAvailable = _product_isInventoryAvailable;
-    }
+        product = Product(
+            _name,
+            _description,
+            _manufacturer,
+            _unitOfMeasurement,
+            _userUniqueProductCode,
+            _uniqueProductCode,
+            _leastSellableUnit,
+            _imageKey,
+            _isActive,
+            _category,
+            _subCategory,
+            _createdDate,
+            _isDeleted,
+            _isInventoryAvailable
+        );}
 
     // Function to update an Item
-    function itemUpdate(
+    function updateItem(
         ItemStatus _status,
         string _comment,
         uint _scheme
     ) returns (uint) {
-        if (item_ownerOrganization != getUserOrganization(tx.origin)) {
+        if (item.ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
 
@@ -145,10 +172,10 @@ contract MarketplaceItem is Asset,
         }
 
         if ((_scheme & (1 << 0)) == (1 << 0)) {
-            item_status = _status;
+            item.status = _status;
         }
         if ((_scheme & (1 << 1)) == (1 << 1)) {
-            item_comment = _comment;
+            item.comment = _comment;
         }
 
         return RestStatus.OK;
@@ -160,7 +187,7 @@ contract MarketplaceItem is Asset,
     ,   InventoryStatus _status
     ,   uint _scheme
     ) returns (uint) {
-      if(inventory_ownerOrganization != getUserOrganization(tx.origin)){
+      if(inventory.ownerOrganization != getUserOrganization(tx.origin)){
         return RestStatus.FORBIDDEN;
       }
 
@@ -169,10 +196,10 @@ contract MarketplaceItem is Asset,
       }
 
       if ((_scheme & (1 << 0)) == (1 << 0)) {
-        inventory_pricePerUnit = _pricePerUnit;
+        inventory.pricePerUnit = _pricePerUnit;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
-        inventory_status = _status;
+        inventory.status = _status;
       }
 
       return RestStatus.OK;
@@ -194,16 +221,16 @@ contract MarketplaceItem is Asset,
       }
 
       if ((_scheme & (1 << 0)) == (1 << 0)) {
-        product_description = _description;
+        product.description = _description;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
-        product_imageKey = _imageKey;
+        product.imageKey = _imageKey;
       }
       if ((_scheme & (1 << 2)) == (1 << 2)) {
-        product_isActive = _isActive;
+        product.isActive = _isActive;
       }
       if ((_scheme & (1 << 3)) == (1 << 3)) {
-        product_userUniqueProductCode = _userUniqueProductCode;
+        product.userUniqueProductCode = _userUniqueProductCode;
       }
 
       return RestStatus.OK;
@@ -215,8 +242,8 @@ contract MarketplaceItem is Asset,
         return (RestStatus.FORBIDDEN, 'Not authorized');
       }
 
-      if(!product_isInventoryAvailable) {
-        product_isDeleted = true;
+      if(!product.isInventoryAvailable) {
+        product.isDeleted = true;
         return (RestStatus.OK, "Product is deleted successfully.");
       }
       return (RestStatus.CONFLICT, "Product cannot be deleted.");
@@ -224,7 +251,7 @@ contract MarketplaceItem is Asset,
 
     // Function to update the quantity of the Inventory
     function updateQuantity(int _quantity) returns(uint){
-      inventory_availableQuantity = _quantity;
+      inventory.availableQuantity = _quantity;
       return RestStatus.OK;
     }
 
@@ -238,11 +265,9 @@ contract MarketplaceItem is Asset,
     function generateOwnershipHistory(
         string _seller,
         string _newOwner,
-        uint _ownershipStartDate,
-        address _itemAddress
+        uint _ownershipStartDate
     ) returns (uint) {
-        Item item = items[_itemAddress]
-        if (item_ownerOrganization != getUserOrganization(tx.origin)) {
+        if (item.ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
         emit ItemOwnershipUpdate(
@@ -256,14 +281,12 @@ contract MarketplaceItem is Asset,
 
     // Function to transfer the ownership of a Item
     function transferOwnership(
-        address _itemAddress,
         address _addr,
         address _productId,
         address _inventoryId
     ) public returns (uint256) {
-        Item item = items[_itemAddress];
         // caller must be current owner to transfer ownership
-        if (item_ownerOrganization != getUserOrganization(tx.origin)) {
+        if (item.ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
 
@@ -277,19 +300,44 @@ contract MarketplaceItem is Asset,
         if (newOwnerOrganization == "") return RestStatus.NOT_FOUND;
 
         generateOwnershipHistory(
-            ownerOrganization,
+            item.ownerOrganization,
             newOwnerOrganization,
-            block.timestamp,
-            _itemAddress
+            block.timestamp
         );
         // set newOwner as asset owner
-        item_owner = _addr;
-        item_ownerOrganization = newOwnerOrganization;
-        item_ownerOrganizationalUnit = newOwnerOrganizationalUnit;
-        item_ownerCommonName = newOwnerCommonName;
-        item_productId = _productId;
-        item_inventoryId = _inventoryId;
+        ownerOrganization = newOwnerOrganization,
+        ownerOrganizationalUnit = newOwnerOrganizationalUnit,
+        ownerCommonName = newOwnerCommonName,
+        item.owner = _addr;
+        item.ownerOrganization = ownerOrganization;
+        item.ownerOrganizationalUnit = ownerOrganizationalUnit;
+        item.ownerCommonName = ownerCommonName;
+        inventory.owner = _addr;
+        inventory.ownerOrganization = ownerOrganization;
+        inventory.ownerOrganizationalUnit = ownerOrganizationalUnit;
+        inventory.ownerCommonName = ownerCommonName;
+        item.productId = _productId;
+        item.inventoryId = _inventoryId;
         return RestStatus.OK;
     }
 
+    // Update the inventory for product
+    function updateInventory(int _pricePerUnit, InventoryStatus _status, uint _scheme) 
+      public returns(uint256){
+    
+      if(inventory.ownerOrganization != getUserOrganization(tx.origin)){
+        return RestStatus.FORBIDDEN;
+      }
+    
+      inventory.updateInventory(_pricePerUnit, _status, _scheme);
+      return (RestStatus.OK);
+    }
+
+
+    // Update the inventory quantity
+    function updateInventoryQuantity(int _quantity) 
+      public returns(uint256){
+      inventory.updateQuantity(_quantity);
+      return (RestStatus.OK);
+    }
 }
