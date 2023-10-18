@@ -247,7 +247,7 @@ contract ProductManager is
                 tx.origin,
                 "Batch"
             );
-            Item_3 itemAddr = new Item_3(
+            Item_3 batch_item = new Item_3(
                 address(product),
                 product.uniqueProductCode(),
                 address(inventoryAddress),
@@ -260,6 +260,12 @@ contract ProductManager is
                 _itemNumber,
                 block.timestamp,
                 tx.origin
+            );
+            batch_item.generateOwnershipHistory(
+                batch_item.ownerOrganization(),
+                batch_item.ownerOrganization(),
+                block.timestamp,
+                address(batch_item)
             );
             return (status, inventoryAddress);
         } else {
