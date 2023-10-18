@@ -202,7 +202,7 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
            , T.pack realm
            , uuid
            , name
-           , org
+           , T.pack org
            ]
   $logInfoS "putIdentity/csv" csvLogMsg
   getVaultKey accessToken >>= \case
