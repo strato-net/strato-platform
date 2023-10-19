@@ -120,15 +120,18 @@ const ListNowModal = ({
               id="percentage"
               name="percentage"
               min={0}
-              // addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between">
-              //   <Col span={12} className="p-1" style={{ backgroundColor: isTaxPercentage ? "#F2F2F5" : "" }} onClick={() => { setIsTaxPercentage(true) }}>
-              //     %
-              //   </Col>
-              //   <Col span={12} className="p-1" style={{ backgroundColor: !isTaxPercentage ? "#F2F2F5" : "" }} onClick={() => { setIsTaxPercentage(false) }}>
-              //     $
-              //   </Col>
-              // </Row>}
-              addonAfter={selectAfter}
+              addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
+                <Col span={12} className="p-1"
+                  style={{ backgroundColor: formik.values.isTaxPercentage ? "#F2F2F5" : "" }}
+                  onClick={() => { formik.setFieldValue("isTaxPercentage", true) }}>
+                  %
+                </Col>
+                <Col span={12} className="p-1"
+                  style={{ backgroundColor: !formik.values.isTaxPercentage ? "#F2F2F5" : "" }}
+                  onClick={() => { formik.setFieldValue("isTaxPercentage", false) }}>
+                  $
+                </Col>
+              </Row>}
               formatter={handleFormatter}
               className="w-full mt-2"
               size="large"

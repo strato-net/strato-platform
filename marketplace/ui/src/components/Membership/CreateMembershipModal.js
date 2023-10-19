@@ -781,19 +781,18 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                           // placeholder="Discount"
                           type="number"
                           size="large"
-                          // addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
-                          //   <Col span={12} className="p-1" 
-                          //   style={{ backgroundColor: isTaxPercentage ? "#F2F2F5" : "" }} 
-                          //   onClick={() => { handleDiscountType("Percent", index) }}>
-                          //     %
-                          //   </Col>
-                          //   <Col span={12} className="p-1" 
-                          //   style={{ backgroundColor: !isTaxPercentage ? "#F2F2F5" : "" }} 
-                          //   onClick={() => { handleDiscountType("Dollar", index) }}>
-                          //     $
-                          //   </Col>
-                          // </Row>}
-                          addonAfter={selectAfter(index)}
+                          addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
+                            <Col span={12} className="p-1"
+                              style={{ backgroundColor: memberDiscount[index] == 2 ? "#F2F2F5" : "" }}
+                              onClick={() => { handleDiscountType("Percent", index) }}>
+                              %
+                            </Col>
+                            <Col span={12} className="p-1"
+                              style={{ backgroundColor: memberDiscount[index] != 2 ? "#F2F2F5" : "" }}
+                              onClick={() => { handleDiscountType("Dollar", index) }}>
+                              $
+                            </Col>
+                          </Row>}
                           controls={false}
                           min={0}
                           value={service.memberPrice}
@@ -828,7 +827,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         icon={<MinusOutlined />}
                         onClick={() => {
                           removeServiceRow();
-                          memberDiscount.pop();
+                          memberDiscount.splice(index, 1);
                         }}
                       ></Button>
                     </Col>
@@ -847,7 +846,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                     >
                       {uploadText(uploadIcon2())}
                     </Upload.Dragger>
-                  </Col> </Row>
+                  </Col>
+                </Row>
 
                 {fileList.length > 0 && <Card className="mt-5 shadow-lg">
                   <Row gutter={16}>
