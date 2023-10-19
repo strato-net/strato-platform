@@ -2,12 +2,14 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
+import "/dapp/items/contracts/UnitOfMeasurement.sol";
 
 
 contract MarketplaceItem is Asset, 
                             ItemStatus, 
                             InventoryStatus,
-                            RestStatus
+                            RestStatus,
+                            UnitOfMeasurement
                              {
      // Item
     struct Item{

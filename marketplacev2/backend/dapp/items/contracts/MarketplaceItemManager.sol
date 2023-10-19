@@ -2,11 +2,13 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/items/contracts/MarketplaceItem.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
+import "/dapp/items/contracts/UnitOfMeasurement.sol";
 
 contract MarketplaceItemManager is ItemStatus, 
                                    InventoryStatus, 
                                    MarketplaceItem,
-                                   RestStatus
+                                   RestStatus,
+                                   UnitOfMeasurement
                                     {
     // check if the serial number is mapping(serialNumber => UPC ) uniqueSerialNumberByUPC;
     mapping(string => uint) private uniqueSerialNumberByUPC;
