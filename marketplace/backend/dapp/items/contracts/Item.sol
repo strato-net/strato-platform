@@ -16,6 +16,7 @@ contract Item_3 is ItemStatus {
     ItemStatus public status;
     string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
+    uint public expiryDate;
     uint public createdDate;
 
     /// @dev Events to add and remove members to this shard.
@@ -45,7 +46,8 @@ contract Item_3 is ItemStatus {
         string[] _rawMaterialSerialNumber,
         string[] _rawMaterialProductId,
         uint _itemNumber,
-        uint _createdDate
+        uint _createdDate,
+        uint _expiryDate
     ) public {
         owner = tx.origin;
 
@@ -56,6 +58,7 @@ contract Item_3 is ItemStatus {
         comment = _comment;
         itemNumber = _itemNumber;
         createdDate = _createdDate;
+        expiryDate = _expiryDate;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -75,9 +78,10 @@ contract Item_3 is ItemStatus {
     function update(
         ItemStatus _status,
         string _comment,
+        uint _expiryDate,
         uint _scheme
     ) returns (uint) {
-        if(ownerOrganization != getUserOrganization(tx.origin)){
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
 
@@ -91,15 +95,18 @@ contract Item_3 is ItemStatus {
         if ((_scheme & (1 << 1)) == (1 << 1)) {
             comment = _comment;
         }
+        if ((_scheme & (1 << 2)) == (1 << 2)) {
+            expiryDate = _expiryDate;
+        }
 
         return RestStatus.OK;
     }
 
     // Get the userOrganization
     function getUserOrganization(address caller) public returns (string) {
-      mapping(string => string) ownerCert = getUserCert(caller);
-      string userOrganization = ownerCert["organization"];
-      return userOrganization;
+        mapping(string => string) ownerCert = getUserCert(caller);
+        string userOrganization = ownerCert["organization"];
+        return userOrganization;
     }
 
     function generateOwnershipHistory(
@@ -108,7 +115,7 @@ contract Item_3 is ItemStatus {
         uint _ownershipStartDate,
         address _itemAddress
     ) returns (uint) {
-        if(ownerOrganization != getUserOrganization(tx.origin)){
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
         emit OwnershipUpdate(
@@ -139,7 +146,6 @@ contract Item_3 is ItemStatus {
 
         // add new owner org (and maybe unit)
         if (newOwnerOrganization == "") return RestStatus.NOT_FOUND;
-        
 
         generateOwnershipHistory(
             ownerOrganization,

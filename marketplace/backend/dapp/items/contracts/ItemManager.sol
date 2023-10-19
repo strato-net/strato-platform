@@ -27,27 +27,45 @@ contract ItemManager is ItemStatus, InventoryStatus {
         ItemObject[] _itemObject,
         ItemStatus _status,
         string _comment,
-        uint _createdDate
+        uint _createdDate,
+        uint _expiryDate
     ) public returns (uint, string, string) {
         string itemAddresses = "";
         string repeatedSerialNumbers = "";
 
         if (_itemObject[0].serialNumber == "") {
-
             for (uint256 i = 0; i < _itemObject.length; i++) {
-                Item_3 itemAddr= new Item_3(_productId, _uniqueProductCode, _inventoryId, "", _status, _comment, _itemObject[i].rawMaterialProductName, _itemObject[i].rawMaterialSerialNumber, _itemObject[i].rawMaterialProductId, _itemObject[i].itemNumber,
-                _createdDate);
+                Item_3 itemAddr = new Item_3(
+                    _productId,
+                    _uniqueProductCode,
+                    _inventoryId,
+                    "",
+                    _status,
+                    _comment,
+                    _itemObject[i].rawMaterialProductName,
+                    _itemObject[i].rawMaterialSerialNumber,
+                    _itemObject[i].rawMaterialProductId,
+                    _itemObject[i].itemNumber,
+                    _createdDate,
+                    _expiryDate
+                );
 
-                address itemContractAddress= address(itemAddr);
-                itemAddr.generateOwnershipHistory("",itemAddr.ownerOrganization(), _createdDate, itemContractAddress);
+                address itemContractAddress = address(itemAddr);
+                itemAddr.generateOwnershipHistory(
+                    "",
+                    itemAddr.ownerOrganization(),
+                    _createdDate,
+                    itemContractAddress
+                );
 
-                uniqueSerialNumberByUPC[_itemObject[0].serialNumber] = _uniqueProductCode;
+                uniqueSerialNumberByUPC[
+                    _itemObject[0].serialNumber
+                ] = _uniqueProductCode;
                 itemProductIdMapping[itemContractAddress] = _productId;
                 itemInventoryIdMapping[itemContractAddress] = _inventoryId;
                 itemAddresses += string(address(itemAddr)) + ",";
             }
-                return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
-
+            return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
         }
         for (uint256 i = 0; i < _itemObject.length; i++) {
             string currentSerialNumber = _itemObject[i].serialNumber;
@@ -67,7 +85,8 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     _itemObject[i].rawMaterialSerialNumber,
                     _itemObject[i].rawMaterialProductId,
                     _itemObject[i].itemNumber,
-                    _createdDate
+                    _createdDate,
+                    _expiryDate
                 );
 
                 address itemContractAddress = address(itemAddr);
@@ -93,11 +112,12 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address[] _itemsAddress,
         ItemStatus _status,
         string _comment,
+        uint _expiryDate,
         uint _scheme
     ) public returns (uint) {
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
             Item_3 item = Item_3(_itemsAddress[i]);
-            item.update(_status, _comment, _scheme);
+            item.update(_status, _comment, _expiryDate, _scheme);
         }
         return (RestStatus.OK);
     }
@@ -134,10 +154,13 @@ contract ItemManager is ItemStatus, InventoryStatus {
         return (RestStatus.CREATED, eventAddresses);
     }
 
-    function certifyEvent (address[] _eventAddress, string _certifierComment, uint _certifiedDate, uint _scheme) 
-        public returns (uint, string) {
-
-        for(uint256 i = 0; i < _eventAddress.length; i++){
+    function certifyEvent(
+        address[] _eventAddress,
+        string _certifierComment,
+        uint _certifiedDate,
+        uint _scheme
+    ) public returns (uint, string) {
+        for (uint256 i = 0; i < _eventAddress.length; i++) {
             Event_1 eventAddr = Event_1(_eventAddress[i]);
             uint status = eventAddr.certify(
                 _certifierComment,
@@ -221,7 +244,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             block.timestamp,
             _newOwner,
             oldInventory.taxPercentageAmount(),
-            oldInventory.taxDollarAmount() 
+            oldInventory.taxDollarAmount()
         );
 
         for (uint i = 0; i < _itemAddress.length; i++) {

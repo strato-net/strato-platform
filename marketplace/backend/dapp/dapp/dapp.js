@@ -245,7 +245,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ ITEMS --------------------------------
   contract.addItem = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    return managers.itemManager.addItem({ ...args.itemArgs, createdDate: createdDate, });
+    // remove the value of expiryDate It is used for test only
+    return managers.itemManager.addItem({ ...args.itemArgs, createdDate: createdDate, expiryDate: Math.floor(Date.now() / 1000) });
   };
   contract.updateItem = async function (args, options = defaultOptions) {
     return managers.itemManager.updateItem(args);
@@ -480,6 +481,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createInventory = async function (args, options = defaultOptions) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
+    // remove the value of expiryDate It is used for test only
+    const expiryDate = Math.floor(Date.now() / 1000);
     const { serialNumber, ...restArgs } = args;
 
     const serialNo = [];
@@ -565,6 +568,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const itemParams = {
       itemObject: transformedArray,
       createdDate,
+      expiryDate,
       comment: "",
       productId: restArgs.productAddress,
       status: restArgs.status,
@@ -1481,7 +1485,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
       const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
-      const { productId, inventoryId } = orderLine
+      const { productId, inventoryId } = orderLine;
 
       // If no serial numbers are passed, a quantity is passed from the front end. 
       // This will allow us to get the first n items from the inventory
@@ -1533,6 +1537,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         itemsAddress: itemsAddresses,
         status: ITEM_STATUS.SOLD,
         comment: "",
+        // remove the value of expiryDate It is used for test only
+        expiryDate: dayjs().valueOf()
       });
       if (soldStatus !== "200") {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
