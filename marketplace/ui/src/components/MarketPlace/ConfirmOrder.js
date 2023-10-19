@@ -6,6 +6,7 @@ import {
   notification,
   Spin,
   Card,
+  Popconfirm,
 } from "antd";
 import {
   useMarketplaceState,
@@ -620,34 +621,22 @@ const ConfirmOrder = () => {
                           <div key={index}>
                             <Card className={`w-max h-full hover:shadow-xl ${index !== selectedAddress ? "" : "border-primary"} hover:opacity-80`} onClick={() => { setSelectedAddress(index) }}>
                               <div className="flex justify-end ">  
-                                <button onClick={()=> handleDeleteAddress(add.address)}> <DeleteOutlined className=" h-5 hover:text-error text-lg hover:text-xl" /> </button>
+                                <Popconfirm
+                                  title="Delete Address?"
+                                  description="Are you sure you want to delete this address?"
+                                  onConfirm={() => handleDeleteAddress(add.address)}
+                                  okText="Yes"
+                                  cancelText="No"
+
+                                >
+                                  <button > <DeleteOutlined className=" h-5 hover:text-error text-lg hover:text-xl" /> </button>
+                                </Popconfirm>
                               </div>
                               <AddressComponent userAddress={add} />
                             </Card>
                           </div>
                         )
                       }
-                      {/* 
-                                {
-                        userAddresses.map((add, index) => {
-                            if (add.isDeleted === false) {
-                              return (
-                                <div key={index}>
-                                  <Card className={`w-max h-full hover:shadow-xl ${index !== selectedAddress ? "" : "border-primary"} hover:opacity-80`} onClick={() => { setSelectedAddress(index) }}>
-                                    <div className="flex justify-end ">  
-                                      <button onClick={()=> handleDeleteAddress(add.address)}> <DeleteOutlined className=" h-5 hover:text-error text-lg hover:text-xl" /> </button>
-                                    </div>
-                                    <AddressComponent userAddress={add} />
-                                  </Card>
-                                </div>
-                              )
-                            } else {
-                              return null;
-                            }
-                          }
-                        )
-                      }
-                       */}
                     </div>
                     :
                     <Card className="w-3/5 mt-4">
