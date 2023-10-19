@@ -49,8 +49,8 @@ const ListNowIndex = ({
   const membershipDispatch = useMembershipDispatch();
   const inventoryDispatch = useInventoryDispatch();
 
-  const isListNow = (!productId || !id || !inventoryId || !quantity || !price);
   const isIssued = type === 'issued';
+  const isListNow = (!productId || !id || !inventoryId || !quantity || !price);
 
   let {
     memberships,
@@ -69,7 +69,7 @@ const ListNowIndex = ({
       let productName;
       if (isIssued) {
         productName = item.product.name;
-      }else{
+      } else {
         productName = item.productName;
       }
 
@@ -85,7 +85,9 @@ const ListNowIndex = ({
 
   useEffect(() => {
     // setPurchasedMembershipData(purchasedMemberships);
-    transformData(isIssued ? memberships : purchasedMemberships);
+    let purchasedList = purchasedMemberships.filter((item) => item.availableQuantity != 0);
+    let issuedList = memberships.filter((item) => item?.inventories?.length == 0);
+    transformData(isIssued ? issuedList : purchasedList);
   }, [memberships, purchasedMemberships]);
 
   // useEffect(() => {
@@ -125,9 +127,9 @@ const ListNowIndex = ({
     setProductId(value);
 
     let idList
-    if(isIssued){
+    if (isIssued) {
       idList = memberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity }))
-    }else{
+    } else {
       idList = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity }))
     }
     // let membership = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber }))
