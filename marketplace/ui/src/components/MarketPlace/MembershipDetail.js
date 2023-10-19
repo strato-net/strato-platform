@@ -2,37 +2,35 @@ import React, { useState, useEffect } from "react";
 import { useFormik, getIn } from "formik";
 import {
   Row,
-  Breadcrumb,
   Image,
   Button,
   Typography,
   Tabs,
-  Space,
   Spin,
   notification,
   InputNumber,
-  // Carousel,
   Col,
   Card,
   Table,
 } from "antd";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import noPreview from "../../images/resources/noPreview.jpg";
-import { useMatch } from "react-router-dom";
+import { useMatch, useParams } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
 import { Carousel } from 'react-responsive-carousel';
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import { actions as itemActions } from "../../contexts/item/actions";
+import { useItemDispatch, useItemState } from "../../contexts/item";
 import {
   useProductDispatch,
   useProductState,
 } from "../../contexts/product";
 import routes from "../../helpers/routes";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import { actions as membershipActions } from "../../contexts/membership/actions";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -44,7 +42,6 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
 import useDebounce from "../UseDebounce";
-import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import ListNowModal from "../Membership/ListNowModal";
@@ -52,8 +49,11 @@ import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import TagManager from "react-gtm-module";
 
 const MembershipDetails = ({ user, users }) => {
+  const { type } = useParams()
+  const isIssued = type === 'issued'
 
   const { state, pathname } = useLocation();
   const [inventoryId, setInventoryId] = useState(state?.inventoryId);
@@ -86,6 +86,8 @@ const MembershipDetails = ({ user, users }) => {
   const { membershipServices, membership, isMembershipLoading, productFiles } =
     useMembershipState();
   const serviceDispatch = useMembershipDispatch();
+  const itemDispatch = useItemDispatch();
+  const { items } = useItemState();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -173,6 +175,12 @@ const MembershipDetails = ({ user, users }) => {
     else setId(routeMatch?.params?.address);
   }, [routeMatch, routeMatch1]);
 
+  useEffect(() => {
+    const inventoryAddress = inventories[0]?.address
+    if (inventoryAddress) {
+      itemActions.fetchItem(itemDispatch, '', 0, inventoryAddress);
+    }
+  }, [inventories])
 
   useEffect(() => {
     if (inventory !== null && inventory !== undefined) {
@@ -205,13 +213,16 @@ const MembershipDetails = ({ user, users }) => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
-  let details = undefined;
-  if (inventoryId && inventoryDetails) {
-    details = inventoryDetails;
-  }
-  else if (!inventoryId && productDetails) {
-    details = productDetails;
-  }
+
+  let details;
+  useEffect(() => {
+    if (inventoryId && inventoryDetails) {
+      details = inventoryDetails;
+    }
+    else if (!inventoryId && productDetails) {
+      details = productDetails;
+    }
+  }, [productDetails, inventoryId])
 
   const subtract = () => {
     if (qty !== 1) {
@@ -221,16 +232,17 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const add = () => {
-    if (qty < details?.availableQuantity) {
+    const availableQty = details?.availableQuantity
+    if (qty < availableQty) {
       let value = qty + 1;
       setQty(value);
     } else {
-      openToast("bottom", true, "Cannot add more than available quantity");
+      openToast("bottom", true, `Cannot add more than available quantity (${availableQty})`);
     }
   };
 
   const isLoading = isMembershipLoading || isInventoriesLoading || isProductDetailsLoading;
-
+  const isOwner = details?.ownerOrganization === user?.organization;
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -375,7 +387,7 @@ const MembershipDetails = ({ user, users }) => {
             serialNumber: [],
           };
           const resalePayload = {
-            // itemAddress: id,
+            itemAddress: items[0].address,
             productAddress: membershipDetails.productId,
             inventory: inventoryId,
             updates: {
@@ -384,9 +396,9 @@ const MembershipDetails = ({ user, users }) => {
               quantity: formik.values.quantity
             }
           }
-          const createInventory = await actions.createInventory(
+          const createInventory = await membershipActions.resaleMembership(
             dispatch,
-            inventoryBody
+            resalePayload
           );
 
           if (createInventory) {
@@ -572,20 +584,77 @@ const MembershipDetails = ({ user, users }) => {
                   >
                     Contact to Buy
                   </Button> :
-                  <Button
-                    type={ownerSameAsUser ? "default" : "primary"}
-                    block={true} size="large" className=" h-full py-4 h-px-56"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        formik.setFieldValue("name", details?.name);
-                        openListNowModal();
-                      }
-                    }}
-                    disabled={ownerSameAsUser}
-                  > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
-                  </Button>}
+                  // <Button
+                  //   type={ownerSameAsUser ? "default" : "primary"}
+                  //   block={true} size="large" className=" h-full py-4 h-px-56"
+                  //   onClick={() => {
+                  //     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  //       window.location.href = loginUrl;
+                  //     } else {
+                  //       formik.setFieldValue("name", details?.name);
+                  //       openListNowModal();
+                  //     }
+                  //   }}
+                  //   disabled={ownerSameAsUser}
+                  // > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
+                  // </Button>
+                  <Row className="w-full mx-auto" gutter={[12]}>
+                    <Col span={12} className="mx-auto flex justify-center">
+                      <Button
+                        block
+                        size="large"
+                        className="group border !h-14 border-primary hover:bg-primary"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'add_to_cart_from_product_details',
+                                product_name: details.name,
+                                category: details.category,
+                                productId: details.productId
+                              },
+                            });
+                            addItemToCart();
+                          }
+                        }}
+                      >
+                        {/* <div className="text-primary group-hover:text-white"> */}
+                        Add To Cart
+                        {/* </div> */}
+                      </Button>
+                    </Col>
+                    <Col span={12}>
+                      <Button
+                        block
+                        size="large"
+                        type="primary"
+                        className="bg-primary !h-14 !hover:bg-primaryHover"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'buy_now_from_product_details',
+                                product_name: details.name,
+                                category: details.category,
+                                productId: details.productId
+                              },
+                            });
+                            addItemToCart();
+                            navigate("/checkout");
+                          }
+                        }}
+                        // disabled={ownerSameAsUser()}
+                        id="buyNow"
+                      >
+                        Buy Now
+                      </Button>
+                    </Col>
+                  </Row>
+                }
               </Row>
             </Col>
           </Row>
@@ -624,186 +693,6 @@ const MembershipDetails = ({ user, users }) => {
             </Card>
           </Row>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          {/* <div className="flex mx-16 mt-100">
-            <div className="w-1/2">
-
-              <div className="items-center justify-center border border-grayLight">
-                {allProductFiles && allProductFiles.length > 0 ? (
-                  <Carousel>
-                    {allProductFiles.map((file, index) =>
-                      <div key={index} className="h-96">
-                        <Image
-                          height={"100%"}
-                          width={"100%"}
-                          style={{ objectFit: "contain" }}
-                          src={file.imageUrl}
-                        />
-
-                      </div>
-                    )}
-                  </Carousel>
-                ) : (
-                  <Image
-                    height={"100%"}
-                    width={"100%"}
-                    style={{ objectFit: "contain" }}
-                    src={null}
-                  />
-                )}
-              </div>
-              {details?.availableQuantity !== 0 ?
-                <Row className="justify-center my-7">
-                  <Button
-                    type="primary"
-                    className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        formik.setFieldValue("name", details?.name);
-                        openListNowModal();
-                      }
-                    }}
-                    disabled={ownerSameAsUser}
-                    id="buyNow"
-                  >
-                    Sell
-                  </Button>
-                </Row>
-                :
-                <div className="flex justify-center">
-                  <Button
-                    type="primary"
-                    className="w-40 h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
-                    href={`mailto:sales@blockapps.net`}>
-                    Contact to Buy
-                  </Button>
-                </div>
-              }
-            </div>
-
-            <div className="w-1/2 ml-8  mb-6" id="details">
-              <Row className="items-center">
-                <Text className="font-semibold text-xl text-primaryB">
-                  {decodeURIComponent(details?.name)}&nbsp;
-                </Text>
-                <Text className="font-medium text-sm text-secondryB ">
-                  ({membershipDetails?.timePeriodInMonths ?? ""})-month Duration
-                </Text>
-              </Row>
-              <Paragraph
-                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-                className="text-primaryC text-[13px] mt-2"
-              >
-                {decodeURIComponent(details?.description ?? "").replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    <br />
-                  </React.Fragment>
-                ))}
-              </Paragraph>
-              <Title level={4} className="!mt-0">
-                {details?.pricePerUnit ? `$ ${details.pricePerUnit}` : "Not Listed"}
-              </Title>
-              <Title level={4} className="!mt-0" style={{ color: 'green' }}>
-                {`Total Savings: $ ${totalSavings}`}
-              </Title>
-              {details?.availableQuantity !== 0 ?
-                <Space>
-                  <Text className="text-primaryB text-base">Quantity</Text>
-                  <div className="flex items-center my-2 ml-5" id="quantity">
-                    <div
-                      onClick={subtract}
-                      className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <MinusOutlined className="text-xs text-secondryD" />
-                    </div>
-                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details?.availableQuantity} value={qty} defaultValue={qty} controls={false}
-                      onChange={e => {
-                        if (e < details?.availableQuantity) {
-                          setQty(e)
-                        } else {
-                          openToast(
-                            "bottom",
-                            true,
-                            "Cannot add more than available quantity"
-                          );
-                          setQty(details?.availableQuantity)
-                        }
-                      }} />
-                    <div
-                      onClick={add}
-                      className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <PlusOutlined className="text-xs text-secondryC" />
-                    </div>
-                  </div>
-                </Space>
-                :
-                <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">
-                  If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
-                </Paragraph>
-              }
-              <Tabs
-                defaultActiveKey="1"
-                onChange={onTabChange}
-                items={!user ?
-                  [{
-                    label: `Description`,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  }]
-                  :
-                  [{
-                    label: `Description`,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  },
-                  {
-                    label: `Services`,
-                    key: "2",
-                    children: (
-                      <div>
-                        <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Services</h1>
-                        <DataTableComponent
-                          columns={serviceColumn}
-                          data={serviceList}
-                          scrollX="100%"
-                          isLoading={isMembershipLoading}
-                        />
-                        <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Savings</h1>
-                        <DataTableComponent
-                          columns={savingsColumn}
-                          data={savingsList}
-                          scrollX="100%"
-                          isLoading={isMembershipLoading}
-                        />
-                      </div>
-                    ),
-                  }
-                  ]}
-              />
-            </div>
-          </div> */}
         </div>
       )}
       {visible && (
