@@ -86,7 +86,7 @@ export const ASSET_TABLE_NAME = (() => {
   try { 
     return getEnvVariable("ASSET_TABLE_NAME");
   } catch (err) {
-     return "BlockApps-Dapp-Inventory";
+     return "";
   }
 })();
 Object.freeze(ASSET_TABLE_NAME)

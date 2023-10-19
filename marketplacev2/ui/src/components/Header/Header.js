@@ -44,8 +44,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
 
-  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
-
   const navItems = [
     {
       role: 0,

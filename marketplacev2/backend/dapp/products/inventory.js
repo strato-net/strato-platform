@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 import { ASSET_TABLE_NAME } from '../../helpers/constants';
 
-const contractName = ASSET_TABLE_NAME;
+const contractName = ASSET_TABLE_NAME ? ASSET_TABLE_NAME : "BlockApps-Dapp-Inventory";
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 
 /** 
@@ -166,8 +166,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
     const { org, ...modifiedOptions } = options;
-    const {ownerOrganization, ...modifiedArgs} = args
-    const inventories = await searchAllWithQueryArgs(contractName, modifiedArgs, modifiedOptions, admin)
+    const {ownerOrganization, ...modifiedArgs} = args;
+    const inventories = await searchAllWithQueryArgs(contractName, modifiedArgs, modifiedOptions, admin);
     return inventories.map((inventory) => marshalOut(inventory))
 }
 
