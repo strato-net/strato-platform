@@ -1174,7 +1174,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             manufacturer: product.manufacturer,
             timePeriodInMonths: memberships[0].timePeriodInMonths,
             savings: savings[0]?.savings,
-            membershipAddress: memberships[0].address
+            membershipAddress: memberships[0].address,
+            // expiryDate:item?.expiryDate
           };
         });
 
@@ -1519,12 +1520,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
       const itemsAddresses = items.map(_item => _item.address);
+      let membership = await membershipJs.get(rawAdmin, { productId: items[0].productId }, { ...options, org: managers.cirrusOrg, app: contractName })
+      const days = membership.timePeriodInMonths;
 
+      const currentDateTime = dayjs();
 
+      const expiryDateTime = currentDateTime.add(days, 'day');
+      const expiryMilliseconds = expiryDateTime.valueOf();
+      const todayMilliseconds = currentDateTime.valueOf();
+
+      let totalExpiry = expiryMilliseconds + todayMilliseconds
       const _args = {
         orderLineId,
         items: itemsAddresses,
         createdDate: Math.floor(Date.now() / 1000),
+        expiryDate: totalExpiry
       };
       // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
       // See orderLine.sol 
@@ -1538,7 +1548,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         status: ITEM_STATUS.SOLD,
         comment: "",
         // remove the value of expiryDate It is used for test only
-        expiryDate: dayjs().valueOf()
+        expiryDate: totalExpiry
       });
       if (soldStatus !== "200") {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
@@ -1700,14 +1710,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort: '-createdDate', productId: batch, ownerOrganization: userOrganization }, newOptions);
 
       // Filter and process memberships
-      // memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
-      memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined);
+      memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
+      // memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined);
       // let productArr = memberships.map((item) => item.productId)
       // Attach product information
       products.forEach(product => {
         memberships = memberships.map(membership => {
           return (membership.productId === product.address) ?
-            { ...membership, product: product, productImage: null, inventories: [] } : membership;
+            { ...membership, product: product, productName: product.name, productId: product.address, productImage: null, inventories: [] } : membership;
         })
       });
 
@@ -1730,7 +1740,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       inventories.forEach(inventory => {
         memberships = memberships.map(membership => {
           let transformedData = { inventories: [], ...membership }
-          let item = itemsList.filter((item) => item.productId == membership.productId)
+          let item = itemsList.filter((item) => item.productId == membership.productId);
           let itemNumber = ''
           let itemAddress = ''
           if (item) {

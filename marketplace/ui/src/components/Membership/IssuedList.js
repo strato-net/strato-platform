@@ -56,10 +56,12 @@ const IssuedList = (
             transformedData["timePeriodInMonths"] = item.timePeriodInMonths
             transformedData["Inventories"] = item?.inventories;
             transformedData["productName"] = transformedData.name;
+            transformedData["productId"] = item.productId;
             if(item.inventories && item.inventories?.length>0){
               transformedData["inventoryId"] = item.inventories[0]?.address;
             }
             transformedData["inventoryId"] = '';
+            transformedData["itemNumber"] = item.itemNumber;
             transformedData["membershipAddress"] = item.address;
             transformedData["productImageLocation"] = item.productImageLocation;
             return (

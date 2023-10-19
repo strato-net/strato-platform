@@ -223,7 +223,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             navigate(navUrls[item.key], { state: { tab: "EventType" } })
           }
           else {
-            setCookie("returnUrl", `marketplace/${navUrls[item.key]}`, 10);
+            // setCookie("returnUrl", `marketplace${navUrls[item.key]}`, 10);
             navigate(navUrls[item.key]);
           }
           if (item.key === "5") {
@@ -252,7 +252,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           onClick={() => {
-            navigate("/memberships", { state: { isCalledFromHeader: true } });
+            navigate("/memberships/purchased", { state: { isCalledFromHeader: true } });
           }}
         >
           <Avatar

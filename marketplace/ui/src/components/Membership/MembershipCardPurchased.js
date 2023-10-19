@@ -6,7 +6,7 @@ import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import UpdateProductModal from "./UpdateProductModal";
 import "./membership.css";
 import routes from "../../helpers/routes";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
@@ -86,7 +86,10 @@ const MembershipCardPurchased = ({
   membershipId,
   isPurchasedList
 }) => {
+  const inventoryDispatch = useInventoryDispatch();
   const membershipDispatch = useMembershipDispatch();
+  const { type } = useParams()
+  const isIssued = type === "issued";
   const {
     subCategory,
     manufacturer,
@@ -97,6 +100,7 @@ const MembershipCardPurchased = ({
     membershipAddress,
     inventoryId,
     Inventories,
+    itemNumber,
     status,
     description,
     productImageLocation
@@ -146,7 +150,7 @@ const MembershipCardPurchased = ({
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
-        formik.setFieldValue("name", membership.product.name);
+        formik.setFieldValue("name", membership.productName);
         formik.setFieldValue("tempInv", inv);
         openListNowModal();
       }
@@ -195,25 +199,51 @@ const MembershipCardPurchased = ({
   const handleCreateFormSubmit = async (values) => {
     if (user) {
       if (formik.values.price !== "" && inventories) {
-        const resalePayload = {
-          itemAddress: membership.itemAddress,
-          productAddress: membership.productId,
-          inventory: membership.inventoryId,
-          updates: {
+        if (isIssued) {
+          let taxPercentageAmountValue = formik.values.taxPercentageAmount ?? 0;
+          let taxDollarAmountValue = formik.values.taxDollarAmount ?? 0;
+          const inventoryBody = {
+            productAddress: membership.productId,
+            quantity: formik.values.quantity,
             pricePerUnit: formik.values.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
             status: INVENTORY_STATUS.PUBLISHED,
-            quantity: 1
+            serialNumber: [],
+            taxPercentageAmount: Math.floor(taxPercentageAmountValue * 100),
+            taxDollarAmount: Math.floor(taxDollarAmountValue * 100),
+          };
+          const createInventory = await inventoryActions.createInventory(
+            inventoryDispatch,
+            inventoryBody
+          );
+          if (createInventory) {
+            formik.resetForm();
+            // handleCancel("success");
           }
         }
-        const resaleMembership = await membershipActions.resaleMembership(
-          membershipDispatch, resalePayload
-        )
+        else {
+          const resalePayload = {
+            itemAddress: membership.itemAddress,
+            productAddress: membership.productId,
+            inventory: membership.inventoryId,
+            updates: {
+              pricePerUnit: formik.values.price,
+              status: INVENTORY_STATUS.PUBLISHED,
+              quantity: 1
+            }
+          }
+          const resaleMembership = await membershipActions.resaleMembership(
+            membershipDispatch, resalePayload
+          )
 
-        if (resaleMembership) {
-          // membership.product_with_inventory = 1;
-          formik.resetForm();
+          if (resaleMembership) {
+            // membership.product_with_inventory = 1;
+            formik.resetForm();
+          }
+          setVisible(false);
         }
-        setVisible(false);
       }
     }
   };
@@ -283,7 +313,7 @@ const MembershipCardPurchased = ({
                     src={productImageLocation[0]}
                   // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
                   />
-                  : 
+                  :
                   <Carousel showArrows={true} showThumbs={false} className="h-full mem-card-carousel" >
                     {productImageLocation && productImageLocation?.map((item) => {
                       return <Image
@@ -396,7 +426,7 @@ const MembershipCardPurchased = ({
           onClick={openListNowModal}
           formik={formik}
           type="Sale"
-          id={membershipId}
+          id={itemNumber}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />

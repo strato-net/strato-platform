@@ -549,13 +549,17 @@ const MembershipDetails = ({ user, users }) => {
                   <Col span={24} className="border-t-1 h-20 mt-8">
                     {details?.availableQuantity != 0
                       ? <Row className="flex justify-between h-10 mt-5">
-                        <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn " onClick={subtract}>
+                        <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn "
+                          disabled={isIssued}
+                          onClick={subtract}>
                           {minusIcon()}
                         </Button> </Col>
                         <Col span={16} className="border border-grayLight rounded-md align-middle text-center h-14 py-2" >
                           <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{qty}</Text>
                         </Col>
-                        <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn" onClick={add}> {plusIcon()} </Button>  </Col>
+                        <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn"
+                          disabled={isIssued}
+                          onClick={add}> {plusIcon()} </Button>  </Col>
                       </Row>
                       : <Paragraph style={{ color: 'red' }} className="mt-5 text-sm decoration-red-700" id="prod-price">
                         If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
@@ -564,7 +568,7 @@ const MembershipDetails = ({ user, users }) => {
                 </Row>
               </Card>
               <Row className="h-14 mt-4">
-                {details?.availableQuantity == 0 ?
+                {(details?.availableQuantity == 0 && !isIssued) ?
                   <Button
                     block={true}
                     type="primary"
@@ -603,6 +607,7 @@ const MembershipDetails = ({ user, users }) => {
                       <Button
                         block
                         size="large"
+                        disabled={isIssued}
                         className="group border !h-14 border-primary hover:bg-primary"
                         onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -628,6 +633,7 @@ const MembershipDetails = ({ user, users }) => {
                     <Col span={12}>
                       <Button
                         block
+                        disabled={isIssued}
                         size="large"
                         type="primary"
                         className="bg-primary !h-14 !hover:bg-primaryHover"

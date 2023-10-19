@@ -840,8 +840,9 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 <Row className="mt-5">
                   <Col span={24}>
                     <Upload.Dragger
+                     {...props}
                       fileList={fileList}
-                      onChange={handleChange}
+                      // onChange={handleChange}
                       showUploadList={false}
                     >
                       {uploadText(uploadIcon2())}

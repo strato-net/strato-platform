@@ -4,6 +4,7 @@ import helperJson from "../../helpers/helper.json"
 import { useInventoryState } from "../../contexts/inventory";
 import { useMembershipState } from "../../contexts/membership";
 import { useProductState } from "../../contexts/product";
+import { useParams } from "react-router-dom";
 const { columns, taxOptions } = helperJson;
 const { Text, Title } = Typography;
 const ListNowModal = ({
@@ -11,18 +12,21 @@ const ListNowModal = ({
   handleCancel,
   user,
   formik,
-  type,
+  // type,
   id,
   getIn,
   isCreateMembershipSubmitting,
 }) => {
+  const { type } = useParams()
+  const isIssued = type === 'issued';
   const { isInventoriesLoading, inventories, isCreateInventorySubmitting } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState()
-  const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
+  // const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user?.user?.user?.organization || user?.user?.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting } = useMembershipState();
   const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting;
+  // const { type } = useParams();
 
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {
@@ -101,14 +105,14 @@ const ListNowModal = ({
               id="quantity"
               name="quantity"
               min={0}
-              max={inventoryQuantity}
+              // max={inventoryQuantity}
               className="w-full mt-2"
               size="large"
               prefix={isInventoriesLoading && <Spin />}
-              disabled={type === "Sale"}
+              disabled={!isIssued}
               // value={1}
               controls={false}
-              value={type === "Sale" ? 1 : formik.values.quantity}
+              value={isIssued ? formik.values.quantity : 1}
               onChange={(value) => {
                 formik.setFieldValue("quantity", value);
               }}
@@ -167,7 +171,7 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={type} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
+            <Row><Input type="text" value={'Sale'} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
         </Row>
       </Form>
