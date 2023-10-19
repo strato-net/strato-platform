@@ -12,15 +12,6 @@ contract EventType_10 is RestStatus {
     string public description;
     uint public createdDate;
 
-    /// @dev Events to add and remove members to this shard.
-    event OrgAdded(string orgName);
-    event OrgUnitAdded(string orgName, string orgUnit);
-    event CommonNameAdded(string orgName, string orgUnit, string commonName);
-
-    event OrgRemoved(string orgName);
-    event OrgUnitRemoved(string orgName, string orgUnit);
-    event CommonNameRemoved(string orgName, string orgUnit, string commonName);
-
     constructor(string _name, string _description, uint _createdDate) public {
         owner = tx.origin;
 
