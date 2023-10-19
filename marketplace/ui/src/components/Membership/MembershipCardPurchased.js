@@ -73,6 +73,10 @@ const initialValues = {
   quantity: ""
 };
 
+const statusColor = {
+  1: 'green',
+  2: "red"
+}
 
 const MembershipCardPurchased = ({
   user,
@@ -138,7 +142,7 @@ const MembershipCardPurchased = ({
   const updateCol = (inv, texts) => (<Row
     style={{ justifyContent: 'space-between' }}>
     <p>{texts} </p>
-    {/* <EditOutlined onClick={() => {
+    <EditOutlined onClick={() => {
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
@@ -146,8 +150,8 @@ const MembershipCardPurchased = ({
         formik.setFieldValue("tempInv", inv);
         openListNowModal();
       }
-    }} 
-    /> */}
+    }}
+    />
   </Row>)
   const callDetailPage = (index, address) => {
     let route = `/memberships/${isPurchasedList ? "purchased" : "issued"}/:id`
@@ -226,10 +230,6 @@ const MembershipCardPurchased = ({
   //   </button>
   // );
 
-  const statusColor = {
-    1: 'green',
-    2: "red"
-  }
   const inventoriesCol = (Inventories && Inventories.length == 0) ? "red" : "green";
 
   return (
@@ -301,7 +301,7 @@ const MembershipCardPurchased = ({
                   </Carousel>}
 
                 {/* {(!membership.product_with_inventory && isPurchasedList) ? */}
-                {availableQuantity == 0 ? "" : <Button 
+                {availableQuantity == 0 ? "" : <Button
                   block={true}
                   className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
                   onClick={() => {
@@ -315,10 +315,10 @@ const MembershipCardPurchased = ({
                   type={availableQuantity == 0 ? "default" : "primary"}
                   disabled={availableQuantity == 0 ? true : false}
                 >
-                  <Row className="mx-auto w-full px-8  font-poppin text-sm font-semibold">
-                    <Col className="w-32 flex justify-between item-center">
+                  <Row className="mx-auto w-full text-sm font-semibold">
+                    <Col className="w-28 mx-auto flex justify-between item-center">
                       <Text>{tagIcon()}</Text>
-                      <Text className="text-white">List for Sale</Text>
+                      <Text className="text-white font-poppin">&nbsp;List for Sale</Text>
                     </Col>
                   </Row>
                 </Button>}
@@ -343,7 +343,7 @@ const MembershipCardPurchased = ({
                   <Text type="success" className="float-right font-poppin leading-5">$ {savings ?? 0}</Text>
                 </Paragraph>
                 {membershipId && isPurchasedList && <Paragraph>
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Membership ID</Text>
+                  <Text className="font-normal text-grey leading-5 font-poppin" >Membership Number</Text>
                   <Text className="float-right font-poppin leading-5">{membershipId ?? "--"}</Text>
                 </Paragraph>}
               </Col>
