@@ -15,8 +15,6 @@ contract MarketplaceItemManager is ItemStatus,
     mapping(address => address) private marketplaceItemProductIdMapping;
     mapping(address => address) private marketplaceItemInventoryIdMapping;
     mapping(string => mapping(uint => address)) record orgToUPCToProduct;
-    mapping(address => mapping(string => bool))
-        private uniqueSerialNumberByProductAddress;
 
     struct ItemObject {
         uint itemNumber;
@@ -157,18 +155,6 @@ contract MarketplaceItemManager is ItemStatus,
                     itemAddr.ownerOrganization(),
                     _createdDate
                 );
-
-                if (uniqueSerialNumberByProductAddress[itemContractAddress][
-                        _itemObject[i].serialNumber
-                    ]
-                ) {
-                    return (RestStatus.CONFLICT, address(0));
-                }
-                else {
-                    uniqueSerialNumberByProductAddress[itemContractAddress][
-                        _itemObject[i].serialNumber
-                    ] = true;
-                }
 
                 uniqueSerialNumberByUPC[
                     currentSerialNumber
