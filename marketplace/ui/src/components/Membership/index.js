@@ -106,7 +106,9 @@ const Membership = (user) => {
 
   let {
     memberships,
-    ismembershipsLoading,
+    isMembershipsLoading,
+    isIssuedMembershipLoading,
+    isPurchasedMembershipLoading,
     purchasedMemberships,
     message,
     success,
@@ -223,7 +225,8 @@ const Membership = (user) => {
                     </Row>
                     <Row>
                       <Typography.Text className="text-sm font-medium text-grey">
-                        {type === "purchased" ? purchasedMemberships?.length : memberships?.length} {type} Memberships found
+                        {(isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading)
+                          ? <Spin size="small" /> : (type === "purchased" ? purchasedMemberships?.length : memberships?.length)} {type} Memberships found
                       </Typography.Text>
                     </Row>
                   </Col>
@@ -238,7 +241,7 @@ const Membership = (user) => {
                         All
                     </Dropdown.Button>
                 </Col> */}
-              <Col  md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 11 }}  className="py-0 m-0 pt-1">
+              <Col md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 11 }} className="py-0 m-0 pt-1">
                 <Col className="flex justify-between">
                   <Button
                     id="add-product-button"
