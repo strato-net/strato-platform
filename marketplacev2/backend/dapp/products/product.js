@@ -3,8 +3,9 @@ import config from '/load.config';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
+import { ASSET_TABLE_NAME } from '../../helpers/constants';
 
-const contractName = 'Product_3';
+const contractName = ASSET_TABLE_NAME ? ASSET_TABLE_NAME : "BlockApps-Dapp-Product_3";
 const contractFilename = `${util.cwd}/dapp/products/contracts/Product.sol`;
 /** 
  * Upload a new Product 
@@ -152,15 +153,16 @@ function bindAddress(user, address, options) {
 
 
 async function get(user, args, options) {
-    const { uniqueProductID, address, ...restArgs } = args;
+    const { org, ...modifiedOptions } = options;
+    const { uniqueProductID, address, ownerOrganization, ...restArgs } = args;
     let product;
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        product = await searchOne(contractName, searchArgs, options, user);
+        product = await searchOne(contractName, searchArgs, modifiedOptions, user);
     } else {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueProductID', value: uniqueProductID });
-        product = await searchOne(contractName, searchArgs, options, user);
+        product = await searchOne(contractName, searchArgs, modifiedOptions, user);
     }
     if (!product) {
         return undefined;
@@ -173,7 +175,9 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const products = await searchAllWithQueryArgs(contractName, args, options, admin)
+    const { org, ...modifiedOptions } = options;
+    const {ownerOrganization, ...modifiedArgs} = args;
+    const products = await searchAllWithQueryArgs(contractName, modifiedArgs, modifiedOptions, admin);
     return products.map((product) => marshalOut(product))
 }
 
@@ -185,6 +189,7 @@ async function count(admin, args = {}, options) {
         order: undefined,
     });
 
+    const { org, ...modifiedOptions } = options;
     const totalResult = await searchAll(
     contractName,
     {
@@ -195,7 +200,7 @@ async function count(admin, args = {}, options) {
         select: "count",
         },
     },
-    options,
+    modifiedOptions,
     admin
     );
 
