@@ -28,9 +28,9 @@ endif
 
 $(info )
 
-all_v2: build_all_v2 docker-compose eks
+all: build_all_v2 docker-compose eks
 
-all: build_all docker-compose eks
+all_old: build_all docker-compose eks
 
 build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
