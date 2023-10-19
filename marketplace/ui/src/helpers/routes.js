@@ -18,6 +18,7 @@ export default {
   Products: { label: "Product", url: "/products" },
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
   Memberships: { label: "Membership", url: "/memberships/:type" },
+  purchasedMemberships: { label: "Membership", url: "/memberships/purchased" },
   MembershipDetail: { label: "Membership Detail", url: "/memberships/:type/:id" },
   ServiceUsage: { label: "ServiceUsage", url: "/memberships/serviceUsage/:serviceType" },
   Inventories: { label: "Inventory", url: "/inventories" },
