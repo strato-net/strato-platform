@@ -8,54 +8,54 @@ import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 contract MarketplaceItem is Asset, 
                             ItemStatus, 
                             InventoryStatus
-                             {
-     // Item
-    struct Item{
-    address owner;
-    string ownerOrganization;
-    string ownerOrganizationalUnit;
-    string ownerCommonName;
-    address productId;
-    address inventoryId;
-    string serialNumber;
-    string comment;
-    uint itemNumber;
-    uint createdDate;
-    ItemStatus status;}
+                            {
+    struct Item {
+      address owner;
+      string ownerOrganization;
+      string ownerOrganizationalUnit;
+      string ownerCommonName;
+      address productId;
+      address inventoryId;
+      string serialNumber;
+      string comment;
+      uint itemNumber;
+      uint createdDate;
+      ItemStatus status;
+    }
 
-    // Inventory
-    struct Inventory{
-    int availableQuantity;
-    string batchId;
-    string category;
-    uint createdDate;
-    address owner;
-    string ownerCommonName;
-    string ownerOrganization;
-    string ownerOrganizationalUnit;
-    int pricePerUnit;
-    address productId;
-    int quantity;
-    InventoryStatus status;
-    string subCategory;
-    string inventoryType;}
+    struct Inventory {
+      int availableQuantity;
+      string batchId;
+      string category;
+      uint createdDate;
+      address owner;
+      string ownerCommonName;
+      string ownerOrganization;
+      string ownerOrganizationalUnit;
+      int pricePerUnit;
+      address productId;
+      int quantity;
+      InventoryStatus status;
+      string subCategory;
+      string inventoryType;
+    }
 
-    // Product
-    struct Product{ 
-    string name;
-    string description;
-    string manufacturer;
-    UnitOfMeasurement unitOfMeasurement;
-    string userUniqueProductCode;
-    uint uniqueProductCode;
-    int leastSellableUnit;
-    string imageKey;
-    bool isActive;
-    string category;
-    string subCategory;
-    uint createdDate;
-    bool isDeleted; 
-    bool isInventoryAvailable;}
+    struct Product { 
+      string name;
+      string description;
+      string manufacturer;
+      UnitOfMeasurement unitOfMeasurement;
+      string userUniqueProductCode;
+      uint uniqueProductCode;
+      int leastSellableUnit;
+      string imageKey;
+      bool isActive;
+      string category;
+      string subCategory;
+      uint createdDate;
+      bool isDeleted; 
+      bool isInventoryAvailable;
+    }
 
     Item item;
     Product product;
@@ -339,5 +339,51 @@ contract MarketplaceItem is Asset,
       public returns(uint256){
       inventory.updateQuantity(_quantity);
       return (RestStatus.OK);
+    }
+
+    // Update product information
+    function updateProduct(
+        string _description
+    ,   string _imageKey
+    ,   bool _isActive
+    ,   string _userUniqueProductCode
+    ,   uint _scheme
+    ) returns (uint) {
+      if(ownerOrganization != getUserOrganization(tx.origin)){
+        return RestStatus.FORBIDDEN;
+      }
+
+      if (_scheme == 0) {
+        return RestStatus.OK;
+      }
+
+      if ((_scheme & (1 << 0)) == (1 << 0)) {
+        product.description = _description;
+      }
+      if ((_scheme & (1 << 1)) == (1 << 1)) {
+        product.imageKey = _imageKey;
+      }
+      if ((_scheme & (1 << 2)) == (1 << 2)) {
+        product.isActive = _isActive;
+      }
+      if ((_scheme & (1 << 3)) == (1 << 3)) {
+        product.userUniqueProductCode = _userUniqueProductCode;
+      }
+
+      return RestStatus.OK;
+    }
+
+
+    // Delete the product
+    function deleteProduct() public returns(uint256, string){
+      if(ownerOrganization != getUserOrganization(tx.origin)){
+        return (RestStatus.FORBIDDEN, 'Not authorized');
+      }
+
+      if(!isInventoryAvailable) {
+        product.isDeleted = true;
+        return (RestStatus.OK, "Product is deleted successfully.");
+      }
+      return (RestStatus.CONFLICT, "Product cannot be deleted.");
     }
 }
