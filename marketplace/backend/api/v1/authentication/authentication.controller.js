@@ -20,6 +20,7 @@ class AuthenticationController {
     const { app } = req
 
     let address
+    let returnUrl
     let username
     let accessToken
     let refreshToken
@@ -68,7 +69,7 @@ class AuthenticationController {
             rest.response.status(RestStatus.UNAUTHORIZED, res, { message: 'User does not have a valid certificate in STRATO!' })
             // rest.response.status('User does not have a valid certificate in STRATO!', res)
             return next()
-          }          
+          }
         }
       } catch (e) {
         // user does not have a valid certificate in STRATO!
@@ -132,7 +133,15 @@ class AuthenticationController {
       return next(e)
     }
 
-    res.redirect('/')
+    // res.redirect('/')
+    returnUrl = req.cookies.returnUrl
+
+    if (returnUrl) {
+      res.redirect(returnUrl)
+    }
+    else {
+      res.redirect('/')
+    }
 
     return true
   }

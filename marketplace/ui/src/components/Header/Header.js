@@ -24,6 +24,7 @@ import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { blockappLogo } from "../../images/SVGComponents";
+import { setCookie } from "../../helpers/cookie";
 
 const { Title } = Typography;
 const { Header } = Layout;
@@ -221,7 +222,10 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             });
             navigate(navUrls[item.key], { state: { tab: "EventType" } })
           }
-          else navigate(navUrls[item.key]);
+          else {
+            setCookie("returnUrl", `marketplace/${navUrls[item.key]}`, 10);
+            navigate(navUrls[item.key]);
+          }
           if (item.key === "5") {
             TagManager.dataLayer({
               dataLayer: {
