@@ -1622,10 +1622,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // This param was hard coded for the get and getAll functions for Membership and MembershipService below
 
     // Get The membership
-    const membership = await membershipJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
+    let membership = await membershipJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
 
+    const createdDate = membership.createdDate;
+
+    // Get the current date in milliseconds
+    const currentDate = dayjs().valueOf();
+
+    // Calculate the difference in months
+    const monthsDifference = dayjs(currentDate).diff(dayjs(createdDate), 'month');
+    const diff = monthsDifference > membership.timePeriodInMonths ? 0 : monthsDifference;
+
+    membership = { ...membership, remainingMonths: diff }
     // Get The productFiles
-    console.log("start", membership.productId)
     var productFiles = undefined
     if (membership.productId) {
       productFiles = await productFileJs.getAll(rawAdmin, { productId: membership.productId }, { ...options, org: managers.cirrusOrg, app: contractName })
@@ -1669,7 +1678,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
-    const products = await managers.productManager.getProducts({ manufacturer: userOrganization }, newOptions);
+    const products = await managers.productManager.getProducts({ manufacturer: userOrganization, sort: '-createdDate' }, newOptions);
     let addressOfProducts = products.map(item => item.address)
 
     // Set the batch size for addressOfProducts processing
@@ -1708,19 +1717,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       // Get inventories using the corresponding ProductIds
       const inventories = await managers.productManager.getInventories({ productId: batch }, newOptions);
+      let inventoryIds = inventories.map((item) => item.address)
 
-      // const itemsList = await itemJs.getAll(rawAdmin, { productId: productArr }, newOptions);
+      const itemsList = await itemJs.getAll(rawAdmin, { inventoryId: inventoryIds }, newOptions);
       // Iterate through the list of inventories and attach the inventory status to the membership object
       inventories.forEach(inventory => {
         memberships = memberships.map(membership => {
           let transformedData = { inventories: [], ...membership }
-          // let item = itemsList.filter((item) => item.productId == membership.productId)
-          // let itemNumber = ''
-          // if (item) {
-          //   itemNumber = item[0]?.itemNumber;
-          // }
+          let item = itemsList.filter((item) => item.productId == membership.productId)
+          let itemNumber = ''
+          let itemAddress = ''
+          if (item) {
+            itemNumber = item[0]?.itemNumber;
+            itemAddress = item[0]?.address;
+          }
           return (membership.productId === inventory.productId) ?
-            { ...membership, inventories: [...transformedData.inventories, inventory] } : membership;
+            { ...membership, inventories: [...transformedData.inventories, inventory], itemNumber, itemAddress } : membership;
         })
       });
 
