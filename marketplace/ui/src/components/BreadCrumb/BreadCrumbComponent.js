@@ -19,11 +19,11 @@ const BreadCrumbComponent = ({ name }) => {
         <Col span={24} className="mt-10" >
           <Breadcrumb>
             {routesArray.map((item, index) => {
-              let len = routesArray.length - 1
+              let len = routesArray.length - 1;
               return <Breadcrumb.Item key={index} href="" onClick={(e) => handleRedirect(e, routesArray.slice(0, index + 1).join('/'))}>
                 <ClickableCell>
-                  <Text className={`${len == index ? "" : "text-primary"} text-md font-bold`} underline>
-                    {item == "" ? "Home" : ((name && index == len) ? name : item)}
+                  <Text className={`${len == index ? "" : "text-primary"} capitalize text-md font-bold`} underline>
+                    {(item == "" && index == 0) ? "Home" : ((name && index == len) ? name : item)}
                   </Text>
                 </ClickableCell>
               </Breadcrumb.Item>
