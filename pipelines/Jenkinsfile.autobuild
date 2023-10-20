@@ -37,7 +37,7 @@ pipeline {
               ./run_unit_tests.sh --coverage
             '''
               dir('strato-worktree') {
-                archiveArtifacts artifacts: "hpc.zip/", fingerprint: true
+                zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
               }
             }
         }
