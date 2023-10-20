@@ -1521,15 +1521,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const itemsAddresses = items.map(_item => _item.address);
       let membership = await membershipJs.get(rawAdmin, { productId: items[0].productId }, { ...options, org: managers.cirrusOrg, app: contractName })
-      const days = membership.timePeriodInMonths;
+      const months = membership.timePeriodInMonths;
 
       const currentDateTime = dayjs();
 
-      const expiryDateTime = currentDateTime.add(days, 'day');
-      const expiryMilliseconds = expiryDateTime.valueOf();
-      const todayMilliseconds = currentDateTime.valueOf();
+      const expiryDateTime = currentDateTime.add((months * 30), 'day');
 
-      let totalExpiry = expiryMilliseconds + todayMilliseconds
+      let totalExpiry = expiryDateTime;
       const _args = {
         orderLineId,
         items: itemsAddresses,
