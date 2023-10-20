@@ -54,7 +54,8 @@ stack test $1\
 if [ $1 = --coverage ]
 then
       mkdir hpc/
-      find strato/.stack-work -name "*.html" -type f -exec cp {} hpc/ \;
+      pwd
+      find .stack-work -name "*.html" -type f -exec cp {} hpc/ \;
       zip -r hpc.zip hpc/
 fi
 
