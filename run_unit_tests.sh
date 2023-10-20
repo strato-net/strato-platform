@@ -53,7 +53,7 @@ stack test $1\
 
 if [ $1 = --coverage ]
 then
-      mkdir hpc/
+      rm -rf hpc/ && mkdir hpc/
       pwd
       find .stack-work -name "*.html" -type f -exec cp {} hpc/ \;
       zip -r hpc.zip hpc/
