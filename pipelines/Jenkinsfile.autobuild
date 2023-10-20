@@ -29,12 +29,6 @@ pipeline {
 
     stage('Test & Push') {
       parallel {
-        stage(' ') { //sequentially push images then test sync
-          stages {
-
-          }
-        }
-
         stage('Strato unit tests') {
           steps{
             sh '''#!/bin/bash -le
