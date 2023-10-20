@@ -106,6 +106,7 @@ const MembershipCardPurchased = ({
     productImageLocation
   } = membership;
 
+  const [isEdit, setIsEdit] = useState(false)
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
@@ -152,6 +153,7 @@ const MembershipCardPurchased = ({
       } else {
         formik.setFieldValue("name", membership.productName);
         formik.setFieldValue("tempInv", inv);
+        setIsEdit(true)
         openListNowModal();
       }
     }}
@@ -214,13 +216,33 @@ const MembershipCardPurchased = ({
             taxPercentageAmount: Math.floor(taxPercentageAmountValue * 100),
             taxDollarAmount: Math.floor(taxDollarAmountValue * 100),
           };
-          const createInventory = await inventoryActions.createInventory(
-            inventoryDispatch,
-            inventoryBody
-          );
-          if (createInventory) {
-            formik.resetForm();
-            // handleCancel("success");
+          if (isEdit) {
+            const updatePayload = {
+              productAddress: membership.productId,
+              inventory: formik.values.tempInv.address,
+              updates: {
+                pricePerUnit: formik.values.price,
+                status: INVENTORY_STATUS.PUBLISHED,
+                quantity: formik.values.quantity
+              }
+            }
+            const updateInventory = await inventoryActions.updateInventory(
+              inventoryDispatch,
+              updatePayload
+            )
+            if (updateInventory) {
+              formik.resetForm();
+              // handleCancel("success");
+            }
+          } else {
+            const createInventory = await inventoryActions.createInventory(
+              inventoryDispatch,
+              inventoryBody
+            )
+            if (createInventory) {
+              formik.resetForm();
+              // handleCancel("success");
+            }
           }
         }
         else {
@@ -275,7 +297,7 @@ const MembershipCardPurchased = ({
               <Col >
                 <Row>
                   <Text level={4} className="font-poppin text-2xl lh-28">
-                    {membership?.productName??"--"}
+                    {membership?.productName ?? "--"}
                     {/* {decodeURIComponent(membership?.productName)} */}
                   </Text>
                 </Row>
