@@ -884,7 +884,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
           onClick={openListNowModal}
           formik={formik}
           id="None"
-          type="New"
+          listType="New"
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateMembershipSubmitting}
         />

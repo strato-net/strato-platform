@@ -13,6 +13,7 @@ const ListNowModal = ({
   user,
   formik,
   // type,
+  listType,
   id,
   getIn,
   isCreateMembershipSubmitting,
@@ -109,10 +110,10 @@ const ListNowModal = ({
               className="w-full mt-2"
               size="large"
               prefix={isInventoriesLoading && <Spin />}
-              disabled={!isIssued}
+              // disabled={listType === "Sale"}
               // value={1}
               controls={false}
-              value={isIssued ? formik.values.quantity : 1}
+              value={(isIssued || listType === "New") ? formik.values.quantity : 1}
               onChange={(value) => {
                 formik.setFieldValue("quantity", value);
               }}
@@ -171,7 +172,7 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={'Sale'} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
+            <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
         </Row>
       </Form>

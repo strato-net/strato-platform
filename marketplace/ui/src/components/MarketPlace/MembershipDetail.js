@@ -72,7 +72,7 @@ const MembershipDetails = ({ user, users }) => {
     quantity: 1
   };
   const [activeTab, setActiveTab] = useState("Details");
-  const [details, setDetails] = useState();
+  // const [details, setDetails] = useState();
   const [serviceList, setServiceList] = useState([])
   const [savingsList, setSavingsList] = useState([])
   const [totalSavings, setTotalSavings] = useState(0)
@@ -214,12 +214,20 @@ const MembershipDetails = ({ user, users }) => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
-  useEffect(() => {
-    if (inventoryId && inventoryDetails) {
-      setDetails(inventoryDetails)
-    }
-  }, [inventoryDetails, inventoryId])
 
+  // useEffect(() => {
+  //   if (inventoryId && inventoryDetails) {
+  //     setDetails(inventoryDetails)
+  //   }
+  // }, [inventoryDetails, inventoryId])
+
+  let details = undefined;
+  if (inventoryId && inventoryDetails) {
+    details = inventoryDetails;
+  }
+  else if (!inventoryId && productDetails) {
+    details = productDetails;
+  }
 
   const subtract = () => {
     if (qty !== 1) {
@@ -706,7 +714,7 @@ const MembershipDetails = ({ user, users }) => {
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
-          type="Sale"
+          listType="Sale"
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
