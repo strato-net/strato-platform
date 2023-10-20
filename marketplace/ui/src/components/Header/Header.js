@@ -159,6 +159,11 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     else setRoleIndex(1)
   }, [user])
 
+  const handleSellModal=()=>{
+  //  setIsListModal(true)
+  console.log("Test");
+  }
+
   return (
     <Header className="!bg-white flex shadow-lg">
       <Space>
@@ -239,6 +244,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       <Space size="large">
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
+          onClick={()=>{handleSellModal()}}
         >
           <Avatar
             style={{

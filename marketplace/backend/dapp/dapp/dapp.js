@@ -1525,9 +1525,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const currentDateTime = dayjs();
 
-      const expiryDateTime = currentDateTime.add((months * 30), 'day');
+      const expiryDateTime = currentDateTime.add((months * 30), 'day').valueOf();
 
-      let totalExpiry = expiryDateTime;
+      let totalExpiry;
+      if (items?.expiryDate === totalExpiry) {
+        totalExpiry = expiryDateTime;
+      } else {
+        totalExpiry = items.expiryDate;
+      }
+
       const _args = {
         orderLineId,
         items: itemsAddresses,

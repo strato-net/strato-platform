@@ -46,8 +46,7 @@ contract Item_3 is ItemStatus {
         string[] _rawMaterialSerialNumber,
         string[] _rawMaterialProductId,
         uint _itemNumber,
-        uint _createdDate,
-        uint _expiryDate
+        uint _createdDate
     ) public {
         owner = tx.origin;
 
@@ -58,7 +57,6 @@ contract Item_3 is ItemStatus {
         comment = _comment;
         itemNumber = _itemNumber;
         createdDate = _createdDate;
-        expiryDate = _expiryDate;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

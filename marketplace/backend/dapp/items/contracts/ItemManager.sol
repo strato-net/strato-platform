@@ -27,8 +27,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         ItemObject[] _itemObject,
         ItemStatus _status,
         string _comment,
-        uint _createdDate,
-        uint _expiryDate
+        uint _createdDate
     ) public returns (uint, string, string) {
         string itemAddresses = "";
         string repeatedSerialNumbers = "";
@@ -46,8 +45,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     _itemObject[i].rawMaterialSerialNumber,
                     _itemObject[i].rawMaterialProductId,
                     _itemObject[i].itemNumber,
-                    _createdDate,
-                    _expiryDate
+                    _createdDate
                 );
 
                 address itemContractAddress = address(itemAddr);
@@ -85,8 +83,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     _itemObject[i].rawMaterialSerialNumber,
                     _itemObject[i].rawMaterialProductId,
                     _itemObject[i].itemNumber,
-                    _createdDate,
-                    _expiryDate
+                    _createdDate
                 );
 
                 address itemContractAddress = address(itemAddr);
