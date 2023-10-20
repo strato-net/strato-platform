@@ -51,8 +51,16 @@ stack test $1\
       source-tools \
       strato-lite
 
+if [ $1 = --coverage ]
+then
+      mkdir hpc/
+      find strato/.stack-work -name "*.html" -type f -exec cp {} hpc/ \;
+      zip -r hpc.zip hpc/
+fi
+
 stack bench vm-runner
 
 stack bench solid-vm
 
 stack bench solid-vm-model
+
