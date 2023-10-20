@@ -1,21 +1,21 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/items/contracts/MarketplaceItem.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/items/contracts/InventoryStatus.sol";
-import "/dapp/dapp/contracts/Dapp.sol";
+import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/items/contracts/UnitOfMeasurement.sol";
 
 /// @title A representation of ItemManager to manage items
-contract MarketplaceItemManager is ItemStatus, InventoryStatus, UnitOfMeasurement, RestStatus  {
-    // check if the serial number is mapping(serialNumber => UPC ) uniqueSerialNumberByUPC;
+contract MarketplaceItemManager is ItemStatus, 
+                                   InventoryStatus, 
+                                   MarketplaceItem,
+                                   RestStatus,
+                                   UnitOfMeasurement
+                                    {
+    // Check if the serial number is mapping(serialNumber => UPC ) uniqueSerialNumberByUPC;
     mapping(string => uint) private uniqueSerialNumberByUPC;
-    mapping(address => address) private itemProductIdMapping;
-    mapping(address => address) private itemInventoryIdMapping;
-    mapping(uint256 => address) private marketplaceItemProducts;
-    
+    mapping(address => address) private marketplaceItemProductIdMapping;
+    mapping(address => address) private marketplaceItemInventoryIdMapping;
     mapping(string => mapping(uint => address)) record orgToUPCToProduct;
-    mapping(address => mapping(string => bool));
-    private uniqueSerialNumberByProductAddress;
 
     struct ItemObject {
         uint itemNumber;
@@ -25,7 +25,7 @@ contract MarketplaceItemManager is ItemStatus, InventoryStatus, UnitOfMeasuremen
         string[] rawMaterialProductId;
     }
 
-    function addItem(
+    function addMarketplaceItem(
         address _productId,
         address _inventoryId,
         uint _uniqueProductCode,
@@ -33,40 +33,76 @@ contract MarketplaceItemManager is ItemStatus, InventoryStatus, UnitOfMeasuremen
         ItemStatus _status,
         string _comment,
         uint _createdDate
+        string _name,
+        string _description,
+        string _manufacturer,
+        UnitOfMeasurement _unitOfMeasurement,
+        string _userUniqueProductCode,
+        int _leastSellableUnit,
+        string _imageKey,
+        bool _isActive,
+        string _category,
+        string _subCategory,
+        int _quantity,
+        int _pricePerUnit,
+        string _batchId,
+        string _inventoryType,
+        InventoryStatus _inventoryStatus
     ) public returns (uint, string, string) {
         string itemAddresses = "";
         string repeatedSerialNumbers = "";
 
         if (_itemObject[0].serialNumber == "") {
             for (uint256 i = 0; i < _itemObject.length; i++) {
+                // Create new MarketplaceItem
                 MarketplaceItem itemAddr = new MarketplaceItem(
+                    tx.origin,
                     _productId,
-                    _uniqueProductCode,
                     _inventoryId,
                     _itemObject[i].serialNumber,
-                    _status,
                     _comment,
+                    _itemObject[i].itemNumber,
+                    _createdDate,
+                    _status,
+                    _uniqueProductCode,
                     _itemObject[i].rawMaterialProductName,
                     _itemObject[i].rawMaterialSerialNumber,
                     _itemObject[i].rawMaterialProductId,
-                    _itemObject[i].itemNumber,
-                    _createdDate,
-                    tx.origin
+                    _quantity,
+                    _batchId,
+                    _category,
+                    _pricePerUnit,
+                    _inventoryStatus,
+                    _subCategory,
+                    _inventoryType,
+                    _name,
+                    _description,
+                    _manufacturer,
+                    _unitOfMeasurement,
+                    _userUniqueProductCode,
+                    _leastSellableUnit,
+                    _imageKey,
+                    _isActive,
+                    _isDeleted,
+                    _isInventoryAvailable
                 );
+
+                string _organization = getOrganization(tx.origin);
+                orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
+
 
                 address itemContractAddress = address(itemAddr);
                 itemAddr.generateOwnershipHistory(
                     "",
                     itemAddr.ownerOrganization(),
-                    _createdDate,
-                    itemContractAddress
+                    _createdDate
                 );
 
                 uniqueSerialNumberByUPC[
                     _itemObject[0].serialNumber
                 ] = _uniqueProductCode;
-                itemProductIdMapping[itemContractAddress] = _productId;
-                itemInventoryIdMapping[itemContractAddress] = _inventoryId;
+                marketplaceItemProductIdMapping[itemContractAddress] = _productId;
+                marketplaceItemInventoryIdMapping[itemContractAddress] = _inventoryId;
                 itemAddresses += string(address(itemAddr)) + ",";
             }
             return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
@@ -74,39 +110,58 @@ contract MarketplaceItemManager is ItemStatus, InventoryStatus, UnitOfMeasuremen
 
         for (uint256 i = 0; i < _itemObject.length; i++) {
             string currentSerialNumber = _itemObject[i].serialNumber;
-            uint exisitngUPC = uniqueSerialNumberByUPC[currentSerialNumber];
+            uint existingUPC = uniqueSerialNumberByUPC[currentSerialNumber];
 
-            if (exisitngUPC == _uniqueProductCode) {
+            if (existingUPC == _uniqueProductCode) {
                 repeatedSerialNumbers += currentSerialNumber + ",";
             } else {
                 MarketplaceItem itemAddr = new MarketplaceItem(
+                    tx.origin,
                     _productId,
-                    _uniqueProductCode,
                     _inventoryId,
-                    currentSerialNumber,
-                    _status,
+                    _itemObject[i].serialNumber,
                     _comment,
+                    _itemObject[i].itemNumber,
+                    _createdDate,
+                    _status,
+                    _uniqueProductCode,
                     _itemObject[i].rawMaterialProductName,
                     _itemObject[i].rawMaterialSerialNumber,
                     _itemObject[i].rawMaterialProductId,
-                    _itemObject[i].itemNumber,
-                    _createdDate,
-                    tx.origin
+                    _quantity,
+                    _batchId,
+                    _category,
+                    _pricePerUnit,
+                    _inventoryStatus,
+                    _subCategory,
+                    _inventoryType,
+                    _name,
+                    _description,
+                    _manufacturer,
+                    _unitOfMeasurement,
+                    _userUniqueProductCode,
+                    _leastSellableUnit,
+                    _imageKey,
+                    _isActive,
+                    _isDeleted,
+                    _isInventoryAvailable
                 );
+
+                string _organization = getOrganization(tx.origin);
+                orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
 
                 address itemContractAddress = address(itemAddr);
                 itemAddr.generateOwnershipHistory(
                     "",
                     itemAddr.ownerOrganization(),
-                    _createdDate,
-                    itemContractAddress
+                    _createdDate
                 );
 
                 uniqueSerialNumberByUPC[
                     currentSerialNumber
                 ] = _uniqueProductCode;
-                itemProductIdMapping[itemContractAddress] = _productId;
-                itemInventoryIdMapping[itemContractAddress] = _inventoryId;
+                marketplaceItemProductIdMapping[itemContractAddress] = _productId;
+                marketplaceItemInventoryIdMapping[itemContractAddress] = _inventoryId;
                 itemAddresses += string(address(itemAddr)) + ",";
             }
         }

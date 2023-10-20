@@ -1,13 +1,15 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
+import "/dapp/items/contracts/UnitOfMeasurement.sol";
 
 
 contract MarketplaceItem is Asset, 
                             ItemStatus, 
-                            InventoryStatus
+                            InventoryStatus,
+                            RestStatus,
+                            UnitOfMeasurement
                              {
      // Item
     struct Item{
@@ -81,7 +83,6 @@ contract MarketplaceItem is Asset,
         string _batchId,
         string _category,
         int _pricePerUnit,
-        int _quantity,
         InventoryStatus _inventoryStatus,
         string _subCategory,
         string _inventoryType,
@@ -93,7 +94,6 @@ contract MarketplaceItem is Asset,
         int _leastSellableUnit,
         string _imageKey,
         bool _isActive,
-        string _category,
         bool _isDeleted,
         bool _isInventoryAvailable
     ) Asset() public {
