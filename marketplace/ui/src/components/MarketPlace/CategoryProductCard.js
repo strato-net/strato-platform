@@ -151,7 +151,7 @@ const CategoryProductCard = ({ product, category }) => {
                 id="prod-name"
                 onClick={() => { handleRedirect() }}
               >
-                {decodeURIComponent(product.name)}&nbsp;
+                {product.name}&nbsp;
               </Text>
               <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
             </div>
@@ -160,12 +160,13 @@ const CategoryProductCard = ({ product, category }) => {
               className="text-primaryC text-xs mt-2"
               id="prod-desc"
             >
-              {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+              {/* {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
                 <React.Fragment key={index}>
                   {line}
                   <br />
                 </React.Fragment>
-              ))}
+              ))} */}
+              {product.description}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
               ${product.pricePerUnit}

@@ -325,7 +325,7 @@ const CategoryProductList = ({ user }) => {
                       <div className="flex flex-col gap-3">
                         {marketplaceList.map((product, index) => (
                           <Checkbox value={product.productId} key={index} className="m-0" onChange={onChangeProduct}>
-                            {decodeURIComponent(product.name)}
+                            {product.name}
                           </Checkbox>
                         ))}
                       </div>
@@ -354,7 +354,7 @@ const CategoryProductList = ({ user }) => {
                       <div className="flex flex-col gap-3">
                         {brands.map((brand, index) => (
                           <Checkbox value={brand} key={index} className="m-0" onChange={onChangeBrand}>
-                            {decodeURIComponent(brand)}
+                            {brand}
                           </Checkbox>
                         ))}
                       </div>
