@@ -28,7 +28,7 @@ const ListNowIndex = ({
   //   isCreateMembershipSubmitting,
 }) => {
   const { type } = useParams();
-  const { inventories, isInventoriesLoading } = useInventoryState()
+  const { inventories, isInventoriesLoading, isCreateInventorySubmitting } = useInventoryState()
   const [availableQuantity, setAvailableQuantity] = useState('');
   // const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
   const seller = user.user.organization;
@@ -39,7 +39,7 @@ const ListNowIndex = ({
   const [error, setError] = useState('');
   const [productId, setProductId] = useState('')
   const [id, setId] = useState("");
-  const [membershipNumber, setMembershipNumber] = useState(isIssued?'None':'')
+  const [membershipNumber, setMembershipNumber] = useState(isIssued ? 'None' : '')
   const [inventoryId, setInventoryId] = useState('')
   const [quantity, setQuantity] = useState(1);
   const [taxPercentage, setTaxPercentage] = useState('');
@@ -217,9 +217,9 @@ const ListNowIndex = ({
             className="mx-auto w-52 font-bold"
             size="large"
             disabled={(isListNow || isResaleMembershipSubmitting) && !isIssued}
-            loading={isResaleMembershipSubmitting}
+            loading={isResaleMembershipSubmitting || isCreateInventorySubmitting}
             onClick={() => { handleCreateFormSubmit() }}
-            type={(isListNow || isResaleMembershipSubmitting)&& !isIssued ? 'default' : 'primary'}
+            type={(isListNow || isResaleMembershipSubmitting) && !isIssued ? 'default' : 'primary'}
           >
             List Now
           </Button>
@@ -347,7 +347,7 @@ const ListNowIndex = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={isIssued?'New':'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
+            <Row><Input type="text" value={isIssued ? 'New' : 'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
           </Col>
         </Row>
       </Form >
