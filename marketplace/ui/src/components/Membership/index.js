@@ -40,6 +40,7 @@ import IssuedList from "./IssuedList";
 import ListNowIndex from "./ListNowIndex";
 import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import { setCookie } from "../../helpers/cookie";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -181,6 +182,7 @@ const Membership = (user) => {
     },
   ];
   const onChange = (key) => {
+    setCookie("returnUrl", `/marketplace/memberships/${key}`, 10);
     navigate(`/memberships/${key}`)
   };
 
@@ -296,7 +298,10 @@ const Membership = (user) => {
 
                     }}
                     className="py-3 px-6 h-12 bg-white !hover:bg-primaryHover font-semibold flex"
-                    onClick={() => navigate("/memberships/serviceUsage/booked")}
+                    onClick={() => {
+                      setCookie("returnUrl", `/marketplace/memberships/serviceUsage/booked`, 10);
+                      navigate("/memberships/serviceUsage/booked")
+                    }}
                   >
                     {servicesIcon()} &nbsp; Services
                   </Button>

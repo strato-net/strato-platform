@@ -275,7 +275,8 @@ const MembershipCardPurchased = ({
               <Col >
                 <Row>
                   <Text level={4} className="font-poppin text-2xl lh-28">
-                    {decodeURIComponent(membership.productName)}
+                    {membership?.productName??"--"}
+                    {/* {decodeURIComponent(membership?.productName)} */}
                   </Text>
                 </Row>
                 <Row strong className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>

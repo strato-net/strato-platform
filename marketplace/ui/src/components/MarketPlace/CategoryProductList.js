@@ -32,6 +32,7 @@ import { useMatch } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { useAuthenticateState } from "../../contexts/authentication";
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -115,29 +116,29 @@ const CategoryProductList = ({ user }) => {
   const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
     if (category !== "" && hasChecked && !isAuthenticated) {
-        actions.fetchMarketplace(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          debouncedMinQty,
-          debouncedMaxQty,
-          debouncedMinPrice,
-          debouncedMaxPrice
-        );
+      actions.fetchMarketplace(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        debouncedMinQty,
+        debouncedMaxQty,
+        debouncedMinPrice,
+        debouncedMaxPrice
+      );
     } else if (category !== "") {
-        actions.fetchMarketplaceLoggedIn(
-          marketplaceDispatch,
-          arrayToStr(selectedCategories),
-          arrayToStr(selectedSubCategories),
-          arrayToStr(selectedProducts),
-          arrayToStr(selectedBrands),
-          debouncedMinQty,
-          debouncedMaxQty,
-          debouncedMinPrice,
-          debouncedMaxPrice
-          );
+      actions.fetchMarketplaceLoggedIn(
+        marketplaceDispatch,
+        arrayToStr(selectedCategories),
+        arrayToStr(selectedSubCategories),
+        arrayToStr(selectedProducts),
+        arrayToStr(selectedBrands),
+        debouncedMinQty,
+        debouncedMaxQty,
+        debouncedMinPrice,
+        debouncedMaxPrice
+      );
     }
   }, [
     marketplaceDispatch,
@@ -191,20 +192,7 @@ const CategoryProductList = ({ user }) => {
 
   return (
     <div>
-      <Breadcrumb className="text-xs ml-14 mt-14">
-      <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-          <ClickableCell href={routes.Marketplace.url}>
-            <p href={routes.Marketplace.url} className="text-primaryB hover:bg-transparent">
-              Home
-            </p>
-          </ClickableCell>
-        </Breadcrumb.Item>
-        {selectedCategories?.map((category, index) => (
-          <Breadcrumb.Item key={index} className="text-primary">
-            {category ? category : ""}
-          </Breadcrumb.Item>
-        ))}
-      </Breadcrumb>
+      <BreadCrumbComponent />
       <div className="flex pt-4">
         {/* Filter section */}
         <div className="mr-6 pt-4">

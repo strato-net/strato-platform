@@ -24,7 +24,7 @@ import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { blockappLogo } from "../../images/SVGComponents";
-import { setCookie } from "../../helpers/cookie";
+import { setCookie, getCookie } from "../../helpers/cookie";
 
 const { Title } = Typography;
 const { Header } = Layout;
@@ -185,6 +185,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         disabledOverflow={true}
         className="h-16 decoration-black m-auto"
         onClick={(item) => {
+          setCookie("returnUrl", `/marketplace${navUrls[item.key]}`, 10);
           setSelectedTab(item.key)
           if (item.key === "0") {
             TagManager.dataLayer({
@@ -223,7 +224,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             navigate(navUrls[item.key], { state: { tab: "EventType" } })
           }
           else {
-            // setCookie("returnUrl", `marketplace${navUrls[item.key]}`, 10);
             navigate(navUrls[item.key]);
           }
           if (item.key === "5") {
@@ -268,6 +268,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           className="cursor-pointer"
           count={cartList.length}
           onClick={() => {
+            setCookie("returnUrl", `/marketplace/checkout`, 10);
             TagManager.dataLayer({
               dataLayer: {
                 event: 'view_shopping_cart',

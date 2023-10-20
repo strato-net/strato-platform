@@ -23,7 +23,7 @@ const BreadCrumbComponent = ({ name }) => {
               return <Breadcrumb.Item key={index} href="" onClick={(e) => handleRedirect(e, routesArray.slice(0, index + 1).join('/'))}>
                 <ClickableCell>
                   <Text className={`${len == index ? "" : "text-primary"} capitalize text-md font-bold`} underline>
-                    {(item == "" && index == 0) ? "Home" : ((name && index == len) ? name : item)}
+                    {(item == "" && index == 0) ? "Home" : ((name && index == len) ? name : decodeURIComponent(item))}
                   </Text>
                 </ClickableCell>
               </Breadcrumb.Item>

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useCategoryState } from "../../contexts/category";
 import { Images } from "../../images";
 import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie"
 
 const { Title, Text } = Typography;
 
@@ -42,13 +43,14 @@ const CategoryCard = () => {
               key={index}
               className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
               onClick={() => {
+                setCookie("returnUrl", `/marketplace${naviroute.replace(":category", category.name)}`, 10);
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 TagManager.dataLayer({
                   dataLayer: {
                     event: `${category.name}_filter_homepage`
                   },
                 });
-                }
+              }
               }
             >
               <div className="flex flex-col items-center text-center">

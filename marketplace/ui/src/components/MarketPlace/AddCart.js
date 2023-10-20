@@ -25,6 +25,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 
 const { Title, Text } = Typography;
 
@@ -57,10 +58,10 @@ const Checkout = ({ user }) => {
     return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
   };
 
-  let storedData  
+  let storedData
   useEffect(() => {
     let cartData = window.localStorage.getItem("cartList");
-    if(cartData){
+    if (cartData) {
       storedData = JSON.parse(cartData);
     }
     // return JSON.parse(cartData ?? "");
@@ -366,7 +367,7 @@ const Checkout = ({ user }) => {
   };
 
   return (
-    <div className="h-screen mx-14  mt-14">
+    <div className="h-screen mx-14">
       {contextHolder}
       {isCreateOrderSubmitting ? (
         <div className="h-screen flex justify-center items-center">
@@ -374,18 +375,7 @@ const Checkout = ({ user }) => {
         </div>
       ) : (
         <div>
-          <Breadcrumb>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                Home
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <p className=" text-primary">
-                Add to Cart
-              </p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
+          <BreadCrumbComponent />
           {
             mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
               <Image src={Images.noProductSymbol} preview={false} />

@@ -27,13 +27,6 @@ const IssuedList = (
     actions.fetchMembership(dispatch);
   }, []);
 
-  const memberships_issued = memberships;
-
-    // .filter((membership_) => membership_?.inventories?.length > 0)
-    // .filter(
-    //   (membership) =>
-    //     membership.ownerOrganization === membership?.inventories[0].manufacturer
-    // );
   const { Title } = Typography;
   return (
     <>
@@ -41,7 +34,7 @@ const IssuedList = (
         <div className="h-screen flex justify-center items-center mx-auto">
           <Spin spinning={isMembershipsLoading} size="large" />
         </div>
-      ) : memberships_issued?.length === 0 ? (
+      ) : memberships?.length === 0 ? (
         <div className="h-screen justify-center flex flex-col items-center mx-auto">
           <Image src={Images.noProductSymbol} preview={false} />
           <Title level={3} className="mt-2">
@@ -50,20 +43,21 @@ const IssuedList = (
         </div>
       ) : (
         <Row className="my-4 flex flex-row" gutter={[12, 12]}>
-          {memberships_issued.map((item, index) => {
+          {memberships?.map((item, index) => {
             // membershipId,
             let transformedData = { ...item.product }
             transformedData["timePeriodInMonths"] = item.timePeriodInMonths
             transformedData["Inventories"] = item?.inventories;
-            transformedData["productName"] = transformedData.name;
+            transformedData["productName"] = item?.productName;
             transformedData["productId"] = item.productId;
-            if(item.inventories && item.inventories?.length>0){
+            if (item.inventories && item.inventories?.length > 0) {
               transformedData["inventoryId"] = item.inventories[0]?.address;
             }
             transformedData["inventoryId"] = '';
             transformedData["itemNumber"] = item.itemNumber;
             transformedData["membershipAddress"] = item.address;
             transformedData["productImageLocation"] = item.productImageLocation;
+            transformedData["savings"] = item.savings;
             return (
               <Col span={12}>
                 <MembershipCardPurchased

@@ -214,15 +214,14 @@ const MembershipDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
 
-  let details;
-  useEffect(() => {
-    if (inventoryId && inventoryDetails) {
-      details = inventoryDetails;
-    }
-    else if (!inventoryId && productDetails) {
-      details = productDetails;
-    }
-  }, [productDetails, inventoryId])
+  let details = undefined;
+  if (inventoryId && inventoryDetails) {
+    details = inventoryDetails;
+  }
+  else if (!inventoryId && productDetails) {
+    details = productDetails;
+  }
+
 
   const subtract = () => {
     if (qty !== 1) {

@@ -114,11 +114,13 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const handleRedirect = () => {
-    let route = `/memberships/market/:id`
-    product.membershipId ?
-      navigate(route.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address } })
-      :
-      navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } })
+    let route = `/memberships/market/:id`;
+    setCookie("returnUrl", `/marketplace${route.replace(":id", product.membershipId)}`, 10);
+    product.membershipId
+      ? navigate(route.replace(":id", product.membershipId), { state: { isCalledFromMembership: true, inventoryId: product.address } })
+      : navigate(`${naviroute.replace(":address", product.address)}`, { state: { isCalledFromInventory: false } });
+
+
   }
 
   return (
