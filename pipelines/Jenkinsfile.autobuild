@@ -38,6 +38,7 @@ pipeline {
             '''
               dir('strato-worktree') {
                 zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
+                archiveArtifacts artifacts: 'hpc.zip', fingerprint: true
               }
             }
         }
