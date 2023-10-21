@@ -8,6 +8,7 @@ import "./membership.css";
 import routes from "../../helpers/routes";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
+import dayjs from 'dayjs';
 import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
 import { actions as membershipActions } from "../../contexts/membership/actions";
@@ -96,6 +97,7 @@ const MembershipCardPurchased = ({
     timePeriodInMonths,
     savings,
     // membershipId,
+    expiryDate,
     availableQuantity,
     membershipAddress,
     inventoryId,
@@ -387,10 +389,15 @@ const MembershipCardPurchased = ({
                   <Text className="font-normal text-grey leading-5 font-poppin" >Company Name</Text>
                   <Text className="float-right font-poppin leading-5">{manufacturer ?? "--"}</Text>
                 </Paragraph>
-                <Paragraph >
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
-                  <Text className="float-right font-poppin leading-5">{timePeriodInMonths ?? "--"} Month(s)</Text>
-                </Paragraph>
+                {isIssued
+                  ? <Paragraph >
+                    <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
+                    <Text className="float-right font-poppin leading-5">{timePeriodInMonths ?? "--"} Month(s)</Text>
+                  </Paragraph>
+                  : <Paragraph >
+                    <Text className="font-normal text-grey leading-5 font-poppin" >Expiry Date</Text>
+                    <Text className="float-right font-poppin leading-5">{dayjs(expiryDate).format('YYYY-MM-DD') ?? "--"}</Text>
+                  </Paragraph>}
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
                   <Text type="success" className="float-right font-poppin leading-5">$ {savings ?? 0}</Text>

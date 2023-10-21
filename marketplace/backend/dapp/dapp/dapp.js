@@ -1175,7 +1175,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             timePeriodInMonths: memberships[0].timePeriodInMonths,
             savings: savings[0]?.savings,
             membershipAddress: memberships[0].address,
-            // expiryDate:item?.expiryDate
+            expiryDate:item?.expiryDate
           };
         });
 

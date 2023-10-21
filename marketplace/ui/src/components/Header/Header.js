@@ -301,7 +301,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
                 })
               }} >
               <Typography className="primary-theme-text">Login / Register</Typography>
-            </a> : (isOauth ? <Title style={{ backgroundColor: 'red', border: 3, padding: 10, color: '#FFFFFF' }} level={3} >Something went wrong, try to refresh page</Title> : null)
+            </a> : (isOauth ? <Title style={{ border: 3, padding: 10, color: '#FFFFFF' }} level={3} >Something went wrong, try to refresh page</Title> : null)
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-black" id="user-dropdown">

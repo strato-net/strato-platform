@@ -58,6 +58,7 @@ const IssuedList = (
             transformedData["membershipAddress"] = item.address;
             transformedData["productImageLocation"] = item.productImageLocation;
             transformedData["savings"] = item.savings;
+            transformedData["expiryDate"] = "";
             return (
               <Col span={12}>
                 <MembershipCardPurchased
