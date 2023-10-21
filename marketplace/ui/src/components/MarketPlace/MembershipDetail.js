@@ -546,7 +546,7 @@ const MembershipDetails = ({ user, users }) => {
                 <Text className="text-2xl leading-8 font-semibold font-poppin"> {decodeURIComponent(details?.name ?? "--")} </Text>
                 {isIssued
                   ? <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
-                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{dayjs(membershipDetails?.expiryDate).format('YYYY-MM-DD') ?? ""}  </Text> </Row>}
+                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY') ?? ""}  </Text> </Row>}
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" > Status </Text>

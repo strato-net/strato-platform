@@ -1654,10 +1654,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // // Calculate the difference in months
     // const monthsDifference = dayjs(currentDate).diff(dayjs(createdDate), 'month');
     // const diff = monthsDifference > membership.timePeriodInMonths ? 0 : monthsDifference;
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
 
-    const item = await itemJs.get(rawAdmin, { productId: membership.productId }, { ...options, org: managers.cirrusOrg, app: contractName });
-    // console.log("item", item);
-    membership = { ...membership, expiryDate: item?.expiryDate }
+    const item = await managers.itemManager.getItems({ productId: membership.productId }, getOptions);
+    membership = { ...membership, expiryDate: item[0]?.expiryDate }
     // Get The productFiles
     var productFiles = undefined
     if (membership.productId) {

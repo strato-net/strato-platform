@@ -396,7 +396,7 @@ const MembershipCardPurchased = ({
                   </Paragraph>
                   : <Paragraph >
                     <Text className="font-normal text-grey leading-5 font-poppin" >Expiry Date</Text>
-                    <Text className="float-right font-poppin leading-5">{dayjs(expiryDate).format('YYYY-MM-DD') ?? "--"}</Text>
+                    <Text className="float-right font-poppin leading-5">{dayjs(expiryDate).format('MM-DD-YYYY') ?? "--"}</Text>
                   </Paragraph>}
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
