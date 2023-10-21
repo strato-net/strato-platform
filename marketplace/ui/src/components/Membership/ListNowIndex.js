@@ -55,6 +55,7 @@ const ListNowIndex = ({
   let {
     memberships,
     isMembershipLoading,
+    isMembershipsLoading,
     isResaleMembershipSubmitting,
     purchasedMemberships,
     isPurchasedMembershipLoading,
@@ -137,23 +138,6 @@ const ListNowIndex = ({
     // inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
   }
 
-  const selectAfter = (
-    <Select
-      defaultValue="1"
-      onChange={(value) => {
-        if (value === "1") {
-          setIsTaxPercentage(true)
-        }
-        else if (value === "0") {
-          setIsTaxPercentage(false)
-        }
-        // formik.setFieldValue("isTaxPercentage", value === "1");
-      }}
-      style={{ width: 60 }}
-      options={taxOptions}
-    />
-  );
-
   const handleCreateFormSubmit = async () => {
     if (isIssued) {
       const inventoryBody = {
@@ -202,7 +186,7 @@ const ListNowIndex = ({
     : "Sale"
 
   const selectSuffix = isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />
-
+  const isMembershipDropDown = (isPurchasedMembershipLoading || isMembershipsLoading);
   return (
     <Modal
       style={{ maxWidth: "720px" }}
@@ -239,8 +223,8 @@ const ListNowIndex = ({
               className="w-full mt-2"
               size="large"
               // placeholder="Membership"
-              suffixIcon={selectSuffix}
-              disabled={isPurchasedMembershipLoading}
+              suffixIcon={isMembershipDropDown ? <Spin /> : selectSuffix}
+              disabled={isMembershipDropDown}
               onChange={(value) => {
                 handleMembership(value)
               }}

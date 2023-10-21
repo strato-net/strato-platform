@@ -48,18 +48,17 @@ const { Title, Text } = Typography;
 const Membership = (user) => {
   const { type } = useParams();
   let { state } = useLocation();
-  const [open, setOpen] = useState(
-    state && user.user ? state.isCalledFromHeader : false
-  );
+  const isOpen = (state && user.user && state.isCalledFromHeader && type === "purchased") ?? false
+  const [open, setOpen] = useState(isOpen);
 
-  useEffect(() => {
-    if (state && user.user) {
-      setOpen(state.isCalledFromHeader);
-    } else {
-      setOpen(false);
-    }
-    window.history.replaceState({}, "/memberships");
-  }, [state]);
+  // useEffect(() => {
+  //   if (state && user.user) {
+  //     setOpen(state.isCalledFromHeader);
+  //   } else {
+  //     setOpen(false);
+  //   }
+  //   window.history.replaceState({}, "/memberships");
+  // }, [state]);
 
   const dispatch = useMembershipDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -71,7 +70,7 @@ const Membership = (user) => {
   const [total, setTotal] = useState(10);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   // let [typeDispay, setTypeDisplay] = useState("purchased");
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(state?.isCalledFromHeader);
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
@@ -204,10 +203,13 @@ const Membership = (user) => {
   const openSellModal = () => {
     setVisible(true);
   };
+
+  const isPageLoading = stripeStatus === null || isLoadingStripeStatus
+
   return (
     <>
       {contextHolder}
-      {stripeStatus === null || isLoadingStripeStatus ? (
+      {isPageLoading ? (
         <div className="h-screen flex justify-center items-center mx-auto">
           <Spin spinning={isLoadingStripeStatus} size="large" />
         </div>
@@ -390,7 +392,7 @@ const Membership = (user) => {
         //   debouncedSearchTerm={debouncedSearchTerm}
         />
       )}
-      {visible && (
+      {visible && !isPageLoading && (
         <ListNowIndex
           open={visible}
           user={user}
