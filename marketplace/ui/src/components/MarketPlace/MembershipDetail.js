@@ -50,6 +50,7 @@ import { INVENTORY_STATUS } from "../../helpers/constants";
 import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import TagManager from "react-gtm-module";
+import dayjs from "dayjs";
 
 const MembershipDetails = ({ user, users }) => {
   const { type } = useParams()
@@ -177,7 +178,12 @@ const MembershipDetails = ({ user, users }) => {
   }, [routeMatch, routeMatch1]);
 
   useEffect(() => {
-    const inventoryAddress = inventories[0]?.address
+    let inventoryAddress;
+    if (type !== "issued" && type !== "purchased") {
+      inventoryAddress = inventoryDetails?.address
+    } else {
+      inventoryAddress = inventories[0]?.address
+    }
     if (inventoryAddress) {
       itemActions.fetchItem(itemDispatch, '', 0, inventoryAddress);
     }
@@ -496,8 +502,8 @@ const MembershipDetails = ({ user, users }) => {
   return (
     <>
       {contextHolder}
-      {details === null || (true &&
-        isLoading) ? (
+      {!details &&
+        isLoading ? (
         <div className="h-screen flex justify-center mx-auto items-center">
           <Spin spinning={isLoading} size="large" />
         </div>
@@ -538,7 +544,9 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin"> {decodeURIComponent(details?.name ?? "--")} </Text>
-                <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
+                {isIssued
+                  ? <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
+                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{dayjs(membershipDetails?.expiryDate).format('YYYY-MM-DD') ?? ""}  </Text> </Row>}
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" > Status </Text>
