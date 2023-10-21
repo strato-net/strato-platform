@@ -35,6 +35,9 @@ pipeline {
               set -x
               echo "Running unit tests"
               ./run_unit_tests.sh --coverage
+              pwd
+              ls
+              ls strato
             '''
               dir('strato-worktree/strato') {
                 zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
