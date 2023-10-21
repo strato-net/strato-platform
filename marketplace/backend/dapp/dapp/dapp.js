@@ -1175,7 +1175,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             timePeriodInMonths: memberships[0].timePeriodInMonths,
             savings: savings[0]?.savings,
             membershipAddress: memberships[0].address,
-            expiryDate:item?.expiryDate
+            expiryDate: item?.expiryDate
           };
         });
 
@@ -1390,7 +1390,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     let { itemAddress, ...restArgs } = args
     const inventoryRes = await managers.productManager.updateInventory(restArgs);
-    const items = await managers.itemManager.getItems({ address:itemAddress }, createOptions);
+    const items = await managers.itemManager.getItems({ address: itemAddress }, createOptions);
     const [soldStatus] = await managers.itemManager.updateItem({
       itemsAddress: [itemAddress],
       status: ITEM_STATUS.PUBLISHED,
@@ -1646,16 +1646,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // Get The membership
     let membership = await membershipJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
 
-    const createdDate = membership.createdDate;
+    // const createdDate = membership.createdDate;
 
-    // Get the current date in milliseconds
-    const currentDate = dayjs().valueOf();
+    // // Get the current date in milliseconds
+    // const currentDate = dayjs().valueOf();
 
-    // Calculate the difference in months
-    const monthsDifference = dayjs(currentDate).diff(dayjs(createdDate), 'month');
-    const diff = monthsDifference > membership.timePeriodInMonths ? 0 : monthsDifference;
+    // // Calculate the difference in months
+    // const monthsDifference = dayjs(currentDate).diff(dayjs(createdDate), 'month');
+    // const diff = monthsDifference > membership.timePeriodInMonths ? 0 : monthsDifference;
 
-    membership = { ...membership, remainingMonths: diff }
+    const item = await itemJs.get(rawAdmin, { productId: membership.productId }, { ...options, org: managers.cirrusOrg, app: contractName });
+    // console.log("item", item);
+    membership = { ...membership, expiryDate: item?.expiryDate }
     // Get The productFiles
     var productFiles = undefined
     if (membership.productId) {
@@ -1699,7 +1701,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   //Also note that there maybe multiple inventories that map to a single product that correspond to a single membership
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //  Added limit for Test remove it when done
+    //  Added limit for Test remove it when done
     const products = await managers.productManager.getProducts({ manufacturer: userOrganization, limit: 30, sort: '-createdDate' }, newOptions);
     let addressOfProducts = products.map(item => item.address)
 
