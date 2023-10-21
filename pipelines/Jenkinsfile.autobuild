@@ -39,9 +39,8 @@ pipeline {
               ls
               ls strato
             '''
-              dir('strato-worktree/strato') {
-                zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
-              }
+            zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
+              
             }
         }
       }
