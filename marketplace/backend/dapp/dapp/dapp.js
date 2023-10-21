@@ -1355,8 +1355,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
               fileName: productFile.fileName,
               uploadDate: productFile.uploadDate,
               createdDate: productFile.createdDate,
-              currentSection: productFile.currentSection,
-              currentType: productFile.currentType,
+              currentSection: parseInt(productFile.currentSection),
+              currentType: parseInt(productFile.currentType),
             };
           });
 
@@ -1387,13 +1387,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.resaleMembership = async function (args, options = defaultOptions) {
-    // console.log("payload", args);
+    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     let { itemAddress, ...restArgs } = args
     const inventoryRes = await managers.productManager.updateInventory(restArgs);
+    const items = await managers.itemManager.getItems({ address:itemAddress }, createOptions);
     const [soldStatus] = await managers.itemManager.updateItem({
       itemsAddress: [itemAddress],
       status: ITEM_STATUS.PUBLISHED,
       comment: "",
+      expiryDate: items[0].expiryDate
     });
     return soldStatus
   };
@@ -1697,8 +1699,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   //Also note that there maybe multiple inventories that map to a single product that correspond to a single membership
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-
-    const products = await managers.productManager.getProducts({ manufacturer: userOrganization, sort: '-createdDate' }, newOptions);
+  //  Added limit for Test remove it when done
+    const products = await managers.productManager.getProducts({ manufacturer: userOrganization, limit: 30, sort: '-createdDate' }, newOptions);
     let addressOfProducts = products.map(item => item.address)
 
     // Set the batch size for addressOfProducts processing
