@@ -214,7 +214,7 @@ const Membership = (user) => {
           <Spin spinning={isLoadingStripeStatus} size="large" />
         </div>
       ) : (
-        <div className=" mt-10 min-h-full">
+        <div className="min-h-full">
           <BreadCrumbComponent />
 
           <Col className="mt-2 h-24 py-5 bg-red-800" style={{ backgroundColor: '#F2F2F2' }}>

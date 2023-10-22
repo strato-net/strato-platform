@@ -19,26 +19,14 @@ import { actions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
 import { Carousel } from 'react-responsive-carousel';
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { actions as itemActions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
-import {
-  useProductDispatch,
-  useProductState,
-} from "../../contexts/product";
+import { useProductDispatch, useProductState } from "../../contexts/product";
 import routes from "../../helpers/routes";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useNavigate, useLocation } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
 import useDebounce from "../UseDebounce";
@@ -62,6 +50,7 @@ const MembershipDetails = ({ user, users }) => {
   const isIssued = type === 'issued'
 
   const { state, pathname } = useLocation();
+
   const [inventoryId, setInventoryId] = useState(state?.inventoryId);
 
   let isCalledFromMembership = false;
@@ -79,10 +68,10 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const [activeTab, setActiveTab] = useState("Details");
-  const [serviceList, setServiceList] = useState([])
-  const [savingsList, setSavingsList] = useState([])
-  const [totalSavings, setTotalSavings] = useState(0)
-  const [ownerSameAsUser, setOwnerSameAsUser] = useState(true)
+  const [serviceList, setServiceList] = useState([]);
+  const [savingsList, setSavingsList] = useState([]);
+  const [totalSavings, setTotalSavings] = useState(0);
+  const [ownerSameAsUser, setOwnerSameAsUser] = useState(true);
   const [Id, setId] = useState(undefined);
   const [isServiceSelected, setIsServiceSelected] = useState(false);
   const [membershipDetails, setMembershipDetails] = useState(undefined);
@@ -104,7 +93,7 @@ const MembershipDetails = ({ user, users }) => {
         membershipActions.fetchMembershipFromDetails(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
       }
     }
-  }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user])
+  }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user]);
 
   useEffect(() => {
     let services = [];
@@ -219,7 +208,7 @@ const MembershipDetails = ({ user, users }) => {
         productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
       });
     }
-  }, [membershipDetails, inventoryId]);
+  }, [membershipDetails, inventories]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -482,7 +471,7 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin"> {decodeURIComponent(inventoryDetails?.name ?? "--")} </Text>
-                {isIssued
+                {(isIssued || type==="all")
                   ? <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
                   : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY') ?? ""}  </Text> </Row>}
                 <Row className="flex justify-between h-20 mt-8">

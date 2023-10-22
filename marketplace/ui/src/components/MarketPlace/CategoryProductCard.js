@@ -112,7 +112,7 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const handleRedirect = () => {
-    let route = `/memberships/market/:id`;
+    let route = `/memberships/all/:id`;
     setCookie(
       "returnUrl",
       `/marketplace${route.replace(":id", product.membershipId)}`,
