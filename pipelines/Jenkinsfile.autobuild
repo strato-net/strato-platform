@@ -38,10 +38,12 @@ pipeline {
               pwd
               ls
               ls strato
+              ls strato/hpc
             '''
-            zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
-              
-            }
+            dir('strato') {
+              zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
+            }   
+          }
         }
       }
     }
