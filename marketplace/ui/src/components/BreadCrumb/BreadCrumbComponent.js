@@ -5,12 +5,18 @@ import ClickableCell from '../ClickableCell'
 const { Text } = Typography;
 
 const BreadCrumbComponent = ({ name }) => {
-  const navigate = useNavigate();
   const { state, pathname } = useLocation();
+  const navigate = useNavigate();
+  const isMarketplace = pathname.includes("all");
+
   const routesArray = pathname.split("/")
   const handleRedirect = (e, item) => {
     e.preventDefault()
-    navigate(item)
+    if (isMarketplace) {
+      navigate('/category/Membership')
+    } else {
+      navigate(item)
+    }
   }
 
   return (
@@ -20,6 +26,9 @@ const BreadCrumbComponent = ({ name }) => {
           <Breadcrumb>
             {routesArray.map((item, index) => {
               let len = routesArray.length - 1;
+              if (item === "all") {
+                return null;
+              }
               return <Breadcrumb.Item key={index} href="" onClick={(e) => handleRedirect(e, routesArray.slice(0, index + 1).join('/'))}>
                 <ClickableCell>
                   <Text className={`${len == index ? "" : "text-primary"} capitalize text-md font-bold`} underline>
