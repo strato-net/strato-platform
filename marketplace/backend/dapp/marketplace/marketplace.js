@@ -78,7 +78,7 @@ async function getAll(admin, args = {}, options) {
     const products = await productJs.getAll(admin, {
         sort: '-createdDate',
         //Added the Limit for test. Remove when Done.
-        limit: 30,
+        limit: 80,
         isActive: true,
         isDeleted: false,
         isInventoryAvailable: true,

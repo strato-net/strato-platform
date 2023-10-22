@@ -1066,7 +1066,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
-      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
+      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', limit: 80, ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
 
       const arrayOfAddresses = ownedProducts.map(obj => obj.address);
@@ -1702,7 +1702,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
     //  Added limit for Test remove it when done
-    const products = await managers.productManager.getProducts({ manufacturer: userOrganization, limit: 30, sort: '-createdDate' }, newOptions);
+    const products = await managers.productManager.getProducts({ manufacturer: userOrganization, limit: 80, sort: '-createdDate' }, newOptions);
     let addressOfProducts = products.map(item => item.address)
 
     // Set the batch size for addressOfProducts processing
