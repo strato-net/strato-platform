@@ -4,6 +4,7 @@ import { Card, Popover, Spin, Button, Row, Col, Typography, Image, Modal, Table,
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
+import helperJson from "../../helpers/helper.json"
 import "./membership.css";
 import routes from "../../helpers/routes";
 import { useNavigate, useParams } from "react-router-dom";
@@ -13,60 +14,17 @@ import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { useMembershipDispatch } from "../../contexts/membership";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
 import { Carousel } from 'react-responsive-carousel';
 import { forwardArrowIcon, tag, tagIcon } from "../../images/SVGComponents";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
-
+const { purchasedCardColumn, statusColor, statusText } = helperJson;
 
 const { Text, Paragraph, Title } = Typography;
 
-const statusText = {
-  1: 'For Sale',
-  2: 'Not For Sale'
-}
-
-const columns = [
-
-  {
-    title: 'Date',
-    dataIndex: 'name',
-    key: 'name',
-    width: '30%',
-    color: "red",
-    // ...getColumnSearchProps('name'),
-  },
-  {
-    title: 'Quantity',
-    dataIndex: 'age',
-    key: 'age',
-    width: '15%',
-    // ...getColumnSearchProps('age'),
-  },
-  {
-    title: 'Status',
-    dataIndex: 'published',
-    key: 'published',
-    width: '20%',
-    // ...getColumnSearchProps('age'),
-  },
-  {
-    title: 'Price',
-    dataIndex: 'address',
-    key: 'address',
-    width: '20%',
-    // ...getColumnSearchProps('address'),
-  },
-  {
-    title: 'Preview',
-    dataIndex: 'preview',
-    key: 'preview',
-    width: '7%',
-  }
-];
 
 const initialValues = {
   name: "",
@@ -74,10 +32,6 @@ const initialValues = {
   quantity: ""
 };
 
-const statusColor = {
-  1: 'green',
-  2: "red"
-}
 
 const MembershipCardPurchased = ({
   user,
@@ -89,6 +43,7 @@ const MembershipCardPurchased = ({
 }) => {
   const inventoryDispatch = useInventoryDispatch();
   const membershipDispatch = useMembershipDispatch();
+  const membershipState = useMembershipState()
   const { type } = useParams()
   const isIssued = type === "issued";
   const {
@@ -186,7 +141,11 @@ const MembershipCardPurchased = ({
   });
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { isCreateInventorySubmitting, inventories } = useInventoryState();
+  const { isCreateInventorySubmitting, inventories, success } = useInventoryState();
+
+  useEffect(() => {
+    setVisible(false);
+  }, [success, membershipState.success])
 
   useEffect(() => {
     setState(membership);
@@ -416,15 +375,13 @@ const MembershipCardPurchased = ({
                     size="large"
                     items={[{ key: '1', label: 'This is default size panel header', children: <Table bordered pagination={false} columns={columns} dataSource={data} /> }]}
                   /> */}
-
                   <Collapse size="large" expandIconPosition='end'>
                     <Collapse.Panel key="1" header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>}>
                       <Table pagination={false}
                         className="inventory-table"
-                        rowClassName={"bg-white"} rowKey="key" columns={columns} dataSource={data} />
+                        rowClassName={"bg-white"} rowKey="key" columns={purchasedCardColumn} dataSource={data} />
                     </Collapse.Panel>
                   </Collapse>
-
                 </Col>
               </Row>}
           </Col>
