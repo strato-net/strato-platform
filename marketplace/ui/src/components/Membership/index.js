@@ -41,6 +41,7 @@ import ListNowIndex from "./ListNowIndex";
 import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import { setCookie } from "../../helpers/cookie";
+import { useInventoryState } from "../../contexts/inventory";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -86,35 +87,21 @@ const Membership = (user) => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
-  const openToast = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
-
   let {
     memberships,
     isMembershipsLoading,
     isIssuedMembershipLoading,
     isPurchasedMembershipLoading,
     purchasedMemberships,
-    message,
-    success,
+    // message,
+    // success,
     stripeStatus,
     isLoadingStripeStatus,
   } = useMembershipState();
+  const membershipState = useMembershipState();
+  const inventoryState = useInventoryState();
+  const success = membershipState.success || inventoryState.success;
+  const message = membershipState.message || inventoryState.message;
 
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.user?.organization);
@@ -202,6 +189,25 @@ const Membership = (user) => {
 
   const openSellModal = () => {
     setVisible(true);
+  };
+
+
+  const openToast = (placement) => {
+    if (success) {
+      api.success({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
   };
 
   const isPageLoading = stripeStatus === null || isLoadingStripeStatus

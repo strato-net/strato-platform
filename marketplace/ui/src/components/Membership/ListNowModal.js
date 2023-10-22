@@ -110,7 +110,7 @@ const ListNowModal = ({
               className="w-full mt-2"
               size="large"
               prefix={isInventoriesLoading && <Spin />}
-              // disabled={listType === "Sale"}
+              disabled={!isIssued && listType!=="New"}
               // value={1}
               controls={false}
               value={(isIssued || listType === "New") ? formik.values.quantity : 1}
