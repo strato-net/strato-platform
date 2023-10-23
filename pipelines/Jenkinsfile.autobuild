@@ -305,8 +305,6 @@ pipeline {
                     sh 'sudo ./fetchlogs --as-dir'
                     sh 'mv strato_logs/ strato_logs_testsync/'
                     archiveArtifacts artifacts: 'strato_logs_testsync/**', fingerprint: true, allowEmptyArchive: true
-                    sh 'sudo ./strato --wipe'
-                    sh 'sudo ./vault --wipe'
                   }
                 }
               }
