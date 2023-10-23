@@ -223,23 +223,17 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         Inventory oldInventory = Inventory(item.inventoryId());
 
-        bool hasInventoryType = true;
-        try {
-            oldInventory.inventoryType();
-        } catch UnknownFunction {
-            hasInventoryType = false;
-        }
-        if (hasInventoryType && oldInventory.inventoryType() == "Batch") {
+        if (oldInventory.inventoryType() == "Batch") {
             (uint status, address inventory) = product.addInventory(
                 _newQuantity,
                 oldInventory.pricePerUnit(),
                 oldInventory.batchId(),
+                oldInventory.inventoryType(),
                 InventoryStatus.UNPUBLISHED,
                 block.timestamp,
-                _newOwner,
-                "Batch"
+                _newOwner
             );
-            Item_3 batch_item = new Item_3(
+            Item_3 itemAddr = new Item_3(
                 address(product),
                 oldProduct.uniqueProductCode(),
                 address(inventory),
@@ -253,25 +247,18 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             );
-            address itemContractAddress = address(batch_item);
+            address itemContractAddress = address(itemAddr);
             itemProductIdMapping[itemContractAddress] = address(product);
             itemInventoryIdMapping[itemContractAddress] = address(inventory);
-
-            item.generateOwnershipHistory(
-                oldInventory.ownerOrganization(),
-                batch_item.ownerOrganization(),
-                block.timestamp,
-                address(batch_item)
-            );
         } else {
             (uint status, address inventory) = product.addInventory(
                 _itemsAddress.length,
                 oldInventory.pricePerUnit(),
                 oldInventory.batchId(),
+                oldInventory.inventoryType(),
                 InventoryStatus.UNPUBLISHED,
                 block.timestamp,
-                _newOwner,
-                "Individual"
+                _newOwner
             );
             for (uint i = 0; i < _itemsAddress.length; i++) {
                 Item_3 _item = Item_3(_itemsAddress[i]);

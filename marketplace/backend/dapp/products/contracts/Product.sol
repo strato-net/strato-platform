@@ -121,8 +121,8 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
     }
 
     // Add the inventory for the product
-    function addInventory(int _quantity, int _pricePerUnit, string _batchId, 
-      InventoryStatus _status, uint _createdDate, address _owner, string _inventoryType) public returns(uint256, address){
+    function addInventory(int _quantity, int _pricePerUnit, string _batchId, string _inventoryType, 
+      InventoryStatus _status, uint _createdDate,address _owner) public returns(uint256, address){
 
       if(ownerOrganization != getUserOrganization(_owner)){
         return (RestStatus.FORBIDDEN, address(0));
