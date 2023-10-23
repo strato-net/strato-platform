@@ -333,7 +333,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           onClick={() => { setVisible(true) }}
           // formik={formik}
           type="Sale"
-          isCalledFromHeader={true}
+          isSellModal={true}
         // id="None"
         // getIn={getIn}
         // isCreateMembershipSubmitting={isCreateInventorySubmitting}
