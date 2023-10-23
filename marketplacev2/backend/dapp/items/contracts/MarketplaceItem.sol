@@ -340,4 +340,50 @@ contract MarketplaceItem is Asset,
       inventory.updateQuantity(_quantity);
       return (RestStatus.OK);
     }
+
+    // Update product information
+    function updateProduct(
+        string _description
+    ,   string _imageKey
+    ,   bool _isActive
+    ,   string _userUniqueProductCode
+    ,   uint _scheme
+    ) returns (uint) {
+      if(ownerOrganization != getUserOrganization(tx.origin)){
+        return RestStatus.FORBIDDEN;
+      }
+
+      if (_scheme == 0) {
+        return RestStatus.OK;
+      }
+
+      if ((_scheme & (1 << 0)) == (1 << 0)) {
+        product.description = _description;
+      }
+      if ((_scheme & (1 << 1)) == (1 << 1)) {
+        product.imageKey = _imageKey;
+      }
+      if ((_scheme & (1 << 2)) == (1 << 2)) {
+        product.isActive = _isActive;
+      }
+      if ((_scheme & (1 << 3)) == (1 << 3)) {
+        product.userUniqueProductCode = _userUniqueProductCode;
+      }
+
+      return RestStatus.OK;
+    }
+
+
+    // Delete the product
+    function deleteProduct() public returns(uint256, string){
+      if(ownerOrganization != getUserOrganization(tx.origin)){
+        return (RestStatus.FORBIDDEN, 'Not authorized');
+      }
+
+      if(!isInventoryAvailable) {
+        product.isDeleted = true;
+        return (RestStatus.OK, "Product is deleted successfully.");
+      }
+      return (RestStatus.CONFLICT, "Product cannot be deleted.");
+    }
 }

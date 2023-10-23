@@ -91,7 +91,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${cirrusUrl}/${assetTableName}?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -102,7 +102,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,
-          payload: body,
+          payload: body.data,
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {

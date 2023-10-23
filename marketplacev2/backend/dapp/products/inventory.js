@@ -3,8 +3,9 @@ import config from '/load.config';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
+import { ASSET_TABLE_NAME } from '../../helpers/constants';
 
-const contractName = 'Inventory';
+const contractName = ASSET_TABLE_NAME ? ASSET_TABLE_NAME : "BlockApps-Dapp-Inventory";
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 
 /** 
@@ -142,15 +143,16 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-    const { uniqueInventoryID, address, ...restArgs } = args;
+    const { org, ...modifiedOptions } = options;
+    const { uniqueInventoryID, address, ownerOrganization, ...restArgs } = args;
     let inventory;
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        inventory = await searchOne(contractName, searchArgs, options, user);
+        inventory = await searchOne(contractName, searchArgs, modifiedOptions, user);
     } else {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueInventoryID', value: uniqueInventoryID });
-        inventory = await searchOne(contractName, searchArgs, options, user);
+        inventory = await searchOne(contractName, searchArgs, modifiedOptions, user);
     }
     if (!inventory) {
         return undefined;
@@ -163,7 +165,9 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventories = await searchAllWithQueryArgs(contractName, args, options, admin)
+    const { org, ...modifiedOptions } = options;
+    const {ownerOrganization, ...modifiedArgs} = args;
+    const inventories = await searchAllWithQueryArgs(contractName, modifiedArgs, modifiedOptions, admin);
     return inventories.map((inventory) => marshalOut(inventory))
 }
 

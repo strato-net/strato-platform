@@ -28,9 +28,13 @@ endif
 
 $(info )
 
-all: build_all docker-compose eks
+all: build_all_v2 docker-compose eks
+
+all_old: build_all docker-compose eks
 
 build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
+
+build_all_v2: strato apex nginx postgrest prometheus smd marketplacev2-backend marketplacev2-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
 .PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
 
@@ -61,6 +65,14 @@ marketplace-backend:
 marketplace-ui:
 	@echo Now building marketplace-ui...
 	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
+
+marketplacev2-backend:
+	@echo Now building marketplace-backend...
+	BASIL_DOCKER_TAG=${REPO_URL}marketplace-backend:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-backend:${VERSION} make --directory=marketplacev2/backend/
+
+marketplacev2-ui:
+	@echo Now building marketplace-ui...
+	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplacev2/ui/
 
 eks:
 	@echo Now generating eks manifest files
