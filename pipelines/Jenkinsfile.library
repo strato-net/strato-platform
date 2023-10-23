@@ -1293,7 +1293,7 @@ def runSyncTester() {
   IS_SYNCED=$(jq -r .isSynced <<< ${METADATA})
   while [ "$IS_SYNCED" != true ]; do
       echo "**************************************"
-      echo "$(date '+%Y-%m-%d %H:%M:%S'):"
+      echo "$(date -u '+%Y-%m-%d %H:%M:%S'):"
       if [[ $(sudo docker ps | grep unhealthy) ]]; then
           echo "Failure: one or more docker containers became unhealthy during sync"
           exit 2
