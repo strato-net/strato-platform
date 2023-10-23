@@ -309,7 +309,7 @@ pipeline {
               cd strato-worktree
               ./run_unit_tests.sh --coverage
             '''
-            dir('strato') {
+            dir('strato-worktree/strato') {
               zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
             }   
           }
