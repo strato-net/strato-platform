@@ -46,7 +46,7 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
         {
             title: "Set Price",
             render: () => (
-                <InputNumber value={pricePerUnit} controls={false} min={pricePerUnit} onChange={(value) => setpricePerUnit(value)} />
+                <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
             )
         }
     ];

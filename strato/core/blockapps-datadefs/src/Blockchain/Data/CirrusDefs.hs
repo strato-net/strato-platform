@@ -29,7 +29,6 @@ module Blockchain.Data.CirrusDefs where
 import Blockchain.Data.PersistTypes ()
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Data.Time
 import Database.Persist.TH
@@ -38,9 +37,7 @@ import GHC.Generics
 --         Table "public.Certificate"
 --        Column       |  Type   | Modifiers
 -- --------------------+---------+-----------
---  record_id          | text    | not null
 --  address            | text    |
---  chainId            | text    |
 --  block_hash         | text    |
 --  block_timestamp    | text    |
 --  block_number       | text    |
@@ -58,15 +55,13 @@ import GHC.Generics
 --  publicKey          | text    |
 --  userAddress        | text    |
 -- Indexes:
---     "Certificate_pkey" PRIMARY KEY, btree (record_id)
+--     "Certificate_pkey" PRIMARY KEY, btree (address)
 
 share
   [mkPersist sqlSettings, mkMigrate "migrateAuto"]
   [persistUpperCase|
     Certificate sql="Certificate"
-        recordId Address sql="record_id"
         address Address
-        chainId Word256 Maybe
         blockHash Keccak256 sql="block_hash"
         blockTimestamp UTCTime sql="block_timestamp"
         blockNumber Integer sqltype=numeric(1000,0) sql="block_number"
@@ -83,6 +78,5 @@ share
         parent Address
         publicKey String
         userAddress Address
-        Primary recordId
         deriving Eq Generic Show
 |]

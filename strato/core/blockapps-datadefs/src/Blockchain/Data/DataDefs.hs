@@ -22,7 +22,7 @@
 
 module Blockchain.Data.DataDefs where
 
-import BlockApps.Solidity.Xabi
+--import BlockApps.Solidity.Xabi
 import Blockchain.Data.PersistTypes ()
 import Blockchain.Data.RLP
 import Blockchain.Data.TXOrigin
