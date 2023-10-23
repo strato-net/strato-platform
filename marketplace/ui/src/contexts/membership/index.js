@@ -7,7 +7,7 @@ const MembershipDispatchContext = createContext();
 const MembershipsProvider = ({ children }) => {
   const initialState = {
     purchasedMemberships: [],
-    issuedMembership:[],
+    issuedMembership: [],
     isPurchasedMembershipLoading: false,
     isIssuedMembershipLoading: false,
     isResaleMembershipSubmitting: false,

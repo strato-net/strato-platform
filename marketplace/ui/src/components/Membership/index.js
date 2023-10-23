@@ -40,6 +40,8 @@ import IssuedList from "./IssuedList";
 import ListNowIndex from "./ListNowIndex";
 import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import { setCookie } from "../../helpers/cookie";
+import { useInventoryState } from "../../contexts/inventory";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -47,18 +49,17 @@ const { Title, Text } = Typography;
 const Membership = (user) => {
   const { type } = useParams();
   let { state } = useLocation();
-  const [open, setOpen] = useState(
-    state && user.user ? state.isCalledFromHeader : false
-  );
+  const isOpen = (state && user.user && state.isCalledFromHeader && type === "purchased") ?? false
+  const [open, setOpen] = useState(isOpen);
 
-  useEffect(() => {
-    if (state && user.user) {
-      setOpen(state.isCalledFromHeader);
-    } else {
-      setOpen(false);
-    }
-    window.history.replaceState({}, "/memberships");
-  }, [state]);
+  // useEffect(() => {
+  //   if (state && user.user) {
+  //     setOpen(state.isCalledFromHeader);
+  //   } else {
+  //     setOpen(false);
+  //   }
+  //   window.history.replaceState({}, "/memberships");
+  // }, [state]);
 
   const dispatch = useMembershipDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -70,7 +71,7 @@ const Membership = (user) => {
   const [total, setTotal] = useState(10);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   // let [typeDispay, setTypeDisplay] = useState("purchased");
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(state?.isCalledFromHeader);
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
@@ -86,33 +87,21 @@ const Membership = (user) => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
-  const openToast = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
-
   let {
     memberships,
-    ismembershipsLoading,
+    isMembershipsLoading,
+    isIssuedMembershipLoading,
+    isPurchasedMembershipLoading,
     purchasedMemberships,
-    message,
-    success,
+    // message,
+    // success,
     stripeStatus,
     isLoadingStripeStatus,
   } = useMembershipState();
+  const membershipState = useMembershipState();
+  const inventoryState = useInventoryState();
+  const success = membershipState.success || inventoryState.success;
+  const message = membershipState.message || inventoryState.message;
 
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.user?.organization);
@@ -179,6 +168,7 @@ const Membership = (user) => {
     },
   ];
   const onChange = (key) => {
+    setCookie("returnUrl", `/marketplace/memberships/${key}`, 10);
     navigate(`/memberships/${key}`)
   };
 
@@ -200,15 +190,37 @@ const Membership = (user) => {
   const openSellModal = () => {
     setVisible(true);
   };
+
+
+  const openToast = (placement) => {
+    if (success) {
+      api.success({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: message,
+        onClose: actions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
+  const isPageLoading = stripeStatus === null || isLoadingStripeStatus
+
   return (
     <>
       {contextHolder}
-      {stripeStatus === null || isLoadingStripeStatus ? (
+      {isPageLoading ? (
         <div className="h-screen flex justify-center items-center mx-auto">
           <Spin spinning={isLoadingStripeStatus} size="large" />
         </div>
       ) : (
-        <div className=" mt-10 min-h-full">
+        <div className="min-h-full">
           <BreadCrumbComponent />
 
           <Col className="mt-2 h-24 py-5 bg-red-800" style={{ backgroundColor: '#F2F2F2' }}>
@@ -223,7 +235,8 @@ const Membership = (user) => {
                     </Row>
                     <Row>
                       <Typography.Text className="text-sm font-medium text-grey">
-                        {type === "purchased" ? purchasedMemberships?.length : memberships?.length} {type} Memberships found
+                        {(isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading)
+                          ? <Spin size="small" /> : (type === "purchased" ? purchasedMemberships?.length : memberships?.length)} {type} Memberships found
                       </Typography.Text>
                     </Row>
                   </Col>
@@ -238,7 +251,7 @@ const Membership = (user) => {
                         All
                     </Dropdown.Button>
                 </Col> */}
-              <Col  md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 11 }}  className="py-0 m-0 pt-1">
+              <Col md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 11 }} className="py-0 m-0 pt-1">
                 <Col className="flex justify-between">
                   <Button
                     id="add-product-button"
@@ -293,7 +306,10 @@ const Membership = (user) => {
 
                     }}
                     className="py-3 px-6 h-12 bg-white !hover:bg-primaryHover font-semibold flex"
-                    onClick={() => navigate("/memberships/serviceUsage/booked")}
+                    onClick={() => {
+                      setCookie("returnUrl", `/marketplace/memberships/serviceUsage/booked`, 10);
+                      navigate("/memberships/serviceUsage/booked")
+                    }}
                   >
                     {servicesIcon()} &nbsp; Services
                   </Button>
@@ -382,7 +398,7 @@ const Membership = (user) => {
         //   debouncedSearchTerm={debouncedSearchTerm}
         />
       )}
-      {visible && (
+      {visible && !isPageLoading && (
         <ListNowIndex
           open={visible}
           user={user}

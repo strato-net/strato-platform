@@ -24,6 +24,7 @@ import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { blockappLogo } from "../../images/SVGComponents";
+import { setCookie, getCookie } from "../../helpers/cookie";
 
 const { Title } = Typography;
 const { Header } = Layout;
@@ -74,8 +75,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
-    // routes.Memberships.url,
-    '/memberships/purchased',
+    routes.purchasedMemberships.url,
     routes.Storage.url,
   ];
 
@@ -159,6 +159,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     else setRoleIndex(1)
   }, [user])
 
+
   return (
     <Header className="!bg-white flex shadow-lg">
       <Space>
@@ -185,6 +186,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         disabledOverflow={true}
         className="h-16 decoration-black m-auto"
         onClick={(item) => {
+          setCookie("returnUrl", `/marketplace${navUrls[item.key]}`, 10);
           setSelectedTab(item.key)
           if (item.key === "0") {
             TagManager.dataLayer({
@@ -222,7 +224,9 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             });
             navigate(navUrls[item.key], { state: { tab: "EventType" } })
           }
-          else navigate(navUrls[item.key]);
+          else {
+            navigate(navUrls[item.key]);
+          }
           if (item.key === "5") {
             TagManager.dataLayer({
               dataLayer: {
@@ -236,6 +240,9 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       <Space size="large">
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
+          onClick={() => {
+            navigate("/memberships/issued", { state: { isCalledFromHeader: true } });
+          }}
         >
           <Avatar
             style={{
@@ -249,7 +256,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           onClick={() => {
-            navigate("/memberships", { state: { isCalledFromHeader: true } });
+            navigate("/memberships/purchased", { state: { isCalledFromHeader: true } });
           }}
         >
           <Avatar
@@ -265,6 +272,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           className="cursor-pointer"
           count={cartList.length}
           onClick={() => {
+            setCookie("returnUrl", `/marketplace/checkout`, 10);
             TagManager.dataLayer({
               dataLayer: {
                 event: 'view_shopping_cart',
@@ -293,7 +301,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
                 })
               }} >
               <Typography className="primary-theme-text">Login / Register</Typography>
-            </a> : (isOauth ? <Title style={{ backgroundColor: 'red', border: 3, padding: 10, color: '#FFFFFF' }} level={3} >Something went wrong, try to refresh page</Title> : null)
+            </a> : (isOauth ? <Title style={{ border: 3, padding: 10, color: '#FFFFFF' }} level={3} >Something went wrong, try to refresh page</Title> : null)
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-black" id="user-dropdown">

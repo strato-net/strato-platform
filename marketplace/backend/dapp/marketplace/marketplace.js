@@ -76,6 +76,9 @@ async function getAll(admin, args = {}, options) {
 
     // First we fetch all the products. 
     const products = await productJs.getAll(admin, {
+        sort: '-createdDate',
+        //Added the Limit for test. Remove when Done.
+        limit: 80,
         isActive: true,
         isDeleted: false,
         isInventoryAvailable: true,
@@ -143,7 +146,7 @@ async function getAll(admin, args = {}, options) {
     inventoryWithoutMembershipResults.forEach((inventoryBatch, batchIx) => {
         inventoryBatch.forEach(inventory => {
             const product = productsWithoutMembershipsMap.get(inventory.productId);
-            const productImageLocation = ownedProductFiles.filter((item)=>item.productId === inventory.productId ).map(item=>item.fileLocation);
+            const productImageLocation = ownedProductFiles.filter((item) => item.productId === inventory.productId).map(item => item.fileLocation);
             productWithoutMembership.push({
                 ...product,
                 ...inventory,
@@ -176,7 +179,7 @@ async function getAll(admin, args = {}, options) {
         inventoryBatch.forEach(inventory => {
             // Find the product for this inventory
             const product = productsWithMembershipsMap.get(inventory.productId);
-            const productImageLocation = ownedProductFiles.filter((item)=>item.productId === inventory.productId ).map(item=>item.fileLocation);
+            const productImageLocation = ownedProductFiles.filter((item) => item.productId === inventory.productId).map(item => item.fileLocation);
             // Find the membership for this product
             const membership = membershipMap.get(product.address);
 
@@ -363,11 +366,9 @@ async function getTopSellingProducts(admin, args = {}, options) {
     return [...productWithMembership, ...productWithoutMembership].map(inventory => marshalOut(inventory));
 }
 
-
-
 export default {
-  getAll,
-  getTopSellingProducts,
-  marshalIn,
-  marshalOut,
+    getAll,
+    getTopSellingProducts,
+    marshalIn,
+    marshalOut,
 };

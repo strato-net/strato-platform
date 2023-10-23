@@ -45,5 +45,46 @@
       "value": "1",
       "label": "%"
     }
-  ]
+  ],
+  "purchasedCardColumn": [
+    {
+      "title": "Date",
+      "dataIndex": "name",
+      "key": "name",
+      "width": "30%",
+      "color": "red"
+    },
+    {
+      "title": "Quantity",
+      "dataIndex": "age",
+      "key": "age",
+      "width": "15%"
+    },
+    {
+      "title": "Status",
+      "dataIndex": "published",
+      "key": "published",
+      "width": "20%"
+    },
+    {
+      "title": "Price",
+      "dataIndex": "address",
+      "key": "address",
+      "width": "20%"
+    },
+    {
+      "title": "Preview",
+      "dataIndex": "preview",
+      "key": "preview",
+      "width": "7%"
+    }
+  ],
+  "statusColor": {
+    "1": "green",
+    "2": "red"
+  },
+  "statusText": {
+    "1": "For Sale",
+    "2": "Not For Sale"
+  }
 }

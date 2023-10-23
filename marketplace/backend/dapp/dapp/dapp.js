@@ -245,7 +245,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ ITEMS --------------------------------
   contract.addItem = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    return managers.itemManager.addItem({ ...args.itemArgs, createdDate: createdDate, });
+    // remove the value of expiryDate It is used for test only
+    return managers.itemManager.addItem({ ...args.itemArgs, createdDate: createdDate, expiryDate: Math.floor(Date.now() / 1000) });
   };
   contract.updateItem = async function (args, options = defaultOptions) {
     return managers.itemManager.updateItem(args);
@@ -480,6 +481,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createInventory = async function (args, options = defaultOptions) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
+    // remove the value of expiryDate It is used for test only
+    const expiryDate = Math.floor(Date.now() / 1000);
     const { serialNumber, ...restArgs } = args;
 
     const serialNo = [];
@@ -565,6 +568,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const itemParams = {
       itemObject: transformedArray,
       createdDate,
+      expiryDate,
       comment: "",
       productId: restArgs.productAddress,
       status: restArgs.status,
@@ -1062,7 +1066,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
-      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
+      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', limit: 80, ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
 
       const arrayOfAddresses = ownedProducts.map(obj => obj.address);
@@ -1170,7 +1174,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             manufacturer: product.manufacturer,
             timePeriodInMonths: memberships[0].timePeriodInMonths,
             savings: savings[0]?.savings,
-            membershipAddress: memberships[0].address
+            membershipAddress: memberships[0].address,
+            expiryDate: item?.expiryDate
           };
         });
 
@@ -1350,8 +1355,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
               fileName: productFile.fileName,
               uploadDate: productFile.uploadDate,
               createdDate: productFile.createdDate,
-              currentSection: productFile.currentSection,
-              currentType: productFile.currentType,
+              currentSection: parseInt(productFile.currentSection),
+              currentType: parseInt(productFile.currentType),
             };
           });
 
@@ -1382,13 +1387,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.resaleMembership = async function (args, options = defaultOptions) {
-    // console.log("payload", args);
+    const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     let { itemAddress, ...restArgs } = args
     const inventoryRes = await managers.productManager.updateInventory(restArgs);
+    const items = await managers.itemManager.getItems({ address: itemAddress }, createOptions);
     const [soldStatus] = await managers.itemManager.updateItem({
       itemsAddress: [itemAddress],
       status: ITEM_STATUS.PUBLISHED,
       comment: "",
+      expiryDate: items[0].expiryDate
     });
     return soldStatus
   };
@@ -1481,7 +1488,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const chainOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
 
       const orderLine = await managers.orderManager.getOrderLine({ address: orderLineId }, chainOptions);
-      const { productId, inventoryId } = orderLine
+      const { productId, inventoryId } = orderLine;
 
       // If no serial numbers are passed, a quantity is passed from the front end. 
       // This will allow us to get the first n items from the inventory
@@ -1515,12 +1522,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
       const itemsAddresses = items.map(_item => _item.address);
+      let membership = await membershipJs.get(rawAdmin, { productId: items[0].productId }, { ...options, org: managers.cirrusOrg, app: contractName })
+      const months = membership.timePeriodInMonths;
 
+      const currentDateTime = dayjs();
+
+      const expiryDateTime = currentDateTime.add((months * 30), 'day').valueOf();
+
+      let totalExpiry;
+      if (items?.expiryDate === totalExpiry) {
+        totalExpiry = expiryDateTime;
+      } else {
+        totalExpiry = items.expiryDate;
+      }
 
       const _args = {
         orderLineId,
         items: itemsAddresses,
         createdDate: Math.floor(Date.now() / 1000),
+        expiryDate: totalExpiry
       };
       // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
       // See orderLine.sol 
@@ -1533,6 +1553,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         itemsAddress: itemsAddresses,
         status: ITEM_STATUS.SOLD,
         comment: "",
+        // remove the value of expiryDate It is used for test only
+        expiryDate: totalExpiry
       });
       if (soldStatus !== "200") {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
@@ -1622,10 +1644,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // This param was hard coded for the get and getAll functions for Membership and MembershipService below
 
     // Get The membership
-    const membership = await membershipJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
+    let membership = await membershipJs.get(rawAdmin, args, { ...options, org: managers.cirrusOrg, app: contractName })
 
+    // const createdDate = membership.createdDate;
+
+    // // Get the current date in milliseconds
+    // const currentDate = dayjs().valueOf();
+
+    // // Calculate the difference in months
+    // const monthsDifference = dayjs(currentDate).diff(dayjs(createdDate), 'month');
+    // const diff = monthsDifference > membership.timePeriodInMonths ? 0 : monthsDifference;
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+
+    const item = await managers.itemManager.getItems({ productId: membership.productId }, getOptions);
+    membership = { ...membership, expiryDate: item[0]?.expiryDate }
     // Get The productFiles
-    console.log("start", membership.productId)
     var productFiles = undefined
     if (membership.productId) {
       productFiles = await productFileJs.getAll(rawAdmin, { productId: membership.productId }, { ...options, org: managers.cirrusOrg, app: contractName })
@@ -1668,8 +1701,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   //Also note that there maybe multiple inventories that map to a single product that correspond to a single membership
   contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-
-    const products = await managers.productManager.getProducts({ manufacturer: userOrganization }, newOptions);
+    //  Added limit for Test remove it when done
+    const products = await managers.productManager.getProducts({ manufacturer: userOrganization, limit: 80, sort: '-createdDate' }, newOptions);
     let addressOfProducts = products.map(item => item.address)
 
     // Set the batch size for addressOfProducts processing
@@ -1685,14 +1718,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let memberships = await membershipJs.getAll(rawAdmin, { ...args, sort: '-createdDate', productId: batch, ownerOrganization: userOrganization }, newOptions);
 
       // Filter and process memberships
-      // memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
-      memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined);
+      memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined && m.ownerOrganization === userOrganization);
+      // memberships = memberships.filter(m => m.productId !== null && m.productId !== undefined);
       // let productArr = memberships.map((item) => item.productId)
       // Attach product information
       products.forEach(product => {
         memberships = memberships.map(membership => {
           return (membership.productId === product.address) ?
-            { ...membership, product: product, productImage: null, inventories: [] } : membership;
+            { ...membership, product: product, productName: product.name, productId: product.address, productImage: null, inventories: [] } : membership;
         })
       });
 
@@ -1708,19 +1741,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       // Get inventories using the corresponding ProductIds
       const inventories = await managers.productManager.getInventories({ productId: batch }, newOptions);
+      let inventoryIds = inventories.map((item) => item.address)
 
-      // const itemsList = await itemJs.getAll(rawAdmin, { productId: productArr }, newOptions);
+      const itemsList = await itemJs.getAll(rawAdmin, { inventoryId: inventoryIds }, newOptions);
       // Iterate through the list of inventories and attach the inventory status to the membership object
       inventories.forEach(inventory => {
         memberships = memberships.map(membership => {
           let transformedData = { inventories: [], ...membership }
-          // let item = itemsList.filter((item) => item.productId == membership.productId)
-          // let itemNumber = ''
-          // if (item) {
-          //   itemNumber = item[0]?.itemNumber;
-          // }
+          let item = itemsList.filter((item) => item.productId == membership.productId);
+          let itemNumber = ''
+          let itemAddress = ''
+          if (item) {
+            itemNumber = item[0]?.itemNumber;
+            itemAddress = item[0]?.address;
+          }
           return (membership.productId === inventory.productId) ?
-            { ...membership, inventories: [...transformedData.inventories, inventory] } : membership;
+            { ...membership, inventories: [...transformedData.inventories, inventory], itemNumber, itemAddress } : membership;
         })
       });
 

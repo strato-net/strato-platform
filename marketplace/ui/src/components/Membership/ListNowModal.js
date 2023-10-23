@@ -4,6 +4,7 @@ import helperJson from "../../helpers/helper.json"
 import { useInventoryState } from "../../contexts/inventory";
 import { useMembershipState } from "../../contexts/membership";
 import { useProductState } from "../../contexts/product";
+import { useParams } from "react-router-dom";
 const { columns, taxOptions } = helperJson;
 const { Text, Title } = Typography;
 const ListNowModal = ({
@@ -11,18 +12,22 @@ const ListNowModal = ({
   handleCancel,
   user,
   formik,
-  type,
+  // type,
+  listType,
   id,
   getIn,
   isCreateMembershipSubmitting,
 }) => {
-  const { isInventoriesLoading, inventories, isCreateInventorySubmitting } = useInventoryState();
+  const { type } = useParams()
+  const isIssued = type === 'issued';
+  const { isInventoriesLoading, inventories, isCreateInventorySubmitting, isinventoryUpdating } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState()
-  const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
+  // const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user?.user?.user?.organization || user?.user?.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting } = useMembershipState();
-  const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting;
+  const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting || isinventoryUpdating;
+  // const { type } = useParams();
 
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {
@@ -101,14 +106,14 @@ const ListNowModal = ({
               id="quantity"
               name="quantity"
               min={0}
-              max={inventoryQuantity}
+              // max={inventoryQuantity}
               className="w-full mt-2"
               size="large"
               prefix={isInventoriesLoading && <Spin />}
-              disabled={type === "Sale"}
+              disabled={!isIssued && listType!=="New"}
               // value={1}
               controls={false}
-              value={type === "Sale" ? 1 : formik.values.quantity}
+              value={(isIssued || listType === "New") ? formik.values.quantity : 1}
               onChange={(value) => {
                 formik.setFieldValue("quantity", value);
               }}
@@ -120,15 +125,18 @@ const ListNowModal = ({
               id="percentage"
               name="percentage"
               min={0}
-              // addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between">
-              //   <Col span={12} className="p-1" style={{ backgroundColor: isTaxPercentage ? "#F2F2F5" : "" }} onClick={() => { setIsTaxPercentage(true) }}>
-              //     %
-              //   </Col>
-              //   <Col span={12} className="p-1" style={{ backgroundColor: !isTaxPercentage ? "#F2F2F5" : "" }} onClick={() => { setIsTaxPercentage(false) }}>
-              //     $
-              //   </Col>
-              // </Row>}
-              addonAfter={selectAfter}
+              addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
+                <Col span={12} className="p-1"
+                  style={{ backgroundColor: formik.values.isTaxPercentage ? "#F2F2F5" : "" }}
+                  onClick={() => { formik.setFieldValue("isTaxPercentage", true) }}>
+                  %
+                </Col>
+                <Col span={12} className="p-1"
+                  style={{ backgroundColor: !formik.values.isTaxPercentage ? "#F2F2F5" : "" }}
+                  onClick={() => { formik.setFieldValue("isTaxPercentage", false) }}>
+                  $
+                </Col>
+              </Row>}
               formatter={handleFormatter}
               className="w-full mt-2"
               size="large"
@@ -164,7 +172,7 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={type} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
+            <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
         </Row>
       </Form>

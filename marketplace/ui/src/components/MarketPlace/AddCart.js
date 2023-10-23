@@ -25,6 +25,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 
 const { Title, Text } = Typography;
 
@@ -46,20 +47,25 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return item.product.taxes ? 
-    (item.product.isTaxPercentage ? 
-          (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)  
-          :  (item.product.taxes/100) * item.qty ) 
-    : 0;
+    return item.product.taxes ?
+      (item.product.isTaxPercentage ?
+        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)
+        : (item.product.taxes / 100) * item.qty)
+      : 0;
   };
 
   const calculateShipping = (item) => {
     return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
   };
 
-  const storedData = useMemo(() => {
-    return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  }, []);
+  let storedData
+  useEffect(() => {
+    let cartData = window.localStorage.getItem("cartList");
+    if (cartData) {
+      storedData = JSON.parse(cartData);
+    }
+    // return JSON.parse(cartData ?? "");
+  }, [window.localStorage.getItem("cartList")]);
 
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
@@ -94,7 +100,7 @@ const Checkout = ({ user }) => {
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.pricePerUnit * item.qty ,
+            item.product.pricePerUnit * item.qty,
           action: item.product.address,
           qty: item.qty,
         });
@@ -243,22 +249,22 @@ const Checkout = ({ user }) => {
               <MinusOutlined className="text-xs text-secondryD" />
             </div>
             <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center"
-                min={1} value={qty} defaultValue={qty} controls={false}
-                onChange={e => {
-                  let items = [...cartList];
-                  cartList.forEach((element, index) => {
-                    if (element.product.address === product.address) {
-                      if (e <= product?.availableQuantity) {
-                        items[index].qty = e;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      } else {
-                        openToast("bottom", true, "Cannot add more than available quantity");
-                        items[index].qty = product?.availableQuantity;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      }
+              min={1} value={qty} defaultValue={qty} controls={false}
+              onChange={e => {
+                let items = [...cartList];
+                cartList.forEach((element, index) => {
+                  if (element.product.address === product.address) {
+                    if (e <= product?.availableQuantity) {
+                      items[index].qty = e;
+                      actions.addItemToCart(marketplaceDispatch, items);
+                    } else {
+                      openToast("bottom", true, "Cannot add more than available quantity");
+                      items[index].qty = product?.availableQuantity;
+                      actions.addItemToCart(marketplaceDispatch, items);
                     }
-                  });
-                }} />
+                  }
+                });
+              }} />
             <div
               onClick={() => {
                 let items = [...cartList];
@@ -347,8 +353,8 @@ const Checkout = ({ user }) => {
       buyerOrganization: user.organization,
       orderList,
       orderTotal: total + tax + shipping,
-      tax:tax,
-      shippingCharges:shipping,
+      tax: tax,
+      shippingCharges: shipping,
     };
 
     let isDone = await orderActions.createOrder(orderDispatch, body);
@@ -361,7 +367,7 @@ const Checkout = ({ user }) => {
   };
 
   return (
-    <div className="h-screen mx-14  mt-14">
+    <div className="h-screen mx-14">
       {contextHolder}
       {isCreateOrderSubmitting ? (
         <div className="h-screen flex justify-center items-center">
@@ -369,18 +375,7 @@ const Checkout = ({ user }) => {
         </div>
       ) : (
         <div>
-          <Breadcrumb>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                Home
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <p className=" text-primary">
-                Add to Cart
-              </p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
+          <BreadCrumbComponent />
           {
             mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
               <Image src={Images.noProductSymbol} preview={false} />

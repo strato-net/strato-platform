@@ -4,68 +4,27 @@ import { Card, Popover, Spin, Button, Row, Col, Typography, Image, Modal, Table,
 import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
+import helperJson from "../../helpers/helper.json"
 import "./membership.css";
 import routes from "../../helpers/routes";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
+import dayjs from 'dayjs';
 import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { useMembershipDispatch } from "../../contexts/membership";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
 import { Carousel } from 'react-responsive-carousel';
 import { forwardArrowIcon, tag, tagIcon } from "../../images/SVGComponents";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
-
+const { purchasedCardColumn, statusColor, statusText } = helperJson;
 
 const { Text, Paragraph, Title } = Typography;
 
-const statusText = {
-  1: 'For Sale',
-  2: 'Not For Sale'
-}
-
-const columns = [
-
-  {
-    title: 'Date',
-    dataIndex: 'name',
-    key: 'name',
-    width: '30%',
-    color: "red",
-    // ...getColumnSearchProps('name'),
-  },
-  {
-    title: 'Quantity',
-    dataIndex: 'age',
-    key: 'age',
-    width: '15%',
-    // ...getColumnSearchProps('age'),
-  },
-  {
-    title: 'Status',
-    dataIndex: 'published',
-    key: 'published',
-    width: '20%',
-    // ...getColumnSearchProps('age'),
-  },
-  {
-    title: 'Price',
-    dataIndex: 'address',
-    key: 'address',
-    width: '20%',
-    // ...getColumnSearchProps('address'),
-  },
-  {
-    title: 'Preview',
-    dataIndex: 'preview',
-    key: 'preview',
-    width: '7%',
-  }
-];
 
 const initialValues = {
   name: "",
@@ -82,22 +41,29 @@ const MembershipCardPurchased = ({
   membershipId,
   isPurchasedList
 }) => {
+  const inventoryDispatch = useInventoryDispatch();
   const membershipDispatch = useMembershipDispatch();
+  const membershipState = useMembershipState()
+  const { type } = useParams()
+  const isIssued = type === "issued";
   const {
     subCategory,
     manufacturer,
     timePeriodInMonths,
     savings,
     // membershipId,
+    expiryDate,
     availableQuantity,
     membershipAddress,
     inventoryId,
     Inventories,
+    itemNumber,
     status,
     description,
     productImageLocation
   } = membership;
 
+  const [isEdit, setIsEdit] = useState(false)
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
@@ -138,16 +104,17 @@ const MembershipCardPurchased = ({
   const updateCol = (inv, texts) => (<Row
     style={{ justifyContent: 'space-between' }}>
     <p>{texts} </p>
-    {/* <EditOutlined onClick={() => {
+    <EditOutlined onClick={() => {
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
-        formik.setFieldValue("name", membership.product.name);
+        formik.setFieldValue("name", membership.productName);
         formik.setFieldValue("tempInv", inv);
+        setIsEdit(true)
         openListNowModal();
       }
-    }} 
-    /> */}
+    }}
+    />
   </Row>)
   const callDetailPage = (index, address) => {
     let route = `/memberships/${isPurchasedList ? "purchased" : "issued"}/:id`
@@ -174,7 +141,11 @@ const MembershipCardPurchased = ({
   });
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { isCreateInventorySubmitting, inventories } = useInventoryState();
+  const { isCreateInventorySubmitting, inventories, success } = useInventoryState();
+
+  useEffect(() => {
+    setVisible(false);
+  }, [success, membershipState.success])
 
   useEffect(() => {
     setState(membership);
@@ -191,25 +162,71 @@ const MembershipCardPurchased = ({
   const handleCreateFormSubmit = async (values) => {
     if (user) {
       if (formik.values.price !== "" && inventories) {
-        const resalePayload = {
-          itemAddress: membership.itemAddress,
-          productAddress: membership.productId,
-          inventory: membership.inventoryId,
-          updates: {
+        if (isIssued) {
+          let taxPercentageAmountValue = formik.values.taxPercentageAmount ?? 0;
+          let taxDollarAmountValue = formik.values.taxDollarAmount ?? 0;
+          const inventoryBody = {
+            productAddress: membership.productId,
+            quantity: formik.values.quantity,
             pricePerUnit: formik.values.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
             status: INVENTORY_STATUS.PUBLISHED,
-            quantity: 1
+            serialNumber: [],
+            taxPercentageAmount: Math.floor(taxPercentageAmountValue * 100),
+            taxDollarAmount: Math.floor(taxDollarAmountValue * 100),
+          };
+          if (isEdit) {
+            const updatePayload = {
+              productAddress: membership.productId,
+              inventory: formik.values.tempInv.address,
+              updates: {
+                pricePerUnit: formik.values.price,
+                status: INVENTORY_STATUS.PUBLISHED,
+                quantity: formik.values.quantity
+              }
+            }
+            const updateInventory = await inventoryActions.updateInventory(
+              inventoryDispatch,
+              updatePayload
+            )
+            if (updateInventory) {
+              formik.resetForm();
+              // handleCancel("success");
+            }
+          } else {
+            const createInventory = await inventoryActions.createInventory(
+              inventoryDispatch,
+              inventoryBody
+            )
+            if (createInventory) {
+              formik.resetForm();
+              // handleCancel("success");
+            }
           }
         }
-        const resaleMembership = await membershipActions.resaleMembership(
-          membershipDispatch, resalePayload
-        )
+        else {
+          const resalePayload = {
+            itemAddress: membership.itemAddress,
+            productAddress: membership.productId,
+            inventory: membership.inventoryId,
+            updates: {
+              pricePerUnit: formik.values.price,
+              status: INVENTORY_STATUS.PUBLISHED,
+              quantity: 1
+            }
+          }
+          const resaleMembership = await membershipActions.resaleMembership(
+            membershipDispatch, resalePayload
+          )
 
-        if (resaleMembership) {
-          // membership.product_with_inventory = 1;
-          formik.resetForm();
+          if (resaleMembership) {
+            // membership.product_with_inventory = 1;
+            formik.resetForm();
+          }
+          setVisible(false);
         }
-        setVisible(false);
       }
     }
   };
@@ -226,10 +243,6 @@ const MembershipCardPurchased = ({
   //   </button>
   // );
 
-  const statusColor = {
-    1: 'green',
-    2: "red"
-  }
   const inventoriesCol = (Inventories && Inventories.length == 0) ? "red" : "green";
 
   return (
@@ -245,7 +258,8 @@ const MembershipCardPurchased = ({
               <Col >
                 <Row>
                   <Text level={4} className="font-poppin text-2xl lh-28">
-                    {decodeURIComponent(membership.productName)}
+                    {membership?.productName ?? "--"}
+                    {/* {decodeURIComponent(membership?.productName)} */}
                   </Text>
                 </Row>
                 <Row strong className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>
@@ -283,7 +297,7 @@ const MembershipCardPurchased = ({
                     src={productImageLocation[0]}
                   // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
                   />
-                  : 
+                  :
                   <Carousel showArrows={true} showThumbs={false} className="h-full mem-card-carousel" >
                     {productImageLocation && productImageLocation?.map((item) => {
                       return <Image
@@ -301,7 +315,7 @@ const MembershipCardPurchased = ({
                   </Carousel>}
 
                 {/* {(!membership.product_with_inventory && isPurchasedList) ? */}
-                {availableQuantity == 0 ? "" : <Button 
+                {availableQuantity == 0 ? "" : <Button
                   block={true}
                   className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
                   onClick={() => {
@@ -315,10 +329,10 @@ const MembershipCardPurchased = ({
                   type={availableQuantity == 0 ? "default" : "primary"}
                   disabled={availableQuantity == 0 ? true : false}
                 >
-                  <Row className="mx-auto w-full px-8  font-poppin text-sm font-semibold">
-                    <Col className="w-32 flex justify-between item-center">
+                  <Row className="mx-auto w-full text-sm font-semibold">
+                    <Col className="w-28 mx-auto flex justify-between item-center">
                       <Text>{tagIcon()}</Text>
-                      <Text className="text-white">List for Sale</Text>
+                      <Text className="text-white font-poppin">&nbsp;List for Sale</Text>
                     </Col>
                   </Row>
                 </Button>}
@@ -334,16 +348,21 @@ const MembershipCardPurchased = ({
                   <Text className="font-normal text-grey leading-5 font-poppin" >Company Name</Text>
                   <Text className="float-right font-poppin leading-5">{manufacturer ?? "--"}</Text>
                 </Paragraph>
-                <Paragraph >
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
-                  <Text className="float-right font-poppin leading-5">{timePeriodInMonths ?? "--"} Month(s)</Text>
-                </Paragraph>
+                {isIssued
+                  ? <Paragraph >
+                    <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
+                    <Text className="float-right font-poppin leading-5">{timePeriodInMonths ?? "--"} Month(s)</Text>
+                  </Paragraph>
+                  : <Paragraph >
+                    <Text className="font-normal text-grey leading-5 font-poppin" >Expiry Date</Text>
+                    <Text className="float-right font-poppin leading-5">{dayjs(expiryDate).format('MM-DD-YYYY') ?? "--"}</Text>
+                  </Paragraph>}
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
                   <Text type="success" className="float-right font-poppin leading-5">$ {savings ?? 0}</Text>
                 </Paragraph>
                 {membershipId && isPurchasedList && <Paragraph>
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Membership ID</Text>
+                  <Text className="font-normal text-grey leading-5 font-poppin" >Membership Number</Text>
                   <Text className="float-right font-poppin leading-5">{membershipId ?? "--"}</Text>
                 </Paragraph>}
               </Col>
@@ -356,15 +375,13 @@ const MembershipCardPurchased = ({
                     size="large"
                     items={[{ key: '1', label: 'This is default size panel header', children: <Table bordered pagination={false} columns={columns} dataSource={data} /> }]}
                   /> */}
-
                   <Collapse size="large" expandIconPosition='end'>
                     <Collapse.Panel key="1" header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>}>
                       <Table pagination={false}
                         className="inventory-table"
-                        rowClassName={"bg-white"} rowKey="key" columns={columns} dataSource={data} />
+                        rowClassName={"bg-white"} rowKey="key" columns={purchasedCardColumn} dataSource={data} />
                     </Collapse.Panel>
                   </Collapse>
-
                 </Col>
               </Row>}
           </Col>
@@ -395,8 +412,8 @@ const MembershipCardPurchased = ({
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
-          type="Sale"
-          id={membershipId}
+          listType={"Sale"}
+          id={itemNumber}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />

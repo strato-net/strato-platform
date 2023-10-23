@@ -178,7 +178,7 @@ async function transferOwnership(admin, contract, _args, baseOptions) {
  * Update Item
  */
 async function updateItem(admin, contract, _args, baseOptions) {
-    
+
     const scheme = Object.keys(_args).reduce((agg, key) => {
         const base = 1
         switch (key) {
@@ -186,6 +186,8 @@ async function updateItem(admin, contract, _args, baseOptions) {
                 return agg | (base << 0)
             case 'comment':
                 return agg | (base << 1)
+            case 'expiryDate':
+                return agg | (base << 2)
             default:
                 return agg
         }
@@ -239,8 +241,8 @@ async function certifyEvent(admin, contract, _args, baseOptions) {
         eventAddress: _args.eventAddress,
         certifiedDate: _args.certifiedDate,
         ..._args.updates,
-      };
-      
+    };
+
     const scheme = Object.keys(_args).reduce((agg, key) => {
         const base = 1
         switch (key) {

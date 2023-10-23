@@ -2,49 +2,34 @@ import React, { useState, useEffect } from "react";
 import { useFormik, getIn } from "formik";
 import {
   Row,
-  Breadcrumb,
   Image,
   Button,
   Typography,
   Tabs,
-  Space,
   Spin,
   notification,
   InputNumber,
-  // Carousel,
   Col,
   Card,
   Table,
 } from "antd";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import noPreview from "../../images/resources/noPreview.jpg";
-import { useMatch } from "react-router-dom";
+import { useMatch, useParams } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
 import { Carousel } from 'react-responsive-carousel';
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import {
-  useProductDispatch,
-  useProductState,
-} from "../../contexts/product";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { actions as itemActions } from "../../contexts/item/actions";
+import { useItemDispatch, useItemState } from "../../contexts/item";
+import { useProductDispatch, useProductState } from "../../contexts/product";
 import routes from "../../helpers/routes";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import { actions as membershipActions } from "../../contexts/membership/actions";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useNavigate, useLocation } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
 import useDebounce from "../UseDebounce";
-import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import ListNowModal from "../Membership/ListNowModal";
@@ -52,10 +37,20 @@ import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import TagManager from "react-gtm-module";
+import dayjs from "dayjs";
+
+const StatusValue = {
+  1: "Listed",
+  2: "Not Listed"
+}
 
 const MembershipDetails = ({ user, users }) => {
+  const { type } = useParams()
+  const isIssued = type === 'issued'
 
   const { state, pathname } = useLocation();
+
   const [inventoryId, setInventoryId] = useState(state?.inventoryId);
 
   let isCalledFromMembership = false;
@@ -71,11 +66,12 @@ const MembershipDetails = ({ user, users }) => {
     price: "",
     quantity: 1
   };
+
   const [activeTab, setActiveTab] = useState("Details");
-  const [serviceList, setServiceList] = useState([])
-  const [savingsList, setSavingsList] = useState([])
-  const [totalSavings, setTotalSavings] = useState(0)
-  const [ownerSameAsUser, setOwnerSameAsUser] = useState(true)
+  const [serviceList, setServiceList] = useState([]);
+  const [savingsList, setSavingsList] = useState([]);
+  const [totalSavings, setTotalSavings] = useState(0);
+  const [ownerSameAsUser, setOwnerSameAsUser] = useState(true);
   const [Id, setId] = useState(undefined);
   const [isServiceSelected, setIsServiceSelected] = useState(false);
   const [membershipDetails, setMembershipDetails] = useState(undefined);
@@ -86,6 +82,8 @@ const MembershipDetails = ({ user, users }) => {
   const { membershipServices, membership, isMembershipLoading, productFiles } =
     useMembershipState();
   const serviceDispatch = useMembershipDispatch();
+  const itemDispatch = useItemDispatch();
+  const { items } = useItemState();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -95,7 +93,7 @@ const MembershipDetails = ({ user, users }) => {
         membershipActions.fetchMembershipFromDetails(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
       }
     }
-  }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user])
+  }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user]);
 
   useEffect(() => {
     let services = [];
@@ -173,6 +171,17 @@ const MembershipDetails = ({ user, users }) => {
     else setId(routeMatch?.params?.address);
   }, [routeMatch, routeMatch1]);
 
+  useEffect(() => {
+    let inventoryAddress;
+    if (type !== "issued" && type !== "purchased") {
+      inventoryAddress = inventoryDetails?.address
+    } else {
+      inventoryAddress = inventories[0]?.address
+    }
+    if (inventoryAddress) {
+      itemActions.fetchItem(itemDispatch, '', 0, inventoryAddress);
+    }
+  }, [inventories])
 
   useEffect(() => {
     if (inventory !== null && inventory !== undefined) {
@@ -199,19 +208,12 @@ const MembershipDetails = ({ user, users }) => {
         productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
       });
     }
-  }, [Id, dispatch, productDispatch, user, membershipDetails, inventoryId]);
+  }, [membershipDetails, inventories]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
-  let details = undefined;
-  if (inventoryId && inventoryDetails) {
-    details = inventoryDetails;
-  }
-  else if (!inventoryId && productDetails) {
-    details = productDetails;
-  }
 
   const subtract = () => {
     if (qty !== 1) {
@@ -221,16 +223,17 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const add = () => {
-    if (qty < details?.availableQuantity) {
+    const availableQty = inventoryDetails?.availableQuantity
+    if (qty < availableQty) {
       let value = qty + 1;
       setQty(value);
     } else {
-      openToast("bottom", true, "Cannot add more than available quantity");
+      openToast("bottom", true, `Cannot add more than available quantity (${availableQty})`);
     }
   };
 
-  const isLoading = isMembershipLoading || isInventoriesLoading || isProductDetailsLoading;
-
+  const isLoading = isMembershipLoading || isInventoriesLoading || isProductDetailsLoading || isInventoryDetailsLoading;
+  const isOwner = inventoryDetails?.ownerOrganization === user?.organization;
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -248,26 +251,17 @@ const MembershipDetails = ({ user, users }) => {
   };
 
 
-  useEffect(() => {
-    if (user && user.organization && (inventoryDetails === null || inventoryDetails === undefined)) {
-      setOwnerSameAsUser(false);
-    }
-    else {
-      setOwnerSameAsUser(true);
-    }
-  }, [inventoryDetails, details])
-
   const addItemToCart = () => {
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === details?.address) {
+      if (cartList[i].product.address === inventoryDetails?.address) {
         found = true;
         break;
       }
     }
     let items = [];
     if (!found) {
-      items = [...cartList, { product: details, qty }];
+      items = [...cartList, { product: inventoryDetails, qty }];
 
       marketPlaceActions.addItemToCart(marketplaceDispatch, items);
       setQty(1);
@@ -275,8 +269,8 @@ const MembershipDetails = ({ user, users }) => {
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
-        if (element.product.address === details?.address) {
-          if (items[index].qty + qty <= details?.availableQuantity) {
+        if (element.product.address === inventoryDetails?.address) {
+          if (items[index].qty + qty <= inventoryDetails?.availableQuantity) {
             items[index].qty += qty;
             marketPlaceActions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
@@ -293,21 +287,6 @@ const MembershipDetails = ({ user, users }) => {
       });
     }
   };
-
-  const savingsColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">NAME</Text>,
-      dataIndex: "serviceName",
-      key: "name",
-      render: (text) => <p>{decodeURIComponent(text)}</p>
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">EFFECTIVE COST SAVINGS FROM MEMBERSHIP </Text>,
-      dataIndex: "serviceCost",
-      key: "serviceCost",
-      render: (text) => <p style={{ textAlign: 'center' }}>${decodeURIComponent(text)}</p>,
-    },
-  ];
 
   const serviceColumn = [
     {
@@ -342,16 +321,6 @@ const MembershipDetails = ({ user, users }) => {
     },
   ];
 
-  const DescTitle = ({ text }) => {
-    return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
-  };
-
-  const onTabChange = (tab) => {
-    if (tab === "1") {
-      if (isServiceSelected) setIsServiceSelected(false)
-    }
-  }
-
   const closeListNowModal = () => {
     setVisible(false);
   };
@@ -364,18 +333,8 @@ const MembershipDetails = ({ user, users }) => {
     if (user) {
       if (Id !== undefined) {
         if (formik.values.price !== "" && formik.values.quantity !== "") {
-          const inventoryBody = {
-            productAddress: membershipDetails.productId,
-            quantity: formik.values.quantity,
-            pricePerUnit: formik.values.price,
-            // Generate random code for now
-            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-            // Status should always be published if we use List Now
-            status: INVENTORY_STATUS.PUBLISHED,
-            serialNumber: [],
-          };
           const resalePayload = {
-            // itemAddress: id,
+            itemAddress: items[0].address,
             productAddress: membershipDetails.productId,
             inventory: inventoryId,
             updates: {
@@ -384,9 +343,9 @@ const MembershipDetails = ({ user, users }) => {
               quantity: formik.values.quantity
             }
           }
-          const createInventory = await actions.createInventory(
+          const createInventory = await membershipActions.resaleMembership(
             dispatch,
-            inventoryBody
+            resalePayload
           );
 
           if (createInventory) {
@@ -403,28 +362,24 @@ const MembershipDetails = ({ user, users }) => {
     setActiveTab(label)
   }
 
-  const StatusValue = {
-    1: "Listed",
-    2: "Not Listed"
-  }
+  const detailTabSchema = [
+    { label: "Seller", value: inventoryDetails?.ownerOrganization },
+    { label: "Sub-Category", value: inventoryDetails?.subCategory },
+    { label: "Time in Months", value: membershipDetails?.timePeriodInMonths },
+    // { label: "Additional Info", value: membershipDetails?.additionalInfo }
+  ]
 
   const DetailTabCard = () => {
     return (
       <>
         <Text className="leading-6 text-lg block font-semibold pb-3"> Information </Text>
         <Col xl={{ span: 14 }} className="border-grey shadow-lg leading-2 w-full rounded-md p-4 " style={{ height: 'auto', display: 'inline-block' }}>
-          <Paragraph >
-            <Text disabled className="font-bold font-poppin" >Seller</Text>
-            <Text strong className="float-right">{details?.ownerOrganization ?? "--"}</Text>
-          </Paragraph>
-          <Paragraph >
-            <Text disabled className="font-bold font-poppin" >Sub-Category</Text>
-            <Text strong className="float-right">{details?.subCategory ?? "--"}</Text>
-          </Paragraph>
-          <Paragraph >
-            <Text disabled className="font-bold font-poppin" >Time in Months</Text>
-            <Text strong className="float-right">{membershipDetails?.timePeriodInMonths ?? "--"} &nbsp; Month(s)</Text>
-          </Paragraph>
+          {detailTabSchema.map((item, index) => {
+            return <Paragraph >
+              <Text disabled className="font-bold font-poppin" >{item.label}</Text>
+              <Text strong className="float-right">{item.value ?? "--"}</Text>
+            </Paragraph>
+          })}
           <Paragraph >
             <Text disabled className="font-bold font-poppin" >Additional Info</Text>
             <Paragraph ellipsis={{ rows: 2, expandable: true, symbol: <Text strong>more</Text> }} className="float-right text-md font-regular h-auto">
@@ -475,21 +430,16 @@ const MembershipDetails = ({ user, users }) => {
     )
   }
 
-
   return (
     <>
       {contextHolder}
-      {details === null || (true &&
-        isLoading) ? (
-        <div className="h-screen flex justify-center mx-auto items-center">
+      {isLoading
+        ? (<div className="h-screen flex justify-center mx-auto items-center">
           <Spin spinning={isLoading} size="large" />
-        </div>
-      ) : (
-        <div>
-          <BreadCrumbComponent name={details?.name} />
-
-          {/* style={{border:"1px solid blue"}} */}
-          <Row justify={'space-betweem'} className="max-w-4xl mx-auto mt-10 h-92" >
+        </div>)
+        : (<div>
+          <BreadCrumbComponent name={inventoryDetails?.name} />
+          <Row className="max-w-4xl mx-auto mt-10 h-92" >
             <Col span={10} className="rounded-md border-1-primary h-px-390">
               {allProductFiles && allProductFiles.length > 0 ? (
                 <Carousel>
@@ -520,12 +470,14 @@ const MembershipDetails = ({ user, users }) => {
 
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
-                <Text className="text-2xl leading-8 font-semibold font-poppin"> {decodeURIComponent(details?.name ?? "--")} </Text>
-                <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
+                <Text className="text-2xl leading-8 font-semibold font-poppin"> {inventoryDetails?.name ?? "--"} </Text>
+                {(isIssued || type === "all")
+                  ? <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
+                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY') ?? ""}  </Text> </Row>}
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" > Status </Text>
-                    <Text className="block text-center text-xl font-bold mt-2" > {StatusValue[details?.status] ?? "--"} </Text>
+                    <Text className="block text-center text-xl font-bold mt-2" > {StatusValue[inventoryDetails?.status] ?? "--"} </Text>
                   </Col>
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" > Total Savings </Text>
@@ -535,15 +487,19 @@ const MembershipDetails = ({ user, users }) => {
                 <Row>
                   <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
                   <Col span={24} className="border-t-1 h-20 mt-8">
-                    {details?.availableQuantity != 0
+                    {inventoryDetails?.availableQuantity != 0
                       ? <Row className="flex justify-between h-10 mt-5">
-                        <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn " onClick={subtract}>
+                        <Col span={4} className="rounded-md h-14" >  <Button className="h-full text-center p-6 add-sub-btn "
+                          disabled={isIssued}
+                          onClick={subtract}>
                           {minusIcon()}
                         </Button> </Col>
                         <Col span={16} className="border border-grayLight rounded-md align-middle text-center h-14 py-2" >
                           <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{qty}</Text>
                         </Col>
-                        <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn" onClick={add}> {plusIcon()} </Button>  </Col>
+                        <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn"
+                          disabled={isIssued}
+                          onClick={add}> {plusIcon()} </Button>  </Col>
                       </Row>
                       : <Paragraph style={{ color: 'red' }} className="mt-5 text-sm decoration-red-700" id="prod-price">
                         If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
@@ -552,7 +508,7 @@ const MembershipDetails = ({ user, users }) => {
                 </Row>
               </Card>
               <Row className="h-14 mt-4">
-                {details?.availableQuantity == 0 ?
+                {(inventoryDetails?.availableQuantity == 0 && !isIssued) ?
                   <Button
                     block={true}
                     type="primary"
@@ -572,20 +528,79 @@ const MembershipDetails = ({ user, users }) => {
                   >
                     Contact to Buy
                   </Button> :
-                  <Button
-                    type={ownerSameAsUser ? "default" : "primary"}
-                    block={true} size="large" className=" h-full py-4 h-px-56"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        formik.setFieldValue("name", details?.name);
-                        openListNowModal();
-                      }
-                    }}
-                    disabled={ownerSameAsUser}
-                  > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
-                  </Button>}
+                  // <Button
+                  //   type={ownerSameAsUser ? "default" : "primary"}
+                  //   block={true} size="large" className=" h-full py-4 h-px-56"
+                  //   onClick={() => {
+                  //     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  //       window.location.href = loginUrl;
+                  //     } else {
+                  //       formik.setFieldValue("name", inventoryDetails?.name);
+                  //       openListNowModal();
+                  //     }
+                  //   }}
+                  //   disabled={ownerSameAsUser}
+                  // > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
+                  // </Button>
+                  <Row className="w-full mx-auto" gutter={[12]}>
+                    <Col span={12} className="mx-auto flex justify-center">
+                      <Button
+                        block
+                        size="large"
+                        disabled={isIssued}
+                        className="group border !h-14 border-primary hover:bg-primary"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'add_to_cart_from_product_details',
+                                product_name: inventoryDetails.name,
+                                category: inventoryDetails.category,
+                                productId: inventoryDetails.productId
+                              },
+                            });
+                            addItemToCart();
+                          }
+                        }}
+                      >
+                        {/* <div className="text-primary group-hover:text-white"> */}
+                        Add To Cart
+                        {/* </div> */}
+                      </Button>
+                    </Col>
+                    <Col span={12}>
+                      <Button
+                        block
+                        disabled={isIssued}
+                        size="large"
+                        type="primary"
+                        className="bg-primary !h-14 !hover:bg-primaryHover"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'buy_now_from_product_details',
+                                product_name: inventoryDetails.name,
+                                category: inventoryDetails.category,
+                                productId: inventoryDetails.productId
+                              },
+                            });
+                            addItemToCart();
+                            navigate("/checkout");
+                          }
+                        }}
+                        // disabled={ownerSameAsUser()}
+                        id="buyNow"
+                      >
+                        Buy Now
+                      </Button>
+                    </Col>
+                  </Row>
+                }
               </Row>
             </Col>
           </Row>
@@ -597,12 +612,13 @@ const MembershipDetails = ({ user, users }) => {
                 ellipsis={{ rows: 2, expandable: true, symbol: <Text strong>Show more</Text> }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(details?.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                {/* {decodeURIComponent(inventoryDetails?.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
                   <React.Fragment key={index}>
                     {line ?? "--"}
                     <br />
                   </React.Fragment>
-                ))}
+                ))} */}
+                {inventoryDetails?.description}
               </Paragraph>
             </Card>
           </Row>
@@ -624,188 +640,8 @@ const MembershipDetails = ({ user, users }) => {
             </Card>
           </Row>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          {/* <div className="flex mx-16 mt-100">
-            <div className="w-1/2">
-
-              <div className="items-center justify-center border border-grayLight">
-                {allProductFiles && allProductFiles.length > 0 ? (
-                  <Carousel>
-                    {allProductFiles.map((file, index) =>
-                      <div key={index} className="h-96">
-                        <Image
-                          height={"100%"}
-                          width={"100%"}
-                          style={{ objectFit: "contain" }}
-                          src={file.imageUrl}
-                        />
-
-                      </div>
-                    )}
-                  </Carousel>
-                ) : (
-                  <Image
-                    height={"100%"}
-                    width={"100%"}
-                    style={{ objectFit: "contain" }}
-                    src={null}
-                  />
-                )}
-              </div>
-              {details?.availableQuantity !== 0 ?
-                <Row className="justify-center my-7">
-                  <Button
-                    type="primary"
-                    className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        formik.setFieldValue("name", details?.name);
-                        openListNowModal();
-                      }
-                    }}
-                    disabled={ownerSameAsUser}
-                    id="buyNow"
-                  >
-                    Sell
-                  </Button>
-                </Row>
-                :
-                <div className="flex justify-center">
-                  <Button
-                    type="primary"
-                    className="w-40 h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
-                    href={`mailto:sales@blockapps.net`}>
-                    Contact to Buy
-                  </Button>
-                </div>
-              }
-            </div>
-
-            <div className="w-1/2 ml-8  mb-6" id="details">
-              <Row className="items-center">
-                <Text className="font-semibold text-xl text-primaryB">
-                  {decodeURIComponent(details?.name)}&nbsp;
-                </Text>
-                <Text className="font-medium text-sm text-secondryB ">
-                  ({membershipDetails?.timePeriodInMonths ?? ""})-month Duration
-                </Text>
-              </Row>
-              <Paragraph
-                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-                className="text-primaryC text-[13px] mt-2"
-              >
-                {decodeURIComponent(details?.description ?? "").replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    <br />
-                  </React.Fragment>
-                ))}
-              </Paragraph>
-              <Title level={4} className="!mt-0">
-                {details?.pricePerUnit ? `$ ${details.pricePerUnit}` : "Not Listed"}
-              </Title>
-              <Title level={4} className="!mt-0" style={{ color: 'green' }}>
-                {`Total Savings: $ ${totalSavings}`}
-              </Title>
-              {details?.availableQuantity !== 0 ?
-                <Space>
-                  <Text className="text-primaryB text-base">Quantity</Text>
-                  <div className="flex items-center my-2 ml-5" id="quantity">
-                    <div
-                      onClick={subtract}
-                      className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <MinusOutlined className="text-xs text-secondryD" />
-                    </div>
-                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details?.availableQuantity} value={qty} defaultValue={qty} controls={false}
-                      onChange={e => {
-                        if (e < details?.availableQuantity) {
-                          setQty(e)
-                        } else {
-                          openToast(
-                            "bottom",
-                            true,
-                            "Cannot add more than available quantity"
-                          );
-                          setQty(details?.availableQuantity)
-                        }
-                      }} />
-                    <div
-                      onClick={add}
-                      className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <PlusOutlined className="text-xs text-secondryC" />
-                    </div>
-                  </div>
-                </Space>
-                :
-                <Paragraph style={{ color: 'red', fontSize: 14 }} className="!mt-0" id="prod-price">
-                  If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
-                </Paragraph>
-              }
-              <Tabs
-                defaultActiveKey="1"
-                onChange={onTabChange}
-                items={!user ?
-                  [{
-                    label: `Description`,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  }]
-                  :
-                  [{
-                    label: `Description`,
-                    key: "1",
-                    children: <DescriptionComponent />,
-                  },
-                  {
-                    label: `Services`,
-                    key: "2",
-                    children: (
-                      <div>
-                        <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Services</h1>
-                        <DataTableComponent
-                          columns={serviceColumn}
-                          data={serviceList}
-                          scrollX="100%"
-                          isLoading={isMembershipLoading}
-                        />
-                        <h1 className="text-primaryB text-base" style={{ marginBottom: '10px' }}>Savings</h1>
-                        <DataTableComponent
-                          columns={savingsColumn}
-                          data={savingsList}
-                          scrollX="100%"
-                          isLoading={isMembershipLoading}
-                        />
-                      </div>
-                    ),
-                  }
-                  ]}
-              />
-            </div>
-          </div> */}
         </div>
-      )}
+        )}
       {visible && (
         <ListNowModal
           open={visible}
@@ -814,7 +650,7 @@ const MembershipDetails = ({ user, users }) => {
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
-          type="Sale"
+          listType="Sale"
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />

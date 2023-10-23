@@ -28,17 +28,18 @@ const ListNowIndex = ({
   //   isCreateMembershipSubmitting,
 }) => {
   const { type } = useParams();
-  const { inventories, isInventoriesLoading } = useInventoryState()
+  const { inventories, isInventoriesLoading, isCreateInventorySubmitting } = useInventoryState()
   const [availableQuantity, setAvailableQuantity] = useState('');
   // const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
   const seller = user.user.organization;
+  const isIssued = type === 'issued';
   const { cartList } = useMarketplaceState();
   const [purchasedMembershipData, setPurchasedMembershipData] = useState([]);
   const [memebershipList, setMemebershipList] = useState([]);
   const [error, setError] = useState('');
   const [productId, setProductId] = useState('')
   const [id, setId] = useState("");
-  const [membershipNumber, setMembershipNumber] = useState('')
+  const [membershipNumber, setMembershipNumber] = useState(isIssued ? 'None' : '')
   const [inventoryId, setInventoryId] = useState('')
   const [quantity, setQuantity] = useState(1);
   const [taxPercentage, setTaxPercentage] = useState('');
@@ -50,11 +51,11 @@ const ListNowIndex = ({
   const inventoryDispatch = useInventoryDispatch();
 
   const isListNow = (!productId || !id || !inventoryId || !quantity || !price);
-  const isIssued = type === 'issued';
 
   let {
     memberships,
     isMembershipLoading,
+    isMembershipsLoading,
     isResaleMembershipSubmitting,
     purchasedMemberships,
     isPurchasedMembershipLoading,
@@ -69,7 +70,7 @@ const ListNowIndex = ({
       let productName;
       if (isIssued) {
         productName = item.product.name;
-      }else{
+      } else {
         productName = item.productName;
       }
 
@@ -85,7 +86,9 @@ const ListNowIndex = ({
 
   useEffect(() => {
     // setPurchasedMembershipData(purchasedMemberships);
-    transformData(isIssued ? memberships : purchasedMemberships);
+    let purchasedList = purchasedMemberships.filter((item) => item.availableQuantity != 0);
+    let issuedList = memberships.filter((item) => item?.inventories?.length == 0);
+    transformData(isIssued ? issuedList : purchasedList);
   }, [memberships, purchasedMemberships]);
 
   // useEffect(() => {
@@ -125,9 +128,9 @@ const ListNowIndex = ({
     setProductId(value);
 
     let idList
-    if(isIssued){
-      idList = memberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity }))
-    }else{
+    if (isIssued) {
+      setProductId(value)
+    } else {
       idList = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity }))
     }
     // let membership = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber }))
@@ -135,45 +138,47 @@ const ListNowIndex = ({
     // inventoryActions.fetchInventory(inventoryDispatch, '', 0, value);
   }
 
-  const selectAfter = (
-    <Select
-      defaultValue="1"
-      onChange={(value) => {
-        if (value === "1") {
-          setIsTaxPercentage(true)
-        }
-        else if (value === "0") {
-          setIsTaxPercentage(false)
-        }
-        // formik.setFieldValue("isTaxPercentage", value === "1");
-      }}
-      style={{ width: 60 }}
-      options={taxOptions}
-    />
-  );
-
   const handleCreateFormSubmit = async () => {
-    const resalePayload = {
-      itemAddress: id,
-      productAddress: productId,
-      inventory: inventoryId,
-      updates: {
+    if (isIssued) {
+      const inventoryBody = {
+        productAddress: productId,
+        quantity: quantity,
         pricePerUnit: price,
+        // Generate random code for now
+        batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+        // Status should always be published if we use List Now
         status: INVENTORY_STATUS.PUBLISHED,
-        quantity: 1
+        serialNumber: [],
+        taxPercentageAmount: Math.floor(taxPercentageAmount * 100),
+        taxDollarAmount: Math.floor(taxDollarAmount * 100),
+      };
+      const createInventory = await inventoryActions.createInventory(
+        inventoryDispatch,
+        inventoryBody
+      );
+    } else {
+      const resalePayload = {
+        itemAddress: id,
+        productAddress: productId,
+        inventory: inventoryId,
+        updates: {
+          pricePerUnit: price,
+          status: INVENTORY_STATUS.PUBLISHED,
+          quantity: 1
+        }
       }
-    }
 
-    const resaleMembership = await membershipActions.resaleMembership(
-      membershipDispatch, resalePayload
-    )
+      const resaleMembership = await membershipActions.resaleMembership(
+        membershipDispatch, resalePayload
+      )
 
-    if (resaleMembership) {
-      // membership.product_with_inventory = 1;
-      setInventoryId('')
-      setProductId('')
+      if (resaleMembership) {
+        // membership.product_with_inventory = 1;
+        setInventoryId('')
+        setProductId('')
+      }
+      handleCancel();
     }
-    handleCancel();
   };
 
   const membershipType = purchasedMembershipData.find((membership) => membership.address === id)
@@ -181,7 +186,7 @@ const ListNowIndex = ({
     : "Sale"
 
   const selectSuffix = isPurchasedMembershipLoading ? <Spin /> : <CaretDownOutlined />
-
+  const isMembershipDropDown = (isPurchasedMembershipLoading || isMembershipsLoading);
   return (
     <Modal
       style={{ maxWidth: "720px" }}
@@ -195,10 +200,10 @@ const ListNowIndex = ({
             key="list-now"
             className="mx-auto w-52 font-bold"
             size="large"
-            disabled={isListNow || isResaleMembershipSubmitting}
-            loading={isResaleMembershipSubmitting}
+            disabled={(isListNow || isResaleMembershipSubmitting) && !isIssued}
+            loading={isResaleMembershipSubmitting || isCreateInventorySubmitting}
             onClick={() => { handleCreateFormSubmit() }}
-            type={(isListNow || isResaleMembershipSubmitting) ? 'default' : 'primary'}
+            type={(isListNow || isResaleMembershipSubmitting) && !isIssued ? 'default' : 'primary'}
           >
             List Now
           </Button>
@@ -218,8 +223,8 @@ const ListNowIndex = ({
               className="w-full mt-2"
               size="large"
               // placeholder="Membership"
-              suffixIcon={selectSuffix}
-              disabled={isPurchasedMembershipLoading}
+              suffixIcon={isMembershipDropDown ? <Spin /> : selectSuffix}
+              disabled={isMembershipDropDown}
               onChange={(value) => {
                 handleMembership(value)
               }}
@@ -234,7 +239,7 @@ const ListNowIndex = ({
               // placeholder="Membership Id"
               value={membershipNumber}
               suffixIcon={selectSuffix}
-              disabled={isPurchasedMembershipLoading}
+              disabled={isPurchasedMembershipLoading || isIssued}
               onChange={(value, obj) => {
                 setMembershipNumber(obj.label)
                 setInventoryId(obj.inventoryId)
@@ -256,10 +261,10 @@ const ListNowIndex = ({
               // placeholder="Quantity"
               prefix={isInventoriesLoading && <Spin />}
               onWheel={(e) => e.target.blur()}
-              disabled={true}
+              disabled={true && !isIssued}
               min={0}
               max={MAX_QUANTITY}
-              value={1}
+              value={quantity}
               onChange={(value) => {
                 setError('');
                 setQuantity(value);
@@ -326,7 +331,7 @@ const ListNowIndex = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
+            <Row><Input type="text" value={isIssued ? 'New' : 'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
           </Col>
         </Row>
       </Form >
