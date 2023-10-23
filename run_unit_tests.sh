@@ -55,8 +55,8 @@ if [ $1 = --coverage ]
 then
       rm -rf hpc
       mkdir hpc
-      cwd
-      cp -R strato/.stack-work/**/hpc hpc
+      pwd
+      cp -R strato/.stack-work/**/**/hpc hpc
 fi
 
 stack bench vm-runner
