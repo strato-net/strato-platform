@@ -91,7 +91,7 @@ const UpdateInventoryModal = ({
           name: subCategory.name ?? "",
         },
         productName: {
-          name: inventoryToUpdate.inventory.name,
+          name: decodeURIComponent(inventoryToUpdate.inventory.name),
           address: inventoryToUpdate.inventory.productId,
         },
         availableQuantity: inventoryToUpdate.inventory.availableQuantity,

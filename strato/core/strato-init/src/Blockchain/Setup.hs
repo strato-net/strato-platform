@@ -39,7 +39,7 @@ import System.Directory
 import System.Exit
 import System.FilePath
 import qualified Text.Colors as CL
-import Turtle (chmod, fromText, roo)
+import Turtle (chmod, roo)
 
 createKafkaTopic :: TopicName -> IO ()
 createKafkaTopic topic = do
@@ -63,7 +63,7 @@ genesisFiles :: [(FilePath, B.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
 makeReadOnly :: FilePath -> IO ()
-makeReadOnly = void . chmod roo . fromText . T.pack
+makeReadOnly = void . chmod roo 
 
 addStandardGenesisBlockIfNeeded :: String -> IO ()
 addStandardGenesisBlockIfNeeded genesisBlockName = do

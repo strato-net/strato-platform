@@ -9,80 +9,51 @@ import Text.RawString.QQ
 userRegistryContract :: Text
 userRegistryContract =
   [r|
+pragma es6;
+pragma strict;
+pragma builtinCreates;
+
+import { Certificate, CertificateRegistry } from <509>;
+
 contract UserRegistry {
-    // The UserRegistry is responsible for creating User contracts for each user.
-    address public owner;
-
-    constructor() {
-        owner = msg.sender;
-    }
-
-    function createUser(string _commonName, string _userAddress, address _certificateAddress) public returns (address) { 
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        User newUser = new User{salt: _commonName}();
-        newUser.initializeUser(_commonName, address(_userAddress), _certificateAddress);
+    function createUser(string _commonName) public returns (address) {
+        User newUser = new User{salt: _commonName}(_commonName);
         return address(newUser);
-    }
-
-    function addCertificateToUser(address _userContractAddress, address _certificateAddress) public {
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        User targetUser = User(_userContractAddress);
-        targetUser.addCertificate(_userContractAddress, _certificateAddress);
-    }
-
-    function toggleUserActiveStatus(address _userContractAddress) public {
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
-        User targetUser = User(_userContractAddress);
-        targetUser.toggleUserActiveStatus();
     }
 }
 
 contract User {
-    address public owner;
-
-    mapping(address => address) userCertificates;     // Data structure subject to change
     string public commonName;
-    bool isActive;
 
-    constructor() {
-        owner = msg.sender;
-    }
-
-    function initializeUser(string _commonName, address _userAddress, address _certificateAddress) {
-        // Only UserRegistry can add new certificates.
-        require((msg.sender == owner), "You don't have permission to use this function!");
-
+    constructor(string _commonName) {
         commonName = _commonName;
-        userCertificates[_userAddress] = _certificateAddress;
-        isActive = true;
     }
 
-    function addCertificate(address _userAddress, address _certificateAddress) public {
-        // Only UserRegistry can add new certificates.
-        require((msg.sender == owner), "You don't have permission to use this function!");
-        
-        userCertificates[_userAddress] = _certificateAddress;
+    modifier authenticated() {
+        // Only the user that this contract is associated with, can use this function.
+        require(authenticate(), "You don't have permission to use this function!");
+        _;
     }
 
-    function toggleUserActiveStatus() public {
-        require((msg.sender == owner), "You don't have permission to use this function!");
+    function createContract(string contractName, string contractSrc, string args) public authenticated {
+        create(contractName, contractSrc, args);
+    }
 
-        isActive = !isActive;
+    function createSaltedContract(string salt, string contractName, string contractSrc, string args) public authenticated {
+        create2(salt, contractName, contractSrc, args);
+    }
+
+    function callContract(address contractToCall, string functionName, variadic args) public returns (variadic) authenticated {
+        variadic result = address(contractToCall).call(functionName, args);
+        return result;
     }
 
     // Checks if the caller is indeed the user the wallet belongs to.
-    function authenticate() public returns (bool) {
-        return userCertificates[msg.sender] != address(0);
-    }
-
-    function callContract(address contractToCall, string functionName, variadic args) public returns (variadic) {
-        // Only the user that this contract is associated with, can use this function.
-        require((authenticate() && isActive), "You don't have permission to use this function!");
-
-        variadic result = address(contractToCall).call(functionName, args);
-        return result;
+    function authenticate() internal returns (bool) {
+        Certificate cert = CertificateRegistry(address(0x509)).getCertByAddress(msg.sender);
+        if (address(cert) != address(0)) {
+            return cert.commonName() == commonName;
+        }
+        return false;
     }
 }|]

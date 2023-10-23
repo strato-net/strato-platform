@@ -594,10 +594,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getProducts = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     console.log('dapp.getProducts - userOrganization', userOrganization)
-    return managers.productManager.getProducts(
+    const products = await managers.productManager.getProducts(
       { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
       getOptions
     );
+    const productCount = await managers.productManager.count(
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+    return {products: products, productCount: productCount}
   };
   contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
@@ -1237,7 +1242,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
       const inventory = await contract.getInventory({ address: items[0].inventoryId, });
-      if (inventory.inventoryType === "Individual") {
+      if (inventory.inventoryType === "Individual" || !inventory.inventoryType) {
         const [soldStatus] = await managers.itemManager.updateItem({
           itemsAddress: itemsAddresses,
           status: ITEM_STATUS.SOLD,

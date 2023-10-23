@@ -226,16 +226,18 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, queryValue, organization, order, selectedDate) => {
+  fetchOrder: async (dispatch, limit, offset, queryValue, organization, order, selectedDate, filter) => {
     let query = queryValue ? `&orderId=${queryValue}` : "";
     let end = selectedDate + 86400;
-    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "";
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "query";
+    
+    query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
     
     dispatch({ type: actionDescriptors.fetchOrder });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}${query}&order=${order}&buyerOrganization=${organization}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&${query}&order=${order}&buyerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -256,17 +258,18 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order, selectedDate) => {
+  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order, selectedDate, filter) => {
     let query = queryValue ? `&orderId=${queryValue}` : "";
     let end = selectedDate + 86400;
-    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "";
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : query;
 
+    query = filter !== 0  ? query.concat(`&status=${filter}`) : query;
 
     dispatch({ type: actionDescriptors.fetchOrderSold });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}${query}&sellerOrganization=${organization}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&${query}&sellerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }

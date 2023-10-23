@@ -14,7 +14,7 @@ contract ProductManager is
     RestStatus
 {
     // constructor() public {}
-    mapping(string => mapping(uint => address)) orgToUPCToProduct;
+    mapping(string => mapping(uint => address)) record orgToUPCToProduct;
     mapping(address => mapping(string => bool))
         private uniqueSerialNumberByProductAddress;
 
@@ -54,6 +54,43 @@ contract ProductManager is
         return (RestStatus.OK, address(product));
     }
 
+    function addProductForBuyer(
+        string _name,
+        string _description,
+        string _manufacturer,
+        UnitOfMeasurement _unitOfMeasurement,
+        string _userUniqueProductCode,
+        uint _uniqueProductCode,
+        int _leastSellableUnit,
+        string _imageKey,
+        bool _isActive,
+        string _category,
+        string _subCategory,
+        uint _createdDate,
+        address _newOwner
+    ) returns (address) {
+        Product_3 product = new Product_3(
+            _name,
+            _description,
+            _manufacturer,
+            _unitOfMeasurement,
+            _userUniqueProductCode,
+            _uniqueProductCode,
+            _leastSellableUnit,
+            _imageKey,
+            _isActive,
+            _category,
+            _subCategory,
+            _createdDate,
+            _newOwner
+        );
+
+        string _organization = getOrganization(_newOwner);
+        orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
+
+        return (address(product));
+    }
+
     function updateProduct(
         address _productAddress,
         string _description,
@@ -83,10 +120,10 @@ contract ProductManager is
         int _quantity,
         int _pricePerUnit,
         string _batchId,
-        string _inventoryType,
         InventoryStatus _status,
         uint _createdDate,
-        string[] _serialNumbers
+        string[] _serialNumbers,
+        string _inventoryType
     ) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
             Product_3 product = Product_3(_productAddress);
@@ -95,10 +132,10 @@ contract ProductManager is
                     _quantity,
                     _pricePerUnit,
                     _batchId,
-                    _inventoryType,
                     _status,
                     _createdDate,
-                    tx.origin
+                    tx.origin,
+                    _inventoryType
                 );
         } else {
             for (uint256 i = 0; i < _serialNumbers.length; i++) {
@@ -123,10 +160,10 @@ contract ProductManager is
                     _quantity,
                     _pricePerUnit,
                     _batchId,
-                    _inventoryType,
                     _status,
                     _createdDate,
-                    tx.origin
+                    tx.origin,
+                    _inventoryType
                 );
         }
     }
@@ -193,17 +230,24 @@ contract ProductManager is
         uint256 isUpdated = existingInventory.updateQuantity(
             existingInventory.availableQuantity() - _quantity
         );
-        if (existingInventory.inventoryType() == "Batch") {
+
+        bool hasInventoryType = true;
+        try {
+            existingInventory.inventoryType();
+        } catch UnknownFunction {
+            hasInventoryType = false;
+        }
+        if (hasInventoryType && existingInventory.inventoryType() == "Batch") {
             (uint256 status, address inventoryAddress) = product.addInventory(
                 _quantity,
                 _price,
                 existingInventory.batchId(),
-                existingInventory.inventoryType(),
                 InventoryStatus.PUBLISHED,
                 block.timestamp,
-                tx.origin
+                tx.origin,
+                "Batch"
             );
-            Item_3 itemAddr = new Item_3(
+            Item_3 batch_item = new Item_3(
                 address(product),
                 product.uniqueProductCode(),
                 address(inventoryAddress),
@@ -217,19 +261,26 @@ contract ProductManager is
                 block.timestamp,
                 tx.origin
             );
+            batch_item.generateOwnershipHistory(
+                batch_item.ownerOrganization(),
+                batch_item.ownerOrganization(),
+                block.timestamp,
+                address(batch_item)
+            );
             return (status, inventoryAddress);
         } else {
             (uint256 status, address inventoryAddress) = product.addInventory(
                 _quantity,
                 _price,
                 existingInventory.batchId(),
-                existingInventory.inventoryType(),
                 InventoryStatus.PUBLISHED,
                 block.timestamp,
-                tx.origin
+                tx.origin,
+                "Individual"
             );
             for (int i = 0; i < _quantity; i++) {
                 Item_3 _item = Item_3(_itemsAddress[i]);
+                _item.update(ItemStatus.PUBLISHED, _item.comment(), 1);
                 _item.transferOwnership(
                     tx.origin,
                     address(product),
@@ -250,18 +301,13 @@ contract ProductManager is
     }
 
     function checkForProduct(
-        address _productAddress,
         uint _uniqueProductCode,
         address _owner
     ) public returns (address) {
         string _organization = getOrganization(_owner);
 
-        if (
-            orgToUPCToProduct[_organization][_uniqueProductCode] !=
-            address(0) &&
-            orgToUPCToProduct[_organization][_uniqueProductCode] ==
-            address(_productAddress)
-        ) {
+        if (orgToUPCToProduct[_organization][_uniqueProductCode] != address(0)) 
+        {
             return orgToUPCToProduct[_organization][_uniqueProductCode];
         }
         return address(0);
