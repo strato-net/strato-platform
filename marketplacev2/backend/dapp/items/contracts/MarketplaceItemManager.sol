@@ -3,6 +3,7 @@ import "/dapp/items/contracts/MarketplaceItem.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/items/contracts/UnitOfMeasurement.sol";
+import "/dapp/dapp/contracts/Dapp.sol";
 
 /// @title A representation of ItemManager to manage items
 contract MarketplaceItemManager is ItemStatus, 
@@ -16,7 +17,7 @@ contract MarketplaceItemManager is ItemStatus,
     mapping(address => address) private marketplaceItemProductIdMapping;
     mapping(address => address) private marketplaceItemInventoryIdMapping;
     mapping(address => address[]) private productToMarketplaceItemMapping;
-    mapping(address => address) record mItemToProduct;
+    mapping(string => mapping(uint => address)) record orgToUPCToProduct;
     
     struct ItemObject {
         uint itemNumber;
@@ -56,7 +57,7 @@ contract MarketplaceItemManager is ItemStatus,
         if (_itemObject[0].serialNumber == "") {
             for (uint256 i = 0; i < _itemObject.length; i++) {
                 // Create new MarketplaceItem
-                MarketplaceItem itemAddr = new MarketplaceItem(
+                MarketplaceItem item = new MarketplaceItem(
                     tx.origin,
                     _productId,
                     _inventoryId,
@@ -88,14 +89,14 @@ contract MarketplaceItemManager is ItemStatus,
                     _isInventoryAvailable
                 );
 
-                string _organization = getOrganization(tx.origin);
-                orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
+                string _organization = item.ownerOrganization();
+                orgToUPCToProduct[_organization][_uniqueProductCode] = _productId;
 
 
-                address itemContractAddress = address(itemAddr);
-                itemAddr.generateOwnershipHistory(
+                address itemContractAddress = address(item);
+                item.generateOwnershipHistory(
                     "",
-                    itemAddr.ownerOrganization(),
+                    _organization,
                     _createdDate
                 );
 
@@ -104,8 +105,8 @@ contract MarketplaceItemManager is ItemStatus,
                 ] = _uniqueProductCode;
                 marketplaceItemProductIdMapping[itemContractAddress] = _productId;
                 marketplaceItemInventoryIdMapping[itemContractAddress] = _inventoryId;
-                productToMarketplaceItemMapping[_productId].push(item);
-                itemAddresses += string(address(itemAddr)) + ",";
+                productToMarketplaceItemMapping[_productId].push(itemContractAddress);
+                itemAddresses += string(itemContractAddress) + ",";
             }
             
             return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
@@ -118,7 +119,7 @@ contract MarketplaceItemManager is ItemStatus,
             if (existingUPC == _uniqueProductCode) {
                 repeatedSerialNumbers += currentSerialNumber + ",";
             } else {
-                MarketplaceItem itemAddr = new MarketplaceItem(
+                MarketplaceItem item = new MarketplaceItem(
                     tx.origin,
                     _productId,
                     _inventoryId,
@@ -150,13 +151,13 @@ contract MarketplaceItemManager is ItemStatus,
                     _isInventoryAvailable
                 );
 
-                string _organization = getOrganization(tx.origin);
-                orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
+                string _organization = item.ownerOrganization();
+                orgToUPCToProduct[_organization][_uniqueProductCode] = _productId;
 
-                address itemContractAddress = address(itemAddr);
-                itemAddr.generateOwnershipHistory(
+                address itemContractAddress = address(item);
+                item.generateOwnershipHistory(
                     "",
-                    itemAddr.ownerOrganization(),
+                    _organization,
                     _createdDate
                 );
 
@@ -165,7 +166,7 @@ contract MarketplaceItemManager is ItemStatus,
                 ] = _uniqueProductCode;
                 marketplaceItemProductIdMapping[itemContractAddress] = _productId;
                 marketplaceItemInventoryIdMapping[itemContractAddress] = _inventoryId;
-                itemAddresses += string(address(itemAddr)) + ",";
+                itemAddresses += string(itemContractAddress) + ",";
             }
         }
 
@@ -201,7 +202,7 @@ contract MarketplaceItemManager is ItemStatus,
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
             address _itemAddress = _itemsAddress[i];
             MarketplaceItem item = MarketplaceItem(_itemAddress);
-            string _itemSerialNumber = item.serialNumber();
+            string _itemSerialNumber = item.item.serialNumber();
 
             Event eventAddr = new Event(
                 _eventTypeId,
@@ -316,7 +317,7 @@ contract MarketplaceItemManager is ItemStatus,
         string _userUniqueProductCode,
         uint _scheme
     ) returns (uint256) {
-        MarketlplaceItem mi = MarketlplaceItem(_marketplaceItemAddress);
+        MarketplaceItem mi = MarketplaceItem(_marketplaceItemAddress);
         return
             mi.updateProduct(
                 _description,
@@ -329,7 +330,7 @@ contract MarketplaceItemManager is ItemStatus,
 
     //DONE
     function deleteProduct(address _marketplaceItemAddress) returns (uint256, string) {
-        MarketlplaceItem mi = MarketlplaceItem(_marketplaceItemAddress);
+        MarketlplaceItem mi = MarketplaceItem(_marketplaceItemAddress);
         address productID = marketplaceItemProductIdMapping[_marketplaceItemAddress];
         address[] addresses = productToMarketplaceItemMapping[productID];
         for (uint256 i = 0; i < addresses.length; i++) {
@@ -346,7 +347,7 @@ contract MarketplaceItemManager is ItemStatus,
         InventoryStatus _status,
         uint _scheme
     ) returns (uint256) {
-        MarketlplaceItem mi = MarketlplaceItem(_marketplaceItemAddress);
+        MarketlplaceItem mi = MarketplaceItem(_marketplaceItemAddress);
         return
             mi.updateInventory(
                 _pricePerUnit,
@@ -365,7 +366,7 @@ contract MarketplaceItemManager is ItemStatus,
             MarketplaceItem mi = MarketplaceItem(_marketplaceItems[i]);
 
             if (_isReduce) {
-                if (_quantities[i] > mi.availableQuantity()) {
+                if (_quantities[i] > mi.inventory.availableQuantity()) {
                     return RestStatus.BAD_REQUEST;
                 }
                 int quantityToDeduct = mi.inventory.availableQuantity() -
@@ -453,7 +454,7 @@ contract MarketplaceItemManager is ItemStatus,
                     address(_item.product.productId),
                     address(_item.inventory.inventoryId)
                 );
-                return (status, inventoryAddress);//CHANGE
+                return (RestStatus.OK, inventoryAddress);
             }
             
         }
