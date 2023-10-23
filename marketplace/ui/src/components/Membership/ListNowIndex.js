@@ -21,6 +21,7 @@ const ListNowIndex = ({
   open,
   handleCancel,
   user,
+  isCalledFromHeader
   //   formik,
   // type,
   // tab
@@ -39,7 +40,7 @@ const ListNowIndex = ({
   const [error, setError] = useState('');
   const [productId, setProductId] = useState('')
   const [id, setId] = useState("");
-  const [membershipNumber, setMembershipNumber] = useState(isIssued ? 'None' : '')
+  const [membershipNumber, setMembershipNumber] = useState((isIssued || isCalledFromHeader) ? 'None' : '')
   const [inventoryId, setInventoryId] = useState('')
   const [quantity, setQuantity] = useState(1);
   const [taxPercentage, setTaxPercentage] = useState('');
@@ -68,7 +69,7 @@ const ListNowIndex = ({
     data.forEach((item) => {
       const productId = item.productId;
       let productName;
-      if (isIssued) {
+      if (isIssued || isCalledFromHeader) {
         productName = item.product.name;
       } else {
         productName = item.productName;
@@ -88,7 +89,7 @@ const ListNowIndex = ({
     // setPurchasedMembershipData(purchasedMemberships);
     let purchasedList = purchasedMemberships.filter((item) => item.availableQuantity != 0);
     let issuedList = memberships.filter((item) => item?.inventories?.length == 0);
-    transformData(isIssued ? issuedList : purchasedList);
+    transformData((isIssued || isCalledFromHeader) ? issuedList : purchasedList);
   }, [memberships, purchasedMemberships]);
 
   // useEffect(() => {
@@ -128,7 +129,7 @@ const ListNowIndex = ({
     setProductId(value);
 
     let idList
-    if (isIssued) {
+    if (isIssued || isCalledFromHeader) {
       setProductId(value)
     } else {
       idList = purchasedMemberships.filter((item) => item.productId == value).map((item) => ({ value: item.itemAddress, label: item.itemNumber, inventoryId: item.inventoryId, availableQuantity: item.availableQuantity }))
@@ -139,7 +140,7 @@ const ListNowIndex = ({
   }
 
   const handleCreateFormSubmit = async () => {
-    if (isIssued) {
+    if (isIssued || isCalledFromHeader) {
       const inventoryBody = {
         productAddress: productId,
         quantity: quantity,
@@ -200,10 +201,10 @@ const ListNowIndex = ({
             key="list-now"
             className="mx-auto w-52 font-bold"
             size="large"
-            disabled={(isListNow || isResaleMembershipSubmitting) && !isIssued}
+            disabled={(isListNow || isResaleMembershipSubmitting) && (!isIssued && !isCalledFromHeader)}
             loading={isResaleMembershipSubmitting || isCreateInventorySubmitting}
             onClick={() => { handleCreateFormSubmit() }}
-            type={(isListNow || isResaleMembershipSubmitting) && !isIssued ? 'default' : 'primary'}
+            type={(isListNow || isResaleMembershipSubmitting) && (!isIssued && !isCalledFromHeader) ? 'default' : 'primary'}
           >
             List Now
           </Button>
@@ -239,7 +240,7 @@ const ListNowIndex = ({
               // placeholder="Membership Id"
               value={membershipNumber}
               suffixIcon={selectSuffix}
-              disabled={isPurchasedMembershipLoading || isIssued}
+              disabled={isPurchasedMembershipLoading || (isIssued || isCalledFromHeader)}
               onChange={(value, obj) => {
                 setMembershipNumber(obj.label)
                 setInventoryId(obj.inventoryId)
@@ -331,7 +332,7 @@ const ListNowIndex = ({
           </Col>
           <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={isIssued ? 'New' : 'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
+            <Row><Input type="text" value={(isIssued || isCalledFromHeader) ? 'New' : 'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
           </Col>
         </Row>
       </Form >
