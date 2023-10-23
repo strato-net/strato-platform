@@ -55,8 +55,8 @@ if [ $1 = --coverage ]
 then
       rm -rf hpc
       mkdir hpc
-      ls -l
-      cp -R .stack-work/**/**/hpc hpc
+      ls -la
+      cp $(stack path --local-hpc-root) hpc/
 fi
 
 stack bench vm-runner
