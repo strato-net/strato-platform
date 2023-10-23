@@ -91,7 +91,6 @@ const actions = {
     const query = queryValue
     ? `&queryValue=${queryValue}&queryFields=name`
     : "";
-    console.log("query", query)
 
     dispatch({ type: actionDescriptors.fetchInventorySearch });
 
@@ -104,7 +103,6 @@ const actions = {
       );
 
       const body = await response.json();
-      console.log('body.data:', body.data)
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySearchSuccessful,

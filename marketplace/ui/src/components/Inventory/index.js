@@ -49,10 +49,10 @@ const Inventory = ({ user }) => {
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
-  
+
   const { categorys } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
-  useInventoryState();
+    useInventoryState();
 
   //events
   const eventsDispatch = useEventDispatch();
@@ -66,15 +66,13 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    console.log("called")
     if (isSearch) {
-      // setOffset(0);
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
     } else actions.fetchInventory(dispatch, limit, offset, "");
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
-       actions.sellerStripeStatus(dispatch, user?.organization);
+    actions.sellerStripeStatus(dispatch, user?.organization);
   }, [dispatch, user]);
 
   useEffect(() => {
@@ -110,14 +108,14 @@ const Inventory = ({ user }) => {
       });
     }
   };
-  
+
   const queryHandle = (e) => {
-    if (e.target.value.length === 0 || e.target.value === "") {
+    if (e.length === 0 || e === "") {
       setIsSearch(false)
     } else {
       setIsSearch(true)
     }
-    setQueryValue(e.target.value);
+    setQueryValue(e);
     setOffset(0);
     setPage(1);
   };
@@ -179,7 +177,7 @@ const Inventory = ({ user }) => {
                     }
                   }}
                   disabled={stripeStatus.detailsSubmitted}
-                  >
+                >
                   {"Connect Stripe"}
                 </Button>
                 <Button
@@ -218,8 +216,7 @@ const Inventory = ({ user }) => {
                     placeholder="Search"
                     className="w-80 mr-6"
                     allowClear
-                    onChange={queryHandle}
-                    value={queryValue}
+                    onSearch={queryHandle}
                   />
                   <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
                     onClick={() => {

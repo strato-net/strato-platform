@@ -616,11 +616,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
   contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
-    const { userAddress, ...restArgs } = args
+    const { userAddress, queryValue, ...restArgs } = args;
+    const encodedQueryValue = encodeURIComponent(queryValue);
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    const productList = await managers.productManager.getProducts({...restArgs, limit: 2000, offset:0, ownerOrganization: userOrganization}, getOptions);
+    const productList = await managers.productManager.getProducts({ ...restArgs, limit: 2000, offset: 0, ownerOrganization: userOrganization, queryValue: encodedQueryValue }, getOptions);
     const productIds = productList.map(product => product.address);
-    const { queryValue, queryFields, ...restArgsPrime } = restArgs
+    const { queryFields, ...restArgsPrime } = restArgs
     return managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
   };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
