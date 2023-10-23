@@ -218,12 +218,10 @@ handleEvents peer = awaitForever $ \case
           bestBlock <- lift $ Mod.get (Proxy @BestBlock)
           let fetchNumber = numberFromBestBlock bestBlock + 1
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-          let lastParent =
-                if M.null existingParents
-                  then fetchNumber
-                  else head . sort $ blockHeaderBlockNumber <$> M.elems existingParents
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
-          syncFetch Reverse lastParent
+          if M.null existingParents
+            then syncFetch Forward fetchNumber
+            else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
 
         let headerHashes = map (blockHeaderHash &&& id) headers
             hashes = map fst headerHashes
