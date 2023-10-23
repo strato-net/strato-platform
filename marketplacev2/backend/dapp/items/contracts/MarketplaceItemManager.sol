@@ -15,8 +15,9 @@ contract MarketplaceItemManager is ItemStatus,
     mapping(string => uint) private uniqueSerialNumberByUPC;
     mapping(address => address) private marketplaceItemProductIdMapping;
     mapping(address => address) private marketplaceItemInventoryIdMapping;
-    mapping(string => mapping(uint => address)) record orgToUPCToProduct;
-
+    mapping(address => address[]) private productToMarketplaceItemMapping;
+    mapping(address => address) record mItemToProduct;
+    
     struct ItemObject {
         uint itemNumber;
         string serialNumber;
@@ -103,8 +104,10 @@ contract MarketplaceItemManager is ItemStatus,
                 ] = _uniqueProductCode;
                 marketplaceItemProductIdMapping[itemContractAddress] = _productId;
                 marketplaceItemInventoryIdMapping[itemContractAddress] = _inventoryId;
+                productToMarketplaceItemMapping[_productId].push(item);
                 itemAddresses += string(address(itemAddr)) + ",";
             }
+            
             return (RestStatus.OK, itemAddresses, repeatedSerialNumbers);
         }
 
@@ -247,165 +250,62 @@ contract MarketplaceItemManager is ItemStatus,
         int _newQuantity,
         uint _itemNumber
     ) public returns (uint, address, address) {
-        Product_3 product;
-        Inventory inventory;
-        MarketplaceItem item = MarketplaceItem(_itemsAddress[0]);
 
-        // get Dapp contract from dapp chain
+        MarketplaceItem mItem = MarketplaceItem(_itemsAddress[0]);
         Dapp dapp = Dapp(address(_dappAddress));
-        ProductManager productManager = dapp.productManager();
+        MarketplaceItemManager marketplaceItemManager = dapp.marketplaceItemManager();
 
-        Product_3 oldProduct = Product_3(item.productId());
-        address productAddress = productManager.checkForProduct(
-            oldProduct.uniqueProductCode(),
-            _newOwner
-        );
-
-        if (productAddress == address(0)) {
-                    address addr = productManager.addProductForBuyer(
-                        oldProduct.name(),
-                        oldProduct.description(),
-                        oldProduct.manufacturer(),
-                        oldProduct.unitOfMeasurement(),
-                        oldProduct.userUniqueProductCode(),
-                        oldProduct.uniqueProductCode(),
-                        oldProduct.leastSellableUnit(),
-                        oldProduct.imageKey(),
-                        oldProduct.isActive(),
-                        oldProduct.category(),
-                        oldProduct.subCategory(),
-                        block.timestamp,
-                        _newOwner
-                    );
-                    product = Product_3(addr);
-                } else {
-                    product = Product_3(productAddress);
-                }
-
-        Inventory oldInventory = Inventory(item.inventoryId());
-
-        if (oldInventory.inventoryType() == "Batch") {
-            (uint status, address inventory) = product.addInventory(
-                _newQuantity,
-                oldInventory.pricePerUnit(),
-                oldInventory.batchId(),
-                oldInventory.inventoryType(),
-                InventoryStatus.UNPUBLISHED,
-                block.timestamp,
+        address productAddress = checkForProduct(
+                mItem.product.uniqueProductCode(),
                 _newOwner
-            );
-            MarketplaceItem itemAddr = new MarketplaceItem(
-                address(product),
-                oldProduct.uniqueProductCode(),
-                address(inventory),
-                "",
-                ItemStatus.UNPUBLISHED,
-                "",
-                [""],
-                [""],
-                [""],
-                _itemNumber,
-                block.timestamp,
-                _newOwner
-            );
-            address itemContractAddress = address(itemAddr);
-            itemProductIdMapping[itemContractAddress] = address(product);
-            itemInventoryIdMapping[itemContractAddress] = address(inventory);
-        } else {
-            (uint status, address inventory) = product.addInventory(
-                _itemsAddress.length,
-                oldInventory.pricePerUnit(),
-                oldInventory.batchId(),
-                oldInventory.inventoryType(),
-                InventoryStatus.UNPUBLISHED,
-                block.timestamp,
-                _newOwner
-            );
+                );
+
+        address inventoryAddress = mItem.item.inventoryId();
+
+        if (_mItem.item.inventoryType() == "Batch") {
+                    addMarketplaceItem(
+                    tx.origin,
+                    productAddress,
+                    inventoryAddress,
+                    "",
+                    "",
+                    _itemNumber,
+                    block.timestamp,
+                    ItemStatus.UNPUBLISHED,
+                    _uniqueProductCode,
+                    [""],
+                    [""],
+                    [""],
+                    _newQuantity,
+                    _mItem.item.batchId,
+                    _mItem.product.category,
+                    _item.inventory.pricePerUnit,
+                    InventoryStatus.UNPUBLISHED,
+                    _mItem.product.subCategory,
+                    _mItem.item.inventoryType,
+                    _mItem.product.name,
+                    _mItem.product.description,
+                    _mItem.product.manufacturer,
+                    _mItem.product.unitOfMeasurement,
+                    _mItem.product.userUniqueProductCode,
+                    _mItem.product.leastSellableUnit,
+                    _mItem.product.imageKey,
+                    _mItem.product.isActive,
+                    _mItem.product.isDeleted,
+                    _mItem.product.isInventoryAvailable
+                );
+        } else{
+            updateInventory(_itemsAddress[i] ,_item.inventory.pricePerUnit, ,_item.inventory.status, ,_scheme);
             for (uint i = 0; i < _itemsAddress.length; i++) {
                 MarketplaceItem _item = MarketplaceItem(_itemsAddress[i]);
                 _item.transferOwnership(
                     _newOwner,
-                    address(product),
-                    address(inventory)
+                    address(_item.product.productId),
+                    address(_item.inventory.inventoryId)
                 );
             }
         }
-
         return (RestStatus.OK, address(product), address(inventory));
-    }
-
-
-    function addProduct(
-        string _name,
-        string _description,
-        string _manufacturer,
-        UnitOfMeasurement _unitOfMeasurement,
-        string _userUniqueProductCode,
-        uint _uniqueProductCode,
-        int _leastSellableUnit,
-        string _imageKey,
-        bool _isActive,
-        string _category,
-        string _subCategory,
-        uint _createdDate
-    ) returns (uint256, address) {
-        Product_3 product = new Product_3(
-            _name,
-            _description,
-            _manufacturer,
-            _unitOfMeasurement,
-            _userUniqueProductCode,
-            _uniqueProductCode,
-            _leastSellableUnit,
-            _imageKey,
-            _isActive,
-            _category,
-            _subCategory,
-            _createdDate,
-            tx.origin
-        );
-
-        string _organization = getOrganization(tx.origin);
-        orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
-
-        return (RestStatus.OK, address(product));
-    }
-
-    function addProductForBuyer(
-        string _name,
-        string _description,
-        string _manufacturer,
-        UnitOfMeasurement _unitOfMeasurement,
-        string _userUniqueProductCode,
-        uint _uniqueProductCode,
-        int _leastSellableUnit,
-        string _imageKey,
-        bool _isActive,
-        string _category,
-        string _subCategory,
-        uint _createdDate,
-        address _newOwner
-    ) returns (address) {
-        Product_3 product = new Product_3(
-            _name,
-            _description,
-            _manufacturer,
-            _unitOfMeasurement,
-            _userUniqueProductCode,
-            _uniqueProductCode,
-            _leastSellableUnit,
-            _imageKey,
-            _isActive,
-            _category,
-            _subCategory,
-            _createdDate,
-            _newOwner
-        );
-
-        string _organization = getOrganization(_newOwner);
-        orgToUPCToProduct[_organization][_uniqueProductCode] = address(product);
-
-        return (address(product));
     }
 
     function updateProduct(
@@ -430,66 +330,18 @@ contract MarketplaceItemManager is ItemStatus,
     //DONE
     function deleteProduct(address _marketplaceItemAddress) returns (uint256, string) {
         MarketlplaceItem mi = MarketlplaceItem(_marketplaceItemAddress);
-        return mi.deleteProduct();
-    }
-
-    function addInventory(
-        address _productAddress,
-        int _quantity,
-        int _pricePerUnit,
-        string _batchId,
-        string _inventoryType,
-        InventoryStatus _status,
-        uint _createdDate,
-        string[] _serialNumbers
-    ) returns (uint256, address) {
-        if (_serialNumbers.length == 0) {
-            Product_3 product = Product_3(_productAddress);
-            return
-                product.addInventory(
-                    _quantity,
-                    _pricePerUnit,
-                    _batchId,
-                    _inventoryType,
-                    _status,
-                    _createdDate,
-                    tx.origin
-                );
-        } else {
-            for (uint256 i = 0; i < _serialNumbers.length; i++) {
-                if (
-                    uniqueSerialNumberByProductAddress[_productAddress][
-                        _serialNumbers[i]
-                    ]
-                ) {
-                    return (RestStatus.CONFLICT, address(0));
-                }
-            }
-
-            for (uint256 j = 0; j < _serialNumbers.length; j++) {
-                uniqueSerialNumberByProductAddress[_productAddress][
-                    _serialNumbers[j]
-                ] = true;
-            }
-
-            Product_3 product = Product_3(_productAddress);
-            return
-                product.addInventory(
-                    _quantity,
-                    _pricePerUnit,
-                    _batchId,
-                    _inventoryType,
-                    _status,
-                    _createdDate,
-                    tx.origin
-                );
+        address productID = marketplaceItemProductIdMapping[_marketplaceItemAddress];
+        address[] addresses = productToMarketplaceItemMapping[productID];
+        for (uint256 i = 0; i < addresses.length; i++) {
+            MarketlplaceItem x = addresses[i];
+            x.deleteProduct();
         }
+        return (RestStatus.OK, "Products are deleted successfully.");
     }
 
     //DONE
     function updateInventory(
         address _marketplaceItemAddress,
-        address _inventory,
         int _pricePerUnit,
         InventoryStatus _status,
         uint _scheme
@@ -497,7 +349,6 @@ contract MarketplaceItemManager is ItemStatus,
         MarketlplaceItem mi = MarketlplaceItem(_marketplaceItemAddress);
         return
             mi.updateInventory(
-                _inventory,
                 _pricePerUnit,
                 _status,
                 _scheme
@@ -539,7 +390,8 @@ contract MarketplaceItemManager is ItemStatus,
         int _quantity,
         int _price,
         uint _itemNumber,
-        address[] _itemsAddress
+        address[] _itemsAddress,
+        uint _scheme
     ) returns (uint256, address) {
         MarketplaceItem existingMarketplaceItem = MarketplaceItem(_existingMarketplaceItem);
         if (
@@ -560,42 +412,50 @@ contract MarketplaceItemManager is ItemStatus,
                 block.timestamp,
                 tx.origin
             );
-            //Not sure why this is here maybe addItem?
-            // Item_3 itemAddr = new Item_3(
-            //     address(product),
-            //     product.uniqueProductCode(),
-            //     address(inventoryAddress),
-            //     "",
-            //     ItemStatus.PUBLISHED,
-            //     "",
-            //     [""],
-            //     [""],
-            //     [""],
-            //     _itemNumber,
-            //     block.timestamp,
-            //     tx.origin
-            // );
+            addMarketplaceItem(
+                    tx.origin,
+                    existingMarketplaceItem.product.productID,
+                    existingMarketplaceItem.inventory.inventoryId,
+                    "",
+                    "",
+                    _itemNumber,
+                    block.timestamp,
+                    ItemStatus.UNPUBLISHED,
+                    _uniqueProductCode,
+                    [""],
+                    [""],
+                    [""],
+                    _quantity,
+                    existingMarketplaceItem.item.batchId,
+                    existingMarketplaceItem.product.category,
+                    existingMarketplaceItem.inventory.pricePerUnit,
+                    InventoryStatus.UNPUBLISHED,
+                    existingMarketplaceItem.product.subCategory,
+                    existingMarketplaceItem.item.inventoryType,
+                    existingMarketplaceItem.product.name,
+                    existingMarketplaceItem.product.description,
+                    existingMarketplaceItem.product.manufacturer,
+                    existingMarketplaceItem.product.unitOfMeasurement,
+                    existingMarketplaceItem.product.userUniqueProductCode,
+                    existingMarketplaceItem.product.leastSellableUnit,
+                    existingMarketplaceItem.product.imageKey,
+                    existingMarketplaceItem.product.isActive,
+                    existingMarketplaceItem.product.isDeleted,
+                    existingMarketplaceItem.product.isInventoryAvailable
+                );
             return (status, inventoryAddress);
         } else {
-            (uint256 status, address inventoryAddress) = existingMarketplaceItem.addInventory(
-                _quantity,
-                _price,
-                existingMarketplaceItem.inventory.batchId(),
-                existingMarketplaceItem.inventory.inventoryType(),
-                InventoryStatus.PUBLISHED,
-                block.timestamp,
-                tx.origin
-            );
-            for (int i = 0; i < _quantity; i++) {
+            updateInventory(_itemsAddress[i] ,_item.inventory.pricePerUnit, ,_item.inventory.status ,_scheme);
+            for (uint i = 0; i < _itemsAddress.length; i++) {
                 MarketplaceItem _item = MarketplaceItem(_itemsAddress[i]);
-                _item.update(ItemStatus.PUBLISHED, _item.comment(), 1);
                 _item.transferOwnership(
-                    tx.origin,
-                    address(existingMarketplaceItem),
-                    address(inventoryAddress)
+                    _newOwner,
+                    address(_item.product.productId),
+                    address(_item.inventory.inventoryId)
                 );
+                return (status, inventoryAddress);//CHANGE
             }
-            return (status, inventoryAddress);
+            
         }
 
         return (RestStatus.BAD_REQUEST, address(0));

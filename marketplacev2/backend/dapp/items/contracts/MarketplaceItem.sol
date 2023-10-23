@@ -305,9 +305,9 @@ contract MarketplaceItem is Asset,
             block.timestamp
         );
         // set newOwner as asset owner
-        ownerOrganization = newOwnerOrganization,
-        ownerOrganizationalUnit = newOwnerOrganizationalUnit,
-        ownerCommonName = newOwnerCommonName,
+        ownerOrganization = newOwnerOrganization;
+        ownerOrganizationalUnit = newOwnerOrganizationalUnit;
+        ownerCommonName = newOwnerCommonName;
         item.owner = _addr;
         item.ownerOrganization = ownerOrganization;
         item.ownerOrganizationalUnit = ownerOrganizationalUnit;
