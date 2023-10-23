@@ -1233,7 +1233,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
       const inventory = await contract.getInventory({ address: items[0].inventoryId, });
-      if (inventory.inventoryType === "Individual") {
+      if (inventory.inventoryType === "Individual" || !inventory.inventoryType) {
         const [soldStatus] = await managers.itemManager.updateItem({
           itemsAddress: itemsAddresses,
           status: ITEM_STATUS.SOLD,
