@@ -55,6 +55,7 @@ if [ $1 = --coverage ]
 then
       rm -rf hpc
       mkdir hpc
+      cwd
       cp -R strato/.stack-work/**/hpc hpc
 fi
 
