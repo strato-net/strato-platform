@@ -9,6 +9,8 @@ import {
   Avatar,
   Dropdown,
   Typography,
+  Spin,
+  Modal,
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined, DollarOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
@@ -22,18 +24,24 @@ import {
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
+import { useMembershipState, useMembershipDispatch } from "../../contexts/membership";
 import TagManager from "react-gtm-module";
 import { blockappLogo } from "../../images/SVGComponents";
 import { setCookie, getCookie } from "../../helpers/cookie";
+import ListNowIndex from "../../components/Membership/ListNowIndex";
+import { actions as membershipActions } from "../../contexts/membership/actions"
 
 const { Title } = Typography;
 const { Header } = Layout;
 
 const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const navigate = useNavigate();
+  const { Text } = Typography;
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
   const { cartList } = useMarketplaceState();
+  const { isMembershipsLoading, memberships } = useMembershipState();
+  const membershipDispatch = useMembershipDispatch();
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -42,6 +50,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     actions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
+  const [visible, setVisible] = useState(false)
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
@@ -152,12 +161,17 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       }
     }
     setInitials(temp);
-  }, [user])
+  }, [user]);
 
   useEffect(() => {
     if (user) setRoleIndex(0)
     else setRoleIndex(1)
-  }, [user])
+  }, [user]);
+
+  const handleSellModal = () => {
+    membershipActions.fetchMembership(membershipDispatch);
+    setVisible(true);
+  }
 
 
   return (
@@ -241,7 +255,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           onClick={() => {
-            navigate("/memberships/issued", { state: { isCalledFromHeader: true } });
+            // navigate("/memberships/issued", { state: { isCalledFromHeader: true } });
+            handleSellModal()
           }}
         >
           <Avatar
@@ -310,6 +325,20 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             </Dropdown>
         }
       </Space>
+      {visible && (
+        <ListNowIndex
+          open={visible}
+          user={{ user: user }}
+          handleCancel={() => { setVisible(false) }}
+          onClick={() => { setVisible(true) }}
+          // formik={formik}
+          type="Sale"
+          isSellModal={true}
+        // id="None"
+        // getIn={getIn}
+        // isCreateMembershipSubmitting={isCreateInventorySubmitting}
+        />
+      )}
     </Header>
   );
 };

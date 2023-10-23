@@ -71,7 +71,7 @@ const Membership = (user) => {
   const [total, setTotal] = useState(10);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   // let [typeDispay, setTypeDisplay] = useState("purchased");
-  const [visible, setVisible] = useState(state?.isCalledFromHeader);
+  const [visible, setVisible] = useState(false);
 
   //Categories
   const categoryDispatch = useCategoryDispatch();

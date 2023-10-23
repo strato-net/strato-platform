@@ -47,7 +47,8 @@ const StatusValue = {
 
 const MembershipDetails = ({ user, users }) => {
   const { type } = useParams()
-  const isIssued = type === 'issued'
+  const isIssued = type === 'issued';
+  const isPurchased = type === 'purchased';
 
   const { state, pathname } = useLocation();
 
@@ -508,7 +509,7 @@ const MembershipDetails = ({ user, users }) => {
                 </Row>
               </Card>
               <Row className="h-14 mt-4">
-                {(inventoryDetails?.availableQuantity == 0 && !isIssued) ?
+                {(inventoryDetails?.availableQuantity == 0) ?
                   <Button
                     block={true}
                     type="primary"
@@ -528,78 +529,80 @@ const MembershipDetails = ({ user, users }) => {
                   >
                     Contact to Buy
                   </Button> :
-                  // <Button
-                  //   type={ownerSameAsUser ? "default" : "primary"}
-                  //   block={true} size="large" className=" h-full py-4 h-px-56"
-                  //   onClick={() => {
-                  //     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                  //       window.location.href = loginUrl;
-                  //     } else {
-                  //       formik.setFieldValue("name", inventoryDetails?.name);
-                  //       openListNowModal();
-                  //     }
-                  //   }}
-                  //   disabled={ownerSameAsUser}
-                  // > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
-                  // </Button>
-                  <Row className="w-full mx-auto" gutter={[12]}>
-                    <Col span={12} className="mx-auto flex justify-center">
-                      <Button
-                        block
-                        size="large"
-                        disabled={isIssued}
-                        className="group border !h-14 border-primary hover:bg-primary"
-                        onClick={() => {
-                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            window.location.href = loginUrl;
-                          } else {
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'add_to_cart_from_product_details',
-                                product_name: inventoryDetails.name,
-                                category: inventoryDetails.category,
-                                productId: inventoryDetails.productId
-                              },
-                            });
-                            addItemToCart();
-                          }
-                        }}
-                      >
-                        {/* <div className="text-primary group-hover:text-white"> */}
-                        Add To Cart
-                        {/* </div> */}
-                      </Button>
-                    </Col>
-                    <Col span={12}>
-                      <Button
-                        block
-                        disabled={isIssued}
-                        size="large"
-                        type="primary"
-                        className="bg-primary !h-14 !hover:bg-primaryHover"
-                        onClick={() => {
-                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            window.location.href = loginUrl;
-                          } else {
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'buy_now_from_product_details',
-                                product_name: inventoryDetails.name,
-                                category: inventoryDetails.category,
-                                productId: inventoryDetails.productId
-                              },
-                            });
-                            addItemToCart();
-                            navigate("/checkout");
-                          }
-                        }}
-                        // disabled={ownerSameAsUser()}
-                        id="buyNow"
-                      >
-                        Buy Now
-                      </Button>
-                    </Col>
-                  </Row>
+
+                  (isPurchased
+                    ? <Button
+                      type={ownerSameAsUser ? "default" : "primary"}
+                      block={true} size="large" className=" h-full py-4 h-px-56"
+                      onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          window.location.href = loginUrl;
+                        } else {
+                          formik.setFieldValue("name", inventoryDetails?.name);
+                          openListNowModal();
+                        }
+                      }}
+                    // disabled={ownerSameAsUser}
+                    > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
+                    </Button>
+                    : <Row className="w-full mx-auto" gutter={[12]}>
+                      <Col span={12} className="mx-auto flex justify-center">
+                        <Button
+                          block
+                          size="large"
+                          disabled={isIssued}
+                          className="group border !h-14 border-primary hover:bg-primary"
+                          onClick={() => {
+                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                              window.location.href = loginUrl;
+                            } else {
+                              TagManager.dataLayer({
+                                dataLayer: {
+                                  event: 'add_to_cart_from_product_details',
+                                  product_name: inventoryDetails.name,
+                                  category: inventoryDetails.category,
+                                  productId: inventoryDetails.productId
+                                },
+                              });
+                              addItemToCart();
+                            }
+                          }}
+                        >
+                          {/* <div className="text-primary group-hover:text-white"> */}
+                          Add To Cart
+                          {/* </div> */}
+                        </Button>
+                      </Col>
+                      <Col span={12}>
+                        <Button
+                          block
+                          disabled={isIssued}
+                          size="large"
+                          type="primary"
+                          className="bg-primary !h-14 !hover:bg-primaryHover"
+                          onClick={() => {
+                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                              window.location.href = loginUrl;
+                            } else {
+                              TagManager.dataLayer({
+                                dataLayer: {
+                                  event: 'buy_now_from_product_details',
+                                  product_name: inventoryDetails.name,
+                                  category: inventoryDetails.category,
+                                  productId: inventoryDetails.productId
+                                },
+                              });
+                              addItemToCart();
+                              navigate("/checkout");
+                            }
+                          }}
+                          // disabled={ownerSameAsUser()}
+                          id="buyNow"
+                        >
+                          Buy Now
+                        </Button>
+                      </Col>
+                    </Row>)
                 }
               </Row>
             </Col>

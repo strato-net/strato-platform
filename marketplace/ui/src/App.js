@@ -11,6 +11,8 @@ import HeaderComponent from "./components/Header/Header";
 import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { getCookie, delete_cookie } from "./helpers/cookie";
+import { MembershipsProvider } from "./contexts/membership";
+import { InventoriesProvider } from "./contexts/inventory";
 
 const { Content } = Layout;
 
@@ -43,7 +45,11 @@ const App = () => {
     <BrowserRouter basename="/marketplace">
       <Layout className="bg-white">
         <UsersProvider>
-          <HeaderComponent isOauth={isAuthenticated} user={user} users={users} loginUrl={loginUrl} />
+          <MembershipsProvider>
+            <InventoriesProvider>
+              <HeaderComponent isOauth={isAuthenticated} user={user} users={users} loginUrl={loginUrl} />
+            </InventoriesProvider>
+          </MembershipsProvider>
         </UsersProvider>
         <Content>
           <AuthenticatedRoutes user={user} users={users} />
