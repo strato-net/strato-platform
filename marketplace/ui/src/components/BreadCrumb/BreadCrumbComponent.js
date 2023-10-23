@@ -8,14 +8,14 @@ const BreadCrumbComponent = ({ name }) => {
   const { state, pathname } = useLocation();
   const navigate = useNavigate();
   const isMarketplace = pathname.includes("all");
-  const isServiceUsage = pathname.includes("serviceUsage");
+  // const isServiceUsage = pathname.includes("serviceUsage");
 
   const routesArray = pathname.split("/")
   const handleRedirect = (e, item) => {
     e.preventDefault()
     if (isMarketplace) {
       navigate('/category/Membership')
-    } else if (isServiceUsage && item === "/memberships/serviceUsage") {
+    } else if (item === "/memberships/serviceUsage") {
     } else {
       navigate(item)
     }
