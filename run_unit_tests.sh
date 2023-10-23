@@ -53,8 +53,9 @@ stack test $1\
 
 if [ $1 = --coverage ]
 then
-      rm -rf hpc/ && mkdir hpc/
-      cp -r .stack-work/**/hpc/ hpc/
+      rm -rf hpc/
+      mkdir hpc/
+      find .stack-work -name '*' -exec cp {} hpc/ \;
 fi
 
 stack bench vm-runner
