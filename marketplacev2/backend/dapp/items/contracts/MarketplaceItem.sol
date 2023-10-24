@@ -204,37 +204,6 @@ contract MarketplaceItem is Asset,
 
       return RestStatus.OK;
     }
-    
-    function updateProduct(
-        string _description
-    ,   string _imageKey
-    ,   bool _isActive
-    ,   string _userUniqueProductCode
-    ,   uint _scheme
-    ) returns (uint) {
-      if(ownerOrganization != getUserOrganization(tx.origin)){
-        return RestStatus.FORBIDDEN;
-      }
-
-      if (_scheme == 0) {
-        return RestStatus.OK;
-      }
-
-      if ((_scheme & (1 << 0)) == (1 << 0)) {
-        product.description = _description;
-      }
-      if ((_scheme & (1 << 1)) == (1 << 1)) {
-        product.imageKey = _imageKey;
-      }
-      if ((_scheme & (1 << 2)) == (1 << 2)) {
-        product.isActive = _isActive;
-      }
-      if ((_scheme & (1 << 3)) == (1 << 3)) {
-        product.userUniqueProductCode = _userUniqueProductCode;
-      }
-
-      return RestStatus.OK;
-    }
 
     // Delete the product
     function deleteProduct() public returns(uint256, string){
@@ -320,19 +289,6 @@ contract MarketplaceItem is Asset,
         item.inventoryId = _inventoryId;
         return RestStatus.OK;
     }
-
-    // Update the inventory for product
-    function updateInventory(int _pricePerUnit, InventoryStatus _status, uint _scheme) 
-      public returns(uint256){
-    
-      if(inventory.ownerOrganization != getUserOrganization(tx.origin)){
-        return RestStatus.FORBIDDEN;
-      }
-    
-      inventory.updateInventory(_pricePerUnit, _status, _scheme);
-      return (RestStatus.OK);
-    }
-
 
     // Update the inventory quantity
     function updateInventoryQuantity(int _quantity) 
