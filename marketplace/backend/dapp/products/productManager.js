@@ -386,10 +386,12 @@ async function getInventories(admin, contract, args = {}, options) {
     const productIds = [
       ...new Set(inventories.map((inventory) => inventory.productId)),
     ];
+
     const products = await contract.getProducts(
       { address: [...productIds] },
       options
     );
+
     const inventoriesWithProductInfo = inventories
       .filter((inventory) => productIds.includes(inventory.productId))
       .map((inventory) => {
@@ -399,6 +401,7 @@ async function getInventories(admin, contract, args = {}, options) {
           ...newInventory,
         };
       });
+
     return inventoriesWithProductInfo;
   } catch (error) {
     throw error;
