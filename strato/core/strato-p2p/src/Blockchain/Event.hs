@@ -127,7 +127,6 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Hello {} -> error "A hello message appeared after the handshake"
   MsgEvt Status {} -> error "A status message appeared after the handshake"
   -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-  MsgEvt NewStatus {} -> error "A new status message appeared after the handshake"
   MsgEvt Ping -> yieldR Pong
   MsgEvt (Transactions txs) -> do
     $logInfoS "handleEvents/Transactions" . T.pack $ "Got " ++ show (length txs) ++ " transaction(s) from" ++ peerString peer ++ ", they are " ++ (intercalate "\n" (format <$> txs))
