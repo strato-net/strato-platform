@@ -1551,6 +1551,7 @@ createConnection server' client' = do
           (sinkTQueue serverToClientTQueue)
           (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+          tm
       rClient :: MonadP2PTest TestContextM (Maybe SomeException)
       rClient =
         runEthClientConduit

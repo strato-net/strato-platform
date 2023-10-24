@@ -114,7 +114,7 @@ runEthClientConduit peer pSource pSink seqSrc peerStr tm = do
   case mConnectionResult of
     Nothing                   -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSourceClient pSource seqSrc peerStr inCtx tm
+      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx tm
       !eventSink   <- mkEthP2PEventConduit peerStr outCtx
       fmap (either Just (const Nothing)) . try . runConduit $
         eventSource

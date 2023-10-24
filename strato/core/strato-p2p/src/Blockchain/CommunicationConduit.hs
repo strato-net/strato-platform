@@ -16,8 +16,7 @@
 module Blockchain.CommunicationConduit
   ( handleMsgServerConduit,
     handleMsgClientConduit,
-    mkEthP2PEventSourceClient,
-    mkEthP2PEventSourceServer,
+    mkEthP2PEventSource,
     mkEthP2PEventConduit,
   )
 where
@@ -86,7 +85,7 @@ ethVersion = 62
 blockstanbulVersion :: Int
 blockstanbulVersion = 1
 
-mkEthP2PEventSourceClient ::
+mkEthP2PEventSource ::
   ( MonadResource m,
     MonadLogger m,
     MonadUnliftIO m
@@ -97,11 +96,11 @@ mkEthP2PEventSourceClient ::
   EthCryptState ->
   ThreadMap ->
   m (ConduitM () Event m ())
-mkEthP2PEventSourceClient peerSourceConduit seqEventSource peerStr inCtx tm = do
+mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx tm = do
   canarySource <- mkCanarySource
   eventsourcethreadid <- myThreadId
   recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
-  merged <- mergeSourcesByForceClient
+  merged <- mergeSourcesByForce
               ( [ peerSourceConduit
                     .| ethDecrypt inCtx
                     .| CL.iterM (recordTraffic Inbound)
@@ -117,39 +116,6 @@ mkEthP2PEventSourceClient peerSourceConduit seqEventSource peerStr inCtx tm = do
               )
               4096 -- 🙏
               tm
-  return $
-    merged
-      .| CL.iterM recordEvent
-
-mkEthP2PEventSourceServer ::
-  ( MonadResource m,
-    MonadLogger m,
-    MonadUnliftIO m
-  ) =>
-  ConduitM () B.ByteString m () ->
-  ConduitM () P2pEvent m () ->
-  String ->
-  EthCryptState ->
-  m (ConduitM () Event m ())
-mkEthP2PEventSourceServer peerSourceConduit seqEventSource peerStr inCtx = do
-  canarySource <- mkCanarySource
-  eventsourcethreadid <- myThreadId
-  recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
-  merged <- mergeSourcesByForceServer
-             ( [ peerSourceConduit
-                   .| ethDecrypt inCtx
-                   .| CL.iterM (recordTraffic Inbound)
-                   .| bytesToMessages
-                   .| CL.iterM (displayMessage Inbound peerStr)
-                   .| CL.map MsgEvt
-                   .| CL.iterM (const $ petWatchdog recvWatchdog),
-                 seqEventSource
-                   .| CL.map NewSeqEvent,
-                 canarySource .| CL.map absurd,
-                 timerSource
-               ]
-             )
-             4096 -- 🙏
   return $
     merged
       .| CL.iterM recordEvent
