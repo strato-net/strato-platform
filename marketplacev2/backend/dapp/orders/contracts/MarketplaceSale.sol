@@ -1,40 +1,14 @@
- import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
+import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "../../../products/contracts/MarketplaceItem.sol";
 import "./OrderStatus.sol";
-import "/dapp/orders/contracts/OrderLine.sol";
+import "/mercata-base-contracts/Templates/Sale/Sale.sol";
 
 /// @title A representation of Order assets
-contract MarketplaceSale is OrderStatus {
-
-    struct OrderLineItem {
-      address public owner;
-      string public ownerOrganization;
-      string public ownerOrganizationalUnit;
-      string public ownerCommonName;
-
-      address public orderLineId;
-      string public itemId;
-      string public itemSerialNumber;
-      uint public createdDate;
-    }
-
-    struct OrderLine {
-      address public owner;
-      string public ownerOrganization;
-      string public ownerOrganizationalUnit;
-      string public ownerCommonName;
-
-      address public orderAddress;
-      address public productId;
-      address public inventoryId;
-      uint public quantity;
-      uint public pricePerUnit;
-      uint public tax;
-      uint public shippingCharges;
-      uint public createdDate;
-      bool public isSerialUploaded;
-    }
+contract MarketplaceSale is OrderStatus, Sale {
+    //Looks like there is a one to many relationship between Order and OrderLine
+    OrderLine[] orderLines;
+    Order order;
 
     struct Order {
       address public owner; 
@@ -57,29 +31,52 @@ contract MarketplaceSale is OrderStatus {
       uint public createdDate;
       string public paymentSessionId;
       address public shippingAddress;
-
-      OrderLine orderLines; //Looks like there is a one to many relationship between Order and OrderLine
     }
 
-    Order order;
+    struct OrderLine {
+      address public owner;
+      string public ownerOrganization;
+      string public ownerOrganizationalUnit;
+      string public ownerCommonName;
+      string public orderId;
+
+      address public productId;
+      address public inventoryId;
+      uint public quantity;
+      uint public pricePerUnit;
+      uint public tax;
+      uint public shippingCharges;
+      uint public createdDate;
+      bool public isSerialUploaded;
+    }
+
+    struct OrderLineItem {
+      address public owner;
+      string public ownerOrganization;
+      string public ownerOrganizationalUnit;
+      string public ownerCommonName;
+
+      address public orderLineId;
+      string public itemId;
+      string public itemSerialNumber;
+      uint public createdDate;
+    }
 
     constructor(
-            string _orderId
-        ,   string _buyerOrganization
-        ,   string _sellerOrganization
-        ,   uint _orderDate
-        ,   uint _orderTotal
-        ,   uint _orderShippingCharges
-        ,   OrderStatus _status
-        ,   uint _amountPaid
-        ,   string _buyerComments
-        ,   string _sellerComments
-        ,   uint _createdDate
-        ,   string _paymentSessionId
-        ,   address _shippingAddress
+      string _orderId
+    , string _buyerOrganization
+    , string _sellerOrganization
+    , uint _orderDate
+    , uint _orderTotal
+    , uint _orderShippingCharges
+    , uint _amountPaid
+    , string _buyerComments
+    , string _sellerComments
+    , uint _createdDate
+    , string _paymentSessionId
+    , address _shippingAddress
     ) public {
         order.owner = tx.origin;
-
         order.orderId = _orderId;
         order.buyerOrganization = _buyerOrganization;
         order.sellerOrganization = _sellerOrganization;
@@ -91,8 +88,8 @@ contract MarketplaceSale is OrderStatus {
         order.buyerComments = _buyerComments;
         order.sellerComments = _sellerComments;
         order.createdDate = _createdDate;
-        order.paymentSessionId= _paymentSessionId;
-        order.shippingAddress= _shippingAddress;
+        order.paymentSessionId = _paymentSessionId;
+        order.shippingAddress = _shippingAddress;
         
         mapping(string => string) ownerCert = getUserCert(owner);
         order.ownerOrganization = ownerCert["organization"];
@@ -101,10 +98,10 @@ contract MarketplaceSale is OrderStatus {
     }
 
     function updateBuyerDetails(
-        OrderStatus _status
-      , string _buyerComments
-      , uint _scheme
-    ) public returns (uint,string,string) {
+      OrderStatus _status
+    , string _buyerComments
+    , uint _scheme
+    ) public returns (uint, string, string) {
 
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
@@ -133,40 +130,37 @@ contract MarketplaceSale is OrderStatus {
     }
 
     function updateSellerDetails(
-        OrderStatus _status
-    ,   uint _fullfilmentDate
-    ,   string _sellerComments
-    ,   uint _scheme
-    ) public  returns (uint,string,string) {
-
+      OrderStatus _status
+    , uint _fullfilmentDate
+    , string _sellerComments
+    , uint _scheme
+    ) public returns (uint, string, string) {
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
       if(assetOwnerOrganization != sellerOrganization){
         return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
       } 
 
-    // check for open status to closed status
-     if(_status == OrderStatus.CLOSED){
-       for(uint i=0;i<order.orderLines.length;i++){
-        OrderLine orderLine = order.orderLines[i];
-        // if(!orderLine.isSerialUploaded()){
-        //   return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
-        // }
+      // check for open status to closed status
+      if (_status == OrderStatus.CLOSED) {
+        for (uint i=0; i < orderLines.length; i++) {
+          OrderLine orderLine = orderLines[i];
+          // if(!orderLine.isSerialUploaded()){
+          //   return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
+          // }
+        }
+        order.fullfilmentDate = _fullfilmentDate;
+        return getInventoriesAndAvailableQuantity(_status, _sellerComments, orderLines, false);
       }
-      order.fullfilmentDate = _fullfilmentDate;
-      return getInventoriesAndAvailableQuantity(_status,_sellerComments,order.orderLines,false);
-     }
 
       // check for open status to closed status
-     if(_status == OrderStatus.CANCELED){
-       return getInventoriesAndAvailableQuantity(_status,_sellerComments, order.orderLines,false);
-     }
-
+      if(_status == OrderStatus.CANCELED){
+        return getInventoriesAndAvailableQuantity(_status, _sellerComments, orderLines, false);
+      }
 
       if (_scheme == 0) {
         return (RestStatus.OK,"","");
       }
-
       if ((_scheme & (1 << 0)) == (1 << 0)) {
         changeStatus(_status);
       }
@@ -182,30 +176,46 @@ contract MarketplaceSale is OrderStatus {
 
     // Add the orderLine of a order
     function addOrderLine(
-      address _orderAddress, 
-      address _productId, 
-      address _inventoryId, 
-      uint _quantity, 
-      uint _pricePerUnit, 
-      uint _shippingCharges, 
-      uint _tax, 
-      uint _createdDate) public returns(uint256, address){
-
+    , address _productId
+    , address _inventoryId
+    , uint _quantity
+    , uint _pricePerUnit
+    , uint _shippingCharges
+    , uint _tax
+    , int _createdDate
+    ) public returns (uint256, address) {
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
-      if(assetOwnerOrganization != buyerOrganization){
+      if(assetOwnerOrganization != order.buyerOrganization){
         return (RestStatus.FORBIDDEN,address(0));
       } 
 
-      OrderLine orderLine = OrderLine(_orderAddress, _productId, _inventoryId, _quantity, _pricePerUnit, _shippingCharges, _tax, _createdDate);
+      OrderLine orderLine = OrderLine(
+        tx.origin,
+        ownerCert["organization"],
+        ownerCert["organizationalUnit"],
+        ownerCert["commonName"],
+        _orderId, 
+        _productId, 
+        _inventoryId, 
+        _quantity, 
+        _pricePerUnit, 
+        _shippingCharges, 
+        _tax, 
+        _createdDate, 
+        false
+      );
       orderLines.push(orderLine);
       return (RestStatus.OK,address(orderLine));
     }
 
 
     // Add the orderLineItem of a order
-    function addOrderLineItems(address _orderLineId,string[] _items, uint _createdDate ) public  returns(uint256, string, string){
-
+    function addOrderLineItems(
+      , address _orderLineId
+      , string[] _items
+      , uint _createdDate
+      ) public returns (uint256, string, string) {
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
       string orderLineItems="";
@@ -215,42 +225,51 @@ contract MarketplaceSale is OrderStatus {
       // if(assetOwnerOrganization != ownerOrganization){
       //   return (RestStatus.FORBIDDEN,address(0));
       // }
-      for(uint i=0;i<_items.length;i++){
-        if(address(_items[i]) == address(0)){
-          return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
+      for (uint i = 0; i < _items.length; i++) {
+        if(address(_items[i]) == address(0)) {
+          return (RestStatus.NOT_FOUND, string(address(0)), string(address(0)));
         }
 
         MarketplaceItem mktItem = MarketplaceItem(address(_items[i]));
 
         // check published status of items
-        if(mktItem.item.status() != ItemStatus.PUBLISHED){
+        if (mktItem.item.status() != ItemStatus.PUBLISHED) {
           return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
         }
 
         // check the item's owner
-        if(assetOwnerOrganization != item.ownerOrganization()){
-          return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
+        if (assetOwnerOrganization != item.ownerOrganization()) {
+          return (RestStatus.FORBIDDEN, string(address(0)), string(address(0)));
         } 
 
-        OrderLineItem orderLineItem = OrderLineItem(_orderLineId, string(address(_items[i])), mktItem.item.serialNumber(), _createdDate);
+        OrderLineItem orderLineItem = OrderLineItem(
+          _orderLineId, 
+          string(address(_items[i])), 
+          mktItem.item.serialNumber(), 
+          _createdDate
+        );
         orderLineItems += string(address(orderLineItem)) + ",";
         items += string(address(item)) + ",";
 
-        if(address(orderLineItem) !=address(0)){
-          orderLineItemCounter += 1;
-        }
+        if(address(orderLineItem) != address(0)) { orderLineItemCounter += 1; }
       }
-      if(orderLineItemCounter != _items.length){
+
+      if(orderLineItemCounter != _items.length) {
         return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
       }
-      isSerialUploaded=true;
+      // todo: orderLine.isSerialUploaded=true;
+      // isSerialUploaded = true;
       updateOrderStatus(OrderStatus.AWAITING_SHIPMENT);
       return (RestStatus.OK,orderLineItems,items);
     }
     
 
     // Add the orderLineItem of a order
-    function addOrderLineItems(address _orderLineId,string[] _items, uint _createdDate ) public  returns(uint256, string,string){
+    function addOrderLineItems(
+      , address _orderLineId
+      , string[] _items
+      , uint _createdDate
+      ) public returns (uint256, string, string) {
       
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
@@ -261,9 +280,9 @@ contract MarketplaceSale is OrderStatus {
       // if(assetOwnerOrganization != ownerOrganization){
       //   return (RestStatus.FORBIDDEN,address(0));
       // }
-      for(uint i=0;i<_items.length;i++){
-        if(address(_items[i]) == address(0)){
-          return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
+      for(uint i=0;i<_items.length;i++) {
+        if(address(_items[i]) == address(0)) {
+          return (RestStatus.NOT_FOUND, string(address(0)), string(address(0)));
         }
 
         MarketplaceItem mktItem = MarketplaceItem(address(_items[i]));
@@ -278,7 +297,16 @@ contract MarketplaceSale is OrderStatus {
           return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
         } 
 
-        OrderLineItem orderLineItem = OrderLineItem(_orderLineId, string(address(_items[i])), mktItem.item.serialNumber(), _createdDate);
+        OrderLineItem orderLineItem = OrderLineItem(
+          tx.origin,
+          owner["organization"],
+          ownerCert["organizationalUnit"],
+          ownerCert["commonName"]],
+          _orderLineId, 
+          string(address(_items[i])), 
+          mktItem.item.serialNumber(), 
+          _createdDate
+        );
         orderLineItems += string(address(orderLineItem)) + ",";
         items += string(address(mktItem)) + ",";
         // itemsAddresses.push(address(mktItem));
@@ -287,10 +315,11 @@ contract MarketplaceSale is OrderStatus {
         //   orderLineItemCounter += 1;
         // }
       }
+
       if(orderLineItemCounter != _items.length){
         return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
       }
-      orderLineItem.isSerialUploaded=true;
+      // orderLineItem.isSerialUploaded=true;
       updateOrderStatus(OrderStatus.AWAITING_SHIPMENT);
       return (RestStatus.OK,orderLineItems,items);
     }
@@ -313,17 +342,25 @@ contract MarketplaceSale is OrderStatus {
       order.status = _status;
     }
 
-    function getInventoriesAndAvailableQuantity(OrderStatus _status,string _comments,OrderLine _orderLines,bool _isBuyer) public returns(uint,string,string){
+    function getInventoriesAndAvailableQuantity(
+        OrderStatus _status
+      , string _comments
+      , OrderLine _orderLines
+      , bool _isBuyer
+      ) public returns (uint, string, string) {
 
       changeStatus(_status);
-      if(_isBuyer){
+
+      if (_isBuyer) {
         order.buyerComments = _comments;
-      }else{
+      } else{
         order.sellerComments = _comments;
       }
+
       string inventories = "";
       string orderLineQuantities = "";
-      for(uint i=0;i<_orderLines.length;i++){
+
+      for(uint i=0; i < _orderLines.length; i++) {
         OrderLine_2 orderLine = _orderLines[i];
         MarketplaceItem inventory = MarketplaceItem(address(orderLine.inventoryId()));
         inventories += string(address(orderLine.inventoryId())) + ",";
@@ -331,4 +368,4 @@ contract MarketplaceSale is OrderStatus {
       }
       return (RestStatus.OK,inventories,orderLineQuantities);
     }
-}
+ 
