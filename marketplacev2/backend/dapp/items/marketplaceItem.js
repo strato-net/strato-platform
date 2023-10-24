@@ -1,7 +1,6 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
-import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
 
 
@@ -55,12 +54,36 @@ async function uploadContract(user, _constructorArgs, options) {
  */
 function marshalIn(_args) {
     const defaultArgs = {
+        owner: '',
         productId: '',
         inventoryId: '',
         serialNumber: '',
-        status: 1,
         comment: '',
+        itemNumber: 0,
         createdDate: 0,
+        itemStatus: 1,
+        uniqueProductCode: '',
+        rawMaterialProductName: [''],
+        rawMaterialSerialNumber: [''],
+        rawMaterialProductId: [''],
+        availableQuantity: 0,
+        batchId: '',
+        category: '',
+        pricePerUnit: 0,
+        quantity: 0,
+        inventoryStatus: 1,
+        subCategory: '',
+        inventoryType: '',
+        name: '',
+        description: '',
+        manufacturer: '',
+        unitOfMeasurement: 1,
+        userUniqueProductCode: '',
+        leastSellableUnit: 0,
+        imageKey: '',
+        isActive: false,
+        isDeleted: false,
+        isInventoryAvailable: false
     };
 
     const args = {
@@ -116,7 +139,6 @@ function bind(user, _contract, options) {
     const contract = { ..._contract };
 
     contract.get = async (args = { address: contract.address, }) => get(user, args, options);
-    contract.getState = async () => getState(user, contract, options);
     contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
@@ -173,13 +195,29 @@ async function getAll(admin, args = {}, options) {
     return items.map((marketplaceItem) => marshalOut(marketplaceItem))
 }
 
-/**
- * Get contract state in bloc.
- * @deprecated Use {@link get `get`} instead.
- */
-async function getState(user, contract, options) {
-    const state = await rest.getState(user, contract, options);
-    return marshalOut(state);
+async function count(admin, args = {}, options) {
+    const queryArgs = setSearchQueryOptionsPrime({
+        ...args,
+        limit: undefined,
+        offset: 0,
+        order: undefined,
+    });
+
+    const totalResult = await searchAll(
+    contractName,
+    {
+        ...queryArgs,
+        sort: undefined,
+        queryOptions: {
+        ...queryArgs.queryOptions,
+        select: "count",
+        },
+    },
+    options,
+    admin
+    );
+
+    return totalResult[0].count
 }
 
 /**
@@ -219,6 +257,7 @@ export default {
     bindAddress,
     get,
     getAll,
+    count,
     getAllOwnershipEvents,
     transferOwnership,
     marshalIn,

@@ -93,7 +93,6 @@ contract MarketplaceItem is Asset,
         int _leastSellableUnit,
         string _imageKey,
         bool _isActive,
-        string _category,
         bool _isDeleted,
         bool _isInventoryAvailable
     ) Asset() public {
