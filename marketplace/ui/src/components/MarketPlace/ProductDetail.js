@@ -48,6 +48,7 @@ import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -529,6 +530,7 @@ const ProductDetails = ({ user, users }) => {
                     id="addToCart"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -548,6 +550,7 @@ const ProductDetails = ({ user, users }) => {
                     className="group w-1/3 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -571,6 +574,7 @@ const ProductDetails = ({ user, users }) => {
                     className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({

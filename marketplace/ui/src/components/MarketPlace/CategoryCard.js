@@ -21,7 +21,7 @@ const CategoryCard = () => {
     Images.clothing,
     
   ];
-  console.log(categorys)
+
   return (
     <Card className="w-full">
       <div className="flex justify-between mb-5">

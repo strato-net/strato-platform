@@ -620,6 +620,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
   };
+  contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
+    const { userAddress, queryValue, ...restArgs } = args;
+    const encodedQueryValue = encodeURIComponent(queryValue);
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const productList = await managers.productManager.getProducts({ ...restArgs, limit: 2000, offset: 0, ownerOrganization: userOrganization, queryValue: encodedQueryValue }, getOptions);
+    const productIds = productList.map(product => product.address);
+    const { queryFields, ...restArgsPrime } = restArgs
+    return managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
+  };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
@@ -1244,7 +1253,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
       const inventory = await contract.getInventory({ address: items[0].inventoryId, });
-      if (inventory.inventoryType === "Individual") {
+      if (inventory.inventoryType === "Individual" || !inventory.inventoryType) {
         const [soldStatus] = await managers.itemManager.updateItem({
           itemsAddress: itemsAddresses,
           status: ITEM_STATUS.SOLD,

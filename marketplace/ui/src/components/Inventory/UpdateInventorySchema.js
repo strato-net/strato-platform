@@ -11,7 +11,7 @@ const getSchema = () => {
     productName: yup.object().shape({
       name: yup.string().required("Product Name is required").nullable(),
     }),
-    quantity: yup.number().required("Quantity is required").nullable(),
+    availableQuantity: yup.number().required("Quantity is required").nullable(),
     pricePerUnit: yup.number().required("Price per unit is required"),
     batchId: yup.string().required("Batch ID is required"),
     status: yup.boolean().required("Status is required"),

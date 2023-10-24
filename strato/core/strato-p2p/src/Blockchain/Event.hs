@@ -218,32 +218,21 @@ handleEvents peer = awaitForever $ \case
           bestBlock <- lift $ Mod.get (Proxy @BestBlock)
           let fetchNumber = numberFromBestBlock bestBlock + 1
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-          let lastParent =
-                if M.null existingParents
-                  then fetchNumber
-                  else head . sort $ blockHeaderBlockNumber <$> M.elems existingParents
           $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
-          syncFetch Reverse lastParent
+          if M.null existingParents
+            then syncFetch Forward fetchNumber
+            else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
 
         let headerHashes = map (blockHeaderHash &&& id) headers
             hashes = map fst headerHashes
         headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
         let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
             (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
-        -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
-        -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
-        --     neededHashes = map headerHash neededHeaders
-        --     neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
-        --     unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
-        -- unless (null unfoundParents) $ do
-        --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
-        --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
-        --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
-
         lift $ putBlockHeaders neededHeaders'
         lift $ putRemainingBHeaders remainingHeaders
         $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
-        yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
+        unless (null neededHeaders') $ do 
+          yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
         lift stampActionTimestamp
       else
         $logInfoS "handleEvents/BlockHeaders" $

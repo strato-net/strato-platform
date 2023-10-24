@@ -35,22 +35,24 @@ const { Title, Text } = Typography;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
-  const debouncedSearchTerm = useDebounce("", 1000);
+  const [queryValue, setQueryValue] = useState("");
+  const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(10);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
+  const [isSearch, setIsSearch] = useState(false);
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
-  
+
   const { categorys } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
-  useInventoryState();
+    useInventoryState();
 
   //items
   const itemDispatch = useItemDispatch();
@@ -64,11 +66,13 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm);
+    if (isSearch) {
+      actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
+    } else actions.fetchInventory(dispatch, limit, offset, "");
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
-       actions.sellerStripeStatus(dispatch, user?.organization);
+    actions.sellerStripeStatus(dispatch, user?.organization);
   }, [dispatch, user]);
 
   useEffect(() => {
@@ -103,6 +107,17 @@ const Inventory = ({ user }) => {
         key: 2,
       });
     }
+  };
+
+  const queryHandle = (e) => {
+    if (e.length === 0 || e === "") {
+      setIsSearch(false)
+    } else {
+      setIsSearch(true)
+    }
+    setQueryValue(e);
+    setOffset(0);
+    setPage(1);
   };
 
   const onPageChange = (page) => {
@@ -162,7 +177,7 @@ const Inventory = ({ user }) => {
                     }
                   }}
                   disabled={stripeStatus.detailsSubmitted}
-                  >
+                >
                   {"Connect Stripe"}
                 </Button>
                 <Button
@@ -197,7 +212,12 @@ const Inventory = ({ user }) => {
                   </Breadcrumb.Item>
                 </Breadcrumb>
                 <div className="flex">
-                  <Search placeholder="Search" className="w-80 mr-3" />
+                  <Search
+                    placeholder="Search"
+                    className="w-80 mr-6"
+                    allowClear
+                    onSearch={queryHandle}
+                  />
                   <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
