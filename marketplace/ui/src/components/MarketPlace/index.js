@@ -36,7 +36,9 @@ const MarketPlace = () => {
             View More
           </div>
         </Button>
-        <Image height={380} src={Images.hero2} preview={false} width="100%" />
+        <Image height={540} src={Images.hero2}
+          style={{ objectFit: "cover" }}
+          preview={false} width="100%" />
       </div>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">
