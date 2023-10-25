@@ -213,6 +213,8 @@ class MembershipController {
         quantity: Joi.number().required(),
         pricePerUnit: Joi.number().required(),
         status: Joi.number().required(),
+        taxPercentageAmount: Joi.number().integer().min(0),
+        taxDollarAmount: Joi.number().integer().min(0),
       }
     })
 

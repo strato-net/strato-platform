@@ -219,7 +219,9 @@ const MembershipCardPurchased = ({
             updates: {
               pricePerUnit: formik.values.price,
               status: INVENTORY_STATUS.PUBLISHED,
-              quantity: 1
+              quantity: 1,
+              taxPercentageAmount: formik.values.taxPercentageAmount,
+              taxDollarAmount: formik.values.taxDollarAmount
             }
           }
           const resaleMembership = await membershipActions.resaleMembership(
@@ -328,6 +330,10 @@ const MembershipCardPurchased = ({
                       window.location.href = loginUrl;
                     } else {
                       formik.setFieldValue("name", membership.productName);
+                      // formik.setFieldValue("quantity", membership.productName);
+                      // formik.setFieldValue("price", membership.productName);
+                      formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
+                      formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
                       openListNowModal();
                     }
                   }}

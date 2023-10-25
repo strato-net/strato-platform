@@ -342,7 +342,9 @@ const MembershipDetails = ({ user, users }) => {
             updates: {
               pricePerUnit: formik.values.price,
               status: INVENTORY_STATUS.PUBLISHED,
-              quantity: formik.values.quantity
+              quantity: formik.values.quantity,
+              taxPercentageAmount: formik.values.taxPercentageAmount,
+              taxDollarAmount: formik.values.taxDollarAmount
             }
           }
           const createInventory = await membershipActions.resaleMembership(
