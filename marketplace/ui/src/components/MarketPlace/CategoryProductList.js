@@ -201,7 +201,7 @@ const CategoryProductList = ({ user }) => {
             <Divider className="m-0 mt-3" />
 
             {/* Panel - Category */}
-            {categorys.length > 0 && (
+            {/* {categorys.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -217,7 +217,7 @@ const CategoryProductList = ({ user }) => {
                       value={selectedCategories}
                     >
                       <div className="flex flex-col gap-3">
-                        {categorys.map((category, index) => (
+                        {categorys.filter(item => item.name === "Membership").map((category, index) => (
                           <Checkbox value={category.name} key={index} className="m-0">
                             {category.name}
                           </Checkbox>
@@ -228,7 +228,7 @@ const CategoryProductList = ({ user }) => {
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )}
+            )} */}
 
             {/* Panel - Price */}
             <Collapse
