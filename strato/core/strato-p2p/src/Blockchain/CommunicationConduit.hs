@@ -46,6 +46,9 @@ import Blockchain.Strato.Model.Util
 import Blockchain.TimerSource
 import Blockchain.Watchdog
 import Conduit
+import Control.Concurrent (ThreadId)
+import Control.Concurrent.Chan.Unagi
+import Control.Concurrent.Hierarchy
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Unlift
@@ -91,27 +94,28 @@ mkEthP2PEventSource ::
   ConduitM () P2pEvent m () ->
   String ->
   EthCryptState ->
+  ThreadMap ->
   m (ConduitM () Event m ())
-mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
+mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx tm = do
   canarySource <- mkCanarySource
-  tid <- myThreadId
-  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  merged <-
-    mergeSourcesByForce
-      ( [ peerSourceConduit
-            .| ethDecrypt inCtx
-            .| CL.iterM (recordTraffic Inbound)
-            .| bytesToMessages
-            .| CL.iterM (displayMessage Inbound peerStr)
-            .| CL.map MsgEvt
-            .| CL.iterM (const $ petWatchdog recvWatchdog),
-          seqEventSource
-            .| CL.map NewSeqEvent,
-          canarySource .| CL.map absurd,
-          timerSource
-        ]
-      )
-      4096 -- 🙏
+  eventsourcethreadid <- myThreadId
+  recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
+  merged <- mergeSourcesByForce
+              ( [ peerSourceConduit
+                    .| ethDecrypt inCtx
+                    .| CL.iterM (recordTraffic Inbound)
+                    .| bytesToMessages
+                    .| CL.iterM (displayMessage Inbound peerStr)
+                    .| CL.map MsgEvt
+                    .| CL.iterM (const $ petWatchdog recvWatchdog),
+                  seqEventSource
+                    .| CL.map NewSeqEvent,
+                  canarySource .| CL.map absurd,
+                  timerSource
+                ]
+              )
+              4096 -- 🙏
+              tm
   return $
     merged
       .| CL.iterM recordEvent
