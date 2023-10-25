@@ -104,28 +104,32 @@ const MembershipCardPurchased = ({
   const updateCol = (inv, texts) => (<Row
     style={{ justifyContent: 'space-between' }}>
     <p>{texts} </p>
-    <EditOutlined onClick={() => {
-      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-        window.location.href = loginUrl;
-      } else {
-        formik.setFieldValue("name", membership.productName);
-        formik.setFieldValue("tempInv", inv);
-        setIsEdit(true)
-        openListNowModal();
-      }
-    }}
-    />
   </Row>)
+
   const callDetailPage = (index, address) => {
     let route = `/memberships/${isPurchasedList ? "purchased" : "issued"}/:id`
     navigate(`${route.replace(`:id`, state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
   }
 
-  const previewCol = (indx, address) => (<Button type="text"
+  const previewCol = (inv, address) => (<Button type="text"
     className="text-primary text-sm cursor-pointer"
-    onClick={callDetailPage.bind(this, indx, address)}
+    // onClick={callDetailPage.bind(this, indx, address)}
+    onClick={() => {
+      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+        window.location.href = loginUrl;
+      } else {
+        formik.setFieldValue("name", membership.productName);
+        formik.setFieldValue("inventoryStatus", inv.status);
+        formik.setFieldValue("tempInv", inv);
+        formik.setFieldValue("taxPercentage", inv.taxPercentage);
+        formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
+        setIsEdit(true)
+        openListNowModal();
+      }
+    }}
   >
-    Preview
+    <EditOutlined
+    />
   </Button>)
 
 
@@ -134,8 +138,8 @@ const MembershipCardPurchased = ({
       key: index,
       name: inventory.block_timestamp,
       age: inventory.availableQuantity,
-      published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
-      preview: previewCol(index, inventory.address),
+      published: updateCol(inventory, inventory.status === '1' ? "Published" : "Unpublished"),
+      edit: previewCol(inventory, inventory.address),
       address: "$ " + String(inventory.pricePerUnit)
     }
   });
@@ -145,14 +149,13 @@ const MembershipCardPurchased = ({
 
   useEffect(() => {
     setVisible(false);
+    setState(membership);
   }, [success, membershipState.success])
 
-  useEffect(() => {
-    setState(membership);
-  }, [membership]);
 
   const closeListNowModal = () => {
     setVisible(false);
+    setIsEdit(false);
   };
 
   const openListNowModal = () => {
@@ -183,8 +186,10 @@ const MembershipCardPurchased = ({
               inventory: formik.values.tempInv.address,
               updates: {
                 pricePerUnit: formik.values.price,
-                status: INVENTORY_STATUS.PUBLISHED,
-                quantity: formik.values.quantity
+                status: parseInt(formik.values.inventoryStatus),
+                quantity: formik.values.tempInv.availableQuantity,
+                taxPercentageAmount: parseInt(formik.values.taxPercentage),
+                taxDollarAmount: parseInt(formik.values.taxDollarAmount)
               }
             }
             const updateInventory = await inventoryActions.updateInventory(
@@ -214,7 +219,9 @@ const MembershipCardPurchased = ({
             updates: {
               pricePerUnit: formik.values.price,
               status: INVENTORY_STATUS.PUBLISHED,
-              quantity: 1
+              quantity: 1,
+              taxPercentageAmount: formik.values.taxPercentageAmount,
+              taxDollarAmount: formik.values.taxDollarAmount
             }
           }
           const resaleMembership = await membershipActions.resaleMembership(
@@ -323,6 +330,10 @@ const MembershipCardPurchased = ({
                       window.location.href = loginUrl;
                     } else {
                       formik.setFieldValue("name", membership.productName);
+                      // formik.setFieldValue("quantity", membership.productName);
+                      // formik.setFieldValue("price", membership.productName);
+                      formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
+                      formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
                       openListNowModal();
                     }
                   }}
@@ -414,6 +425,8 @@ const MembershipCardPurchased = ({
           formik={formik}
           listType={"Sale"}
           id={itemNumber}
+          isEdit={isEdit}
+          membershipStatus={membership.status}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />

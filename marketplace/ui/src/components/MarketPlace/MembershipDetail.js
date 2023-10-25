@@ -49,6 +49,7 @@ const MembershipDetails = ({ user, users }) => {
   const { type } = useParams()
   const isIssued = type === 'issued';
   const isPurchased = type === 'purchased';
+  const isMarketPlace = (!isIssued && !isPurchased);
 
   const { state, pathname } = useLocation();
 
@@ -341,7 +342,9 @@ const MembershipDetails = ({ user, users }) => {
             updates: {
               pricePerUnit: formik.values.price,
               status: INVENTORY_STATUS.PUBLISHED,
-              quantity: formik.values.quantity
+              quantity: formik.values.quantity,
+              taxPercentageAmount: formik.values.taxPercentageAmount,
+              taxDollarAmount: formik.values.taxDollarAmount
             }
           }
           const createInventory = await membershipActions.resaleMembership(
@@ -472,20 +475,20 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin"> {inventoryDetails?.name ?? "--"} </Text>
-                {(isIssued || type === "all")
+                {(membershipDetails?.expiryDate === 0)
                   ? <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
                   : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY') ?? ""}  </Text> </Row>}
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
-                    <Text className="block text-center text-grey text-base font-poppin font-normal" > Status </Text>
-                    <Text className="block text-center text-xl font-bold mt-2" > {StatusValue[inventoryDetails?.status] ?? "--"} </Text>
+                    <Text className="block text-center text-grey text-base font-poppin font-normal" >{isMarketPlace ? "Price" : "Status"} </Text>
+                    <Text className="block text-center text-xl font-bold mt-2" >{isMarketPlace ? (`$ ${inventoryDetails?.pricePerUnit}`) : (StatusValue[inventoryDetails?.status] ?? "--")} </Text>
                   </Col>
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" > Total Savings </Text>
                     <Text className="block text-center text-xl font-bold mt-2 leading-6" style={{ color: "green" }} > $ {totalSavings}  </Text>
                   </Col>
                 </Row>
-                <Row>
+                {isMarketPlace && <Row>
                   <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
                   <Col span={24} className="border-t-1 h-20 mt-8">
                     {inventoryDetails?.availableQuantity != 0
@@ -500,13 +503,22 @@ const MembershipDetails = ({ user, users }) => {
                         </Col>
                         <Col span={4} className="rounded-md h-14" > <Button className="h-full text-center p-6 float-right add-sub-btn"
                           disabled={isIssued}
-                          onClick={add}> {plusIcon()} </Button>  </Col>
+                          onClick={add}> {plusIcon()} </Button>
+                        </Col>
                       </Row>
                       : <Paragraph style={{ color: 'red' }} className="mt-5 text-sm decoration-red-700" id="prod-price">
                         If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
                       </Paragraph>}
                   </Col>
-                </Row>
+                </Row>}
+
+                {/* {isPurchased && <Row>
+                  <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
+                  <Col span={16} className="border border-grayLight rounded-md align-middle text-center mx-auto mt-12 h-14 py-2" >
+                    <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{inventoryDetails?.availableQuantity}</Text>
+                  </Col>
+                </Row>} */}
+
               </Card>
               <Row className="h-14 mt-4">
                 {(inventoryDetails?.availableQuantity == 0) ?
@@ -530,9 +542,10 @@ const MembershipDetails = ({ user, users }) => {
                     Contact to Buy
                   </Button> :
 
-                  (isPurchased
+                  (!isMarketPlace
                     ? <Button
-                      type={ownerSameAsUser ? "default" : "primary"}
+                      // type={ownerSameAsUser ? "default" : "primary"}
+                      type="primary"
                       block={true} size="large" className=" h-full py-4 h-px-56"
                       onClick={() => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -543,7 +556,9 @@ const MembershipDetails = ({ user, users }) => {
                         }
                       }}
                     // disabled={ownerSameAsUser}
-                    > <Text className={`text-lg font-poppin ${ownerSameAsUser ? "font-bold" : "text-white"}`}>Sale </Text>
+                    > <Text className={`text-lg font-poppin text-white 
+                    `}>List for Sale </Text>
+                      {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
                     </Button>
                     : <Row className="w-full mx-auto" gutter={[12]}>
                       <Col span={12} className="mx-auto flex justify-center">

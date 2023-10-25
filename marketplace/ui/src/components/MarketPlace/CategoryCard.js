@@ -16,10 +16,10 @@ const CategoryCard = () => {
   const { categorys } = useCategoryState();
 
   const categoryImages = [
+    Images.membership,
     Images.art,
     Images.carbon,
     Images.realEstate,
-    Images.membership
   ];
 
   return (
@@ -35,8 +35,8 @@ const CategoryCard = () => {
           </div>
         </Space>
       </div>
-      <div className="flex justify-evenly px-2">
-        {categorys.map((category, index) => {
+      <div className="flex px-2">
+        {categorys.filter(item => item.name === "Membership").map((category, index) => {
           return (
             <div
               id={category.name}

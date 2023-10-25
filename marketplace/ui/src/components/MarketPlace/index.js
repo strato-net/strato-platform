@@ -30,13 +30,15 @@ const MarketPlace = () => {
         </Typography.Text>
         <Button
           id="viewMore"
-          onClick={() => navigate(routes.MarketplaceProductList.url)}
+          onClick={() => navigate(routes.MarketplaceProductList.membershipUrl)}
           className="group w-44 h-11 z-10 absolute left-12 top-60 border border-primary hover:bg-primary">
           <div className="text-primary group-hover:text-white text-sm font-medium ">
             View More
           </div>
         </Button>
-        <Image height={380} src={Images.hero2} preview={false} width="100%" />
+        <Image height={540} src={Images.hero2}
+          style={{ objectFit: "cover" }}
+          preview={false} width="100%" />
       </div>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">

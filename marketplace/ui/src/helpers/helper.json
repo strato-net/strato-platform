@@ -73,9 +73,9 @@
       "width": "20%"
     },
     {
-      "title": "Preview",
-      "dataIndex": "preview",
-      "key": "preview",
+      "title": "Edit",
+      "dataIndex": "edit",
+      "key": "edit",
       "width": "7%"
     }
   ],
@@ -86,5 +86,9 @@
   "statusText": {
     "1": "For Sale",
     "2": "Not For Sale"
+  },
+  "StatusValue": {
+    "1": "Published",
+    "2": "UnPublished"
   }
 }

@@ -154,6 +154,8 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
         int _pricePerUnit,
         InventoryStatus _status,
         int _quantity,
+        uint _taxPercentageAmount,
+        uint _taxDollarAmount,
         uint _scheme
     ) public returns (uint256) {
         if (ownerOrganization != getUserOrganization(tx.origin)) {
@@ -161,7 +163,14 @@ contract Product_3 is UnitOfMeasurement, InventoryStatus {
         }
 
         Inventory_2 inventory = Inventory_2(_inventory);
-        inventory.update(_pricePerUnit, _status, _quantity, _scheme);
+        inventory.update(
+            _pricePerUnit,
+            _status,
+            _quantity,
+            _taxPercentageAmount,
+            _taxDollarAmount,
+            _scheme
+        );
         return (RestStatus.OK);
     }
 

@@ -266,6 +266,10 @@ async function updateInventory(admin, contract, _args, baseOptions) {
         return agg | (base << 1);
       case "quantity":
         return agg | (base << 2);
+      case "taxPercentageAmount":
+        return agg | (base << 3);
+      case "taxDollarAmount":
+        return agg | (base << 4);
       default:
         return agg;
     }

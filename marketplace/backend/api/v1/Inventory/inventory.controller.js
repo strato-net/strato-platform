@@ -128,10 +128,10 @@ class InventoryController {
         })).required()
       }).required(),
       taxPercentageAmount: Joi.number().integer().min(0).required(),
-      taxDollarAmount:     Joi.number().integer().min(0).required(),
+      taxDollarAmount: Joi.number().integer().min(0).required(),
     });
 
-    
+
     const validation = createInventorySchema.validate(args);
 
     if (validation.error) {
@@ -149,7 +149,9 @@ class InventoryController {
       updates: Joi.object({
         pricePerUnit: Joi.number().integer().greater(0).required(),
         status: Joi.number().integer().min(1).max(2),
-        quantity: Joi.number().integer().min(0)
+        quantity: Joi.number().integer().min(0),
+        taxPercentageAmount: Joi.number().integer().min(0),
+        taxDollarAmount: Joi.number().integer().min(0),
       }).required()
     });
 

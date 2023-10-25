@@ -27,14 +27,12 @@ const PurchasedList = (
           <Spin spinning={isPurchasedMembershipLoading} size="large" />
         </div>
       ) : purchasedMemberships.length === 0 ? (
-        <div className="h-screen w-full justify-center flex flex-col items-center">
-          <div className="text-center">
-            <Image src={Images.noProductSymbol} preview={false} />
-            <Title level={3} className="mt-2 text-center">
-              No product found
-            </Title>
-          </div>
-        </div>
+        <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
+        <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
+        <Title level={3} className="mt-2">
+          No product found
+        </Title>
+      </div>
       ) : (
         <>
 

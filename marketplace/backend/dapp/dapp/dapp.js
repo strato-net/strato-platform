@@ -592,7 +592,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
     const itemsAddress = items.map((item) => item.address);
     await managers.productManager.updateInventory(args);
-    const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
+    const itemParams = { itemsAddress, comment: "", status: args.updates.status,expiryDate:items[0].expiryDate };
     return await managers.itemManager.updateItem(itemParams);
   };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
@@ -1175,7 +1175,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             timePeriodInMonths: memberships[0].timePeriodInMonths,
             savings: savings[0]?.savings,
             membershipAddress: memberships[0].address,
-            expiryDate: item?.expiryDate
+            expiryDate: item?.expiryDate,
+            taxDollarAmount: inventoryDetail.taxDollarAmount,
+            taxPercentageAmount:inventoryDetail.taxPercentageAmount
           };
         });
 
@@ -1749,14 +1751,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         memberships = memberships.map(membership => {
           let transformedData = { inventories: [], ...membership }
           let item = itemsList.filter((item) => item.productId == membership.productId);
-          let itemNumber = ''
-          let itemAddress = ''
+          let itemNumber = '';
+          let itemAddress = '';
+          let status = '';
           if (item) {
             itemNumber = item[0]?.itemNumber;
             itemAddress = item[0]?.address;
+            status = item[0]?.status;
           }
           return (membership.productId === inventory.productId) ?
-            { ...membership, inventories: [...transformedData.inventories, inventory], itemNumber, itemAddress } : membership;
+            { ...membership, inventories: [...transformedData.inventories, inventory], itemNumber, itemAddress, status } : membership;
         })
       });
 
