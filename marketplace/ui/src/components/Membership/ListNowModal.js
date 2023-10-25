@@ -20,7 +20,9 @@ const ListNowModal = ({
 }) => {
   const { type } = useParams()
   const isIssued = type === 'issued';
-  const { isInventoriesLoading, inventories, isCreateInventorySubmitting, isinventoryUpdating, inventoryDetails } = useInventoryState();
+  const isPurchased = type === 'purchased';
+  
+  const { isInventoriesLoading, inventories, isCreateInventorySubmitting, isinventoryUpdating, inventoryDetails, Inventory } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState()
   // const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user?.user?.user?.organization || user?.user?.organization;
@@ -96,8 +98,8 @@ const ListNowModal = ({
             <Row><Text className="font-medium">Membership</Text> </Row>
             <Row> <Input type="text" value={membership} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
-          {/* <Col span={8}>
-            <Row> <Text className="font-medium">ID</Text></Row>
+         {isPurchased && <Col span={8}>
+            <Row> <Text className="font-medium">Membership Number</Text></Row>
             <Row><Input type="text" value={id} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /></Row>
           </Col> */}
           <Col span={8}>

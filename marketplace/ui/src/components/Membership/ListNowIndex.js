@@ -29,11 +29,13 @@ const ListNowIndex = ({
   //   isCreateMembershipSubmitting,
 }) => {
   const { type } = useParams();
+  const isIssued = type === 'issued';
+  const isPurchased = type === 'purchased';
+
   const { inventories, isInventoriesLoading, isCreateInventorySubmitting } = useInventoryState()
   const [availableQuantity, setAvailableQuantity] = useState('');
   // const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
   const seller = user.user.organization;
-  const isIssued = type === 'issued';
   const { cartList } = useMarketplaceState();
   const [purchasedMembershipData, setPurchasedMembershipData] = useState([]);
   const [memebershipList, setMemebershipList] = useState([]);
@@ -232,8 +234,8 @@ const ListNowIndex = ({
               options={purchasedMembershipData}
             /> </Row>
           </Col>
-          <Col span={8}>
-            <Row> <Text className="font-medium">ID</Text></Row>
+          {isPurchased && <Col span={8}>
+            <Row> <Text className="font-medium">Membership Number</Text></Row>
             <Row><Select
               className="w-full mt-2"
               size="large"
@@ -249,7 +251,7 @@ const ListNowIndex = ({
               }}
               options={memebershipList}
             /></Row>
-          </Col>
+          </Col>}
           <Col span={8}>
             <Row> <Text className="font-medium">Quantity</Text></Row>
             <Row><InputNumber
@@ -330,10 +332,10 @@ const ListNowIndex = ({
               />
             </Row>
           </Col>
-          <Col span={8}>
+          {isPurchased && <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={(isIssued || isSellModal) ? 'New' : 'Sale'} size="large" disabled={true} className="cursor-not-allowed mt-2 h-12" /> </Row>
-          </Col>
+          </Col>}
         </Row>
       </Form >
     </Modal >
