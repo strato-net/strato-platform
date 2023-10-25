@@ -183,8 +183,8 @@ const MembershipCardPurchased = ({
               inventory: formik.values.tempInv.address,
               updates: {
                 pricePerUnit: formik.values.price,
-                status: INVENTORY_STATUS.PUBLISHED,
-                quantity: formik.values.quantity
+                status: formik.values.inventoryStatus,
+                quantity: formik.values.tempInv.availableQuantity
               }
             }
             const updateInventory = await inventoryActions.updateInventory(
@@ -414,6 +414,8 @@ const MembershipCardPurchased = ({
           formik={formik}
           listType={"Sale"}
           id={itemNumber}
+          isEdit={isEdit}
+          membershipStatus={membership.status}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />

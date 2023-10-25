@@ -59,6 +59,7 @@ const IssuedList = (
             transformedData["productImageLocation"] = item.productImageLocation;
             transformedData["savings"] = item.savings;
             transformedData["expiryDate"] = "";
+            transformedData["status"] = item.status;
             return (
               <Col span={12}>
                 <MembershipCardPurchased
@@ -69,6 +70,7 @@ const IssuedList = (
                   debouncedSearchTerm={debouncedSearchTerm}
                   membershipId={item.address}
                   isPurchasedList={false}
+                  MembershipCardPurchased={index}
                 />
               </Col>
             );
