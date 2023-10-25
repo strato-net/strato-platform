@@ -128,10 +128,10 @@ const ListNowModal = ({
               className="w-full mt-2"
               // size="large"
               prefix={isInventoriesLoading && <Spin />}
-              disabled={(!isIssued && listType !== "New") || isEdit}
+              disabled={(!isIssued && !isNew) || isEdit}
               // value={1}
               controls={false}
-              value={(isIssued || listType === "New") ? (isEdit ? formik?.values?.tempInv?.availableQuantity : formik.values.quantity) : 1}
+              value={(isIssued || isNew) ? (isEdit ? formik?.values?.tempInv?.availableQuantity : formik.values.quantity) : 1}
               onChange={(value) => {
                 formik.setFieldValue("quantity", value);
               }}
