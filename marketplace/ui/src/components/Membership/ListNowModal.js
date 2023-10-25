@@ -20,7 +20,7 @@ const ListNowModal = ({
 }) => {
   const { type } = useParams()
   const isIssued = type === 'issued';
-  const { isInventoriesLoading, inventories, isCreateInventorySubmitting, isinventoryUpdating } = useInventoryState();
+  const { isInventoriesLoading, inventories, isCreateInventorySubmitting, isinventoryUpdating, inventoryDetails } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState()
   // const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user?.user?.user?.organization || user?.user?.organization;
@@ -28,7 +28,7 @@ const ListNowModal = ({
   let { isResaleMembershipSubmitting } = useMembershipState();
   const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting || isinventoryUpdating;
   // const { type } = useParams();
-
+  console.log("inventoryDetails============>", inventoryDetails);
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {
       return '0.00';
@@ -73,9 +73,10 @@ const ListNowModal = ({
         <Row>
           <Button
             key="list-now"
-            className="mx-auto w-52"
+            className="mx-auto w-52 mt-10"
             onClick={formik.handleSubmit}
             loading={isSubmit}
+            size="large"
             type="primary"
           >
             List Now
@@ -96,10 +97,10 @@ const ListNowModal = ({
             <Row><Text className="font-medium">Membership</Text> </Row>
             <Row> <Input type="text" value={membership} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
-          {!isIssued && <Col span={8}>
+          {/* <Col span={8}>
             <Row> <Text className="font-medium">ID</Text></Row>
             <Row><Input type="text" value={id} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /></Row>
-          </Col>}
+          </Col> */}
           <Col span={8}>
             <Row> <Text className="font-medium">Quantity</Text></Row>
             <Row><InputNumber
@@ -108,7 +109,7 @@ const ListNowModal = ({
               min={0}
               // max={inventoryQuantity}
               className="w-full mt-2"
-              size="large"
+              // size="large"
               prefix={isInventoriesLoading && <Spin />}
               disabled={!isIssued && listType !== "New"}
               // value={1}
@@ -170,14 +171,16 @@ const ListNowModal = ({
               }}
             /></Row>
           </Col>
-          {!isIssued && <Col span={8}>
+          {/* <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
-          </Col>}
-          {isIssued && <Col span={8}>
+          </Col> */}
+          <Col span={8}>
             <Row> <Text className="font-medium">Status</Text></Row>
-            <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
-          </Col>}
+            <Row>
+              <Input type="text" value={inventoryDetails?.status === 1 ? "Published" : "UnPublished"} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" />
+            </Row>
+          </Col>
         </Row>
       </Form>
     </Modal>
