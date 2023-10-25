@@ -251,12 +251,12 @@ const Membership = (user) => {
                         All
                     </Dropdown.Button>
                 </Col> */}
-              <Col md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 11 }} className="py-0 m-0 pt-1">
-                <Col className="flex justify-between">
+              <Col md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 16 }} className="py-0 m-0 pt-1">
+                <Col className="flex justify-between float-right">
                   <Button
                     id="add-product-button"
                     type="primary"
-                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold flex"
+                    className="py-3 px-6 h-12 bg-500 mx-4 !hover:bg-primaryHover font-semibold flex"
                     style={{
                       backgroundColor: "blue",
                       color: "white",
@@ -282,7 +282,7 @@ const Membership = (user) => {
                       // backgroundColor: "green",
                       color: "black",
                     }}
-                    className="py-3 px-6 h-12 bg-white align-middle font-semibold !hover:bg-primaryHover flex"
+                    className="py-3 px-6 h-12 mx-4 bg-white align-middle font-semibold !hover:bg-primaryHover flex"
                     onClick={() => {
                       if (
                         hasChecked &&
@@ -305,7 +305,7 @@ const Membership = (user) => {
                       color: "black",
 
                     }}
-                    className="py-3 px-6 h-12 bg-white !hover:bg-primaryHover font-semibold flex"
+                    className="py-3 px-6 mx-4 h-12 bg-white !hover:bg-primaryHover font-semibold flex"
                     onClick={() => {
                       setCookie("returnUrl", `/marketplace/memberships/serviceUsage/booked`, 10);
                       navigate("/memberships/serviceUsage/booked")
@@ -327,9 +327,9 @@ const Membership = (user) => {
                   </Button> */}
                   <Button
                     id="add-product-button"
-                    type="primary"
+                    type={stripeStatus.detailsSubmitted?"default":"primary"}
                     style={{ color: "white", fontWeight: "bold" }}
-                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold"
+                    className="py-3 px-6 mx-4 h-12 bg-500 !hover:bg-primaryHover font-semibold"
                     disabled={stripeStatus.detailsSubmitted}
                     onClick={() => {
                       if (
