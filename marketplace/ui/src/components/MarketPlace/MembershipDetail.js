@@ -510,12 +510,12 @@ const MembershipDetails = ({ user, users }) => {
                   </Col>
                 </Row>}
 
-                {isPurchased && <Row>
+                {/* {isPurchased && <Row>
                   <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
                   <Col span={16} className="border border-grayLight rounded-md align-middle text-center mx-auto mt-12 h-14 py-2" >
                     <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{inventoryDetails?.availableQuantity}</Text>
                   </Col>
-                </Row>}
+                </Row>} */}
 
               </Card>
               <Row className="h-14 mt-4">
