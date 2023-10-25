@@ -94,15 +94,15 @@ const Membership = (user) => {
     isIssuedMembershipLoading,
     isPurchasedMembershipLoading,
     purchasedMemberships,
-    // message,
-    // success,
+    message,
+    success,
     stripeStatus,
     isLoadingStripeStatus,
   } = useMembershipState();
   const membershipState = useMembershipState();
   const inventoryState = useInventoryState();
-  const success = membershipState.success || inventoryState.success;
-  const message = membershipState.message || inventoryState.message;
+  // const success = membershipState.success || inventoryState.success;
+  // const message = membershipState.message || inventoryState.message;
 
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.user?.organization);
