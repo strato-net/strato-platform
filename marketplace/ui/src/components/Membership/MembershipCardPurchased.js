@@ -119,6 +119,7 @@ const MembershipCardPurchased = ({
         window.location.href = loginUrl;
       } else {
         formik.setFieldValue("name", membership.productName);
+        formik.setFieldValue("inventoryStatus", inv.status);
         formik.setFieldValue("tempInv", inv);
         setIsEdit(true)
         openListNowModal();
@@ -183,7 +184,7 @@ const MembershipCardPurchased = ({
               inventory: formik.values.tempInv.address,
               updates: {
                 pricePerUnit: formik.values.price,
-                status: formik.values.inventoryStatus,
+                status: parseInt(formik.values.inventoryStatus),
                 quantity: formik.values.tempInv.availableQuantity
               }
             }
