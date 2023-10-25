@@ -201,7 +201,7 @@ const ListNowIndex = ({
         <Row>
           <Button
             key="list-now"
-            className="mx-auto w-52 font-bold"
+            className="mx-auto w-52 mt-10 font-bold"
             size="large"
             disabled={(isListNow || isResaleMembershipSubmitting) && (!isIssued && !isSellModal)}
             loading={isResaleMembershipSubmitting || isCreateInventorySubmitting}
