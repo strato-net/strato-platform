@@ -592,7 +592,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
     const itemsAddress = items.map((item) => item.address);
     await managers.productManager.updateInventory(args);
-    const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
+    const itemParams = { itemsAddress, comment: "", status: args.updates.status,expiryDate:items[0].expiryDate };
     return await managers.itemManager.updateItem(itemParams);
   };
   contract.getProduct = async function (args, options = optionsNoChainIds) {

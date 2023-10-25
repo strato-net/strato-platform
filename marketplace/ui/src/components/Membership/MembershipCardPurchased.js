@@ -113,9 +113,8 @@ const MembershipCardPurchased = ({
 
   const previewCol = (inv, address) => (<Button type="text"
     className="text-primary text-sm cursor-pointer"
-  // onClick={callDetailPage.bind(this, indx, address)}
-  >
-    <EditOutlined onClick={() => {
+    // onClick={callDetailPage.bind(this, indx, address)}
+    onClick={() => {
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
@@ -125,6 +124,8 @@ const MembershipCardPurchased = ({
         openListNowModal();
       }
     }}
+  >
+    <EditOutlined
     />
   </Button>)
 
@@ -134,7 +135,7 @@ const MembershipCardPurchased = ({
       key: index,
       name: inventory.block_timestamp,
       age: inventory.availableQuantity,
-      published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
+      published: updateCol(inventory, inventory.status === '1' ? "Published" : "Unpublished"),
       edit: previewCol(inventory, inventory.address),
       address: "$ " + String(inventory.pricePerUnit)
     }
