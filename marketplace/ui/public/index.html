@@ -22,6 +22,12 @@
       href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap"
       rel="stylesheet"
     />
+    <!-- 
+      See docs on inserting an env variable in the index.html here
+      I get errors if I try to use src={`...url?site_id=${Env_Variable}`}
+      https://create-react-app.dev/docs/adding-custom-environment-variables/#referencing-environment-variables-in-the-html 
+    -->
+    <script async defer src="https://tools.luckyorange.com/core/lo.js?site-id=%REACT_APP_LO_SITE_ID%"></script>
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.
       It will be replaced with the URL of the `public` folder during the build.

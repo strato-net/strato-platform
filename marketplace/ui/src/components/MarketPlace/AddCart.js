@@ -325,6 +325,12 @@ const Checkout = ({ user }) => {
             let items = [...cartList];
             items.splice(
               items.findIndex(function (i) {
+                window.LOQ = window.LOQ || []
+                window.LOQ.push(['ready', async LO => {
+                    // Track an event
+                    await LO.$internal.ready('events')
+                    LO.events.track('Delete Cart Item', { product: i.product.name, category: i.product.category })
+                }])
                 TagManager.dataLayer({
                   dataLayer: {
                     event: 'delete_item_from_cart',
