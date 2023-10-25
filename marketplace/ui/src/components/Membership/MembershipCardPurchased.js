@@ -146,11 +146,9 @@ const MembershipCardPurchased = ({
 
   useEffect(() => {
     setVisible(false);
+    setState(membership);
   }, [success, membershipState.success])
 
-  useEffect(() => {
-    setState(membership);
-  }, [membership]);
 
   const closeListNowModal = () => {
     setVisible(false);

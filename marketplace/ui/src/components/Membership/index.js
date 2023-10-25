@@ -48,8 +48,9 @@ const { Title, Text } = Typography;
 
 const Membership = (user) => {
   const { type } = useParams();
+  const isPurchased = type === "purchased";
   let { state } = useLocation();
-  const isOpen = (state && user.user && state.isCalledFromHeader && type === "purchased") ?? false
+  const isOpen = (state && user.user && state.isCalledFromHeader && isPurchased) ?? false
   const [open, setOpen] = useState(isOpen);
 
   // useEffect(() => {
@@ -85,7 +86,7 @@ const Membership = (user) => {
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
-  }, [categoryDispatch]);
+  }, []);
 
   let {
     memberships,
@@ -105,7 +106,7 @@ const Membership = (user) => {
 
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.user?.organization);
-  }, [dispatch, user]);
+  }, [user]);
 
   const navigate = useNavigate();
 
@@ -122,13 +123,13 @@ const Membership = (user) => {
   //   actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
   // }, [limit, offset, debouncedSearchTerm]);
 
-  useEffect(() => {
-    let len = memberships.length;
-    let total;
-    if (len === limit) total = page * 10 + limit;
-    else total = (page - 1) * 10 + limit;
-    setTotal(total);
-  }, [memberships]);
+  // useEffect(() => {
+  //   let len = memberships.length;
+  //   let total;
+  //   if (len === limit) total = page * 10 + limit;
+  //   else total = (page - 1) * 10 + limit;
+  //   setTotal(total);
+  // }, [memberships]);
 
   const showModal = () => {
     hasChecked && !isAuthenticated && loginUrl !== undefined
@@ -155,18 +156,7 @@ const Membership = (user) => {
     setOffset((page - 1) * limit);
     setPage(page);
   };
-  const dummyData = [
-    //TODO, unhardcode this
-    {
-      //When the utility of this
-      label: "All", //understood
-      key: "1",
-    },
-    {
-      label: "Health",
-      key: "2",
-    },
-  ];
+
   const onChange = (key) => {
     setCookie("returnUrl", `/marketplace/memberships/${key}`, 10);
     navigate(`/memberships/${key}`)
@@ -176,7 +166,7 @@ const Membership = (user) => {
   const items = [
     {
       key: "purchased",
-      label: <Text className="text-xl font-bold leading-6" style={{ color: type === "purchased" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Purchased</Text>,
+      label: <Text className="text-xl font-bold leading-6" style={{ color: isPurchased ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Purchased</Text>,
     },
     {
       key: "issued",
@@ -190,7 +180,6 @@ const Membership = (user) => {
   const openSellModal = () => {
     setVisible(true);
   };
-
 
   const openToast = (placement) => {
     if (success) {
@@ -236,7 +225,7 @@ const Membership = (user) => {
                     <Row>
                       <Typography.Text className="text-sm font-medium text-grey">
                         {(isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading)
-                          ? <Spin size="small" /> : (type === "purchased" ? purchasedMemberships?.length : memberships?.length)} {type} Memberships found
+                          ? <Spin size="small" /> : (isPurchased ? purchasedMemberships?.length : memberships?.length)} {type} Memberships found
                       </Typography.Text>
                     </Row>
                   </Col>
@@ -327,7 +316,7 @@ const Membership = (user) => {
                   </Button> */}
                   <Button
                     id="add-product-button"
-                    type={stripeStatus.detailsSubmitted?"default":"primary"}
+                    type={stripeStatus.detailsSubmitted ? "default" : "primary"}
                     style={{ color: "white", fontWeight: "bold" }}
                     className="py-3 px-6 mx-4 h-12 bg-500 !hover:bg-primaryHover font-semibold"
                     disabled={stripeStatus.detailsSubmitted}
@@ -360,7 +349,7 @@ const Membership = (user) => {
             </Col>
           </Row>
           <Row className="mx-16">
-            {type === "purchased" ? (
+            {isPurchased ? (
               <PurchasedList
                 user={user}
                 categorys={categorys}
