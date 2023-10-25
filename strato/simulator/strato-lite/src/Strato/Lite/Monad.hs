@@ -1676,9 +1676,9 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  tm                  <- newThreadMap
   let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer =
+      rServer = do
+        tm <- liftIO newThreadMap
         runEthServerConduit
           (_p2pPeerPPeer client')
           (sourceTQueue clientToServerTQueue)
@@ -1687,7 +1687,8 @@ createConnection server' client' = do
           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
           tm
       rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient =
+      rClient = do
+        tm <- liftIO newThreadMap
         runEthClientConduit
           (_p2pPeerPPeer server')
           (sourceTQueue serverToClientTQueue)
