@@ -102,8 +102,13 @@ const Product = () => {
   };
 
   const queryHandle = (e) => {
-    setQueryValue(e.target.value);
-    setIsSearch(true)
+    if (e.length === 0 || e === "") {
+      setIsSearch(false)
+    } else {
+      setIsSearch(true)
+    }
+    setQueryValue(e);
+    setOffset(0);
     setPage(1);
   };
 
@@ -163,8 +168,7 @@ const Product = () => {
                     placeholder="Search"
                     className="w-80 mr-6"
                     allowClear
-                    onChange={queryHandle}
-                    value={queryValue}
+                    onSearch={queryHandle}
                   />
                   <Button id="add-product-button" type="primary" className="w-48"
                     onClick={() => {

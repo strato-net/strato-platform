@@ -592,17 +592,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
   };
   contract.getProducts = async function (args, options = optionsNoChainIds) {
+    const { queryValue, ...restArgs } = args;
+    const encodedQueryValue = encodeURIComponent(queryValue);
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    console.log('dapp.getProducts - userOrganization', userOrganization)
     const products = await managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      { ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization, queryValue: encodedQueryValue },
       getOptions
     );
     const productCount = await managers.productManager.count(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      { ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization },
       getOptions
     );
-    return {products: products, productCount: productCount}
+    return { products: products, productCount: productCount }
   };
   contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
