@@ -35,12 +35,12 @@ const IssuedList = (
           <Spin spinning={isMembershipsLoading} size="large" />
         </div>
       ) : memberships?.length === 0 ? (
-        <div className="h-screen justify-center flex flex-col items-center mx-auto">
-          <Image src={Images.noProductSymbol} preview={false} />
-          <Title level={3} className="mt-2">
-            No product found
-          </Title>
-        </div>
+        <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
+        <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
+        <Title level={3} className="mt-2">
+          No product found
+        </Title>
+      </div>
       ) : (
         <Row className="my-4 flex flex-row" gutter={[12, 12]}>
           {memberships?.map((item, index) => {
