@@ -121,6 +121,8 @@ const MembershipCardPurchased = ({
         formik.setFieldValue("name", membership.productName);
         formik.setFieldValue("inventoryStatus", inv.status);
         formik.setFieldValue("tempInv", inv);
+        formik.setFieldValue("taxPercentage", inv.taxPercentage);
+        formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
         setIsEdit(true)
         openListNowModal();
       }
@@ -185,7 +187,9 @@ const MembershipCardPurchased = ({
               updates: {
                 pricePerUnit: formik.values.price,
                 status: parseInt(formik.values.inventoryStatus),
-                quantity: formik.values.tempInv.availableQuantity
+                quantity: formik.values.tempInv.availableQuantity,
+                taxPercentageAmount: parseInt(formik.values.taxPercentage),
+                taxDollarAmount: parseInt(formik.values.taxDollarAmount)
               }
             }
             const updateInventory = await inventoryActions.updateInventory(

@@ -133,6 +133,8 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         int _pricePerUnit,
         InventoryStatus _status,
         int _quantity,
+        uint _taxPercentageAmount,
+        uint _taxDollarAmount,
         uint _scheme
     ) returns (uint256) {
         Product_3 product = Product_3(_productAddress);
@@ -142,6 +144,8 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
                 _pricePerUnit,
                 _status,
                 _quantity,
+                _taxPercentageAmount,
+                _taxDollarAmount,
                 _scheme
             );
     }

@@ -57,6 +57,8 @@ contract Inventory_2 is InventoryStatus {
         int _pricePerUnit,
         InventoryStatus _status,
         int _quantity,
+        uint _taxPercentageAmount,
+        uint _taxDollarAmount,
         uint _scheme
     ) returns (uint) {
         if (ownerOrganization != getUserOrganization(tx.origin)) {
@@ -75,6 +77,12 @@ contract Inventory_2 is InventoryStatus {
         }
         if ((_scheme & (1 << 2)) == (1 << 2)) {
             availableQuantity = _quantity;
+        }
+        if ((_scheme & (1 << 3)) == (1 << 3)) {
+            taxPercentageAmount = _taxPercentageAmount;
+        }
+        if ((_scheme & (1 << 4)) == (1 << 4)) {
+            taxDollarAmount = _taxDollarAmount;
         }
         return RestStatus.OK;
     }

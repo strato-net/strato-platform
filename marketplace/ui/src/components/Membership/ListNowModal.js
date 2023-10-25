@@ -165,10 +165,10 @@ const ListNowModal = ({
                 formik.setFieldValue("taxPercentage", value);
                 formik.values.isTaxPercentage ?
                   (formik.setFieldValue("taxPercentageAmount", value))
-                  : (formik.setFieldValue("taxDollarAmount", value))
+                  : (formik.setFieldValue("taxDollarAmount", 0))
                 !formik.values.isTaxPercentage ?
                   (formik.setFieldValue("taxPercentageAmount", 0))
-                  : (formik.setFieldValue("taxDollarAmount", 0))
+                  : (formik.setFieldValue("taxDollarAmount", value))
               }}
             /></Row>
           </Col>
