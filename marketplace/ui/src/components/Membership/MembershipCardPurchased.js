@@ -153,6 +153,7 @@ const MembershipCardPurchased = ({
 
   const closeListNowModal = () => {
     setVisible(false);
+    setIsEdit(false);
   };
 
   const openListNowModal = () => {
