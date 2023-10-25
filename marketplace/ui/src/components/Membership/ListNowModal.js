@@ -96,10 +96,10 @@ const ListNowModal = ({
             <Row><Text className="font-medium">Membership</Text> </Row>
             <Row> <Input type="text" value={membership} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col>
-          <Col span={8}>
+          {!isIssued && <Col span={8}>
             <Row> <Text className="font-medium">ID</Text></Row>
             <Row><Input type="text" value={id} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /></Row>
-          </Col>
+          </Col>}
           <Col span={8}>
             <Row> <Text className="font-medium">Quantity</Text></Row>
             <Row><InputNumber
@@ -110,7 +110,7 @@ const ListNowModal = ({
               className="w-full mt-2"
               size="large"
               prefix={isInventoriesLoading && <Spin />}
-              disabled={!isIssued && listType!=="New"}
+              disabled={!isIssued && listType !== "New"}
               // value={1}
               controls={false}
               value={(isIssued || listType === "New") ? formik.values.quantity : 1}
@@ -170,10 +170,14 @@ const ListNowModal = ({
               }}
             /></Row>
           </Col>
-          <Col span={8}>
+          {!isIssued && <Col span={8}>
             <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
-          </Col>
+          </Col>}
+          {isIssued && <Col span={8}>
+            <Row> <Text className="font-medium">Status</Text></Row>
+            <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
+          </Col>}
         </Row>
       </Form>
     </Modal>
