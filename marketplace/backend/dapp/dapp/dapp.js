@@ -1749,14 +1749,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         memberships = memberships.map(membership => {
           let transformedData = { inventories: [], ...membership }
           let item = itemsList.filter((item) => item.productId == membership.productId);
-          let itemNumber = ''
-          let itemAddress = ''
+          let itemNumber = '';
+          let itemAddress = '';
+          let status = '';
           if (item) {
             itemNumber = item[0]?.itemNumber;
             itemAddress = item[0]?.address;
+            status = item[0]?.status;
           }
           return (membership.productId === inventory.productId) ?
-            { ...membership, inventories: [...transformedData.inventories, inventory], itemNumber, itemAddress } : membership;
+            { ...membership, inventories: [...transformedData.inventories, inventory], itemNumber, itemAddress, status } : membership;
         })
       });
 
