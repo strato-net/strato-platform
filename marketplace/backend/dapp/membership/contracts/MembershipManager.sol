@@ -10,8 +10,8 @@ import "/dapp/productFile/contracts/ProductFileType.sol";
 
 
 
-/// @title A representation of MembershipManager to manage membership and inventory
-contract MembershipManager is RestStatus, ProductFileSection, ProductFileType{
+/// @title A representation of Mem_MembershipManager to manage membership and inventory
+contract Mem_MembershipManager is RestStatus, ProductFileSection, ProductFileType{
 
 
     address owner;
@@ -76,7 +76,7 @@ contract MembershipManager is RestStatus, ProductFileSection, ProductFileType{
         //     return (RestStatus.NOT_FOUND, address(0));
         // }
 
-        ProductManager productManager = ProductManager(dapp.productManager());
+        Mem_ProductManager productManager = Mem_ProductManager(dapp.productManager());
 
 
 

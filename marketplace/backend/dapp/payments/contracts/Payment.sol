@@ -4,7 +4,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of Payment assets
-contract Payment_3 {
+contract Mem_Payment_3 {
 
     address public owner;
     string public ownerOrganization;

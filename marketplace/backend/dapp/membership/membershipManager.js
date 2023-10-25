@@ -5,11 +5,11 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 
-const contractName = 'MembershipManager';
+const contractName = 'Mem_MembershipManager';
 const contractFilename = `${util.cwd}/dapp/membership/contracts/MembershipManager.sol`;
 
 /** 
- * Upload a new MembershipManager 
+ * Upload a new Mem_MembershipManager 
  * @param user User token (typically an admin)
  * @param _constructorArgs Arguments of Membership's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
@@ -108,7 +108,7 @@ async function uploadContract(user, _constructorArgs, options) {
 //            return (RestStatus.NOT_FOUND, address(0));
 //        }
 //
-//        ProductManager productManager = ProductManager(dapp.productManager());
+//        Mem_ProductManager productManager = Mem_ProductManager(dapp.productManager());
 //
 //
 //

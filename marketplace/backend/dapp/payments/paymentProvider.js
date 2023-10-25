@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 // import dayjs from 'dayjs';
 
 
-const contractName = 'PaymentProvider_1';
+const contractName = 'Mem_PaymentProvider_1';
 const contractFilename = `${util.cwd}/dapp/payments/contracts/PaymentProvider.sol`;
 
 /** 

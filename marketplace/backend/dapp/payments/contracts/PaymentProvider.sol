@@ -4,8 +4,8 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/payments/contracts/PaymentServices.sol";
 
-/// @title A representation of PaymentProvider_1 assets
-contract PaymentProvider_1 is PaymentServices{
+/// @title A representation of Mem_PaymentProvider_1 assets
+contract Mem_PaymentProvider_1 is PaymentServices{
 
     address public owner;
     string public ownerOrganization;

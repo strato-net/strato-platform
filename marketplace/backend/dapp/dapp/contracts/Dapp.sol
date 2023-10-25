@@ -31,15 +31,14 @@ contract Dapp {
 
     // ---- here are some other managers we have, you can import and use them if you want
     // OrganizationManager organizationManager;
-    // MembershipManager membershipManager;
     // UserManager userManager;
-    ItemManager itemManager;
-    ProductManager public productManager;
+    Mem_ItemManager itemManager;
+    Mem_ProductManager public productManager;
     EventTypeManager_10 eventTypeManager;
     ServiceManager_10 serviceManager;
     PaymentManager paymentManager;
     OrderManager orderManager;
-    MembershipManager membershipManager;
+    Mem_MembershipManager membershipManager;
     
     account public bootUserAccount;
     string public bootUserCommonName;
@@ -55,19 +54,19 @@ contract Dapp {
         bootUserOrganization = userCert["organization"];
         bootUserOrganizationalUnit = userCert["organizationalUnit"];
         orderManager = new OrderManager();
-        itemManager = new ItemManager();
-        productManager = new ProductManager();
+        itemManager = new Mem_ItemManager();
+        productManager = new Mem_ProductManager();
         eventTypeManager = new EventTypeManager_10();
         serviceManager = new ServiceManager_10();
         paymentManager = new PaymentManager();
-        membershipManager = new MembershipManager();
+        membershipManager = new Mem_MembershipManager();
     }
 
-    function getProductManager() public returns (ProductManager) {
+    function getProductManager() public returns (Mem_ProductManager) {
         return productManager;
     }
 
-    function getMembershipManager() public returns (MembershipManager) {
+    function getMembershipManager() public returns (Mem_MembershipManager) {
         return membershipManager;
     }
 
