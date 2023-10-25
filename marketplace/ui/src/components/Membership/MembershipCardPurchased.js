@@ -104,6 +104,17 @@ const MembershipCardPurchased = ({
   const updateCol = (inv, texts) => (<Row
     style={{ justifyContent: 'space-between' }}>
     <p>{texts} </p>
+  </Row>)
+
+  const callDetailPage = (index, address) => {
+    let route = `/memberships/${isPurchasedList ? "purchased" : "issued"}/:id`
+    navigate(`${route.replace(`:id`, state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
+  }
+
+  const previewCol = (inv, address) => (<Button type="text"
+    className="text-primary text-sm cursor-pointer"
+  // onClick={callDetailPage.bind(this, indx, address)}
+  >
     <EditOutlined onClick={() => {
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
@@ -115,17 +126,6 @@ const MembershipCardPurchased = ({
       }
     }}
     />
-  </Row>)
-  const callDetailPage = (index, address) => {
-    let route = `/memberships/${isPurchasedList ? "purchased" : "issued"}/:id`
-    navigate(`${route.replace(`:id`, state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
-  }
-
-  const previewCol = (indx, address) => (<Button type="text"
-    className="text-primary text-sm cursor-pointer"
-    onClick={callDetailPage.bind(this, indx, address)}
-  >
-    Preview
   </Button>)
 
 
@@ -135,7 +135,7 @@ const MembershipCardPurchased = ({
       name: inventory.block_timestamp,
       age: inventory.availableQuantity,
       published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
-      preview: previewCol(index, inventory.address),
+      edit: previewCol(inventory, inventory.address),
       address: "$ " + String(inventory.pricePerUnit)
     }
   });

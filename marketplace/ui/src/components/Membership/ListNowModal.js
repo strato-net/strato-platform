@@ -5,7 +5,7 @@ import { useInventoryState } from "../../contexts/inventory";
 import { useMembershipState } from "../../contexts/membership";
 import { useProductState } from "../../contexts/product";
 import { useParams } from "react-router-dom";
-const { columns, taxOptions } = helperJson;
+const { columns, taxOptions, StatusValue } = helperJson;
 const { Text, Title } = Typography;
 const ListNowModal = ({
   open,
@@ -28,7 +28,6 @@ const ListNowModal = ({
   let { isResaleMembershipSubmitting } = useMembershipState();
   const isSubmit = isCreateMembershipSubmitting || isResaleMembershipSubmitting || isuploadImageSubmitting || isCreateInventorySubmitting || isinventoryUpdating;
   // const { type } = useParams();
-  console.log("inventoryDetails============>", inventoryDetails);
   const handleFormatter = (value) => {
     if (value === '' || value === '.') {
       return '0.00';
@@ -178,7 +177,7 @@ const ListNowModal = ({
           <Col span={8}>
             <Row> <Text className="font-medium">Status</Text></Row>
             <Row>
-              <Input type="text" value={inventoryDetails?.status === 1 ? "Published" : "UnPublished"} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" />
+              <Input type="text" value={StatusValue[inventoryDetails?.status || formik.values?.tempInv?.status]} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" />
             </Row>
           </Col>
         </Row>
