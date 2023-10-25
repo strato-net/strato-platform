@@ -7,6 +7,7 @@ export default {
   MarketplaceProductList: {
     label: "Marketplace Product List",
     url: "/category/:category",
+    membershipUrl: "/category/Membership",
   },
   MarketplaceProductDetail: {
     label: "Marketplace Product Detail",

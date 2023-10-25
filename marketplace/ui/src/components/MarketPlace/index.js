@@ -30,7 +30,7 @@ const MarketPlace = () => {
         </Typography.Text>
         <Button
           id="viewMore"
-          onClick={() => navigate(routes.MarketplaceProductList.url)}
+          onClick={() => navigate(routes.MarketplaceProductList.membershipUrl)}
           className="group w-44 h-11 z-10 absolute left-12 top-60 border border-primary hover:bg-primary">
           <div className="text-primary group-hover:text-white text-sm font-medium ">
             View More
