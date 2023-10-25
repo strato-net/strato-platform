@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
-import { useAuthenticateState } from "./contexts/authentication";
+import React, { useEffect, useState } from "react";
+import { useAuthenticateState, useAuthenticateDispatch } from "./contexts/authentication";
 import AuthenticatedRoutes from "./AuthenticatedRoutes";
+import { actions } from "./contexts/authentication/actions";
 import "@shopify/polaris/build/esm/styles.css";
 import { BrowserRouter } from "react-router-dom";
 import "./styles/app.css";
@@ -9,6 +10,8 @@ import HeaderComponent from "./components/Header/Header";
 import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { getCookie, delete_cookie } from "./helpers/cookie";
+import { useIdleTimeout } from "./helpers/useIdleTimeout";
+import IdleModal from "./components/Header/IdleModal";
 
 const { Content } = Layout;
 
@@ -20,15 +23,33 @@ const App = () => {
 
   TagManager.initialize(tagManagerArgs);
 
-  const { user, loginUrl, users, isAuthenticated } =
-    useAuthenticateState();
+  const { user, loginUrl, users, isAuthenticated } = useAuthenticateState();
+  const userDispatch = useAuthenticateDispatch();
+  const [isIdleModalOpen, setIsIdleModalOpen] = useState(false);
+  const handleIdle = () => {
+    setIsIdleModalOpen(true);
+  }
+  const { idleTimer } = useIdleTimeout({ onIdle: handleIdle, idleTime: 110 })  // number is in minutes
+  const stay = () => {
+    setIsIdleModalOpen(false);
+    idleTimer.reset();
+  }
+  const logout = () => {
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'logout',
+      },
+    });
+    actions.logout(userDispatch);
+    setIsIdleModalOpen(false);
+  };
 
-  
-    // Using this to delete our returnUrl cookie after login
-    if (getCookie('returnUrl') && isAuthenticated) {
-      delete_cookie('returnUrl');
-    }
-  
+
+  // Using this to delete our returnUrl cookie after login
+  if (getCookie('returnUrl') && isAuthenticated) {
+    delete_cookie('returnUrl');
+  }
+
   // useEffect if path is empty then redirect to marketplace without using navigate
   // This is needed for non dockerized version to redirect to marketplace after login and anon access
   useEffect(() => {
@@ -60,6 +81,11 @@ const App = () => {
         <Content>
           <AuthenticatedRoutes user={user} users={users} />
         </Content>
+        {user && <IdleModal
+          isOpen={isIdleModalOpen}
+          stay={stay}
+          logout={logout}
+        />}
       </Layout>
     </BrowserRouter>
   );
