@@ -52,8 +52,9 @@ const IssuedList = (
             transformedData["productId"] = item.productId;
             if (item.inventories && item.inventories?.length > 0) {
               transformedData["inventoryId"] = item.inventories[0]?.address;
+            } else {
+              transformedData["inventoryId"] = '';
             }
-            transformedData["inventoryId"] = '';
             transformedData["itemNumber"] = item.itemNumber;
             transformedData["membershipAddress"] = item.address;
             transformedData["productImageLocation"] = item.productImageLocation;

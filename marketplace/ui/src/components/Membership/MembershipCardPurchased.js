@@ -107,8 +107,9 @@ const MembershipCardPurchased = ({
   </Row>)
 
   const callDetailPage = (index, address) => {
-    let route = `/memberships/${isPurchasedList ? "purchased" : "issued"}/:id`
-    navigate(`${route.replace(`:id`, state.membershipAddress)}`, { state: { isCalledFromMembership: true, inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null) ? state.inventoryAddress : null } });
+    let route;
+    route = `/memberships/${type}/${membership.membershipAddress}?inventoryId=${membership.inventoryId ?? null}`
+    navigate(route);
   }
 
   const previewCol = (inv, address) => (<Button type="text"
