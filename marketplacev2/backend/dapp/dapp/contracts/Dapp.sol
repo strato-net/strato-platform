@@ -1,14 +1,13 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
 /** @dev Importing contracts to be later instantiated on chains via codePtr */
-import "/dapp/products/contracts/ProductManager.sol";
 import "/dapp/orders/contracts/Order.sol";
 import "/dapp/eventType/contracts/EventType.sol";
 import "/dapp/eventType/contracts/EventTypeManager.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
 import "/dapp/orders/contracts/OrderLineItem.sol";
 import "/dapp/items/contracts/Event.sol";
-import "/dapp/items/contracts/ItemManager.sol";
+import "/dapp/items/contracts/MarketplaceItemManager.sol";
 import "/dapp/payments/contracts/PaymentManager.sol";
 import "/dapp/orders/contracts/OrderManager.sol";
 /**
@@ -46,7 +45,7 @@ contract Dapp {
         paymentManager = new PaymentManager();
     }
 
-    function getProductManager() public returns (ProductManager) {
-        return productManager;
+    function getMarketplaceItemManager() public returns (MarketplaceItemManager) {
+        return marketplaceItemManager;
     }
 }
