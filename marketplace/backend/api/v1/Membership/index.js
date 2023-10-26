@@ -22,7 +22,7 @@ router.get(
 
 router.get(
   Membership.get,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   MembershipController.get
 );

@@ -95,10 +95,8 @@ const MembershipDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if (user) {
-      if (Id !== undefined) {
-        membershipActions.fetchMembershipFromDetails(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
-      }
+    if (Id !== undefined) {
+      membershipActions.fetchMembershipFromDetails(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
     }
   }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user]);
 
