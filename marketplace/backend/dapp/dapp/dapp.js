@@ -618,7 +618,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+    
+    const inventories = await managers.productManager.getInventories(
+      { ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+    const inventoryCount = await managers.productManager.inventoryCount(
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+    return {inventories: inventories, inventoryCount: inventoryCount}
   };
   contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
     const { userAddress, queryValue, ...restArgs } = args;
