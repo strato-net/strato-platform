@@ -135,7 +135,7 @@ function generateHtmlContentNickel(customerFirstName, nickel ) {
             
             <p>You may receive a full refund for your deposit (net fees from the payment processor) at any time up until the buying window opens. If you wish for a refund, please send us an email.</p>
             
-            <p>Thank you for your commitment!.</p>
+            <p>Thank you for your commitment!</p>
             
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
