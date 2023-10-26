@@ -144,15 +144,15 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
     const { org, ...modifiedOptions } = options;
-    const { uniqueInventoryID, address, ownerOrganization, ...restArgs } = args;
+    const { uniqueInventoryID, address, ownerOrganization, offset, limit, ...restArgs } = args;
     let inventory;
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        inventory = await searchOne(contractName, searchArgs, modifiedOptions, user);
+        inventory = await searchOne(contractName, {"offset": offset, "limit": limit}, modifiedOptions, user);
     } else {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueInventoryID', value: uniqueInventoryID });
-        inventory = await searchOne(contractName, searchArgs, modifiedOptions, user);
+        inventory = await searchOne(contractName, {"offset": offset, "limit": limit}, modifiedOptions, user);
     }
     if (!inventory) {
         return undefined;
@@ -166,8 +166,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
     const { org, ...modifiedOptions } = options;
-    const {ownerOrganization, ...modifiedArgs} = args;
-    const inventories = await searchAllWithQueryArgs(contractName, modifiedArgs, modifiedOptions, admin);
+    const { offset, limit, ...restArgs } = args;
+    const inventories = await searchAllWithQueryArgs(contractName, {"offset": offset, "limit": limit}, modifiedOptions, admin);
     return inventories.map((inventory) => marshalOut(inventory))
 }
 

@@ -154,15 +154,15 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
     const { org, ...modifiedOptions } = options;
-    const { uniqueProductID, address, ownerOrganization, ...restArgs } = args;
+    const { uniqueProductID, address, ownerOrganization, offset, limit, ...restArgs } = args;
     let product;
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        product = await searchOne(contractName, searchArgs, modifiedOptions, user);
+        product = await searchOne(contractName, {"offset": offset, "limit": limit}, modifiedOptions, user);
     } else {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueProductID', value: uniqueProductID });
-        product = await searchOne(contractName, searchArgs, modifiedOptions, user);
+        product = await searchOne(contractName, {"offset": offset, "limit": limit}, modifiedOptions, user);
     }
     if (!product) {
         return undefined;
@@ -176,14 +176,13 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
     const { org, ...modifiedOptions } = options;
-    const {ownerOrganization, ...modifiedArgs} = args;
-    const products = await searchAllWithQueryArgs(contractName, modifiedArgs, modifiedOptions, admin);
+    const { offset, limit, ...restArgs } = args; 
+    const products = await searchAllWithQueryArgs(contractName, {"offset": offset, "limit": limit}, modifiedOptions, admin);
     return products.map((product) => marshalOut(product))
 }
 
 async function count(admin, args = {}, options) {
     const queryArgs = setSearchQueryOptionsPrime({
-        ...args,
         limit: undefined,
         offset: 0,
         order: undefined,
