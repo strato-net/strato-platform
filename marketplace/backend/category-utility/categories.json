@@ -50,6 +50,21 @@
                     "name": "Pants"
                 }
             ]
+        },
+        {
+            "name": "Collectables",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Trading Cards"
+                },
+                {
+                    "name": "Toys"
+                },
+                {
+                    "name": "Video Games"
+                }
+            ]
         }
     ]
 }
