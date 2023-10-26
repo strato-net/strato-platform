@@ -206,23 +206,23 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (BlockHeaders bHeaders) -> do
     let headers = morphBlockHeader <$> bHeaders
     lift stampActionTimestamp
-    alreadyRequestedHeaders <- lift getBlockHeaders -- get already requested headers
+    -- check if blockheaders we recieved have parents.
+    let parents = map blockDataParentHash headers
+    existingParents <- lift $ lookupMany (Proxy @BlockData) parents
+    let missingParents = S.fromList parents S.\\ M.keysSet existingParents
+    unless (S.null missingParents) $ do
+      bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+      let fetchNumber = numberFromBestBlock bestBlock + 1
+      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
+      $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
+      if M.null existingParents
+        then syncFetch Forward fetchNumber
+        else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
+    
+    alreadyRequestedHeaders <- lift getBlockHeaders -- check what already requested
     if null alreadyRequestedHeaders
       then do
-        -- proceed if we are not already requesting headers
-        -- check if blockheaders we recieved have parents.
-        let parents = map blockDataParentHash headers
-        existingParents <- lift $ lookupMany (Proxy @BlockData) parents
-        let missingParents = S.fromList parents S.\\ M.keysSet existingParents
-        unless (S.null missingParents) $ do
-          bestBlock <- lift $ Mod.get (Proxy @BestBlock)
-          let fetchNumber = numberFromBestBlock bestBlock + 1
-          $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-          $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
-          if M.null existingParents
-            then syncFetch Forward fetchNumber
-            else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
-
+        -- proceed if we are not already requesting bodies
         let headerHashes = map (blockHeaderHash &&& id) headers
             hashes = map fst headerHashes
         headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
@@ -303,7 +303,10 @@ handleEvents peer = awaitForever $ \case
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
   -- todo:
-  MsgEvt (BlockBodies []) -> return () --clearActionTimestamp
+  MsgEvt (BlockBodies []) -> do 
+    lift stampActionTimestamp
+    lift $ putBlockHeaders [] -- clear cache for other threads
+    lift $ putRemainingBHeaders []
   MsgEvt (BlockBodies bodies) -> do
     lift stampActionTimestamp
     headers <- lift getBlockHeaders
