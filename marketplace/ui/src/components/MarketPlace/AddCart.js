@@ -89,7 +89,7 @@ const Checkout = ({ user }) => {
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: item.product.imageUrl,
+            image: item.product.productImageLocation[0],
             status: item.product.isActive ? "Active" : "Inactive",
           },
           sellerOrganization: item.product.ownerOrganization,
