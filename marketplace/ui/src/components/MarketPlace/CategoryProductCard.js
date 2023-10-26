@@ -113,14 +113,14 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const handleRedirect = () => {
-    let route = `/memberships/all/${product.membershipId}?inventoryId=${product.address ?? null}`;
+    let route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
     setCookie(
       "returnUrl",
       `/marketplace${route}`,
       10
     );
 
-    route = `/memberships/all/${product.membershipId}?inventoryId=${product.address ?? null}`;
+    route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
     navigate(route);
   };
 

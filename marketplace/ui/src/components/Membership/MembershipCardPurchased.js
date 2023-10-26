@@ -46,6 +46,7 @@ const MembershipCardPurchased = ({
   const membershipState = useMembershipState()
   const { type } = useParams()
   const isIssued = type === "issued";
+  const isPurchased = type === "purchased";
   const {
     subCategory,
     manufacturer,
@@ -108,7 +109,7 @@ const MembershipCardPurchased = ({
 
   const callDetailPage = (index, address) => {
     let route;
-    route = `/memberships/${type}/${membership.membershipAddress}?inventoryId=${membership.inventoryId ?? null}`
+    route = `/memberships/${type}/${membership.membershipAddress}?inventoryId=${membership.inventoryId}`
     navigate(route);
   }
 
@@ -282,6 +283,22 @@ const MembershipCardPurchased = ({
                   <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
                   <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
                 </Row>
+                {isPurchased && <Row className="px-2">
+                  <Button onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      formik.setFieldValue("name", membership.productName);
+                      // formik.setFieldValue("quantity", membership.productName);
+                      // formik.setFieldValue("price", membership.productName);
+                      formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
+                      formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
+                      openListNowModal();
+                    }
+                  }} >
+                    <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Edit</Text>
+                  </Button>
+                </Row>}
               </Col>
               {!isPurchasedList &&
                 (<Col span={24} className="mt-2">
