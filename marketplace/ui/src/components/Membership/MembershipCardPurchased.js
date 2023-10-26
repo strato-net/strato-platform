@@ -222,7 +222,7 @@ const MembershipCardPurchased = ({
             inventory: membership.inventoryId,
             updates: {
               pricePerUnit: formik.values.price,
-              status: INVENTORY_STATUS.PUBLISHED,
+              status: formik.values.inventoryStatus || INVENTORY_STATUS.PUBLISHED,
               quantity: 1,
               taxPercentageAmount: formik.values.taxPercentageAmount,
               taxDollarAmount: formik.values.taxDollarAmount
@@ -292,7 +292,7 @@ const MembershipCardPurchased = ({
                     } else {
                       formik.setFieldValue("name", membership.productName);
                       // formik.setFieldValue("quantity", membership.productName);
-                      // formik.setFieldValue("inventoryStatus", membership.status);
+                      formik.setFieldValue("inventoryStatus", membership.status);
                       formik.setFieldValue("price", membership.price);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
@@ -356,7 +356,7 @@ const MembershipCardPurchased = ({
                       window.location.href = loginUrl;
                     } else {
                       formik.setFieldValue("name", membership.productName);
-                      // formik.setFieldValue("quantity", membership.productName);
+                      formik.setFieldValue("inventoryStatus", membership.status);
                       formik.setFieldValue("price", membership?.price);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
