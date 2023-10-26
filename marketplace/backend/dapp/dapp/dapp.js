@@ -1177,7 +1177,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             membershipAddress: memberships[0].address,
             expiryDate: item?.expiryDate,
             taxDollarAmount: inventoryDetail.taxDollarAmount,
-            taxPercentageAmount:inventoryDetail.taxPercentageAmount
+            taxPercentageAmount:inventoryDetail.taxPercentageAmount,
+            price: inventoryDetail.pricePerUnit
           };
         });
 
