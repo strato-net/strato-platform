@@ -77,6 +77,7 @@ import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
 import Control.Applicative (liftA2)
+import Control.Concurrent.Hierarchy
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
@@ -115,8 +116,8 @@ import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
 import Executable.EthereumVM
 import Executable.StratoP2P
-import Executable.StratoP2PClient
-import Executable.StratoP2PServer
+import Executable.StratoP2PClient 
+import Executable.StratoP2PServer (runEthServerConduit)
 import Network.Socket
 import Text.Read (readMaybe)
 import UnliftIO
@@ -1676,21 +1677,25 @@ createConnection server' client' = do
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
   let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer =
+      rServer = do
+        tm <- liftIO newThreadMap
         runEthServerConduit
           (_p2pPeerPPeer client')
           (sourceTQueue clientToServerTQueue)
           (sinkTQueue serverToClientTQueue)
           (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+          tm
       rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient =
+      rClient = do
+        tm <- liftIO newThreadMap
         runEthClientConduit
           (_p2pPeerPPeer server')
           (sourceTQueue serverToClientTQueue)
           (sinkTQueue clientToServerTQueue)
           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+          tm
   pure $
     P2PConnection
       serverToClientTQueue
@@ -1714,6 +1719,7 @@ createGermophobicConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
+  tm                  <- newThreadMap
   let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
       rServer = pure Nothing -- server is germophobic; will not conduct handshake
       rClient :: MonadP2PTest TestContextM (Maybe SomeException)
@@ -1724,6 +1730,7 @@ createGermophobicConnection server' client' = do
           (sinkTQueue clientToServerTQueue)
           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+          tm
   pure $
     P2PConnection
       serverToClientTQueue

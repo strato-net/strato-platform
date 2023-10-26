@@ -146,6 +146,11 @@ const CategoryProductCard = ({ product, category }) => {
               </Text>
               <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
             </div>
+            <Text className="text-secondryB text-sm" id="prod-category">
+              Sold By: {product.ownerOrganization.startsWith('Mercata Account')
+                ? product.ownerCommonName
+                : product.ownerOrganization}
+            </Text>
             <Paragraph
               ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
               className="text-primaryC text-xs mt-2"
