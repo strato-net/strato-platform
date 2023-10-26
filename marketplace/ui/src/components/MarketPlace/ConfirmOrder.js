@@ -255,7 +255,7 @@ const ConfirmOrder = () => {
       dataIndex: "item",
       render: (text) => {
         return (
-          <p className="text-primary text-[17px]">{decodeURIComponent(text.name)}</p>
+          <p className="text-primary text-[17px]">{text.name}</p>
         );
       },
       
