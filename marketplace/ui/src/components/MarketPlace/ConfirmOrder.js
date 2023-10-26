@@ -771,12 +771,12 @@ const ConfirmOrder = () => {
               }
             </div>
             {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className="justify-center mt-12">
-              {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
+              <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);
                 }}>
                 Pay later
-              </div> */}
+              </div>
               <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
                 onClick={() => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {

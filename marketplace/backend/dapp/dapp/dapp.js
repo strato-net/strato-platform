@@ -592,7 +592,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const items = await managers.itemManager.getItems({ inventoryId }, getOptions);
     const itemsAddress = items.map((item) => item.address);
     await managers.productManager.updateInventory(args);
-    const itemParams = { itemsAddress, comment: "", status: args.updates.status,expiryDate:items[0].expiryDate };
+    const itemParams = { itemsAddress, comment: "", status: args.updates.status, expiryDate: items[0].expiryDate };
     return await managers.itemManager.updateItem(itemParams);
   };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
@@ -2033,17 +2033,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // ownerOrganization: userOrganization,
       bookedUserAddress: userAddress
     }, getOptions);
+    const itemAddress = serviceUsage['serviceUsage']?.map((item) => item.itemId)
+    const serviceIds = serviceUsage['serviceUsage']?.map((item) => item.itemId)
 
     const memberships = await contract.getPurchasedMemberships();
     const services = await contract.getServices();
     const users = await contract.getCertificates();
+    const items = await contract.getItems({ address: itemAddress });
 
-    const data = serviceUsage['serviceUsage'].map((item) => ({
+    const data = serviceUsage['serviceUsage']?.map((item) => ({
       ...item,
       provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
       serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
       bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
+      expiryDate: (items.find((itemE) => itemE.address = item.address)[0]?.expiryDate || 1709623680000) || ''
     }));
 
     return { result: data, total: serviceUsage.total };
@@ -2068,18 +2072,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // providerLastUpdated:userAddress,
       itemId: itemAddressList
     }
-
+    const items = await contract.getItems({ address: itemAddressList });
     const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();
-    const users = await contract.getCertificates()
+    // const users = await contract.getCertificates();
     const data = serviceUsage['serviceUsage'].map((item) => ({
       ...item,
       provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
       serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
       bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
+      expiryDate: (items.find((itemE) => itemE.address = item.address)[0]?.expiryDate || 1709623680000) || ''
     }));
 
     return { result: data, total: serviceUsage.total };

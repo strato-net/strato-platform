@@ -32,7 +32,7 @@ const ListNowIndex = ({
   const isIssued = type === 'issued';
   const isPurchased = type === 'purchased';
 
-  const { inventories, isInventoriesLoading, isCreateInventorySubmitting } = useInventoryState()
+  const { inventories, isInventoriesLoading, isCreateInventorySubmitting } = useInventoryState();
   const [availableQuantity, setAvailableQuantity] = useState('');
   // const inventoryQuantity = type == 'Resale' ? availableQuantity : 99999;
   const seller = user.user.organization;
@@ -167,7 +167,9 @@ const ListNowIndex = ({
         updates: {
           pricePerUnit: price,
           status: INVENTORY_STATUS.PUBLISHED,
-          quantity: 1
+          quantity: 1,
+          taxPercentageAmount: Math.floor(taxPercentageAmount * 100),
+          taxDollarAmount: Math.floor(taxDollarAmount * 100),
         }
       }
 

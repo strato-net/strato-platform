@@ -327,6 +327,8 @@ const ServiceTable = () => {
       setMembershipList(membershipData);
       servicesActions.fetchService(serviceDispatch, 10, offset, value);
     } else if (field === "itemId") {
+      // const expiryDate = membership?.purchasedMemberships.filter((item) => item.itemAddress === value).expiryDate
+      // updateTableData('expiryDate', expiryDate, 'expiryDate');
       updateTableData(field, value, key);
     } else if (field === "bookedUserAddress") {
       const membershipData = membership?.purchasedMemberships
