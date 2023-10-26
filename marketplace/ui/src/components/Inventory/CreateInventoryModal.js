@@ -358,7 +358,7 @@ const CreateInventoryModal = ({
                     allowClear
                     showSearch
                     id="product"
-                    value={formik.values.productName.name}
+                    value={decodeURIComponent(formik.values.productName.name??"Select Product")}
                     name="productName.name"
                     loading={isCategoryBasedProductsLoading}
                     disabled={
