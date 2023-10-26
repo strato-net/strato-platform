@@ -9,7 +9,7 @@ import {
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { actions } from "../../contexts/marketplace/actions";
 import noPreview from "../../images/resources/noPreview.jpg";
@@ -27,6 +27,7 @@ const CategoryProductCard = ({ product, category }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
+  const { type } = useParams();
 
   // const storedData = useMemo(() => {
   //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
@@ -112,19 +113,15 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const handleRedirect = () => {
-    let route = `/memberships/all/:id`;
+    let route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
     setCookie(
       "returnUrl",
-      `/marketplace${route.replace(":id", product.membershipId)}`,
+      `/marketplace${route}`,
       10
     );
-    product.membershipId
-      ? navigate(route.replace(":id", product.membershipId), {
-          state: { isCalledFromMembership: true, inventoryId: product.address },
-        })
-      : navigate(`${naviroute.replace(":address", product.address)}`, {
-          state: { isCalledFromInventory: false },
-        });
+
+    route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
+    navigate(route);
   };
 
   return (
@@ -132,9 +129,6 @@ const CategoryProductCard = ({ product, category }) => {
       {contextHolder}
       <Card
         className="mb-6 cursor-pointer"
-        // onClick={() =>
-        //   navigate(`${naviroute.replace(":address", product.address)}`)
-        // }
       >
         <div className="flex justify-start items-center">
           <div className="m-4">

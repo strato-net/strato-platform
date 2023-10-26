@@ -168,10 +168,10 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     else setRoleIndex(1)
   }, [user]);
 
-  const handleSellModal = () => {
-    membershipActions.fetchMembership(membershipDispatch);
-    setVisible(true);
-  }
+  // const handleSellModal = () => {
+  //   membershipActions.fetchMembership(membershipDispatch);
+  //   setVisible(true);
+  // }
 
 
   return (
@@ -252,22 +252,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         items={navItems[roleIndex]?.items}
       />
       <Space size="large">
-        {roleIndex === undefined || roleIndex === 1 ? null : <Badge
-          className="cursor-pointer"
-          onClick={() => {
-            // navigate("/memberships/issued", { state: { isCalledFromHeader: true } });
-            handleSellModal()
-          }}
-        >
-          <Avatar
-            style={{
-              backgroundColor: "transparent",
-              color: 'black'
-            }}
-            icon={<DollarOutlined />}
-          />
-        </Badge>
-        }
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
           onClick={() => {

@@ -47,22 +47,27 @@ const StatusValue = {
 
 const MembershipDetails = ({ user, users }) => {
   const { type } = useParams()
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const inventoryID = queryParams.get('inventoryId');
+
   const isIssued = type === 'issued';
   const isPurchased = type === 'purchased';
   const isMarketPlace = (!isIssued && !isPurchased);
 
   const { state, pathname } = useLocation();
 
-  const [inventoryId, setInventoryId] = useState(state?.inventoryId);
+  const [inventoryId, setInventoryId] = useState(inventoryID);
 
   let isCalledFromMembership = false;
 
-  if (state !== null && state !== undefined) {
-    isCalledFromMembership = state.isCalledFromMembership
-  }
-  else if (pathname.includes("memberships")) {
+  if (pathname.includes("memberships")) {
     isCalledFromMembership = true
   }
+  else if (state !== null && state !== undefined) {
+    isCalledFromMembership = state.isCalledFromMembership
+  }
+
   const initialValues = {
     name: "",
     price: "",
@@ -90,10 +95,8 @@ const MembershipDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if (user) {
-      if (Id !== undefined) {
-        membershipActions.fetchMembershipFromDetails(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
-      }
+    if (Id !== undefined) {
+      membershipActions.fetchMembershipFromDetails(serviceDispatch, limit, offset, debouncedSearchTerm, Id);
     }
   }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user]);
 
@@ -210,7 +213,7 @@ const MembershipDetails = ({ user, users }) => {
         productActions.fetchProductDetails(productDispatch, membershipDetails?.productId, null);
       });
     }
-  }, [membershipDetails, inventories]);
+  }, [membershipDetails, inventoryId]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -336,7 +339,7 @@ const MembershipDetails = ({ user, users }) => {
       if (Id !== undefined) {
         if (formik.values.price !== "" && formik.values.quantity !== "") {
           const resalePayload = {
-            itemAddress: items[0].address,
+            itemAddress: inventoryId,
             productAddress: membershipDetails.productId,
             inventory: inventoryId,
             updates: {
@@ -475,9 +478,9 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin"> {inventoryDetails?.name ?? "--"} </Text>
-                {(membershipDetails?.expiryDate === 0)
+                {(membershipDetails?.expiryDate === 0 || !membershipDetails?.expiryDate)
                   ? <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
-                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY') ?? ""}  </Text> </Row>}
+                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{membershipDetails?.expiryDate ? (dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY') ?? "") : "--"}  </Text> </Row>}
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" >{isMarketPlace ? "Price" : "Status"} </Text>
@@ -552,6 +555,8 @@ const MembershipDetails = ({ user, users }) => {
                           window.location.href = loginUrl;
                         } else {
                           formik.setFieldValue("name", inventoryDetails?.name);
+                          formik.setFieldValue("taxPercentageAmount", inventoryDetails.taxPercentageAmount);
+                          formik.setFieldValue("taxDollarAmount", inventoryDetails.taxDollarAmount);
                           openListNowModal();
                         }
                       }}

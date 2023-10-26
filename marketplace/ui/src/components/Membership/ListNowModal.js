@@ -19,6 +19,7 @@ const ListNowModal = ({
   user,
   formik,
   // type,
+  listed,
   isEdit,
   listType,
   id,
@@ -142,6 +143,7 @@ const ListNowModal = ({
             <Row> <InputNumber
               id="percentage"
               name="percentage"
+              disabled={listed === 1}
               min={0}
               addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
                 <Col span={12} className="p-1"
@@ -182,6 +184,7 @@ const ListNowModal = ({
               min={0}
               size="large"
               controls={false}
+              disabled={listed === 1}
               value={formik.values.price}
               onChange={(value) => {
                 formik.setFieldValue("price", value);
@@ -195,12 +198,12 @@ const ListNowModal = ({
           {!isNew && <Col span={8}>
             <Row> <Text className="font-medium">Status</Text></Row>
             <Row>
-              {isEdit
+              {(isEdit || listed === 1 || listed === 2)
                 ? <Select
                   placeholder="Status"
                   className="mt-2 w-full"
                   size="large"
-                  defaultValue={StatusValue[formik?.values?.tempInv?.status]}
+                  defaultValue={StatusValue[formik?.values?.tempInv?.status || formik?.values?.inventoryStatus]}
                   // suffixIcon={<CaretDownOutlined />}
                   // disabled={IsLoading}
                   // style={{ width: 120 }}

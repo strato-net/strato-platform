@@ -264,7 +264,7 @@ const Membership = (user) => {
                   >
                     {createServiceIcon()} &nbsp; New Membership
                   </Button>
-                  <Button
+                  {/* <Button
                     id="add-product-button"
                     // type="primary"
                     style={{
@@ -285,7 +285,7 @@ const Membership = (user) => {
                     }}
                   >
                     {sellServicesIcon()}  &nbsp; Sell Membership
-                  </Button>
+                  </Button> */}
                   <Button
                     id="add-product-button"
                     // type="primary"

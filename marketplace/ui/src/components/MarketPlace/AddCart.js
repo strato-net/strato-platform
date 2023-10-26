@@ -89,7 +89,7 @@ const Checkout = ({ user }) => {
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: item.product.imageUrl,
+            image: item.product.productImageLocation[0],
             status: item.product.isActive ? "Active" : "Inactive",
           },
           sellerOrganization: item.product.ownerOrganization,
@@ -177,7 +177,7 @@ const Checkout = ({ user }) => {
       dataIndex: "item",
       render: (text) => {
         return (
-          <p className="text-primary text-[17px]">{decodeURIComponent(text.name)}</p>
+          <p className="text-primary text-[17px]">{text.name}</p>
         );
       },
     },
