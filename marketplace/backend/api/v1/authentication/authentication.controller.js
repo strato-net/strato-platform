@@ -135,9 +135,6 @@ class AuthenticationController {
 
     // This might be coming up undefined in Carbon Node. Logging to check in backend logs.
     returnUrl = req.cookies.returnUrl
-    console.log("returnUrl======>", returnUrl);
-    console.log("req.cookies======>", req.cookies);
-    console.log("full req======>", req)
 
     // if (returnUrl) {
     //   res.redirect(returnUrl)
