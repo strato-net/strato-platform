@@ -341,7 +341,7 @@ const MembershipDetails = ({ user, users }) => {
       if (Id !== undefined) {
         if (formik.values.price !== "" && formik.values.quantity !== "") {
           const resalePayload = {
-            itemAddress: items[0].address,
+            itemAddress: inventoryId,
             productAddress: membershipDetails.productId,
             inventory: inventoryId,
             updates: {

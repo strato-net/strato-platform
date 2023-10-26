@@ -69,6 +69,7 @@ const MembershipCardPurchased = ({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [carouselModel, setCarouselModel] = useState(false);
+  const [listed, setListed] = useState(0)
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
@@ -158,6 +159,7 @@ const MembershipCardPurchased = ({
   const closeListNowModal = () => {
     setVisible(false);
     setIsEdit(false);
+    setListed(0)
   };
 
   const openListNowModal = () => {
@@ -290,9 +292,15 @@ const MembershipCardPurchased = ({
                     } else {
                       formik.setFieldValue("name", membership.productName);
                       // formik.setFieldValue("quantity", membership.productName);
-                      // formik.setFieldValue("price", membership.productName);
+                      // formik.setFieldValue("inventoryStatus", membership.status);
+                      formik.setFieldValue("price", membership.price);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
+                      if (status === '2') {
+                        setListed(1)
+                      } else {
+                        setListed(2)
+                      }
                       openListNowModal();
                     }
                   }} >
@@ -349,7 +357,7 @@ const MembershipCardPurchased = ({
                     } else {
                       formik.setFieldValue("name", membership.productName);
                       // formik.setFieldValue("quantity", membership.productName);
-                      // formik.setFieldValue("price", membership.productName);
+                      formik.setFieldValue("price", membership?.price);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
                       openListNowModal();
@@ -444,6 +452,7 @@ const MembershipCardPurchased = ({
           listType={"Sale"}
           id={itemNumber}
           isEdit={isEdit}
+          listed={listed}
           membershipStatus={membership.status}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
