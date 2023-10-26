@@ -35,9 +35,9 @@ contract Dapp {
     Mem_ItemManager itemManager;
     Mem_ProductManager public productManager;
     EventTypeManager_10 eventTypeManager;
-    ServiceManager_10 serviceManager;
-    PaymentManager paymentManager;
-    OrderManager orderManager;
+    Mem_ServiceManager_10 serviceManager;
+    Mem_PaymentManager paymentManager;
+    Mem_OrderManager orderManager;
     Mem_MembershipManager membershipManager;
     
     account public bootUserAccount;
@@ -53,12 +53,12 @@ contract Dapp {
         bootUserCommonName = userCert["commonName"];
         bootUserOrganization = userCert["organization"];
         bootUserOrganizationalUnit = userCert["organizationalUnit"];
-        orderManager = new OrderManager();
+        orderManager = new Mem_OrderManager();
         itemManager = new Mem_ItemManager();
         productManager = new Mem_ProductManager();
         eventTypeManager = new EventTypeManager_10();
-        serviceManager = new ServiceManager_10();
-        paymentManager = new PaymentManager();
+        serviceManager = new Mem_ServiceManager_10();
+        paymentManager = new Mem_PaymentManager();
         membershipManager = new Mem_MembershipManager();
     }
 

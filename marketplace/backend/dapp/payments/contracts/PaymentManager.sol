@@ -4,7 +4,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/payments/contracts/PaymentProvider.sol";
 import "/dapp/payments/contracts/PaymentServices.sol";
 
-contract PaymentManager is PaymentServices {
+contract Mem_PaymentManager is PaymentServices {
 
     constructor(){}
 

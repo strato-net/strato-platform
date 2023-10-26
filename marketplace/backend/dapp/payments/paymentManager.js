@@ -7,7 +7,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 
 
 
-const contractName = 'PaymentManager'
+const contractName = 'Mem_PaymentManager'
 const contractFilename = `${util.cwd}/dapp/payments/contracts/PaymentManager.sol`
 
 async function uploadContract(admin, args = {}, options) {

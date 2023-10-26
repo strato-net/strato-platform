@@ -5,7 +5,7 @@ import "/dapp/orders/contracts/Order.sol";
 import "./OrderStatus.sol";
 import "/dapp/orders/contracts/OrderLine.sol";
 
-contract OrderManager is RestStatus,OrderStatus{
+contract Mem_OrderManager is RestStatus,OrderStatus{
   
     function createOrder(    
             string _orderId

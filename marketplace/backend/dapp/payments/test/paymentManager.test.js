@@ -71,7 +71,7 @@ describe('Payment Manager', function() {
 
         dapp = await dappJs.loadFromDeployment({ token: adminUserToken }, `${config.configDirPath}/${config.deployFilename}`, options);
         newOptions={
-            app:'PaymentManager',
+            app:'Mem_PaymentManager',
             org:dapp.managers.cirrusOrg,
             ...options
         }
