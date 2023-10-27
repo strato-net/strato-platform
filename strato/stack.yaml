@@ -30,6 +30,8 @@ packages:
 - core/vm-runner/
 - core/vm-tools/
 
+- highway/api
+
 - identity-provider/api
 - identity-provider/server
 - identity-provider/client
