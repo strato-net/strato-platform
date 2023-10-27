@@ -18,6 +18,7 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie";
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -195,6 +196,7 @@ const CategoryProductCard = ({ product, category }) => {
                     className="group w-40 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -216,6 +218,7 @@ const CategoryProductCard = ({ product, category }) => {
                     className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
