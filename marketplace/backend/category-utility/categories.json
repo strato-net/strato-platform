@@ -48,6 +48,30 @@
                 },
                 {
                     "name": "Pants"
+                },
+                {
+                    "name": "Jackets"
+                },
+                {
+                    "name": "Accessories"
+                }
+            ]
+        },
+        {
+            "name": "Collectables",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Trading Cards"
+                },
+                {
+                    "name": "Toys"
+                },
+                {
+                    "name": "Video Games"
+                },
+                {
+                    "name": "Vinyls"
                 }
             ]
         }
