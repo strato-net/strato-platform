@@ -291,10 +291,12 @@ const MembershipCardPurchased = ({
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
                     } else {
+                      let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
                       formik.setFieldValue("name", membership.productName);
                       // formik.setFieldValue("quantity", membership.productName);
                       formik.setFieldValue("inventoryStatus", parseInt(membership.status));
                       // formik.setFieldValue("isTaxPercentage", false);
+                      formik.setFieldValue("taxPercentage", taxVal);
                       formik.setFieldValue("price", membership.price);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
@@ -357,10 +359,12 @@ const MembershipCardPurchased = ({
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
                     } else {
+                      let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
                       formik.setFieldValue("name", membership.productName);
                       formik.setFieldValue("inventoryStatus", 1);
                       // formik.setFieldValue("isTaxPercentage", false);
                       formik.setFieldValue("price", membership?.price);
+                      formik.setFieldValue("taxPercentage", taxVal);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
                       openListNowModal();

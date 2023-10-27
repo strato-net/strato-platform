@@ -343,7 +343,7 @@ const MembershipDetails = ({ user, users }) => {
       if (Id !== undefined) {
         if (formik.values.price !== "" && formik.values.quantity !== "") {
           const resalePayload = {
-            itemAddress: inventoryId,
+            itemAddress: inventoryDetails.itemId,
             productAddress: membershipDetails.productId,
             inventory: inventoryId,
             updates: {
@@ -558,7 +558,10 @@ const MembershipDetails = ({ user, users }) => {
                         if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                           window.location.href = loginUrl;
                         } else {
+                          let taxVal = inventoryDetails.taxPercentageAmount===0?inventoryDetails.taxDollarAmount:inventoryDetails.taxPercentageAmount;
                           formik.setFieldValue("name", inventoryDetails?.name);
+                          formik.setFieldValue("price", inventoryDetails?.pricePerUnit);
+                          formik.setFieldValue("taxPercentage", taxVal);
                           formik.setFieldValue("taxPercentageAmount", inventoryDetails.taxPercentageAmount);
                           formik.setFieldValue("taxDollarAmount", inventoryDetails.taxDollarAmount);
                           openListNowModal();
