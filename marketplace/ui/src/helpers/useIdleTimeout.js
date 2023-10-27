@@ -15,8 +15,10 @@ export const useIdleTimeout = ({ onIdle, idleTime }) => {
         }
     }
     const idleTimer = useIdleTimer({
-        timeout: idleTimeout,
-        promptBeforeIdle: idleTimeout - 600000,   // timeout minus 10 minutes
+        // timeout: idleTimeout,
+        // promptBeforeIdle: idleTimeout - 600000,   // timeout minus 10 minutes
+        timeout: 120000,
+        promptBeforeIdle: 60000,   // timeout minus 10 minutes
         onPrompt: onIdle,
         onIdle: handleIdle,
         debounce: 500
