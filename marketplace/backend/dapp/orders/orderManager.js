@@ -14,7 +14,7 @@ import orderJs from 'dapp/orders/order';
 import orderLineJs from 'dapp/orders/orderLine';
 import orderLineItemJs from 'dapp/orders/orderLineItem';
 
-const contractName = "OrderManager";
+const contractName = "Mem_OrderManager";
 const contractFilename = `${util.cwd}/dapp/products/contracts/OrderManager.sol`;
 
 /**

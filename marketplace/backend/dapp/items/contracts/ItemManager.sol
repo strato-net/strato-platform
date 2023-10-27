@@ -5,8 +5,8 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/ProductManager.sol";
 
-/// @title A representation of ItemManager to manage items
-contract ItemManager is ItemStatus, InventoryStatus {
+/// @title A representation of Mem_ItemManager to manage items
+contract Mem_ItemManager is ItemStatus, InventoryStatus {
     // check if the serial number is mapping(serialNumber => UPC ) uniqueSerialNumberByUPC;
     mapping(string => uint) private uniqueSerialNumberByUPC;
     mapping(address => address) private itemProductIdMapping;
@@ -34,7 +34,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         if (_itemObject[0].serialNumber == "") {
             for (uint256 i = 0; i < _itemObject.length; i++) {
-                Item_3 itemAddr = new Item_3(
+                Mem_Item_3 itemAddr = new Mem_Item_3(
                     _productId,
                     _uniqueProductCode,
                     _inventoryId,
@@ -72,7 +72,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             if (exisitngUPC == _uniqueProductCode) {
                 repeatedSerialNumbers += currentSerialNumber + ",";
             } else {
-                Item_3 itemAddr = new Item_3(
+                Mem_Item_3 itemAddr = new Mem_Item_3(
                     _productId,
                     _uniqueProductCode,
                     _inventoryId,
@@ -113,7 +113,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         uint _scheme
     ) public returns (uint) {
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
-            Item_3 item = Item_3(_itemsAddress[i]);
+            Mem_Item_3 item = Mem_Item_3(_itemsAddress[i]);
             item.update(_status, _comment, _expiryDate, _scheme);
         }
         return (RestStatus.OK);
@@ -132,7 +132,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
 
         for (uint256 i = 0; i < _itemsAddress.length; i++) {
             address _itemAddress = _itemsAddress[i];
-            Item_3 item = Item_3(_itemAddress);
+            Mem_Item_3 item = Mem_Item_3(_itemAddress);
             string _itemSerialNumber = item.serialNumber();
 
             Event_1 eventAddr = new Event_1(
@@ -186,7 +186,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         // }
         // get Dapp contract from dapp chain
         Dapp dapp = Dapp(address(_dappAddress));
-        ProductManager productManager = dapp.productManager();
+        Mem_ProductManager productManager = dapp.productManager();
 
         (address productId, address inventoryId) = getProductAndInventory(
             productManager,
@@ -198,15 +198,15 @@ contract ItemManager is ItemStatus, InventoryStatus {
     }
 
     function getProductAndInventory(
-        ProductManager _productManager,
+        Mem_ProductManager _productManager,
         address[] _itemAddress,
         address _newOwner
     ) public returns (address, address) {
-        Item_3 item = Item_3(_itemAddress[0]);
-        Product_3 product;
-        Inventory_2 inventory;
+        Mem_Item_3 item = Mem_Item_3(_itemAddress[0]);
+        Mem_Product_3 product;
+        Mem_Inventory_2 inventory;
 
-        Product_3 oldProduct = Product_3(item.productId());
+        Mem_Product_3 oldProduct = Mem_Product_3(item.productId());
         address productAddress = _productManager.checkForProduct(
             address(oldProduct),
             oldProduct.uniqueProductCode(),
@@ -214,7 +214,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         );
 
         product = (productAddress == address(0))
-            ? new Product_3(
+            ? new Mem_Product_3(
                 oldProduct.name(),
                 oldProduct.description(),
                 oldProduct.manufacturer(),
@@ -229,9 +229,9 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             )
-            : Product_3(productAddress);
+            : Mem_Product_3(productAddress);
 
-        Inventory_2 oldInventory = Inventory_2(item.inventoryId());
+        Mem_Inventory_2 oldInventory = Mem_Inventory_2(item.inventoryId());
 
         (uint status, address inventory) = product.addInventory(
             _itemAddress.length,
@@ -245,7 +245,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         );
 
         for (uint i = 0; i < _itemAddress.length; i++) {
-            Item_3 _item = Item_3(_itemAddress[i]);
+            Mem_Item_3 _item = Mem_Item_3(_itemAddress[i]);
             _item.transferOwnership(
                 _newOwner,
                 address(product),

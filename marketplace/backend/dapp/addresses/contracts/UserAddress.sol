@@ -5,7 +5,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of UserAddress assets
-contract UserAddress_1 is RestStatus {
+contract Mem_UserAddress_1 is RestStatus {
 
     address public owner;
     string public ownerOrganization;

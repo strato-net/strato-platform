@@ -5,7 +5,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 
 
 /// @title A representation of OrderLineItem assets
-contract OrderLineItem {
+contract Mem_OrderLineItem {
 
     address public owner;
     string public ownerOrganization;

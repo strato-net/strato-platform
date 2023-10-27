@@ -12,7 +12,7 @@ import dayjs from "dayjs";
 import productJs from "./product";
 import inventoryJs from "./inventory";
 
-const contractName = "ProductManager";
+const contractName = "Mem_ProductManager";
 const contractFilename = `${util.cwd}/dapp/products/contracts/ProductManager.sol`;
 
 /**

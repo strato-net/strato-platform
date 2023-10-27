@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 
-const contractName = 'Payment_3';
+const contractName = 'Mem_Payment_3';
 const contractFilename = `${util.cwd}/dapp/payments/contracts/Payment.sol`;
 
 /** 

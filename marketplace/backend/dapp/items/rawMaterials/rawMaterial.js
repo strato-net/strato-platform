@@ -3,7 +3,7 @@ import config from '/load.config';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 
-const contractName = 'RawMaterial_3';
+const contractName = 'Mem_RawMaterial_3';
 const contractFilename = `${util.cwd}/dapp/items/rawMaterials/contracts/RawMaterial.sol`;
 
 /** 
