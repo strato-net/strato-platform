@@ -9,7 +9,7 @@ import "/dapp/items/contracts/Item.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets
-contract OrderLine_2 is ItemStatus,OrderStatus{
+contract Mem_OrderLine_2 is ItemStatus,OrderStatus{
 
     address public owner;
     string public ownerOrganization;
@@ -72,7 +72,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
       uint orderLineItemCounter = 0;
 
       // getting the order chain's governance contract
-      Order order = Order(orderAddress);
+      Mem_Order order = Mem_Order(orderAddress);
 
 
       // if(assetOwnerOrganization != ownerOrganization){
@@ -83,7 +83,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
         }
 
-        Item_3 item = Item_3(address(_items[i]));
+        Mem_Item_3 item = Mem_Item_3(address(_items[i]));
 
         // check published status of items
         if(item.status() != ItemStatus.PUBLISHED){
@@ -95,7 +95,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
         } 
 
-        OrderLineItem orderLineItem=new OrderLineItem(_orderLineId, string(address(_items[i])), item.serialNumber(), _createdDate);
+        Mem_OrderLineItem orderLineItem=new Mem_OrderLineItem(_orderLineId, string(address(_items[i])), item.serialNumber(), _createdDate);
         orderLineItems += string(address(orderLineItem)) + ",";
         items += string(address(item)) + ",";
         itemsAddresses.push(address(item));

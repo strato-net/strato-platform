@@ -7,7 +7,7 @@ import eventJs from 'dapp/items/event';
 
 import rawMaterialJs from 'dapp/items/rawMaterials/rawMaterial';
 
-const contractName = 'ItemManager';
+const contractName = 'Mem_ItemManager';
 const contractFilename = `${util.cwd}/dapp/items/contracts/ItemManager.sol`
 
 

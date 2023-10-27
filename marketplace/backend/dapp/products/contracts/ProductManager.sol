@@ -4,8 +4,8 @@ import "./Inventory.sol";
 import "/dapp/products/contracts/UnitOfMeasurement.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 
-/// @title A representation of ProductManager to manage product and inventory
-contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
+/// @title A representation of Mem_ProductManager to manage product and inventory
+contract Mem_ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     // constructor() public {}
     mapping(string => mapping(uint => address)) orgToUPCToProduct;
     mapping(address => mapping(string => bool))
@@ -25,7 +25,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         string _subCategory,
         uint _createdDate
     ) returns (uint256, address) {
-        Product_3 product = new Product_3(
+        Mem_Product_3 product = new Mem_Product_3(
             _name,
             _description,
             _manufacturer,
@@ -55,7 +55,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         string _userUniqueProductCode,
         uint _scheme
     ) returns (uint256) {
-        Product_3 product = Product_3(_productAddress);
+        Mem_Product_3 product = Mem_Product_3(_productAddress);
         return
             product.update(
                 _description,
@@ -67,7 +67,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
     }
 
     function deleteProduct(address _productAddress) returns (uint256, string) {
-        Product_3 product = Product_3(_productAddress);
+        Mem_Product_3 product = Mem_Product_3(_productAddress);
         return product.deleteProduct();
     }
 
@@ -83,7 +83,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         uint _taxDollarAmount
     ) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
-            Product_3 product = Product_3(_productAddress);
+            Mem_Product_3 product = Mem_Product_3(_productAddress);
             return
                 product.addInventory(
                     _quantity,
@@ -112,7 +112,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
                 ] = true;
             }
 
-            Product_3 product = Product_3(_productAddress);
+            Mem_Product_3 product = Mem_Product_3(_productAddress);
             return
                 product.addInventory(
                     _quantity,
@@ -137,7 +137,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         uint _taxDollarAmount,
         uint _scheme
     ) returns (uint256) {
-        Product_3 product = Product_3(_productAddress);
+        Mem_Product_3 product = Mem_Product_3(_productAddress);
         return
             product.updateInventory(
                 _inventory,
@@ -156,7 +156,7 @@ contract ProductManager is UnitOfMeasurement, InventoryStatus, RestStatus {
         bool _isReduce
     ) returns (uint256) {
         for (uint i = 0; i < _inventories.length; i++) {
-            Inventory_2 inventory = Inventory_2(_inventories[i]);
+            Mem_Inventory_2 inventory = Mem_Inventory_2(_inventories[i]);
 
             if (_isReduce) {
                 if (_quantities[i] > inventory.availableQuantity()) {

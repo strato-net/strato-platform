@@ -294,7 +294,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 name: updatedValues.name,
                 description: updatedValues.description,
                 manufacturer: user.user.organization,
-                unitOfMeasurement: 1,
+                unitOfMeasurement: 6,
                 // Generate random code for now
                 userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
                 // Generate random number for now

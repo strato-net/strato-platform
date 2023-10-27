@@ -2,7 +2,7 @@ import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 
 /// @title A representation of RawMaterial
-contract RawMaterial_3 {
+contract Mem_RawMaterial_3 {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;

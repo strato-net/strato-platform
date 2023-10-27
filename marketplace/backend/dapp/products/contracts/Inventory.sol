@@ -3,7 +3,7 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory_2 is InventoryStatus {
+contract Mem_Inventory_2 is InventoryStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
