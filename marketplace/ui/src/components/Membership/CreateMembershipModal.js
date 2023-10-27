@@ -188,18 +188,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     formik.setFieldValue("services", updatedServices);
   };
 
-  const handlePriceDiscountClick = (index) => {
-    const updatedMemberDiscount = [...memberDiscount];
-    updatedMemberDiscount[index] = 1;
-    setMemberDiscount(updatedMemberDiscount);
-  };
-
-  const handlePercentDiscountClick = (index) => {
-    const updatedMemberDiscount = [...memberDiscount];
-    updatedMemberDiscount[index] = 2;
-    setMemberDiscount(updatedMemberDiscount);
-  };
-
   const handleDocumentChange = (info) => {
     let fileList = [...info.fileList];
     fileList = fileList.slice(-info.fileList.length);
@@ -364,8 +352,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                   // Status should always be published if we use List Now
                   status: INVENTORY_STATUS.PUBLISHED,
                   serialNumber: [],
-                  taxPercentageAmount: Math.floor(updatedValues.taxPercentageAmount * 100),
-                  taxDollarAmount: Math.floor(updatedValues.taxDollarAmount * 100),
+                  taxPercentageAmount: updatedValues.taxPercentageAmount,
+                  taxDollarAmount: updatedValues.taxDollarAmount,
                 };
 
                 const createInventory = await inventoryActions.createInventory(
@@ -840,7 +828,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 <Row className="mt-5">
                   <Col span={24}>
                     <Upload.Dragger
-                     {...props}
+                      {...props}
                       fileList={fileList}
                       // onChange={handleChange}
                       showUploadList={false}

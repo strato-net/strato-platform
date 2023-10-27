@@ -85,11 +85,12 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
+        const imgUrl = item.product.productImageLocation?.length>0 && item.product.productImageLocation[0] 
         modifiedValue.push({
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: item.product.productImageLocation[0],
+            image: imgUrl,
             status: item.product.isActive ? "Active" : "Inactive",
           },
           sellerOrganization: item.product.ownerOrganization,

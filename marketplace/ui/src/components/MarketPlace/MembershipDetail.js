@@ -138,6 +138,8 @@ const MembershipDetails = ({ user, users }) => {
     });
   };
 
+  const isDuration = membershipDetails?.expiryDate === 0 || !membershipDetails?.expiryDate
+
   const formik = useFormik({
     initialValues: initialValues,
     validationSchema: getSchema(visible),
@@ -255,6 +257,7 @@ const MembershipDetails = ({ user, users }) => {
     }
   };
 
+  const expiryDateVal = dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY')
 
   const addItemToCart = () => {
     let found = false;
@@ -265,17 +268,18 @@ const MembershipDetails = ({ user, users }) => {
       }
     }
     let items = [];
+    let productFileImg = allProductFiles?.length > 0 && allProductFiles[0]?.imageUrl
+    let inventoryDetailCpy = { ...inventoryDetails, productImageLocation: [productFileImg] }
     if (!found) {
-      items = [...cartList, { product: inventoryDetails, qty }];
-
+      items = [...cartList, { product: inventoryDetailCpy, qty }];
       marketPlaceActions.addItemToCart(marketplaceDispatch, items);
       setQty(1);
       openToast("bottom", false, "Item added to cart");
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
-        if (element.product.address === inventoryDetails?.address) {
-          if (items[index].qty + qty <= inventoryDetails?.availableQuantity) {
+        if (element.product.address === inventoryDetailCpy?.address) {
+          if (items[index].qty + qty <= inventoryDetailCpy?.availableQuantity) {
             items[index].qty += qty;
             marketPlaceActions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
@@ -372,7 +376,7 @@ const MembershipDetails = ({ user, users }) => {
   const detailTabSchema = [
     { label: "Seller", value: inventoryDetails?.ownerOrganization },
     { label: "Sub-Category", value: inventoryDetails?.subCategory },
-    { label: "Time in Months", value: membershipDetails?.timePeriodInMonths },
+    { label: `${isDuration ? "Time in Months" : "Expiry Date"}`, value: (isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal) },
     // { label: "Additional Info", value: membershipDetails?.additionalInfo }
   ]
 
@@ -478,9 +482,9 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin"> {inventoryDetails?.name ?? "--"} </Text>
-                {(membershipDetails?.expiryDate === 0 || !membershipDetails?.expiryDate)
+                {(isDuration)
                   ? <Row className="mb-1"> {watchIcon()} <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm"> {membershipDetails?.timePeriodInMonths ?? ""} -month duration </Text> </Row>
-                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{membershipDetails?.expiryDate ? (dayjs(membershipDetails?.expiryDate).format('MM-DD-YYYY') ?? "") : "--"}  </Text> </Row>}
+                  : <Row className="mb-1"> <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm"> Expiry Date:- &nbsp;{membershipDetails?.expiryDate ? expiryDateVal : "--"}  </Text> </Row>}
                 <Row className="flex justify-between h-20 mt-8">
                   <Col span={11} className="border border-grayLight rounded-md p-2 h-full">
                     <Text className="block text-center text-grey text-base font-poppin font-normal" >{isMarketPlace ? "Price" : "Status"} </Text>
