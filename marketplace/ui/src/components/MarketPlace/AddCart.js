@@ -48,7 +48,7 @@ const Checkout = ({ user }) => {
 
   const calculateTax = (item) => {
     return item.product.taxes ?
-      (item.product.isTaxPercentage ?
+      (item.product.taxPercentageAmount ?
         (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)
         : (item.product.taxes / 100) * item.qty)
       : 0;
