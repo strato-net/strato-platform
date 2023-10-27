@@ -61,7 +61,7 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventoriesSearch({ ...query })
-      const inventoriesWithImageUrl = inventories.map(inventory => (
+      const inventoriesWithImageUrl = inventories?.inventories.map(inventory => (
         inventory.imageKey ?
         {
           ...inventory,
@@ -71,7 +71,7 @@ class InventoryController {
         :
         inventory
       ))
-      rest.response.status200(res, inventoriesWithImageUrl)
+      rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
 
       return next()
     } catch (e) {
