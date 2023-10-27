@@ -29,7 +29,8 @@ const { Text, Paragraph, Title } = Typography;
 const initialValues = {
   name: "",
   price: "",
-  quantity: ""
+  quantity: "",
+  // isTaxPercentage:false,
 };
 
 
@@ -293,6 +294,7 @@ const MembershipCardPurchased = ({
                       formik.setFieldValue("name", membership.productName);
                       // formik.setFieldValue("quantity", membership.productName);
                       formik.setFieldValue("inventoryStatus", parseInt(membership.status));
+                      // formik.setFieldValue("isTaxPercentage", false);
                       formik.setFieldValue("price", membership.price);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
@@ -357,6 +359,7 @@ const MembershipCardPurchased = ({
                     } else {
                       formik.setFieldValue("name", membership.productName);
                       formik.setFieldValue("inventoryStatus", 1);
+                      // formik.setFieldValue("isTaxPercentage", false);
                       formik.setFieldValue("price", membership?.price);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);

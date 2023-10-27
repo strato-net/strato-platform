@@ -96,7 +96,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     description: "",
     price: "",
     quantity: "",
-    isTaxPercentage: true,
+    isTaxPercentage: false,
     taxDollarAmount: 0,
     taxPercentageAmount: 0,
     taxPercentage: 0,

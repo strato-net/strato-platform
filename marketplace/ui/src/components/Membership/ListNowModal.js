@@ -13,6 +13,11 @@ const statusOptions = [
   { value: 2, label: "Unpublished" }
 ]
 
+const discountTypeVal = {
+  true: "taxPercentageAmount",
+  false: "taxDollarAmount"
+}
+
 const ListNowModal = ({
   open,
   handleCancel,
@@ -77,6 +82,12 @@ const ListNowModal = ({
   );
 
   const statusVal = inventoryDetails?.status || membershipStatus || formik.values?.tempInv?.status;
+
+  const handleTypeBtn = (status) => {
+    formik.setFieldValue("isTaxPercentage", status)
+    formik.setFieldValue(discountTypeVal[status], formik.values.taxPercentage)
+    formik.setFieldValue(discountTypeVal[!status], 0)
+  }
 
   return (
     <Modal
@@ -148,12 +159,12 @@ const ListNowModal = ({
               addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
                 <Col span={12} className="p-1"
                   style={{ backgroundColor: formik.values.isTaxPercentage ? "#F2F2F5" : "" }}
-                  onClick={() => { formik.setFieldValue("isTaxPercentage", true) }}>
+                  onClick={() => { handleTypeBtn(true) }}>
                   %
                 </Col>
                 <Col span={12} className="p-1"
                   style={{ backgroundColor: !formik.values.isTaxPercentage ? "#F2F2F5" : "" }}
-                  onClick={() => { formik.setFieldValue("isTaxPercentage", false) }}>
+                  onClick={() => { handleTypeBtn(false) }}>
                   $
                 </Col>
               </Row>}
@@ -164,13 +175,10 @@ const ListNowModal = ({
               parser={handleParser}
               value={formik.values.taxPercentage}
               onChange={(value) => {
+                let btnStatus = formik.values.isTaxPercentage
+                formik.setFieldValue(discountTypeVal[btnStatus], value);
+                formik.setFieldValue(discountTypeVal[!btnStatus], 0);
                 formik.setFieldValue("taxPercentage", value);
-                formik.values.isTaxPercentage ?
-                  (formik.setFieldValue("taxPercentageAmount", value))
-                  : (formik.setFieldValue("taxDollarAmount", 0))
-                !formik.values.isTaxPercentage ?
-                  (formik.setFieldValue("taxPercentageAmount", 0))
-                  : (formik.setFieldValue("taxDollarAmount", value))
               }}
             /></Row>
           </Col>
