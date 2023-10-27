@@ -112,8 +112,8 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
+  let route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
   const handleRedirect = () => {
-    let route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
     setCookie(
       "returnUrl",
       `/marketplace${route}`,
@@ -232,7 +232,7 @@ const CategoryProductCard = ({ product, category }) => {
                     ) {
                       setCookie(
                         "returnUrl",
-                        `/marketplace/productList/${product.address}`,
+                        `/marketplace${route}`,
                         10
                       );
                       window.location.href = loginUrl;
@@ -265,7 +265,7 @@ const CategoryProductCard = ({ product, category }) => {
                     ) {
                       setCookie(
                         "returnUrl",
-                        `/marketplace/productList/${product.address}`,
+                        `/marketplace${route}`,
                         10
                       );
                       window.location.href = loginUrl;
