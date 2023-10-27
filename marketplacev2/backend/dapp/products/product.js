@@ -3,9 +3,9 @@ import config from '/load.config';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
-import { ASSET_TABLE_NAME } from '../../helpers/constants';
+import constants from '../../helpers/constants';
 
-const contractName = ASSET_TABLE_NAME ? ASSET_TABLE_NAME : "BlockApps-Dapp-Product_3";
+const contractName = constants.assetTableName;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Product.sol`;
 /** 
  * Upload a new Product 

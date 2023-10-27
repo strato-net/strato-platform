@@ -22,7 +22,8 @@ export default {
   s3ParamName: "s3",
   tempUploadDir: "./temp",
   buyerOrgName: "rejolut",
-  sellerOrgName: "blockapps"
+  sellerOrgName: "blockapps",
+  assetTableName: "BlockApps-Mercata-Asset"
 };
 
 export const STRIPE_ENV = {
@@ -82,13 +83,5 @@ SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
 
-export const ASSET_TABLE_NAME = (() => {
-  try { 
-    return getEnvVariable("ASSET_TABLE_NAME");
-  } catch (err) {
-     return "";
-  }
-})();
-Object.freeze(ASSET_TABLE_NAME)
 
 
