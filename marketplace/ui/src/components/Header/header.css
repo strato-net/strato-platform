@@ -8,6 +8,8 @@
   border: none;
 }
 .header-search,
+/* .header-search > .ant-input-prefix,
+.header-search > span > .anticon-search, */
 .header-search input {
   background-color: #f2f2f2;
 }
@@ -27,4 +29,3 @@
 .bg-1 {
   background-color: #f2f2f2;
 }
-
