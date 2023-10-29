@@ -29,7 +29,8 @@ const { Text, Paragraph, Title } = Typography;
 const initialValues = {
   name: "",
   price: "",
-  quantity: ""
+  quantity: "",
+  // isTaxPercentage:false,
 };
 
 
@@ -46,6 +47,7 @@ const MembershipCardPurchased = ({
   const membershipState = useMembershipState()
   const { type } = useParams()
   const isIssued = type === "issued";
+  const isPurchased = type === "purchased";
   const {
     subCategory,
     manufacturer,
@@ -68,6 +70,7 @@ const MembershipCardPurchased = ({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [carouselModel, setCarouselModel] = useState(false);
+  const [listed, setListed] = useState(0)
   const navigate = useNavigate();
   const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
@@ -108,7 +111,7 @@ const MembershipCardPurchased = ({
 
   const callDetailPage = (index, address) => {
     let route;
-    route = `/memberships/${type}/${membership.membershipAddress}?inventoryId=${membership.inventoryId ?? null}`
+    route = `/memberships/${type}/${membership.membershipAddress}?inventoryId=${membership.inventoryId}`
     navigate(route);
   }
 
@@ -157,6 +160,7 @@ const MembershipCardPurchased = ({
   const closeListNowModal = () => {
     setVisible(false);
     setIsEdit(false);
+    setListed(0)
   };
 
   const openListNowModal = () => {
@@ -219,7 +223,7 @@ const MembershipCardPurchased = ({
             inventory: membership.inventoryId,
             updates: {
               pricePerUnit: formik.values.price,
-              status: INVENTORY_STATUS.PUBLISHED,
+              status: formik.values.inventoryStatus,
               quantity: 1,
               taxPercentageAmount: formik.values.taxPercentageAmount,
               taxDollarAmount: formik.values.taxDollarAmount
@@ -282,6 +286,31 @@ const MembershipCardPurchased = ({
                   <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
                   <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
                 </Row>
+                {isPurchased && <Row className="px-2">
+                  <Button onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
+                      formik.setFieldValue("name", membership.productName);
+                      // formik.setFieldValue("quantity", membership.productName);
+                      formik.setFieldValue("inventoryStatus", parseInt(membership.status));
+                      // formik.setFieldValue("isTaxPercentage", false);
+                      formik.setFieldValue("taxPercentage", taxVal);
+                      formik.setFieldValue("price", membership.price);
+                      formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
+                      formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
+                      if (status === '2') {
+                        setListed(1)
+                      } else {
+                        setListed(2)
+                      }
+                      openListNowModal();
+                    }
+                  }} >
+                    <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Edit</Text>
+                  </Button>
+                </Row>}
               </Col>
               {!isPurchasedList &&
                 (<Col span={24} className="mt-2">
@@ -330,9 +359,12 @@ const MembershipCardPurchased = ({
                     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                       window.location.href = loginUrl;
                     } else {
+                      let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
                       formik.setFieldValue("name", membership.productName);
-                      // formik.setFieldValue("quantity", membership.productName);
-                      // formik.setFieldValue("price", membership.productName);
+                      formik.setFieldValue("inventoryStatus", 1);
+                      // formik.setFieldValue("isTaxPercentage", false);
+                      formik.setFieldValue("price", membership?.price);
+                      formik.setFieldValue("taxPercentage", taxVal);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
                       openListNowModal();
@@ -427,6 +459,7 @@ const MembershipCardPurchased = ({
           listType={"Sale"}
           id={itemNumber}
           isEdit={isEdit}
+          listed={listed}
           membershipStatus={membership.status}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}

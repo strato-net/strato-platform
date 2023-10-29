@@ -79,7 +79,6 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-   
   }, [routeMatch]);
 
   useEffect(() => {
@@ -128,7 +127,6 @@ const BoughtOrderDetails = ({ user, users }) => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.status)));
       setcomment(orderDetails.buyerComments);
-     
       let items = [];
       orderDetails.orderLines.forEach((prod) => {
         items.push({
@@ -211,7 +209,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px]"
         >
-          {decodeURIComponent(text)}
+          {text}
         </p>
       ),
     },
@@ -228,7 +226,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               navigate(
                 `${routes.BoughtOrderItemDetail.url
                   .replace(":id", text.address)}`,
-                  // .replace(":chainId", text.chainId)}`,
+                // .replace(":chainId", text.chainId)}`,
                 { state: { orderId: details.orderId, address: Id } }
               );
             }}
@@ -244,7 +242,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       dataIndex: "manufacturer",
       key: "manufacturer",
       align: "center",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
+      render: (text) => <p>{text}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -372,7 +370,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 <TextArea
                   rows={2}
                   placeholder="Enter Comments"
-                  value={decodeURIComponent(comment)}
+                  value={comment}
                   disabled={status !== getStatus(1)}
                   onChange={(event) => {
                     setcomment(event.target.value);

@@ -4,7 +4,7 @@ import serviceJS from './service'
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils'
 import { service } from '../../api/v1/endpoints';
 
-const contractName = 'serviceManager_10'
+const contractName = 'Mem_ServiceManager_10'
 const contractFilename = `${util.cwd}/dapp/service/contracts/serviceManager.sol`
 
 async function uploadContract(user, _constructorArgs = {}, options) {

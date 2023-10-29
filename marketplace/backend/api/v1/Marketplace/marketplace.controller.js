@@ -1,54 +1,77 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
-import constants from '../../../helpers/constants'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
+import { rest } from "blockapps-rest";
+import Joi from "@hapi/joi";
+import RestStatus from "http-status-codes";
+import config from "../../../load.config";
+import constants from "../../../helpers/constants";
+import { getSignedUrlFromS3 } from "../../../helpers/s3";
 
-const options = { config, cacheNonce: true }
+const options = { config, cacheNonce: true };
 
 class MarketplaceController {
-
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
       if (query.manufacturer) {
-        const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
-        query.manufacturer = encodedManufacturers
+        const encodedManufacturers = query.manufacturer.map((product) => {
+          return encodeURIComponent(product);
+        });
+        query.manufacturer = encodedManufacturers;
       }
-      const inventories = await dapp.getMarketplaceInventories({ ...query })
+      let inventories = await dapp.getMarketplaceInventories({ ...query });
 
       // const productsWithImageUrl = inventories
       //   .map(product => ({
       //     ...product,
       //     imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
       //   }))
-      rest.response.status200(res, inventories)
 
-      return next()
+      inventories = inventories.map((inventory) => {
+        let img = "";
+        if (
+          inventory.productImageLocation !== null &&
+          inventory.productImageLocation !== undefined &&
+          inventory?.productImageLocation?.length > 0
+        ) {
+          img = inventory.productImageLocation.map((item) => {
+            return getSignedUrlFromS3(item, req.app.get(constants.s3ParamName));
+          });
+        }
+        return { ...inventory, productImageLocation: img };
+      });
+      rest.response.status200(res, inventories);
+
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getAllLoggedIn(req, res, next) {
     try {
-      const { dapp, query } = req
-      
+      const { dapp, query } = req;
+
       if (query.manufacturer) {
-        const encodedManufacturers = query.manufacturer.map(product => { return encodeURIComponent(product) })
-        query.manufacturer = encodedManufacturers
+        const encodedManufacturers = query.manufacturer.map((product) => {
+          return encodeURIComponent(product);
+        });
+        query.manufacturer = encodedManufacturers;
       }
-      let inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query });
+      let inventories = await dapp.getMarketplaceInventoriesLoggedIn({
+        ...query,
+      });
 
       inventories = inventories.map((inventory) => {
-        let img = ''
-        if (inventory.productImageLocation !== null && inventory.productImageLocation !== undefined && inventory?.productImageLocation?.length>0) {
-           img = inventory.productImageLocation.map((item)=>{
-            return getSignedUrlFromS3(item , req.app.get(constants.s3ParamName));
-          })
+        let img = "";
+        if (
+          inventory.productImageLocation !== null &&
+          inventory.productImageLocation !== undefined &&
+          inventory?.productImageLocation?.length > 0
+        ) {
+          img = inventory.productImageLocation.map((item) => {
+            return getSignedUrlFromS3(item, req.app.get(constants.s3ParamName));
+          });
         }
-        return { ...inventory, productImageLocation: img }
+        return { ...inventory, productImageLocation: img };
       });
 
       // const productsWithImageUrl = inventories
@@ -56,49 +79,49 @@ class MarketplaceController {
       //     ...product,
       //     imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
       //   }))
-      rest.response.status200(res, inventories)
+      rest.response.status200(res, inventories);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getTopSellingProducts(req, res, next) {
     try {
-      const { dapp, query } = req
-      const inventories = await dapp.getTopSellingProducts({ ...query })
+      const { dapp, query } = req;
+      const inventories = await dapp.getTopSellingProducts({ ...query });
       // const productsWithImageUrl = inventories.map(product => ({
       //   ...product,
       //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
       //   )
       // }))
-      rest.response.status200(res, inventories)
+      rest.response.status200(res, inventories);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getTopSellingProductsLoggedIn(req, res, next) {
     try {
-      const { dapp, query } = req
-      const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
+      const { dapp, query } = req;
+      const inventories = await dapp.getTopSellingProductsLoggedIn({
+        ...query,
+      });
       // const productsWithImageUrl = inventories.map(product => ({
       //   ...product,
       //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
       //   )
       // }))
-      rest.response.status200(res, inventories)
+      rest.response.status200(res, inventories);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 }
 
-
-
-export default MarketplaceController
+export default MarketplaceController;

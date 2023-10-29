@@ -48,7 +48,7 @@ const Checkout = ({ user }) => {
 
   const calculateTax = (item) => {
     return item.product.taxes ?
-      (item.product.isTaxPercentage ?
+      (item.product.taxPercentageAmount ?
         (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)
         : (item.product.taxes / 100) * item.qty)
       : 0;
@@ -85,11 +85,12 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
+        const imgUrl = item.product.productImageLocation?.length>0 && item.product.productImageLocation[0] 
         modifiedValue.push({
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: item.product.imageUrl,
+            image: imgUrl,
             status: item.product.isActive ? "Active" : "Inactive",
           },
           sellerOrganization: item.product.ownerOrganization,
@@ -177,7 +178,7 @@ const Checkout = ({ user }) => {
       dataIndex: "item",
       render: (text) => {
         return (
-          <p className="text-primary text-[17px]">{decodeURIComponent(text.name)}</p>
+          <p className="text-primary text-[17px]">{text.name}</p>
         );
       },
     },

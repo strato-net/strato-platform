@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 
-const contractName = 'OrderLineItem';
+const contractName = 'Mem_OrderLineItem';
 const contractFilename = `${util.cwd}/dapp/orders/contracts/OrderLineItem.sol`;
 
 /** 

@@ -4,7 +4,7 @@ import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 
 /// @title A representation of Item assets
-contract Item_3 is ItemStatus {
+contract Mem_Item_3 is ItemStatus {
     address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -168,7 +168,7 @@ contract Item_3 is ItemStatus {
         string _rawMaterialSerialNumber,
         string _rawMaterialProductId
     ) public returns (uint256) {
-        RawMaterial_3 rawMaterial = new RawMaterial_3(
+        Mem_RawMaterial_3 rawMaterial = new Mem_RawMaterial_3(
             serialNumber,
             _rawMaterialSerialNumber,
             _rawMaterialProductName,

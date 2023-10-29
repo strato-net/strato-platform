@@ -9,7 +9,7 @@ import {
 } from "/helpers/utils";
 import dayjs from "dayjs";
 
-const contractName = "Order";
+const contractName = "Mem_Order";
 const contractFilename = `${util.cwd}/dapp/orders/contracts/Order.sol`;
 
 /**

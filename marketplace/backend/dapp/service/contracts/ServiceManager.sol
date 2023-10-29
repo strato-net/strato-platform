@@ -1,7 +1,7 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/Service/contracts/Service.sol";
 
-contract ServiceManager_10 is RestStatus {
+contract Mem_ServiceManager_10 is RestStatus {
 
     function createService(
         string _name,

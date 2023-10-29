@@ -96,7 +96,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     description: "",
     price: "",
     quantity: "",
-    isTaxPercentage: true,
+    isTaxPercentage: false,
     taxDollarAmount: 0,
     taxPercentageAmount: 0,
     taxPercentage: 0,
@@ -186,18 +186,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     const updatedServices = [...formik.values.services];
     updatedServices.splice(indexToRemove, 1);
     formik.setFieldValue("services", updatedServices);
-  };
-
-  const handlePriceDiscountClick = (index) => {
-    const updatedMemberDiscount = [...memberDiscount];
-    updatedMemberDiscount[index] = 1;
-    setMemberDiscount(updatedMemberDiscount);
-  };
-
-  const handlePercentDiscountClick = (index) => {
-    const updatedMemberDiscount = [...memberDiscount];
-    updatedMemberDiscount[index] = 2;
-    setMemberDiscount(updatedMemberDiscount);
   };
 
   const handleDocumentChange = (info) => {
@@ -306,7 +294,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 name: updatedValues.name,
                 description: updatedValues.description,
                 manufacturer: user.user.organization,
-                unitOfMeasurement: 1,
+                unitOfMeasurement: 6,
                 // Generate random code for now
                 userUniqueMembershipCode: `U-ID-${Math.floor(Math.random() * 1000000)}`,
                 // Generate random number for now
@@ -840,7 +828,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 <Row className="mt-5">
                   <Col span={24}>
                     <Upload.Dragger
-                     {...props}
+                      {...props}
                       fileList={fileList}
                       // onChange={handleChange}
                       showUploadList={false}

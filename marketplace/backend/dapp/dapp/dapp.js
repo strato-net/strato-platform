@@ -1177,7 +1177,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             membershipAddress: memberships[0].address,
             expiryDate: item?.expiryDate,
             taxDollarAmount: inventoryDetail.taxDollarAmount,
-            taxPercentageAmount:inventoryDetail.taxPercentageAmount
+            taxPercentageAmount: inventoryDetail.taxPercentageAmount,
+            price: inventoryDetail.pricePerUnit
           };
         });
 
@@ -1524,12 +1525,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
       const itemsAddresses = items.map(_item => _item.address);
-      let membership = await membershipJs.get(rawAdmin, { productId: items[0].productId }, { ...options, org: managers.cirrusOrg, app: contractName })
-      const months = membership.timePeriodInMonths;
-
+      let membership = await membershipJs.getAll(rawAdmin, { productId: [productId] }, { ...options, org: managers.cirrusOrg, app: contractName })
+      const months = membership[0].timePeriodInMonths;
       const currentDateTime = dayjs();
-
-      const expiryDateTime = currentDateTime.add((months * 30), 'day').valueOf();
+      const expiryDateTime = currentDateTime.add(months, 'month').add(1, 'day').valueOf();
 
       let totalExpiry;
       if (items?.expiryDate === totalExpiry) {

@@ -22,9 +22,10 @@ class InventoryController {
         chainOptions = { ...options }
       }
 
-      const inventory = await dapp.getInventory(args, chainOptions)
+      const inventory = await dapp.getInventory(args, chainOptions);
+      const itemId = await dapp.getItem({inventoryId:inventory.address});
       // const inventoryImageUrl = getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
-      const result = { ...inventory }
+      const result = { ...inventory, itemId:itemId?.address }
       rest.response.status200(res, result)
 
       return next()
