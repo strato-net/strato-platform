@@ -122,11 +122,16 @@ const MembershipCardPurchased = ({
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
+        let tax = inv.taxPercentageAmount || inv.taxDollarAmount
         formik.setFieldValue("name", membership.productName);
         formik.setFieldValue("inventoryStatus", inv.status);
         formik.setFieldValue("tempInv", inv);
-        formik.setFieldValue("taxPercentage", inv.taxPercentage);
+        formik.setFieldValue("inventoryID", inv.address);
+        formik.setFieldValue("quantity", inv.availableQuantity);
+        formik.setFieldValue("price", inv.pricePerUnit);
+        formik.setFieldValue("taxPercentage", tax);
         formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
+        formik.setFieldValue("taxPercentageAmount", inv.taxPercentageAmount);
         setIsEdit(true)
         openListNowModal();
       }
@@ -136,13 +141,12 @@ const MembershipCardPurchased = ({
     />
   </Button>)
 
-
   let data = Inventories?.map((inventory, index) => {
     return {
       key: index,
       name: inventory.block_timestamp,
       age: inventory.availableQuantity,
-      published: updateCol(inventory, inventory.status === '1' ? "Published" : "Unpublished"),
+      published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
       edit: previewCol(inventory, inventory.address),
       address: "$ " + String(inventory.pricePerUnit)
     }
@@ -188,11 +192,11 @@ const MembershipCardPurchased = ({
           if (isEdit) {
             const updatePayload = {
               productAddress: membership.productId,
-              inventory: formik.values.tempInv.address,
+              inventory: formik.values.inventoryID,
               updates: {
                 pricePerUnit: formik.values.price,
                 status: parseInt(formik.values.inventoryStatus),
-                quantity: formik.values.tempInv.availableQuantity,
+                quantity: formik.values.quantity,
                 taxPercentageAmount: parseInt(formik.values.taxPercentage),
                 taxDollarAmount: parseInt(formik.values.taxDollarAmount)
               }

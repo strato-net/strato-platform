@@ -12,11 +12,13 @@ import {
   Row,
   Col,
 } from "antd";
+
 import helperJson from "../../helpers/helper.json";
 import { useInventoryState } from "../../contexts/inventory";
 import { useMembershipState } from "../../contexts/membership";
 import { useProductState } from "../../contexts/product";
 import { useParams } from "react-router-dom";
+
 const { columns, taxOptions, StatusValue } = helperJson;
 const { Text, Title } = Typography;
 
@@ -57,18 +59,21 @@ const ListNowModal = ({
     inventoryDetails,
     Inventory,
   } = useInventoryState();
+
   const { isuploadImageSubmitting } = useProductState();
-  // const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
+
   const seller = user?.user?.user?.organization || user?.user?.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting, purchasedMemberships, memberships } =
     useMembershipState();
+
   const isSubmit =
     isCreateMembershipSubmitting ||
     isResaleMembershipSubmitting ||
     isuploadImageSubmitting ||
     isCreateInventorySubmitting ||
     isinventoryUpdating;
+
   const handleFormatter = (value) => {
     if (value === "" || value === ".") {
       return "0.00";
@@ -84,7 +89,6 @@ const ListNowModal = ({
     }
   };
 
-  const membershipData = isIssued ? memberships : purchasedMemberships;
 
   const handleParser = (value) => {
     // Remove non-numeric characters and leading zeros
@@ -97,21 +101,9 @@ const ListNowModal = ({
     formik.setFieldValue("inventoryStatus", value);
   };
 
-  const selectAfter = (
-    <Select
-      defaultValue="1"
-      onChange={(value) => {
-        formik.setFieldValue("isTaxPercentage", value === "1");
-      }}
-      style={{ width: 60 }}
-      options={taxOptions}
-    />
-  );
-
   const statusVal =
     inventoryDetails?.status ||
-    membershipStatus ||
-    formik.values?.tempInv?.status;
+    membershipStatus;
 
   const handleTypeBtn = (status) => {
     formik.setFieldValue("isTaxPercentage", status);
@@ -121,7 +113,6 @@ const ListNowModal = ({
 
   return (
     <Modal
-      // width={800}
       style={{ maxWidth: "720px" }}
       width="auto"
       title={
@@ -152,8 +143,7 @@ const ListNowModal = ({
         <Row gutter={[48, 12]}>
           <Col span={8}>
             <Row>
-              {" "}
-              <Text className="font-medium">Seller</Text>{" "}
+              <Text className="font-medium">Seller</Text>
             </Row>
             <Row>
               <Input
@@ -162,28 +152,26 @@ const ListNowModal = ({
                 size="large"
                 disabled={true}
                 className="w-full mt-2 cursor-not-allowed"
-              />{" "}
+              />
             </Row>
           </Col>
           <Col span={8}>
             <Row>
-              <Text className="font-medium">Membership</Text>{" "}
+              <Text className="font-medium">Membership</Text>
             </Row>
             <Row>
-              {" "}
               <Input
                 type="text"
                 value={membership}
                 size="large"
                 disabled={true}
                 className="w-full mt-2 cursor-not-allowed"
-              />{" "}
+              />
             </Row>
           </Col>
           {isPurchased && (
             <Col span={8}>
               <Row>
-                {" "}
                 <Text className="font-medium">Membership Number</Text>
               </Row>
               <Row>
@@ -199,7 +187,6 @@ const ListNowModal = ({
           )}
           <Col span={8}>
             <Row>
-              {" "}
               <Text className="font-medium">Quantity</Text>
             </Row>
             <Row>
@@ -216,9 +203,7 @@ const ListNowModal = ({
                 controls={false}
                 value={
                   isIssued || isNew
-                    ? isEdit
-                      ? formik?.values?.tempInv?.availableQuantity
-                      : formik.values.quantity
+                    ? (isEdit ? formik.values.quantity : 1)
                     : 1
                 }
                 onChange={(value) => {
@@ -229,11 +214,11 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row>
-              {" "}
+
               <Text className="font-medium">Tax Percentage/Amount</Text>
             </Row>
             <Row>
-              {" "}
+
               <InputNumber
                 id="percentage"
                 name="percentage"
@@ -288,7 +273,6 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row>
-              {" "}
               <Text className="font-medium">Price</Text>
             </Row>
             <Row>
@@ -315,7 +299,6 @@ const ListNowModal = ({
           {!isNew && (
             <Col span={8}>
               <Row>
-                {" "}
                 <Text className="font-medium">Status</Text>
               </Row>
               <Row>
@@ -326,8 +309,7 @@ const ListNowModal = ({
                     size="large"
                     defaultValue={
                       StatusValue[
-                        formik?.values?.tempInv?.status ||
-                          formik?.values?.inventoryStatus
+                      formik?.values?.inventoryStatus
                       ]
                     }
                     // suffixIcon={<CaretDownOutlined />}
