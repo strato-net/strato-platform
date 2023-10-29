@@ -1,34 +1,22 @@
-import React, { useEffect, useState } from "react";
-import MembershipCard from "./MembershipCard";
-import { Col, Row, Spin } from "antd";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import { actions } from "../../contexts/membership/actions";
+import React, { useEffect } from "react";
+import { Col, Row } from "antd";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { actions as membershipActions } from "../../contexts/membership/actions";
 import { Image, Typography } from "antd";
 import { Images } from "../../images";
 import MembershipCardPurchased from "./MembershipCardPurchased";
 import LoaderComponent from "../Loader/LoaderComponent";
 
-const IssuedList = (
-  user,
-  categorys,
-  subCategorys,
-  key,
-  debouncedSearchTerm
-) => {
-  const dispatch = useMembershipDispatch();
-  let {
-    memberships,
-    isMembershipsLoading,
-  } = useMembershipState();
-
-  useEffect(() => {
-    actions.fetchMembership(dispatch);
-  }, []);
+const IssuedList = ({ user, categorys, subCategorys, debouncedSearchTerm }) => {
 
   const { Title } = Typography;
+  const { memberships, isMembershipsLoading } = useMembershipState();
+  const membershipDispatch = useMembershipDispatch();
+
+  useEffect(() => {
+    membershipActions.fetchMembership(membershipDispatch);
+  }, []);
+
   return (
     <>
       {isMembershipsLoading ? (
@@ -42,39 +30,46 @@ const IssuedList = (
         </div>
       ) : (
         <Row className="w-full my-4 flex flex-row" gutter={[12, 12]}>
-          {memberships?.map((item, index) => {
-            // membershipId,
-            let transformedData = { ...item.product }
-            transformedData["timePeriodInMonths"] = item.timePeriodInMonths
-            transformedData["Inventories"] = item?.inventories;
-            transformedData["productName"] = item?.productName;
-            transformedData["productId"] = item.productId;
-            if (item.inventories && item.inventories?.length > 0) {
-              transformedData["inventoryId"] = item.inventories[0]?.address;
-            } else {
-              transformedData["inventoryId"] = '';
-            }
-            transformedData["itemNumber"] = item.itemNumber;
-            transformedData["membershipAddress"] = item.address;
-            transformedData["productImageLocation"] = item.productImageLocation;
-            transformedData["savings"] = item.savings;
-            transformedData["expiryDate"] = "";
-            transformedData["status"] = item.status;
+          {memberships.map(({
+            product,
+            timePeriodInMonths,
+            inventories,
+            productName,
+            productId,
+            itemNumber,
+            address,
+            productImageLocation,
+            savings,
+            status,
+          }) => {
+            const inventoryId = inventories?.length > 0 ? inventories[0]?.address : '';
             return (
-              <Col span={12}>
+              <Col span={12} key={address}>
                 <MembershipCardPurchased
                   user={user}
-                  membership={transformedData}
+                  membership={{
+                    ...product,
+                    timePeriodInMonths,
+                    Inventories: inventories,
+                    productName,
+                    productId,
+                    inventoryId,
+                    itemNumber,
+                    membershipAddress: address,
+                    productImageLocation,
+                    savings,
+                    expiryDate: "",
+                    status,
+                  }}
                   categorys={categorys}
                   subCategorys={subCategorys}
                   debouncedSearchTerm={debouncedSearchTerm}
-                  membershipId={item.address}
+                  membershipId={address}
                   isPurchasedList={false}
                 />
               </Col>
             );
           })}
-
         </Row>
       )}
     </>
