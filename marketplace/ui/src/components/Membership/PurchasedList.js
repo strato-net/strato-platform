@@ -1,13 +1,11 @@
 import React, { useEffect } from "react";
 import MembershipCardPurchased from "./MembershipCardPurchased";
-import { Col, Input, Row, Select, Spin } from "antd";
+import { Col, Input, Row, Select } from "antd";
 import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../contexts/membership";
-import { actions } from "../../contexts/membership/actions";
-import { Image, Typography } from "antd";
-import { Images } from "../../images";
+import { actions as membershipActions } from "../../contexts/membership/actions";
 import { SearchOutlined } from "@ant-design/icons";
 import LoaderComponent from "../Loader/LoaderComponent";
 import NoProductComponent from "../NoProductFound/NoProductComponent";
@@ -18,10 +16,10 @@ const PurchasedList = (
   subCategorys,
   debouncedSearchTerm
 ) => {
-  const dispatch = useMembershipDispatch();
+  const membershipDispatch = useMembershipDispatch();
   const { purchasedMemberships, isPurchasedMembershipLoading } = useMembershipState();
-  useEffect(() => { actions.fetchPurchasedMemberships(dispatch) }, []);
-  const { Title } = Typography;
+  useEffect(() => { membershipActions.fetchPurchasedMemberships(membershipDispatch) }, []);
+
   return (
     <>
       {isPurchasedMembershipLoading ? (
@@ -30,7 +28,6 @@ const PurchasedList = (
         <NoProductComponent />
       ) : (
         <>
-
           {/* <Row className="flex justify-start w-full">
             <Col span={12} className="flex justify-between">
             <Col span={8}>
