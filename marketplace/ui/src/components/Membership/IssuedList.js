@@ -6,6 +6,7 @@ import { Image, Typography } from "antd";
 import { Images } from "../../images";
 import MembershipCardPurchased from "./MembershipCardPurchased";
 import LoaderComponent from "../Loader/LoaderComponent";
+import NoProductComponent from "../NoProductFound/NoProductComponent";
 
 const IssuedList = ({ user, categorys, subCategorys, debouncedSearchTerm }) => {
 
@@ -22,12 +23,7 @@ const IssuedList = ({ user, categorys, subCategorys, debouncedSearchTerm }) => {
       {isMembershipsLoading ? (
         <LoaderComponent />
       ) : memberships.length === 0 ? (
-        <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
-          <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
-          <Title level={3} className="mt-2">
-            No product found
-          </Title>
-        </div>
+        <NoProductComponent />
       ) : (
         <Row className="w-full my-4 flex flex-row" gutter={[12, 12]}>
           {memberships.map(({
