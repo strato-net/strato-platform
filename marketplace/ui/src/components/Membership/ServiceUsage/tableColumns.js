@@ -21,9 +21,9 @@ import dayjs from "dayjs";
 
 dayjs.locale('es');
 
-const disabledDate = (current) => {
-  return current && dayjs(current).isBefore(dayjs().startOf('day'));
-};
+// const disabledDate = (current) => {
+//   return current && dayjs(current).isBefore(dayjs().startOf('day'));
+// };
 
 export function generateTableColumns({
   isEdit,
@@ -216,6 +216,15 @@ export function generateTableColumns({
   };
 
   const renderDateColumn = (text, record, index, isEdit, handleInputChange) => {
+
+    const disabledDate = (current) => {
+      // return current && dayjs(current).isBefore(dayjs().startOf('day'));
+      const today = dayjs().startOf('day');
+      const expiryDate = dayjs(record.expiryDate).startOf('day'); // Assuming record.expiryDate contains the expiry date
+      // Disable dates that are after the expiryDate or before today
+      return current && (dayjs(current).isAfter(expiryDate) || dayjs(current).isBefore(today));
+    };
+
     return (
       <span>
         {record.editable ? (

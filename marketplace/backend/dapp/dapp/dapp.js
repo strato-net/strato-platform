@@ -1397,7 +1397,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       itemsAddress: [itemAddress],
       status: ITEM_STATUS.PUBLISHED,
       comment: "",
-      expiryDate: items[0].expiryDate
+      expiryDate: items[0]?.expiryDate
     });
     return soldStatus
   };
@@ -2024,7 +2024,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: '' };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
 
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
       ...args,
