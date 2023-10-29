@@ -2047,7 +2047,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
       bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
       expiryDate: (items.find((itemE) => itemE.address = item.address)[0]?.expiryDate || 1709623680000) || ''
-    }));
+    })).filter(item => {
+      const itemExpiryDate = dayjs(item.expiryDate);
+      return itemExpiryDate.isSameOrAfter(currentDate);
+    }); //Test this filter
 
     return { result: data, total: serviceUsage.total };
   };
@@ -2084,7 +2087,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
       bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
       expiryDate: (items.find((itemE) => itemE.address = item.address)[0]?.expiryDate || 1709623680000) || ''
-    }));
+    })).filter(item => {
+      const itemExpiryDate = dayjs(item.expiryDate);
+      return itemExpiryDate.isSameOrAfter(currentDate);
+    }); //Test this filter;
 
     return { result: data, total: serviceUsage.total };
 
