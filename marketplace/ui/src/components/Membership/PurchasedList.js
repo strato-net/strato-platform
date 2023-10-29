@@ -9,6 +9,7 @@ import { actions } from "../../contexts/membership/actions";
 import { Image, Typography } from "antd";
 import { Images } from "../../images";
 import { SearchOutlined } from "@ant-design/icons";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const PurchasedList = (
   user,
@@ -23,16 +24,14 @@ const PurchasedList = (
   return (
     <>
       {isPurchasedMembershipLoading ? (
-        <div className="h-screen flex justify-center items-center mx-auto">
-          <Spin spinning={isPurchasedMembershipLoading} size="large" />
-        </div>
+        <LoaderComponent />
       ) : purchasedMemberships.length === 0 ? (
         <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
-        <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
-        <Title level={3} className="mt-2">
-          No product found
-        </Title>
-      </div>
+          <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
+          <Title level={3} className="mt-2">
+            No product found
+          </Title>
+        </div>
       ) : (
         <>
 

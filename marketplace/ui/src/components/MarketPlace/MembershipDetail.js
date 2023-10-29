@@ -48,6 +48,7 @@ import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import TagManager from "react-gtm-module";
 import dayjs from "dayjs";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const StatusValue = {
   1: "Listed",
@@ -571,9 +572,7 @@ const MembershipDetails = ({ user, users }) => {
     <>
       {contextHolder}
       {isLoading ? (
-        <div className="h-screen flex justify-center mx-auto items-center">
-          <Spin spinning={isLoading} size="large" />
-        </div>
+        <LoaderComponent />
       ) : (
         <div>
           <BreadCrumbComponent name={inventoryDetails?.name} />
@@ -737,16 +736,16 @@ const MembershipDetails = ({ user, users }) => {
                     size="large"
                     className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
-                    // onClick={() => {
-                    //   TagManager.dataLayer({
-                    //     dataLayer: {
-                    //       event: 'contact_sales_from_category_card',
-                    //       product_name: product.name,
-                    //       category: product.category,
-                    //       productId: product.productId
-                    //     },
-                    //   });
-                    // }}
+                  // onClick={() => {
+                  //   TagManager.dataLayer({
+                  //     dataLayer: {
+                  //       event: 'contact_sales_from_category_card',
+                  //       product_name: product.name,
+                  //       category: product.category,
+                  //       productId: product.productId
+                  //     },
+                  //   });
+                  // }}
                   >
                     Contact to Buy
                   </Button>
@@ -786,7 +785,7 @@ const MembershipDetails = ({ user, users }) => {
                         openListNowModal();
                       }
                     }}
-                    // disabled={ownerSameAsUser}
+                  // disabled={ownerSameAsUser}
                   >
                     {" "}
                     <Text

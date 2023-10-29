@@ -33,6 +33,7 @@ import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
 import { useAuthenticateState } from "../../contexts/authentication";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -370,9 +371,7 @@ const CategoryProductList = ({ user }) => {
 
         {/* Product list section */}
         {isMarketplaceLoading ? (
-          <div className="h-96 w-9/12 flex justify-center items-center">
-            <Spin spinning={isMarketplaceLoading} size="large" />
-          </div>
+          <LoaderComponent />
         ) : (
           <div className="w-9/12 mb-12">
             <Text className="text-sm text-secondryB">

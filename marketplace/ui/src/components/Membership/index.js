@@ -42,6 +42,7 @@ import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import { setCookie } from "../../helpers/cookie";
 import { useInventoryState } from "../../contexts/inventory";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -205,9 +206,7 @@ const Membership = (user) => {
     <>
       {contextHolder}
       {isPageLoading ? (
-        <div className="h-screen flex justify-center items-center mx-auto">
-          <Spin spinning={isLoadingStripeStatus} size="large" />
-        </div>
+        <LoaderComponent />
       ) : (
         <div className="min-h-full">
           <BreadCrumbComponent />

@@ -8,6 +8,7 @@ import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const MarketPlace = () => {
   const limit = 10, offset = 0;
@@ -41,9 +42,7 @@ const MarketPlace = () => {
           preview={false} width="100%" />
       </div>
       {iscategorysLoading ? (
-        <div className="h-96 flex justify-center items-center">
-          <Spin spinning={iscategorysLoading} size="large" />
-        </div>
+        <LoaderComponent />
       ) : (
         <div className="px-8 py-12">
           <CategoryCard />

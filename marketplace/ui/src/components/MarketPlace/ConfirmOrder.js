@@ -20,7 +20,7 @@ import {
   Form,
   Input,
 } from "antd";
-import { useState, useEffect, useMemo} from "react";
+import { useState, useEffect, useMemo } from "react";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
@@ -37,6 +37,7 @@ import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { TextArea } = Input;
 
@@ -100,15 +101,15 @@ const ConfirmOrder = () => {
   const handleCancel = () => {
     setOpen(false);
   };
-  
+
   useEffect(() => {
     actions.fetchUserAddresses(marketplaceDispatch);
   }, [marketplaceDispatch])
-  
+
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
-  
+
   useEffect(() => {
     actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
@@ -258,7 +259,7 @@ const ConfirmOrder = () => {
           <p className="text-primary text-[17px]">{text.name}</p>
         );
       },
-      
+
     },
     {
       title: (
@@ -267,7 +268,7 @@ const ConfirmOrder = () => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: (
@@ -276,7 +277,7 @@ const ConfirmOrder = () => {
       dataIndex: "unitOfMeasure",
       align: "center",
       render: (text) => <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -313,7 +314,7 @@ const ConfirmOrder = () => {
   ];
 
   const navigate = useNavigate();
-  
+
   const handleOrderConfirm = async () => {
     let concatenatedOrderString = "";
     let firstSellerOrg;
@@ -363,7 +364,7 @@ const ConfirmOrder = () => {
     } catch (error) {
       console.error('Failed to send email:', error);
     }
-  
+
     handleCancel();
     let orderList = [];
     let orderItemAddress = [];
@@ -416,7 +417,7 @@ const ConfirmOrder = () => {
       },
     });
     let data = await orderActions.createPayment(orderDispatch, body);
-   
+
     if (data != null && data.url !== undefined) {
       window.location.replace(data.url);
     }
@@ -436,9 +437,7 @@ const ConfirmOrder = () => {
     <div className="h-screen mx-14  mt-14">
       {contextHolder}
       {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
-        </div>
+        <LoaderComponent />
       ) : (
         <div className="pb-20">
           <Breadcrumb>
@@ -635,9 +634,7 @@ const ConfirmOrder = () => {
             <div className="mt-4">
               {
                 isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
-                  <div className="h-80 flex justify-center items-center">
-                    <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
-                  </div> :
+                  <LoaderComponent /> :
                   userAddresses.length !== 0 ?
                     <div className="flex flex-nowrap overflow-x-auto space-x-4">
                       {

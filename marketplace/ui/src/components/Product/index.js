@@ -26,6 +26,7 @@ import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -116,9 +117,7 @@ const Product = () => {
     <>
       {contextHolder}
       {isProductsLoading || iscategorysLoading || issubCategorysLoading ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isProductsLoading} size="large" />
-        </div>
+        <LoaderComponent />
       ) : (
         <div className="mx-16 mt-14 h-screen">
           {products.length === 0 && offset === 0 ? (

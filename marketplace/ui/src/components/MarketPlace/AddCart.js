@@ -26,6 +26,7 @@ import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Title, Text } = Typography;
 
@@ -371,9 +372,7 @@ const Checkout = ({ user }) => {
     <div className="h-screen mx-14">
       {contextHolder}
       {isCreateOrderSubmitting ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isCreateOrderSubmitting} size="large" />
-        </div>
+        <LoaderComponent />
       ) : (
         <div>
           <BreadCrumbComponent />

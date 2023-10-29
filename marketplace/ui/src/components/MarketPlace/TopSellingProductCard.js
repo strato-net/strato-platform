@@ -21,6 +21,7 @@ import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Title, Text } = Typography;
 
@@ -131,9 +132,7 @@ const TopSellingProductCard = () => {
         </div>
         <div className="flex justify-evenly px-2" id="topSelling">
           {isTopSellingProductsLoading ? (
-            <div className="h-52 flex justify-center items-center">
-              <Spin spinning={isTopSellingProductsLoading} size="large" />
-            </div>
+            <LoaderComponent />
           ) : (
             topSellingProducts
               .map((topSellingProduct, index) => {
