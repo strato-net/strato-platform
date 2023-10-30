@@ -372,7 +372,8 @@ const CreateInventoryModal = ({
                           (e) => e.address === value
                           );
                         }
-                        formik.setFieldValue("productName.name", selectedProduct.name);
+                        var pname = (selectedProduct?.name !== null && selectedProduct?.name !== undefined) ? decodeURIComponent(selectedProduct.name) : null
+                        formik.setFieldValue("productName.name", pname);
                         formik.setFieldValue(
                           "productName.address",
                           selectedProduct.address
