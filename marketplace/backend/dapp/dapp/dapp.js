@@ -1528,7 +1528,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let membership = await membershipJs.getAll(rawAdmin, { productId: [productId] }, { ...options, org: managers.cirrusOrg, app: contractName })
       const months = membership[0].timePeriodInMonths;
       const currentDateTime = dayjs();
-      const expiryDateTime = currentDateTime.add(months, 'month').add(1, 'day').valueOf();
+      // const expiryDateTime = currentDateTime.add(months, 'month').add(1, 'day').valueOf();
+      const expiryDateTime = currentDateTime.add(months, 'month').valueOf();
 
       let totalExpiry;
       if (items?.expiryDate === totalExpiry) {
