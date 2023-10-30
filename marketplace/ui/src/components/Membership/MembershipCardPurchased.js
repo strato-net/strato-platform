@@ -127,6 +127,7 @@ const MembershipCardPurchased = ({
         formik.setFieldValue("inventoryStatus", inv.status);
         formik.setFieldValue("tempInv", inv);
         formik.setFieldValue("price", inv.pricePerUnit);
+        formik.setFieldValue("quantity", inv.availableQuantity);
         formik.setFieldValue("taxPercentage", tax);
         formik.setFieldValue("taxPercentageAmount", inv.taxPercentageAmount);
         formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
@@ -145,7 +146,7 @@ const MembershipCardPurchased = ({
       key: index,
       name: inventory.block_timestamp,
       age: inventory.availableQuantity,
-      published: updateCol(inventory, inventory.status === '1' ? "Published" : "Unpublished"),
+      published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
       edit: previewCol(inventory, inventory.address),
       address: "$ " + String(inventory.pricePerUnit)
     }
