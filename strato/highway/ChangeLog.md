@@ -1,3 +1,3 @@
-# Changelog for vault-wrapper
+# Changelog for highway
 
 ## Unreleased changes
