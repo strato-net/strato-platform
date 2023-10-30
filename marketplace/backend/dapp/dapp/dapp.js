@@ -839,9 +839,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       orderList.forEach(orderLine => {
         const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
         const product = productList.find(item => item.address === inventoryItem.productId)
-        invoices.push({ productName: decodeURIComponent(product.name), unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
-
-        calculatedOrderTotal += (inventoryItem.pricePerUnit * orderLine.quantity)
+        invoices.push({ productName: product.name, unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
+        let price = inventoryItem.pricePerUnit
+        let tax = inventoryItem.taxDollarAmount === 0 ? (price * (inventoryItem.taxPercentageAmount / 10000)) : (inventoryItem.taxDollarAmount/100)
+        let finalPrice = inventoryItem.pricePerUnit + tax;
+        calculatedOrderTotal += (finalPrice * orderLine.quantity)
       })
 
       if (calculatedOrderTotal != recievedOrderTotal) {
@@ -1528,7 +1530,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let membership = await membershipJs.getAll(rawAdmin, { productId: [productId] }, { ...options, org: managers.cirrusOrg, app: contractName })
       const months = membership[0].timePeriodInMonths;
       const currentDateTime = dayjs();
-      const expiryDateTime = currentDateTime.add(months, 'month').add(1, 'day').valueOf();
+      // const expiryDateTime = currentDateTime.add(months, 'month').add(1, 'day').valueOf();
+      const expiryDateTime = currentDateTime.add(months, 'month').valueOf();
 
       let totalExpiry;
       if (items?.expiryDate === totalExpiry) {
