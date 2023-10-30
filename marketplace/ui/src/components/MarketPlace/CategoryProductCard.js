@@ -79,7 +79,7 @@ const CategoryProductCard = ({ product, category }) => {
 
   const addItemToCart = () => {
     let found = false;
-    for (var i = 0; i < cartList.length; i++) {
+    for (var i = 0; i < cartList?.length; i++) {
       if (cartList[i].product.address === product.address) {
         found = true;
         break;

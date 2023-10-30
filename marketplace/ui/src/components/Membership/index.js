@@ -12,6 +12,8 @@ import {
 } from "antd";
 import CreateMembershipModal from "./CreateMembershipModal";
 import { actions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -33,7 +35,6 @@ import ListNowIndex from "./ListNowIndex";
 import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import { setCookie } from "../../helpers/cookie";
-import { useInventoryState } from "../../contexts/inventory";
 import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Search } = Input;
@@ -55,6 +56,7 @@ const Membership = (user) => {
   const [visible, setVisible] = useState(false);
 
   const categoryDispatch = useCategoryDispatch();
+  const inventoryDispatch = useInventoryDispatch();
 
   const { categorys, iscategorysLoading } = useCategoryState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
@@ -131,18 +133,28 @@ const Membership = (user) => {
     setVisible(true);
   };
 
+  const handleToastClose = () => {
+    actions.resetMessage(dispatch);
+    inventoryActions.resetMessage(inventoryDispatch);
+  }
+
+  let msg = message || inventoryState.message;
   const openToast = (placement) => {
-    if (success) {
+    if (success || inventoryState.success) {
       api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
+        message: msg,
+        onClose: () => {
+          handleToastClose()
+        },
         placement,
         key: 1,
       });
     } else {
       api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
+        message: msg,
+        onClose: () => {
+          handleToastClose()
+        },
         placement,
         key: 2,
       });
@@ -291,7 +303,7 @@ const Membership = (user) => {
         // isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
-      {message && openToast("bottom")}
+      {msg && openToast("bottom")}
     </>
   );
 };
