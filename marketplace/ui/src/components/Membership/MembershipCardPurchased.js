@@ -122,10 +122,14 @@ const MembershipCardPurchased = ({
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
+        let tax = inv.taxPercentageAmount || inv.taxDollarAmount;
         formik.setFieldValue("name", membership.productName);
         formik.setFieldValue("inventoryStatus", inv.status);
         formik.setFieldValue("tempInv", inv);
-        formik.setFieldValue("taxPercentage", inv.taxPercentage);
+        formik.setFieldValue("price", inv.pricePerUnit);
+        formik.setFieldValue("quantity", inv.availableQuantity);
+        formik.setFieldValue("taxPercentage", tax);
+        formik.setFieldValue("taxPercentageAmount", inv.taxPercentageAmount);
         formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
         setIsEdit(true)
         openListNowModal();
@@ -142,7 +146,7 @@ const MembershipCardPurchased = ({
       key: index,
       name: inventory.block_timestamp,
       age: inventory.availableQuantity,
-      published: updateCol(inventory, inventory.status === '1' ? "Published" : "Unpublished"),
+      published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
       edit: previewCol(inventory, inventory.address),
       address: "$ " + String(inventory.pricePerUnit)
     }
@@ -193,7 +197,7 @@ const MembershipCardPurchased = ({
                 pricePerUnit: formik.values.price,
                 status: parseInt(formik.values.inventoryStatus),
                 quantity: formik.values.tempInv.availableQuantity,
-                taxPercentageAmount: parseInt(formik.values.taxPercentage),
+                taxPercentageAmount: parseInt(formik.values.taxPercentageAmount),
                 taxDollarAmount: parseInt(formik.values.taxDollarAmount)
               }
             }
