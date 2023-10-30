@@ -310,7 +310,7 @@ const Checkout = ({ user }) => {
       title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-center">{Math.trunc(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">ACTION</Text>,
