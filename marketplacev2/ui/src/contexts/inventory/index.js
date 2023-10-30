@@ -1,0 +1,67 @@
+import React, { createContext, useContext, useReducer } from "react";
+import reducer from "./reducer";
+
+const InventoryStateContext = createContext();
+const InventoryDispatchContext = createContext();
+
+const InventoriesProvider = ({ children }) => {
+  const initialState = {
+    inventory: null,
+    isCreateInventorySubmitting: false,
+    inventories: [],
+    isInventoriesLoading: false,
+    inventoryUpdateObject: null,
+    isinventoryUpdating: false,
+    isReselling: false,
+    inventoryDetails: null,
+    isInventoryDetailsLoading: false,
+    error: undefined,
+    success: false,
+    message: null,
+    isOnboardingSellerToStripe: false,
+    onboardedSeller: null,
+    stripeStatus: null,
+    isLoadingStripeStatus: false,
+  };
+
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  return (
+    <InventoryStateContext.Provider value={state}>
+      <InventoryDispatchContext.Provider value={dispatch}>
+        {children}
+      </InventoryDispatchContext.Provider>
+    </InventoryStateContext.Provider>
+  );
+};
+
+const useInventoryState = () => {
+  const context = useContext(InventoryStateContext);
+  if (context === undefined) {
+    throw new Error(
+      `'useInventoryState' must be used within a InventorysProvider`
+    );
+  }
+  return context;
+};
+
+const useInventoryDispatch = () => {
+  const context = useContext(InventoryDispatchContext);
+  if (context === undefined) {
+    throw new Error(
+      `'useInventoryDispatch' must be used within a InventorysProvider`
+    );
+  }
+  return context;
+};
+
+const useInventoryUnit = () => {
+  return [useInventoryState(), useInventoryDispatch()];
+};
+
+export {
+  useInventoryDispatch,
+  useInventoryState,
+  useInventoryUnit,
+  InventoriesProvider,
+};
