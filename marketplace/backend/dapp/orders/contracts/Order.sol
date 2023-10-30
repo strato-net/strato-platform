@@ -214,22 +214,6 @@ contract Order is OrderStatus, Sale {
     /// @notice Change the status of an order
     /// @param newStatus The status to change the order to
     function changeStatus(OrderStatus newStatus) public {
-      if (status == OrderStatus.AWAITING_FULFILLMENT){
-          if (newStatus == OrderStatus.AWAITING_SHIPMENT) {
-              status = newStatus;
-          } else if (newStatus == OrderStatus.CANCELED) {
-              status = newStatus;
-          }
-      } else if(status == OrderStatus.AWAITING_SHIPMENT) {
-          if (newStatus == OrderStatus.CLOSED) {
-              status = newStatus;
-          } 
-      }
-    }
-
-    /// @notice Set the order status
-    /// @param _status The status to set the order to
-    function updateOrderStatus(OrderStatus _status) public{
       status = _status;
     }
 
