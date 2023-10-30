@@ -143,8 +143,8 @@ resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDec
          labelName `M.member` structDefs,
          labelName `M.member` enumDefs
        ) of
-    (_, _, True, _) -> x {_varType = SVMType.Enum Nothing labelName Nothing}
-    (_, _, _, True) -> x {_varType = SVMType.Struct Nothing labelName}
+    (_, _, _, True) -> x {_varType = SVMType.Enum Nothing labelName Nothing}
+    (_, _, True, _) -> x {_varType = SVMType.Struct Nothing labelName}
     (True, _, _, _) -> x {_varType = SVMType.Contract labelName}
     _ -> x {_varType = SVMType.UnknownLabel labelName Nothing}
 -- _ -> error $ "unknown label in call to resolveLabelsInDef: " ++ labelName
