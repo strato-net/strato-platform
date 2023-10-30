@@ -18,6 +18,8 @@ import { DownOutlined } from "@ant-design/icons";
 import MembershipCard from "./MembershipCard";
 import CreateMembershipModal from "./CreateMembershipModal";
 import { actions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -41,7 +43,6 @@ import ListNowIndex from "./ListNowIndex";
 import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import { setCookie } from "../../helpers/cookie";
-import { useInventoryState } from "../../contexts/inventory";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -76,6 +77,7 @@ const Membership = (user) => {
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
+  const inventoryDispatch = useInventoryDispatch();
 
   //Sub-categories
 
@@ -181,18 +183,28 @@ const Membership = (user) => {
     setVisible(true);
   };
 
+  const handleToastClose = () => {
+    actions.resetMessage(dispatch);
+    inventoryActions.resetMessage(inventoryDispatch);
+  }
+
+  let msg = message || inventoryState.message;
   const openToast = (placement) => {
-    if (success) {
+    if (success || inventoryState.success) {
       api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
+        message: msg,
+        onClose: () => {
+          handleToastClose()
+        },
         placement,
         key: 1,
       });
     } else {
       api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
+        message: msg,
+        onClose: () => {
+          handleToastClose()
+        },
         placement,
         key: 2,
       });
@@ -400,7 +412,7 @@ const Membership = (user) => {
         // isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
-      {message && openToast("bottom")}
+      {msg && openToast("bottom")}
     </>
   );
 };

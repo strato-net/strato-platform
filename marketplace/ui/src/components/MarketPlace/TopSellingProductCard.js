@@ -163,7 +163,7 @@ const TopSellingProductCard = () => {
                           :
                           navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                       }>
-                        {decodeURIComponent(topSellingProduct.name)}
+                        {topSellingProduct.name}
                       </Text>
                       <Text className="mt-3 text-xl !text-primaryC font-semibold">
                         ${topSellingProduct.pricePerUnit}
