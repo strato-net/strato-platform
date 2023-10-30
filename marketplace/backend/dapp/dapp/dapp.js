@@ -2047,8 +2047,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getProvidedServiceUsages = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions1 = { ...options, org: managers.cirrusOrg, app: contractName, };
-    let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions);
 
     const arrayOfProductAddresses = issuedProducts.map(obj => obj.address);
 
@@ -2058,7 +2058,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       notEqualsField: 'ownerOrganization',
     };
 
-    let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
+    let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions);
     let itemAddressList = issuedItems.map(item => item.address);
     const args1 = {
       // ownerOrganization: userOrganization,
@@ -2066,7 +2066,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       itemId: itemAddressList
     }
 
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();

@@ -78,7 +78,7 @@ contract ServiceUsage is Status, PaymentStatus {
         uint _pricePaid,
         uint _scheme
     ) returns (uint) {
-        if (tx.origin != owner) {
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
 
@@ -133,5 +133,11 @@ contract ServiceUsage is Status, PaymentStatus {
             // Add more here in the future
             paymentStatus = newSection;
         }
+    }
+
+    function getUserOrganization(address caller) public returns (string) {
+        mapping(string => string) ownerCert = getUserCert(caller);
+        string userOrganization = ownerCert["organization"];
+        return userOrganization;
     }
 }
