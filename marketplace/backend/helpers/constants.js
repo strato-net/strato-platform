@@ -22,7 +22,8 @@ export default {
   s3ParamName: "s3",
   tempUploadDir: "./temp",
   buyerOrgName: "rejolut",
-  sellerOrgName: "blockapps"
+  sellerOrgName: "blockapps",
+  assetTableName: "BlockApps-Mercata-Asset"
 };
 
 export const STRIPE_ENV = {
