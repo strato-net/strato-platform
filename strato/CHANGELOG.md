@@ -51,5 +51,6 @@ so that they could be properly moved to their respective version's subsection.
 - Account not found in call stack errors for returning arrays to another contract
 ### Removed
 - `bloc22` database removed
+- dependency on relapse library for rlp encoding
 
 ## [10.0.0] - TBD
