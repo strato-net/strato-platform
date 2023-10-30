@@ -914,7 +914,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createOrder = async function (args, options = defaultOptions) {
 
     try {
-      const { buyerOrganization, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
+      const { buyerOrganization, buyerCommonName, orderList, orderTotal: recievedOrderTotal, paymentSessionId = "", shippingAddress } = args;
       const currentTimestamp = Math.floor(Date.now() / 1000);
 
       const [createdDate, orderDate] = Array(2).fill(currentTimestamp);
@@ -955,8 +955,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       });
 
       const groupedData = inventories.reduce((acc, inventory) => {
-        if (!acc[inventory.ownerOrganization]) {
-          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, data: [] };
+        if (!acc[inventory.ownerOrganization] && !acc[inventory.ownerCommonName]) {
+          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, ownerCommonName: inventory.ownerCommonName, data: [] };
         }
         acc[inventory.ownerOrganization].data.push(inventory);
         return acc;
@@ -986,7 +986,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
           orderId: util.uid(),
           buyerOrganization,
+          buyerCommonName,
           sellerOrganization: inventory.ownerOrganization,
+          sellerCommonName: inventory.ownerCommonName,
           orderDate,
           orderTotal,
           orderShippingCharges: shippingCharge,

@@ -81,7 +81,6 @@ const ShippingDetailsSchema = () => {
 
 const ConfirmOrder = () => {
   const { Text } = Typography;
-  const [open, setOpen] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -101,9 +100,6 @@ const ConfirmOrder = () => {
 
   const [showAddress, setshowAddress] = useState(false);
 
-  const handleCancel = () => {
-    setOpen(false);
-  };
 
   useEffect(() => {
     actions.fetchUserAddresses(marketplaceDispatch);
@@ -322,42 +318,6 @@ const ConfirmOrder = () => {
 
   const navigate = useNavigate();
 
-
-  const handleOrderConfirm = async () => {
-    handleCancel();
-    let orderList = [];
-    let orderItemAddress = [];
-    confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
-      orderItemAddress.push(item.key);
-    });
-    const body = {
-      buyerOrganization: userOrganization,
-      orderList,
-      orderTotal: total + tax + shipping,
-      shippingAddress: userAddresses[selectedAddress].address,
-    };
-
-    TagManager.dataLayer({
-      dataLayer: {
-        event: 'pay_later_button',
-      },
-    });
-    let isDone = await orderActions.createOrder(orderDispatch, body);
-    if (isDone) {
-      let updatedCart = [];
-      cartList.forEach(cart => {
-        if (!orderItemAddress.includes(cart.product.address)) {
-          updatedCart.push(cart);
-        }
-      });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
-      setTimeout(function () {
-        navigate(`/orders`, { state: { defaultKey: "Bought" } });
-      }, 2000);
-    }
-  };
-
   const handlePaymentConfirm = async () => {
     let orderList = [];
     confirmOrderList.forEach((item) => {
@@ -373,6 +333,7 @@ const ConfirmOrder = () => {
     // These additional fields need to be sent to form the request after stripe. 
     const body = {
       buyerOrganization: userOrganization,
+      buyerCommonName: user.commonName,
       orderList,
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,

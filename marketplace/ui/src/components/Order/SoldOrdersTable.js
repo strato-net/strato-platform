@@ -57,7 +57,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
         chainId: order.chainId,
         key: order.address,
         orderNumber: order,
-        buyerOrganization: order.buyerOrganization,
+        buyerOrganization: order.buyerOrganization.startsWith('Mercata Account') ? order.buyerCommonName : order.buyerOrganization,
         orderTotal: order.orderTotal,
         date: getStringDate(order.orderDate, US_DATE_FORMAT),
         status: getStatus(parseInt(order.status)),

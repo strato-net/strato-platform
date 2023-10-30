@@ -355,6 +355,7 @@ const Checkout = ({ user }) => {
     });
     const body = {
       buyerOrganization: user.organization,
+      buyerCommonName: user.commonName,
       orderList,
       orderTotal: total + tax + shipping,
     };

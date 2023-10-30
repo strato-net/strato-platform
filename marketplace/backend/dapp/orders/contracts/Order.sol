@@ -16,7 +16,9 @@ contract Order is OrderStatus {
 
     string public orderId;
     string public buyerOrganization;
+    string public buyerCommonName;
     string public sellerOrganization;
+    string public sellerCommonName;
     uint public orderDate;
     uint public orderTotal;
     uint public orderShippingCharges;
@@ -44,7 +46,9 @@ contract Order is OrderStatus {
     constructor(
             string _orderId
         ,   string _buyerOrganization
+        ,   string _buyerCommonName
         ,   string _sellerOrganization
+        ,   string _sellerCommonName
         ,   uint _orderDate
         ,   uint _orderTotal
         ,   uint _orderShippingCharges
@@ -60,7 +64,9 @@ contract Order is OrderStatus {
 
         orderId = _orderId;
         buyerOrganization = _buyerOrganization;
+        buyerCommonName = _buyerCommonName;
         sellerOrganization = _sellerOrganization;
+        sellerCommonName = _sellerCommonName;
         orderDate = _orderDate;
         orderTotal = _orderTotal;
         orderShippingCharges = _orderShippingCharges;

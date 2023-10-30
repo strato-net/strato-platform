@@ -10,7 +10,9 @@ contract OrderManager is RestStatus,OrderStatus{
     function createOrder(    
             string _orderId
         ,   string _buyerOrganization
+        ,   string _buyerCommonName
         ,   string _sellerOrganization
+        ,   string _sellerCommonName
         ,   uint _orderDate
         ,   uint _orderTotal
         ,   uint _orderShippingCharges
@@ -21,7 +23,7 @@ contract OrderManager is RestStatus,OrderStatus{
         ,   uint _createdDate
         ,   string _paymentSessionId
         ,   address _shippingAddress) public returns (uint256, address){
-        Order order = new Order( _orderId, _buyerOrganization,_sellerOrganization, _orderDate,_orderTotal,_orderShippingCharges,_status,_amountPaid,_buyerComments,_sellerComments,_createdDate,_paymentSessionId,_shippingAddress);
+        Order order = new Order( _orderId, _buyerOrganization, _buyerOrganization, _sellerOrganization, _sellerCommonName, _orderDate,_orderTotal,_orderShippingCharges,_status,_amountPaid,_buyerComments,_sellerComments,_createdDate,_paymentSessionId,_shippingAddress);
         return (RestStatus.CREATED, address(order));
     }
 

@@ -202,6 +202,7 @@ const ProcessingOrder = () => {
     
     const body = {
       buyerOrganization: cartData.buyerOrganization,
+      buyerCommonName: cartData.buyerCommonName,
       orderList: orderList,
       orderTotal: cartData.orderTotal,
       paymentSessionId: cartData.paymentSessionId,

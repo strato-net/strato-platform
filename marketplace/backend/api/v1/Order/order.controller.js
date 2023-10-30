@@ -167,6 +167,7 @@ class OrderController {
   static validateCreateOrderArgs(args) {
     const createOrderSchema = Joi.object({
       buyerOrganization: Joi.string().required(),
+      buyerCommonName: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
         inventoryId: Joi.string().required(),
         quantity: Joi.number().required()
@@ -191,6 +192,7 @@ class OrderController {
   static validatePaymentArgs(args) {
     const paymentSchema = Joi.object({
       buyerOrganization: Joi.string().required(),
+      buyerCommonName: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
             inventoryId: Joi.string().required(),
             quantity: Joi.number().required(),

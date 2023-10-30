@@ -266,7 +266,7 @@ const actions = {
     query = filter !== 0  ? query.concat(`&status=${filter}`) : query;
 
     dispatch({ type: actionDescriptors.fetchOrderSold });
-
+    console.log("sellerOrganization", organization)
     try {
       const response = await fetch(
         `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&${query}&sellerOrganization=${organization}`,
