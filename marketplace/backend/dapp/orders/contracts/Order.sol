@@ -100,7 +100,7 @@ contract Order is OrderStatus, Sale {
 
       mapping(string => string) ownerCert = getUserCert(tx.origin);
       string assetOwnerOrganization = ownerCert["organization"];
-      if(assetOwnerOrganization != order.buyerOrganization){
+      if(assetOwnerOrganization != buyerOrganization){
         return (RestStatus.FORBIDDEN);
       } 
 
@@ -186,7 +186,7 @@ contract Order is OrderStatus, Sale {
         for (uint i=0; i < orderLines.length; i++) {
           OrderLine orderLine = orderLines[i];
         }
-        order.fullfilmentDate = _fullfilmentDate;
+        fullfilmentDate = _fullfilmentDate;
         return getInventoriesAndAvailableQuantity(_status, _sellerComments, orderLines, false);
       }
 
@@ -202,10 +202,10 @@ contract Order is OrderStatus, Sale {
         changeStatus(_status);
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
-        order.fullfilmentDate = _fullfilmentDate;
+        fullfilmentDate = _fullfilmentDate;
       }
       if ((_scheme & (1 << 2)) == (1 << 2)) {
-        order.sellerComments = _sellerComments;
+        sellerComments = _sellerComments;
       }
 
       return RestStatus.OK;
