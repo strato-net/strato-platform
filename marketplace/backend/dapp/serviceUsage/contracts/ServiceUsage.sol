@@ -34,7 +34,6 @@ contract ServiceUsage is Status, PaymentStatus {
     event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
     constructor(
-        uint _createdDate,
         address _itemId,
         address _serviceId,
         uint _serviceDate,
@@ -49,7 +48,7 @@ contract ServiceUsage is Status, PaymentStatus {
     ) public {
         owner = tx.origin;
 
-        createdDate = _createdDate;
+        createdDate = block.timestamp;
         itemId = _itemId;
         serviceId = _serviceId;
         serviceDate = _serviceDate;

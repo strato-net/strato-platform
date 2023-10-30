@@ -2000,9 +2000,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   //----------------------------- ServiceUsage (Start ->) -------------------------------
   contract.createServiceUsage = async function (args, options = defaultOptions) {
     try {
-      const createdDate = Math.floor(Date.now() / 1000);
       const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      return serviceUsageJs.uploadContract(rawAdmin, { ...args, createdDate, }, createOptions);
+      return managers.membershipManager.createServiceUsage({ ...args });
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -2012,7 +2011,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args }, getOptions)
     const memberships = await contract.getPurchasedMemberships();
     const data = serviceUsage.map((item, index) => {
@@ -2023,8 +2022,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: '' };
-
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
       ...args,
       sort: '-createdDate',
