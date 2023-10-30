@@ -32,8 +32,6 @@ contract Order is OrderStatus, Sale {
     string public ownerCommonName;
 
     string public orderId;
-    string public buyerOrganization;
-    string public sellerOrganization;
     uint public orderDate;
     uint public orderTotal;
     uint public orderShippingCharges;
@@ -52,8 +50,6 @@ contract Order is OrderStatus, Sale {
 
     constructor(
           string _orderId
-        , string _buyerOrganization
-        , string _sellerOrganization
         , uint _orderDate
         , uint _orderTotal
         , uint _orderShippingCharges
@@ -67,8 +63,6 @@ contract Order is OrderStatus, Sale {
         owner = tx.origin;
 
         orderId = _orderId;
-        buyerOrganization = _buyerOrganization;
-        sellerOrganization = _sellerOrganization;
         orderDate = _orderDate;
         orderTotal = _orderTotal;
         orderShippingCharges = _orderShippingCharges;
