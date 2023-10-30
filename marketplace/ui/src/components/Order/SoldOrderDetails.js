@@ -331,7 +331,7 @@ const SoldOrderDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
       dataIndex: "productName",
       key: "productName",
-      render: (text) => <p className="text-primary text-[17px]">{decodeURIComponent(text)}</p>,
+      render: (text) => <p className="text-primary text-[17px]">{text}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
@@ -395,7 +395,7 @@ const SoldOrderDetails = ({ user, users }) => {
       dataIndex: "manufacturer",
       key: "manufacturer",
       align: "center",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
+      render: (text) => <p>{text}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -637,7 +637,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 <TextArea
                   rows={2}
                   placeholder="Enter Comments"
-                  value={decodeURIComponent(comment)}
+                  value={comment}
                   disabled={
                     orderDetails.status === 3 || orderDetails.status === 4
                   }
