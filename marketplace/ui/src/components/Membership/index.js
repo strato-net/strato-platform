@@ -11,7 +11,7 @@ import {
   Row,
 } from "antd";
 import CreateMembershipModal from "./CreateMembershipModal";
-import { actions } from "../../contexts/membership/actions";
+import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import {
@@ -85,7 +85,7 @@ const Membership = (user) => {
 
   useEffect(() => {
     if (user.user) {
-      actions.sellerStripeStatus(dispatch, user?.user?.organization);
+      membershipActions.sellerStripeStatus(dispatch, user?.user?.organization);
     }
   }, [user]);
 
@@ -104,7 +104,7 @@ const Membership = (user) => {
   const handleCancel = (message) => {
     if (message === "success") {
       setOpen(false);
-      actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
+      membershipActions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
     } else {
       setOpen(false);
     }
@@ -134,7 +134,7 @@ const Membership = (user) => {
   };
 
   const handleToastClose = () => {
-    actions.resetMessage(dispatch);
+    membershipActions.resetMessage(dispatch);
     inventoryActions.resetMessage(inventoryDispatch);
   }
 
