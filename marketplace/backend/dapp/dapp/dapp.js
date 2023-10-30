@@ -841,7 +841,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const product = productList.find(item => item.address === inventoryItem.productId)
         invoices.push({ productName: product.name, unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
         let price = inventoryItem.pricePerUnit
-        let tax = inventoryItem.taxDollarAmount === 0 ? (price * (inventoryItem.taxPercentageAmount / 10000)) : (inventoryItem.taxDollarAmount/100)
+        let tax = inventoryItem.taxDollarAmount === 0 ? Math.ceil(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
         let finalPrice = inventoryItem.pricePerUnit + tax;
         calculatedOrderTotal += (finalPrice * orderLine.quantity)
       })
@@ -962,7 +962,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const groupedData = inventories.reduce((acc, inventory) => {
         if (!acc[inventory.productId]) {
-          const taxRate = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount : inventory.taxDollarAmount) / 100;
+          const taxRate = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount : inventory.taxDollarAmount);
           acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: inventory.taxDollarAmount === 0, data: [] };
         }
         acc[inventory.productId].data.push(inventory);
@@ -973,7 +973,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const total = inventoriesData.reduce((acc, obj) => {
         const result = obj.data.reduce((total, curr) => obj.tax !== 0 ?
           (obj.isTaxPercentage ?
-            ((total + ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax / 100)))) * 100) / 100
+            ((total + ((curr.pricePerUnit * curr.quantity) + Math.ceil((curr.pricePerUnit * curr.quantity) * (obj.tax / 100)))))
             : total + (curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity)
           ) : (total + curr.pricePerUnit * curr.quantity), 0);
         return Number(acc) + Number(result);

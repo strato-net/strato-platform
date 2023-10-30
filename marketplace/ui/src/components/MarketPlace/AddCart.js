@@ -49,13 +49,13 @@ const Checkout = ({ user }) => {
   const calculateTax = (item) => {
     return item.product.taxes ?
       (item.product.taxPercentageAmount ?
-        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)
-        : (item.product.taxes / 100) * item.qty)
+        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100)).toFixed(2)
+        : (item.product.taxes) * item.qty)
       : 0;
   };
 
   const calculateShipping = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
+    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING);
   };
 
   let storedData
