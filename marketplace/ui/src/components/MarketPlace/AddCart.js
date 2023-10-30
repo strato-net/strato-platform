@@ -73,7 +73,7 @@ const Checkout = ({ user }) => {
 
   useEffect(() => {
     const map = new Map();
-    for (const obj of cartList) {
+    for (const obj of (cartList || [])) {
       const org = obj.product.ownerOrganization;
       if (!map.has(org)) {
         map.set(org, []);
