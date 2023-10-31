@@ -107,6 +107,7 @@ const TopSellingProductCard = () => {
       });
     }
   };
+  console.log("topSellingProducts: ", topSellingProducts)
 
   return (
     <div>
@@ -159,6 +160,11 @@ const TopSellingProductCard = () => {
                         navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
                       }>
                         {decodeURIComponent(topSellingProduct.name)}
+                      </Text>
+                      <Text className="text-secondryB text-sm" id="prod-category">
+                        Sold By: {topSellingProduct.ownerOrganization.startsWith('Mercata Account')
+                          ? topSellingProduct.ownerCommonName
+                          : topSellingProduct.ownerOrganization}
                       </Text>
                       <Text className="mt-3 text-xl !text-primaryC font-semibold">
                         ${topSellingProduct.pricePerUnit}
