@@ -119,7 +119,7 @@ const TopSellingProductCard = () => {
       {contextHolder}
       <Card className="w-full mt-14">
         <div className="flex justify-between mb-5">
-          <Title level={3}>Top Selling Products</Title>
+          <Title level={3}>Recently Listed Products</Title>
           <Space size="large">
             <div
               onClick={getPrevProds}
