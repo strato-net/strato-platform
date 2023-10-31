@@ -10,7 +10,7 @@ abstract contract Asset {
 
     constructor(string _name, string _description) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         owner  = Certificate(account(address(c), "main")).userAddress();
         ownerCommonName = Certificate(account(address(c), "main")).commonName();
         name = _name;

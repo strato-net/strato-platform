@@ -34,7 +34,7 @@ abstract contract Sale{
     ) {
         assetToBeSold = Asset(_assetToBeSold);
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         sellersCommonName = Certificate(account(address(c), "main")).commonName();
         address currentOwner = assetToBeSold.owner;
         currentOwnerName = Certificate(account(address(currentOwner), "main")).commonName();
