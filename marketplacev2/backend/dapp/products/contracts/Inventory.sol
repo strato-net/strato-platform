@@ -8,7 +8,6 @@ import "/dapp/products/contracts/InventoryStatus.sol";
 contract Inventory is InventoryStatus, Asset{
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
-    string public ownerCommonName;
 
     address public productId;
     string public category;

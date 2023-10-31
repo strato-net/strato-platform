@@ -7,7 +7,6 @@ import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 contract Item is ItemStatus, Asset {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
-    string public ownerCommonName;
     address public inventoryId;
     string public serialNumber;
     ItemStatus public status;
