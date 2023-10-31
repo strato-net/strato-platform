@@ -36,6 +36,7 @@ const ListNowModal = ({
   user,
   formik,
   // type,
+  isCreate,
   listed,
   isEdit,
   listType,
@@ -126,7 +127,7 @@ const ListNowModal = ({
       width="auto"
       title={
         <Text className="text-xl font-semibold">
-          {isEdit ? "Edit Listing" : "Create Listing"}
+          {isCreate ? "Create Listing" : "Create / Edit Listing"}
         </Text>
       }
       open={open}
@@ -142,7 +143,7 @@ const ListNowModal = ({
             size="large"
             type="primary"
           >
-            List Now
+            Save
           </Button>
         </Row>,
       ]}
@@ -180,7 +181,7 @@ const ListNowModal = ({
               />{" "}
             </Row>
           </Col>
-          {isPurchased && (
+          {(isPurchased && !isCreate) && (
             <Col span={8}>
               <Row>
                 {" "}
@@ -211,7 +212,8 @@ const ListNowModal = ({
                 className="w-full mt-2"
                 // size="large"
                 prefix={isInventoriesLoading && <Spin />}
-                disabled={(!isIssued && !isNew) || isEdit}
+                // disabled={(!isIssued && !isNew) || isEdit}
+                disabled={isEdit && !isNew}
                 // value={1}
                 controls={false}
                 value={
@@ -312,14 +314,14 @@ const ListNowModal = ({
             <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col> */}
-          {!isNew && (
+          {!isCreate && (
             <Col span={8}>
               <Row>
                 {" "}
                 <Text className="font-medium">Status</Text>
               </Row>
               <Row>
-                {isEdit || listed === 1 || listed === 2 ? (
+                {isEdit || listed === 1 || listed === 2 || isNew ? (
                   <Select
                     placeholder="Status"
                     className="mt-2 w-full"

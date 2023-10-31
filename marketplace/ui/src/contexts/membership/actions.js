@@ -124,7 +124,7 @@ const actions = {
           type: actionDescriptors.resaleMembershipSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Membership listed for sale successfully", true)
+        actions.setMessage(dispatch, "Membership Successfully Saved", true)
         return body.data
       }
 
