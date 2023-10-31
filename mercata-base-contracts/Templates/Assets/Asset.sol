@@ -46,14 +46,12 @@ abstract contract Asset {
         sale = createBaseSale(_purchaser, _purchasePrice, _state, _payment);
     }
 
-    function changeSaleState(SaleState _state){
-        requireOwner("Change Sale State");
+    function changeSaleState(SaleState _state) public requireOwner("Change Sale State"){
         require(Sale!=address(0));
         sale.changeSaleState(_state);
     }
 
-    function changePaymentType(PaymentType _payment){
-        requireOwner("Change Payment Type");
+    function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){
         require(Sale!=address(0));
         sale.changePaymentType(_payment);
     }

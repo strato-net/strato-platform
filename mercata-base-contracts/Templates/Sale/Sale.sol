@@ -45,7 +45,7 @@ abstract contract Sale{
         payment = _payment;
     }
 
-    function requireSeller(string action) {
+    modifier requireSeller(string action) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         string err = "Only "
@@ -59,18 +59,16 @@ abstract contract Sale{
         require(commonName == sellersCommonName, err);
     }
 
-    function changeSaleState(SaleState _state){
-        requireSeller("Change Sale State");
+    function changeSaleState(SaleState _state) public requireSeller("Change Payment Type"){
         state=_state;
     }
 
-    function changePaymentType(PaymentType _payment){
-        requireSeller("Change Payment Type");
+    function changePaymentType(PaymentType _payment) public requireSeller("Change Payment Type"){
+
         payment=_payment;
     }
 
-    function transferOwnership(string purchasersCommonName, string price){
-        requireSeller("Transfer Ownership of Asset");
+    function transferOwnership(string purchasersCommonName, string price) public requireSeller("Transfer Ownership of Asset") {
         assetToBeSold.transferOwnership(purchasersCommonName, price);
         state = SaleState.Closed;
     }
