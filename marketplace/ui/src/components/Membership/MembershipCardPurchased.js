@@ -161,6 +161,7 @@ const MembershipCardPurchased = ({
   useEffect(() => {
     setVisible(false);
     setState(membership);
+    setIsEdit(false);
   }, [success, membershipState.success])
 
 
@@ -379,7 +380,7 @@ const MembershipCardPurchased = ({
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
                       if (isIssued) {
                         setListType("New")
-                      }else{
+                      } else {
                         setIsEdit(true)
                         setListType("Sale")
                       }
