@@ -113,6 +113,9 @@ const ConfirmOrder = () => {
     actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
     confirmOrderList.forEach((item) => {
+      item.sellerOrganization = item.sellerOrganization.startsWith('Mercata Account')
+        ? item.sellerCommonName
+        : item.sellerOrganization;
       cartData.push(item);
     });
 
