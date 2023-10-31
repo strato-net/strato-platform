@@ -326,8 +326,8 @@ const ListNowModal = ({
                     size="large"
                     defaultValue={
                       StatusValue[
-                        formik?.values?.tempInv?.status ||
-                          formik?.values?.inventoryStatus
+                      formik?.values?.tempInv?.status ||
+                      formik?.values?.inventoryStatus
                       ]
                     }
                     // suffixIcon={<CaretDownOutlined />}
