@@ -90,12 +90,25 @@ class MarketplaceController {
   static async getTopSellingProducts(req, res, next) {
     try {
       const { dapp, query } = req;
-      const inventories = await dapp.getTopSellingProducts({ ...query });
+      let inventories = await dapp.getTopSellingProducts({ ...query });
       // const productsWithImageUrl = inventories.map(product => ({
       //   ...product,
       //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
       //   )
       // }))
+      inventories = inventories.map((inventory) => {
+        let img = "";
+        if (
+          inventory.productImageLocation !== null &&
+          inventory.productImageLocation !== undefined &&
+          inventory?.productImageLocation?.length > 0
+        ) {
+          img = inventory.productImageLocation.map((item) => {
+            return getSignedUrlFromS3(item, req.app.get(constants.s3ParamName));
+          });
+        }
+        return { ...inventory, productImageLocation: img };
+      });
       rest.response.status200(res, inventories);
 
       return next();
@@ -107,7 +120,7 @@ class MarketplaceController {
   static async getTopSellingProductsLoggedIn(req, res, next) {
     try {
       const { dapp, query } = req;
-      const inventories = await dapp.getTopSellingProductsLoggedIn({
+      let inventories = await dapp.getTopSellingProductsLoggedIn({
         ...query,
       });
       // const productsWithImageUrl = inventories.map(product => ({
@@ -115,6 +128,19 @@ class MarketplaceController {
       //   imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
       //   )
       // }))
+      inventories = inventories.map((inventory) => {
+        let img = "";
+        if (
+          inventory.productImageLocation !== null &&
+          inventory.productImageLocation !== undefined &&
+          inventory?.productImageLocation?.length > 0
+        ) {
+          img = inventory.productImageLocation.map((item) => {
+            return getSignedUrlFromS3(item, req.app.get(constants.s3ParamName));
+          });
+        }
+        return { ...inventory, productImageLocation: img };
+      });
       rest.response.status200(res, inventories);
 
       return next();
