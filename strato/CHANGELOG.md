@@ -48,9 +48,11 @@ so that they could be properly moved to their respective version's subsection.
 - String formatting related errors in `.code` SolidVM tests
 - Typechecker test errors that were missing `pragma strict` and failing
 - The out-of-scope errors of storage variables for Solidity try/catch statements
-- Free function overloading conflict with the import resolver 
+- Free function overloading conflict with the import resolver
+- Resolved the ghost thread build-up in strato-p2p via hierarchical thread tracking
 - Account not found in call stack errors for returning arrays to another contract
 ### Removed
 - `bloc22` database removed
+- dependency on relapse library for rlp encoding
 
 ## [10.0.0] - TBD
