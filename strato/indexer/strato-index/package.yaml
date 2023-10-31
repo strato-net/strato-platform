@@ -24,6 +24,7 @@ library:
   - extra
   - format
   - hedis
+  - kafka-monad
   - milena
   - monad-alter
   - resourcet
@@ -41,11 +42,22 @@ executables:
     main: ApiIndexerMain.hs
     source-dirs: exec_src
     dependencies:
+      - blockapps-data
+      - blockapps-datadefs
       - blockapps-init
       - common-log
+      - containers
+      - evm-solidity
       - hflags
+      - kafka-monad
+      - monad-alter
+      - seqevents
+      - sql-monad
+      - strato-conf
       - strato-index
-    other-modules: []
+      - strato-model
+    other-modules:
+      - Wiring
 
   strato-p2p-indexer:
     main: P2PIndexerMain.hs

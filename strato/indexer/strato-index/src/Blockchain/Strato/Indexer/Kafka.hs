@@ -3,6 +3,7 @@
 module Blockchain.Strato.Indexer.Kafka
   ( indexEventsTopicName,
     readIndexEvents,
+    readIndexEvents',
     writeIndexEvents,
   )
 where
@@ -11,6 +12,7 @@ import Blockchain.KafkaTopics (lookupTopic)
 import Blockchain.MilenaTools
 import Blockchain.Strato.Indexer.Model
 import Blockchain.Stream.Raw (fetchBytes, setDefaultKafkaState)
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import Data.Binary
 import qualified Data.ByteString.Lazy as L
@@ -24,8 +26,14 @@ indexEventsTopicName = lookupTopic "indexevents"
 readIndexEvents :: K.Kafka k => KP.Offset -> k [IndexEvent]
 readIndexEvents = readIndexEventsFromTopic indexEventsTopicName
 
+readIndexEvents' :: (MonadIO m, HasKafka m) => KP.Offset -> m [IndexEvent]
+readIndexEvents' = readIndexEventsFromTopic' indexEventsTopicName
+
 readIndexEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [IndexEvent]
 readIndexEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . L.fromStrict) <$> fetchBytes topic offset
+
+readIndexEventsFromTopic' :: (MonadIO m, HasKafka m) => KP.TopicName -> KP.Offset -> m [IndexEvent]
+readIndexEventsFromTopic' topic offset = map (decode . L.fromStrict) <$> execKafka (fetchBytes topic offset)
 
 writeIndexEvents :: K.Kafka k => [IndexEvent] -> k [KP.ProduceResponse]
 writeIndexEvents events = do

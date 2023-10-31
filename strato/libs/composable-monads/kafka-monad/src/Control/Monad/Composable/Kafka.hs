@@ -31,7 +31,8 @@ createKafkaEnv ::
 createKafkaEnv x y = do
   let kafkaState =
         (mkKafkaState x y)
-          { _stateWaitSize = 1, -- Awaken from sleep only if there is at least one message
+          { _stateRequiredAcks = -1,
+            _stateWaitSize = 1, -- Awaken from sleep only if there is at least one message
             _stateWaitTime = 100000 -- 100s
           }
 

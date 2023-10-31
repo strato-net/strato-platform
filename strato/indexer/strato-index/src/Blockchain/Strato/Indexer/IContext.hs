@@ -23,29 +23,20 @@ where
 
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
-import Blockchain.DBM
 import Blockchain.Data.Block (BestBlock (..), Private (..))
-import Blockchain.Data.BlockDB
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.ChainInfoDB (putChainInfo)
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Transaction (insertTX)
-import Blockchain.Data.ValidatorRef
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.Kafka
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Control.Arrow ((&&&))
 import Control.Exception
 import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import Control.Monad.Trans.State
@@ -86,32 +77,6 @@ data IndexerException
   = Lookup String String String
   | Delete String String String
   deriving (Eq, Show, Exception)
-
-instance (Keccak256 `A.Alters` API OutputTx) IContextM where
-  lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
-  delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
-  insert _ _ (API OutputTx {..}) = void . lift $ insertTX Log otOrigin Nothing [otBaseTx]
-
-instance (Word256 `A.Alters` API ChainInfo) IContextM where
-  lookup _ _ = liftIO . throwIO $ Lookup "API" "Word256" "ChainInfo"
-  delete _ _ = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
-  insert _ cId (API cInfo) = void . lift $ putChainInfo (ChainId cId) cInfo
-
-instance (([ChainMemberParsedSet], [ChainMemberParsedSet]) `A.Alters` API (A.Proxy ValidatorRef)) IContextM where
-  lookup _ _ = liftIO . throwIO $ Lookup "API" "Vals" "ValidatorRef"
-  delete _ _ = liftIO . throwIO $ Delete "API" "Vals" "AddressStateRef"
-  insert _ vals _ = void . lift $ addRemoveValidator vals
-
-instance (Keccak256 `A.Alters` API OutputBlock) IContextM where
-  lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
-  delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
-  insert _ _ (API ob) = void . lift $ putBlocks [(outputBlockToBlockRetainPayloads ob, obTotalDifficulty ob)] False
-  insertMany _ =
-    void
-      . lift
-      . flip putBlocks False
-      . map ((outputBlockToBlockRetainPayloads &&& obTotalDifficulty) . unAPI)
-      . M.elems
 
 instance (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) IContextM where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
