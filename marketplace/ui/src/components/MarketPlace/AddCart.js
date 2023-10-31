@@ -100,9 +100,8 @@ const Checkout = ({ user }) => {
           isTaxPercentage: item.product.isTaxPercentage,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
-          amount: 
-          item.product.taxDollarAmount === 0 ? (item.product.pricePerUnit * item.qty) : 
-          ((item.product.pricePerUnit + calculateTax(item)) * item.qty),
+          amount:
+            item.isTaxPercentage ? ((item.product.pricePerUnit + calculateTax(item)) * item.qty) : ((item.product.pricePerUnit + item.product.taxes) * item.qty),
           action: item.product.address,
           qty: item.qty,
         });
