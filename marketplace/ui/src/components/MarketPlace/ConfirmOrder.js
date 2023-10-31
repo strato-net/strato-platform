@@ -20,7 +20,7 @@ import {
   Form,
   Input,
 } from "antd";
-import { useState, useEffect, useMemo} from "react";
+import { useState, useEffect, useMemo } from "react";
 import { actions as inventoryAction } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
@@ -100,20 +100,21 @@ const ConfirmOrder = () => {
   const handleCancel = () => {
     setOpen(false);
   };
-  
+
   useEffect(() => {
     actions.fetchUserAddresses(marketplaceDispatch);
   }, [marketplaceDispatch])
-  
+
   const storedData = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
   }, []);
-  
+
   useEffect(() => {
     actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
     confirmOrderList.forEach((item) => {
-      cartData.push(item);
+      let amount = ((item.unitPrice * item.qty) + item.tax)
+      cartData.push({...item, amount});
     });
 
     setData(cartData);
@@ -129,7 +130,7 @@ const ConfirmOrder = () => {
     setShipping(s);
     let sum = 0;
     confirmOrderList.forEach((item) => {
-      sum += parseFloat(item.amount);
+      sum += parseFloat(item.unitPrice * item.qty);
     });
     setTotal(sum);
   }, [marketplaceDispatch, confirmOrderList, storedData]);
@@ -258,7 +259,7 @@ const ConfirmOrder = () => {
           <p className="text-primary text-[17px]">{text.name}</p>
         );
       },
-      
+
     },
     {
       title: (
@@ -267,7 +268,7 @@ const ConfirmOrder = () => {
       dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: (
@@ -276,7 +277,7 @@ const ConfirmOrder = () => {
       dataIndex: "unitOfMeasure",
       align: "center",
       render: (text) => <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>,
-      width:"12%"
+      width: "12%"
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -308,12 +309,12 @@ const ConfirmOrder = () => {
       title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-center">{Math.trunc(text)}</p>,
     },
   ];
 
   const navigate = useNavigate();
-  
+
   const handleOrderConfirm = async () => {
     let concatenatedOrderString = "";
     let firstSellerOrg;
@@ -363,7 +364,7 @@ const ConfirmOrder = () => {
     } catch (error) {
       console.error('Failed to send email:', error);
     }
-  
+
     handleCancel();
     let orderList = [];
     let orderItemAddress = [];
@@ -416,7 +417,7 @@ const ConfirmOrder = () => {
       },
     });
     let data = await orderActions.createPayment(orderDispatch, body);
-   
+
     if (data != null && data.url !== undefined) {
       window.location.replace(data.url);
     }
