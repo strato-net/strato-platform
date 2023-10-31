@@ -127,8 +127,7 @@ const ListNowModal = ({
       width="auto"
       title={
         <Text className="text-xl font-semibold">
-          {/* {isEdit ? "Edit Listing" : "Create Listing"} */}
-          Create / Edit Listing
+          {isCreate ? "Create Listing" : "Create / Edit Listing"}
         </Text>
       }
       open={open}
@@ -322,7 +321,7 @@ const ListNowModal = ({
                 <Text className="font-medium">Status</Text>
               </Row>
               <Row>
-                {isEdit || listed === 1 || listed === 2  || isNew ? (
+                {isEdit || listed === 1 || listed === 2 || isNew ? (
                   <Select
                     placeholder="Status"
                     className="mt-2 w-full"
