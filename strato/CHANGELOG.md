@@ -34,10 +34,14 @@ so that they could be properly moved to their respective version's subsection.
 - `address.derive(salt, args)` function which allows SolidVM to derive salted contracts without creating them
 - SolidVM built-in `create` and `create2` functions which allows for the explicit creation of contracts within SolidVM contracts
 - new `solidvmevents` kafka topic for emitted solidvm events
+- `pretty` Makefile command that triggers the `ormolu` code formatter
+- `hoogle` Makefile command that generates Haddock documentation and serves through local Hoogle instance
+- new built-in accessor functions for arrays
 
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
+- optimized logic flow in p2p to prevent sync stalls
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
 - Bagger no longer crashes the VM upon encountering a transaction that exceeds the nonce or size limit
@@ -45,8 +49,10 @@ so that they could be properly moved to their respective version's subsection.
 - Typechecker test errors that were missing `pragma strict` and failing
 - The out-of-scope errors of storage variables for Solidity try/catch statements
 - Free function overloading conflict with the import resolver
-- Resolved the ghost thread build-up in strato-p2p via hierarchical thread tracking.
+- Resolved the ghost thread build-up in strato-p2p via hierarchical thread tracking
+- Account not found in call stack errors for returning arrays to another contract
 ### Removed
 - `bloc22` database removed
+- dependency on relapse library for rlp encoding
 
 ## [10.0.0] - TBD

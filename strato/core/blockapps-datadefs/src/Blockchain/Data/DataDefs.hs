@@ -14,6 +14,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoDeriveAnyClass #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
@@ -21,7 +22,7 @@
 
 module Blockchain.Data.DataDefs where
 
-import BlockApps.Solidity.Xabi
+--import BlockApps.Solidity.Xabi
 import Blockchain.Data.PersistTypes ()
 import Blockchain.Data.RLP
 import Blockchain.Data.TXOrigin

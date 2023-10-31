@@ -8,12 +8,18 @@ const actionDescriptors = {
   fetchInventory: "fetch_inventories",
   fetchInventorySuccessful: "fetch_inventory_successful",
   fetchInventoryFailed: "fetch_inventory_failed",
+  fetchInventorySearch: "fetch_inventory_search",
+  fetchInventorySearchSuccessful: "fetch_inventory_search_successful",
+  fetchInventorySearchFailed: "fetch_inventory_search_failed",
   fetchInventoryDetail: "fetch_inventory_detail",
   fetchInventoryDetailSuccessful: "fetch_inventory_detail_successful",
   fetchInventoryDetailFailed: "fetch_inventory_detail_failed",
   updateInventory: "update_inventory",
   updateInventorySuccessful: "update_inventory_successful",
   updateInventoryFailed: "update_inventory_failed",
+  resellInventory: "resell_inventory",
+  resellInventorySuccessful: "resell_inventory_successful",
+  resellInventoryFailed: "resell_inventory_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
   onboardSellerToStripe: "onboard_seller_to_stripe",
@@ -78,6 +84,46 @@ const actions = {
         error: "Error while creating Inventory",
       });
       actions.setMessage(dispatch, "Error while creating Inventory");
+    }
+  },
+
+  fetchInventorySearch: async (dispatch, limit, offset, queryValue) => {
+    const query = queryValue
+    ? `&queryValue=${queryValue}&queryFields=name`
+    : "";
+
+    dispatch({ type: actionDescriptors.fetchInventorySearch });
+
+    try {
+      const response = await fetch(
+        `${apiUrl}/inventory/search?limit=${limit}&offset=${offset}${query}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchInventorySearchSuccessful,
+          payload: body.data,
+        });
+        return;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchInventorySearchFailed,
+          error: "Error while fetching Inventory",
+        });
+      }
+      dispatch({
+        type: actionDescriptors.fetchInventorySearchFailed,
+        error: body.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchInventorySearchFailed,
+        error: "Error while fetching Inventory",
+      });
     }
   },
 
@@ -164,6 +210,54 @@ const actions = {
         error: "Error while updating Inventory",
       });
       actions.setMessage(dispatch, "Error while updating Inventory");
+    }
+  },
+
+  resellInventory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.resellInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/inventory/resell`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.resellInventorySuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Resale inventory was successfully created", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.resellInventoryFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while reselling Inventory" });
+        actions.setMessage(dispatch, "Error while reselling Inventory")
+        return false;
+      }
+
+      dispatch({
+        type: actionDescriptors.resellInventoryFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.resellInventoryFailed,
+        error: "Error while reselling Inventory",
+      });
+      actions.setMessage(dispatch, "Error while reselling Inventory");
     }
   },
 

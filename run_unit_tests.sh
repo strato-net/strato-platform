@@ -12,7 +12,7 @@ trap "docker rm -f ${REDIS}" EXIT
 
 cd strato
 
-stack test --coverage\
+stack test $1\
       blockapps-data \
       blockapps-mpdbs \
       blockapps-tools \
@@ -50,6 +50,13 @@ stack test --coverage\
       labeled-error \
       source-tools \
       strato-lite
+
+if [ $1 = --coverage ]
+then
+      rm -rf hpc
+      mkdir hpc
+      cp -r $(stack path --local-hpc-root) hpc/
+fi
 
 stack bench vm-runner
 

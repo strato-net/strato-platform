@@ -143,11 +143,11 @@ const actions = {
       );
 
       const body = await response.json();
-     
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchProductSuccessful,
-          payload: body.data,
+          payload: {data: body.data.productsWithImageUrl, count: body.data.count},
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
@@ -319,7 +319,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/product?isDeleted=false&category=${category}&subCategory=${subCategory}`,
+        `${apiUrl}/product?isActive=true&isDeleted=false&category=${category}&subCategory=${subCategory}`,
         {
           method: HTTP_METHODS.GET,
         }

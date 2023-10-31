@@ -48,6 +48,7 @@ import ClickableCell from "../ClickableCell";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -408,69 +409,6 @@ const ProductDetails = ({ user, users }) => {
     },
   ];
 
-  const transformationColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
-      onCell: (record) => {
-        return {
-          onClick: (ev) => {
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-        >
-          {text}
-        </Button>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
-      dataIndex: "itemNumber",
-      key: "itemNumber",
-      align: "center",
-      onCell: (record, rowIndex) => {
-        return {
-          onClick: (ev) => {
-            if (isEventSelected) setIsEventSelected(false);
-            if (isSerialNumberSelected) setIsSerialNumberSelected(false);
-            setIsTransformationSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemRawMaterials(
-              itemDispatch,
-              details.uniqueProductCode,
-              record.serialNumber
-            );
-          }
-        };
-      },
-      render: (text) => (
-        <Button
-          type="link"
-          className="text-primary text-[17px]"
-          onClick={() => {
-
-          }}
-        >
-          {text}
-        </Button>
-      ),
-    },
-  ];
-
-
   const DescTitle = ({ text }) => {
     return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
   };
@@ -592,6 +530,7 @@ const ProductDetails = ({ user, users }) => {
                     id="addToCart"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -611,6 +550,7 @@ const ProductDetails = ({ user, users }) => {
                     className="group w-1/3 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -634,6 +574,7 @@ const ProductDetails = ({ user, users }) => {
                     className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -688,7 +629,7 @@ const ProductDetails = ({ user, users }) => {
                 // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
                 className="text-primaryC text-[13px] mt-2"
               >
-                {decodeURIComponent(details.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
+                {decodeURIComponent(details.description).split('\n').map((line, index) => (
                   <React.Fragment key={index}>
                     {line}
                     <br />
@@ -748,18 +689,6 @@ const ProductDetails = ({ user, users }) => {
                     children: <DescriptionComponent />,
                   },
                   {
-                    label: `Events`,
-                    key: "2",
-                    children: (
-                      <DataTableComponent
-                        columns={eventColumn}
-                        data={eventList}
-                        scrollX="100%"
-                        isLoading={isInventoryEventsLoading}
-                      />
-                    ),
-                  },
-                  {
                     label: `Ownership History`,
                     key: "3",
                     children: (
@@ -768,24 +697,6 @@ const ProductDetails = ({ user, users }) => {
                         data={serialNumbers}
                         scrollX="100%"
                         isLoading={isSerialNumbersLoading}
-                        pagination={{
-                          defaultPageSize: 5,
-                          showSizeChanger: false,
-                          position: ["bottomCenter"],
-                        }}
-                        rowKey={(record) => record.serialNumber}
-                      />
-                    ),
-                  },
-                  {
-                    label: `Transformation`,
-                    key: "4",
-                    children: (
-                      <DataTableComponent
-                        columns={transformationColumn}
-                        data={serialNumbers}
-                        isLoading={false}
-                        scrollX="100%"
                         pagination={{
                           defaultPageSize: 5,
                           showSizeChanger: false,

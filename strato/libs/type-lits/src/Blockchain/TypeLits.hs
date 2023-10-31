@@ -42,7 +42,7 @@ import Test.QuickCheck hiding (Failure, Success)
 newtype NamedTuple (k :: Symbol) (v :: Symbol) a b = NamedTuple {unNamedTuple :: (a, b)}
   deriving stock (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
   deriving newtype (Applicative, Bifunctor, Biapplicative, Bifoldable, Comonad)
-  deriving anyclass (Bitraversable)
+  --deriving (Bitraversable)
 
 type NamedTupleParser k v a b = Parser (NamedTuple k v a b)
 
@@ -65,6 +65,11 @@ instance forall k a v b. (KnownSymbol k, KnownSymbol v, FromJSON a, FromJSON b) 
         (o .: (DAK.fromText . Text.pack $ symbolVal (Proxy :: Proxy k)))
         (o .: (DAK.fromText . Text.pack $ symbolVal (Proxy :: Proxy v)))
   parseJSON o = error $ "parseJSON NamedTuple: expected object, got " ++ show o
+
+
+instance Bitraversable (NamedTuple k v) where
+    bitraverse f g (NamedTuple (a, b)) = NamedTuple <$> liftA2 (,) (f a) (g b)
+
 
 instance forall k a v b. (KnownSymbol k, KnownSymbol v, Arbitrary a, Arbitrary b) => Arbitrary (NamedTuple k v a b) where
   arbitrary = NamedTuple <$> (liftA2 (,) arbitrary arbitrary :: Gen (a, b))

@@ -38,6 +38,7 @@ import qualified Data.Vector as DV
 import qualified Data.Vector.Storable.Mutable as V
 import Data.Word
 import Foreign
+import qualified Foreign.Marshal.Utils as FMU
 import System.Exit
 import qualified Text.Colors as CL
 import UnliftIO
@@ -51,7 +52,7 @@ safeReadRange v !offset !count = do
   dstFP <- BI.mallocByteString count
   withForeignPtr dstFP $ \dst ->
     V.unsafeWith v $ \src ->
-      BI.memcpy dst (plusPtr src offset) count
+      FMU.copyBytes dst (plusPtr src offset) count
   return $! BI.PS dstFP 0 count
 
 getSizeInWords :: MonadIO m => VMM m Word256

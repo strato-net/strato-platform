@@ -19,6 +19,7 @@ contract Inventory is InventoryStatus{
     int public pricePerUnit;
     string public batchId;
     int public availableQuantity;
+    string public inventoryType;
     InventoryStatus public status;
     uint public createdDate;
 
@@ -29,6 +30,7 @@ contract Inventory is InventoryStatus{
         ,   int _quantity
         ,   int _pricePerUnit
         ,   string _batchId
+        ,   string _inventoryType
         ,   InventoryStatus _status
         ,   uint _createdDate
         ,   address _owner
@@ -42,6 +44,7 @@ contract Inventory is InventoryStatus{
         pricePerUnit = _pricePerUnit;
         batchId = _batchId;
         availableQuantity = _quantity;
+        inventoryType = _inventoryType;
         status = _status;
         createdDate = _createdDate;
 
@@ -75,10 +78,6 @@ contract Inventory is InventoryStatus{
     }    
 
     function updateQuantity(int _quantity) returns(uint){
-      // if (tx.origin != owner) { return RestStatus.FORBIDDEN; }
-      // if(_quantity > quantity){
-      //   return RestStatus.BAD_REQUEST;
-      // }
       availableQuantity = _quantity;
       return RestStatus.OK;
     }

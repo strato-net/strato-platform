@@ -65,7 +65,12 @@ main = do
   void $ Strato23.runMigrations conn
   close conn
 
-  pool <- createPool (connect dbConnectInfo) close 20 3 20
+  let poolConfig = defaultPoolConfig
+                    (connect dbConnectInfo)
+                    close
+                    3 -- timeout: 3 seconds
+                    20 -- max resources
+  pool <- newPool poolConfig
   mgr <- newManager defaultManagerSettings
   password <- newIORef Nothing
   cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0

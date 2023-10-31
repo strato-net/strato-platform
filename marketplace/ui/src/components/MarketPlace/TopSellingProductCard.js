@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie";
 
 const { Title, Text } = Typography;
 
@@ -44,12 +45,13 @@ const TopSellingProductCard = () => {
   const limit = 3;
 
   const getPrevProds = () => {
-    if (offset > 0) setOffset(offset-limit);
+    if (offset > 0) setOffset(offset - limit);
   };
 
   const getNextProds = () => {
-    // setOffset(3);
-    setOffset(offset+limit);
+    if (offset !== 9) {
+      setOffset(offset + limit);
+    }
   };
 
   const navigate = useNavigate();
@@ -82,7 +84,7 @@ const TopSellingProductCard = () => {
     if (!found) {
       items = [...cartList, { product, qty: 1 }];
       actions.addItemToCart(marketplaceDispatch, items);
-      
+
       openToast("bottom", false, "Item added to cart");
     } else {
       items = [...cartList];
@@ -91,7 +93,7 @@ const TopSellingProductCard = () => {
           if (items[index].qty + 1 <= product.availableQuantity) {
             items[index].qty += 1;
             actions.addItemToCart(marketplaceDispatch, items);
-            
+
             openToast("bottom", false, "Item updated in cart");
           } else {
             openToast(
@@ -111,7 +113,7 @@ const TopSellingProductCard = () => {
       {contextHolder}
       <Card className="w-full mt-14">
         <div className="flex justify-between mb-5">
-          <Title level={3}>Top Selling Products</Title>
+          <Title level={3}>Recently Listed Products</Title>
           <Space size="large">
             <div
               onClick={getPrevProds}
@@ -147,6 +149,7 @@ const TopSellingProductCard = () => {
                         src={topSellingProduct.imageUrl}
                         height={230}
                         width={230}
+                        style={{ objectFit: "contain" }}
                         preview={false}
                         onClick={() =>
                           navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
@@ -170,10 +173,11 @@ const TopSellingProductCard = () => {
                       </Text>
                       <div className="flex justify-evenly items-center mt-4 w-full px-3">
                         <Button
-                          id={`${topSellingProduct.name.replace(/ /g,"_")}-buy-now`}
+                          id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
                           className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
                           onClick={() => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
                               TagManager.dataLayer({
@@ -194,6 +198,7 @@ const TopSellingProductCard = () => {
                         <div
                           onClick={() => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
                               TagManager.dataLayer({

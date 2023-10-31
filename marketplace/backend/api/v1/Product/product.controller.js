@@ -2,7 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3, deleteFileFromS3} from '../../../helpers/s3'
+import { getSignedUrlFromS3, deleteFileFromS3 } from '../../../helpers/s3'
 import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
@@ -38,13 +38,16 @@ class ProductController {
       const { dapp, query } = req
 
       const products = await dapp.getProducts({ ...query })
-      const productsWithImageUrl = products.map(product => ({
-        ...product,
-        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
-        )
-      }))
-
-      rest.response.status200(res, productsWithImageUrl)
+      const productsWithImageUrl = products.products.map(product => (
+        product.imageKey ?
+        {
+          ...product,
+          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+        }
+        :
+        product
+      ))
+      rest.response.status200(res, {productsWithImageUrl:productsWithImageUrl, count: products.productCount})
 
       return next()
     } catch (e) {
@@ -90,7 +93,7 @@ class ProductController {
 
       // If the old image key is present, delete the old image from S3. Keys are sent from UpdateProductModal.js
       const result = await dapp.updateProduct(body, options)
-      
+
       if (req.body.updates.oldImageKey) {
 
         const fileKey = req.body.updates.oldImageKey
@@ -99,7 +102,7 @@ class ProductController {
         if (!isDeleted) {
           rest.response.status400(res, "Image is failed to delete")
         }
-      } 
+      }
 
       rest.response.status200(res, result)
       return next()
@@ -156,7 +159,7 @@ class ProductController {
         name: Joi.string().required(),
         description: Joi.string().required(),
         manufacturer: Joi.string().required(),
-        unitOfMeasurement: Joi.number().integer().min(1).max(10).required(),
+        unitOfMeasurement: Joi.number().integer().min(1).max(11).required(),
         userUniqueProductCode: Joi.string().allow("").required(),
         leastSellableUnit: Joi.number().required(),
         imageKey: Joi.string().required(),

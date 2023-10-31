@@ -34,7 +34,7 @@ const contractName = "Dapp";
 const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
 
 const balance = 100000000000000000000;
-let   userCert = null;
+let userCert = null;
 
 // interface Member {
 //   access?:boolean,
@@ -126,13 +126,13 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
   return { cirrusOrg, productManager, eventTypeManager, itemManager, paymentManager, orderManager };
 }
 
-async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
+async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
   console.log(contract)
   let userOrganization
-  
+
   if (!serviceUser) {
-    
+
     let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
 
     //We are not guaranteed the user will have a certificate
@@ -141,11 +141,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
-      userCert    = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
+      userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
       console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
   }
-  
+
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
@@ -450,7 +450,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   // ------------------------------ PRODUCT MANAGER --------------------------------
   contract.createProduct = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = { uniqueProductCode: parseInt(util.iuid()), ...args.productArgs }
+    const newArgs = { uniqueProductCode: parseInt(util.uid()), ...args.productArgs }
     return managers.productManager.createProduct({ ...newArgs, createdDate: createdDate });
   };
   contract.updateProduct = async function (args, options = defaultOptions) {
@@ -463,11 +463,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const createdDate = Math.floor(Date.now() / 1000);
     const { serialNumber, ...restArgs } = args;
+    const newArgs = { ...restArgs, batchId: util.uid() };
+
 
     const serialNo = [];
     const repeatedSerialNumber = [];
     const serialNumbers = []
-
+    let transformedArray = [];
 
     if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
       for (let i = 0; i < serialNumber.length; i += 200) {
@@ -488,8 +490,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     }
 
     const productDetail = await managers.productManager.getProduct({ address: restArgs.productAddress }, getOptions);
-
-    let transformedArray = [];
 
     if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
       serialNumber.forEach(function (item) {
@@ -512,7 +512,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         }
 
         transformedArray.push({
-          "itemNumber": parseInt(util.iuid()),
+          "itemNumber": parseInt(util.uid()),
           "serialNumber": item.itemSerialNumber,
           "rawMaterialProductName": rawMaterialProductNameArray,
           "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
@@ -521,23 +521,32 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         serialNumbers.push(item.itemSerialNumber)
       });
     }
-    // For some reason an else statement is not working here
-    if (serialNumber.length === 0 || serialNumber.length === undefined) {
-      const quantity = args.quantity;
-      for (let i = 0; i < quantity; i++) {
+
+    if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Batch") {
+      transformedArray.push({
+        "itemNumber": parseInt(util.uid()),
+        "serialNumber": "",
+        "rawMaterialProductName": [],
+        "rawMaterialSerialNumber": [],
+        "rawMaterialProductId": []
+      });
+    }
+    else if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Individual") {
+      for (let i = 0; i < newArgs.quantity; i++) {
         transformedArray.push({
-          "itemNumber": parseInt(util.iuid()),
+          "itemNumber": parseInt(util.uid()),
           "serialNumber": "",
           "rawMaterialProductName": [],
           "rawMaterialSerialNumber": [],
           "rawMaterialProductId": []
-        });
+        })
       }
     }
-    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...restArgs, createdDate, serialNumbers });
+
+    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    if(args.quantity === 0) {
+    if (args.quantity === 0) {
       return [
         createInventoryStatus,
         createdInventoryAddress,
@@ -573,6 +582,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const itemParams = { itemsAddress, comment: "", status: args.updates.status, };
     return await managers.itemManager.updateItem(itemParams);
   };
+  contract.resellInventory = async function (args, options = defaultOptions) {
+    const { inventoryId, quantity, price, itemsAddress } = args;
+    const newItemNumber = parseInt(util.uid());
+    return await managers.productManager.resellInventory({ existingInventory: inventoryId, quantity, price, itemNumber: newItemNumber, itemsAddress: itemsAddress });
+  };
   contract.getProduct = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getProduct({ ...args, ownerOrganization: userOrganization }, getOptions);
@@ -580,10 +594,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
   contract.getProducts = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     console.log('dapp.getProducts - userOrganization', userOrganization)
-    return managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+    const products = await managers.productManager.getProducts(
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization, notEqualsField: 'category', notEqualsValue: 'Membership' },
       getOptions
     );
+    const productCount = await managers.productManager.count(
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization, notEqualsField: 'category', notEqualsValue: 'Membership' },
+      getOptions
+    );
+    return {products: products, productCount: productCount}
   };
   contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
@@ -600,6 +619,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+  };
+  contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
+    const { userAddress, queryValue, ...restArgs } = args;
+    const encodedQueryValue = encodeURIComponent(queryValue);
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const productList = await managers.productManager.getProducts({ ...restArgs, limit: 2000, offset: 0, ownerOrganization: userOrganization, queryValue: encodedQueryValue }, getOptions);
+    const productIds = productList.map(product => product.address);
+    const { queryFields, ...restArgsPrime } = restArgs
+    return managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
   };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
@@ -896,7 +924,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       if (paymentSessionId.length > 1) {
         const order = await managers.orderManager.getOrders(rawAdmin, { paymentSessionId }, createOptions);
-        if (order.length > 0) {
+        if (order.orders.length > 0) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, `Order already placed for payment_id ${paymentSessionId}`)
         }
       }
@@ -1044,22 +1072,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         return { status };
       } else if (updates.status == ORDER_STATUS.CLOSED) {
 
-
         const [statusResponse, inventoryAddresses, quantitiesToUpdate] = await managers.orderManager.updateSellerDetails({ orderAddress: address, ...updates });
 
-        // const newOptions = { ...chainOptions, org: managers.cirrusOrg, app: contractName }
-
         const orderLines = await managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-        const orderLinesAddresses = orderLines.map(orderLine => orderLine.address);
 
-        let itemAddresses
-        let newOwner = orderLines[0].owner
         let result = []
+        const newOwner = orderLines[0].owner
+        const itemNumber = parseInt(util.uid());
 
-        for (let orderLineAddress of orderLinesAddresses) {
-          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
-          itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
+        for (let orderLine of orderLines) {
+          const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address }, createOptions);
+          const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber });
           result.push({ status, productId, inventoryId });
         }
         return result;
@@ -1083,14 +1107,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
       const optionsWithChainId = { ...options, org: managers.cirrusOrg };
 
       const order = managers.orderManager.getOrder(args, createOptions);
-      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);    
+      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
 
       const response = await Promise.allSettled([order, orderLines]);
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
       const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
 
-      for(let i = 0; i < result.orderLines.length; i++) {
-        const {productId, inventoryId } = result.orderLines[i];
+      for (let i = 0; i < result.orderLines.length; i++) {
+        const { productId, inventoryId } = result.orderLines[i];
         const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
 
         if (items === null || items === undefined || items.length === 0) {
@@ -1195,6 +1219,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
 
       const _contract = { name: orderLineJs.contractName, address: orderLineId };
 
+      // const items = await managers.itemManager.getItems(
+      //   {
+      //     productId,
+      //     inventoryId,
+      //     offset: 0,
+      //     limit: quantity,
+      //     status: 1
+      //   },
+      //   chainOptions
+      // );
+
       const itemsAddresses = items.map(_item => _item.address);
 
 
@@ -1203,20 +1238,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser=false) {
         items: itemsAddresses,
         createdDate: Math.floor(Date.now() / 1000),
       };
-      // This gives me a status of 200 and the orderLineItems, but the _items is undefined. 
-      // See orderLine.sol 
-      // Item_3 item = Item_3(account(address(_items[i]),"parent"));
 
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
-
-      const [soldStatus] = await managers.itemManager.updateItem({
-        itemsAddress: itemsAddresses,
-        status: ITEM_STATUS.SOLD,
-        comment: "",
-      });
-      if (soldStatus !== "200") {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
+      const inventory = await contract.getInventory({ address: items[0].inventoryId, });
+      if (inventory.inventoryType === "Individual" || !inventory.inventoryType) {
+        const [soldStatus] = await managers.itemManager.updateItem({
+          itemsAddress: itemsAddresses,
+          status: ITEM_STATUS.SOLD,
+          comment: "",
+        });
+        if (soldStatus !== "200") {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "Sold status was not updated");
+        }
       }
 
       return result;

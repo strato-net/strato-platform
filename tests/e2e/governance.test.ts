@@ -65,9 +65,9 @@ describe("Create Chain", function() {
   before(async() => {
     // create user
     oauth = await oauthUtil.init(config.nodes[0].oauth);
-    let accessToken1:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user1", "1234", "strato-devel");
+    let accessToken1:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user3", "1234", "strato-devel");
     ouser1 = {token: accessToken1.token.access_token};
-    let accessToken2:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user2", "1234", "strato-devel");
+    let accessToken2:AccessToken = await oauth.getAccessTokenByResourceOwnerCredential("user4", "1234", "strato-devel");
     ouser2 = {token: accessToken2.token.access_token};
     alice = await rest.createUser(ouser1, options);
     bob = await rest.createUser(ouser2, options);

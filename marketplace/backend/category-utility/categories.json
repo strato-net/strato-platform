@@ -20,6 +20,60 @@
                     "name": "Membership DAO"
                 }
             ]
+        },
+        {
+            "name": "Materials",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Nickel Reserve"
+                },
+                {
+                    "name": "Nickel"
+                },
+                {
+                    "name": "Silver"
+                }
+            ]
+        },
+        {
+            "name": "Clothing",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Sneakers"
+                },
+                {
+                    "name": "Shirts"
+                },
+                {
+                    "name": "Pants"
+                },
+                {
+                    "name": "Jackets"
+                },
+                {
+                    "name": "Accessories"
+                }
+            ]
+        },
+        {
+            "name": "Collectibles",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Trading Cards"
+                },
+                {
+                    "name": "Toys"
+                },
+                {
+                    "name": "Video Games"
+                },
+                {
+                    "name": "Vinyls"
+                }
+            ]
         }
     ]
 }

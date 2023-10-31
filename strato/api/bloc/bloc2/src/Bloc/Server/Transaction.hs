@@ -49,6 +49,7 @@ import Blockchain.Data.AlternateTransaction
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json hiding (Contract)
+import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
 import Blockchain.Strato.Model.Account
@@ -90,7 +91,6 @@ import qualified Data.Map as M
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import Data.RLP
 import Data.Semigroup (Max (..))
 import Data.Set (isSubsetOf)
 import qualified Data.Set as S
@@ -107,6 +107,7 @@ import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
+import qualified SolidVM.Model.Value as SMV
 import Strato.Strato23.API.Types
 import Strato.Strato23.Client
 import System.Clock
@@ -631,7 +632,7 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
                     ]
           userCert <- maybe (throwIO err) pure =<<
             A.select (A.Proxy @Certificate) addr
-          pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash Nothing
+          pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash (Just . show $ SMV.OrderedVals [SMV.SString $ certificateCommonName userCert])
         else pure addr
       nonceMap <- getAccountNonce addr (S.singleton chainId)
       accountNonce <- case Map.lookup chainId nonceMap of
@@ -1139,7 +1140,7 @@ preparePostTx time from tx =
       kecc
       API
   where
-    kecc = hash (rlpSerialize tx)
+    kecc = hash . rlpSerialize $ rlpEncode tx
     r = transactionR tx
     s = transactionS tx
     v = transactionV tx
