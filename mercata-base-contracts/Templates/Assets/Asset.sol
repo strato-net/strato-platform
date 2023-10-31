@@ -2,6 +2,7 @@ import <509>;
 
 abstract contract Asset {
     address public owner;
+    string ownerCommonName;
     string name;
     string description;
 
@@ -9,7 +10,9 @@ abstract contract Asset {
 
     constructor(string _name, string _description) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        owner = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        owner  = Certificate(account(address(c), "main")).userAddress();
+        ownerCommonName = Certificate(account(address(c), "main")).commonName();
         name = _name;
         description =_description;
     }
@@ -27,23 +30,37 @@ abstract contract Asset {
         _;
     }
 
-    function createBaseSale(address _purchaser, string _purchasePrice) internal returns (Sale) {
+    function createBaseSale(address _purchaser, string _purchasePrice, SaleState _state, PaymentType _payment) internal returns (Sale) {
         Sale b = new Sale(
             _purchaser,
             address(this),
-            _purchasePrice
+            _purchasePrice,
+            _state,
+            _payment,
         );
         return b;
     }
 
-    function createSale(address _purchaser, string _purchasePrice) public requireOwner("Create sale") {
+    function createSale(address _purchaser, string _purchasePrice, SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = createBaseSale(_purchaser, _purchasePrice);
+        sale = createBaseSale(_purchaser, _purchasePrice, _state, _payment);
+    }
+
+    function changeSaleState(SaleState _state){
+        requireOwner("Change Sale State");
+        require(Sale!=address(0));
+        sale.changeSaleState(_state);
+    }
+
+    function changePaymentType(PaymentType _payment){
+        requireOwner("Change Payment Type");
+        require(Sale!=address(0));
+        sale.changePaymentType(_payment);
     }
 
     function transferOwnership(string _newOwner) public requireOwner("Ownership transfer") {
         require(msg.sender == address(sale), "Ownership transfer must originate from the active bill of sale");
-        owner = _newOwner;
+        ownerCommonName = _newOwner;
         sale = Sale(address(0));
     }
 }
