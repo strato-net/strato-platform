@@ -43,7 +43,7 @@ abstract contract Asset {
         sale = createBaseSale(_purchaserCommonName, _purchasePrice);
     }
 
-    function transferOwnership(string _newOwnerOrganization, string _newOwnerOrganizationalUnit, string _newOwnerCommonName) public requireOwner("Ownership transfer") {
+    function transferOwnership(string _newOwnerCommonName) public requireOwner("Ownership transfer") {
         require(msg.sender == address(sale), "Ownership transfer must originate from the active bill of sale");
         ownerCommonName = _newOwnerCommonName;
         sale = Sale(address(0));
