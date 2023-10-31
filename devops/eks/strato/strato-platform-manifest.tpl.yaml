@@ -2,13 +2,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: strato-platform
+  name: <REPLACE_WITH_NAMESPACE>
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: genesis-block
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
 data:
   genesis-block.json: |
     {
@@ -322,7 +322,7 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ebs-claim-marketplace-data
 spec:
   accessModes:
@@ -335,7 +335,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ebs-claim-postgres-data
 spec:
   accessModes:
@@ -348,7 +348,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ebs-claim-prometheus-data
 spec:
   accessModes:
@@ -361,7 +361,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ebs-claim-kafka-data
 spec:
   accessModes:
@@ -374,7 +374,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ebs-claim-redis-data
 spec:
   accessModes:
@@ -387,7 +387,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ebs-claim-zookeeper-data
 spec:
   accessModes:
@@ -400,7 +400,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ebs-claim-strato-data
 spec:
   accessModes:
@@ -413,7 +413,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: deployment-strato-platform
 spec:
   replicas: 1
@@ -472,7 +472,7 @@ spec:
         - name: MP_IS_BOOTNODE
           value: "false"
         - name: MP_DAPP_ADDRESS
-          value: "c93f9a422a4508a6501a63537291128122f7bcf2"
+          value: "038b2c5c70dc23ff707bdd92648666863a388a0d"
         - name: MP_API_DEBUG
           value: "false"
         - name: MP_DELAY_DEPLOYMENT
@@ -868,7 +868,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: service-strato
 spec:
   ports:
@@ -882,7 +882,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  namespace: strato-platform
+  namespace: <REPLACE_WITH_NAMESPACE>
   name: ingress-strato
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing

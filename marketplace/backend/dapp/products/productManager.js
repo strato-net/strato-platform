@@ -99,6 +99,8 @@ function bind(user, _contract, options) {
     getProduct(user, args, _options);
   contract.getProducts = async (args, _options = defaultOptions) =>
     getProducts(user, args, _options);
+  contract.count = async (args, _options = defaultOptions) =>
+    count(user, args, _options);
   contract.getInventory = async (args, _options = defaultOptions) =>
     getInventory(user, contract, args, _options);
   contract.getInventories = async (args, _options = defaultOptions) =>
@@ -111,6 +113,8 @@ function bind(user, _contract, options) {
     createInventory(user, contract, args, options);
   contract.updateInventory = async (args) =>
     updateInventory(user, contract, args, options);
+  contract.resellInventory = async (args) =>
+    resellInventory(user, contract, args, options);
   contract.deleteProduct = async (args) =>
     deleteProduct(user, contract, args, options);
   contract.updateInventoriesQuantities = async (args) =>
@@ -294,6 +298,34 @@ async function updateInventory(admin, contract, _args, baseOptions) {
 }
 
 /**
+ * Resell a portion of existing inventory
+ */
+async function resellInventory(admin, contract, _args, baseOptions) {
+  const callArgs = {
+    contract,
+    method: "resellInventory",
+    args: util.usc({
+      ..._args,
+    }),
+  };
+  const options = {
+    ...baseOptions,
+    history: [contractName],
+  };
+
+  const [restStatus, inventoryAddress] = await rest.call(
+    admin,
+    callArgs,
+    options
+  );
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK)
+    throw new rest.RestError(restStatus, 0, { callArgs });
+
+  return [restStatus, inventoryAddress];
+}
+
+/**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
  */
@@ -314,6 +346,13 @@ async function getProduct(user, args, options) {
  */
 async function getProducts(user, args, options) {
   return productJs.getAll(user, args, options);
+}
+
+/**
+ * get all the product count
+ */
+async function count(user, args, options) {
+  return productJs.count(user, args, options);
 }
 
 /**
@@ -347,10 +386,12 @@ async function getInventories(admin, contract, args = {}, options) {
     const productIds = [
       ...new Set(inventories.map((inventory) => inventory.productId)),
     ];
+
     const products = await contract.getProducts(
       { address: [...productIds] },
       options
     );
+
     const inventoriesWithProductInfo = inventories
       .filter((inventory) => productIds.includes(inventory.productId))
       .map((inventory) => {
@@ -360,6 +401,7 @@ async function getInventories(admin, contract, args = {}, options) {
           ...newInventory,
         };
       });
+
     return inventoriesWithProductInfo;
   } catch (error) {
     throw error;
@@ -403,5 +445,6 @@ export default {
   deleteProduct,
   createInventory,
   updateInventory,
+  resellInventory,
   updateInventoriesQuantities
 };

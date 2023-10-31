@@ -1,18 +1,16 @@
-
-module ReverseOrderedKVs (
-  ReverseOrderedKVs, --we must not export the constructor....  you should only be allowed to make a ReverseOrderedKVs using the following funcitons
-  orderTheKVs,
-  iPromiseTheseKVsAreOrdered,
-  getTheKVs
-  ) where
+module ReverseOrderedKVs
+  ( ReverseOrderedKVs, --we must not export the constructor....  you should only be allowed to make a ReverseOrderedKVs using the following funcitons
+    orderTheKVs,
+    iPromiseTheseKVsAreOrdered,
+    getTheKVs,
+  )
+where
 
 import Data.Function
 import Data.List
-
 import KV
 
 newtype ReverseOrderedKVs = ReverseOrderedKVs [KV] deriving (Show)
-
 
 orderTheKVs :: [KV] -> ReverseOrderedKVs
 orderTheKVs kvs = ReverseOrderedKVs $ sortBy (flip compare `on` theKey) kvs

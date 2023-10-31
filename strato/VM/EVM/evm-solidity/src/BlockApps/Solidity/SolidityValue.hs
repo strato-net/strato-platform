@@ -3,36 +3,36 @@
 
 module BlockApps.Solidity.SolidityValue where
 
-import           Control.Lens              ((&), (?~))
-import           Data.Aeson
-import qualified Data.Aeson.Key            as DAK
-import           Data.ByteString           (ByteString)
-import qualified Data.ByteString           as ByteString
-import           Data.Foldable
-import           Data.Swagger
-import           Data.Text                 (Text)
-import qualified Data.Bifunctor            as BF
-import           GHC.Generics
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances ()
-
+import Control.Lens ((&), (?~))
+import Data.Aeson
+import qualified Data.Aeson.Key as DAK
+import qualified Data.Bifunctor as BF
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
+import Data.Foldable
+import Data.Swagger
+import Data.Text (Text)
+import GHC.Generics
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 
 data SolidityValue
   = SolidityValueAsString Text
   | SolidityBool Bool
   | SolidityArray [SolidityValue]
-  | SolidityBytes  ByteString
+  | SolidityBytes ByteString
   | SolidityObject [(Text, SolidityValue)]
-  deriving (Eq,Show,Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON SolidityValue where
   toJSON (SolidityValueAsString str) = toJSON str
   toJSON (SolidityBool boolean) = toJSON boolean
   toJSON (SolidityArray array) = toJSON array
-  toJSON (SolidityBytes bytes) = object
-    [ "type" .= ("Buffer" :: Text)
-    , "data" .= ByteString.unpack bytes
-    ]
+  toJSON (SolidityBytes bytes) =
+    object
+      [ "type" .= ("Buffer" :: Text),
+        "data" .= ByteString.unpack bytes
+      ]
   toJSON (SolidityObject namedItems) =
     object $ uncurry (.=) <$> map (BF.first DAK.fromText) namedItems
 
@@ -44,17 +44,19 @@ instance FromJSON SolidityValue where
   parseJSON (Object obj) = do
     ty <- obj .: "type"
     if ty == ("Buffer" :: Text)
-    then do
-      bytes <- obj .: "data"
-      return $ SolidityBytes (ByteString.pack bytes)
-    else
-      fail "Failed to parse SolidityBytes"
+      then do
+        bytes <- obj .: "data"
+        return $ SolidityBytes (ByteString.pack bytes)
+      else fail "Failed to parse SolidityBytes"
   parseJSON _ = fail "Failed to parse solidity value"
 
 instance Arbitrary SolidityValue where
   arbitrary = return (SolidityBool True)
 
 instance ToSchema SolidityValue where
-  declareNamedSchema = pure . pure $ NamedSchema (Just "Solidity Value") $ mempty
-      & description ?~ "A Solidity return type value"
-      & example ?~ toJSON (SolidityBool True)
+  declareNamedSchema =
+    pure . pure $
+      NamedSchema (Just "Solidity Value") $
+        mempty
+          & description ?~ "A Solidity return type value"
+          & example ?~ toJSON (SolidityBool True)

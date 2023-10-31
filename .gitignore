@@ -24,5 +24,6 @@ dryrun.log
 targets.log
 strato/tools/x509-generator/subject.json
 strato/tools/genesis-builder/certs.json
+strato/haddock
 *.cabal
 *~

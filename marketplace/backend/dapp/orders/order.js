@@ -6,6 +6,7 @@ import {
   searchOne,
   searchAll,
   searchAllWithQueryArgs,
+  setSearchQueryOptionsPrime
 } from "/helpers/utils";
 import dayjs from "dayjs";
 
@@ -239,7 +240,23 @@ async function getAll(admin, args = {}, options) {
     options,
     admin
   );
-  return orders.map((order) => marshalOut(order));
+
+  const queryArgs = await searchAllWithQueryArgs(
+    contractName,
+    {
+    ...args,
+    limit: undefined,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: "count",
+      }
+    },
+    options,
+    admin
+  );
+
+  return { orders: orders.map((order) => marshalOut(order)), total: queryArgs[0].count}
 }
 
 /**

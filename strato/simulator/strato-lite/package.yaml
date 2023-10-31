@@ -16,7 +16,7 @@ dependencies:
 executables:
   strato-lite:
     source-dirs: exec_src/
-    ghc-options: -Wall -Werror -dynamic
+    ghc-options: -Wall -Werror 
     main: Main.hs
     dependencies:
       - aeson
@@ -35,7 +35,7 @@ library:
   exposed-modules:
     - Strato.Lite
     - Strato.Lite.Options
-  ghc-options: -Wall -O2 -dynamic
+  ghc-options: -Wall -O2 
   dependencies:
   - QuickCheck
   - aeson
@@ -93,6 +93,7 @@ library:
   - strato-p2p
   - strato-sequencer
   - text
+  - thread-hierarchy
   - time
   - transformers
   - unliftio
@@ -166,4 +167,4 @@ tests:
       - vm-runner
       - vm-tools
       - x509-certs
-            
+

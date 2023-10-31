@@ -9,30 +9,13 @@ import jwtDecode from 'jwt-decode'
 const options = { config }
 
 const loadDapp = async (req, res, next) => {
-  const { app, username, accessToken } = req
+  const { app, username, accessToken, address } = req
 
   const userCredentials = {
     username,
     ...accessToken,
   }
-  console.log('User Credentials: \n\n\n\n\n', userCredentials)
-
-  let address
-  
-  try {
-    address = await rest.getKey(userCredentials, options);
-  } catch (e) {
-    // user isn't created in STRATO
-    if (e.response.status === RestStatus.BAD_REQUEST) {
-      rest.response.status(RestStatus.FORBIDDEN, res)
-      return next()
-    }
-    
-    // unexpected error
-    return next(e)
-  }
-    
-  
+  console.log(`Requester username/uuid: ${username}`)
   const user = {
     ...userCredentials,
     node: config.nodes[0],

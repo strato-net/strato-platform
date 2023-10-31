@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import { RestError } from 'blockapps-rest/dist/util/rest.util'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import { pollingHelper } from '../../../helpers/utils'
 
 const options = { config, cacheNonce: true }
 
@@ -10,17 +11,14 @@ class UsersController {
     try {
       const { dapp, accessToken, decodedToken, address: userAddress } = req
       const username = decodedToken.preferred_username
-
-      let user = await dapp.getCertificate({ userAddress })
-
-      console.log('me USER ', user)
-      if (user === null || user === undefined) { 
-          console.log('user not found in first attempt')
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          user = await dapp.getCertificate({ userAddress })
-          console.log('user content from second attempt', user)
+      let user = null
+      if (Object.hasOwn(dapp, 'hasCert')) user = dapp.hasCert;
+      if (user === null || user === undefined) {
+        user = await pollingHelper( dapp.getCertificate, [{ userAddress}]);
+        // user = await dapp.getCertificate({ userAddress })
+        if (user === null || user === undefined) console.log('user not found in after multiple attempts');
       }
-
+      console.log('me USER ', user);
       if (!user || Object.keys(user).length == 0) {
         rest.response.status400(res, { username }) 
       }

@@ -22,6 +22,21 @@
             ]
         },
         {
+            "name": "Materials",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Nickel Reserve"
+                },
+                {
+                    "name": "Nickel"
+                },
+                {
+                    "name": "Silver"
+                }
+            ]
+        },
+        {
             "name": "Clothing",
             "imageKey": "",
             "subCategories": [
@@ -33,18 +48,30 @@
                 },
                 {
                     "name": "Pants"
+                },
+                {
+                    "name": "Jackets"
+                },
+                {
+                    "name": "Accessories"
                 }
             ]
         },
         {
-            "name": "Materials",
+            "name": "Collectibles",
             "imageKey": "",
             "subCategories": [
                 {
-                    "name": "Nickel Reserve"
+                    "name": "Trading Cards"
                 },
                 {
-                    "name": "Nickel"
+                    "name": "Toys"
+                },
+                {
+                    "name": "Video Games"
+                },
+                {
+                    "name": "Vinyls"
                 }
             ]
         }

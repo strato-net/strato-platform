@@ -43,10 +43,12 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
+  search: '/search',
   get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
+  resell: '/resell',
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership',
 }

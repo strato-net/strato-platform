@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import classNames from "classnames";
-import { EyeOutlined } from "@ant-design/icons";
+import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled} from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStatus } from "./constant";
@@ -10,19 +10,23 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination } from "antd";
+import { Pagination, Button, Radio, Space} from "antd";
 import TagManager from "react-gtm-module";
+import "./ordersTable.css"
 
 
-const SoldOrdersTable = ({ user }) => {
+const SoldOrdersTable = ({ user, selectedDate }) => {
   const dispatch = useOrderDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
+  const [order, setOrder] = useState("createdDate.desc");
+  const [filter, setFilter] = useState(0)
+  const [selectedValue, setSelectedValue] = useState(null);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  const { ordersSold, isordersSoldLoading } = useOrderState();
+  const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
   useEffect(() => {
     actions.fetchOrderSold(
@@ -30,11 +34,18 @@ const SoldOrdersTable = ({ user }) => {
       limit,
       offset,
       debouncedSearchTerm,
-      user?.organization
+      user?.organization,
+      order,
+      selectedDate,
+      filter
     );
 
+  }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
 
-  }, [dispatch, limit, offset, debouncedSearchTerm, user]);
+  useEffect(() => {
+    setPage(1);
+    setOffset(0);
+  }, [orderSoldTotal]);
 
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
@@ -66,10 +77,7 @@ const SoldOrdersTable = ({ user }) => {
           id={order.orderId}
           onClick={() => {
             navigate(
-              `${routes.SoldOrderDetails.url.replace(
-                ":id",
-                order.address
-              )}`
+              `${routes.SoldOrderDetails.url.replace(":id", order.address)}`
             );
           }}
           className="text-primary hover:text-primaryHover cursor-pointer"
@@ -91,24 +99,40 @@ const SoldOrdersTable = ({ user }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: "Date (mm/dd/yyyy)".toUpperCase(),
       dataIndex: "date",
       key: "date",
       render: (text) => <p>{text}</p>,
+      title: (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div>{"Date (mm/dd/yyyy)".toUpperCase()}</div>
+          <div>
+            {order === "createdDate.desc" ? (
+              <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
+            ) : (
+              <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.desc")} />
+            )}
+          </div>
+        </div>
+      ),
     },
     {
       title: "invoice".toUpperCase(),
       dataIndex: "invoice",
       key: "invoice",
       render: (text) => (
-        <button onClick={() => {
-          TagManager.dataLayer({
-            dataLayer: {
-              event: 'view_invoice_in_orders_sold',
-            },
-          });
-        }}>
-          <Link to={`${routes.Invoice.url.replace(":id", text.address)}`} target="_blank" >
+        <button
+          onClick={() => {
+            TagManager.dataLayer({
+              dataLayer: {
+                event: "view_invoice_in_orders_sold",
+              },
+            });
+          }}
+        >
+          <Link
+            to={`${routes.Invoice.url.replace(":id", text.address)}`}
+            target="_blank"
+          >
             <div className="flex items-center cursor-pointer hover:text-primary">
               <EyeOutlined className="mr-2" />
               <p>View</p>
@@ -122,26 +146,57 @@ const SoldOrdersTable = ({ user }) => {
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),
-      filters: [
-        {
-          text: "Awaiting Fulfillment",
-          value: "Awaiting Fulfillment",
-        },
-        {
-          text: "Awaiting Shipment",
-          value: "Awaiting Shipment",
-        },
-        {
-          text: "Canceled",
-          value: "Canceled",
-        },
-        {
-          text: "Closed",
-          value: "Closed",
-        },
-      ],
-      onFilter: (value, record) => record.status.startsWith(value),
+      filterDropdown: ({confirm}) => ( dropdownVisible && (
+        <div style={{ padding: 8 }}>
+          <Radio.Group
+            onChange={(e) => {
+              setSelectedValue(e.target.value);
+            }}
+            value={selectedValue}
+            vertical={true}
+          >
+            <Space direction="vertical">
+              <Radio value={1}>Awaiting Fulfillment</Radio>
+              <Radio value={2}>Awaiting Shipment</Radio>
+              <Radio value={3}>Closed</Radio>
+              <Radio value={4}>Canceled</Radio>
+            </Space>
+          </Radio.Group>
+          <div className="mt-2" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button
+              type="primary"
+              onClick={() => {
+                setFilter(0);
+                setSelectedValue(null);
+                setDropdownVisible(false);
+                confirm();
+              }}
+              style={{ marginRight: 8 }}
+            >
+              Reset
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                if (selectedValue === null) {
+                  setFilter(0);
+                }
+                else {
+                  setFilter(selectedValue);
+                }
+                confirm();
+              }}
+            >
+              OK
+            </Button>
+          </div>
+        </div>
+      )),
+      filterIcon: () => (<FilterFilled style={{ color: filter !== 0 ? '#1890ff' : undefined }}/>),
+      onFilterDropdownOpenChange: (visible) => {setDropdownVisible(visible)},
       filterSearch: true,
+      filterMultiple: false,
+      filterResetToDefaultFilteredValue: true,
       width: "15%",
     },
   ];
@@ -155,7 +210,6 @@ const SoldOrdersTable = ({ user }) => {
     } else if (status === "Canceled") {
       textClass = "text-error  bg-[#FFF0F0]";
     }
-
     return (
       <div className={classNames(textClass, "text-center py-1 rounded")}>
         <p>{status}</p>
@@ -168,14 +222,6 @@ const SoldOrdersTable = ({ user }) => {
     setPage(page);
   };
 
-  useEffect(() => {
-    let len = data.length;
-    let total;
-    if (len === limit) total = page * 10 + limit;
-    else total = (page - 1) * 10 + limit;
-    setTotal(total);
-  }, [data]);
-
   return (
     <div>
       <DataTableComponent
@@ -183,13 +229,12 @@ const SoldOrdersTable = ({ user }) => {
         data={data}
         isLoading={isordersSoldLoading}
         pagination={false}
-        // naviroute={routes.SoldOrderDetails.url}
         scrollX="100%"
       />
       <Pagination
         current={page}
         onChange={onPageChange}
-        total={total}
+        total={orderSoldTotal}
         showSizeChanger={false}
         className="flex justify-center my-5 "
       />

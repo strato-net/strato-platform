@@ -359,16 +359,26 @@ const ConfirmOrder = () => {
   };
 
   const handlePaymentConfirm = async () => {
-    handleCancel();
     let orderList = [];
     confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
+    // These additional fields need to be sent to form the request after stripe. 
+      orderList.push({
+        inventoryId: item.key, 
+        quantity: item.qty,
+        name: item.item.name,
+        unitPrice: item.unitPrice,
+      });
     });
+
+    // These additional fields need to be sent to form the request after stripe. 
     const body = {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
+      tax: tax,
+      user: user.commonName,
+      email: user.preferred_username,
     };
     TagManager.dataLayer({
       dataLayer: {
@@ -458,7 +468,7 @@ const ConfirmOrder = () => {
             </p>
           </Row>
           <Row align="middle">
-            <p className="text-lg font-semibold mr-4">Shipping address</p>
+            <p className="text-lg font-semibold mr-4">Address Details</p>
             {
               userAddresses.length === 0 ? <div /> : showAddress ? <MinusCircleOutlined className="text-xl text-primary"
                 onClick={() => {
@@ -471,12 +481,12 @@ const ConfirmOrder = () => {
               />
             }
           </Row>
-          <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select a shipping address" : "Create a new shipping address"}</p>
+          <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select an address" : "Create a new address"}</p>
           {
             showAddress ? <Card className="w-3/5 mt-4">
               <Form layout="vertical" className="mt-5">
                 <div>
-                  <div className="flex justify-between mb-4">
+                  <div className="flex justify-around mb-4">
                     <Form.Item label="Name" name="name" className="w-72">
                       <Input
                         label="name"
@@ -492,39 +502,46 @@ const ConfirmOrder = () => {
                       )}
                     </Form.Item>
 
-                    <Form.Item label="Zipcode" name="zipcode" className="w-72">
-                      <Input
-                        label="zipcode"
-                        name="zipcode"
-                        placeholder="Enter Zipcode"
-                        maxLength={15}
-                        value={formik.values.zipcode}
+                    <Form.Item
+                      label="Address Line 1"
+                      name="addressLine1"
+                      className="w-72"
+                    >
+                      <TextArea
+                        rows={1}
+                        name="addressLine1"
+                        placeholder="Enter Address Line 1"
+                        value={formik.values.addressLine1}
                         onChange={formik.handleChange}
                       />
-                      {formik.touched.zipcode && formik.errors.zipcode && (
+                      {formik.touched.addressLine1 && formik.errors.addressLine1 && (
                         <span className="text-error text-xs">
-                          {formik.errors.zipcode}
+                          {formik.errors.addressLine1}
                         </span>
                       )}
                     </Form.Item>
                   </div>
 
-                  <div className="flex justify-between mb-4">
-                    <Form.Item label="State" name="state" className="w-72">
-                      <Input
-                        label="state"
-                        name="state"
-                        placeholder="Enter State"
-                        value={formik.values.state}
+                  <div className="flex justify-around mb-4">
+                   
+                  <Form.Item
+                      label="Address Line 2"
+                      name="addressLine2"
+                      className="w-72"
+                    >
+                      <TextArea
+                        rows={1}
+                        name="addressLine2"
+                        placeholder="Enter Address Line 2"
+                        value={formik.values.addressLine2}
                         onChange={formik.handleChange}
                       />
-                      {formik.touched.state && formik.errors.state && (
+                      {formik.touched.addressLine2 && formik.errors.addressLine2 && (
                         <span className="text-error text-xs">
-                          {formik.errors.state}
+                          {formik.errors.addressLine2}
                         </span>
                       )}
                     </Form.Item>
-
                     <Form.Item label="City" name="city" className="w-72">
                       <Input
                         label="city"
@@ -541,45 +558,38 @@ const ConfirmOrder = () => {
                     </Form.Item>
                   </div>
 
-                  <div className="flex justify-between items-start mb-4">
-                    <Form.Item
-                      label="Address Line 1"
-                      name="addressLine1"
-                      className="w-72"
-                    >
-                      <TextArea
-                        rows={3}
-                        name="addressLine1"
-                        placeholder="Enter Address Line 1"
-                        value={formik.values.addressLine1}
+                  <div className="flex justify-around items-start mb-4">
+                  <Form.Item label="State" name="state" className="w-72">
+                      <Input
+                        label="state"
+                        name="state"
+                        placeholder="Enter State"
+                        value={formik.values.state}
                         onChange={formik.handleChange}
                       />
-                      {formik.touched.addressLine1 && formik.errors.addressLine1 && (
+                      {formik.touched.state && formik.errors.state && (
                         <span className="text-error text-xs">
-                          {formik.errors.addressLine1}
+                          {formik.errors.state}
                         </span>
                       )}
                     </Form.Item>
 
-                    <Form.Item
-                      label="Address Line 2"
-                      name="addressLine2"
-                      className="w-72"
-                    >
-                      <TextArea
-                        rows={3}
-                        name="addressLine2"
-                        placeholder="Enter Address Line 2"
-                        value={formik.values.addressLine2}
+                   
+                    <Form.Item label="Zipcode" name="zipcode" className="w-72">
+                      <Input
+                        label="zipcode"
+                        name="zipcode"
+                        placeholder="Enter Zipcode"
+                        maxLength={15}
+                        value={formik.values.zipcode}
                         onChange={formik.handleChange}
                       />
-                      {formik.touched.addressLine2 && formik.errors.addressLine2 && (
+                      {formik.touched.zipcode && formik.errors.zipcode && (
                         <span className="text-error text-xs">
-                          {formik.errors.addressLine2}
+                          {formik.errors.zipcode}
                         </span>
                       )}
                     </Form.Item>
-
                   </div>
 
                 </div>
@@ -752,11 +762,6 @@ const ConfirmOrder = () => {
           </div>
         </div>
       )}
-      <ConfirmOrderModel
-        open={open}
-        handleCancel={handleCancel}
-        handleConfirm={handleOrderConfirm}
-      />
       {marketplaceMessage && openToastMarketplace("Bottom")}
       {message && openToastOrder("bottom")}
     </div>

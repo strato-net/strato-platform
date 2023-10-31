@@ -1,62 +1,64 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module SolidVM.Model.Storable where
 
-import           Control.Applicative ((<|>))
-import           Control.DeepSeq
-import           Control.Exception
-import           Data.Attoparsec.ByteString as Atto
-import           Data.Attoparsec.ByteString.Char8 (scientific)
-import           Data.Binary
+import Blockchain.Data.RLP
+import Blockchain.SolidVM.Model
+import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ExtendedWord
+import Control.Applicative ((<|>))
+import Control.DeepSeq
+import Control.Exception
+import Data.Attoparsec.ByteString as Atto
+import Data.Attoparsec.ByteString.Char8 (scientific)
+import Data.Binary
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Internal as BI
-import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.UTF8   as UTF8
-import           Data.Char
-import           Data.Hashable
-import           Data.Scientific (isInteger, toBoundedInteger)
-import           Foreign.Ptr
-import           Foreign.Storable
-import           GHC.Generics
-import           System.IO.Unsafe
-
-import           Blockchain.Data.RLP
-import           Blockchain.SolidVM.Model
-import           Blockchain.Strato.Model.Account
-import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ExtendedWord
+import qualified Data.ByteString.Internal as BI
+import qualified Data.ByteString.UTF8 as UTF8
+import qualified Data.ByteString.Unsafe as BU
+import Data.Char
+import Data.Hashable
+import Data.Scientific (isInteger, toBoundedInteger)
+import Foreign.Ptr
+import Foreign.Storable
+import GHC.Generics
 import qualified LabeledError
-import           SolidVM.Model.SolidString
-import           Text.Format
+import SolidVM.Model.SolidString
+import System.IO.Unsafe
+import Text.Format
 
-data BasicValue = BInteger !Integer
-                | BString !B.ByteString
-                | BBool !Bool
-                | BAccount !NamedAccount 
-                | BEnumVal !SolidString !SolidString !Word32
-                | BContract !SolidString !NamedAccount
-                  -- The sole purpose of this sentinel is to make slipstream reserve
-                  -- a column for this mapping
-                | BMappingSentinel
-                | BDefault -- Indicates a not present value
-                deriving (Show, Eq, Generic, NFData, Hashable, Binary)
+data BasicValue
+  = BInteger !Integer
+  | BString !B.ByteString
+  | BBool !Bool
+  | BAccount !NamedAccount
+  | BEnumVal !SolidString !SolidString !Word32
+  | BContract !SolidString !NamedAccount
+  | -- The sole purpose of this sentinel is to make slipstream reserve
+    -- a column for this mapping
+    BMappingSentinel
+  | BDefault -- Indicates a not present value
+  deriving (Show, Eq, Generic, NFData, Hashable, Binary)
 
 isDefault :: BasicValue -> Bool
-isDefault (BInteger i)     = i == 0
-isDefault (BString bs)     = B.null bs
-isDefault (BBool b)        = not b
-isDefault (BAccount a)     = a == unspecifiedChain 0x0 
+isDefault (BInteger i) = i == 0
+isDefault (BString bs) = B.null bs
+isDefault (BBool b) = not b
+isDefault (BAccount a) = a == unspecifiedChain 0x0
 isDefault (BEnumVal _ _ w) = w == 0
-isDefault (BContract _ a)  = a == unspecifiedChain 0x0
+isDefault (BContract _ a) = a == unspecifiedChain 0x0
 isDefault BMappingSentinel = False
-isDefault BDefault         = True
+isDefault BDefault = True
 
 instance Format BasicValue where
   format (BInteger i) = show i
-  format (BString s) = ('"':) . (++"\"") $ UTF8.toString s
+  format (BString s) = ('"' :) . (++ "\"") $ UTF8.toString s
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
@@ -65,16 +67,18 @@ instance Format BasicValue where
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
 
-data IndexType = INum Integer
-               | IText B.ByteString
-               | IBool Bool
-               | IAccount NamedAccount
-               deriving (Eq, Show, Ord, Generic, Hashable, NFData)
+data IndexType
+  = INum Integer
+  | IText B.ByteString
+  | IBool Bool
+  | IAccount NamedAccount
+  deriving (Eq, Show, Ord, Generic, Hashable, NFData)
 
-data StoragePathPiece = Field B.ByteString
-                      | MapIndex IndexType
-                      | ArrayIndex Int
-                      deriving (Eq, Show, Generic, NFData, Hashable)
+data StoragePathPiece
+  = Field B.ByteString
+  | MapIndex IndexType
+  | ArrayIndex Int
+  deriving (Eq, Show, Generic, NFData, Hashable)
 
 instance Format StoragePathPiece where
   format (Field n) = C8.unpack n
@@ -85,13 +89,12 @@ newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Show, Generic
 
 instance Format StoragePath where
   format (StoragePath []) = "<empty path>"
-  format (StoragePath (first:rest)) =
+  format (StoragePath (first : rest)) =
     format first ++ unwords (map (addConditionalDot . format) rest)
     where
       addConditionalDot :: String -> String
-      addConditionalDot w@(c1:_) | isAlpha c1 = "." ++ w
+      addConditionalDot w@(c1 : _) | isAlpha c1 = "." ++ w
       addConditionalDot w = w
-
 
 empty :: StoragePath
 empty = StoragePath []
@@ -100,11 +103,14 @@ singleton :: B.ByteString -> StoragePath
 singleton bs = StoragePath [Field bs]
 
 getField :: StoragePath -> B.ByteString
-getField (StoragePath (Field f:_)) = f
+getField (StoragePath (Field f : _)) = f
 getField path = error "StoragePath must begin with field" path
 
 snoc :: StoragePath -> StoragePathPiece -> StoragePath
 snoc (StoragePath p) piece = StoragePath $ p ++ [piece]
+
+snocList :: StoragePath -> [StoragePathPiece] -> StoragePath
+snocList (StoragePath p) pieces = StoragePath $ p ++ pieces
 
 toList :: StoragePath -> [StoragePathPiece]
 toList (StoragePath p) = p
@@ -152,7 +158,7 @@ parseArrayIndex = do
   skip (== c2w8 '[')
   idx <- parseInt
   skip (== c2w8 ']')
-  (ArrayIndex idx:) <$> pathParser
+  (ArrayIndex idx :) <$> pathParser
 
 parseMapIndex :: Parser [StoragePathPiece]
 parseMapIndex = do
@@ -168,30 +174,32 @@ parseMapIndex = do
       mChain <- case w82c <$> mColon of
         Just ':' -> do
           _ <- string ":"
-          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . LabeledError.b16Decode "parseMapIndex"  <$> Atto.take 64) <?> "parseMapIndex"
+          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . LabeledError.b16Decode "parseMapIndex" <$> Atto.take 64) <?> "parseMapIndex"
         _ -> pure UnspecifiedChain
       IAccount <$> either fail (return . flip NamedAccount mChain) eAddress
     '"' -> do
-       skip (== c2w8 '"')
-       let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
-           ignoreEscapedQuotes False 0x5c = Just True -- Begin of escape sequence
-           ignoreEscapedQuotes _ _ = Just False
-       strContents <- scan False ignoreEscapedQuotes
-       skip (== c2w8 '"')
-       return . IText . unescapeKey $ strContents
+      skip (== c2w8 '"')
+      let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
+          ignoreEscapedQuotes False 0x5c = Just True -- Begin of escape sequence
+          ignoreEscapedQuotes _ _ = Just False
+      strContents <- scan False ignoreEscapedQuotes
+      skip (== c2w8 '"')
+      return . IText . unescapeKey $ strContents
     _ -> INum <$> parseInteger
   skip (== c2w8 '>')
-  (MapIndex idx:) <$> pathParser
+  (MapIndex idx :) <$> pathParser
 
 parseField :: Parser [StoragePathPiece]
 parseField = do
   skip (== c2w8 '.')
-  (do n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
-      (Field n:) <$> pathParser)
+  ( do
+      n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
+      (Field n :) <$> pathParser
+    )
     <|> ((string ":creator") *> pathParser)
     <|> ((string ":creatorAddress") *> pathParser)
 
-parsePath :: B.ByteString-> Either String StoragePath
+parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
 
 escapeKey :: B.ByteString -> B.ByteString
@@ -202,18 +210,18 @@ escapeKey srcBS = unsafePerformIO $ do
       let src = castPtr src'
           copyAndEscape :: Int -> Int -> IO Int
           copyAndEscape !dstOff !srcOff =
-           if srcOff >= len
-             then return dstOff
-             else do
-               ch <- peekByteOff src srcOff :: IO Word8
-               if ch /= 0x22 && ch /= 0x5c
-                 then do
-                   pokeByteOff dst dstOff ch
-                   copyAndEscape (dstOff+1) (srcOff+1)
-                 else do
-                   pokeByteOff dst dstOff (0x5c :: Word8)
-                   pokeByteOff dst (dstOff+1) ch
-                   copyAndEscape (dstOff+2) (srcOff+1)
+            if srcOff >= len
+              then return dstOff
+              else do
+                ch <- peekByteOff src srcOff :: IO Word8
+                if ch /= 0x22 && ch /= 0x5c
+                  then do
+                    pokeByteOff dst dstOff ch
+                    copyAndEscape (dstOff + 1) (srcOff + 1)
+                  else do
+                    pokeByteOff dst dstOff (0x5c :: Word8)
+                    pokeByteOff dst (dstOff + 1) ch
+                    copyAndEscape (dstOff + 2) (srcOff + 1)
       copyAndEscape 0 0
 
 unescapeKey :: B.ByteString -> B.ByteString
@@ -229,29 +237,32 @@ unescapeKey srcBS = unsafePerformIO $ do
                 ch <- peekByteOff src srcOff :: IO Word8
                 if ch == 0x5c
                   then do
-                    ch' <- peekByteOff src (srcOff+1) :: IO Word8
+                    ch' <- peekByteOff src (srcOff + 1) :: IO Word8
                     pokeByteOff dst dstOff ch'
-                    copyAndUnescape (dstOff+1) (srcOff+2)
+                    copyAndUnescape (dstOff + 1) (srcOff + 2)
                   else do
                     pokeByteOff dst dstOff ch
-                    copyAndUnescape (dstOff +1) (srcOff+1)
-              else if len - srcOff == 1 then do
-                ch <- peekByteOff src srcOff :: IO Word8
-                pokeByteOff dst dstOff ch
-                copyAndUnescape (dstOff+1) (srcOff+1)
-              else return dstOff
+                    copyAndUnescape (dstOff + 1) (srcOff + 1)
+              else
+                if len - srcOff == 1
+                  then do
+                    ch <- peekByteOff src srcOff :: IO Word8
+                    pokeByteOff dst dstOff ch
+                    copyAndUnescape (dstOff + 1) (srcOff + 1)
+                  else return dstOff
       copyAndUnescape 0 0
 
 unparsePath :: StoragePath -> B.ByteString
 unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
-  where go :: StoragePathPiece -> [B.ByteString]
-        go (Field p) = [".", p]
-        go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
-        go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
-        go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
-        go (MapIndex (IBool True)) = ["<true>"]
-        go (MapIndex (IBool False)) = ["<false>"]
-        go (MapIndex (IAccount a)) = ["<a:", C8.pack $ show a, ">"]
+  where
+    go :: StoragePathPiece -> [B.ByteString]
+    go (Field p) = [".", p]
+    go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
+    go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
+    go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
+    go (MapIndex (IBool True)) = ["<true>"]
+    go (MapIndex (IBool False)) = ["<false>"]
+    go (MapIndex (IAccount a)) = ["<a:", C8.pack $ show a, ">"]
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case
@@ -263,7 +274,7 @@ instance RLPSerializable BasicValue where
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
     BMappingSentinel -> RLPArray [RLPScalar 6]
-  rlpDecode x@(RLPArray ((RLPScalar t):s)) =
+  rlpDecode x@(RLPArray ((RLPScalar t) : s)) =
     case (t, s) of
       (0, [f]) -> BInteger $ rlpDecode f
       (1, [f]) -> BString $ rlpDecode f
@@ -286,9 +297,14 @@ hexStorageToPath :: HexStorage -> Either String StoragePath
 hexStorageToPath (HexStorage hs) = parsePath hs
 
 hexStorageToBasic :: HexStorage -> Either String BasicValue
-hexStorageToBasic (HexStorage hs) = unsafeDupablePerformIO . handle handler
-                                  . evaluate . force
-                                  . Right . rlpDecode . rlpDeserialize $ hs
-
-  where handler :: SomeException -> IO (Either String BasicValue)
-        handler = return . Left . show
+hexStorageToBasic (HexStorage hs) =
+  unsafeDupablePerformIO . handle handler
+    . evaluate
+    . force
+    . Right
+    . rlpDecode
+    . rlpDeserialize
+    $ hs
+  where
+    handler :: SomeException -> IO (Either String BasicValue)
+    handler = return . Left . show

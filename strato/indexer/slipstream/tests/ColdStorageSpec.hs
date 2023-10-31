@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
-module ColdStorageSpec where
 
-import ClassyPrelude
-import Control.Monad.Trans.Resource
-import Database.Persist.Sqlite
-import qualified Prelude as P()
-import Test.Hspec (Spec, describe, it)
-import Test.Hspec.Expectations.Lifted
+module ColdStorageSpec where
 
 import BlockApps.Logging
 import BlockApps.Solidity.Value
 import Blockchain.Strato.Model.Account
+import ClassyPrelude
+import Control.Monad.Trans.Resource
+import Database.Persist.Sqlite
 import Slipstream.GlobalsColdStorage
+import Test.Hspec (Spec, describe, it)
+import Test.Hspec.Expectations.Lifted
+import qualified Prelude as P ()
 
 runTest :: ReaderT SqlBackend (NoLoggingT (ResourceT IO)) () -> IO ()
 runTest = runSqlite ":memory:"
@@ -27,8 +27,10 @@ spec = do
 
     it "can read writes" . runTest $ do
       let acct = Account 0xdeadbeef (Just 87)
-          vals = [ ("owner", ValueContract $ unspecifiedChain 0x888)
-                 , ("distance", SimpleValue $ valueUInt 23)]
+          vals =
+            [ ("owner", ValueContract $ unspecifiedChain 0x888),
+              ("distance", SimpleValue $ valueUInt 23)
+            ]
 
       h <- initStorage
       asyncWriteToStorage h acct vals
@@ -48,13 +50,13 @@ spec = do
       let acct = Account 0x4 Nothing
           vals n = [("Age", SimpleValue $ valueUInt n)]
       h <- initStorage
-      forM_ [1..97] $ asyncWriteToStorage h acct . vals
+      forM_ [1 .. 97] $ asyncWriteToStorage h acct . vals
       syncStorage h
       readStorage h acct `shouldReturn` Right [("Age", SimpleValue $ valueUInt 97)]
 
     it "can handle large contracts" . runTest $ do
       let acct = Account 99 Nothing
-          vals = [("field_" <> tshow n, SimpleValue $ valueUInt n) | n <- [0..400000]]
+          vals = [("field_" <> tshow n, SimpleValue $ valueUInt n) | n <- [0 .. 400000]]
       h <- initStorage
       asyncWriteToStorage h acct vals
       syncStorage h

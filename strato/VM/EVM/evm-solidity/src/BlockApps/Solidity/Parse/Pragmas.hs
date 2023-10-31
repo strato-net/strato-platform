@@ -1,15 +1,15 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 -- |
 -- Module: Pragmas
 -- Description: Parsers for Solidity pragmas
 -- Maintainer: Dustin Norwood <dustin@blockapps.net>
-{-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module BlockApps.Solidity.Parse.Pragmas (solidityPragma) where
 
-import           Text.Parsec
-
-import           BlockApps.Solidity.Parse.Lexer
-import           BlockApps.Solidity.Parse.ParserTypes
+import BlockApps.Solidity.Parse.Lexer
+import BlockApps.Solidity.Parse.ParserTypes
+import Text.Parsec
 
 solidityPragma :: SolidityParser SourceUnit
 solidityPragma = do

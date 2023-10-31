@@ -1,12 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
+
 module Blockchain.EVM.MutableStack where
 
 import Control.DeepSeq
 import Control.Monad
-import qualified Data.Vector as V
-import qualified Data.Vector.Mutable as V
-import qualified Data.Vector.Mutable as MV
 import Data.IORef.Unboxed
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
+import qualified Data.Vector.Mutable as V
 
 {-# INLINE stackMax #-}
 stackMax :: Int
@@ -18,8 +19,8 @@ stackMax = 1024
 --   race_ (push s 17) (push s 20)
 -- is undefined behavior.
 data MutableStack a = MutableStack
-  { stackPointer :: Counter -- Points to the lowest element on the stack
-  , payload :: V.IOVector a
+  { stackPointer :: Counter, -- Points to the lowest element on the stack
+    payload :: V.IOVector a
   }
 
 instance (Show a) => Show (MutableStack a) where

@@ -1,3 +1,4 @@
+{- ORMOLU_DISABLE -}
 {-# OPTIONS -fno-warn-unused-imports              #-}
 {-# LANGUAGE OverloadedStrings                    #-}
 {-# LANGUAGE RecordWildCards                      #-}
@@ -95,7 +96,7 @@ stripTransactionsAndUncles b = b { ibReceiptTransactions = [], ibBlockUncles = [
 dedupWindow :: Int
 dedupWindow = 100
 
--- NOTE: this is (and must be) the same as "testPriv" from Monad.hs....used by the 
+-- NOTE: this is (and must be) the same as "testPriv" from Monad.hs....used by the
 -- HasVault instance so we can make Blockstanbul message signatures without a vault client
 myPriv :: PrivateKey
 myPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "myPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
@@ -246,7 +247,7 @@ spec = do
     describe "SequencerM" $ do
       -- This test sets off three timers, which will fire every millisecond
       -- Each timer begins by writing the number passed to it to an IORef,
-      -- which stores the current round number. When each timer fires, 
+      -- which stores the current round number. When each timer fires,
       -- it checks the current round number in the IORef. If the current
       -- round number is less than or equal to the value passed to the timer,
       -- the timer will reset itself to fire after another millisecond.
@@ -355,7 +356,7 @@ spec = do
         let ieBlk = IEBlock . blockToIngestBlock TO.Morphism
             mkBlkChn :: Int -> Keccak256 -> Integer -> SequencerM [Block]
             mkBlkChn 0 _ _ = return []
-            mkBlkChn n p i = do 
+            mkBlkChn n p i = do
               b <- mkBlk p i
               rst <- mkBlkChn (n - 1) (blockHash b) (i + 1)
               return $ b : rst

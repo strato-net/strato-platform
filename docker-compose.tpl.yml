@@ -63,7 +63,7 @@ services:
     - nginx
     environment:
     - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
-    - MP_DAPP_ADDRESS=${MP_DAPP_ADDRESS:-c93f9a422a4508a6501a63537291128122f7bcf2}
+    - MP_DAPP_ADDRESS=${MP_DAPP_ADDRESS:-038b2c5c70dc23ff707bdd92648666863a388a0d}
     - MP_API_DEBUG=${MP_API_DEBUG:-false}
     - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
     - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
@@ -91,6 +91,7 @@ services:
     - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
     - ORG_NAME='BlockApps' # TODO: can be removed?
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
     restart: unless-stopped
@@ -106,6 +107,8 @@ services:
       - marketplace-backend
     environment:
       - NODE_ENV=${NODE_ENV:-production}
+      - ASSET_TABLE_NAME=${ASSET_TABLE_NAME}
+      - SALE_TABLE_NAME=${SALE_TABLE_NAME}
     build: .
     image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
@@ -167,7 +170,7 @@ services:
     - mineBlocks=${mineBlocks:-true}
     - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
-    - network=${network:-mercata-hydrogen}
+    - network=${network}
     - networkID=${networkID}
     - numMinPeers=${numMinPeers}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
@@ -201,6 +204,10 @@ services:
     - svmDev=${svmDev}
     - txSizeLimit=${txSizeLimit}
     - useSyncMode=${useSyncMode}
+    - userRegistryAddress=${userRegistryAddress}
+    - userRegistryCodeHash=${userRegistryCodeHash}
+    - useBuiltinUserRegistry=${useBuiltinUserRegistry}
+    - useWalletsByDefault=${useWalletsByDefault}
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}

@@ -42,6 +42,7 @@
   "private": true,
   "dependencies": {
     "@hapi/joi": "^17.1.1",
+    "@sendgrid/mail": "^7.7.0",
     "aws-sdk": "^2.1284.0",
     "babel-plugin-module-resolver": "^4.1.0",
     "blockapps-rest": "8.1.0",
@@ -61,14 +62,15 @@
     "is-subset": "^0.1.1",
     "jpeg-js": "^0.4.4",
     "jwt-decode": "^3.1.2",
-    "mocha": "^10.2.0",
+    "kafkajs": "^2.2.4",
     "moment": "^2.29.4",
     "multer": "^1.4.5-lts.1",
     "ramda": "^0.28.0",
     "stripe": "^11.10.0",
     "swagger-jsdoc": "^6.2.7",
     "swagger-ui-express": "^4.6.0",
-    "winston": "^3.8.2"
+    "winston": "^3.8.2",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "@babel/cli": "^7.20.7",
@@ -76,6 +78,7 @@
     "@babel/node": "^7.20.7",
     "@babel/polyfill": "^7.12.1",
     "@babel/preset-env": "^7.20.2",
-    "@babel/register": "^7.18.9"
+    "@babel/register": "^7.18.9",
+    "mocha": "^10.2.0"
   }
 }

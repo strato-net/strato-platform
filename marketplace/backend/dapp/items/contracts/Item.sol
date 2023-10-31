@@ -45,17 +45,18 @@ contract Item_3 is ItemStatus {
         string[] _rawMaterialSerialNumber,
         string[] _rawMaterialProductId,
         uint _itemNumber,
-        uint _createdDate
+        uint _createdDate,
+        address _owner
     ) public {
-        owner = tx.origin;
+        owner = _owner;
 
         productId = _productId;
         inventoryId = _inventoryId;
         serialNumber = _serialNumber;
         status = _status;
         comment = _comment;
-        itemNumber = _itemNumber;
         createdDate = _createdDate;
+        itemNumber = _itemNumber;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -77,7 +78,7 @@ contract Item_3 is ItemStatus {
         string _comment,
         uint _scheme
     ) returns (uint) {
-        if(ownerOrganization != getUserOrganization(tx.origin)){
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
 
@@ -97,9 +98,9 @@ contract Item_3 is ItemStatus {
 
     // Get the userOrganization
     function getUserOrganization(address caller) public returns (string) {
-      mapping(string => string) ownerCert = getUserCert(caller);
-      string userOrganization = ownerCert["organization"];
-      return userOrganization;
+        mapping(string => string) ownerCert = getUserCert(caller);
+        string userOrganization = ownerCert["organization"];
+        return userOrganization;
     }
 
     function generateOwnershipHistory(
@@ -108,7 +109,7 @@ contract Item_3 is ItemStatus {
         uint _ownershipStartDate,
         address _itemAddress
     ) returns (uint) {
-        if(ownerOrganization != getUserOrganization(tx.origin)){
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
         emit OwnershipUpdate(
@@ -127,7 +128,7 @@ contract Item_3 is ItemStatus {
         address _inventoryId
     ) public returns (uint256) {
         // caller must be current owner to transfer ownership
-        if (tx.origin != owner) {
+        if (ownerOrganization != getUserOrganization(tx.origin)) {
             return RestStatus.FORBIDDEN;
         }
 
@@ -139,12 +140,6 @@ contract Item_3 is ItemStatus {
 
         // add new owner org (and maybe unit)
         if (newOwnerOrganization == "") return RestStatus.NOT_FOUND;
-        else if (newOwnerOrganizationalUnit == "") addOrg(newOwnerOrganization);
-        else addOrgUnit(newOwnerOrganization, newOwnerOrganizationalUnit);
-
-        // remove old owner org (and maybe unit)
-        if (ownerOrganizationalUnit == "") removeOrg(ownerOrganization);
-        else removeOrgUnit(ownerOrganization, ownerOrganizationalUnit);
 
         generateOwnershipHistory(
             ownerOrganization,

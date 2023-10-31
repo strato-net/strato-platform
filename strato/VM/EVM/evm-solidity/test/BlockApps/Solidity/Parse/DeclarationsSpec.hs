@@ -3,16 +3,18 @@
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
 -- import qualified Data.Text as Text
-import           Test.Hspec
-import           Text.Parsec                          hiding (parse)
+
+import BlockApps.Solidity.Parse.Declarations
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Parse.ParserTypes
 import BlockApps.Solidity.Xabi
-import BlockApps.Solidity.Parse.Declarations
 -- import BlockApps.Solidity.Parse.UnParser
 import BlockApps.Solidity.Xabi.Type
+import Test.Hspec
+import Text.Parsec hiding (parse)
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
+
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 spec :: Spec
@@ -23,7 +25,7 @@ spec = do
       printLeft eRes
       -- Right (_, visibility,  _, _)
       let visibility = case eRes of
-            Right (_, visibility',  _, _) -> visibility'
+            Right (_, visibility', _, _) -> visibility'
             Left _ -> error "should not be left"
       visibility `shouldBe` Private
   --   it "should parse function as public" $ do
@@ -211,16 +213,17 @@ spec = do
           eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "a" (xempty, []))
     it "should parse an empty library" $ do
-      parseContract "library l {}" `shouldBe`
-          Right (NamedXabi "l" (xempty{xabiKind=LibraryKind}, []))
+      parseContract "library l {}"
+        `shouldBe` Right (NamedXabi "l" (xempty {xabiKind = LibraryKind}, []))
     it "should try 2" $ do
-      parseContract "library Library {}" `shouldBe`
-          Right (NamedXabi "Library" (xempty{xabiKind=LibraryKind}, []))
+      parseContract "library Library {}"
+        `shouldBe` Right (NamedXabi "Library" (xempty {xabiKind = LibraryKind}, []))
     it "should parse an empty interface" $ do
-      parseContract "interface I {}" `shouldBe`
-          Right (NamedXabi "I" (xempty{xabiKind=InterfaceKind}, []))
+      parseContract "interface I {}"
+        `shouldBe` Right (NamedXabi "I" (xempty {xabiKind = InterfaceKind}, []))
     it "should parse a basic contract" $ do
-      let contractString = "\
+      let contractString =
+            "\
             \contract q {\
             \    function r() {}\
             \}"
@@ -231,39 +234,45 @@ spec = do
           eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "b" (xempty, []))
     it "should parse nested a nested comments contract" $ do
-      let contractString = "contract c { \
-                           \  /* this is how \
-                           \  function hidden () { \
-                           \  // bam! double comment \
-                           \ */ }"
+      let contractString =
+            "contract c { \
+            \  /* this is how \
+            \  function hidden () { \
+            \  // bam! double comment \
+            \ */ }"
           eRes = parseContract contractString
       eRes `shouldBe` Right (NamedXabi "c" (xempty, []))
     it "should parse unbalanced braces inside a string" $ do
-      let contractString = "contract d { \
-                           \  function x() constant returns (string) { \
-                           \    return \"{\"; \
-                           \  } \
-                           \}"
+      let contractString =
+            "contract d { \
+            \  function x() constant returns (string) { \
+            \    return \"{\"; \
+            \  } \
+            \}"
           eRes = runParser solidityContract "" "" contractString
       nameOf <$> eRes `shouldBe` Right "d"
 
     it "should parse unbalanced parens inside a string" $ do
-      let contractString = "contract e { \
-                           \  function x() constant returns (string) { \
-                           \    return \"(\"; \
-                           \  } \
-                           \}"
+      let contractString =
+            "contract e { \
+            \  function x() constant returns (string) { \
+            \    return \"(\"; \
+            \  } \
+            \}"
           eRes = parseContract contractString
       nameOf <$> eRes `shouldBe` Right "e"
 
     it "should parse unbalanced strings inside a comment" $ do
-      let contractString = unlines ["contract f { ",
-                                    "  function x() { ",
-                                    "    return // \"  ",
-                                    "  } ",
-                                    "}"]
+      let contractString =
+            unlines
+              [ "contract f { ",
+                "  function x() { ",
+                "    return // \"  ",
+                "  } ",
+                "}"
+              ]
           eRes = parseContract contractString
-      nameOf<$> eRes `shouldBe` Right "f"
+      nameOf <$> eRes `shouldBe` Right "f"
 
   let isLeft (Right _) = False
       isLeft (Left _) = True
@@ -325,11 +334,17 @@ spec = do
       let eventString = "event MemberAdded (address indexed member, uint indexed count, string name);"
           eRes = runParser eventDeclaration "" "" eventString
       (fst <$> eRes) `shouldBe` Right "MemberAdded"
-      (snd <$> eRes) `shouldBe` Right (EventDeclaration (Event False
-                                                               [("member", (IndexedType 0 Address))
-                                                               ,("count", (IndexedType 1 (Int (Just False) Nothing)))
-                                                               ,("name", (IndexedType 2 (String (Just True))))
-                                                               ]))
+      (snd <$> eRes)
+        `shouldBe` Right
+          ( EventDeclaration
+              ( Event
+                  False
+                  [ ("member", (IndexedType 0 Address)),
+                    ("count", (IndexedType 1 (Int (Just False) Nothing))),
+                    ("name", (IndexedType 2 (String (Just True))))
+                  ]
+              )
+          )
 
   describe "Declarations - variableDeclaration" $ do
     let parseVarName = fmap fst . runParser variableDeclaration "" ""
@@ -366,7 +381,6 @@ spec = do
       parseUsing "using name for type" `shouldSatisfy` isLeft
     it "should not try to detect what is valid" $
       parseUsing "using name 105927)&(^!#$;" `shouldBe` Right ("name", UsingDeclaration (Using "105927)&(^!#$"))
-
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg

@@ -12,7 +12,7 @@ import {
   Upload,
   notification
 } from "antd";
-import { Link } from "react-router-dom" ;
+import { Link } from "react-router-dom";
 import TextArea from "antd/es/input/TextArea";
 import getSchema from "./InventorySchema";
 import { actions } from "../../contexts/inventory/actions";
@@ -67,12 +67,13 @@ const CreateInventoryModal = ({
     },
     quantity: null,
     pricePerUnit: "",
-    batchId: "",
+    batchId: " ",
     serialNumber: {
       serialNumStr: "",
       serialNumArr: [],
     },
     status: true,
+    inventoryType: ""
   };
 
   const formik = useFormik({
@@ -80,7 +81,7 @@ const CreateInventoryModal = ({
     validationSchema: schema,
     onSubmit: function (values) {
       if (
-        (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) || 
+        (values.serialNumber.serialNumArr.length === parseInt(values.quantity)) ||
         // Serial numbers are optional, we can submit the form if there are none. 
         (values.serialNumber.serialNumArr.length === 0)
       ) {
@@ -95,7 +96,7 @@ const CreateInventoryModal = ({
   });
 
   useEffect(() => {
-    if(formik.values.subCategory && formik.values.category.name){
+    if (formik.values.subCategory && formik.values.category.name) {
       productActions.fetchCategoryBasedProduct(
         productDispatch,
         formik.values.category.name,
@@ -116,6 +117,7 @@ const CreateInventoryModal = ({
       batchId: values.batchId,
       status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
       serialNumber: values.serialNumber.serialNumArr,
+      inventoryType: values.inventoryType
     };
 
     TagManager.dataLayer({
@@ -174,17 +176,17 @@ const CreateInventoryModal = ({
         let rawMaterialSerials = [];
         let isAlreadyPresent = serialNumArr.find(elem => elem.itemSerialNumber === row["ItemSerialNumber"]);
         if (row["ItemSerialNumber"]) {
-          if(row["RawMaterialProductName"]){
-            if(!row['RawMaterialProductId']) {
+          if (row["RawMaterialProductName"]) {
+            if (!row['RawMaterialProductId']) {
               setUploadErr("Missing value - 'RawMaterialProductId'");
               return;
             }
-          
+
             for (let j = 1; j <= MAX_RAW_MATERIAL; j++) {
               if (row[`RawMaterialSerialNumber${j}`]) {
                 rawMaterialSerials.push(row[`RawMaterialSerialNumber${j}`])
-              }else{
-                if(j === 1){
+              } else {
+                if (j === 1) {
                   setUploadErr("Missing value - 'RawMaterialSerialNumber1'");
                   return;
                 }
@@ -193,13 +195,13 @@ const CreateInventoryModal = ({
           }
 
           let itemRecord;
-        
+
           if (isAlreadyPresent) {
-          
+
 
             itemRecord = {
               itemSerialNumber: row["ItemSerialNumber"],
-              rawMaterials: row["RawMaterialProductName"] === undefined || row["RawMaterialProductName"] === ""? [] : [{
+              rawMaterials: row["RawMaterialProductName"] === undefined || row["RawMaterialProductName"] === "" ? [] : [{
                 rawMaterialProductName: encodeURIComponent(row['RawMaterialProductName']),
                 rawMaterialProductId: row["RawMaterialProductId"],
                 rawMaterialSerialNumbers: [...rawMaterialSerials]
@@ -221,7 +223,7 @@ const CreateInventoryModal = ({
           }
         }
       }
-     
+
       serialNumbers = serialNumbers.substring(0, serialNumbers.length - 1);
       formik.setFieldValue("serialNumber.serialNumStr", serialNumbers);
       formik.setFieldValue("serialNumber.serialNumArr", serialNumArr);
@@ -288,11 +290,11 @@ const CreateInventoryModal = ({
                     onChange={(value) => {
                       formik.setFieldValue("category.name", value);
                       formik.setFieldTouched("category.name", false, false);
-                      
-                      if(formik.values.subCategory.name){
+
+                      if (formik.values.subCategory.name) {
                         formik.setFieldValue("subCategory.name", null);
                       }
-                      if(formik.values.productName.name){
+                      if (formik.values.productName.name) {
                         formik.setFieldValue("productName.name", null);
                       }
                     }}
@@ -366,25 +368,25 @@ const CreateInventoryModal = ({
                     onChange={(value) => {
                       let selectedProduct = { address: "" };
                       if (value) {
-                        selectedProduct = categoryBasedProducts.find(
-                          (e) => e.name === value
+                        selectedProduct = categoryBasedProducts.productsWithImageUrl.find(
+                          (e) => e.address === value
+                          );
+                        }
+                        var pname = (selectedProduct?.name !== null && selectedProduct?.name !== undefined) ? decodeURIComponent(selectedProduct.name) : null
+                        formik.setFieldValue("productName.name", pname);
+                        formik.setFieldValue(
+                          "productName.address",
+                          selectedProduct.address
                         );
-                      }
-                      formik.setFieldValue("productName.name", value);
-                      formik.setFieldValue(
-                        "productName.address",
-                        selectedProduct.address
-                      );
-                      formik.setFieldTouched("productName.name", false, false);
-                    }}
-                  >
-                    {categoryBasedProducts.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {decodeURIComponent(e.name)}
-                      </Option>
-                    ))}
-                  </Select>
-
+                        formik.setFieldTouched("productName.name", false, false);
+                      }}
+                    >
+                      {categoryBasedProducts.productsWithImageUrl && categoryBasedProducts.productsWithImageUrl.map((e, index) => (
+                        <Option value={e.address} key={index}>
+                          {decodeURIComponent(e.name)}
+                        </Option>
+                      ))}
+                    </Select>
                   {getIn(formik.touched, "productName.name") &&
                     getIn(formik.errors, "productName.name") && (
                       <span className="text-error text-xs">
@@ -433,7 +435,7 @@ const CreateInventoryModal = ({
                     label="batchId"
                     placeholder="Enter Batch ID"
                     name="batchId"
-                    disabled={false}
+                    disabled={true}
                     value={formik.values.batchId}
                     onChange={formik.handleChange}
                   />
@@ -447,13 +449,13 @@ const CreateInventoryModal = ({
               <div className="mt-4 flex justify-between items-center">
                 <div>Serial Numbers</div>
                 <div className="flex items-center">
-                <Link to="/sample.csv" target="_blank" download>
-                  <div className="flex items-center" >
-                    <DownloadOutlined className="text-primary text-sm font-medium cursor-pointer hover:text-primaryHover" />
-                    <div className="text-primary ml-2 text-xs font-medium cursor-pointer hover:text-primaryHover">
-                      Download Sample CSV
+                  <Link to="/sample.csv" target="_blank" download>
+                    <div className="flex items-center" >
+                      <DownloadOutlined className="text-primary text-sm font-medium cursor-pointer hover:text-primaryHover" />
+                      <div className="text-primary ml-2 text-xs font-medium cursor-pointer hover:text-primaryHover">
+                        Download Sample CSV
+                      </div>
                     </div>
-                  </div>
                   </Link>
                   <Upload
                     onChange={uploadCSV}
@@ -474,9 +476,9 @@ const CreateInventoryModal = ({
                 <TextArea
                   label="serialNumbers"
                   className="mt-2"
-                  disabled={true}
+                  disabled={formik.values.inventoryType === "Batch" ? true : false}
                   rows={4}
-                  value={formik.values.serialNumber.serialNumStr}
+                  value={formik.values.inventoryType === "Batch" ? "" : formik.values.serialNumber.serialNumStr}
                   placeholder="Upload serial numbers using upload CSV option"
                 />
                 {getIn(formik.touched, "serialNumber.serialNumStr") &&
@@ -493,22 +495,40 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
 
-              <Form.Item label="Status" name="status" className="mt-4">
-                <Radio.Group
-                  value={formik.values.status}
-                  onChange={formik.handleChange}
-                  name="status"
-                >
-                  <Radio value={true}>Publish</Radio>
-                  <Radio value={false}>Unpublish</Radio>
-                </Radio.Group>
+              <div className="flex justify-between">
+                <Form.Item label="Status" name="status" className="mt-4">
+                  <Radio.Group
+                    value={formik.values.status}
+                    onChange={formik.handleChange}
+                    name="status"
+                  >
+                    <Radio value={true}>Publish</Radio>
+                    <Radio value={false}>Unpublish</Radio>
+                  </Radio.Group>
 
-                {formik.touched.status && formik.errors.status && (
-                  <span className="text-error text-xs">
-                    {formik.errors.status}
-                  </span>
-                )}
-              </Form.Item>
+                  {formik.touched.status && formik.errors.status && (
+                    <span className="text-error text-xs">
+                      {formik.errors.status}
+                    </span>
+                  )}
+                </Form.Item>
+                <Form.Item label="Type" name="inventoryType" className="mt-4">
+                  <Radio.Group
+                    value={formik.values.inventoryType}
+                    onChange={formik.handleChange}
+                    name="inventoryType"
+                  >
+                    <Radio value={"Individual"}>Individual</Radio>
+                    <Radio value={"Batch"}>Batch</Radio>
+                  </Radio.Group>
+
+                  {formik.touched.inventoryType && formik.errors.inventoryType && (
+                    <span className="text-error text-xs">
+                      {formik.errors.inventoryType}
+                    </span>
+                  )}
+                </Form.Item>
+              </div>
             </div>
           </Form>
         )}

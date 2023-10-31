@@ -1,19 +1,20 @@
+module Blockchain.EventException
+  ( EventException (..),
+  )
+where
 
-module Blockchain.EventException (
-  EventException(..)
-  ) where
+import Blockchain.Data.Wire
+import Control.Exception.Lifted
 
-import           Control.Exception.Lifted
-
-import           Blockchain.Data.Wire
-
-data EventException =
-    PeerDisconnected
+data EventException
+  = PeerDisconnected
+  | PeerNonResponsive
   | EventBeforeHandshake Message
   | WrongGenesisBlock
   | NetworkIDMismatch
   | RootCertificateMismatch
   | NoPeerPubKey
-  | NoPeerCertificate deriving (Show)
+  | NoPeerCertificate
+  deriving (Show)
 
-instance Exception EventException where
+instance Exception EventException

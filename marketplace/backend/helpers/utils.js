@@ -147,7 +147,7 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
   const queryOptionsArray = Array.isArray(_queryOptionsArray) ? _queryOptionsArray : [_queryOptionsArray]
   const queryOptions = queryOptionsArray.reduce((agg, cur) => {
     const { key, value, predicate = 'eq' } = cur
-    if (key === 'order') {
+    if (key === 'order'){
       return {
         ...agg,
         order: value,
@@ -179,6 +179,120 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
     } else {
       option = {
         [key]: `${predicate}.${value}`,
+      }
+    }
+    return {
+      ...agg,
+      ...option,
+    }
+  }, {})
+
+  const searchArgs = {
+    ...args,
+    queryOptions: {
+      ...args.queryOptions,
+      ...queryOptions,
+    },
+  }
+  return searchArgs
+}
+
+export const setSearchQueryOptionsPrime = (args) => {
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', , 'notEqualsField', 'notEqualsValue']
+  const queryArgs = setSearchQueryOptionsLike(args, Object.keys(args).reduce((result, key) => {
+    if (!nonQueryOptions.includes(key)) {
+      if (Array.isArray(args[key])) {
+        result.push(({ key, value: `(${args[key].join(',')})`, predicate: 'in' }))
+      } else {
+        result.push(({ key, value: args[key] }))
+      }
+    }
+
+    if (key === 'queryValue') {
+      const { queryValue, queryFields } = args
+      if (queryFields) {
+        if (Array.isArray(queryFields)) {
+          result.push({ key: queryFields, value: `*${queryValue}*`, predicate: 'or', subPredicate: 'ilike' })
+        } else {
+          result.push({ key: queryFields, value: `*${queryValue}*`, predicate: 'ilike' })
+        }
+      }
+    }
+
+    if (key === 'sort') {
+      result.push(args[key])
+    }
+    
+    if (key == 'range') {
+      if (Array.isArray(args[key])) {
+        const queryArray = args[key].reduce((agg, cum) => {
+          const rangeFilter = cum.split(',')
+          const [name, min = 0, max = 0] = rangeFilter
+          agg.push({
+            name, min, max
+          })
+          return agg
+        }, [])
+        if (queryArray.length > 0) {
+          result.push({ key: queryArray, value: queryArray, predicate: 'and' })
+        }
+      }
+    }
+    
+    if (key === 'notEqualsValue') {
+      const { notEqualsField, notEqualsValue } = args
+      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+    }
+
+    return result
+  }, []))
+  return queryArgs
+}
+
+export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
+  const queryOptionsArray = Array.isArray(_queryOptionsArray) ? _queryOptionsArray : [_queryOptionsArray]
+  const queryOptions = queryOptionsArray.reduce((agg, cur) => {
+    let { key, value, predicate = 'like' } = cur
+    if (!value) {
+      return agg
+    }
+    if (key == 'and') {
+      return {
+        ...agg,
+        [key]: value
+      }
+    }
+    let option = {}
+    if (predicate === 'or') {
+      const { subPredicate = 'eq' } = cur
+      const valueArray = key.reduce((orAgg, orCur) => {
+        orAgg.push(`${orCur}.${subPredicate}.${value}`)
+        return orAgg
+      }, [])
+      option = {
+        [predicate]: `(${valueArray.join(',')})`,
+      }
+    } else if (predicate === 'and') {
+      const valueArray = key.reduce((andAgg, andCur) => {
+        const { name, min = 0, max = 0 } = andCur
+        andAgg.push(`${name}.gte.${min}`, `${name}.lte.${max}`)
+        return andAgg
+      }, [])
+      option = {
+        [predicate]: `(${valueArray.join(',')})`,
+      } 
+      
+    } else if (value === "true" || value === "false" || typeof value == 'boolean') {
+      option = {
+        [key]: `eq.${value}`,
+      }
+    } else {
+      let searchedValue = value
+      if (predicate === 'like') {
+        searchedValue = `*${value}*`
+      }
+      option = {
+        [key]: `${predicate}.${searchedValue}`,
       }
     }
     return {
@@ -279,4 +393,12 @@ export function getEnvVariable(name) {
   const value = process.env[name] || ''
   if (value == '') throw new Error("missing env var for " + name);
   return value
+}
+
+export const  pollingHelper = async ( func, argsToFunc, attemptNumber=0, attemptsAllowed=8, milliseconds=1000  )  => {
+ if (attemptsAllowed  < attemptNumber) return null;
+ let result = await func(...argsToFunc);
+ if (!(result === null || result === undefined)) return result;
+ await new Promise(resolve => setTimeout(resolve, milliseconds));
+ return pollingHelper(func, argsToFunc, attemptNumber+1, attemptsAllowed, milliseconds  );
 }
