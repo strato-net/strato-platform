@@ -34,7 +34,6 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Util
 import Control.DeepSeq
 import Control.Lens.Operators
-import Control.Monad ((<=<))
 import qualified Data.Aeson as Ae
 import qualified Data.Aeson.Encoding as Enc
 import qualified Data.Aeson.Key as DAK
@@ -49,7 +48,6 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Data
 import Data.Hashable (Hashable)
-import qualified Data.RLP as RLP2
 import Data.Swagger hiding (Format)
 import qualified Data.Text as T
 import Database.Persist.Sql
@@ -102,11 +100,6 @@ instance RLPSerializable Keccak256 where
       RLPString $
         B.replicate (32 - B.length val) 0
           `B.append` val
-
--- Someday we should remove the second RLP library...
-instance RLP2.RLPEncodable Keccak256 where
-  rlpEncode = RLP2.rlpEncode . keccak256ToByteString
-  rlpDecode = Right . Keccak256 <=< RLP2.rlpDecode
 
 instance Ae.ToJSON Keccak256 where
   toJSON = Ae.String . T.pack . keccak256ToHex

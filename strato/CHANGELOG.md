@@ -41,6 +41,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
+- optimized logic flow in p2p to prevent sync stalls
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
 - Bagger no longer crashes the VM upon encountering a transaction that exceeds the nonce or size limit
@@ -52,5 +53,6 @@ so that they could be properly moved to their respective version's subsection.
 ### Removed
 - `bloc22` database removed
 - NewStatus message type from strato-p2p
+- dependency on relapse library for rlp encoding
 
 ## [10.0.0] - TBD

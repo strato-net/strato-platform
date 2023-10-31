@@ -219,24 +219,28 @@ handleEvents peer = awaitForever $ \case
         else syncFetch Reverse (minimum $ blockHeaderBlockNumber <$> M.elems existingParents)
     
     alreadyRequestedHeaders <- lift getBlockHeaders -- check what already requested
-    if null alreadyRequestedHeaders
-      then do
+    alreadyRequestedRemainingHeaders <- lift getRemainingBHeaders
+    let headerHashes = map (blockHeaderHash &&& id) headers
+        hashes = map fst headerHashes
+    headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
+    let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
+        (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
+    case (alreadyRequestedHeaders, alreadyRequestedRemainingHeaders) of
+      ([], _) -> do
         -- proceed if we are not already requesting bodies
-        let headerHashes = map (blockHeaderHash &&& id) headers
-            hashes = map fst headerHashes
-        headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
-        let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
-            (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
         lift $ putBlockHeaders neededHeaders'
         lift $ putRemainingBHeaders remainingHeaders
         $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders')
         unless (null neededHeaders') $ do 
           yieldR . GetBlockBodies $ blockHeaderHash <$> neededHeaders'
         lift stampActionTimestamp
-      else
-        $logInfoS "handleEvents/BlockHeaders" $
+      (_, []) -> do
+        lift $ putRemainingBHeaders neededHeaders -- save it to handle later
+        $logInfoS "handleEvents/BlockHeaders" $ 
+          "Not requesting BlockBodies because cache is currently in use, but will request after next batch of BlockBodies arrives."
+      (_, _) -> $logInfoS "handleEvents/BlockHeaders" $
           T.unlines
-            [ "Tried to request more block headers but it seems the block headers cache is currenlty being used.",
+            [ "Tried to request more block bodies but it seems the block headers cache is currenlty being used.",
               "If this message shows up a lot but the node's best block # doesn't increase,",
               "there might be something wrong with the cache."
             ]
@@ -567,29 +571,18 @@ handleGetChainDetails peer cids' = do
 numberFromBestBlock :: BestBlock -> Integer
 numberFromBestBlock (BestBlock _ n _) = n
 
--- todo: we should take blockNumber as argument here instead of just looking for
--- bestBlock to prevent us from getting stuck
 syncFetch ::
   ( MonadIO m,
-    MonadLogger m,
     Modifiable ActionTimestamp m,
-    Accessible [BlockData] m,
     Accessible MaxReturnedHeaders m
   ) =>
   Direction ->
   Integer ->
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
-    blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
-    if null blockHeaders' then do
-        mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
-        yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
-        lift stampActionTimestamp
-      else $logInfoS "syncFetch" $ T.unlines [
-        "Tried to request more block headers but it seems the block headers cache is currently being used.",
-        "If this message shows up a lot but the node's best block # doesn't increase,",
-        "there might be something wrong with the cache."
-      ]
+  mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
+  yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
+  lift stampActionTimestamp
 
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of
