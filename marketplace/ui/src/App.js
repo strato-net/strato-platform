@@ -44,9 +44,9 @@ const App = () => {
     setIsIdleModalOpen(false);
   };
 
-
   // Using this to delete our returnUrl cookie after login
   if (getCookie('returnUrl') && isAuthenticated) {
+    window.location.href = getCookie('returnUrl');
     delete_cookie('returnUrl');
   }
 
