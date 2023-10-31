@@ -1,30 +1,48 @@
-abstract contract Sale{
+import <509>;
 
-    string sellersOrganization;
+abstract contract Sale{ 
     string sellersCommonName;
-    string purchasersOrganization;
     string purchasersCommonName;
     Asset assetToBeSold;
     string price;
 
+    enum SaleState {
+        NONE,
+        Created,
+        Closed,
+        MAX
+    }
+
+    enum PaymentType{
+        NONE,
+        CASH,
+        STRAT,
+        MAX
+    }
+
+
+    SaleState state;
+    PaymentType payment;
+
+
     constructor(
-        string _purchasersOrganization,
         string _purchasersCommonName,
         address _assetToBeSold,
-        string _price
+        string _price,
+        SaleState _state,
+        PaymentType _payment
     ) {
         assetToBeSold = Asset(_assetToBeSold);
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
-        sellersOrganization = Certificate(account(address(c), "main")).organization();
         sellersCommonName = Certificate(account(address(c), "main")).commonName();
-        string currentOwnerOrg = assetToBeSold.ownerOrganization();
-        string currentOwnerName = assetToBeSold.ownerCommonName();
-        require(sellersOrganization == currentOwnerOrg, "Only the owner of the asset can open a bill of sale");
+        address currentOwner = assetToBeSold.owner;
+        currentOwnerName = Certificate(account(address(currentOwner), "main")).commonName();
         require(sellersCommonName == currentOwnerName, "Only the owner of the asset can open a bill of sale");
-        purchasersOrganization = _purchasersOrganization;
         purchasersCommonName = _purchasersCommonName;
         price = _price;
+        state = _state;
+        payment = _payment;
     }
 
     function requireSeller(string action) {
@@ -32,8 +50,6 @@ abstract contract Sale{
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         string err = "Only "
                    + sellersCommonName
-                   + " from "
-                   + sellersOrganization
                    + " can perform "
                    + action
                    + ".";
@@ -41,5 +57,21 @@ abstract contract Sale{
         require(org == sellersOrganization, err);
         string commonName = Certificate(account(address(c), "main")).commonName();
         require(commonName == sellersCommonName, err);
+    }
+
+    function changeSaleState(SaleState _state){
+        requireSeller("Change Sale State");
+        state=_state;
+    }
+
+    function changePaymentType(PaymentType _payment){
+        requireSeller("Change Payment Type");
+        payment=_payment;
+    }
+
+    function transferOwnership(string purchasersCommonName, string price){
+        requireSeller("Transfer Ownership of Asset");
+        assetToBeSold.transferOwnership(purchasersCommonName, price);
+        state = SaleState.Closed;
     }
 }

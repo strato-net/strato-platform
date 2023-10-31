@@ -5,8 +5,9 @@ import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 
 /// @title A representation of Item assets
 contract Item is ItemStatus, Asset {
-    address public own;erOrganization;
-    address public own;erOrganizationalUnit;
+    string public ownerOrganization;
+    string public ownerOrganizationalUnit;
+    string public ownerCommonName;
     address public inventoryId;
     string public serialNumber;
     ItemStatus public status;
