@@ -5,16 +5,18 @@ abstract contract Asset {
     string ownerCommonName;
     string name;
     string description;
+    string[] images;
 
     Sale public sale;
 
-    constructor(string _name, string _description) {
+    constructor(string _name, string _description, string[] _images) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         owner  = Certificate(account(address(c), "main")).userAddress();
         ownerCommonName = Certificate(account(address(c), "main")).commonName();
         name = _name;
         description =_description;
+        images =_images;
     }
 
     modifier requireOwner(string action) {
