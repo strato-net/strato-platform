@@ -49,7 +49,7 @@ const Checkout = ({ user }) => {
   const calculateTax = (item) => {
     return item.product.taxes ?
       (item.product.taxPercentageAmount ?
-        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100)).toFixed(2)
+        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100))
         : (item.product.taxes) * item.qty)
       : 0;
   };
@@ -100,8 +100,9 @@ const Checkout = ({ user }) => {
           isTaxPercentage: item.product.isTaxPercentage,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
-          amount:
-            item.product.pricePerUnit * item.qty,
+          amount: 
+          item.product.taxDollarAmount === 0 ? (item.product.pricePerUnit * item.qty) : 
+          ((item.product.pricePerUnit + calculateTax(item)) * item.qty),
           action: item.product.address,
           qty: item.qty,
         });

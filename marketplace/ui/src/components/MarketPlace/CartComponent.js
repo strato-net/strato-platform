@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import { actions } from "../../contexts/marketplace/actions";
 import {
     useMarketplaceDispatch,
-  } from "../../contexts/marketplace";
+} from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 
@@ -32,9 +32,9 @@ const CartComponent = ({ columns, data }) => {
         let s = 0;
         let tot = 0;
         data.forEach(element => {
-            t += ((parseFloat(element.tax) ));
+            t += ((parseFloat(element.tax)));
             s += (parseFloat(element.shippingCharges));
-            tot += element.isTaxPercentage ? parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2)) : parseFloat((Math.ceil(parseFloat(element.amount) * 100) / 100).toFixed(2));
+            tot += (element.unitPrice * element.qty)
         });
         setTax(t);
         setShipping(s);
@@ -43,16 +43,16 @@ const CartComponent = ({ columns, data }) => {
     let totalNew = 0;
     data.forEach(element => { totalNew += (element.amount + element.tax); });
 
-    const finalTotal = ( total +tax +shipping ).toFixed(2);
+    const finalTotal = (total + tax + shipping).toFixed(2);
     //To future dev, amount_ is for the column amount in the table, it includes tax
     //Why total uses amount
     columns[8].dataIndex = "amount_";
-    
-    data.forEach(element => { 
-        element.amount_ =   !element.isTaxPercentage ? element.amount * (1 + parseFloat(element.tax)/10000) : element.amount + parseFloat(element.tax)
+
+    data.forEach(element => {
+        element.amount_ = !element.isTaxPercentage ? element.amount * (1 + parseFloat(element.tax) / 10000) : element.amount + parseFloat(element.tax)
     });
 
-      
+
     return (
         <Card className="my-4">
             <div>
@@ -106,14 +106,15 @@ const CartComponent = ({ columns, data }) => {
                                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                                     window.location.href = loginUrl;
                                 } else {
-                                actions.addItemToConfirmOrder(marketplaceDispatch, data);
-                                TagManager.dataLayer({
-                                    dataLayer: {
-                                      event: 'submit_order_from_cart',
-                                    },
-                                  });
-                                navigate("/confirmOrder");
-                            }}}
+                                    actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                                    TagManager.dataLayer({
+                                        dataLayer: {
+                                            event: 'submit_order_from_cart',
+                                        },
+                                    });
+                                    navigate("/confirmOrder");
+                                }
+                            }}
                             disabled={data.length === 0}
                         >
                             Submit Order
