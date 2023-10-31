@@ -4,8 +4,8 @@ pipeline {
   }
   options { disableConcurrentBuilds() }
   parameters {
-    string(name: 'GIT_TAG', defaultValue: 'tags/20231027-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
-    string(name: 'RELEASE_VERSION', defaultValue: '20231027', description: 'The version tag for the future release')
+    string(name: 'GIT_TAG', defaultValue: 'tags/10.0-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
+    string(name: 'RELEASE_VERSION', defaultValue: '10.0', description: 'The version tag for the future release')
   }
   stages {
     stage('Prepare') {
@@ -251,20 +251,18 @@ pipeline {
             sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m 'Update latest release version to ${env.RELEASE_VERSION}' --allow-empty"
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
             sh "git tag ${env.RELEASE_VERSION}"
-            // The following step requires `cd-blockapps` user to be able to push directly to master
-            // (requirement for pull-request reviews should be disabled for `master` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
-            // any ideas how to avoid that?
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
 
             // A trick to avoid error: "fatal: 'develop' is already checked out at <...>/jenkins/workspace/RELEASE_STRATO_release_build"
             sh "(cd ../ && git checkout ${env.GIT_TAG})"
-            
+
             // Merge VERSION change back to develop
             sh 'git checkout develop'
             sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
             sh 'git merge master'
-            // The following step requires `cd-blockapps` user to be able to push directly to develop
-            // (requirement for pull-request reviews should be disabled for `develop` branch or cd-blockapps should be the admin and "Include administrators" should be unchecked in branch protection rules)
+            
+            // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
+            // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
             // any ideas how to avoid that?
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
           }
