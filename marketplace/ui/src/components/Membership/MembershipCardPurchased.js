@@ -188,8 +188,8 @@ const MembershipCardPurchased = ({
             // Status should always be published if we use List Now
             status: INVENTORY_STATUS.PUBLISHED,
             serialNumber: [],
-            taxPercentageAmount: Math.floor(taxPercentageAmountValue * 100),
-            taxDollarAmount: Math.floor(taxDollarAmountValue * 100),
+            taxPercentageAmount: Math.floor(taxPercentageAmountValue),
+            taxDollarAmount: Math.floor(taxDollarAmountValue),
           };
           if (isEdit) {
             const updatePayload = {
@@ -367,9 +367,10 @@ const MembershipCardPurchased = ({
                       window.location.href = loginUrl;
                     } else {
                       let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
+                      let isPercent = membership.taxDollarAmount === 0 ? true : false
                       formik.setFieldValue("name", membership.productName);
                       formik.setFieldValue("inventoryStatus", 1);
-                      // formik.setFieldValue("isTaxPercentage", false);
+                      formik.setFieldValue("isTaxPercentage", isPercent);
                       formik.setFieldValue("price", membership?.price);
                       formik.setFieldValue("taxPercentage", taxVal);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
