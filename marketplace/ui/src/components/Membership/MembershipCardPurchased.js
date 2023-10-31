@@ -122,7 +122,8 @@ const MembershipCardPurchased = ({
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
-        let tax = inv.taxPercentageAmount || inv.taxDollarAmount
+        let tax = inv.taxPercentageAmount || inv.taxDollarAmount;
+        // let isPercent = inv.taxDollarAmount === 0 ? true : false
         formik.setFieldValue("name", membership.productName);
         formik.setFieldValue("inventoryStatus", inv.status);
         formik.setFieldValue("tempInv", inv);
@@ -130,6 +131,8 @@ const MembershipCardPurchased = ({
         formik.setFieldValue("quantity", inv.availableQuantity);
         formik.setFieldValue("price", inv.pricePerUnit);
         formik.setFieldValue("taxPercentage", tax);
+        // formik.setFieldValue("isTaxPercentage", isPercent);
+        formik.setFieldValue("taxPercentageAmount", inv.taxPercentageAmount);
         formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
         formik.setFieldValue("taxPercentageAmount", inv.taxPercentageAmount);
         setIsEdit(true)

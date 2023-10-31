@@ -114,7 +114,8 @@ const ConfirmOrder = () => {
     actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
     confirmOrderList.forEach((item) => {
-      cartData.push(item);
+      let amount = ((item.unitPrice * item.qty) + item.tax)
+      cartData.push({...item, amount});
     });
 
     setData(cartData);
@@ -130,7 +131,7 @@ const ConfirmOrder = () => {
     setShipping(s);
     let sum = 0;
     confirmOrderList.forEach((item) => {
-      sum += parseFloat(item.amount);
+      sum += parseFloat(item.unitPrice * item.qty);
     });
     setTotal(sum);
   }, [marketplaceDispatch, confirmOrderList, storedData]);
@@ -309,7 +310,7 @@ const ConfirmOrder = () => {
       title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-center">{Math.trunc(text)}</p>,
     },
   ];
 

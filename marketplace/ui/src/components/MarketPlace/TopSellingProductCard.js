@@ -109,6 +109,12 @@ const TopSellingProductCard = () => {
     }
   };
 
+  const handleNavigate = (topSellingProduct) => {
+    let route;
+    route = `/memberships/all/${topSellingProduct.membershipId}?inventoryId=${topSellingProduct.address ? topSellingProduct.address : ''}`
+    navigate(route);
+  }
+
   return (
     <div>
       {contextHolder}
@@ -145,23 +151,16 @@ const TopSellingProductCard = () => {
                     <div className="flex flex-col items-center">
                       <Image
                         className="cursor-pointer"
-                        src={topSellingProduct.imageUrl}
+                        src={topSellingProduct.productImageLocation[0]}
                         height={230}
                         width={230}
                         preview={false}
-                        onClick={() =>
-                          topSellingProduct.membershipId ?
-                            navigate(naviroute2.replace(":id", topSellingProduct.membershipId), { state: { isCalledFromMembership: true, inventoryId: topSellingProduct.address } })
-                            :
-                            navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                        }
+                        onClick={() => {
+                          handleNavigate(topSellingProduct)
+                        }}
                       />
-                      <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer" onClick={() =>
-                        topSellingProduct.membershipId ?
-                          navigate(naviroute2.replace(":id", topSellingProduct.membershipId), { state: { isCalledFromMembership: true, inventoryId: topSellingProduct.address } })
-                          :
-                          navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                      }>
+                      <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer"
+                        onClick={() => { handleNavigate(topSellingProduct) }}>
                         {topSellingProduct.name}
                       </Text>
                       <Text className="mt-3 text-xl !text-primaryC font-semibold">
