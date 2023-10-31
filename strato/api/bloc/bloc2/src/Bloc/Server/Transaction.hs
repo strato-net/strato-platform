@@ -49,6 +49,7 @@ import Blockchain.Data.AlternateTransaction
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json hiding (Contract)
+import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
 import Blockchain.Strato.Model.Account
@@ -90,7 +91,6 @@ import qualified Data.Map as M
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
-import Data.RLP
 import Data.Semigroup (Max (..))
 import Data.Set (isSubsetOf)
 import qualified Data.Set as S
@@ -1140,7 +1140,7 @@ preparePostTx time from tx =
       kecc
       API
   where
-    kecc = hash (rlpSerialize tx)
+    kecc = hash . rlpSerialize $ rlpEncode tx
     r = transactionR tx
     s = transactionS tx
     v = transactionV tx

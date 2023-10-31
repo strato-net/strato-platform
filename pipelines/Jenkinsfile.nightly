@@ -223,11 +223,11 @@ pipeline {
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
-                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
-                withCredentials([
-                    usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
-                ]) {
-                  dir ('strato-worktree') {
+                dir ('strato-worktree') {
+                  archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
+                  withCredentials([
+                      usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                  ]) {
                     sh '''#!/bin/bash -le
                       set -x
                       version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
@@ -241,6 +241,7 @@ pipeline {
                     '''
                   }
                 }
+
               }
             }
             
