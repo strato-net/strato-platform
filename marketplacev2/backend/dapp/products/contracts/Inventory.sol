@@ -31,7 +31,9 @@ contract Inventory is InventoryStatus, Asset{
         ,   InventoryStatus _status
         ,   uint _createdDate
         ,   address _owner
-    ) public {
+        ,   string _name,
+        ,   string _description
+    ) public Asset (_name, _description) {
         owner = _owner;
 
         productId = msg.sender;

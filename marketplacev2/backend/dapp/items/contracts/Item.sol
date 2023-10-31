@@ -32,7 +32,7 @@ contract Item is ItemStatus, Asset {
         address _owner,
         string _name,
         string _desc
-    ) public Asset(string name, string _desc ){
+    ) public Asset(string _name, string _desc ){
         owner = _owner;
 
         productId = _productId;
