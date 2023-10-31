@@ -325,6 +325,8 @@ const MembershipDetails = ({ user, users }) => {
       allProductFiles?.length > 0 && allProductFiles[0]?.imageUrl;
     let inventoryDetailCpy = {
       ...inventoryDetails,
+      taxes: inventoryDetails.taxPercentageAmount === 0 ? inventoryDetails.taxDollarAmount : (inventoryDetails.taxPercentageAmount / 10000),
+      isTaxPercentage: inventoryDetails.taxDollarAmount === 0,
       productImageLocation: [productFileImg],
     };
     if (!found) {
@@ -737,16 +739,16 @@ const MembershipDetails = ({ user, users }) => {
                     size="large"
                     className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
-                    // onClick={() => {
-                    //   TagManager.dataLayer({
-                    //     dataLayer: {
-                    //       event: 'contact_sales_from_category_card',
-                    //       product_name: product.name,
-                    //       category: product.category,
-                    //       productId: product.productId
-                    //     },
-                    //   });
-                    // }}
+                  // onClick={() => {
+                  //   TagManager.dataLayer({
+                  //     dataLayer: {
+                  //       event: 'contact_sales_from_category_card',
+                  //       product_name: product.name,
+                  //       category: product.category,
+                  //       productId: product.productId
+                  //     },
+                  //   });
+                  // }}
                   >
                     Contact to Buy
                   </Button>
@@ -786,7 +788,7 @@ const MembershipDetails = ({ user, users }) => {
                         openListNowModal();
                       }
                     }}
-                    // disabled={ownerSameAsUser}
+                  // disabled={ownerSameAsUser}
                   >
                     {" "}
                     <Text
