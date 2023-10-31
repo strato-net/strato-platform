@@ -1,15 +1,20 @@
 import <509>;
 
 abstract contract Asset {
-    string public ownerOrganization;
-    string public ownerCommonName;
+    address public owner;
+    string ownerCommonName;
+    string name;
+    string description;
+
     Sale public sale;
 
-    constructor() {
+    constructor(string _name, string _description) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        ownerOrganization = Certificate(account(address(c), "main")).organization();
+        owner  = Certificate(account(address(c), "main")).userAddress();
         ownerCommonName = Certificate(account(address(c), "main")).commonName();
+        name = _name;
+        description =_description;
     }
 
     modifier requireOwner(string action) {
@@ -17,37 +22,43 @@ abstract contract Asset {
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         string err = "Only "
                    + ownerCommonName
-                   + " from "
-                   + ownerOrganization
                    + " can perform "
                    + action
                    + ".";
-        string org = Certificate(account(address(c), "main")).organization();
-        require(org == ownerCommonName, err);
         string commonName = Certificate(account(address(c), "main")).commonName();
         require(commonName == ownerCommonName, err);
         _;
     }
 
-    function createBaseSale(string _purchaserOrganization, string _purchaserCommonName, string _purchasePrice) internal returns (Sale) {
+    function createBaseSale(address _purchaser, string _purchasePrice, SaleState _state, PaymentType _payment) internal returns (Sale) {
         Sale b = new Sale(
-            _purchaserOrganization,
-            _purchaserCommonName,
+            _purchaser,
             address(this),
-            _purchasePrice
+            _purchasePrice,
+            _state,
+            _payment,
         );
         return b;
     }
 
-    function createSale(string _purchaserOrganization, string _purchaserCommonName, string _purchasePrice) public requireOwner("Create sale") {
+    function createSale(address _purchaser, string _purchasePrice, SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = createBaseSale(_purchaserOrganization, _purchaserCommonName, _purchasePrice);
+        sale = createBaseSale(_purchaser, _purchasePrice, _state, _payment);
     }
 
-    function transferOwnership(string _newOwnerOrganization, string _newOwnerCommonName) public requireOwner("Ownership transfer") {
+    function changeSaleState(SaleState _state) public requireOwner("Change Sale State"){
+        require(Sale!=address(0));
+        sale.changeSaleState(_state);
+    }
+
+    function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){
+        require(Sale!=address(0));
+        sale.changePaymentType(_payment);
+    }
+
+    function transferOwnership(string _newOwner) public requireOwner("Ownership transfer") {
         require(msg.sender == address(sale), "Ownership transfer must originate from the active bill of sale");
-        ownerOrganization = _newOwnerOrganization;
-        ownerCommonName = _newOwnerCommonName;
+        ownerCommonName = _newOwner;
         sale = Sale(address(0));
     }
 }
