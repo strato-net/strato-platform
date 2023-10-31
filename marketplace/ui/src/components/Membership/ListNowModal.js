@@ -126,7 +126,8 @@ const ListNowModal = ({
       width="auto"
       title={
         <Text className="text-xl font-semibold">
-          {isEdit ? "Edit Listing" : "Create Listing"}
+          {/* {isEdit ? "Edit Listing" : "Create Listing"} */}
+          Create / Edit Listing
         </Text>
       }
       open={open}
@@ -142,7 +143,7 @@ const ListNowModal = ({
             size="large"
             type="primary"
           >
-            List Now
+            Save
           </Button>
         </Row>,
       ]}
@@ -211,7 +212,8 @@ const ListNowModal = ({
                 className="w-full mt-2"
                 // size="large"
                 prefix={isInventoriesLoading && <Spin />}
-                disabled={(!isIssued && !isNew) || isEdit}
+                // disabled={(!isIssued && !isNew) || isEdit}
+                disabled={isEdit && !isNew}
                 // value={1}
                 controls={false}
                 value={
@@ -312,7 +314,7 @@ const ListNowModal = ({
             <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col> */}
-          {!isNew && (
+          {/* {!isNew && ( */}
             <Col span={8}>
               <Row>
                 {" "}
@@ -349,7 +351,7 @@ const ListNowModal = ({
                 )}
               </Row>
             </Col>
-          )}
+          {/* )} */}
         </Row>
       </Form>
     </Modal>
