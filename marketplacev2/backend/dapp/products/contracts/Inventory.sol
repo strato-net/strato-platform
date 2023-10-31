@@ -5,7 +5,7 @@ import "/dapp/dapp/contracts/Dapp.sol"
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory is InventoryStatus{
+contract Inventory is InventoryStatus, Asset{
 
     address public owner;
     string public ownerOrganization;
