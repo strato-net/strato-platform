@@ -36,6 +36,7 @@ const ListNowModal = ({
   user,
   formik,
   // type,
+  isCreate,
   listed,
   isEdit,
   listType,
@@ -181,7 +182,7 @@ const ListNowModal = ({
               />{" "}
             </Row>
           </Col>
-          {isPurchased && (
+          {(isPurchased && !isCreate) && (
             <Col span={8}>
               <Row>
                 {" "}
@@ -314,14 +315,14 @@ const ListNowModal = ({
             <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col> */}
-          {/* {!isNew && ( */}
+          {!isCreate && (
             <Col span={8}>
               <Row>
                 {" "}
                 <Text className="font-medium">Status</Text>
               </Row>
               <Row>
-                {isEdit || listed === 1 || listed === 2 ? (
+                {isEdit || listed === 1 || listed === 2  || isNew ? (
                   <Select
                     placeholder="Status"
                     className="mt-2 w-full"
@@ -351,7 +352,7 @@ const ListNowModal = ({
                 )}
               </Row>
             </Col>
-          {/* )} */}
+          )}
         </Row>
       </Form>
     </Modal>

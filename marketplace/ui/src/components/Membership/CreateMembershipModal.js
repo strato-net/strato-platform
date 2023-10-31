@@ -873,6 +873,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
           formik={formik}
           id="None"
           listType="New"
+          isCreate={true}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateMembershipSubmitting}
         />

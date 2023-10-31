@@ -377,10 +377,10 @@ const MembershipCardPurchased = ({
                       formik.setFieldValue("taxPercentage", taxVal);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
-                      setIsEdit(true)
                       if (isIssued) {
                         setListType("New")
                       }else{
+                        setIsEdit(true)
                         setListType("Sale")
                       }
                       openListNowModal();
