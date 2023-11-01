@@ -10,6 +10,8 @@ import "/dapp/orders/contracts/OrderLine.sol";
 contract Order is OrderStatus {
 
     address public owner; 
+    string public ownerOrganization;
+    string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
     string public orderId;
@@ -45,9 +47,8 @@ contract Order is OrderStatus {
         ,   uint _createdDate
         ,   string _paymentSessionId
         ,   address _shippingAddress
-    ) public Sale() {
-        owner = assetToBeSold.owner();
-        ownerCommonName = assetToBeSold.commonName();
+    ) public {
+        owner = tx.origin;
 
         orderId = _orderId;
         buyerOrganization = _buyerOrganization;
