@@ -2029,7 +2029,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // bookedUserAddress: userAddress
     }, getOptions);
     const itemAddress = serviceUsage['serviceUsage']?.map((item) => item.itemId)
-    const serviceIds = serviceUsage['serviceUsage']?.map((item) => item.itemId)
 
     const memberships = await contract.getPurchasedMemberships();
     const services = await contract.getServices();
@@ -2044,7 +2043,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
         membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
         bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
-        expiryDate: (items.find((itemE) => itemE.address = item.itemId)?.expiryDate)
+        expiryDate: (items.find((itemE) => itemE.address === item.itemId)?.expiryDate)
       })
     })
     // .filter(item => {
@@ -2088,7 +2087,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
       bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
-      expiryDate: (items.find((itemE) => itemE.address = item.itemId)?.expiryDate)
+      expiryDate: (items.find((itemE) => itemE.address === item.itemId)?.expiryDate)
     }))
     // .filter(item => {
     //   const itemExpiryDate = dayjs(item.expiryDate);
