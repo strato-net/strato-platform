@@ -43,20 +43,17 @@ import Data.Aeson.Types
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.Data
 import Data.Hashable
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import qualified Data.RLP as RLP2
 import Data.Swagger hiding (Format, format, get, put)
 import qualified Data.Swagger as Sw
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.Persist.Sql hiding (get)
 import GHC.Generics
-import qualified LabeledError
 import Numeric
 import Servant.API
 import Servant.Docs
@@ -186,14 +183,6 @@ instance ToCapture (Capture "address" Address) where
 
 instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
-
-instance RLP2.RLPEncodable Address where
-  rlpEncode addr = RLP2.rlpEncode . LabeledError.b16Decode "RLPEncodable<Address>" . BC.pack $ formatAddressWithoutColor addr
-  rlpDecode obj = Address . fromInteger <$> RLP2.rlpDecode obj
-
-instance RLP2.RLPEncodable (Maybe Address) where
-  rlpEncode = maybe RLP2.rlp0 RLP2.rlpEncode
-  rlpDecode x = if x == RLP2.rlp0 then return Nothing else Just <$> RLP2.rlpDecode x
 
 instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"
