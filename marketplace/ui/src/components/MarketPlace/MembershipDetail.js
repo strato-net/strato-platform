@@ -821,7 +821,8 @@ const MembershipDetails = ({ user, users }) => {
                       className={`text-lg font-poppin text-white 
                     `}
                     >
-                      {isIssued ? "Add Inventory" : "Edit Listing"}
+                      {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
+                      List for Sale
                     </Text>
                     {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
                   </Button>
