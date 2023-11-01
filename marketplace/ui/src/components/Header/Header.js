@@ -51,7 +51,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
         { label: <div id="Inventory">Inventory</div>, key: '2' },
-        { label: <div id="Products">Products</div>, key: '3' },
+        // { label: <div id="Products">Products</div>, key: '3' }, // hiding products from marketplace, if fit, remove later
         // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
       ]
     },
@@ -67,7 +67,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     routes.Marketplace.url,
     routes.Orders.url,
     routes.Inventories.url,
-    routes.Products.url,
+    // routes.Products.url,
     routes.Events.url,
   ];
 
@@ -89,8 +89,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       setSelectedTab("1");
     } else if (pathName.includes("/inventories")) {
       setSelectedTab("2");
-    } else if (pathName.includes("/products")) {
-      setSelectedTab("3");
+    // } else if (pathName.includes("/products")) {
+    //   setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
     } 
