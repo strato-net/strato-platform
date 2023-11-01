@@ -18,6 +18,7 @@ import { useMatch, useParams } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions"
 import { Carousel } from "react-responsive-carousel";
 import {
   useInventoryDispatch,
@@ -433,15 +434,38 @@ const MembershipDetails = ({ user, users }) => {
               taxDollarAmount: formik.values.taxDollarAmount,
             },
           };
-          const resaleMembership = await membershipActions.resaleMembership(
-            membershipDispatch,
-            resalePayload
-          );
+          const inventoryBody = {
+            productAddress: membershipDetails.productId,
+            quantity: formik.values.quantity,
+            pricePerUnit: formik.values.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
+            status: formik.values.inventoryStatus,
+            serialNumber: [],
+            taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
+            taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
+          };
+          if (isIssued) {
+            const createInventory = await inventoryActions.createInventory(
+              inventoryDispatch,
+              inventoryBody
+            )
 
-          if (resaleMembership) {
-            formik.resetForm();
+            if (createInventory) {
+              formik.resetForm();
+            }
+            setVisible(false);
+          } else {
+            const resaleMembership = await membershipActions.resaleMembership(
+              membershipDispatch,
+              resalePayload
+            )
+            if (resaleMembership) {
+              formik.resetForm();
+            }
+            setVisible(false);
           }
-          setVisible(false);
         }
       }
     }
@@ -777,6 +801,7 @@ const MembershipDetails = ({ user, users }) => {
                           inventoryDetails?.pricePerUnit
                         );
                         formik.setFieldValue("taxPercentage", taxVal);
+                        formik.setFieldValue("quantity", 1);
                         formik.setFieldValue(
                           "taxPercentageAmount",
                           inventoryDetails.taxPercentageAmount
@@ -795,7 +820,7 @@ const MembershipDetails = ({ user, users }) => {
                       className={`text-lg font-poppin text-white 
                     `}
                     >
-                      List for Sale{" "}
+                      {isIssued ? "Add Inventory" : "List for Sale"}
                     </Text>
                     {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
                   </Button>
@@ -946,8 +971,9 @@ const MembershipDetails = ({ user, users }) => {
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
+          isEdit={true}
           getIn={getIn}
-          listType="Sale"
+          listType={isIssued ? "New" : "Sale"}
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
