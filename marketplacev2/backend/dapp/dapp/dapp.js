@@ -543,7 +543,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
     }
 
-    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
+    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });//cancel
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
     if (args.quantity === 0) {

@@ -20,18 +20,15 @@ abstract contract Sale{
         MAX
     }
 
-
     SaleState state;
     PaymentType payment;
 
 
     constructor(
-        string _purchasersCommonName,
         address _assetToBeSold,
-        string _price,
         SaleState _state,
         PaymentType _payment
-    ) {
+    ) {    
         assetToBeSold = Asset(_assetToBeSold);
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
@@ -39,8 +36,9 @@ abstract contract Sale{
         address currentOwner = assetToBeSold.owner;
         currentOwnerName = Certificate(account(address(currentOwner), "main")).commonName();
         require(sellersCommonName == currentOwnerName, "Only the owner of the asset can open a bill of sale");
-        purchasersCommonName = _purchasersCommonName;
-        price = _price;
+        sellersCommonName = asset.ownerCommonName;
+        purchasersCommonName = sellersCommonName;
+        price = assetToBeSold.price;
         state = _state;
         payment = _payment;
     }
@@ -64,12 +62,13 @@ abstract contract Sale{
     }
 
     function changePaymentType(PaymentType _payment) public requireSeller("Change Payment Type"){
-
         payment=_payment;
     }
 
-    function transferOwnership(string purchasersCommonName, string price) public requireSeller("Transfer Ownership of Asset") {
-        assetToBeSold.transferOwnership(purchasersCommonName, price);
+
+    function transferOwnership(string purchasersCommonName) public requireSeller("Transfer Ownership of Asset") {
+        purchasersCommonName = _purchasersCommonName,
+        assetToBeSold.transferOwnership(purchasersCommonName);
         state = SaleState.Closed;
     }
 }

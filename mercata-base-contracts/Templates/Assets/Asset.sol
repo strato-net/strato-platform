@@ -6,10 +6,11 @@ abstract contract Asset {
     string name;
     string description;
     string[] images;
+    uint price;
 
     Sale public sale;
 
-    constructor(string _name, string _description, string[] _images) {
+    constructor(string _name, string _description, string[] _images, uint _price, SaleState _state, PaymentType _payment) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         owner  = Certificate(account(address(c), "main")).userAddress();
@@ -17,6 +18,8 @@ abstract contract Asset {
         name = _name;
         description =_description;
         images =_images;
+        price = _price;
+        createSale(_state, _payment);
     }
 
     modifier requireOwner(string action) {
@@ -32,25 +35,28 @@ abstract contract Asset {
         _;
     }
 
-    function createBaseSale(address _purchaser, string _purchasePrice, SaleState _state, PaymentType _payment) internal returns (Sale) {
+    function createBaseSale(address _purchaser, SaleState _state, PaymentType _payment) internal returns (Sale) {
         Sale b = new Sale(
             _purchaser,
             address(this),
-            _purchasePrice,
             _state,
             _payment,
         );
         return b;
     }
 
-    function createSale(address _purchaser, string _purchasePrice, SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
+    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = createBaseSale(_purchaser, _purchasePrice, _state, _payment);
+        sale = createBaseSale(_state, _payment);
     }
 
     function changeSaleState(SaleState _state) public requireOwner("Change Sale State"){
         require(Sale!=address(0));
         sale.changeSaleState(_state);
+    }
+
+    function changePrice(uint _price) public requireOwner("Change Asset Price"){
+       price = _price;
     }
 
     function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){

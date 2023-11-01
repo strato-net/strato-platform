@@ -10,8 +10,6 @@ import "/dapp/orders/contracts/OrderLine.sol";
 contract Order is OrderStatus {
 
     address public owner; 
-    string public ownerOrganization;
-    string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
     string public orderId;
@@ -31,14 +29,6 @@ contract Order is OrderStatus {
     address public shippingAddress;
 
     address[] orderLines;
-    /// @dev Events to add and remove members to this shard.
-    event OrgAdded(string orgName);
-    event OrgUnitAdded(string orgName, string orgUnit);
-    event CommonNameAdded(string orgName, string orgUnit, string commonName); 
-
-    event OrgRemoved(string orgName);
-    event OrgUnitRemoved(string orgName, string orgUnit);
-    event CommonNameRemoved(string orgName, string orgUnit, string commonName);
 
 
     constructor(
@@ -55,8 +45,9 @@ contract Order is OrderStatus {
         ,   uint _createdDate
         ,   string _paymentSessionId
         ,   address _shippingAddress
-    ) public {
-        owner = tx.origin;
+    ) public Sale() {
+        owner = assetToBeSold.owner();
+        ownerCommonName = assetToBeSold.commonName();
 
         orderId = _orderId;
         buyerOrganization = _buyerOrganization;
@@ -213,103 +204,4 @@ contract Order is OrderStatus {
       return (RestStatus.OK,inventories,orderLineQuantities);
   
     }
-
-   
-    // ------------------- ASSET SHARD MEMBERSHIP FUNCTIONS ---------------
-
-    // Add an organization to the chain
-    function addOrg(string _orgName) {
-      assert(tx.origin == owner);
-      emit OrgAdded(_orgName);
-    }
-
-    // Add an organization unit to the chain
-    function addOrgUnit(string _orgName, string _orgUnit) {
-      assert(tx.origin == owner);
-      emit OrgUnitAdded(_orgName, _orgUnit);
-    }
-
-    // Add a member to the chain
-    function addMember(string _orgName, string _orgUnit, string _commonName) { 
-      assert(tx.origin == owner);
-      emit CommonNameAdded(_orgName, _orgUnit, _commonName); 
-    } 
-
-    // Remove an organization from the chain
-    function removeOrg(string _orgName) {
-      assert(tx.origin == owner);
-      emit OrgRemoved(_orgName);
-    }
-
-    // Remove an organization unit from the chain
-    function removeOrgUnit(string _orgName, string _orgUnit) {
-      assert(tx.origin == owner);
-      emit OrgUnitRemoved(_orgName, _orgUnit);
-    }
-    
-    // Remove a member from the chain
-    function removeMember(string _orgName, string _orgUnit, string _commonName) { 
-      assert(tx.origin == owner);
-      emit CommonNameRemoved(_orgName, _orgUnit, _commonName);  
-    }
-
-    // Bulk add organizations to the chain
-    function addOrgs(string[] _orgNames) public returns (uint256) {
-        assert(tx.origin == owner);
-        for (uint256 i = 0; i < _orgNames.length; i++) {
-            addOrg(_orgNames[i]);
-        }
-        return RestStatus.OK;
-    }
-
-    // Bulk add organization units to the chain
-    function addOrgUnits(string[] _orgNames, string[] _orgUnits) public returns (uint256) {
-        assert(tx.origin == owner);
-        require((_orgNames.length == _orgUnits.length), "Input data should be consistent");
-        for (uint256 i = 0; i < _orgNames.length; i++) {
-            addOrgUnit(_orgNames[i], _orgUnits[i]);
-        }
-        return RestStatus.OK;
-    }
-
-    // Bulk add members to the chain
-    function addMembers(string[] _orgNames, string[] _orgUnits, string[] _commonNames ) public returns (uint256) {
-        assert(tx.origin == owner);
-        require((_orgNames.length == _orgUnits.length && _orgUnits.length == _commonNames.length), "Input data should be consistent");
-        for (uint256 i = 0; i < _orgNames.length; i++) {
-            addMember(_orgNames[i], _orgUnits[i], _commonNames[i]);
-        }
-        return RestStatus.OK;
-    }
-
-    // Bulk remove organizations from the chain
-    function removeOrgs(string[] _orgNames) public returns (uint256) {
-        assert(tx.origin == owner);
-        for (uint256 i = 0; i < _orgNames.length; i++) {
-            removeOrg(_orgNames[i]);
-        }
-        return RestStatus.OK;
-    }
-
-    // Bulk remove organization units from the chain
-    function removeOrgUnits(string[] _orgNames, string[] _orgUnits) public returns (uint256) {
-        assert(tx.origin == owner);
-        require((_orgNames.length == _orgUnits.length), "Input data should be consistent");
-        for (uint256 i = 0; i < _orgNames.length; i++) {
-            removeOrgUnit(_orgNames[i], _orgUnits[i]);
-        }
-        return RestStatus.OK;
-    }
-
-    // Bulk remove members from the chain
-    function removeMembers(string[] _orgNames, string[] _orgUnits, string[] _commonNames ) public returns (uint256) {
-        assert(tx.origin == owner);
-        require((_orgNames.length == _orgUnits.length && _orgUnits.length == _commonNames.length), "Input data should be consistent");
-        for (uint256 i = 0; i < _orgNames.length; i++) {
-            removeMember(_orgNames[i], _orgUnits[i], _commonNames[i]);
-        }
-        return RestStatus.OK;
-    }
-
-
 }
