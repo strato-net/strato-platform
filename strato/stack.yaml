@@ -43,6 +43,7 @@ packages:
 - libs/clockwork
 - libs/common-log
 - libs/composable-monads/kafka-monad
+- libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
 - libs/composable-monads/identity-monad
 - libs/composable-monads/vault-monad
