@@ -112,5 +112,5 @@ getUnprocessedIndexEvents :: (MonadIO m, HasKafka m) =>
                              m (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
   ofs <- getKafkaCheckpoint
-  evs <- readIndexEvents' ofs
+  evs <- execKafka $ readIndexEvents ofs
   return (ofs, evs)
