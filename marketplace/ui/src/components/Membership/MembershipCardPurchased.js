@@ -372,7 +372,7 @@ const MembershipCardPurchased = ({
                       let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
                       let isPercent = membership.taxDollarAmount === 0 ? true : false
                       formik.setFieldValue("name", membership.productName);
-                      formik.setFieldValue("inventoryStatus", 1);
+                      formik.setFieldValue("inventoryStatus", membership.status);
                       formik.setFieldValue("isTaxPercentage", isPercent);
                       formik.setFieldValue("price", membership?.price);
                       formik.setFieldValue("taxPercentage", taxVal);
