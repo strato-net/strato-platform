@@ -117,7 +117,7 @@ const MembershipDetails = ({ user, users }) => {
         Id
       );
     }
-  }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user]);
+  }, [limit, offset, debouncedSearchTerm, serviceDispatch, user]);
 
   useEffect(() => {
     let services = [];
