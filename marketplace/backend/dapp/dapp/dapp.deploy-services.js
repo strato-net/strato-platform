@@ -7,11 +7,14 @@ import RestStatus from "http-status-codes"
 import dotenv from 'dotenv'
 
 import dappJs from "./dapp"
+import ServiceSeederJs from "/seeder-utility/serviceSeeder";
+import ServiceJson from "/seeder-utility/service.json";
+import { ROLE } from "/helpers/constants";
 const options = { config, logger: console }
 const loadEnv = dotenv.config()
 import { fsUtil } from 'blockapps-rest'
 
-describe("Marketplace Dapp - deploy contracts, bootnode organization", function () {
+describe("Marketplace Dapp - load services for an Org", function () {
   this.timeout(config.timeout)
 
   let adminCredentials
@@ -34,16 +37,16 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
       "deployFilename is missing. Set in config"
     )
     assert.isDefined(
-      process.env.GLOBAL_ADMIN_NAME,
-      "GLOBAL_ADMIN_NAME is missing. Add it to .env file"
+      process.env.ORG_ADMIN_NAME,
+      "ORG_ADMIN_NAME is missing. Add it to .env file"
     )
     assert.isDefined(
-      process.env.GLOBAL_ADMIN_PASSWORD,
-      "GLOBAL_ADMIN_PASSWORD is missing. Add it to .env file"
+      process.env.ORG_ADMIN_PASSWORD,
+      "ORG_ADMIN_PASSWORD is missing. Add it to .env file"
     )
 
-    adminUserName = process.env.GLOBAL_ADMIN_NAME
-    adminUserPassword = process.env.GLOBAL_ADMIN_PASSWORD
+    adminUserName = process.env.ORG_ADMIN_NAME
+    adminUserPassword = process.env.ORG_ADMIN_PASSWORD
 
     let adminUserToken
     try {
@@ -64,29 +67,18 @@ describe("Marketplace Dapp - deploy contracts, bootnode organization", function 
     adminUser = { ...adminResponse.user, ...adminCredentials }
   })
 
-  it('Deploy Dapp and Add Bootmembers', async () => {
-    let members = []
-    if (config.bootMembersFilename) {
-      const fileContents = getYamlFile(`./${config.configDirPath}/${config.bootMembersFilename}`)
+   it('Should populate services', async () => {
+    // let _dapp = await dappJs.uploadDappContract(adminUser, options)
+    const deploy = fsUtil.getYaml(`${config.configDirPath}/${config.deployFilename}`)
+    const options = { config }
 
-      members = fileContents ? fileContents.members.map((mem) => {
-        return {
-          orgName: mem.organization ? mem.organization : '',
-          orgUnit: mem.unit ? mem.unit : '',
-          commonName: mem.commonName ? mem.commonName : '',
-          access: true,
-        }
-      }) : [{}]
-    }
+    const _dapp = await dappJs.bind(adminUser, deploy.dapp.contract, {       
+      ...options,
+    })
 
-
-    // temporary - to force proper table namespacing
-    dapp = await dappJs.uploadDappContract(adminUser, options)
-
-    const deployArgs = { deployFilePath: `${config.configDirPath}/${config.deployFilename}` }
-    const deployment = dapp.deploy(deployArgs)
-    assert.isDefined(deployment)
-    assert.equal(deployment.dapp.contract.address, dapp.address)
+    const result = await ServiceSeederJs.createServices(_dapp)
+    assert(Array.isArray(result), 'result should be an array')
+    assert.equal(result.length, ServiceJson.services.length)
   })
 
 })
