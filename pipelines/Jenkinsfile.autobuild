@@ -101,7 +101,6 @@ pipeline {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
-                BLOC_DEBUG=true \\
                 SLIPSTREAM_OPTIONAL=false \\
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
                 OAUTH_CLIENT_ID=dev \\
