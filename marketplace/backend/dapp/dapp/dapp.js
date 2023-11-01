@@ -839,7 +839,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       orderList.forEach(orderLine => {
         const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
         const product = productList.find(item => item.address === inventoryItem.productId)
-        
+
         let price = inventoryItem.pricePerUnit
         let tax = inventoryItem.taxDollarAmount === 0 ? Math.round(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
         let finalPrice = inventoryItem.pricePerUnit + tax;
@@ -968,24 +968,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }, {});
 
       const inventoriesData = Object.values(groupedData);
-     
+
       const total = inventoriesData.reduce((acc, obj) => {
         const result = obj.data.reduce((total, curr) => {
-            let tax = curr.taxDollarAmount === 0 ? Math.round(curr.pricePerUnit * (curr.taxPercentageAmount / 100)) : curr.taxDollarAmount;
-            let finalPrice = curr.pricePerUnit + tax;
-    
-            return total + (finalPrice * curr.quantity);  // corrected this line
+          let tax = curr.taxDollarAmount === 0 ? Math.round(curr.pricePerUnit * (curr.taxPercentageAmount / 100)) : curr.taxDollarAmount;
+          let finalPrice = curr.pricePerUnit + tax;
+
+          return total + (finalPrice * curr.quantity);  // corrected this line
         }, 0);
         return acc + result;
       }, 0);
-    
+
       if (total != recievedOrderTotal) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
       }
 
       let orders = [];
       for (const inventory of inventoriesData) {
-       
+
         const orderArgs = {
 
           orderId: util.uid(),
@@ -1205,8 +1205,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       let issuedItems = await itemJs.getAll(rawAdmin, args, getOptions);
-      let itemAddressList = issuedItems.map((item) => item.address)
-      const items = await contract.getItems({ address: itemAddressList });
       // Combine issuedProducts, issuedItems, issuedMemberships, and issuedProductFiles into one JSON object array
       const combinedData = issuedItems
         .filter(item => {
@@ -1220,7 +1218,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const product = issuedProducts.find(p => p.address === item.productId);
           // const memberships = issuedMemberships.filter(m => m.productId === item.productId);
           // const productFiles = issuedProductFiles.filter(file => file.productId === item.productId);
-
           return {
             itemAddress: item.address,
             itemNumber: item.itemNumber,
@@ -1234,7 +1231,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
             savings: null, //memberships[0].savings,
             membershipAddress: null, //memberships[0].address,
-            expiryDate: (items.find((itemE) => itemE.address = item.address)?.expiryDate)
+            expiryDate: item?.expiryDate
           };
         }) //.filter((item) => item.manufacturer === userOrganization)
 

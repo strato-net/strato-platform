@@ -315,7 +315,7 @@ const ServiceTable = () => {
         if (index === key) {
           item[field] = value || "";
           if (field === "itemId") {
-            item['expiryDate'] = filteredMembership.expiryDate;
+            item['expiryDate'] = filteredMembership?.expiryDate;
           }
         }
         return item;
@@ -341,10 +341,11 @@ const ServiceTable = () => {
     } else if (field === "bookedUserAddress") {
       const membershipData = membership?.purchasedMemberships
         .filter(({ owner }) => owner === value)
-        .map(({ itemAddress, itemNumber, manufacturer }) => ({
+        .map(({ itemAddress, itemNumber, manufacturer, expiryDate }) => ({
           value: itemAddress,
           label: itemNumber,
           organization: manufacturer,
+          expiryDate: expiryDate
         }));
       setMembershipList(membershipData);
       updateTableData("itemId", '', key);
