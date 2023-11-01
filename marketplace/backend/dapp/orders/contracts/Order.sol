@@ -187,6 +187,10 @@ contract Order is OrderStatus {
           if (newStatus == OrderStatus.CLOSED) {
               status = newStatus;
           } 
+      }else if(status == OrderStatus.PAYMENT_PENDING){
+          if (newStatus == OrderStatus.CANCELED) {
+              status = newStatus;
+          } 
       }
     }
 
