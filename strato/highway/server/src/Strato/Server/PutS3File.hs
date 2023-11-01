@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Strato.Strato23.Server.User
+module Strato.Server.User
   ( getUsers,
     getUsers',
   )
@@ -10,9 +10,8 @@ where
 import BlockApps.Logging
 import Data.Int
 import Data.Text hiding (map)
-import Strato.Strato23.API
-import Strato.Strato23.Database.Queries
-import Strato.Strato23.Monad
+import Strato.API
+import Strato.Monad
 
 getUsers :: Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultM [User]
 getUsers headerUsername mAddr mLimit mOffset = do
