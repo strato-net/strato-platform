@@ -476,8 +476,8 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const detailTabSchema = [
-    { label: "Seller", value: inventoryDetails?.ownerOrganization },
-    { label: "Sub-Category", value: inventoryDetails?.subCategory },
+    { label: "Seller", value: inventoryDetails?.ownerOrganization ? inventoryDetails?.ownerOrganization : productDetails?.ownerOrganization },
+    { label: "Sub-Category", value: inventoryDetails?.subCategory ? inventoryDetails?.subCategory : productDetails?.subCategory },
     {
       label: `${isDuration ? "Time in Months" : "Expiry Date"}`,
       value: isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal,
@@ -602,7 +602,7 @@ const MembershipDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <BreadCrumbComponent name={inventoryDetails?.name} />
+          <BreadCrumbComponent name={inventoryDetails?.name || productDetails?.name} />
           <Row className="max-w-4xl mx-auto mt-10 h-92">
             <Col span={10} className="rounded-md border-1-primary h-px-390">
               {allProductFiles && allProductFiles.length > 0 ? (
@@ -635,18 +635,15 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin">
-                  {" "}
-                  {inventoryDetails?.name ?? "--"}{" "}
+                  {(inventoryDetails?.name ? inventoryDetails?.name : productDetails?.name)}
                 </Text>
                 {isDuration ? (
                   <Row className="mb-1">
-                    {" "}
-                    {watchIcon()}{" "}
+                    {watchIcon()}
                     <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm">
-                      {" "}
                       {membershipDetails?.timePeriodInMonths ?? ""} -month
-                      duration{" "}
-                    </Text>{" "}
+                      duration
+                    </Text>
                   </Row>
                 ) : (
                   <Row className="mb-1">
@@ -671,7 +668,7 @@ const MembershipDetails = ({ user, users }) => {
                     <Text className="block text-center text-xl font-bold mt-2">
                       {isMarketPlace
                         ? `$ ${inventoryDetails?.pricePerUnit}`
-                        : StatusValue[inventoryDetails?.status] ?? "--"}{" "}
+                        : (inventoryID ? StatusValue[inventoryDetails?.status] : "Not Listed") ?? "--"}{" "}
                     </Text>
                   </Col>
                   <Col
@@ -820,7 +817,7 @@ const MembershipDetails = ({ user, users }) => {
                       className={`text-lg font-poppin text-white 
                     `}
                     >
-                      {isIssued ? "Add Inventory" : "List for Sale"}
+                      {isIssued ? "Add Inventory" : "Edit Listing"}
                     </Text>
                     {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
                   </Button>
@@ -913,7 +910,7 @@ const MembershipDetails = ({ user, users }) => {
                     <br />
                   </React.Fragment>
                 ))} */}
-                {inventoryDetails?.description}
+                {inventoryDetails?.description ? inventoryDetails?.description : productDetails?.description}
               </Paragraph>
             </Card>
           </Row>
