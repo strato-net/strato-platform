@@ -63,7 +63,10 @@ const MembershipDetails = ({ user, users }) => {
 
   const isIssued = type === "issued";
   const isPurchased = type === "purchased";
-  const isMarketPlace = !isIssued && !isPurchased;
+  const isMarket = type === "all";
+  const isMarketPlace = isIssued || isMarket;
+  // const isMarketPlace = !isIssued && !isPurchased;
+  // && !isPurchased;
 
   const { state, pathname } = useLocation();
 
@@ -434,29 +437,29 @@ const MembershipDetails = ({ user, users }) => {
               taxDollarAmount: formik.values.taxDollarAmount,
             },
           };
-          const inventoryBody = {
-            productAddress: membershipDetails.productId,
-            quantity: formik.values.quantity,
-            pricePerUnit: formik.values.price,
-            // Generate random code for now
-            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-            // Status should always be published if we use List Now
-            status: formik.values.inventoryStatus,
-            serialNumber: [],
-            taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
-            taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
-          };
-          if (isIssued) {
-            const createInventory = await inventoryActions.createInventory(
-              inventoryDispatch,
-              inventoryBody
-            )
+          // const inventoryBody = {
+          //   productAddress: membershipDetails.productId,
+          //   quantity: formik.values.quantity,
+          //   pricePerUnit: formik.values.price,
+          //   // Generate random code for now
+          //   batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+          //   // Status should always be published if we use List Now
+          //   status: formik.values.inventoryStatus,
+          //   serialNumber: [],
+          //   taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
+          //   taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
+          // };
+          // if (isIssued) {
+          //   const createInventory = await inventoryActions.createInventory(
+          //     inventoryDispatch,
+          //     inventoryBody
+          //   )
 
-            if (createInventory) {
-              formik.resetForm();
-            }
-            setVisible(false);
-          } else {
+          //   if (createInventory) {
+          //     formik.resetForm();
+          //   }
+          //   setVisible(false);
+          // } else {
             const resaleMembership = await membershipActions.resaleMembership(
               membershipDispatch,
               resalePayload
@@ -465,7 +468,7 @@ const MembershipDetails = ({ user, users }) => {
               formik.resetForm();
             }
             setVisible(false);
-          }
+          // }
         }
       }
     }
