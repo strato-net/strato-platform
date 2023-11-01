@@ -38,7 +38,6 @@ import {
   useMarketplaceState,
 } from "../../contexts/marketplace";
 import { useNavigate, useLocation } from "react-router-dom";
-import DataTableComponent from "../DataTableComponent";
 import useDebounce from "../UseDebounce";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -90,9 +89,7 @@ const MembershipDetails = ({ user, users }) => {
   const [serviceList, setServiceList] = useState([]);
   const [savingsList, setSavingsList] = useState([]);
   const [totalSavings, setTotalSavings] = useState(0);
-  const [ownerSameAsUser, setOwnerSameAsUser] = useState(true);
   const [Id, setId] = useState(undefined);
-  const [isServiceSelected, setIsServiceSelected] = useState(false);
   const [membershipDetails, setMembershipDetails] = useState(undefined);
   const [allProductFiles, setAllProductFiles] = useState(undefined);
   const [visible, setVisible] = useState(false);
@@ -117,7 +114,7 @@ const MembershipDetails = ({ user, users }) => {
         Id
       );
     }
-  }, [limit, offset, debouncedSearchTerm, serviceDispatch, Id, user]);
+  }, [Id]);
 
   useEffect(() => {
     let services = [];
