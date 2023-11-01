@@ -17,6 +17,14 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unreleased]
 
 ### Added
+### Changed
+### Fixed
+### Removed
+
+
+## [10.0.0] - 10/31/2023
+
+### Added
 - Abstract contract functionality for SolidVM
 - Salted contract creations allow for deterministic addresses
 - `/transaction/unsigned` endpoint for generating raw transaction inputs
@@ -37,7 +45,7 @@ so that they could be properly moved to their respective version's subsection.
 - `pretty` Makefile command that triggers the `ormolu` code formatter
 - `hoogle` Makefile command that generates Haddock documentation and serves through local Hoogle instance
 - new built-in accessor functions for arrays
-
+- `develop`, `profile` Makefile commands added
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
@@ -54,5 +62,3 @@ so that they could be properly moved to their respective version's subsection.
 ### Removed
 - `bloc22` database removed
 - dependency on relapse library for rlp encoding
-
-## [10.0.0] - TBD
