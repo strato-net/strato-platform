@@ -909,7 +909,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
       
       const session = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
-      console.log("from dapp:",session.payment_intent)
   
       // Use the StripeService method to get the PaymentIntent details
       const paymentIntent = await StripeService.getPaymentIntent(session.payment_intent, paymentDetail.sellerAccountId);
@@ -1050,7 +1049,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           await managers.orderManager.updateBuyerDetails({ orderAddress: address, ...updates });
 
         const inventories = inventoryAddresses.split(",").slice(0, -1);
-        const quantities = quantitiesToUpdate.split(",").slice(0, -1);
+        const quantities = quantitiesToUpdate.split(",").slice(0, -1).map(Number);
         const [status] = await managers.productManager.updateInventoriesQuantities({ inventories, quantities, isReduce: false, });
 
         return { status };
