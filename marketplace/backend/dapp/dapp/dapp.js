@@ -1209,7 +1209,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       // Get Items where productId = ownedProducts.productId and ownerOrg === userOrg
       let issuedItems = await itemJs.getAll(rawAdmin, args, getOptions);
-
+      let itemAddressList = issuedItems.map((item) => item.address)
+      const items = await contract.getItems({ address: itemAddressList });
       // Combine issuedProducts, issuedItems, issuedMemberships, and issuedProductFiles into one JSON object array
       const combinedData = issuedItems
         .filter(item => {
@@ -1236,7 +1237,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             manufacturer: product.manufacturer,
             timePeriodInMonths: null,//memberships[0].timePeriodInMonths,
             savings: null, //memberships[0].savings,
-            membershipAddress: null //memberships[0].address
+            membershipAddress: null, //memberships[0].address,
+            expiryDate: (items.find((itemE) => itemE.address = item.address)?.expiryDate)
           };
         }) //.filter((item) => item.manufacturer === userOrganization)
 
@@ -2031,7 +2033,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       sort: '-createdDate',
       // owner: userAddress, 
       // ownerOrganization: userOrganization,
-      bookedUserAddress: userAddress
+      // bookedUserAddress: userAddress
     }, getOptions);
     const itemAddress = serviceUsage['serviceUsage']?.map((item) => item.itemId)
     const serviceIds = serviceUsage['serviceUsage']?.map((item) => item.itemId)
@@ -2040,18 +2042,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const services = await contract.getServices();
     const users = await contract.getCertificates();
     const items = await contract.getItems({ address: itemAddress });
+    const currentDate = dayjs();
 
-    const data = serviceUsage['serviceUsage']?.map((item) => ({
-      ...item,
-      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
-      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
-      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
-      bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
-      expiryDate: (items.find((itemE) => itemE.address = item.address)[0]?.expiryDate || 1709623680000) || ''
-    })).filter(item => {
-      const itemExpiryDate = dayjs(item.expiryDate);
-      return itemExpiryDate.isSameOrAfter(currentDate);
-    }); //Test this filter
+    const data = serviceUsage['serviceUsage']?.map((item) => {
+      return ({
+        ...item,
+        provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+        serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+        membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+        bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
+        expiryDate: (items.find((itemE) => itemE.address = item.itemId)?.expiryDate)
+      })
+    })
+    // .filter(item => {
+    //   const itemExpiryDate = dayjs(item.expiryDate);
+    //   return itemExpiryDate.isSameOrAfter(currentDate);
+    //   // return itemExpiryDate.isSameOrAfter(currentDate);
+    // }); //Test this filter
 
     return { result: data, total: serviceUsage.total };
   };
@@ -2075,9 +2082,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // providerLastUpdated:userAddress,
       itemId: itemAddressList
     }
+
+    const items = await contract.getItems({ address: itemAddressList });
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();
+    // const currentDate = dayjs();
     // const users = await contract.getCertificates();
     const data = serviceUsage['serviceUsage'].map((item) => ({
       ...item,
@@ -2085,11 +2095,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
       membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
       bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
-      expiryDate: (items.find((itemE) => itemE.address = item.address)[0]?.expiryDate || 1709623680000) || ''
-    })).filter(item => {
-      const itemExpiryDate = dayjs(item.expiryDate);
-      return itemExpiryDate.isSameOrAfter(currentDate);
-    }); //Test this filter;
+      expiryDate: (items.find((itemE) => itemE.address = item.itemId)?.expiryDate)
+    }))
+    // .filter(item => {
+    //   const itemExpiryDate = dayjs(item.expiryDate);
+    //   // return itemExpiryDate.isSameOrAfter(currentDate);
+    //   console.log("itemExpiryDate", itemExpiryDate);
+    //   console.log("currentDate", currentDate);
+    //   return itemExpiryDate.isValid() && itemExpiryDate.isSameOrAfter(currentDate);
+    // }); //Test this filter;
 
     return { result: data, total: serviceUsage.total };
 
