@@ -839,11 +839,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       orderList.forEach(orderLine => {
         const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
         const product = productList.find(item => item.address === inventoryItem.productId)
-        invoices.push({ productName: product.name, unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
+        
         let price = inventoryItem.pricePerUnit
-        let tax = inventoryItem.taxDollarAmount === 0 ? Math.ceil(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
+        let tax = inventoryItem.taxDollarAmount === 0 ? Math.round(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
         let finalPrice = inventoryItem.pricePerUnit + tax;
         calculatedOrderTotal += (finalPrice * orderLine.quantity)
+        invoices.push({ productName: product.name, unitPrice: finalPrice, quantity: orderLine.quantity })
       })
 
       if (calculatedOrderTotal != recievedOrderTotal) {
@@ -958,51 +959,43 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       });
 
-
-
       const groupedData = inventories.reduce((acc, inventory) => {
-        if (!acc[inventory.productId]) {
-          const taxRate = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount : inventory.taxDollarAmount);
-          acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: inventory.taxDollarAmount === 0, data: [] };
+        if (!acc[inventory.ownerOrganization]) {
+          acc[inventory.ownerOrganization] = { ownerOrganization: inventory.ownerOrganization, data: [] };
         }
-        acc[inventory.productId].data.push(inventory);
+        acc[inventory.ownerOrganization].data.push(inventory);
         return acc;
       }, {});
 
       const inventoriesData = Object.values(groupedData);
+     
       const total = inventoriesData.reduce((acc, obj) => {
-        const result = obj.data.reduce((total, curr) => obj.tax !== 0 ?
-          (obj.isTaxPercentage ?
-            ((total + ((curr.pricePerUnit * curr.quantity) + Math.ceil((curr.pricePerUnit * curr.quantity) * (obj.tax / 100)))))
-            : total + (curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity)
-          ) : (total + curr.pricePerUnit * curr.quantity), 0);
-        return Number(acc) + Number(result);
-      }, 0).toFixed(2);
-
+        const result = obj.data.reduce((total, curr) => {
+            let tax = curr.taxDollarAmount === 0 ? Math.round(curr.pricePerUnit * (curr.taxPercentageAmount / 100)) : curr.taxDollarAmount;
+            let finalPrice = curr.pricePerUnit + tax;
+    
+            return total + (finalPrice * curr.quantity);  // corrected this line
+        }, 0);
+        return acc + result;
+      }, 0);
+    
       if (total != recievedOrderTotal) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
       }
 
       let orders = [];
       for (const inventory of inventoriesData) {
-        const inventoryTotal = inventory.data.reduce((acc, curr) => acc + (curr.pricePerUnit * curr.quantity), 0);
-        const shippingCharge = inventoryTotal * CHARGES.SHIPPING;
-        const tax = inventoryTotal * CHARGES.TAX;
-
-        // shipping charge for order 
-        const orderTotal = inventoryTotal + shippingCharge + tax;
-        const amountPaid = orderTotal;  // need to remove if no further use
-
+       
         const orderArgs = {
 
           orderId: util.uid(),
           buyerOrganization,
           sellerOrganization: inventory.ownerOrganization,
           orderDate,
-          orderTotal,
-          orderShippingCharges: shippingCharge,
+          orderTotal: total,  // OrderTotal is being calculated above use it
+          orderShippingCharges: 0,
           status: ORDER_STATUS.AWAITING_FULFILLMENT,
-          amountPaid,
+          amountPaid: recievedOrderTotal, //amount recieved in order
           buyerComments: '',
           sellerComments: '',
           createdDate, paymentSessionId, shippingAddress
@@ -1015,7 +1008,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         for (const inventoryObject of inventory.data) {
 
           const shippingCharges = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
-          const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
+          // const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
+
+          let taxUnit = inventoryObject.taxDollarAmount === 0 ? Math.round(inventoryObject.pricePerUnit * (inventoryObject.taxPercentageAmount / 100)) : (inventoryObject.taxDollarAmount)
+          let tax = taxUnit * inventoryObject.quantity
 
           await managers.orderManager.addOrderLine({
             orderAddress,
