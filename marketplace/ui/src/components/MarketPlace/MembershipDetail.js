@@ -18,6 +18,7 @@ import { useMatch, useParams } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions"
 import { Carousel } from "react-responsive-carousel";
 import {
   useInventoryDispatch,
@@ -433,15 +434,38 @@ const MembershipDetails = ({ user, users }) => {
               taxDollarAmount: formik.values.taxDollarAmount,
             },
           };
-          const resaleMembership = await membershipActions.resaleMembership(
-            membershipDispatch,
-            resalePayload
-          );
+          const inventoryBody = {
+            productAddress: membershipDetails.productId,
+            quantity: formik.values.quantity,
+            pricePerUnit: formik.values.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
+            status: formik.values.inventoryStatus,
+            serialNumber: [],
+            taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
+            taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
+          };
+          if (isIssued) {
+            const createInventory = await inventoryActions.createInventory(
+              inventoryDispatch,
+              inventoryBody
+            )
 
-          if (resaleMembership) {
-            formik.resetForm();
+            if (createInventory) {
+              formik.resetForm();
+            }
+            setVisible(false);
+          } else {
+            const resaleMembership = await membershipActions.resaleMembership(
+              membershipDispatch,
+              resalePayload
+            )
+            if (resaleMembership) {
+              formik.resetForm();
+            }
+            setVisible(false);
           }
-          setVisible(false);
         }
       }
     }
@@ -452,8 +476,8 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const detailTabSchema = [
-    { label: "Seller", value: inventoryDetails?.ownerOrganization },
-    { label: "Sub-Category", value: inventoryDetails?.subCategory },
+    { label: "Seller", value: inventoryDetails?.ownerOrganization ? inventoryDetails?.ownerOrganization : productDetails?.ownerOrganization },
+    { label: "Sub-Category", value: inventoryDetails?.subCategory ? inventoryDetails?.subCategory : productDetails?.subCategory },
     {
       label: `${isDuration ? "Time in Months" : "Expiry Date"}`,
       value: isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal,
@@ -578,7 +602,7 @@ const MembershipDetails = ({ user, users }) => {
         </div>
       ) : (
         <div>
-          <BreadCrumbComponent name={inventoryDetails?.name} />
+          <BreadCrumbComponent name={inventoryDetails?.name || productDetails?.name} />
           <Row className="max-w-4xl mx-auto mt-10 h-92">
             <Col span={10} className="rounded-md border-1-primary h-px-390">
               {allProductFiles && allProductFiles.length > 0 ? (
@@ -611,18 +635,15 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin">
-                  {" "}
-                  {inventoryDetails?.name ?? "--"}{" "}
+                  {(inventoryDetails?.name ? inventoryDetails?.name : productDetails?.name)}
                 </Text>
                 {isDuration ? (
                   <Row className="mb-1">
-                    {" "}
-                    {watchIcon()}{" "}
+                    {watchIcon()}
                     <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm">
-                      {" "}
                       {membershipDetails?.timePeriodInMonths ?? ""} -month
-                      duration{" "}
-                    </Text>{" "}
+                      duration
+                    </Text>
                   </Row>
                 ) : (
                   <Row className="mb-1">
@@ -647,7 +668,7 @@ const MembershipDetails = ({ user, users }) => {
                     <Text className="block text-center text-xl font-bold mt-2">
                       {isMarketPlace
                         ? `$ ${inventoryDetails?.pricePerUnit}`
-                        : StatusValue[inventoryDetails?.status] ?? "--"}{" "}
+                        : (inventoryID ? StatusValue[inventoryDetails?.status] : "Not Listed") ?? "--"}{" "}
                     </Text>
                   </Col>
                   <Col
@@ -772,11 +793,13 @@ const MembershipDetails = ({ user, users }) => {
                             ? inventoryDetails.taxDollarAmount
                             : inventoryDetails.taxPercentageAmount;
                         formik.setFieldValue("name", inventoryDetails?.name);
+                        formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
                         formik.setFieldValue(
                           "price",
                           inventoryDetails?.pricePerUnit
                         );
                         formik.setFieldValue("taxPercentage", taxVal);
+                        formik.setFieldValue("quantity", 1);
                         formik.setFieldValue(
                           "taxPercentageAmount",
                           inventoryDetails.taxPercentageAmount
@@ -795,7 +818,7 @@ const MembershipDetails = ({ user, users }) => {
                       className={`text-lg font-poppin text-white 
                     `}
                     >
-                      List for Sale{" "}
+                      {isIssued ? "Add Inventory" : "Edit Listing"}
                     </Text>
                     {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
                   </Button>
@@ -888,7 +911,7 @@ const MembershipDetails = ({ user, users }) => {
                     <br />
                   </React.Fragment>
                 ))} */}
-                {inventoryDetails?.description}
+                {inventoryDetails?.description ? inventoryDetails?.description : productDetails?.description}
               </Paragraph>
             </Card>
           </Row>
@@ -946,8 +969,9 @@ const MembershipDetails = ({ user, users }) => {
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
+          isEdit={true}
           getIn={getIn}
-          listType="Sale"
+          listType={isIssued ? "New" : "Sale"}
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
