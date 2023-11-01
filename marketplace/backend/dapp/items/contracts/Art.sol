@@ -1,13 +1,15 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
+
+pragma es6;
+pragma strict;
+import <f1bf0f62ba0ca6d7c7b7486d33d0a264ba8e38ed>;
 
 /// @title A representation of Item assets
 contract Art is ItemStatus, Asset {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
-    address public inventoryId;
     string public serialNumber;
     ItemStatus public status;
     string public comment; // to store remarks if the item is removed from the application.
@@ -23,8 +25,6 @@ contract Art is ItemStatus, Asset {
     );
 
     constructor(
-        uint _uniqueProductCode,
-        address _inventoryId,
         string _serialNumber,
         ItemStatus _status,
         string _comment,
@@ -33,12 +33,14 @@ contract Art is ItemStatus, Asset {
         address _owner,
         string _name,
         string _desc,
-        uint _artQuantity
-    ) public Asset(string _name, string _desc ){
+        uint _artQuantity,
+        string[] _images,
+        uint _price,
+        SaleState _saleState,
+        PaymentType _paymentType
+    ) public Asset(_name, _desc, _images, _price, _saleState, _paymentType ){
         owner = _owner;
 
-        productId = _productId;
-        inventoryId = _inventoryId;
         serialNumber = _serialNumber;
         status = _status;
         comment = _comment;

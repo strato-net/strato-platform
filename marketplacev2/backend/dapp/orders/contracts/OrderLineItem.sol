@@ -1,3 +1,6 @@
+pragma es6;
+pragma strict;
+import { Sale } from <f1bf0f62ba0ca6d7c7b7486d33d0a264ba8e38ed>;
  
 
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";

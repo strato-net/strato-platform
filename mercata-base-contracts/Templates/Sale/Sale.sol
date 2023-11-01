@@ -1,5 +1,8 @@
 import <509>;
 
+pragma es6;
+pragma strict;
+
 abstract contract Sale{ 
     string sellersCommonName;
     string purchasersCommonName;

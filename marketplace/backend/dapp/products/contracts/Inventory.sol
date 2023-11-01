@@ -5,9 +5,12 @@ import "/dapp/dapp/contracts/Dapp.sol"
 import "/dapp/products/contracts/InventoryStatus.sol";
 
 /// @title A representation of Inventory assets
-contract Inventory is InventoryStatus, Asset{
+contract Inventory is InventoryStatus{
+
+    address public owner;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
+    string public ownerCommonName;
 
     address public productId;
     string public category;
@@ -31,9 +34,7 @@ contract Inventory is InventoryStatus, Asset{
         ,   InventoryStatus _status
         ,   uint _createdDate
         ,   address _owner
-        ,   string _name,
-        ,   string _description
-    ) public Asset (_name, _description) {
+    ) public {
         owner = _owner;
 
         productId = msg.sender;
