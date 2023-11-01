@@ -625,6 +625,11 @@ const ProductDetails = ({ user, users }) => {
                   ({categoryName})
                 </Text>
               </Row>
+              <Text className="text-secondryB text-sm" id="prod-category">
+                Sold By: {details.ownerOrganization.startsWith('Mercata Account')
+                  ? details.ownerCommonName
+                  : details.ownerOrganization}
+              </Text>
               <Paragraph
                 // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
                 className="text-primaryC text-[13px] mt-2"
