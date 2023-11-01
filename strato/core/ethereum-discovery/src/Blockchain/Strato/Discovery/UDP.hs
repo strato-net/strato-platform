@@ -29,7 +29,6 @@ import Blockchain.Strato.Discovery.P2PUtil (DiscoverException (..))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Util
 import Control.Error (note)
 import Control.Exception hiding (try)
 import qualified Control.Monad.Change.Alter as A
@@ -258,17 +257,6 @@ processDataStream' bs =
            in if theHash /= keccak256ToWord256 theHash'
                 then error "bad UDP data sent from peer, the hash isn't correct"
                 else fromMaybe (error "malformed signature in call to processDataStream") publicKey
-
-nodeIDToPoint :: NodeID -> Point
-nodeIDToPoint (NodeID nodeID) | B.length nodeID /= 64 = error "NodeID contains a bytestring that is not 64 bytes long"
-nodeIDToPoint (NodeID nodeID) = Point x y
-  where
-    x = byteString2Integer $ B.take 32 nodeID
-    y = byteString2Integer $ B.drop 32 nodeID
-
-pointToNodeID :: Point -> NodeID
-pointToNodeID PointO = error "called pointToNodeID with PointO, we can't handle that yet"
-pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
 
 data UDPException = UDPTimeout deriving (Show)
 

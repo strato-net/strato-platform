@@ -30,7 +30,9 @@ import Blockchain.Data.PubKey
 import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Discovery.Metrics
+import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Util (byteString2Integer)
 import Control.Exception hiding (try)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -38,6 +40,7 @@ import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.List (sortBy)
 import qualified Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
@@ -476,14 +479,33 @@ peerToEnode peer =
 getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m Int
 getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT
 
--- todo: respect the requester's target. also is this basically getClosePeers?s
+nodeIDToPoint :: NodeID -> Point
+nodeIDToPoint (NodeID nodeID) | B.length nodeID /= 64 = error "NodeID contains a bytestring that is not 64 bytes long"
+nodeIDToPoint (NodeID nodeID) = Point x y
+  where
+    x = byteString2Integer $ B.take 32 nodeID
+    y = byteString2Integer $ B.drop 32 nodeID
+
+pointToNodeID :: Point -> NodeID
+pointToNodeID PointO = error "called pointToNodeID with PointO, we can't handle that yet"
+pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
+
 getPeersClosestTo ::
   (A.Selectable IPAsText ClosestPeers m) =>
   NodeID ->
   T.Text ->
-  Point ->
+  Point -> -- what am I supposed to do with this?
   m [PPeer]
-getPeersClosestTo _ requesterIP _ = take 20 . maybe [] unClosestPeers <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)
+getPeersClosestTo targetNID requesterIP _ = 
+  let targetPt = nodeIDToPoint targetNID
+  in take 20 . 
+    sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) ((dist targetPt (pPeerPubkey peerB)))) .
+    maybe [] unClosestPeers <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)
+  where 
+    dist :: Point -> Maybe Point -> B.ByteString
+    dist (Point x1 y1) (Just (Point x2 y2)) = -- pythagorean theorem is overrated
+      word256ToBytes (fromInteger . abs $ x2 - x1) <> word256ToBytes (fromInteger . abs $ y2 - y1)
+    dist _ _ = B.pack $ replicate 64 0xFF -- this case should never happen but just in case, make it the max distance possible
 
 updateLastMessage ::
   (A.Replaceable T.Text PPeer m) =>
