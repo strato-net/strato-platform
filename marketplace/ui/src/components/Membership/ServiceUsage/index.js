@@ -306,10 +306,17 @@ const ServiceTable = () => {
   };
 
   const handleInputChange = (value, field, key) => {
+    let filteredMembership;
+    if (field === "itemId") {
+      filteredMembership = membershipList.find((item) => item.value === value)
+    }
     const updateTableData = (field, value, key) => {
       const newData = tableData.map((item, index) => {
         if (index === key) {
           item[field] = value || "";
+          if (field === "itemId") {
+            item['expiryDate'] = filteredMembership.expiryDate;
+          }
         }
         return item;
       });
@@ -319,10 +326,11 @@ const ServiceTable = () => {
     if (field === "provider") {
       const membershipData = membership?.purchasedMemberships
         .filter(({ manufacturer }) => manufacturer === value)
-        .map(({ itemAddress, itemNumber, manufacturer }) => ({
+        .map(({ itemAddress, itemNumber, manufacturer, expiryDate }) => ({
           value: itemAddress,
           label: itemNumber,
           organization: manufacturer,
+          expiryDate: expiryDate
         }));
       setMembershipList(membershipData);
       servicesActions.fetchService(serviceDispatch, 10, offset, value);
@@ -483,7 +491,7 @@ const ServiceTable = () => {
             icon={<PlusOutlined />}
             onClick={handleAddRow}
             disabled={
-              validationError ||
+              // validationError ||
               IsLoading ||
               (tableData && tableData?.length != 0 && !tableData[0]?.address) ||
               page != 1
