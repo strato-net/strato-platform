@@ -793,6 +793,7 @@ const MembershipDetails = ({ user, users }) => {
                             ? inventoryDetails.taxDollarAmount
                             : inventoryDetails.taxPercentageAmount;
                         formik.setFieldValue("name", inventoryDetails?.name);
+                        formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
                         formik.setFieldValue(
                           "price",
                           inventoryDetails?.pricePerUnit
