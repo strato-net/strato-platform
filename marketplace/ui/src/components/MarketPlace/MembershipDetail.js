@@ -64,8 +64,8 @@ const MembershipDetails = ({ user, users }) => {
   const isIssued = type === "issued";
   const isPurchased = type === "purchased";
   const isMarket = type === "all";
-  const isMarketPlace = isIssued || isMarket;
-  // const isMarketPlace = !isIssued && !isPurchased;
+  // const isMarketPlace = isIssued || isMarket;
+  const isMarketPlace = !isIssued && !isPurchased;
   // && !isPurchased;
 
   const { state, pathname } = useLocation();
@@ -691,7 +691,7 @@ const MembershipDetails = ({ user, users }) => {
                     </Text>
                   </Col>
                 </Row>
-                {isMarketPlace && (
+                {(isIssued || isMarket) && (
                   <Row>
                     <Row
                       className="w-full absolute mr-5 left-0 mt-6"
