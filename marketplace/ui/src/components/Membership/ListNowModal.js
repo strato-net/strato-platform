@@ -241,6 +241,8 @@ const ListNowModal = ({
                 name="percentage"
                 disabled={listed === 1}
                 min={0}
+                step={1}
+                precision={0}
                 addonAfter={
                   <Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
                     <Col
@@ -273,11 +275,11 @@ const ListNowModal = ({
                     </Col>
                   </Row>
                 }
-                formatter={handleFormatter}
+                // formatter={handleFormatter}
                 className="w-full mt-2"
                 size="large"
                 controls={false}
-                parser={handleParser}
+                // parser={handleParser}
                 value={formik.values.taxPercentage}
                 onChange={(value) => {
                   let btnStatus = formik.values.isTaxPercentage;

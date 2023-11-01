@@ -215,7 +215,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const handleUpdateComment = async () => {
 
     let body = {};
-    let promises = [];
+    let isDone=false;
     for (let i = 0; i < orderDetails.orderLines.length; i++) {
       setselectedProd(orderDetails.orderLines[i]);
 
@@ -232,12 +232,10 @@ const SoldOrderDetails = ({ user, users }) => {
           quantity: details.orderLines[i].quantity,
         };
 
-        promises.push(actions.createOrderLineItem(dispatch, body));
+        isDone = await actions.createOrderLineItem(dispatch, body);
       }
     }
-    if (promises.length > 0) {
-      await Promise.all(promises);
-    }
+    
     body = {};
     if (selectedDate == null) {
       body = {
@@ -260,7 +258,7 @@ const SoldOrderDetails = ({ user, users }) => {
         },
       };
     }
-    let isDone = await actions.updateSellerDetails(dispatch, body);
+    isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
       await actions.fetchOrderDetails(dispatch, Id);
