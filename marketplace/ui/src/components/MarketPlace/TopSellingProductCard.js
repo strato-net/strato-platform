@@ -10,6 +10,7 @@ import {
 } from "antd";
 import { LeftArrow, RightArrow } from "../../images/SVGComponents";
 import { Cart } from "../../images/SVGComponents";
+import logo from "../../images/resources/item_placeholder.png";
 import { actions } from "../../contexts/marketplace/actions";
 import {
   useMarketplaceDispatch,
@@ -146,7 +147,7 @@ const TopSellingProductCard = () => {
                     <div className="flex flex-col items-center">
                       <Image
                         className="cursor-pointer"
-                        src={topSellingProduct.imageUrl}
+                        src={topSellingProduct.imageUrl ? topSellingProduct.imageUrl : logo}
                         height={230}
                         width={230}
                         style={{ objectFit: "contain" }}

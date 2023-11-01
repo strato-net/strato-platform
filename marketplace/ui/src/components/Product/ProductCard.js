@@ -5,6 +5,7 @@ import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import DeleteProductModal from "./DeleteProductModal";
 import UpdateProductModal from "./UpdateProductModal";
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import logo from "../../images/resources/item_placeholder.png";
 
 const ProductCard = ({
   product,
@@ -56,9 +57,9 @@ const ProductCard = ({
         <Card className="w-full mt-6" id="product">
           <div className="flex">
             <img
-              className="w-52 object-cover"
+              className="w-52 object-contain"
               alt=""
-              src={state.imageUrl}
+              src={state.imageUrl ? state.imageUrl : logo}
             />
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">

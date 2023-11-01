@@ -15,6 +15,7 @@ import { UNIT_OF_MEASUREMENTS, INVENTORY_STATUS } from "../../helpers/constants"
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ResellModal from "./ResellModal";
 import routes from "../../helpers/routes";
+import logo from "../../images/resources/item_placeholder.png";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -70,7 +71,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   return (
     <Card className="w-full mt-6">
       <div className="flex" id={id}>
-        <img className="w-52 object-cover" alt="" src={inventory.imageUrl} />
+        <img className="w-52 object-contain" alt="" src={inventory.imageUrl ? inventory.imageUrl : logo} />
         <div className="ml-12 w-full">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
