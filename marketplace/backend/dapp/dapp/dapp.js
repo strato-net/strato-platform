@@ -2046,11 +2046,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         expiryDate: (items.find((itemE) => itemE.address === item.itemId)?.expiryDate)
       })
     })
-    // .filter(item => {
-    //   const itemExpiryDate = dayjs(item.expiryDate);
-    //   return itemExpiryDate.isSameOrAfter(currentDate);
-    //   // return itemExpiryDate.isSameOrAfter(currentDate);
-    // }); //Test this filter
+      .filter(item => {
+        const itemExpiryDate = dayjs(item.expiryDate);
+        return itemExpiryDate.isAfter(currentDate);
+      }); //Test this filter
 
     return { result: data, total: serviceUsage.total };
   };
@@ -2089,14 +2088,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
       expiryDate: (items.find((itemE) => itemE.address === item.itemId)?.expiryDate)
     }))
-    // .filter(item => {
-    //   const itemExpiryDate = dayjs(item.expiryDate);
-    //   // return itemExpiryDate.isSameOrAfter(currentDate);
-    //   console.log("itemExpiryDate", itemExpiryDate);
-    //   console.log("currentDate", currentDate);
-    //   return itemExpiryDate.isValid() && itemExpiryDate.isSameOrAfter(currentDate);
-    // }); //Test this filter;
-
+      .filter(item => {
+        const itemExpiryDate = dayjs(item.expiryDate);
+        return itemExpiryDate.isAfter(currentDate);
+      });
     return { result: data, total: serviceUsage.total };
 
   };
