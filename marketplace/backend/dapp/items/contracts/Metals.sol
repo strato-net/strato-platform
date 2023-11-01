@@ -4,7 +4,7 @@ import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 
 /// @title A representation of Item assets
-contract Item is ItemStatus, Asset {
+contract Metals is ItemStatus, Asset {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     address public inventoryId;
@@ -13,6 +13,7 @@ contract Item is ItemStatus, Asset {
     string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
     uint public createdDate;
+    uint public metalQuantity;
 
     event OwnershipUpdate(
         string seller,
@@ -31,7 +32,8 @@ contract Item is ItemStatus, Asset {
         uint _createdDate,
         address _owner,
         string _name,
-        string _desc
+        string _desc,
+        uint _metalQ
     ) public Asset(string _name, string _desc ){
         owner = _owner;
 
@@ -42,6 +44,7 @@ contract Item is ItemStatus, Asset {
         comment = _comment;
         createdDate = _createdDate;
         itemNumber = _itemNumber;
+        metalQuantity = _metalQ;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -97,38 +100,4 @@ contract Item is ItemStatus, Asset {
         );
         return RestStatus.OK;
     }
-
-    // Transfer the ownership of a Item
-    // function transferOwnership(
-    //     address _addr,
-    //     address _productId,
-    //     address _inventoryId
-    // ) public returns (uint256) {
-    //     // caller must be current owner to transfer ownership
-    //     if (ownerOrganization != getUserOrganization(tx.origin)) {
-    //         return RestStatus.FORBIDDEN;
-    //     }
-
-    //     // fetch new owner cert details (org and unit)
-    //     mapping(string => string) newOwnerCert = getUserCert(_addr);
-    //     string newOwnerCommonName = newOwnerCert["commonName"];
-
-    //     // add new owner org (and maybe unit)
-    //     if (newOwnerOrganization == "") return RestStatus.NOT_FOUND;
-
-    //     generateOwnershipHistory(
-    //         ownerOrganization,
-    //         newOwnerOrganization,
-    //         block.timestamp,
-    //         address(this)
-    //     );
-    //     // set newOwner as asset owner
-    //     owner = _addr;
-    //     ownerOrganization = newOwnerOrganization;
-    //     ownerOrganizationalUnit = newOwnerOrganizationalUnit;
-    //     ownerCommonName = newOwnerCommonName;
-    //     productId = _productId;
-    //     inventoryId = _inventoryId;
-    //     return RestStatus.OK;
-    // }
 }
