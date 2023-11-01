@@ -27,8 +27,10 @@ library:
   - kafka-monad
   - milena
   - monad-alter
+  - redis-monad
   - resourcet
   - seqevents
+  - sql-monad
   - stm
   - strato-conf
   - strato-model
@@ -88,11 +90,24 @@ executables:
     main: TxrIndexerMain.hs
     source-dirs: exec_src/
     dependencies:
+      - blockapps-data
+      - blockapps-datadefs
       - blockapps-init
       - common-log
+      - containers
+      - evm-solidity
       - hflags
+      - kafka-monad
+      - monad-alter
+      - redis-monad
+      - seqevents
+      - sql-monad
+      - strato-conf
       - strato-index
-    other-modules: []
+      - strato-model
+      - strato-redis-blockdb
+    other-modules:
+      - Wiring
 
 tests:
   strato-index-test:

@@ -29,6 +29,9 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Conduit
 import Control.Monad
+import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.Redis
+import Control.Monad.Composable.SQL
 import qualified Data.ByteString.Char8 as C8
 import Data.Either.Extra (eitherToMaybe)
 import qualified Data.List as List
@@ -41,7 +44,8 @@ import Text.Format
 logF :: MonadLogger m => [String] -> m ()
 logF = $logInfoS "txrIndexer" . T.pack . concat
 
-doAddOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
+doAddOrgName :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
+                Word256 -> ChainMemberParsedSet -> m ()
 doAddOrgName chainId cm = do
   logF
     [ "Adding chain ",
@@ -49,11 +53,12 @@ doAddOrgName chainId cm = do
       " to cm ",
       format cm
     ]
-  lift $ addMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.addChainMember chainId cm
-  void . withKafkaRetry1s $ writeUnseqEvents [IENewChainOrgName chainId cm]
+  addMember chainId cm
+  void . execRedis $ RBDB.addChainMember chainId cm
+  void . execKafka $ writeUnseqEvents [IENewChainOrgName chainId cm]
 
-doRemoveOrgName :: Word256 -> ChainMemberParsedSet -> IContextM ()
+doRemoveOrgName :: (MonadLogger m, HasRedis m, HasSQL m) =>
+                   Word256 -> ChainMemberParsedSet -> m ()
 doRemoveOrgName chainId cm = do
   logF
     [ "Removing chain ",
@@ -61,10 +66,11 @@ doRemoveOrgName chainId cm = do
       " from org ",
       format cm
     ]
-  lift $ removeMember chainId cm
-  void . RBDB.withRedisBlockDB $ RBDB.removeChainMember chainId cm
+  removeMember chainId cm
+  void . execRedis $ RBDB.removeChainMember chainId cm
 
-doRegisterCertificate :: Address -> X509CertInfoState -> IContextM ()
+doRegisterCertificate :: (MonadIO m, MonadLogger m, HasKafka m, HasRedis m) =>
+                         Address -> X509CertInfoState -> m ()
 doRegisterCertificate userAddress x509CertInfoState = do
   logF
     [ "Registering X.509 Certificate -- key/userAddress: ",
@@ -72,19 +78,21 @@ doRegisterCertificate userAddress x509CertInfoState = do
       "; value/x509CertInfoState: ",
       format x509CertInfoState
     ]
-  void . RBDB.withRedisBlockDB $ RBDB.registerCertificate userAddress x509CertInfoState
-  void . withKafkaRetry1s $ writeUnseqEvents [IENewCertRegistered userAddress x509CertInfoState]
+  void . execRedis $ RBDB.registerCertificate userAddress x509CertInfoState
+  void . execKafka $ writeUnseqEvents [IENewCertRegistered userAddress x509CertInfoState]
 
-doRevokeCertificate :: Address -> IContextM ()
+doRevokeCertificate :: (MonadIO m, MonadLogger m, HasKafka m, HasRedis m) =>
+                       Address -> m ()
 doRevokeCertificate userAddress = do
   logF
     [ "Revoking X.509 Certificate -- key/userAddress: ",
       format userAddress
     ]
-  void . RBDB.withRedisBlockDB $ RBDB.revokeCertificate userAddress
-  void . withKafkaRetry1s $ writeUnseqEvents [IECertRevoked userAddress]
+  void . execRedis $ RBDB.revokeCertificate userAddress
+  void . execKafka $ writeUnseqEvents [IECertRevoked userAddress]
 
-doValidatorAdded :: Keccak256 -> ChainMemberParsedSet -> IContextM ()
+doValidatorAdded :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
+                    Keccak256 -> ChainMemberParsedSet -> m ()
 doValidatorAdded bHash cm = do
   logF
     [ "Adding validator ",
@@ -92,11 +100,12 @@ doValidatorAdded bHash cm = do
       " at block ",
       format bHash
     ]
-  lift $ addRemoveValidator ([], [cm])
-  void . RBDB.withRedisBlockDB $ RBDB.addValidators [cm]
-  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorAdded bHash cm]
+  addRemoveValidator ([], [cm])
+  void . execRedis $ RBDB.addValidators [cm]
+  void . execKafka $ writeUnseqEvents [IEValidatorAdded bHash cm]
 
-doValidatorRemoved :: Keccak256 -> ChainMemberParsedSet -> IContextM ()
+doValidatorRemoved :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
+                      Keccak256 -> ChainMemberParsedSet -> m ()
 doValidatorRemoved bHash cm = do
   logF
     [ "Removing validator ",
@@ -104,12 +113,13 @@ doValidatorRemoved bHash cm = do
       " at block ",
       format bHash
     ]
-  lift $ addRemoveValidator ([cm], [])
-  void . RBDB.withRedisBlockDB $ RBDB.removeValidators [cm]
-  void . withKafkaRetry1s $ writeUnseqEvents [IEValidatorRemoved bHash cm]
+  addRemoveValidator ([cm], [])
+  void . execRedis $ RBDB.removeValidators [cm]
+  void . execKafka $ writeUnseqEvents [IEValidatorRemoved bHash cm]
 
-txrIndexer :: LoggingT IO ()
-txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
+txrIndexerMainLoop :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
+                      m ()
+txrIndexerMainLoop = forever $ do
   $logInfoS "txrIndexer" "About to fetch IndexEvents"
   (offset, idxEvents) <- getUnprocessedIndexEvents
   logF ["Fetched ", show (length idxEvents), " events starting from ", show offset]
@@ -166,13 +176,14 @@ indexEventToTxrResults = \case
   TxResult r -> [PutTxResult r]
   _ -> []
 
-txrResultHandler :: TxrResult -> IContextM ()
+txrResultHandler :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
+                    TxrResult -> m ()
 txrResultHandler = \case
   AddOrgName chainId chainMember -> doAddOrgName chainId chainMember
   RemoveOrgName chainId chainMember -> doRemoveOrgName chainId chainMember
   RegisterCertificate ua certInfoState -> doRegisterCertificate ua certInfoState
   CertificateRevoked userAddress -> doRevokeCertificate userAddress
-  TerminateChain chainId -> lift $ terminateChain chainId
+  TerminateChain chainId -> terminateChain chainId
   ValidatorAdded bHash chainMember -> doValidatorAdded bHash chainMember
   ValidatorRemoved bHash chainMember -> doValidatorRemoved bHash chainMember
   PutLogDB l -> do
@@ -184,7 +195,7 @@ txrResultHandler = \case
         " at block ",
         format $ logDBBlockHash l
       ]
-    void . lift $ LogDB.putLogDB l
+    void $ LogDB.putLogDB l
   PutEventDB ev -> do
     let evName = eventDBName ev
         evArgs = eventDBArgs ev
@@ -204,27 +215,30 @@ txrResultHandler = \case
 --         , " at block "
 --         , format $ transactionResultBlockHash r
 --         ]
---    void . lift $ TxrDB.putTransactionResult r
+--    void $ TxrDB.putTransactionResult r
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer")
 
-getKafkaCheckpoint :: IContextM Offset
+getKafkaCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) =>
+                      m Offset
 getKafkaCheckpoint =
-  withKafkaRetry1s (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
+  execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
     Left UnknownTopicOrPartition -> setKafkaCheckpoint 0 >> getKafkaCheckpoint
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
 
-setKafkaCheckpoint :: Offset -> IContextM ()
+setKafkaCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) =>
+                      Offset -> m ()
 setKafkaCheckpoint ofs = do
   $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-  withKafkaRetry1s (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
+  execKafka (commitSingleOffset (snd kafkaClientIds) targetTopicName 0 ofs "") >>= \case
     Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
     Right () -> return ()
 
-getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent])
+getUnprocessedIndexEvents :: (MonadIO m, MonadLogger m, HasKafka m) =>
+                             m (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
   ofs <- getKafkaCheckpoint
-  evs <- withKafkaRetry1s (readIndexEvents ofs)
+  evs <- execKafka (readIndexEvents ofs)
   return (ofs, evs)
