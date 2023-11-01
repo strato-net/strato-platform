@@ -49,13 +49,13 @@ const Checkout = ({ user }) => {
   const calculateTax = (item) => {
     return item.product.taxes ?
       (item.product.taxPercentageAmount ?
-        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)
-        : (item.product.taxes / 100) * item.qty)
+        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100))
+        : (item.product.taxes) * item.qty)
       : 0;
   };
 
   const calculateShipping = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
+    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING);
   };
 
   let storedData
@@ -101,7 +101,7 @@ const Checkout = ({ user }) => {
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.pricePerUnit * item.qty,
+            item.product.isTaxPercentage ? ((item.product.pricePerUnit * item.qty) + calculateTax(item)) : ((item.product.pricePerUnit + item.product.taxes) * item.qty),
           action: item.product.address,
           qty: item.qty,
         });
@@ -110,6 +110,7 @@ const Checkout = ({ user }) => {
       // Return the new object
       return { key: key, value: modifiedValue };
     });
+
     setmapData(mapDataArray)
 
     let t = 0;
@@ -310,7 +311,7 @@ const Checkout = ({ user }) => {
       title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-center">{Math.trunc(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">ACTION</Text>,

@@ -839,9 +839,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       orderList.forEach(orderLine => {
         const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
         const product = productList.find(item => item.address === inventoryItem.productId)
-        invoices.push({ productName: decodeURIComponent(product.name), unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
-
-        calculatedOrderTotal += (inventoryItem.pricePerUnit * orderLine.quantity)
+        invoices.push({ productName: product.name, unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
+        let price = inventoryItem.pricePerUnit
+        let tax = inventoryItem.taxDollarAmount === 0 ? Math.ceil(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
+        let finalPrice = inventoryItem.pricePerUnit + tax;
+        calculatedOrderTotal += (finalPrice * orderLine.quantity)
       })
 
       if (calculatedOrderTotal != recievedOrderTotal) {
@@ -960,7 +962,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const groupedData = inventories.reduce((acc, inventory) => {
         if (!acc[inventory.productId]) {
-          const taxRate = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount : inventory.taxDollarAmount) / 100;
+          const taxRate = (inventory.taxDollarAmount === 0 ? inventory.taxPercentageAmount : inventory.taxDollarAmount);
           acc[inventory.productId] = { ownerOrganization: inventory.ownerOrganization, tax: taxRate, isTaxPercentage: inventory.taxDollarAmount === 0, data: [] };
         }
         acc[inventory.productId].data.push(inventory);
@@ -971,7 +973,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const total = inventoriesData.reduce((acc, obj) => {
         const result = obj.data.reduce((total, curr) => obj.tax !== 0 ?
           (obj.isTaxPercentage ?
-            ((total + ((curr.pricePerUnit * curr.quantity) * (1 + (obj.tax / 100)))) * 100) / 100
+            ((total + ((curr.pricePerUnit * curr.quantity) + Math.ceil((curr.pricePerUnit * curr.quantity) * (obj.tax / 100)))))
             : total + (curr.pricePerUnit * curr.quantity) + (obj.tax * curr.quantity)
           ) : (total + curr.pricePerUnit * curr.quantity), 0);
         return Number(acc) + Number(result);
@@ -1528,7 +1530,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let membership = await membershipJs.getAll(rawAdmin, { productId: [productId] }, { ...options, org: managers.cirrusOrg, app: contractName })
       const months = membership[0].timePeriodInMonths;
       const currentDateTime = dayjs();
-      const expiryDateTime = currentDateTime.add(months, 'month').add(1, 'day').valueOf();
+      // const expiryDateTime = currentDateTime.add(months, 'month').add(1, 'day').valueOf();
+      const expiryDateTime = currentDateTime.add(months, 'month').valueOf();
 
       let totalExpiry;
       if (items?.expiryDate === totalExpiry) {
@@ -2000,9 +2003,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   //----------------------------- ServiceUsage (Start ->) -------------------------------
   contract.createServiceUsage = async function (args, options = defaultOptions) {
     try {
-      const createdDate = Math.floor(Date.now() / 1000);
       const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      return serviceUsageJs.uploadContract(rawAdmin, { ...args, createdDate, }, createOptions);
+      return managers.membershipManager.createServiceUsage({ ...args });
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -2012,7 +2014,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getServiceUsage = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { ...args }, getOptions)
     const memberships = await contract.getPurchasedMemberships();
     const data = serviceUsage.map((item, index) => {
@@ -2024,7 +2026,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getBookedServiceUsage = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, {
       ...args,
       sort: '-createdDate',
@@ -2056,8 +2057,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getProvidedServiceUsages = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions1 = { ...options, org: managers.cirrusOrg, app: contractName, };
-    let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions1);
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    let issuedProducts = await managers.productManager.getProducts({ category: 'Membership', manufacturer: userOrganization }, getOptions);
 
     const arrayOfProductAddresses = issuedProducts.map(obj => obj.address);
 
@@ -2067,15 +2068,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       notEqualsField: 'ownerOrganization',
     };
 
-    let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions1);
+    let issuedItems = await itemJs.getAll(rawAdmin, arg, getOptions);
     let itemAddressList = issuedItems.map(item => item.address);
     const args1 = {
       // ownerOrganization: userOrganization,
       // providerLastUpdated:userAddress,
       itemId: itemAddressList
     }
-    const items = await contract.getItems({ address: itemAddressList });
-    const getOptions = { ...options, org: managers.cirrusOrg, app: "", };
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();

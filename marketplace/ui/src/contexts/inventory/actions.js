@@ -54,7 +54,7 @@ const actions = {
           type: actionDescriptors.createInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory created successfully", true);
+        actions.setMessage(dispatch, "Membership Successfully Saved", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.createInventoryFailed, error: body.error.message });
@@ -141,7 +141,7 @@ const actions = {
           type: actionDescriptors.updateInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Inventory has been updated", true);
+        actions.setMessage(dispatch, "Membership Successfully Saved", true);
         return true;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
