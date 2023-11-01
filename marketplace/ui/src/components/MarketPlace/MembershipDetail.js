@@ -814,7 +814,7 @@ const MembershipDetails = ({ user, users }) => {
                         openListNowModal();
                       }
                     }}
-                  // disabled={ownerSameAsUser}
+                  disabled={isIssued}
                   >
                     {" "}
                     <Text
