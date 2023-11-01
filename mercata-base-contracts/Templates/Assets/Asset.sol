@@ -3,13 +3,13 @@ import <509>;
 pragma es6;
 pragma strict;
 
-abstract contract Asset {
+abstract contract Asset is PaymentType, SaleState{
     address public owner;
-    string ownerCommonName;
-    string name;
-    string description;
-    string[] images;
-    uint price;
+    string public ownerCommonName;
+    string public name;
+    string public description;
+    string[] public images;
+    uint public price;
 
     Sale public sale;
 
@@ -38,14 +38,8 @@ abstract contract Asset {
         _;
     }
 
-    function createBaseSale(address _purchaser, SaleState _state, PaymentType _payment) internal returns (Sale) {
-        Sale b = new Sale(
-            _purchaser,
-            address(this),
-            _state,
-            _payment,
-        );
-        return b;
+    function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
+        return new Sale(address(this), _state, _payment);
     }
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
@@ -54,7 +48,7 @@ abstract contract Asset {
     }
 
     function changeSaleState(SaleState _state) public requireOwner("Change Sale State"){
-        require(Sale!=address(0));
+        require(address(sale)!=address(0));
         sale.changeSaleState(_state);
     }
 
@@ -63,7 +57,7 @@ abstract contract Asset {
     }
 
     function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){
-        require(Sale!=address(0));
+        require(address(sale)!=address(0));
         sale.changePaymentType(_payment);
     }
 
@@ -73,4 +67,3 @@ abstract contract Asset {
         sale = Sale(address(0));
     }
 }
-

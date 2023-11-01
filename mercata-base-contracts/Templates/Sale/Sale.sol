@@ -3,25 +3,11 @@ import <509>;
 pragma es6;
 pragma strict;
 
-abstract contract Sale{ 
+abstract contract Sale is PaymentType, SaleState{ 
     string sellersCommonName;
     string purchasersCommonName;
     Asset assetToBeSold;
-    string price;
-
-    enum SaleState {
-        NONE,
-        Created,
-        Closed,
-        MAX
-    }
-
-    enum PaymentType{
-        NONE,
-        CASH,
-        STRAT,
-        MAX
-    }
+    uint price;
 
     SaleState state;
     PaymentType payment;
@@ -36,12 +22,12 @@ abstract contract Sale{
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         sellersCommonName = Certificate(account(address(c), "main")).commonName();
-        address currentOwner = assetToBeSold.owner;
-        currentOwnerName = Certificate(account(address(currentOwner), "main")).commonName();
+        address currentOwner = assetToBeSold.owner();
+        string currentOwnerName = Certificate(account(currentOwner, "main")).commonName();
         require(sellersCommonName == currentOwnerName, "Only the owner of the asset can open a bill of sale");
-        sellersCommonName = asset.ownerCommonName;
+        sellersCommonName = assetToBeSold.ownerCommonName();
         purchasersCommonName = sellersCommonName;
-        price = assetToBeSold.price;
+        price = assetToBeSold.price();
         state = _state;
         payment = _payment;
     }
@@ -69,9 +55,10 @@ abstract contract Sale{
     }
 
 
-    function transferOwnership(string purchasersCommonName) public requireSeller("Transfer Ownership of Asset") {
-        purchasersCommonName = _purchasersCommonName,
+    function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") {
+        purchasersCommonName = _purchasersCommonName;
         assetToBeSold.transferOwnership(purchasersCommonName);
         state = SaleState.Closed;
     }
 }
+
