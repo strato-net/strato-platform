@@ -841,7 +841,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const product = productList.find(item => item.address === inventoryItem.productId)
         
         let price = inventoryItem.pricePerUnit
-        let tax = inventoryItem.taxDollarAmount === 0 ? Math.ceil(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
+        let tax = inventoryItem.taxDollarAmount === 0 ? Math.round(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
         let finalPrice = inventoryItem.pricePerUnit + tax;
         calculatedOrderTotal += (finalPrice * orderLine.quantity)
         invoices.push({ productName: product.name, unitPrice: finalPrice, quantity: orderLine.quantity })
@@ -971,7 +971,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
      
       const total = inventoriesData.reduce((acc, obj) => {
         const result = obj.data.reduce((total, curr) => {
-            let tax = curr.taxDollarAmount === 0 ? Math.ceil(curr.pricePerUnit * (curr.taxPercentageAmount / 100)) : curr.taxDollarAmount;
+            let tax = curr.taxDollarAmount === 0 ? Math.round(curr.pricePerUnit * (curr.taxPercentageAmount / 100)) : curr.taxDollarAmount;
             let finalPrice = curr.pricePerUnit + tax;
     
             return total + (finalPrice * curr.quantity);  // corrected this line
@@ -1010,7 +1010,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const shippingCharges = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
           // const tax = (inventoryObject.pricePerUnit * inventoryObject.quantity) * CHARGES.SHIPPING;
 
-          let taxUnit = inventoryObject.taxDollarAmount === 0 ? Math.ceil(inventoryObject.pricePerUnit * (inventoryObject.taxPercentageAmount / 100)) : (inventoryObject.taxDollarAmount)
+          let taxUnit = inventoryObject.taxDollarAmount === 0 ? Math.round(inventoryObject.pricePerUnit * (inventoryObject.taxPercentageAmount / 100)) : (inventoryObject.taxDollarAmount)
           let tax = taxUnit * inventoryObject.quantity
 
           await managers.orderManager.addOrderLine({

@@ -47,11 +47,8 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return item.product.taxes ?
-      (item.product.taxPercentageAmount ?
-        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100))
-        : (item.product.taxes) * item.qty)
-      : 0;
+    let tax = item.product.taxDollarAmount === 0 ? Math.round(item.product.pricePerUnit * (item.product.taxPercentageAmount / 100)) : (item.product.taxDollarAmount)
+    return tax * item.qty   
   };
 
   const calculateShipping = (item) => {
