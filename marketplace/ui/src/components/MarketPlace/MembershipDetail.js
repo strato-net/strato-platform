@@ -63,7 +63,10 @@ const MembershipDetails = ({ user, users }) => {
 
   const isIssued = type === "issued";
   const isPurchased = type === "purchased";
+  const isMarket = type === "all";
+  // const isMarketPlace = isIssued || isMarket;
   const isMarketPlace = !isIssued && !isPurchased;
+  // && !isPurchased;
 
   const { state, pathname } = useLocation();
 
@@ -434,38 +437,38 @@ const MembershipDetails = ({ user, users }) => {
               taxDollarAmount: formik.values.taxDollarAmount,
             },
           };
-          const inventoryBody = {
-            productAddress: membershipDetails.productId,
-            quantity: formik.values.quantity,
-            pricePerUnit: formik.values.price,
-            // Generate random code for now
-            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-            // Status should always be published if we use List Now
-            status: formik.values.inventoryStatus,
-            serialNumber: [],
-            taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
-            taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
-          };
-          if (isIssued) {
-            const createInventory = await inventoryActions.createInventory(
-              inventoryDispatch,
-              inventoryBody
-            )
+          // const inventoryBody = {
+          //   productAddress: membershipDetails.productId,
+          //   quantity: formik.values.quantity,
+          //   pricePerUnit: formik.values.price,
+          //   // Generate random code for now
+          //   batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+          //   // Status should always be published if we use List Now
+          //   status: formik.values.inventoryStatus,
+          //   serialNumber: [],
+          //   taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
+          //   taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
+          // };
+          // if (isIssued) {
+          //   const createInventory = await inventoryActions.createInventory(
+          //     inventoryDispatch,
+          //     inventoryBody
+          //   )
 
-            if (createInventory) {
-              formik.resetForm();
-            }
-            setVisible(false);
-          } else {
-            const resaleMembership = await membershipActions.resaleMembership(
-              membershipDispatch,
-              resalePayload
-            )
-            if (resaleMembership) {
-              formik.resetForm();
-            }
-            setVisible(false);
+          //   if (createInventory) {
+          //     formik.resetForm();
+          //   }
+          //   setVisible(false);
+          // } else {
+          const resaleMembership = await membershipActions.resaleMembership(
+            membershipDispatch,
+            resalePayload
+          )
+          if (resaleMembership) {
+            formik.resetForm();
           }
+          setVisible(false);
+          // }
         }
       }
     }
@@ -688,7 +691,7 @@ const MembershipDetails = ({ user, users }) => {
                     </Text>
                   </Col>
                 </Row>
-                {isMarketPlace && (
+                {(isIssued || isMarket) && (
                   <Row>
                     <Row
                       className="w-full absolute mr-5 left-0 mt-6"
@@ -774,54 +777,57 @@ const MembershipDetails = ({ user, users }) => {
                     Contact to Buy
                   </Button>
                 ) : !isMarketPlace ? (
-                  <Button
-                    // type={ownerSameAsUser ? "default" : "primary"}
-                    type="primary"
-                    block={true}
-                    size="large"
-                    className=" h-full py-4 h-px-56"
-                    onClick={() => {
-                      if (
-                        hasChecked &&
-                        !isAuthenticated &&
-                        loginUrl !== undefined
-                      ) {
-                        window.location.href = loginUrl;
-                      } else {
-                        let taxVal =
-                          inventoryDetails.taxPercentageAmount === 0
-                            ? inventoryDetails.taxDollarAmount
-                            : inventoryDetails.taxPercentageAmount;
-                        formik.setFieldValue("name", inventoryDetails?.name);
-                        formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
-                        formik.setFieldValue(
-                          "price",
-                          inventoryDetails?.pricePerUnit
-                        );
-                        formik.setFieldValue("taxPercentage", taxVal);
-                        formik.setFieldValue("quantity", 1);
-                        formik.setFieldValue(
-                          "taxPercentageAmount",
-                          inventoryDetails.taxPercentageAmount
-                        );
-                        formik.setFieldValue(
-                          "taxDollarAmount",
-                          inventoryDetails.taxDollarAmount
-                        );
-                        openListNowModal();
-                      }
-                    }}
-                  // disabled={ownerSameAsUser}
-                  >
-                    {" "}
-                    <Text
-                      className={`text-lg font-poppin text-white 
-                    `}
+                  <>
+                    {!isIssued && <Button
+                      // type={ownerSameAsUser ? "default" : "primary"}
+                      type="primary"
+                      block={true}
+                      size="large"
+                      className=" h-full py-4 h-px-56"
+                      onClick={() => {
+                        if (
+                          hasChecked &&
+                          !isAuthenticated &&
+                          loginUrl !== undefined
+                        ) {
+                          window.location.href = loginUrl;
+                        } else {
+                          let taxVal =
+                            inventoryDetails.taxPercentageAmount === 0
+                              ? inventoryDetails.taxDollarAmount
+                              : inventoryDetails.taxPercentageAmount;
+                          formik.setFieldValue("name", inventoryDetails?.name);
+                          formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
+                          formik.setFieldValue(
+                            "price",
+                            inventoryDetails?.pricePerUnit
+                          );
+                          formik.setFieldValue("taxPercentage", taxVal);
+                          formik.setFieldValue("quantity", 1);
+                          formik.setFieldValue(
+                            "taxPercentageAmount",
+                            inventoryDetails.taxPercentageAmount
+                          );
+                          formik.setFieldValue(
+                            "taxDollarAmount",
+                            inventoryDetails.taxDollarAmount
+                          );
+                          openListNowModal();
+                        }
+                      }}
+                      disabled={isIssued}
                     >
-                      {isIssued ? "Add Inventory" : "Edit Listing"}
-                    </Text>
-                    {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
-                  </Button>
+                      {" "}
+                      <Text
+                        className={`text-lg font-poppin text-white 
+                    `}
+                      >
+                        {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
+                        List for Sale
+                      </Text>
+                      {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
+                    </Button>}
+                  </>
                 ) : (
                   <Row className="w-full mx-auto" gutter={[12]}>
                     <Col span={12} className="mx-auto flex justify-center">
@@ -892,7 +898,7 @@ const MembershipDetails = ({ user, users }) => {
                 )}
               </Row>
             </Col>
-          </Row>
+          </Row >
 
           <Row className="max-w-4xl mx-auto mt-10">
             <Card className="w-full shadow-md">
@@ -960,22 +966,24 @@ const MembershipDetails = ({ user, users }) => {
               />
             </Card>
           </Row>
-        </div>
+        </div >
       )}
-      {visible && (
-        <ListNowModal
-          open={visible}
-          user={{ user }}
-          handleCancel={closeListNowModal}
-          onClick={openListNowModal}
-          formik={formik}
-          isEdit={true}
-          getIn={getIn}
-          listType={isIssued ? "New" : "Sale"}
-          id={Id}
-          isCreateMembershipSubmitting={isCreateInventorySubmitting}
-        />
-      )}
+      {
+        visible && (
+          <ListNowModal
+            open={visible}
+            user={{ user }}
+            handleCancel={closeListNowModal}
+            onClick={openListNowModal}
+            formik={formik}
+            isEdit={true}
+            getIn={getIn}
+            listType={isIssued ? "New" : "Sale"}
+            id={Id}
+            isCreateMembershipSubmitting={isCreateInventorySubmitting}
+          />
+        )
+      }
     </>
   );
 };
