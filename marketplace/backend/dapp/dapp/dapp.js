@@ -2026,7 +2026,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       sort: '-createdDate',
       // owner: userAddress, 
       // ownerOrganization: userOrganization,
-      // bookedUserAddress: userAddress
+      bookedUserAddress: userAddress
     }, getOptions);
     const itemAddress = serviceUsage['serviceUsage']?.map((item) => item.itemId)
 
@@ -2037,16 +2037,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const currentDate = dayjs();
 
     const data = serviceUsage['serviceUsage']?.map((item) => {
+      let membershipDetail = memberships.find((mItem) => mItem.itemAddress === item.itemId)
       return ({
         ...item,
-        provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
+        provider: membershipDetail?.manufacturer || '',
         serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
-        membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
+        membershipNumber: membershipDetail?.itemNumber || '',
         bookedUserName: (users.find((uItem) => uItem.userAddress === item?.bookedUserAddress) || {}).commonName || '',
         expiryDate: (items.find((itemE) => itemE.address === item.itemId)?.expiryDate)
       })
-    })
-      .filter(item => {
+    }).filter(item => {
         const itemExpiryDate = dayjs(item.expiryDate);
         return itemExpiryDate.isAfter(currentDate);
       }); //Test this filter
@@ -2078,17 +2078,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const serviceUsage = await serviceUsageJs.getAll(rawAdmin, { itemId: itemAddressList, ...args, sort: '-createdDate' }, getOptions)
     const services = await contract.getServices();
     const memberships = await contract.getIssuedMemberships();
-    // const currentDate = dayjs();
+    const currentDate = dayjs();
     // const users = await contract.getCertificates();
-    const data = serviceUsage['serviceUsage'].map((item) => ({
-      ...item,
-      provider: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).manufacturer || '',
-      serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
-      membershipNumber: (memberships.find((mItem) => mItem.itemAddress === item.itemId) || {}).itemNumber || '',
-      bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
-      expiryDate: (items.find((itemE) => itemE.address === item.itemId)?.expiryDate)
-    }))
-      .filter(item => {
+    const data = serviceUsage['serviceUsage'].map((item) => {
+      let membershipDetail = memberships.find((mItem) => mItem.itemAddress === item.itemId);
+      return ({
+        ...item,
+        provider: membershipDetail.manufacturer || '',
+        serviceName: (services.find((sId) => sId.address === item.serviceId) || {}).name || '',
+        membershipNumber: membershipDetail.itemNumber || '',
+        bookedUserName: (memberships.find((uItem) => uItem.owner === item?.bookedUserAddress) || {}).ownerCommonName || '',
+        expiryDate: (items.find((itemE) => itemE.address === item.itemId)?.expiryDate)
+      })
+    }).filter(item => {
         const itemExpiryDate = dayjs(item.expiryDate);
         return itemExpiryDate.isAfter(currentDate);
       });
