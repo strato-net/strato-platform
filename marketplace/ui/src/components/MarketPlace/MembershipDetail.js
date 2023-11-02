@@ -229,8 +229,6 @@ const MembershipDetails = ({ user, users }) => {
     }
   }, [inventory]);
 
-  console.log({ inventoryId, membershipDetails, Id });
-
   useEffect(() => {
     if (Id !== undefined && inventoryId && !membershipDetails) {
       actions.fetchInventoryDetail(inventoryDispatch, inventoryId);
@@ -290,13 +288,6 @@ const MembershipDetails = ({ user, users }) => {
       );
     }
   };
-
-  console.log({
-    isMembershipLoading,
-    isInventoriesLoading,
-    isProductDetailsLoading,
-    isInventoryDetailsLoading,
-  });
 
   useEffect(() => {
     if (
@@ -629,8 +620,6 @@ const MembershipDetails = ({ user, users }) => {
       </Row>
     );
   };
-
-  console.log({ isLoading });
 
   return (
     <>
