@@ -13,6 +13,7 @@ import {
   Table,
 } from "antd";
 import noPreview from "../../images/resources/noPreview.jpg";
+import { listNowConfig } from "./listNowConfig";
 import { useMatch, useParams } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
@@ -81,6 +82,7 @@ const MembershipDetails = ({ user, users }) => {
     quantity: 1,
   };
 
+  const [listModalConfig, setListModalConfig] = useState({})
   const [activeTab, setActiveTab] = useState("Details");
   const [serviceList, setServiceList] = useState([]);
   const [savingsList, setSavingsList] = useState([]);
@@ -434,6 +436,8 @@ const MembershipDetails = ({ user, users }) => {
 
   const openListNowModal = () => {
     setVisible(true);
+    let config = listNowConfig("resaleMembership")
+    setListModalConfig(config)
   };
 
   const handleCreateFormSubmit = async (values) => {
@@ -517,8 +521,7 @@ const MembershipDetails = ({ user, users }) => {
     return (
       <>
         <Text className="leading-6 text-lg block font-semibold pb-3">
-          {" "}
-          Information{" "}
+          Information
         </Text>
         <Col
           xl={{ span: 14 }}
@@ -679,14 +682,12 @@ const MembershipDetails = ({ user, users }) => {
                   </Row>
                 ) : (
                   <Row className="mb-1">
-                    {" "}
                     <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm">
-                      {" "}
                       Expiry Date:- &nbsp;
                       {membershipDetails?.expiryDate
                         ? expiryDateVal
-                        : "--"}{" "}
-                    </Text>{" "}
+                        : "--"}
+                    </Text>
                   </Row>
                 )}
                 <Row className="flex justify-between h-20 mt-8">
@@ -695,14 +696,14 @@ const MembershipDetails = ({ user, users }) => {
                     className="border border-grayLight rounded-md p-2 h-full"
                   >
                     <Text className="block text-center text-grey text-base font-poppin font-normal">
-                      {isMarketPlace ? "Price" : "Status"}{" "}
+                      {isMarketPlace ? "Price" : "Status"}
                     </Text>
                     <Text className="block text-center text-xl font-bold mt-2">
                       {isMarketPlace
                         ? `$ ${inventoryDetails?.pricePerUnit}`
                         : (inventoryID
-                            ? StatusValue[inventoryDetails?.status]
-                            : "Not Listed") ?? "--"}{" "}
+                          ? StatusValue[inventoryDetails?.status]
+                          : "Not Listed")}
                     </Text>
                   </Col>
                   <Col
@@ -710,15 +711,13 @@ const MembershipDetails = ({ user, users }) => {
                     className="border border-grayLight rounded-md p-2 h-full"
                   >
                     <Text className="block text-center text-grey text-base font-poppin font-normal">
-                      {" "}
-                      Total Savings{" "}
+                      Total Savings
                     </Text>
                     <Text
                       className="block text-center text-xl font-bold mt-2 leading-6"
                       style={{ color: "green" }}
                     >
-                      {" "}
-                      $ {totalSavings}{" "}
+                      $ {totalSavings}
                     </Text>
                   </Col>
                 </Row>
@@ -732,36 +731,33 @@ const MembershipDetails = ({ user, users }) => {
                       {inventoryDetails?.availableQuantity != 0 ? (
                         <Row className="flex justify-between h-10 mt-5">
                           <Col span={4} className="rounded-md h-14">
-                            {" "}
                             <Button
                               className="h-full text-center p-6 add-sub-btn "
                               disabled={isIssued}
                               onClick={subtract}
                             >
                               {minusIcon()}
-                            </Button>{" "}
+                            </Button>
                           </Col>
                           <Col
                             span={16}
                             className="border border-grayLight rounded-md align-middle text-center h-14 py-2"
                           >
                             <Text className="font-poppin font-normal text-base text-grey">
-                              Quantity{" "}
-                            </Text>{" "}
-                            &nbsp;{" "}
+                              Quantity
+                            </Text>
+                            &nbsp;
                             <Text className="text-2xl font-bold leading-8 pt-2">
                               {qty}
                             </Text>
                           </Col>
                           <Col span={4} className="rounded-md h-14">
-                            {" "}
                             <Button
                               className="h-full text-center p-6 float-right add-sub-btn"
                               disabled={isIssued}
                               onClick={add}
                             >
-                              {" "}
-                              {plusIcon()}{" "}
+                              {plusIcon()}
                             </Button>
                           </Col>
                         </Row>
@@ -794,16 +790,16 @@ const MembershipDetails = ({ user, users }) => {
                     size="large"
                     className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
-                    // onClick={() => {
-                    //   TagManager.dataLayer({
-                    //     dataLayer: {
-                    //       event: 'contact_sales_from_category_card',
-                    //       product_name: product.name,
-                    //       category: product.category,
-                    //       productId: product.productId
-                    //     },
-                    //   });
-                    // }}
+                  // onClick={() => {
+                  //   TagManager.dataLayer({
+                  //     dataLayer: {
+                  //       event: 'contact_sales_from_category_card',
+                  //       product_name: product.name,
+                  //       category: product.category,
+                  //       productId: product.productId
+                  //     },
+                  //   });
+                  // }}
                   >
                     Contact to Buy
                   </Button>
@@ -855,7 +851,6 @@ const MembershipDetails = ({ user, users }) => {
                         }}
                         disabled={isIssued}
                       >
-                        {" "}
                         <Text
                           className={`text-lg font-poppin text-white 
                     `}
@@ -1011,14 +1006,13 @@ const MembershipDetails = ({ user, users }) => {
       )}
       {visible && (
         <ListNowModal
+          config={listModalConfig}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
-          isEdit={true}
           getIn={getIn}
-          listType={isIssued ? "New" : "Sale"}
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />

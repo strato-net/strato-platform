@@ -20,6 +20,7 @@ import {
 } from "antd";
 import { PlusOutlined, InboxOutlined, MinusOutlined, CaretDownOutlined, CheckCircleOutlined, DeleteOutlined } from "@ant-design/icons";
 import getSchema from "./MembershipSchema";
+import { listNowConfig } from "../MarketPlace/listNowConfig";
 // import useDebounce from "../UseDebounce";
 
 // Actions for the membership context
@@ -59,6 +60,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
   // Can update these values for service search later on
   const [offset, setOffset] = useState(0);
   const dispatch = useMembershipDispatch();
+  const [listModalConfig, setListModalConfig] = useState({})
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -394,11 +396,11 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
 
   const openListNowModal = () => {
     setVisible(true);
+    let config = listNowConfig("create");
+    setListModalConfig(config)
   };
 
   const handleInputChange = (name, event) => {
-    // console.log();
-    // const { name, value } = event.target;
     formik.setFieldValue(name, event.target.value);
   };
 
@@ -866,14 +868,13 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
       </Modal>
       {visible && (
         <ListNowModal
+          config={listModalConfig}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
           id="None"
-          listType="New"
-          isCreate={true}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateMembershipSubmitting}
         />

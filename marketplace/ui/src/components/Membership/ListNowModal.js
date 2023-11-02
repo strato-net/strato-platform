@@ -37,20 +37,11 @@ const ListNowModal = ({
   handleCancel,
   user,
   formik,
-  // type,
-  isCreate,
-  listed,
-  isEdit,
-  listType,
   id,
-  getIn,
   membershipStatus,
   isCreateMembershipSubmitting,
+  config: { title, isMembershipNumber, quantityDisabled, priceDisabled, isStatusVisible, statusDropDown }
 }) => {
-  const { type } = useParams();
-  const isIssued = type === "issued";
-  const isPurchased = type === "purchased";
-  const isNew = listType === "New";
 
   const {
     isInventoriesLoading,
@@ -62,7 +53,6 @@ const ListNowModal = ({
   } = useInventoryState();
 
   const { isuploadImageSubmitting } = useProductState();
-
   const seller = user?.user?.user?.organization || user?.user?.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting, purchasedMemberships, memberships } =
@@ -89,7 +79,6 @@ const ListNowModal = ({
       return `${decimalParts[0]}.${decimalParts[1].substring(0, 2)}`;
     }
   };
-
 
   const handleParser = (value) => {
     // Remove non-numeric characters and leading zeros
@@ -118,7 +107,7 @@ const ListNowModal = ({
       width="auto"
       title={
         <Text className="text-xl font-semibold">
-          {isCreate ? "Create Listing" : "Create / Edit Listing"}
+          {title}
         </Text>
       }
       open={open}
@@ -170,7 +159,7 @@ const ListNowModal = ({
               />
             </Row>
           </Col>
-          {(isPurchased && !isCreate) && (
+          {isMembershipNumber && (
             <Col span={8}>
               <Row>
                 <Text className="font-medium">Membership Number</Text>
@@ -195,19 +184,11 @@ const ListNowModal = ({
                 id="quantity"
                 name="quantity"
                 min={0}
-                // max={inventoryQuantity}
                 className="w-full mt-2"
                 size="large"
-                // prefix={isInventoriesLoading && <Spin />}
-                // disabled={(!isIssued && !isNew) || isEdit}
-                disabled={isEdit && !isNew}
-                // value={1}
+                disabled={quantityDisabled}
                 controls={false}
-                value={
-                  isIssued || isNew
-                    ? (isEdit ? formik.values.quantity : 1)
-                    : 1
-                }
+                value={formik.values.quantity}
                 onChange={(value) => {
                   formik.setFieldValue("quantity", value);
                 }}
@@ -216,15 +197,12 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row>
-
               <Text className="font-medium">Tax Percentage/Amount</Text>
             </Row>
-            <Row>
-
+            <Row className="mt-2">
               <InputNumber
                 id="percentage"
                 name="percentage"
-                disabled={listed === 1}
                 min={0}
                 step={1}
                 precision={0}
@@ -261,7 +239,7 @@ const ListNowModal = ({
                   </Row>
                 }
                 // formatter={handleFormatter}
-                className="w-full mt-2"
+                className="w-full"
                 size="large"
                 controls={false}
                 // parser={handleParser}
@@ -279,16 +257,16 @@ const ListNowModal = ({
             <Row>
               <Text className="font-medium">Price</Text>
             </Row>
-            <Row>
+            <Row className="mt-2">
               <InputNumber
                 addonBefore="$"
                 id="price"
                 name="price"
-                className="w-full mt-2"
+                className="w-full"
                 min={0}
                 size="large"
                 controls={false}
-                disabled={listed === 1}
+                disabled={priceDisabled}
                 value={formik.values.price}
                 onChange={(value) => {
                   formik.setFieldValue("price", value);
@@ -296,17 +274,13 @@ const ListNowModal = ({
               />
             </Row>
           </Col>
-          {/* <Col span={8}>
-            <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
-          </Col> */}
-          {!isCreate && (
+          {isStatusVisible && (
             <Col span={8}>
               <Row>
                 <Text className="font-medium">Status</Text>
               </Row>
               <Row>
-                {isEdit || listed === 1 || listed === 2 || isNew ? (
+                {statusDropDown ? (
                   <Select
                     placeholder="Status"
                     className="mt-2 w-full"
