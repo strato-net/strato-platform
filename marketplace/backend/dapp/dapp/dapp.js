@@ -10,6 +10,8 @@ import RestStatus from 'http-status-codes';
 import certificateJs from "/dapp/certificates/certificate";
 
 import itemJs from "/dapp/items/item";
+import artJs from "/dapp/items/art";
+
 import orderJs from "/dapp/orders/order";
 import orderLineJs from "/dapp/orders/orderLine";
 import artJs from "/dapp/items/art";
@@ -695,6 +697,50 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       getOptions
     );
   };
+
+  // ------------------------------ ART STARTS------------------------------
+
+  contract.createArt = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+     // Assuming args is an object that contains all the necessary product arguments
+    const newArgs = {
+      ...args, // Spread existing arguments
+      uniqueProductCode, // Add the unique product code
+      createdDate, // Add the creation date
+      // Assuming the 'owner' will be set from options or another source in the system
+      owner: options.ownerAddress, // Placeholder for the art's owner Ethereum address
+      // Additional properties with placeholder values - these should be replaced with actual values
+      name: 'Artwork Title', // Placeholder for the name of the art
+      desc: 'Description of the artwork', // Placeholder for the description of the art
+      artQuantity: 1, // Placeholder for the quantity of the art pieces available
+      images: ['http://example.com/image1.jpg', 'http://example.com/image2.jpg'], // Placeholder array of image URLs
+      price: 100, // Placeholder for the price of the art
+      saleState: 0, // Placeholder for the sale state (enum represented as an integer)
+      paymentType: 0, // Placeholder for the payment type (enum represented as an integer)
+    };
+    return artJs.createArt(newArgs, options);
+  };
+
+  contract.getArts = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return artJs.getAll(rawAdmin, { ...args, }, getOptions);
+  };
+
+  // contract.transferOwnershipArt = async function (args, options = defaultOptions) {
+  //   const { address, chainId, newOwner } = args;
+  //   const contract = { name: artJs.contractName, address: address, };
+  //   const chainOptions = { chainIds: [chainId], ...options };
+  //   return artJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
+  // };
+
+  // contract.updateArt = async function (args, options = defaultOptions) {
+  //   const { address, chainId, updates } = args;
+  //   const contract = { name: artJs.contractName, address: address, };
+  //   const chainOptions = { chainIds: [chainId], ...options };
+  //   return artJs.update(rawAdmin, contract, updates, chainOptions);
+  // };
+  // ------------------------------ ART ENDS--------------------------------
+
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {

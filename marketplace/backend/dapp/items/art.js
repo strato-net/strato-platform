@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 import dayjs from 'dayjs';
 
 
-const contractName = 'Art';
+const contractName = constants.assetTableName;
 const contractFilename = `${util.cwd}/dapp/items/contracts/Art.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
@@ -108,6 +108,7 @@ function marshalOut(_args) {
 function bind(user, _contract, options) {
     const contract = { ..._contract };
 
+    contract.create = async(args) => uploadContract(user, args, options);
     contract.get = async (args = { address: contract.address, }) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
@@ -162,9 +163,17 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const items = await searchAllWithQueryArgs(contractName, args, options, admin)
-    return items.map((item) => marshalOut(item))
-}
+    // Add the filter condition for the field 'ginger' equal to 'Art'
+    const filterArgs = {
+      ...args,
+      contractName: 'Art',
+    };
+    const { org, ...modifiedOptions } = options;
+    const { offset, limit, ...restArgs } = filterArgs;
+    const inventories = await searchAllWithQueryArgs(contractName, { offset, limit }, modifiedOptions, admin);
+    return inventories.map((inventory) => marshalOut(inventory));
+  }
+  
 
 /**
  * Get contract state in bloc.

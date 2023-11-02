@@ -65,6 +65,18 @@ export const Item = {
   getRawMaterials: '/rawmaterials'
 }
 
+export const Art = {
+  prefix: '/art',
+  ownershipHistory: '/ownership/:address',
+  get: '/:address/:chainId/',
+  getAll: '/',
+  create: '/create',
+  update: '/update',
+  audit: '/:address/:chainId/audit',
+  transferOwnership: '/transferOwnership',
+  getRawMaterials: '/rawmaterials'
+}
+
 export const Order = {
   prefix: '/order',
   get: '/:address',
