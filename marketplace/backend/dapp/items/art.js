@@ -16,7 +16,7 @@ const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
  * @returns Contract object
  * */
-async function uploadContract(user, _constructorArgs, options) {
+async function createArt(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
 
     const contractArgs = {
@@ -108,7 +108,7 @@ function marshalOut(_args) {
 function bind(user, _contract, options) {
     const contract = { ..._contract };
 
-    contract.create = async(args) => uploadContract(user, args, options);
+    contract.create = async(args) => createArt(user, args, options);
     contract.get = async (args = { address: contract.address, }) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
@@ -122,7 +122,7 @@ function bind(user, _contract, options) {
  * Bind an existing Item contract to a new user token. Useful for having multiple users test
  * the same contract.
  * @example <caption>Create an admin and user bound to the same new item contract.</caption>
- * const adminBoundContract = uploadContract(adminToken, args, options);
+ * const adminBoundContract = createArt(adminToken, args, options);
  * const userBoundContract = bindAddress(userToken, adminBoundContract.address, options);
  * @param user User token
  * @param address Address of the Item contract
@@ -215,7 +215,7 @@ async function getAllOwnershipEvents(admin, args = {}, options) {
 }
 
 export default {
-    uploadContract,
+    createArt,
     contractName,
     contractFilename,
     bindAddress,
