@@ -1,7 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import config from '/load.config';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
+import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
 
 const contractName = 'Inventory';
@@ -167,6 +167,31 @@ async function getAll(admin, args = {}, options) {
     return inventories.map((inventory) => marshalOut(inventory))
 }
 
+async function inventoryCount(admin, args = {}, options) {
+    const queryArgs = setSearchQueryOptionsPrime({
+        ...args,
+        limit: undefined,
+        offset: 0,
+        order: undefined,
+    });
+
+    const totalResult = await searchAll(
+    contractName,
+    {
+        ...queryArgs,
+        sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
+        queryOptions: {
+        ...queryArgs.queryOptions,
+        select: "count",
+        },
+    },
+    options,
+    admin
+    );
+
+    return totalResult[0].count
+}
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -183,6 +208,7 @@ export default {
     bindAddress,
     get,
     getAll,
+    inventoryCount,
     marshalIn,
     marshalOut,
     getHistory
