@@ -17,7 +17,7 @@ const MembershipsProvider = ({ children }) => {
     productFiles: [],
     isCreateMembershipSubmitting: false,
     memberships: [],
-    ismembershipsLoading: false,
+    isMembershipsLoading: false,
     membershipDetails: null,
     isMembershipDetailsLoading: false,
     membershipOwnership: null,

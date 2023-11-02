@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Carousel } from "react-responsive-carousel";
+
 import { useFormik, getIn } from "formik";
 import {
   Row,
@@ -8,27 +11,27 @@ import {
   Tabs,
   Spin,
   notification,
-  InputNumber,
   Col,
   Card,
   Table,
 } from "antd";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { useMatch, useParams } from "react-router-dom";
-import { actions } from "../../contexts/inventory/actions";
+
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
-import { actions as inventoryActions } from "../../contexts/inventory/actions"
-import { Carousel } from "react-responsive-carousel";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as itemActions } from "../../contexts/item/actions";
+import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
+
+
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
-import { actions as itemActions } from "../../contexts/item/actions";
+
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { useProductDispatch, useProductState } from "../../contexts/product";
-import routes from "../../helpers/routes";
-import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -37,7 +40,8 @@ import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-import { useNavigate, useLocation } from "react-router-dom";
+
+
 import useDebounce from "../UseDebounce";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -56,29 +60,17 @@ const StatusValue = {
 };
 
 const MembershipDetails = ({ user, users }) => {
-  const { type } = useParams();
+  const { type, id } = useParams();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const inventoryID = queryParams.get("inventoryId");
 
   const isIssued = type === "issued";
   const isPurchased = type === "purchased";
-  const isMarket = type === "all";
-  // const isMarketPlace = isIssued || isMarket;
   const isMarketPlace = !isIssued && !isPurchased;
-  // && !isPurchased;
-
-  const { state, pathname } = useLocation();
 
   const [inventoryId, setInventoryId] = useState(inventoryID);
 
-  let isCalledFromMembership = false;
-
-  if (pathname.includes("memberships")) {
-    isCalledFromMembership = true;
-  } else if (state !== null && state !== undefined) {
-    isCalledFromMembership = state.isCalledFromMembership;
-  }
 
   const initialValues = {
     name: "",
@@ -90,9 +82,6 @@ const MembershipDetails = ({ user, users }) => {
   const [serviceList, setServiceList] = useState([]);
   const [savingsList, setSavingsList] = useState([]);
   const [totalSavings, setTotalSavings] = useState(0);
-  const [Id, setId] = useState(undefined);
-  const [membershipDetails, setMembershipDetails] = useState(undefined);
-  const [allProductFiles, setAllProductFiles] = useState(undefined);
   const [visible, setVisible] = useState(false);
   const limit = 10,
     offset = 0;
@@ -106,16 +95,16 @@ const MembershipDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if (Id !== undefined) {
+    if (id) {
       membershipActions.fetchMembershipFromDetails(
         serviceDispatch,
         limit,
         offset,
         debouncedSearchTerm,
-        Id
+        id
       );
     }
-  }, [Id]);
+  }, [id]);
 
   useEffect(() => {
     let services = [];
@@ -144,13 +133,6 @@ const MembershipDetails = ({ user, users }) => {
     setSavingsList(savings);
   }, [membershipServices]);
 
-  useEffect(() => {
-    setMembershipDetails(membership);
-  }, [membership]);
-
-  useEffect(() => {
-    setAllProductFiles(productFiles);
-  }, [productFiles]);
 
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
@@ -167,7 +149,7 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const isDuration =
-    membershipDetails?.expiryDate === 0 || !membershipDetails?.expiryDate;
+    membership?.expiryDate === 0 || !membership?.expiryDate;
 
   const formik = useFormik({
     initialValues: initialValues,
@@ -200,24 +182,10 @@ const MembershipDetails = ({ user, users }) => {
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
 
-  const routeMatch = useMatch({
-    path: routes.MarketplaceProductDetail.url,
-    strict: true,
-  });
-
-  const routeMatch1 = useMatch({
-    path: routes.MembershipDetail.url,
-    strict: true,
-  });
-
-  useEffect(() => {
-    if (isCalledFromMembership) setId(routeMatch1?.params?.id);
-    else setId(routeMatch?.params?.address);
-  }, [routeMatch, routeMatch1]);
 
   useEffect(() => {
     let inventoryAddress;
-    if (type !== "issued" && type !== "purchased") {
+    if (isMarketPlace) {
       inventoryAddress = inventoryDetails?.address;
     } else {
       inventoryAddress = inventories[0]?.address;
@@ -227,18 +195,13 @@ const MembershipDetails = ({ user, users }) => {
     }
   }, [inventories]);
 
-  useEffect(() => {
-    if (inventory !== null && inventory !== undefined) {
-      setInventoryId(inventory[1]);
-    }
-  }, [inventory]);
 
   useEffect(() => {
-    if (Id !== undefined && inventoryId) {
-      actions.fetchInventoryDetail(inventoryDispatch, inventoryId);
-    } else if (Id !== undefined && membershipDetails) {
+    if (inventoryId) {
+      inventoryActions.fetchInventoryDetail(inventoryDispatch, inventoryId);
+    } else if (membership) {
       const inventoryResult = Promise.resolve(
-        actions.fetchInventory(inventoryDispatch, 10, 0, membershipDetails?.productId)
+        inventoryActions.fetchInventory(inventoryDispatch, 10, 0, membership?.productId)
       );
 
       inventoryResult
@@ -248,7 +211,7 @@ const MembershipDetails = ({ user, users }) => {
           } else {
             productActions.fetchProductDetails(
               productDispatch,
-              membershipDetails?.productId,
+              membership?.productId,
               null
             );
           }
@@ -256,12 +219,12 @@ const MembershipDetails = ({ user, users }) => {
         .catch((err) => {
           productActions.fetchProductDetails(
             productDispatch,
-            membershipDetails?.productId,
+            membership?.productId,
             null
           );
         });
     }
-  }, [membershipDetails, inventoryId]);
+  }, [membership, inventoryId]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -293,7 +256,7 @@ const MembershipDetails = ({ user, users }) => {
     isInventoriesLoading ||
     isProductDetailsLoading ||
     isInventoryDetailsLoading;
-  const isOwner = inventoryDetails?.ownerOrganization === user?.organization;
+
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -310,7 +273,7 @@ const MembershipDetails = ({ user, users }) => {
     }
   };
 
-  const expiryDateVal = dayjs(membershipDetails?.expiryDate).format(
+  const expiryDateVal = dayjs(membership?.expiryDate).format(
     "MM-DD-YYYY"
   );
 
@@ -324,7 +287,7 @@ const MembershipDetails = ({ user, users }) => {
     }
     let items = [];
     let productFileImg =
-      allProductFiles?.length > 0 && allProductFiles[0]?.imageUrl;
+      productFiles?.length > 0 && productFiles[0]?.imageUrl;
     let inventoryDetailCpy = {
       ...inventoryDetails,
       taxes: inventoryDetails.taxPercentageAmount === 0 ? inventoryDetails.taxDollarAmount : (inventoryDetails.taxPercentageAmount / 10000),
@@ -421,11 +384,11 @@ const MembershipDetails = ({ user, users }) => {
 
   const handleCreateFormSubmit = async (values) => {
     if (user) {
-      if (Id !== undefined) {
+      if (id) {
         if (formik.values.price !== "" && formik.values.quantity !== "") {
           const resalePayload = {
             itemAddress: inventoryDetails.itemId,
-            productAddress: membershipDetails.productId,
+            productAddress: membership.productId,
             inventory: inventoryId,
             updates: {
               pricePerUnit: formik.values.price,
@@ -436,7 +399,7 @@ const MembershipDetails = ({ user, users }) => {
             },
           };
           // const inventoryBody = {
-          //   productAddress: membershipDetails.productId,
+          //   productAddress: membership.productId,
           //   quantity: formik.values.quantity,
           //   pricePerUnit: formik.values.price,
           //   // Generate random code for now
@@ -481,9 +444,9 @@ const MembershipDetails = ({ user, users }) => {
     { label: "Sub-Category", value: inventoryDetails?.subCategory ? inventoryDetails?.subCategory : productDetails?.subCategory },
     {
       label: `${isDuration ? "Time in Months" : "Expiry Date"}`,
-      value: isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal,
+      value: isDuration ? membership?.timePeriodInMonths : expiryDateVal,
     },
-    // { label: "Additional Info", value: membershipDetails?.additionalInfo }
+    // { label: "Additional Info", value: membership?.additionalInfo }
   ];
 
   const DetailTabCard = () => {
@@ -500,7 +463,7 @@ const MembershipDetails = ({ user, users }) => {
         >
           {detailTabSchema.map((item, index) => {
             return (
-              <Paragraph>
+              <Paragraph key={index}>
                 <Text disabled className="font-bold font-poppin">
                   {item.label}
                 </Text>
@@ -522,7 +485,7 @@ const MembershipDetails = ({ user, users }) => {
               }}
               className="float-right text-md font-regular h-auto"
             >
-              {membershipDetails?.additionalInfo ?? "--"}
+              {membership?.additionalInfo ?? "--"}
             </Paragraph>
           </Paragraph>
           {/* {true && <Paragraph>
@@ -554,10 +517,10 @@ const MembershipDetails = ({ user, users }) => {
         </Text>
         <hr style={{ color: "grey" }} />
         <Col span={24} className="max-h-96 overflow-y-auto">
-          <Row className="">
+          <Row>
             {savingsList.map(({ serviceName, serviceCost }, index) => {
               return (
-                <Col span={8} className="">
+                <Col span={8}  key={index}>
                   <Card className="shadow-md m-2">
                     <Row className="mt-2">
                       <Col span={24}>
@@ -604,9 +567,9 @@ const MembershipDetails = ({ user, users }) => {
           <BreadCrumbComponent name={inventoryDetails?.name || productDetails?.name} />
           <Row className="max-w-4xl mx-auto mt-10 h-92">
             <Col span={10} className="rounded-md border-1-primary h-px-390">
-              {allProductFiles && allProductFiles.length > 0 ? (
-                <Carousel>
-                  {allProductFiles.map((file, index) => (
+              {productFiles && productFiles.length > 0 ? (
+                <Carousel showThumbs={true}>
+                  {productFiles.map((file, index) => (
                     <div key={index} className="h-96">
                       <Image
                         height={"100%"}
@@ -640,7 +603,7 @@ const MembershipDetails = ({ user, users }) => {
                   <Row className="mb-1">
                     {watchIcon()}
                     <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm">
-                      {membershipDetails?.timePeriodInMonths ?? ""} -month
+                      {membership?.timePeriodInMonths ?? ""} -month
                       duration
                     </Text>
                   </Row>
@@ -650,7 +613,7 @@ const MembershipDetails = ({ user, users }) => {
                     <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm">
                       {" "}
                       Expiry Date:- &nbsp;
-                      {membershipDetails?.expiryDate
+                      {membership?.expiryDate
                         ? expiryDateVal
                         : "--"}{" "}
                     </Text>{" "}
@@ -687,7 +650,7 @@ const MembershipDetails = ({ user, users }) => {
                     </Text>
                   </Col>
                 </Row>
-                {(isIssued || isMarket) && (
+                {(!isPurchased) && (
                   <Row>
                     <Row
                       className="w-full absolute mr-5 left-0 mt-6"
@@ -775,7 +738,6 @@ const MembershipDetails = ({ user, users }) => {
                 ) : !isMarketPlace ? (
                   <>
                     {!isIssued && <Button
-                      // type={ownerSameAsUser ? "default" : "primary"}
                       type="primary"
                       block={true}
                       size="large"
@@ -975,7 +937,7 @@ const MembershipDetails = ({ user, users }) => {
             isEdit={true}
             getIn={getIn}
             listType={isIssued ? "New" : "Sale"}
-            id={Id}
+            id={id}
             isCreateMembershipSubmitting={isCreateInventorySubmitting}
           />
         )
