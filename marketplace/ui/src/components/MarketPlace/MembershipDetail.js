@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Carousel } from "react-responsive-carousel";
-
 import { useFormik, getIn } from "formik";
 import {
   Row,
@@ -17,21 +14,19 @@ import {
 } from "antd";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { useMatch, useParams } from "react-router-dom";
-
+import { actions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { actions as itemActions } from "../../contexts/item/actions";
-import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-
-
+import { Carousel } from "react-responsive-carousel";
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
-
+import { actions as itemActions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import routes from "../../helpers/routes";
+import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
 import {
   useMembershipDispatch,
   useMembershipState,
@@ -40,8 +35,7 @@ import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-
-
+import { useNavigate, useLocation } from "react-router-dom";
 import useDebounce from "../UseDebounce";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -52,7 +46,6 @@ import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import TagManager from "react-gtm-module";
 import dayjs from "dayjs";
-import LoaderComponent from "../Loader/LoaderComponent";
 
 const StatusValue = {
   1: "Listed",
@@ -60,17 +53,27 @@ const StatusValue = {
 };
 
 const MembershipDetails = ({ user, users }) => {
-  const { type, id } = useParams();
+  const { type } = useParams();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const inventoryID = queryParams.get("inventoryId");
 
   const isIssued = type === "issued";
   const isPurchased = type === "purchased";
+  const isMarket = type === "all";
   const isMarketPlace = !isIssued && !isPurchased;
+
+  const { state, pathname } = useLocation();
 
   const [inventoryId, setInventoryId] = useState(inventoryID);
 
+  let isCalledFromMembership = false;
+
+  if (pathname.includes("memberships")) {
+    isCalledFromMembership = true;
+  } else if (state !== null && state !== undefined) {
+    isCalledFromMembership = state.isCalledFromMembership;
+  }
 
   const initialValues = {
     name: "",
@@ -82,6 +85,10 @@ const MembershipDetails = ({ user, users }) => {
   const [serviceList, setServiceList] = useState([]);
   const [savingsList, setSavingsList] = useState([]);
   const [totalSavings, setTotalSavings] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [Id, setId] = useState(undefined);
+  const [membershipDetails, setMembershipDetails] = useState(undefined);
+  const [allProductFiles, setAllProductFiles] = useState(undefined);
   const [visible, setVisible] = useState(false);
   const limit = 10,
     offset = 0;
@@ -95,16 +102,16 @@ const MembershipDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if (id) {
+    if (Id !== undefined) {
       membershipActions.fetchMembershipFromDetails(
         serviceDispatch,
         limit,
         offset,
         debouncedSearchTerm,
-        id
+        Id
       );
     }
-  }, [id]);
+  }, [Id]);
 
   useEffect(() => {
     let services = [];
@@ -133,6 +140,13 @@ const MembershipDetails = ({ user, users }) => {
     setSavingsList(savings);
   }, [membershipServices]);
 
+  useEffect(() => {
+    setMembershipDetails(membership);
+  }, [membership]);
+
+  useEffect(() => {
+    setAllProductFiles(productFiles);
+  }, [productFiles]);
 
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
@@ -149,7 +163,7 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const isDuration =
-    membership?.expiryDate === 0 || !membership?.expiryDate;
+    membershipDetails?.expiryDate === 0 || !membershipDetails?.expiryDate;
 
   const formik = useFormik({
     initialValues: initialValues,
@@ -182,10 +196,24 @@ const MembershipDetails = ({ user, users }) => {
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
 
+  const routeMatch = useMatch({
+    path: routes.MarketplaceProductDetail.url,
+    strict: true,
+  });
+
+  const routeMatch1 = useMatch({
+    path: routes.MembershipDetail.url,
+    strict: true,
+  });
+
+  useEffect(() => {
+    if (isCalledFromMembership) setId(routeMatch1?.params?.id);
+    else setId(routeMatch?.params?.address);
+  }, [routeMatch, routeMatch1]);
 
   useEffect(() => {
     let inventoryAddress;
-    if (isMarketPlace) {
+    if (type !== "issued" && type !== "purchased") {
       inventoryAddress = inventoryDetails?.address;
     } else {
       inventoryAddress = inventories[0]?.address;
@@ -195,13 +223,23 @@ const MembershipDetails = ({ user, users }) => {
     }
   }, [inventories]);
 
+  useEffect(() => {
+    if (inventory !== null && inventory !== undefined) {
+      setInventoryId(inventory[1]);
+    }
+  }, [inventory]);
 
   useEffect(() => {
-    if (inventoryId) {
-      inventoryActions.fetchInventoryDetail(inventoryDispatch, inventoryId);
-    } else if (membership) {
+    if (Id !== undefined && inventoryId && !membershipDetails) {
+      actions.fetchInventoryDetail(inventoryDispatch, inventoryId);
+    } else if (Id !== undefined && membershipDetails) {
       const inventoryResult = Promise.resolve(
-        inventoryActions.fetchInventory(inventoryDispatch, 10, 0, membership?.productId)
+        actions.fetchInventory(
+          inventoryDispatch,
+          10,
+          0,
+          membershipDetails?.productId
+        )
       );
 
       inventoryResult
@@ -211,7 +249,7 @@ const MembershipDetails = ({ user, users }) => {
           } else {
             productActions.fetchProductDetails(
               productDispatch,
-              membership?.productId,
+              membershipDetails?.productId,
               null
             );
           }
@@ -219,12 +257,12 @@ const MembershipDetails = ({ user, users }) => {
         .catch((err) => {
           productActions.fetchProductDetails(
             productDispatch,
-            membership?.productId,
+            membershipDetails?.productId,
             null
           );
         });
     }
-  }, [membership, inventoryId]);
+  }, [membershipDetails, inventoryId]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -251,12 +289,25 @@ const MembershipDetails = ({ user, users }) => {
     }
   };
 
-  const isLoading =
-    isMembershipLoading ||
-    isInventoriesLoading ||
-    isProductDetailsLoading ||
-    isInventoryDetailsLoading;
+  useEffect(() => {
+    if (
+      !isMembershipLoading &&
+      !isInventoriesLoading &&
+      !isProductDetailsLoading &&
+      !isInventoryDetailsLoading
+    ) {
+      setIsLoading(false); // All booleans are false, set isLoading to false
+    } else {
+      setIsLoading(true); // At least one boolean is true, set isLoading to true
+    }
+  }, [
+    isMembershipLoading,
+    isInventoriesLoading,
+    isProductDetailsLoading,
+    isInventoryDetailsLoading,
+  ]);
 
+  const isOwner = inventoryDetails?.ownerOrganization === user?.organization;
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -273,7 +324,7 @@ const MembershipDetails = ({ user, users }) => {
     }
   };
 
-  const expiryDateVal = dayjs(membership?.expiryDate).format(
+  const expiryDateVal = dayjs(membershipDetails?.expiryDate).format(
     "MM-DD-YYYY"
   );
 
@@ -287,10 +338,13 @@ const MembershipDetails = ({ user, users }) => {
     }
     let items = [];
     let productFileImg =
-      productFiles?.length > 0 && productFiles[0]?.imageUrl;
+      allProductFiles?.length > 0 && allProductFiles[0]?.imageUrl;
     let inventoryDetailCpy = {
       ...inventoryDetails,
-      taxes: inventoryDetails.taxPercentageAmount === 0 ? inventoryDetails.taxDollarAmount : (inventoryDetails.taxPercentageAmount / 10000),
+      taxes:
+        inventoryDetails.taxPercentageAmount === 0
+          ? inventoryDetails.taxDollarAmount
+          : inventoryDetails.taxPercentageAmount / 10000,
       isTaxPercentage: inventoryDetails.taxDollarAmount === 0,
       productImageLocation: [productFileImg],
     };
@@ -384,11 +438,11 @@ const MembershipDetails = ({ user, users }) => {
 
   const handleCreateFormSubmit = async (values) => {
     if (user) {
-      if (id) {
+      if (Id !== undefined) {
         if (formik.values.price !== "" && formik.values.quantity !== "") {
           const resalePayload = {
             itemAddress: inventoryDetails.itemId,
-            productAddress: membership.productId,
+            productAddress: membershipDetails.productId,
             inventory: inventoryId,
             updates: {
               pricePerUnit: formik.values.price,
@@ -399,7 +453,7 @@ const MembershipDetails = ({ user, users }) => {
             },
           };
           // const inventoryBody = {
-          //   productAddress: membership.productId,
+          //   productAddress: membershipDetails.productId,
           //   quantity: formik.values.quantity,
           //   pricePerUnit: formik.values.price,
           //   // Generate random code for now
@@ -424,7 +478,7 @@ const MembershipDetails = ({ user, users }) => {
           const resaleMembership = await membershipActions.resaleMembership(
             membershipDispatch,
             resalePayload
-          )
+          );
           if (resaleMembership) {
             formik.resetForm();
           }
@@ -440,13 +494,23 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const detailTabSchema = [
-    { label: "Seller", value: inventoryDetails?.ownerOrganization ? inventoryDetails?.ownerOrganization : productDetails?.ownerOrganization },
-    { label: "Sub-Category", value: inventoryDetails?.subCategory ? inventoryDetails?.subCategory : productDetails?.subCategory },
+    {
+      label: "Seller",
+      value: inventoryDetails?.ownerOrganization
+        ? inventoryDetails?.ownerOrganization
+        : productDetails?.ownerOrganization,
+    },
+    {
+      label: "Sub-Category",
+      value: inventoryDetails?.subCategory
+        ? inventoryDetails?.subCategory
+        : productDetails?.subCategory,
+    },
     {
       label: `${isDuration ? "Time in Months" : "Expiry Date"}`,
-      value: isDuration ? membership?.timePeriodInMonths : expiryDateVal,
+      value: isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal,
     },
-    // { label: "Additional Info", value: membership?.additionalInfo }
+    // { label: "Additional Info", value: membershipDetails?.additionalInfo }
   ];
 
   const DetailTabCard = () => {
@@ -485,7 +549,7 @@ const MembershipDetails = ({ user, users }) => {
               }}
               className="float-right text-md font-regular h-auto"
             >
-              {membership?.additionalInfo ?? "--"}
+              {membershipDetails?.additionalInfo ?? "--"}
             </Paragraph>
           </Paragraph>
           {/* {true && <Paragraph>
@@ -520,7 +584,7 @@ const MembershipDetails = ({ user, users }) => {
           <Row>
             {savingsList.map(({ serviceName, serviceCost }, index) => {
               return (
-                <Col span={8}  key={index}>
+                <Col span={8} key={index}>
                   <Card className="shadow-md m-2">
                     <Row className="mt-2">
                       <Col span={24}>
@@ -561,15 +625,19 @@ const MembershipDetails = ({ user, users }) => {
     <>
       {contextHolder}
       {isLoading ? (
-        <LoaderComponent />
+        <div className="h-screen flex justify-center mx-auto items-center">
+          <Spin spinning={isLoading} size="large" />
+        </div>
       ) : (
         <div>
-          <BreadCrumbComponent name={inventoryDetails?.name || productDetails?.name} />
+          <BreadCrumbComponent
+            name={inventoryDetails?.name || productDetails?.name}
+          />
           <Row className="max-w-4xl mx-auto mt-10 h-92">
             <Col span={10} className="rounded-md border-1-primary h-px-390">
-              {productFiles && productFiles.length > 0 ? (
-                <Carousel showThumbs={true}>
-                  {productFiles.map((file, index) => (
+              {allProductFiles && allProductFiles.length > 0 ? (
+                <Carousel showThumbs={false}>
+                  {allProductFiles.map((file, index) => (
                     <div key={index} className="h-96">
                       <Image
                         height={"100%"}
@@ -597,13 +665,15 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin">
-                  {(inventoryDetails?.name ? inventoryDetails?.name : productDetails?.name)}
+                  {inventoryDetails?.name
+                    ? inventoryDetails?.name
+                    : productDetails?.name}
                 </Text>
                 {isDuration ? (
                   <Row className="mb-1">
                     {watchIcon()}
                     <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm">
-                      {membership?.timePeriodInMonths ?? ""} -month
+                      {membershipDetails?.timePeriodInMonths ?? ""} -month
                       duration
                     </Text>
                   </Row>
@@ -613,7 +683,7 @@ const MembershipDetails = ({ user, users }) => {
                     <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm">
                       {" "}
                       Expiry Date:- &nbsp;
-                      {membership?.expiryDate
+                      {membershipDetails?.expiryDate
                         ? expiryDateVal
                         : "--"}{" "}
                     </Text>{" "}
@@ -630,7 +700,9 @@ const MembershipDetails = ({ user, users }) => {
                     <Text className="block text-center text-xl font-bold mt-2">
                       {isMarketPlace
                         ? `$ ${inventoryDetails?.pricePerUnit}`
-                        : (inventoryID ? StatusValue[inventoryDetails?.status] : "Not Listed") ?? "--"}{" "}
+                        : (inventoryID
+                            ? StatusValue[inventoryDetails?.status]
+                            : "Not Listed") ?? "--"}{" "}
                     </Text>
                   </Col>
                   <Col
@@ -650,7 +722,7 @@ const MembershipDetails = ({ user, users }) => {
                     </Text>
                   </Col>
                 </Row>
-                {(!isPurchased) && (
+                {(isIssued || isMarket) && (
                   <Row>
                     <Row
                       className="w-full absolute mr-5 left-0 mt-6"
@@ -722,69 +794,78 @@ const MembershipDetails = ({ user, users }) => {
                     size="large"
                     className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
-                  // onClick={() => {
-                  //   TagManager.dataLayer({
-                  //     dataLayer: {
-                  //       event: 'contact_sales_from_category_card',
-                  //       product_name: product.name,
-                  //       category: product.category,
-                  //       productId: product.productId
-                  //     },
-                  //   });
-                  // }}
+                    // onClick={() => {
+                    //   TagManager.dataLayer({
+                    //     dataLayer: {
+                    //       event: 'contact_sales_from_category_card',
+                    //       product_name: product.name,
+                    //       category: product.category,
+                    //       productId: product.productId
+                    //     },
+                    //   });
+                    // }}
                   >
                     Contact to Buy
                   </Button>
                 ) : !isMarketPlace ? (
                   <>
-                    {!isIssued && <Button
-                      type="primary"
-                      block={true}
-                      size="large"
-                      className=" h-full py-4 h-px-56"
-                      onClick={() => {
-                        if (
-                          hasChecked &&
-                          !isAuthenticated &&
-                          loginUrl !== undefined
-                        ) {
-                          window.location.href = loginUrl;
-                        } else {
-                          let taxVal =
-                            inventoryDetails.taxPercentageAmount === 0
-                              ? inventoryDetails.taxDollarAmount
-                              : inventoryDetails.taxPercentageAmount;
-                          formik.setFieldValue("name", inventoryDetails?.name);
-                          formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
-                          formik.setFieldValue(
-                            "price",
-                            inventoryDetails?.pricePerUnit
-                          );
-                          formik.setFieldValue("taxPercentage", taxVal);
-                          formik.setFieldValue("quantity", 1);
-                          formik.setFieldValue(
-                            "taxPercentageAmount",
-                            inventoryDetails.taxPercentageAmount
-                          );
-                          formik.setFieldValue(
-                            "taxDollarAmount",
-                            inventoryDetails.taxDollarAmount
-                          );
-                          openListNowModal();
-                        }
-                      }}
-                      disabled={isIssued}
-                    >
-                      {" "}
-                      <Text
-                        className={`text-lg font-poppin text-white 
-                    `}
+                    {!isIssued && (
+                      <Button
+                        // type={ownerSameAsUser ? "default" : "primary"}
+                        type="primary"
+                        block={true}
+                        size="large"
+                        className=" h-full py-4 h-px-56"
+                        onClick={() => {
+                          if (
+                            hasChecked &&
+                            !isAuthenticated &&
+                            loginUrl !== undefined
+                          ) {
+                            window.location.href = loginUrl;
+                          } else {
+                            let taxVal =
+                              inventoryDetails.taxPercentageAmount === 0
+                                ? inventoryDetails.taxDollarAmount
+                                : inventoryDetails.taxPercentageAmount;
+                            formik.setFieldValue(
+                              "name",
+                              inventoryDetails?.name
+                            );
+                            formik.setFieldValue(
+                              "inventoryStatus",
+                              inventoryDetails?.status
+                            );
+                            formik.setFieldValue(
+                              "price",
+                              inventoryDetails?.pricePerUnit
+                            );
+                            formik.setFieldValue("taxPercentage", taxVal);
+                            formik.setFieldValue("quantity", 1);
+                            formik.setFieldValue(
+                              "taxPercentageAmount",
+                              inventoryDetails.taxPercentageAmount
+                            );
+                            formik.setFieldValue(
+                              "taxDollarAmount",
+                              inventoryDetails.taxDollarAmount
+                            );
+                            openListNowModal();
+                          }
+                        }}
+                        disabled={isIssued}
                       >
-                        {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
-                        List for Sale
-                      </Text>
-                      {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
-                    </Button>}
+                        {" "}
+                        <Text
+                          className={`text-lg font-poppin text-white 
+                    `}
+                        >
+                          {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
+                          List for Sale
+                        </Text>
+                        {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <Row className="w-full mx-auto" gutter={[12]}>
@@ -856,7 +937,7 @@ const MembershipDetails = ({ user, users }) => {
                 )}
               </Row>
             </Col>
-          </Row >
+          </Row>
 
           <Row className="max-w-4xl mx-auto mt-10">
             <Card className="w-full shadow-md">
@@ -875,7 +956,9 @@ const MembershipDetails = ({ user, users }) => {
                     <br />
                   </React.Fragment>
                 ))} */}
-                {inventoryDetails?.description ? inventoryDetails?.description : productDetails?.description}
+                {inventoryDetails?.description
+                  ? inventoryDetails?.description
+                  : productDetails?.description}
               </Paragraph>
             </Card>
           </Row>
@@ -924,24 +1007,22 @@ const MembershipDetails = ({ user, users }) => {
               />
             </Card>
           </Row>
-        </div >
+        </div>
       )}
-      {
-        visible && (
-          <ListNowModal
-            open={visible}
-            user={{ user }}
-            handleCancel={closeListNowModal}
-            onClick={openListNowModal}
-            formik={formik}
-            isEdit={true}
-            getIn={getIn}
-            listType={isIssued ? "New" : "Sale"}
-            id={id}
-            isCreateMembershipSubmitting={isCreateInventorySubmitting}
-          />
-        )
-      }
+      {visible && (
+        <ListNowModal
+          open={visible}
+          user={{ user }}
+          handleCancel={closeListNowModal}
+          onClick={openListNowModal}
+          formik={formik}
+          isEdit={true}
+          getIn={getIn}
+          listType={isIssued ? "New" : "Sale"}
+          id={Id}
+          isCreateMembershipSubmitting={isCreateInventorySubmitting}
+        />
+      )}
     </>
   );
 };

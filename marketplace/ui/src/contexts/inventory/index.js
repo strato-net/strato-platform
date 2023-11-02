@@ -9,7 +9,7 @@ const InventoriesProvider = ({ children }) => {
     inventory: null,
     isCreateInventorySubmitting: false,
     inventories: [],
-    isInventoriesLoading: false,
+    isInventoriesLoading: true,
     inventoryUpdateObject: null,
     isinventoryUpdating: false,
     inventoryDetails: null,
