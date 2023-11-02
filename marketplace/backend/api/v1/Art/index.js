@@ -6,53 +6,18 @@ import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
-
 router.get(
-  Art.getAll,
+  Art.getAll, // Assuming this is the correct endpoint for getting all arts
   authHandler.authorizeRequest(true),
   loadDapp,
   ArtController.getAll
 );
 
-router.get(
-  Art.ownershipHistory,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  ArtController.getOwnershipHistory
-);
-
 router.post(
-  Art.create,
+  Art.create, // Assuming this is the correct endpoint for creating an art
   authHandler.authorizeRequest(),
   loadDapp,
   ArtController.create
 );
-
-router.post(
-  Art.transferOwnership,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ArtController.transferOwnership
-)
-
-router.put(
-  Art.update,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ArtController.update
-)
-
-router.get(
-  Art.audit,
-  loadDapp,
-  ArtController.audit
-)
-
-router.get(
-  Art.getRawMaterials,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  ArtController.getAllRawMaterials
-)
 
 export default router;

@@ -1,124 +1,36 @@
 paths:
   /art/:
     get:
-      security:              
-        - bearerAuth: []                    
-      tags:               
-        - Art        
+      security:
+        - bearerAuth: []
+      tags:
+        - Art
       summary: Retrieve art
       produces:
-      - application/json
-      responses:         
+        - application/json
+      responses:
         200:
           description: Array of arts
-    post:  
-      security:              
-        - bearerAuth: []                  
-      tags:               
-        - Art        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Art
       summary: Create a art
       produces:
-      - application/json
-      requestBody:         
-        description: It enable user to create art
+        - application/json
+      requestBody:
+        description: It enables user to create art
         required: true
         content:
-          'application/json': 
-            schema:       
-              $ref: '#/definitions/createArt' 
-      responses:         
+          'application/json':
+            schema:
+              $ref: '#/definitions/createArt'
+      responses:
         200:
           description: Object of create art
-  /art/{address}/{chainId}:
-    get:                 
-      security:              
-        - bearerAuth: []   
-      tags:               
-        - Art        
-      summary: Retrieve a art
-      produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the art
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/fetchArt' 
-      responses:         
-        200:
-          description: Retrieve a art
-  /art/update:
-    put:    
-      security:              
-        - bearerAuth: []                
-      tags:               
-        - Art        
-      summary: Update a art
-      produces:
-      - application/json
-      requestBody:         
-        description: It enable user to update a art
-        required: true
-        content:
-          'application/json':
-            schema:       
-              $ref: '#/definitions/updateArt' 
-      responses:         
-        200:
-          description: Retrieve a updated art
-  /art/{address}/{chainId}/audit:
-    get:     
-      security:              
-        - bearerAuth: []               
-      tags:               
-        - Art        
-      summary: Audit art
-      produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the art
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/auditArt' 
-      responses:         
-        200:
-          description: List of audit
-  /art/transferOwnership:
-    post:              
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - Art        
-      summary: Transfer ownership
-      produces:
-      - application/json
-      requestBody:         
-        description: It enable user to transfer ownership
-        required: true
-        content:
-          'application/json':
-            schema:       
-              $ref: '#/definitions/transferOwnership' 
-      responses:         
-        200:
-          description: indicates success of transfer ownership
-definitions:        
-  fetchArt:
-    address:
-      type: string
-    chainId:
-      type: string
+
+definitions:
   createArt:
     type: object
     properties:
@@ -137,39 +49,3 @@ definitions:
             type: string
           createdAt:
             type: string
-  updateArt:
-    type: object
-    properties:
-      address:
-        type: string
-      chainId:
-        type: string
-      updates:
-        type: object
-        properties:
-          productId:
-            type: string
-          inventoryId:
-            type: string
-          serialNumber:
-            type: string
-          status:
-            type: string
-          comment:
-            type: string
-          createdAt:
-            type: string
-  auditArt:
-    address:
-      type: string
-    chainId:
-      type: string
-  transferOwnership:
-    type: object
-    properties:
-      address:
-        type: string
-      chainId:
-        type: string
-      newOwner:
-        type: string

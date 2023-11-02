@@ -67,15 +67,10 @@ export const Item = {
 
 export const Art = {
   prefix: '/art',
-  ownershipHistory: '/ownership/:address',
-  get: '/:address/:chainId/',
-  getAll: '/',
-  create: '/create',
-  update: '/update',
-  audit: '/:address/:chainId/audit',
-  transferOwnership: '/transferOwnership',
-  getRawMaterials: '/rawmaterials'
+  getAll: '/',      // Endpoint to get all arts
+  create: '/create' // Endpoint to create a new art
 }
+
 
 export const Order = {
   prefix: '/order',
