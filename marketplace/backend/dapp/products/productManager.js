@@ -105,6 +105,8 @@ function bind(user, _contract, options) {
     getInventory(user, contract, args, _options);
   contract.getInventories = async (args, _options = defaultOptions) =>
     getInventories(user, contract, args, _options);
+  contract.inventoryCount = async (args, _options = defaultOptions) =>
+    inventoryCount(user, args, _options);
   contract.updateProduct = async (args) =>
     updateProduct(user, contract, args, options);
   contract.createProduct = async (args) =>
@@ -353,6 +355,13 @@ async function getProducts(user, args, options) {
  */
 async function count(user, args, options) {
   return productJs.count(user, args, options);
+}
+
+/**
+ * get all the inventory count
+ */
+async function inventoryCount(user, args, options) {
+  return inventoryJs.inventoryCount(user, args, options);
 }
 
 /**

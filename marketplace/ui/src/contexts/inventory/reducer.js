@@ -39,7 +39,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchInventorySuccessful:
       return {
         ...state,
-        inventories: action.payload,
+        inventories: action.payload.data,
+        inventoriesTotal: action.payload.count,
         isInventoriesLoading: false
       };
     case actionDescriptors.fetchInventoryFailed:
@@ -56,7 +57,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchInventorySearchSuccessful:
       return {
         ...state,
-        inventories: action.payload,
+        inventories: action.payload.data,
+        inventoriesTotal: action.payload.count,
         isInventoriesLoading: false
       };
     case actionDescriptors.fetchInventorySearchFailed:
