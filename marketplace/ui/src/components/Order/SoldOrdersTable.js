@@ -60,6 +60,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
         ordersSold.map(async (order) => {
           if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
             try {
+              isordersSoldLoading = true;
               const response = await fetch(
                 `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
                 {
@@ -68,15 +69,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
               );
   
               const body = await response.json();
-
-              const intentResponse = await fetch(
-                `${apiUrl}/order/payment/intent/sessions/${order.paymentSessionId}`,
-                {
-                  method: HTTP_METHODS.GET,
-                }
-              );
-  
-              const intentBody = await intentResponse.json();
+              isordersSoldLoading = false;
   
               if (response.status === RestStatus.OK) {
                 if (
@@ -84,10 +77,12 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
                   getStatus(parseInt(order.status)) === "Payment Pending"
                 ) {
                   // Update payment status
-                  const isDone = await actions.updateOrderStatus(dispatch, {
+                  isordersSoldLoading = true;
+                  let isDone = await actions.updateOrderStatus(dispatch, {
                     orderAddress: order.address,
                     status: 1,
                   });
+                  if(isDone) isordersSoldLoading = false;
                 }
               }
             } catch (err) {
@@ -255,7 +250,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       textClass = "text-blue  bg-[#EBF7FF]";
     } else if (status === "Closed") {
       textClass = "text-success  bg-[#EAFFEE]";
-    } else if (status === "Canceled") {
+    } else if (status === "Cancelled") {
       textClass = "text-error  bg-[#FFF0F0]";
     } else if (status === "Payment Pending") {
       textClass = "text-orange bg-[#FFF6EC]";
@@ -271,7 +266,6 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     setOffset((page - 1) * limit);
     setPage(page);
   };
-console.log("J=HEYY",data)
   return (
     <div>
       <DataTableComponent

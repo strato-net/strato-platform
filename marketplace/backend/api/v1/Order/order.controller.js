@@ -93,8 +93,6 @@ class OrderController {
   static async updateOrderStatus(req, res, next) {
     try {
       const { dapp, body } = req
-      console.log(body, "HEEEYY")
-      //{ orderAddress: 'a9b6d336f214bccd732deadcf8672e14ed41b45e', status: 1 }
       OrderController.validateUpdateOrderStatus(body)
       
       const result = await dapp.updateOrderStatus(body, options)
@@ -280,7 +278,7 @@ class OrderController {
       address: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().required(),
-        buyerComments: Joi.string().required(),
+        buyerComments: Joi.string().allow(''),
       }),
     });
 

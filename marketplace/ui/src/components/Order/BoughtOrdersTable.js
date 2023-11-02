@@ -56,6 +56,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         orders.map(async (order) => {
           if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
             try {
+              isordersLoading = true;
               const response = await fetch(
                 `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
                 {
@@ -64,13 +65,13 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
               );
   
               const body = await response.json();
-  
+              isordersLoading = false;
               if (response.status === RestStatus.OK) {
                 if (
                   body.data["payment_status"] === "paid" &&
                   getStatus(parseInt(order.status)) === "Payment Pending"
                 ) {
-                  // Update payment status
+                  // Update order status
                   const isDone = await actions.updateOrderStatus(dispatch, {
                     orderAddress: order.address,
                     status: 1,
@@ -242,7 +243,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       textClass = "text-blue  bg-[#EBF7FF]";
     } else if (status === "Closed") {
       textClass = "text-success  bg-[#EAFFEE]";
-    } else if (status === "Canceled") {
+    } else if (status === "Cancelled") {
       textClass = "text-error  bg-[#FFF0F0]";
     } else if (status === "Payment Pending") {
       textClass = "text-orange bg-[#FFF6EC]";

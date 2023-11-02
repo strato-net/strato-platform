@@ -96,6 +96,47 @@ const BoughtOrderDetails = ({ user, users }) => {
     }
   }
 
+  const validatePayment = async(paymentSessionId) => {
+    //if payment session exists and status = Payment Pending
+    // OR if payment session exists and comment is not set and status = Cancelled
+    if(paymentSessionId !== "" && getStatus(parseInt(orderDetails.status)) === getStatus(5) || comment==="" && paymentSessionId!=="" && getStatus(parseInt(orderDetails.status)) === getStatus(4)) {
+      try{
+        const intentResponse = await fetch(
+          `${apiUrl}/order/payment/intent/sessions/${paymentSessionId}`,
+          {
+            method: HTTP_METHODS.GET,
+          }
+        );
+
+        
+        const intentBody = await intentResponse.json();
+        //Set the Comment with Status Message 
+        if(intentBody.data.last_payment_error.message) setcomment('Stripe:'+intentBody.data.last_payment_error.message);
+
+        //If any payment failure exists, and STATUS != Cancelled 
+        if(intentBody.data.status==='requires_payment_method' && getStatus(parseInt(orderDetails.status)) !== getStatus(4))
+          { 
+          setcomment('Stripe:'+intentBody.data.last_payment_error.message);
+
+          const body = {
+            address: Id,
+            updates: {
+              buyerComments: encodeURIComponent(comment),
+              status: 4,
+            },
+          };
+          //Update Buyer Details and change the Order Status to 'Cancelled' from 'Payment Pending'
+          let isDone = await actions.updateBuyerDetails(dispatch, body);
+          if (isDone) {
+            setStatus(getStatus(4));
+            await actions.fetchOrderDetails(dispatch, Id);
+            }
+        }
+
+      }catch(err){console.log(`Error:`+err)}
+    }
+  }
+
   const getPaymentStatus = async (paymentSessionId) => {
     if (paymentSessionId !== "") {
       try {
@@ -116,6 +157,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           }
           if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
             setAchStatus(true);
+            await validatePayment(paymentSessionId);
           }
 
         }
@@ -303,8 +345,9 @@ const BoughtOrderDetails = ({ user, users }) => {
     };
     let isDone = await actions.updateBuyerDetails(dispatch, body);
     if (isDone) {
-      setStatus("Canceled");
-    }
+      setStatus(getStatus(4));
+      await actions.fetchOrderDetails(dispatch, Id);
+      }
   };
 
   return (
@@ -336,15 +379,47 @@ const BoughtOrderDetails = ({ user, users }) => {
           </Breadcrumb>
 
           <Card className="mx-12 mb-14">
-            <div className="flex">
+          <div className="flex">
               <Text className="font-semibold text-primaryB">Order Details</Text>
               {
-                 !paid ?  (achStatus && <div className={classNames("text-warning  bg-[#FFC300]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
-                 <p>Processing</p>
-               </div>) : <div className={classNames("text-success  bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
-                  <p>Paid</p>
+              status === getStatus(4) ? (
+                <div className="flex">
+                  <div className={classNames("text-error bg-[#FFF0F0]", "ml-4 w-30 text-center text-xs p-1 rounded")}>
+                    <p>Payment Failed</p>
+                  </div>
+                  <div className={classNames("text-primaryB bg-[#EAFFEE]", "ml-2 w-20 text-center text-xs p-1 rounded")}>
+                    <p><b>ACH</b></p>
+                  </div>
                 </div>
-              }
+              ) : (
+                !paid ? (
+                  achStatus && (
+                    <div className="flex">
+                      <div className={classNames("text-warning bg-[#FFC300]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                        <p>Processing</p>
+                      </div>
+                      <div className={classNames("text-primaryB bg-[#EAFFEE]", "ml-2 w-20 text-center text-xs p-1 rounded")}>
+                        <p><b>ACH</b></p>
+                      </div>
+                    </div>
+                  )
+                ) : (achStatus ? (
+                  <div className="flex">
+                    <div className={classNames("text-success bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                      <p>Paid</p>
+                    </div>
+                    <div className={classNames("text-primaryB bg-[#EAFFEE]", "ml-2 w-20 text-center text-xs p-1 rounded")}>
+                      <p><b>ACH</b></p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={classNames("text-success bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                    <p>Paid</p>
+                  </div>
+                ))
+              )
+            }
+
             </div>
             <Row className="my-6 justify-between">
               <OrderData title="NUMBER" value={`#${details.orderId}`} />

@@ -15,6 +15,9 @@ class StripeService {
                       verification_method: 'instant',
                   },
                 },
+                metadata: {
+                    cart: JSON.stringify(cartData)
+                },
                 // For each item use the id to get it's information
                 // Take that information and convert it to Stripe's format
                 // shipping_address_collection: { allowed_countries: ['US'] },

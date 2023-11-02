@@ -1058,7 +1058,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           await managers.orderManager.updateBuyerDetails({ orderAddress: address, ...updates });
 
         const inventories = inventoryAddresses.split(",").slice(0, -1);
-        const quantities = quantitiesToUpdate.split(",").slice(0, -1).map(Number);
+        const quantities = quantitiesToUpdate.split(",").slice(0, -1);
         const [status] = await managers.productManager.updateInventoriesQuantities({ inventories, quantities, isReduce: false, });
 
         return { status };
