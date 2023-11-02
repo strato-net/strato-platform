@@ -29,6 +29,7 @@ library:
   - base16-bytestring
   - bytestring
   - cryptonite
+  - http-media
   - labeled-error
   - lens
   - saltine

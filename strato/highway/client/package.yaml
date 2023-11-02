@@ -1,4 +1,4 @@
-name:                blockapps-vault-wrapper-client
+name:                blockapps-highway-wrapper-client
 version:             0.1.0.0
 github:              "githubuser/client"
 author:              "Author name here"
@@ -22,8 +22,7 @@ dependencies:
 - base
 - servant-client
 - text
-- blockapps-vault-wrapper-api
+- blockapps-highway-wrapper-api
 
 library:
   source-dirs: src
-
