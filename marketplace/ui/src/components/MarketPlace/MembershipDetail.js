@@ -18,6 +18,7 @@ import { useMatch, useParams } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions"
 import { Carousel } from "react-responsive-carousel";
 import {
   useInventoryDispatch,
@@ -63,7 +64,10 @@ const MembershipDetails = ({ user, users }) => {
 
   const isIssued = type === "issued";
   const isPurchased = type === "purchased";
+  const isMarket = type === "all";
+  // const isMarketPlace = isIssued || isMarket;
   const isMarketPlace = !isIssued && !isPurchased;
+  // && !isPurchased;
 
   const { state, pathname } = useLocation();
 
@@ -326,6 +330,8 @@ const MembershipDetails = ({ user, users }) => {
       allProductFiles?.length > 0 && allProductFiles[0]?.imageUrl;
     let inventoryDetailCpy = {
       ...inventoryDetails,
+      taxes: inventoryDetails.taxPercentageAmount === 0 ? inventoryDetails.taxDollarAmount : (inventoryDetails.taxPercentageAmount / 10000),
+      isTaxPercentage: inventoryDetails.taxDollarAmount === 0,
       productImageLocation: [productFileImg],
     };
     if (!found) {
@@ -432,15 +438,38 @@ const MembershipDetails = ({ user, users }) => {
               taxDollarAmount: formik.values.taxDollarAmount,
             },
           };
+          // const inventoryBody = {
+          //   productAddress: membershipDetails.productId,
+          //   quantity: formik.values.quantity,
+          //   pricePerUnit: formik.values.price,
+          //   // Generate random code for now
+          //   batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+          //   // Status should always be published if we use List Now
+          //   status: formik.values.inventoryStatus,
+          //   serialNumber: [],
+          //   taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
+          //   taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
+          // };
+          // if (isIssued) {
+          //   const createInventory = await inventoryActions.createInventory(
+          //     inventoryDispatch,
+          //     inventoryBody
+          //   )
+
+          //   if (createInventory) {
+          //     formik.resetForm();
+          //   }
+          //   setVisible(false);
+          // } else {
           const resaleMembership = await membershipActions.resaleMembership(
             membershipDispatch,
             resalePayload
-          );
-
+          )
           if (resaleMembership) {
             formik.resetForm();
           }
           setVisible(false);
+          // }
         }
       }
     }
@@ -451,8 +480,8 @@ const MembershipDetails = ({ user, users }) => {
   };
 
   const detailTabSchema = [
-    { label: "Seller", value: inventoryDetails?.ownerOrganization },
-    { label: "Sub-Category", value: inventoryDetails?.subCategory },
+    { label: "Seller", value: inventoryDetails?.ownerOrganization ? inventoryDetails?.ownerOrganization : productDetails?.ownerOrganization },
+    { label: "Sub-Category", value: inventoryDetails?.subCategory ? inventoryDetails?.subCategory : productDetails?.subCategory },
     {
       label: `${isDuration ? "Time in Months" : "Expiry Date"}`,
       value: isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal,
@@ -575,7 +604,7 @@ const MembershipDetails = ({ user, users }) => {
         <LoaderComponent />
       ) : (
         <div>
-          <BreadCrumbComponent name={inventoryDetails?.name} />
+          <BreadCrumbComponent name={inventoryDetails?.name || productDetails?.name} />
           <Row className="max-w-4xl mx-auto mt-10 h-92">
             <Col span={10} className="rounded-md border-1-primary h-px-390">
               {allProductFiles && allProductFiles.length > 0 ? (
@@ -608,18 +637,15 @@ const MembershipDetails = ({ user, users }) => {
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
                 <Text className="text-2xl leading-8 font-semibold font-poppin">
-                  {" "}
-                  {inventoryDetails?.name ?? "--"}{" "}
+                  {(inventoryDetails?.name ? inventoryDetails?.name : productDetails?.name)}
                 </Text>
                 {isDuration ? (
                   <Row className="mb-1">
-                    {" "}
-                    {watchIcon()}{" "}
+                    {watchIcon()}
                     <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm">
-                      {" "}
                       {membershipDetails?.timePeriodInMonths ?? ""} -month
-                      duration{" "}
-                    </Text>{" "}
+                      duration
+                    </Text>
                   </Row>
                 ) : (
                   <Row className="mb-1">
@@ -644,7 +670,7 @@ const MembershipDetails = ({ user, users }) => {
                     <Text className="block text-center text-xl font-bold mt-2">
                       {isMarketPlace
                         ? `$ ${inventoryDetails?.pricePerUnit}`
-                        : StatusValue[inventoryDetails?.status] ?? "--"}{" "}
+                        : (inventoryID ? StatusValue[inventoryDetails?.status] : "Not Listed") ?? "--"}{" "}
                     </Text>
                   </Col>
                   <Col
@@ -664,7 +690,7 @@ const MembershipDetails = ({ user, users }) => {
                     </Text>
                   </Col>
                 </Row>
-                {isMarketPlace && (
+                {(isIssued || isMarket) && (
                   <Row>
                     <Row
                       className="w-full absolute mr-5 left-0 mt-6"
@@ -750,52 +776,57 @@ const MembershipDetails = ({ user, users }) => {
                     Contact to Buy
                   </Button>
                 ) : !isMarketPlace ? (
-                  <Button
-                    // type={ownerSameAsUser ? "default" : "primary"}
-                    type="primary"
-                    block={true}
-                    size="large"
-                    className=" h-full py-4 h-px-56"
-                    onClick={() => {
-                      if (
-                        hasChecked &&
-                        !isAuthenticated &&
-                        loginUrl !== undefined
-                      ) {
-                        window.location.href = loginUrl;
-                      } else {
-                        let taxVal =
-                          inventoryDetails.taxPercentageAmount === 0
-                            ? inventoryDetails.taxDollarAmount
-                            : inventoryDetails.taxPercentageAmount;
-                        formik.setFieldValue("name", inventoryDetails?.name);
-                        formik.setFieldValue(
-                          "price",
-                          inventoryDetails?.pricePerUnit
-                        );
-                        formik.setFieldValue("taxPercentage", taxVal);
-                        formik.setFieldValue(
-                          "taxPercentageAmount",
-                          inventoryDetails.taxPercentageAmount
-                        );
-                        formik.setFieldValue(
-                          "taxDollarAmount",
-                          inventoryDetails.taxDollarAmount
-                        );
-                        openListNowModal();
-                      }
-                    }}
-                  // disabled={ownerSameAsUser}
-                  >
-                    {" "}
-                    <Text
-                      className={`text-lg font-poppin text-white 
-                    `}
+                  <>
+                    {!isIssued && <Button
+                      // type={ownerSameAsUser ? "default" : "primary"}
+                      type="primary"
+                      block={true}
+                      size="large"
+                      className=" h-full py-4 h-px-56"
+                      onClick={() => {
+                        if (
+                          hasChecked &&
+                          !isAuthenticated &&
+                          loginUrl !== undefined
+                        ) {
+                          window.location.href = loginUrl;
+                        } else {
+                          let taxVal =
+                            inventoryDetails.taxPercentageAmount === 0
+                              ? inventoryDetails.taxDollarAmount
+                              : inventoryDetails.taxPercentageAmount;
+                          formik.setFieldValue("name", inventoryDetails?.name);
+                          formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
+                          formik.setFieldValue(
+                            "price",
+                            inventoryDetails?.pricePerUnit
+                          );
+                          formik.setFieldValue("taxPercentage", taxVal);
+                          formik.setFieldValue("quantity", 1);
+                          formik.setFieldValue(
+                            "taxPercentageAmount",
+                            inventoryDetails.taxPercentageAmount
+                          );
+                          formik.setFieldValue(
+                            "taxDollarAmount",
+                            inventoryDetails.taxDollarAmount
+                          );
+                          openListNowModal();
+                        }
+                      }}
+                      disabled={isIssued}
                     >
-                      List for Sale{" "}
-                    </Text>
-                    {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
-                  </Button>
+                      {" "}
+                      <Text
+                        className={`text-lg font-poppin text-white 
+                    `}
+                      >
+                        {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
+                        List for Sale
+                      </Text>
+                      {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
+                    </Button>}
+                  </>
                 ) : (
                   <Row className="w-full mx-auto" gutter={[12]}>
                     <Col span={12} className="mx-auto flex justify-center">
@@ -866,7 +897,7 @@ const MembershipDetails = ({ user, users }) => {
                 )}
               </Row>
             </Col>
-          </Row>
+          </Row >
 
           <Row className="max-w-4xl mx-auto mt-10">
             <Card className="w-full shadow-md">
@@ -885,7 +916,7 @@ const MembershipDetails = ({ user, users }) => {
                     <br />
                   </React.Fragment>
                 ))} */}
-                {inventoryDetails?.description}
+                {inventoryDetails?.description ? inventoryDetails?.description : productDetails?.description}
               </Paragraph>
             </Card>
           </Row>
@@ -934,21 +965,24 @@ const MembershipDetails = ({ user, users }) => {
               />
             </Card>
           </Row>
-        </div>
+        </div >
       )}
-      {visible && (
-        <ListNowModal
-          open={visible}
-          user={{ user }}
-          handleCancel={closeListNowModal}
-          onClick={openListNowModal}
-          formik={formik}
-          getIn={getIn}
-          listType="Sale"
-          id={Id}
-          isCreateMembershipSubmitting={isCreateInventorySubmitting}
-        />
-      )}
+      {
+        visible && (
+          <ListNowModal
+            open={visible}
+            user={{ user }}
+            handleCancel={closeListNowModal}
+            onClick={openListNowModal}
+            formik={formik}
+            isEdit={true}
+            getIn={getIn}
+            listType={isIssued ? "New" : "Sale"}
+            id={Id}
+            isCreateMembershipSubmitting={isCreateInventorySubmitting}
+          />
+        )
+      }
     </>
   );
 };

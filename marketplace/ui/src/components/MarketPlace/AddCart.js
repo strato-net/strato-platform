@@ -48,11 +48,8 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return item.product.taxes ?
-      (item.product.taxPercentageAmount ?
-        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100))
-        : (item.product.taxes) * item.qty)
-      : 0;
+    let tax = item.product.taxDollarAmount === 0 ? Math.round(item.product.pricePerUnit * (item.product.taxPercentageAmount / 100)) : (item.product.taxDollarAmount)
+    return tax * item.qty   
   };
 
   const calculateShipping = (item) => {
@@ -102,7 +99,7 @@ const Checkout = ({ user }) => {
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.isTaxPercentage ? ((item.product.pricePerUnit + calculateTax(item)) * item.qty) : ((item.product.pricePerUnit + item.product.taxes) * item.qty),
+            item.product.isTaxPercentage ? ((item.product.pricePerUnit * item.qty) + calculateTax(item)) : ((item.product.pricePerUnit + item.product.taxes) * item.qty),
           action: item.product.address,
           qty: item.qty,
         });
@@ -111,6 +108,7 @@ const Checkout = ({ user }) => {
       // Return the new object
       return { key: key, value: modifiedValue };
     });
+
     setmapData(mapDataArray)
 
     let t = 0;

@@ -38,6 +38,7 @@ const ListNowModal = ({
   user,
   formik,
   // type,
+  isCreate,
   listed,
   isEdit,
   listType,
@@ -117,7 +118,7 @@ const ListNowModal = ({
       width="auto"
       title={
         <Text className="text-xl font-semibold">
-          {isEdit ? "Edit Listing" : "Create Listing"}
+          {isCreate ? "Create Listing" : "Create / Edit Listing"}
         </Text>
       }
       open={open}
@@ -133,7 +134,7 @@ const ListNowModal = ({
             size="large"
             type="primary"
           >
-            List Now
+            Save
           </Button>
         </Row>,
       ]}
@@ -169,7 +170,7 @@ const ListNowModal = ({
               />
             </Row>
           </Col>
-          {isPurchased && (
+          {(isPurchased && !isCreate) && (
             <Col span={8}>
               <Row>
                 <Text className="font-medium">Membership Number</Text>
@@ -198,7 +199,8 @@ const ListNowModal = ({
                 className="w-full mt-2"
                 // size="large"
                 prefix={isInventoriesLoading && <Spin />}
-                disabled={(!isIssued && !isNew) || isEdit}
+                // disabled={(!isIssued && !isNew) || isEdit}
+                disabled={isEdit && !isNew}
                 // value={1}
                 controls={false}
                 value={
@@ -224,6 +226,8 @@ const ListNowModal = ({
                 name="percentage"
                 disabled={listed === 1}
                 min={0}
+                step={1}
+                precision={0}
                 addonAfter={
                   <Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
                     <Col
@@ -256,11 +260,11 @@ const ListNowModal = ({
                     </Col>
                   </Row>
                 }
-                formatter={handleFormatter}
+                // formatter={handleFormatter}
                 className="w-full mt-2"
                 size="large"
                 controls={false}
-                parser={handleParser}
+                // parser={handleParser}
                 value={formik.values.taxPercentage}
                 onChange={(value) => {
                   let btnStatus = formik.values.isTaxPercentage;
@@ -296,19 +300,20 @@ const ListNowModal = ({
             <Row> <Text className="font-medium">Type</Text></Row>
             <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
           </Col> */}
-          {!isNew && (
+          {!isCreate && (
             <Col span={8}>
               <Row>
                 <Text className="font-medium">Status</Text>
               </Row>
               <Row>
-                {isEdit || listed === 1 || listed === 2 ? (
+                {isEdit || listed === 1 || listed === 2 || isNew ? (
                   <Select
                     placeholder="Status"
                     className="mt-2 w-full"
                     size="large"
                     defaultValue={
                       StatusValue[
+                      formik?.values?.tempInv?.status ||
                       formik?.values?.inventoryStatus
                       ]
                     }
