@@ -30,6 +30,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
   const [filter, setFilter] = useState(0)
   const [selectedValue, setSelectedValue] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
 
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
@@ -60,7 +61,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
         ordersSold.map(async (order) => {
           if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
             try {
-              isordersSoldLoading = true;
+              setIsLoading(true);
               const response = await fetch(
                 `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
                 {
@@ -69,7 +70,6 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
               );
   
               const body = await response.json();
-              isordersSoldLoading = false;
   
               if (response.status === RestStatus.OK) {
                 if (
@@ -77,12 +77,11 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
                   getStatus(parseInt(order.status)) === "Payment Pending"
                 ) {
                   // Update payment status
-                  isordersSoldLoading = true;
                   let isDone = await actions.updateOrderStatus(dispatch, {
                     orderAddress: order.address,
                     status: 1,
                   });
-                  if(isDone) isordersSoldLoading = false;
+
                 }
               }
             } catch (err) {
@@ -102,7 +101,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
           };
         })
       );
-  
+      setIsLoading(false);
       setdata(updatedData);
     };
   
@@ -271,7 +270,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       <DataTableComponent
         columns={column}
         data={data}
-        isLoading={isordersSoldLoading}
+        isLoading={isordersSoldLoading || isLoading}
         pagination={false}
         scrollX="100%"
       />

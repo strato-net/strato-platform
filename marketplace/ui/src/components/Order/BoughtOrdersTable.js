@@ -27,6 +27,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   const [filter, setFilter] = useState(0)
   const [selectedValue, setSelectedValue] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
 
   const { orders, isordersLoading, orderBoughtTotal} = useOrderState();
 
@@ -56,7 +57,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         orders.map(async (order) => {
           if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
             try {
-              isordersLoading = true;
+              setIsLoading(true);
               const response = await fetch(
                 `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
                 {
@@ -65,7 +66,6 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
               );
   
               const body = await response.json();
-              isordersLoading = false;
               if (response.status === RestStatus.OK) {
                 if (
                   body.data["payment_status"] === "paid" &&
@@ -95,7 +95,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
           };
         })
       );
-  
+      setIsLoading(false);
       setdata(updatedDataBought);
     };
   
@@ -267,7 +267,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         columns={column}
         data={data}
         pagination={false}
-        isLoading={isordersLoading}
+        isLoading={isordersLoading || isLoading}
         scrollX="100%"
       />
       <Pagination
