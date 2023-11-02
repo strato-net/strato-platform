@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS -fno-warn-deprecations #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
@@ -160,27 +161,27 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
   Pong {} -> do
-    let ip = sockAddrToIP addr
     thePeer <- getPeerByIP' ip
     eErr <- resetPeerUdp $ fromJust thePeer
     whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
-    eErr' <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
+    eErr' <- setPeerBondingState ip otherUdpPort 2
     whenLeft eErr' $ \err -> do
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
   (FindNeighbors targetPubkey _) -> do
-    time <- liftIO $ round `fmap` getPOSIXTime
-    let nextTime = time + 50
-        ip = sockAddrToIP addr
-    peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
-    let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
-    sendPacket addr $ Neighbors theNeighbors nextTime
-    where
-      mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
-      mkNodeId = pointToNodeID . fromJust . pPeerPubkey
+    A.select (A.Proxy @PeerBondingState) (IPAsText $ T.pack ip, UDPPort otherUdpPort) >>= \case 
+      Just (PeerBondingState b) | b > 1 -> do
+        time <- liftIO $ round `fmap` getPOSIXTime
+        let nextTime = time + 50
+        peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
+        let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
+        sendPacket addr $ Neighbors theNeighbors nextTime
+        where
+          mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
+          mkNodeId = pointToNodeID . fromJust . pPeerPubkey
+      _ -> $logInfoS "handleValidPacket" "Recieved FindNeighbors request from a peer we are not bonded to; rejecting them"
   Neighbors neighbors _ -> do
     let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors)
-        ip = sockAddrToIP addr
     thePeer <- getPeerByIP' ip
     updateLastMessage (T.pack "Neighbors") $ fromJust thePeer
     neighborsExist <- doPeersExist neighborIPs
@@ -221,10 +222,10 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
         eErr <- resetPeerUdp $ fromJust thePeer
         whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
   where
+    ip = sockAddrToIP addr
     addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do
       curTime <- liftIO getCurrentTime
-      let ip = sockAddrToIP addr
-          peer =
+      let peer =
             PPeer
               { pPeerPubkey = Just otherPubKey,
                 pPeerIp = T.pack ip,

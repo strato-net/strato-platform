@@ -180,6 +180,12 @@ instance Mod.Accessible ActivePeers IO where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
+instance A.Selectable (IPAsText, UDPPort) PeerBondingState IO where
+  select _ (IPAsText ip, UDPPort port) = withGlobalSQLPool $ \sqldb -> do
+    fmap (fmap $ PeerBondingState . pPeerBondState . SQL.entityVal) $
+      flip runSqlPool sqldb $
+        SQL.selectFirst [PPeerIp SQL.==. ip, PPeerUdpPort SQL.==. port] []
+
 instance (A.Replaceable (IPAsText, UDPPort) PeerBondingState) IO where
   replace _ (IPAsText ip, UDPPort port) (PeerBondingState state) = withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $

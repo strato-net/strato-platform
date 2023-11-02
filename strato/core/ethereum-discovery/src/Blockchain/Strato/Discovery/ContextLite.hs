@@ -175,6 +175,9 @@ instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT ContextLite m) where
 instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT ContextLite m) where
   replace p k = liftIO . A.replace p k
 
+instance MonadIO m => A.Selectable (IPAsText, UDPPort) PeerBondingState (ReaderT ContextLite m) where
+  select p = liftIO . A.select p
+
 instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
   sign msg = do
     vc <- asks vaultClient
@@ -208,6 +211,7 @@ type MonadDiscovery m =
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
     A.Selectable (Maybe IPAsText, UDPPort) SockAddr m,
+    A.Selectable (IPAsText, UDPPort) PeerBondingState m,
     Mod.Accessible AvailablePeers m,
     Mod.Accessible BondedPeersForUDP m,
     A.Replaceable PPeer UdpEnableTime m,

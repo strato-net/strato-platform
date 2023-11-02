@@ -557,6 +557,9 @@ instance MonadIO m => Mod.Accessible BondedPeers (ReaderT Config m) where
 instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT Config m) where
   access = liftIO . Mod.access
 
+instance MonadIO m => A.Selectable (IPAsText, UDPPort) PeerBondingState (ReaderT Config m) where
+  select p = liftIO . A.select p
+
 instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT Config m) where
   replace p k = liftIO . A.replace p k
 
