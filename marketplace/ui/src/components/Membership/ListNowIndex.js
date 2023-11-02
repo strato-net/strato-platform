@@ -57,7 +57,6 @@ const ListNowIndex = ({
 
   let {
     memberships,
-    isMembershipLoading,
     isMembershipsLoading,
     isResaleMembershipSubmitting,
     purchasedMemberships,
