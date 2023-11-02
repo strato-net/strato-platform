@@ -65,6 +65,13 @@ export const Item = {
   getRawMaterials: '/rawmaterials'
 }
 
+export const Art = {
+  prefix: '/art',
+  getAll: '/',      // Endpoint to get all arts
+  create: '/create' // Endpoint to create a new art
+}
+
+
 export const Order = {
   prefix: '/order',
   get: '/:address',

@@ -1,0 +1,51 @@
+paths:
+  /art/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Art
+      summary: Retrieve art
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of arts
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Art
+      summary: Create a art
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create art
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createArt'
+      responses:
+        200:
+          description: Object of create art
+
+definitions:
+  createArt:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          productId:
+            type: string
+          inventoryId:
+            type: string
+          serialNumber:
+            type: string
+          status:
+            type: string
+          comment:
+            type: string
+          createdAt:
+            type: string
