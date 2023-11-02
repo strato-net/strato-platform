@@ -636,7 +636,7 @@ const MembershipDetails = ({ user, users }) => {
           <Row className="max-w-4xl mx-auto mt-10 h-92">
             <Col span={10} className="rounded-md border-1-primary h-px-390">
               {allProductFiles && allProductFiles.length > 0 ? (
-                <Carousel>
+                <Carousel showThumbs={false}>
                   {allProductFiles.map((file, index) => (
                     <div key={index} className="h-96">
                       <Image
