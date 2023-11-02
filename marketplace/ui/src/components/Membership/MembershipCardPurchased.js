@@ -21,6 +21,7 @@ import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
+import { listNowConfig } from "../MarketPlace/listNowConfig";
 const { purchasedCardColumn, statusColor, statusText } = helperJson;
 
 const { Text, Paragraph, Title } = Typography;
@@ -67,6 +68,7 @@ const MembershipCardPurchased = ({
 
   const [isEdit, setIsEdit] = useState(false)
   const [state, setState] = useState(null);
+  const [listModalConfig, setListModalConfig] = useState({})
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [carouselModel, setCarouselModel] = useState(false);
@@ -135,7 +137,7 @@ const MembershipCardPurchased = ({
         formik.setFieldValue("taxPercentageAmount", inv.taxPercentageAmount);
         formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
         setIsEdit(true)
-        openListNowModal();
+        openListNowModal("editInventory");
       }
     }}
   >
@@ -164,7 +166,6 @@ const MembershipCardPurchased = ({
     setIsEdit(false);
   }, [success, membershipState.success])
 
-
   const closeListNowModal = () => {
     setVisible(false);
     setIsEdit(false);
@@ -172,8 +173,10 @@ const MembershipCardPurchased = ({
     setListed(0);
   };
 
-  const openListNowModal = () => {
+  const openListNowModal = (configCase) => {
     setVisible(true);
+    let config = listNowConfig(configCase);
+    setListModalConfig(config);
   };
 
   const handleCreateFormSubmit = async (values) => {
@@ -375,16 +378,11 @@ const MembershipCardPurchased = ({
                       formik.setFieldValue("inventoryStatus", membership.status);
                       formik.setFieldValue("isTaxPercentage", isPercent);
                       formik.setFieldValue("price", membership?.price);
+                      formik.setFieldValue("quantity", isPurchased ? 1 : null);
                       formik.setFieldValue("taxPercentage", taxVal);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
-                      if (isIssued) {
-                        setListType("New")
-                      } else {
-                        setIsEdit(true)
-                        setListType("Sale")
-                      }
-                      openListNowModal();
+                      openListNowModal(isPurchased ? "resaleMembership" : "AddInventory");
                     }
                   }}
                   type={availableQuantity == 0 ? "default" : "primary"}
@@ -471,15 +469,13 @@ const MembershipCardPurchased = ({
       )}
       {visible && (
         <ListNowModal
+          config={listModalConfig}
           open={visible}
           user={user}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
-          listType={listType}
           id={itemNumber}
-          isEdit={isEdit}
-          listed={listed}
           membershipStatus={membership.status}
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}

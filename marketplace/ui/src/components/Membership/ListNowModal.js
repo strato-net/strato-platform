@@ -35,20 +35,11 @@ const ListNowModal = ({
   handleCancel,
   user,
   formik,
-  // type,
-  isCreate,
-  listed,
-  isEdit,
-  listType,
   id,
-  getIn,
   membershipStatus,
   isCreateMembershipSubmitting,
+  config: { title, isMembershipNumber, quantityDisabled, priceDisabled, isStatusVisible, statusDropDown }
 }) => {
-  const { type } = useParams();
-  const isIssued = type === "issued";
-  const isPurchased = type === "purchased";
-  const isNew = listType === "New";
 
   const {
     isInventoriesLoading,
@@ -59,17 +50,18 @@ const ListNowModal = ({
     Inventory,
   } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState();
-  // const inventoryQuantity = type == 'Sale' ? inventories[0]?.availableQuantity : 99999;
   const seller = user?.user?.user?.organization || user?.user?.organization;
   const membership = formik.values.name;
   let { isResaleMembershipSubmitting, purchasedMemberships, memberships } =
     useMembershipState();
+
   const isSubmit =
     isCreateMembershipSubmitting ||
     isResaleMembershipSubmitting ||
     isuploadImageSubmitting ||
     isCreateInventorySubmitting ||
     isinventoryUpdating;
+
   const handleFormatter = (value) => {
     if (value === "" || value === ".") {
       return "0.00";
@@ -85,8 +77,6 @@ const ListNowModal = ({
     }
   };
 
-  const membershipData = isIssued ? memberships : purchasedMemberships;
-
   const handleParser = (value) => {
     // Remove non-numeric characters and leading zeros
     const numericValue = value.replace(/[^\d.-]/g, "");
@@ -97,17 +87,6 @@ const ListNowModal = ({
   const handleStatus = (value) => {
     formik.setFieldValue("inventoryStatus", value);
   };
-
-  const selectAfter = (
-    <Select
-      defaultValue="1"
-      onChange={(value) => {
-        formik.setFieldValue("isTaxPercentage", value === "1");
-      }}
-      style={{ width: 60 }}
-      options={taxOptions}
-    />
-  );
 
   const statusVal =
     inventoryDetails?.status ||
@@ -122,12 +101,11 @@ const ListNowModal = ({
 
   return (
     <Modal
-      // width={800}
       style={{ maxWidth: "720px" }}
       width="auto"
       title={
         <Text className="text-xl font-semibold">
-          {isCreate ? "Create Listing" : "Create / Edit Listing"}
+          {title}
         </Text>
       }
       open={open}
@@ -153,8 +131,7 @@ const ListNowModal = ({
         <Row gutter={[48, 12]}>
           <Col span={8}>
             <Row>
-              {" "}
-              <Text className="font-medium">Seller</Text>{" "}
+              <Text className="font-medium">Seller</Text>
             </Row>
             <Row>
               <Input
@@ -163,28 +140,26 @@ const ListNowModal = ({
                 size="large"
                 disabled={true}
                 className="w-full mt-2 cursor-not-allowed"
-              />{" "}
+              />
             </Row>
           </Col>
           <Col span={8}>
             <Row>
-              <Text className="font-medium">Membership</Text>{" "}
+              <Text className="font-medium">Membership</Text>
             </Row>
             <Row>
-              {" "}
               <Input
                 type="text"
                 value={membership}
                 size="large"
                 disabled={true}
                 className="w-full mt-2 cursor-not-allowed"
-              />{" "}
+              />
             </Row>
           </Col>
-          {(isPurchased && !isCreate) && (
+          {isMembershipNumber && (
             <Col span={8}>
               <Row>
-                {" "}
                 <Text className="font-medium">Membership Number</Text>
               </Row>
               <Row>
@@ -200,7 +175,6 @@ const ListNowModal = ({
           )}
           <Col span={8}>
             <Row>
-              {" "}
               <Text className="font-medium">Quantity</Text>
             </Row>
             <Row>
@@ -208,21 +182,11 @@ const ListNowModal = ({
                 id="quantity"
                 name="quantity"
                 min={0}
-                // max={inventoryQuantity}
                 className="w-full mt-2"
                 size="large"
-                // prefix={isInventoriesLoading && <Spin />}
-                // disabled={(!isIssued && !isNew) || isEdit}
-                disabled={isEdit && !isNew}
-                // value={1}
+                disabled={quantityDisabled}
                 controls={false}
-                value={
-                  isIssued || isNew
-                    ? isEdit
-                      ? formik?.values?.tempInv?.availableQuantity
-                      : formik.values.quantity
-                    : 1
-                }
+                value={formik.values.quantity}
                 onChange={(value) => {
                   formik.setFieldValue("quantity", value);
                 }}
@@ -231,15 +195,12 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row>
-              {" "}
               <Text className="font-medium">Tax Percentage/Amount</Text>
             </Row>
-            <Row>
-              {" "}
+            <Row className="mt-2">
               <InputNumber
                 id="percentage"
                 name="percentage"
-                disabled={listed === 1}
                 min={0}
                 step={1}
                 precision={0}
@@ -276,7 +237,7 @@ const ListNowModal = ({
                   </Row>
                 }
                 // formatter={handleFormatter}
-                className="w-full mt-2"
+                className="w-full"
                 size="large"
                 controls={false}
                 // parser={handleParser}
@@ -292,19 +253,18 @@ const ListNowModal = ({
           </Col>
           <Col span={8}>
             <Row>
-              {" "}
               <Text className="font-medium">Price</Text>
             </Row>
-            <Row>
+            <Row className="mt-2">
               <InputNumber
                 addonBefore="$"
                 id="price"
                 name="price"
-                className="w-full mt-2"
+                className="w-full"
                 min={0}
                 size="large"
                 controls={false}
-                disabled={listed === 1}
+                disabled={priceDisabled}
                 value={formik.values.price}
                 onChange={(value) => {
                   formik.setFieldValue("price", value);
@@ -312,18 +272,13 @@ const ListNowModal = ({
               />
             </Row>
           </Col>
-          {/* <Col span={8}>
-            <Row> <Text className="font-medium">Type</Text></Row>
-            <Row><Input type="text" value={listType} size="large" disabled={true} className="w-full mt-2 cursor-not-allowed" /> </Row>
-          </Col> */}
-          {!isCreate && (
+          {isStatusVisible && (
             <Col span={8}>
               <Row>
-                {" "}
                 <Text className="font-medium">Status</Text>
               </Row>
               <Row>
-                {isEdit || listed === 1 || listed === 2 || isNew ? (
+                {statusDropDown ? (
                   <Select
                     placeholder="Status"
                     className="mt-2 w-full"
