@@ -150,6 +150,7 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     fi
     
     CONFIG=generated yarn deploy
+    CONFIG=generated yarn deploy:services
   fi
   
 else
