@@ -215,9 +215,9 @@ const MembershipDetails = ({ user, users }) => {
     } else {
       inventoryAddress = inventories[0]?.address;
     }
-    if (inventoryAddress) {
-      itemActions.fetchItem(itemDispatch, "", 0, inventoryAddress);
-    }
+    // if (inventoryAddress) {
+    //   itemActions.fetchItem(itemDispatch, "", 0, inventoryAddress);
+    // }
   }, [inventories]);
 
   useEffect(() => {
@@ -615,6 +615,156 @@ const MembershipDetails = ({ user, users }) => {
     );
   };
 
+  const listForSale = () => {
+    return (<Button
+      // type={ownerSameAsUser ? "default" : "primary"}
+      type="primary"
+      block={true}
+      size="large"
+      className=" h-full py-4 h-px-56"
+      onClick={() => {
+        if (
+          hasChecked &&
+          !isAuthenticated &&
+          loginUrl !== undefined
+        ) {
+          window.location.href = loginUrl;
+        } else {
+          let taxVal =
+            inventoryDetails.taxPercentageAmount === 0
+              ? inventoryDetails.taxDollarAmount
+              : inventoryDetails.taxPercentageAmount;
+          formik.setFieldValue(
+            "name",
+            inventoryDetails?.name
+          );
+          formik.setFieldValue(
+            "inventoryStatus",
+            inventoryDetails?.status
+          );
+          formik.setFieldValue(
+            "price",
+            inventoryDetails?.pricePerUnit
+          );
+          formik.setFieldValue("taxPercentage", taxVal);
+          formik.setFieldValue("quantity", 1);
+          formik.setFieldValue(
+            "taxPercentageAmount",
+            inventoryDetails.taxPercentageAmount
+          );
+          formik.setFieldValue(
+            "taxDollarAmount",
+            inventoryDetails.taxDollarAmount
+          );
+          openListNowModal();
+        }
+      }}
+      disabled={isIssued}
+    >
+      <Text
+        className={`text-lg font-poppin text-white`}
+      >
+        List for Sale
+      </Text>
+    </Button>
+    )
+  }
+
+  const cartAndBuyBtn = () => {
+    return (
+      <Row className="w-full mx-auto" gutter={[12]}>
+        <Col span={12} className="mx-auto flex justify-center">
+          <Button
+            block
+            size="large"
+            disabled={isIssued}
+            className="group border !h-14 border-primary hover:bg-primary"
+            onClick={() => {
+              if (
+                hasChecked &&
+                !isAuthenticated &&
+                loginUrl !== undefined
+              ) {
+                window.location.href = loginUrl;
+              } else {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: "add_to_cart_from_product_details",
+                    product_name: inventoryDetails.name,
+                    category: inventoryDetails.category,
+                    productId: inventoryDetails.productId,
+                  },
+                });
+                addItemToCart();
+              }
+            }}
+          >
+            {/* <div className="text-primary group-hover:text-white"> */}
+            Add To Cart
+            {/* </div> */}
+          </Button>
+        </Col>
+        <Col span={12}>
+          <Button
+            block
+            disabled={isIssued}
+            size="large"
+            type="primary"
+            className="bg-primary !h-14 !hover:bg-primaryHover"
+            onClick={() => {
+              if (
+                hasChecked &&
+                !isAuthenticated &&
+                loginUrl !== undefined
+              ) {
+                window.location.href = loginUrl;
+              } else {
+                TagManager.dataLayer({
+                  dataLayer: {
+                    event: "buy_now_from_product_details",
+                    product_name: inventoryDetails.name,
+                    category: inventoryDetails.category,
+                    productId: inventoryDetails.productId,
+                  },
+                });
+                addItemToCart();
+                navigate("/checkout");
+              }
+            }}
+            // disabled={ownerSameAsUser()}
+            id="buyNow"
+          >
+            Buy Now
+          </Button>
+        </Col>
+      </Row>
+    )
+  }
+
+  const contactToBuyBtn = () => {
+    return (
+      <Button
+        block={true}
+        type="primary"
+        size="large"
+        className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
+        href={`mailto:sales@blockapps.net`}
+      // onClick={() => {
+      //   TagManager.dataLayer({
+      //     dataLayer: {
+      //       event: 'contact_sales_from_category_card',
+      //       product_name: product.name,
+      //       category: product.category,
+      //       productId: product.productId
+      //     },
+      //   });
+      // }}
+      >
+        Contact to Buy
+      </Button>
+    )
+  }
+
   return (
     <>
       {contextHolder}
@@ -775,152 +925,10 @@ const MembershipDetails = ({ user, users }) => {
               </Card>
               <Row className="h-14 mt-4">
                 {inventoryDetails?.availableQuantity == 0 ? (
-                  <Button
-                    block={true}
-                    type="primary"
-                    size="large"
-                    className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
-                    href={`mailto:sales@blockapps.net`}
-                  // onClick={() => {
-                  //   TagManager.dataLayer({
-                  //     dataLayer: {
-                  //       event: 'contact_sales_from_category_card',
-                  //       product_name: product.name,
-                  //       category: product.category,
-                  //       productId: product.productId
-                  //     },
-                  //   });
-                  // }}
-                  >
-                    Contact to Buy
-                  </Button>
-                ) : !isMarketPlace ? (
-                  <>
-                    {!isIssued && (
-                      <Button
-                        // type={ownerSameAsUser ? "default" : "primary"}
-                        type="primary"
-                        block={true}
-                        size="large"
-                        className=" h-full py-4 h-px-56"
-                        onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
-                            window.location.href = loginUrl;
-                          } else {
-                            let taxVal =
-                              inventoryDetails.taxPercentageAmount === 0
-                                ? inventoryDetails.taxDollarAmount
-                                : inventoryDetails.taxPercentageAmount;
-                            formik.setFieldValue(
-                              "name",
-                              inventoryDetails?.name
-                            );
-                            formik.setFieldValue(
-                              "inventoryStatus",
-                              inventoryDetails?.status
-                            );
-                            formik.setFieldValue(
-                              "price",
-                              inventoryDetails?.pricePerUnit
-                            );
-                            formik.setFieldValue("taxPercentage", taxVal);
-                            formik.setFieldValue("quantity", 1);
-                            formik.setFieldValue(
-                              "taxPercentageAmount",
-                              inventoryDetails.taxPercentageAmount
-                            );
-                            formik.setFieldValue(
-                              "taxDollarAmount",
-                              inventoryDetails.taxDollarAmount
-                            );
-                            openListNowModal();
-                          }
-                        }}
-                        disabled={isIssued}
-                      >
-                        <Text
-                          className={`text-lg font-poppin text-white 
-                    `}
-                        >
-                          {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
-                          List for Sale
-                        </Text>
-                        {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  <Row className="w-full mx-auto" gutter={[12]}>
-                    <Col span={12} className="mx-auto flex justify-center">
-                      <Button
-                        block
-                        size="large"
-                        disabled={isIssued}
-                        className="group border !h-14 border-primary hover:bg-primary"
-                        onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
-                            window.location.href = loginUrl;
-                          } else {
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: "add_to_cart_from_product_details",
-                                product_name: inventoryDetails.name,
-                                category: inventoryDetails.category,
-                                productId: inventoryDetails.productId,
-                              },
-                            });
-                            addItemToCart();
-                          }
-                        }}
-                      >
-                        {/* <div className="text-primary group-hover:text-white"> */}
-                        Add To Cart
-                        {/* </div> */}
-                      </Button>
-                    </Col>
-                    <Col span={12}>
-                      <Button
-                        block
-                        disabled={isIssued}
-                        size="large"
-                        type="primary"
-                        className="bg-primary !h-14 !hover:bg-primaryHover"
-                        onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
-                            window.location.href = loginUrl;
-                          } else {
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: "buy_now_from_product_details",
-                                product_name: inventoryDetails.name,
-                                category: inventoryDetails.category,
-                                productId: inventoryDetails.productId,
-                              },
-                            });
-                            addItemToCart();
-                            navigate("/checkout");
-                          }
-                        }}
-                        // disabled={ownerSameAsUser()}
-                        id="buyNow"
-                      >
-                        Buy Now
-                      </Button>
-                    </Col>
-                  </Row>
-                )}
+                  contactToBuyBtn()
+                ) : !isMarketPlace
+                  ? (<>{!isIssued && listForSale()}</>)
+                  : (cartAndBuyBtn())}
               </Row>
             </Col>
           </Row>
