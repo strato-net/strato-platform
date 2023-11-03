@@ -3,20 +3,21 @@ import config from '/load.config';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '/helpers/utils';
 import dayjs from 'dayjs';
+import constants from '../../helpers/constants';
 
 
-const contractName = constants.assetTableName;
+const contractName = "Art";
 const contractFilename = `${util.cwd}/dapp/items/contracts/Art.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
 /** 
- * Upload a new Item 
+ * Uploads a new Art item 
  * @param user User token (typically an admin)
  * @param _constructorArgs Arguments of Item's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
  * @returns Contract object
  * */
-async function createArt(user, _constructorArgs, options) {
+async function uploadContract(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
 
     const contractArgs = {
@@ -108,7 +109,6 @@ function marshalOut(_args) {
 function bind(user, _contract, options) {
     const contract = { ..._contract };
 
-    contract.create = async(args) => createArt(user, args, options);
     contract.get = async (args = { address: contract.address, }) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.transferOwnership = async (newOwner) => transferOwnership(user, contract, options, newOwner);
@@ -119,7 +119,7 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing Item contract to a new user token. Useful for having multiple users test
+ * Bind an existing Art contract to a new user token. Useful for having multiple users test
  * the same contract.
  * @example <caption>Create an admin and user bound to the same new item contract.</caption>
  * const adminBoundContract = createArt(adminToken, args, options);
@@ -148,10 +148,10 @@ async function get(user, args, options) {
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        item = await searchOne(contractName, searchArgs, options, user);
+        item = await searchOne(constants.assetTableName, searchArgs, options, user);
     } else {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueItemID', value: uniqueItemID });
-        item = await searchOne(contractName, searchArgs, options, user);
+        item = await searchOne(constants.assetTableName, searchArgs, options, user);
     }
     if (!item) {
         return undefined;
@@ -163,14 +163,9 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    // Add the filter condition for the field 'ginger' equal to 'Art'
-    const filterArgs = {
-      ...args,
-      contractName: 'Art',
-    };
     const { org, ...modifiedOptions } = options;
     const { offset, limit, ...restArgs } = filterArgs;
-    const inventories = await searchAllWithQueryArgs(contractName, { offset, limit }, modifiedOptions, admin);
+    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { offset, limit, contractName: "Art" }, modifiedOptions, admin);
     return inventories.map((inventory) => marshalOut(inventory));
   }
   
@@ -215,7 +210,7 @@ async function getAllOwnershipEvents(admin, args = {}, options) {
 }
 
 export default {
-    createArt,
+    uploadContract,
     contractName,
     contractFilename,
     bindAddress,
