@@ -111,6 +111,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
+    "owners" jsonb,
   PRIMARY KEY (address) );|]
 
       vehicleInsert
@@ -178,6 +179,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
+    "owners" jsonb,
   PRIMARY KEY (address) );|]
 
       historyCreate
@@ -186,7 +188,8 @@ spec = do
     block_timestamp text,
     block_number text,
     transaction_hash text NOT NULL,
-    transaction_sender text);|]
+    transaction_sender text,
+    "owners" jsonb);|]
 
       historyIndex
         `shouldBe` [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle2"
@@ -272,6 +275,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
+    "\"owners\"" jsonb,
   PRIMARY KEY (address) );|]
 
       vehicleInsert
@@ -365,6 +369,7 @@ spec = do
     transaction_hash text,
     transaction_sender text,
     "addr" text,
+    "array_nums" jsonb,
     "boolean" bool,
     "contract" text,
     "enum_val" text,
@@ -568,6 +573,7 @@ spec = do
     transaction_hash text,
     transaction_sender text,
     "addr" text,
+    "array_nums" jsonb,
     "boolean" bool,
     "contract" text,
     "enum_val" text,
