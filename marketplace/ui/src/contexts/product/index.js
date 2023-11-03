@@ -6,19 +6,21 @@ const ProductDispatchContext = createContext();
 
 const ProductsProvider = ({ children }) => {
   const initialState = {
+    isProductDetailsLoading: false,
+    isInitialLoadProductDetails: true,
+
     product: null,
     isCreateProductSubmitting: false,
     products: [],
     isProductsLoading: false,
     isProductsForFilterLoading: false,
-    productsForFilter:[],
+    productsForFilter: [],
     categoryBasedProducts: [],
     isCategoryBasedProductsLoading: false,
     productDetails: null,
-    isProductDetailsLoading: true,
     isProductDeleting: false,
     productDeleteObject: null,
-    uploadedImg : null,
+    uploadedImg: null,
     isuploadImageSubmitting: false,
     deletedImg: null,
     isdeletedImageSubmitting: false,
@@ -45,9 +47,7 @@ const ProductsProvider = ({ children }) => {
 const useProductState = () => {
   const context = useContext(ProductStateContext);
   if (context === undefined) {
-    throw new Error(
-      `'useProductState' must be used within a ProductsProvider`
-    );
+    throw new Error(`'useProductState' must be used within a ProductsProvider`);
   }
   return context;
 };

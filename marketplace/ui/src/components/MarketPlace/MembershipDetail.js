@@ -14,7 +14,7 @@ import {
 } from "antd";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { useMatch, useParams } from "react-router-dom";
-import { actions } from "../../contexts/inventory/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
 import { Carousel } from "react-responsive-carousel";
@@ -22,8 +22,6 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
-import { actions as itemActions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
 import { useProductDispatch, useProductState } from "../../contexts/product";
 import routes from "../../helpers/routes";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
@@ -52,11 +50,12 @@ const StatusValue = {
   2: "Not Listed",
 };
 
-const MembershipDetails = ({ user, users }) => {
+const MembershipDetails = ({ user }) => {
   const { type } = useParams();
+
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const inventoryID = queryParams.get("inventoryId");
+  const inventoryId = queryParams.get("inventoryId");
 
   const isIssued = type === "issued";
   const isPurchased = type === "purchased";
@@ -64,8 +63,6 @@ const MembershipDetails = ({ user, users }) => {
   const isMarketPlace = !isIssued && !isPurchased;
 
   const { state, pathname } = useLocation();
-
-  const [inventoryId, setInventoryId] = useState(inventoryID);
 
   let isCalledFromMembership = false;
 
@@ -93,11 +90,13 @@ const MembershipDetails = ({ user, users }) => {
   const limit = 10,
     offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { membershipServices, membership, isMembershipLoading, productFiles } =
-    useMembershipState();
+  const {
+    membershipServices,
+    membership,
+    isInitialLoadMembershipDetail,
+    productFiles,
+  } = useMembershipState();
   const serviceDispatch = useMembershipDispatch();
-  const itemDispatch = useItemDispatch();
-  const { items } = useItemState();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -184,14 +183,11 @@ const MembershipDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const {
     inventoryDetails,
-    inventories,
-    isInventoryDetailsLoading,
-    isInventoriesLoading,
-    inventory,
     isCreateInventorySubmitting,
+    isInitialLoadInventoryDetails,
   } = useInventoryState();
   const productDispatch = useProductDispatch();
-  const { productDetails, isProductDetailsLoading } = useProductState();
+  const { productDetails, isInitialLoadProductDetails } = useProductState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
@@ -212,57 +208,14 @@ const MembershipDetails = ({ user, users }) => {
   }, [routeMatch, routeMatch1]);
 
   useEffect(() => {
-    let inventoryAddress;
-    if (type !== "issued" && type !== "purchased") {
-      inventoryAddress = inventoryDetails?.address;
-    } else {
-      inventoryAddress = inventories[0]?.address;
-    }
-    if (inventoryAddress) {
-      itemActions.fetchItem(itemDispatch, "", 0, inventoryAddress);
-    }
-  }, [inventories]);
-
-  useEffect(() => {
-    if (inventory !== null && inventory !== undefined) {
-      setInventoryId(inventory[1]);
-    }
-  }, [inventory]);
-
-  console.log({ inventoryId, membershipDetails, Id });
-
-  useEffect(() => {
     if (Id !== undefined && inventoryId && !membershipDetails) {
-      actions.fetchInventoryDetail(inventoryDispatch, inventoryId);
-    } else if (Id !== undefined && membershipDetails) {
-      const inventoryResult = Promise.resolve(
-        actions.fetchInventory(
-          inventoryDispatch,
-          10,
-          0,
-          membershipDetails?.productId
-        )
+      inventoryActions.fetchInventoryDetail(inventoryDispatch, inventoryId);
+    } else if (Id !== undefined && membershipDetails && !inventoryId) {
+      productActions.fetchProductDetails(
+        productDispatch,
+        membershipDetails?.productId,
+        null
       );
-
-      inventoryResult
-        .then((value) => {
-          if (inventories.length > 0) {
-            setInventoryId(inventories[0].address);
-          } else {
-            productActions.fetchProductDetails(
-              productDispatch,
-              membershipDetails?.productId,
-              null
-            );
-          }
-        })
-        .catch((err) => {
-          productActions.fetchProductDetails(
-            productDispatch,
-            membershipDetails?.productId,
-            null
-          );
-        });
     }
   }, [membershipDetails, inventoryId]);
 
@@ -291,32 +244,21 @@ const MembershipDetails = ({ user, users }) => {
     }
   };
 
-  console.log({
-    isMembershipLoading,
-    isInventoriesLoading,
-    isProductDetailsLoading,
-    isInventoryDetailsLoading,
-  });
-
   useEffect(() => {
     if (
-      !isMembershipLoading &&
-      !isInventoriesLoading &&
-      !isProductDetailsLoading &&
-      !isInventoryDetailsLoading
+      (!isInitialLoadMembershipDetail && !isInitialLoadProductDetails) ||
+      (!isInitialLoadMembershipDetail && !isInitialLoadInventoryDetails)
     ) {
       setIsLoading(false); // All booleans are false, set isLoading to false
     } else {
       setIsLoading(true); // At least one boolean is true, set isLoading to true
     }
   }, [
-    isMembershipLoading,
-    isInventoriesLoading,
-    isProductDetailsLoading,
-    isInventoryDetailsLoading,
+    isInitialLoadMembershipDetail,
+    isInitialLoadProductDetails,
+    isInitialLoadInventoryDetails,
   ]);
 
-  const isOwner = inventoryDetails?.ownerOrganization === user?.organization;
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -630,8 +572,6 @@ const MembershipDetails = ({ user, users }) => {
     );
   };
 
-  console.log({ isLoading });
-
   return (
     <>
       {contextHolder}
@@ -647,7 +587,7 @@ const MembershipDetails = ({ user, users }) => {
           <Row className="max-w-4xl mx-auto mt-10 h-92">
             <Col span={10} className="rounded-md border-1-primary h-px-390">
               {allProductFiles && allProductFiles.length > 0 ? (
-                <Carousel>
+                <Carousel showThumbs={false}>
                   {allProductFiles.map((file, index) => (
                     <div key={index} className="h-96">
                       <Image
@@ -711,7 +651,7 @@ const MembershipDetails = ({ user, users }) => {
                     <Text className="block text-center text-xl font-bold mt-2">
                       {isMarketPlace
                         ? `$ ${inventoryDetails?.pricePerUnit}`
-                        : (inventoryID
+                        : (inventoryId
                             ? StatusValue[inventoryDetails?.status]
                             : "Not Listed") ?? "--"}{" "}
                     </Text>
