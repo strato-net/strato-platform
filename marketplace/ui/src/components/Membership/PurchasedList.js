@@ -9,6 +9,8 @@ import { actions } from "../../contexts/membership/actions";
 import { Image, Typography } from "antd";
 import { Images } from "../../images";
 import { SearchOutlined } from "@ant-design/icons";
+import helperJson from "../../../src/helpers/helper.json"
+const { purchasedCardConfig } = helperJson
 
 const PurchasedList = (
   user,
@@ -28,11 +30,11 @@ const PurchasedList = (
         </div>
       ) : purchasedMemberships.length === 0 ? (
         <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
-        <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
-        <Title level={3} className="mt-2">
-          No product found
-        </Title>
-      </div>
+          <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
+          <Title level={3} className="mt-2">
+            No product found
+          </Title>
+        </div>
       ) : (
         <>
 
@@ -73,13 +75,13 @@ const PurchasedList = (
               return (
                 <Col span={12}>
                   <MembershipCardPurchased
+                    cardConfig={purchasedCardConfig}
                     user={user}
                     membership={product}
                     categorys={categorys}
                     subCategorys={subCategorys}
                     debouncedSearchTerm={debouncedSearchTerm}
                     membershipId={product.itemNumber}
-                    isPurchasedList={true}
                   />
                 </Col>
               );

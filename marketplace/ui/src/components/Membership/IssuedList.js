@@ -9,6 +9,9 @@ import { actions } from "../../contexts/membership/actions";
 import { Image, Typography } from "antd";
 import { Images } from "../../images";
 import MembershipCardPurchased from "./MembershipCardPurchased";
+import helperJson from "../../../src/helpers/helper.json"
+
+const { issuedCardConfig } = helperJson
 
 const IssuedList = (
   user,
@@ -64,13 +67,13 @@ const IssuedList = (
             return (
               <Col span={12}>
                 <MembershipCardPurchased
+                  cardConfig={issuedCardConfig}
                   user={user}
                   membership={transformedData}
                   categorys={categorys}
                   subCategorys={subCategorys}
                   debouncedSearchTerm={debouncedSearchTerm}
                   membershipId={item.address}
-                  isPurchasedList={false}
                 />
               </Col>
             );
