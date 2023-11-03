@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  Input,
+  // Input,
   Button,
   Col,
   notification,
@@ -10,35 +10,31 @@ import {
   Tabs,
   Row,
 } from "antd";
+//components
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
 import CreateMembershipModal from "./CreateMembershipModal";
-import { actions as membershipActions } from "../../contexts/membership/actions";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-
-import useDebounce from "../UseDebounce";
-//categories
-import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-//sub-categories
-import { useSubCategoryState } from "../../contexts/subCategory";
-import "./membership.css";
-import routes from "../../helpers/routes";
-import { useAuthenticateState } from "../../contexts/authentication";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
-import ListNowIndex from "./ListNowIndex";
-import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
-import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+//actions
+import { actions as membershipActions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as categoryActions } from "../../contexts/category/actions";
+//context state & dispatch
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { useAuthenticateState } from "../../contexts/authentication";
+import { useSubCategoryState } from "../../contexts/subCategory";
+// utils,css,other
+import useDebounce from "../UseDebounce";
+import "./membership.css";
+import routes from "../../helpers/routes";
+import { createServiceIcon, servicesIcon } from "../../images/SVGComponents";
 import { setCookie } from "../../helpers/cookie";
-import LoaderComponent from "../Loader/LoaderComponent";
 
-const { Search } = Input;
-const { Title, Text } = Typography;
+// const { Search } = Input;
+const { Text } = Typography;
 
 const Membership = (user) => {
   const { type } = useParams();
@@ -53,7 +49,6 @@ const Membership = (user) => {
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  const [visible, setVisible] = useState(false);
 
   const categoryDispatch = useCategoryDispatch();
   const inventoryDispatch = useInventoryDispatch();
@@ -78,7 +73,7 @@ const Membership = (user) => {
     stripeStatus,
     isLoadingStripeStatus,
   } = useMembershipState();
-  const membershipState = useMembershipState();
+  // const membershipState = useMembershipState();
   const inventoryState = useInventoryState();
   // const success = membershipState.success || inventoryState.success;
   // const message = membershipState.message || inventoryState.message;
@@ -125,13 +120,6 @@ const Membership = (user) => {
       label: <Text className="text-xl font-bold leading-6" style={{ color: type === "issued" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Issued</Text>,
     },
   ];
-  const closeSellModal = () => {
-    setVisible(false);
-  };
-
-  const openSellModal = () => {
-    setVisible(true);
-  };
 
   const handleToastClose = () => {
     membershipActions.resetMessage(dispatch);
@@ -171,7 +159,6 @@ const Membership = (user) => {
       ) : (
         <div className="min-h-full">
           <BreadCrumbComponent />
-
           <Col className="mt-2 h-24 py-5 bg-red-800" style={{ backgroundColor: '#F2F2F2' }}>
             <Row className="mx-16 flex justify-between item-center">
               <Col span={8} >
@@ -288,19 +275,6 @@ const Membership = (user) => {
           open={open}
           user={user}
           handleCancel={handleCancel}
-        />
-      )}
-      {visible && !isPageLoading && (
-        <ListNowIndex
-          open={visible}
-          user={user}
-          handleCancel={closeSellModal}
-          onClick={() => { setVisible(true) }}
-          // formik={formik}
-          type="Sale"
-        // id="None"
-        // getIn={getIn}
-        // isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
       {msg && openToast("bottom")}
