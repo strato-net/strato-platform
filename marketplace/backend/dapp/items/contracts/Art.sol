@@ -4,7 +4,7 @@ import "/dapp/items/contracts/ItemStatus.sol";
 
 pragma es6;
 pragma strict;
-import <d816194227e1a7a780fff236a449604afeb36255>;
+import <a03b3af42743b41d406d6ddf018fcacea303d481>;
 
 /// @title A representation of Item assets
 contract Art is ItemStatus, Asset {
