@@ -107,8 +107,10 @@ const Membership = (user) => {
   // const message = membershipState.message || inventoryState.message;
 
   useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user?.user?.organization);
-  }, [user]);
+    if(user?.user?.organization){
+      actions.sellerStripeStatus(dispatch, user?.user?.organization);
+    }
+  }, [user.user]);
 
   const navigate = useNavigate();
 
