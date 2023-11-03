@@ -67,8 +67,8 @@ export const Item = {
 
 export const Art = {
   prefix: '/art',
-  getAll: '/',      // Endpoint to get all arts
-  create: '/create' // Endpoint to create a new art
+  getAll: '/',
+  create: '/'
 }
 
 

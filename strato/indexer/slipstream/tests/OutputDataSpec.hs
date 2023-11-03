@@ -111,6 +111,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
+    "owners" jsonb,
   PRIMARY KEY (address) );|]
 
       vehicleInsert
@@ -119,20 +120,23 @@ spec = do
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender")
+    "transaction_sender",
+    "owners")
   VALUES ('0000000000000000000000000000000000000add',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add')
+    '0000000000000000000000000000000000000add',
+    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
   ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender;|]
+    transaction_sender = excluded.transaction_sender,
+    "owners" = excluded."owners";|]
 
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
@@ -178,6 +182,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
+    "owners" jsonb,
   PRIMARY KEY (address) );|]
 
       historyCreate
@@ -186,7 +191,8 @@ spec = do
     block_timestamp text,
     block_number text,
     transaction_hash text NOT NULL,
-    transaction_sender text);|]
+    transaction_sender text,
+    "owners" jsonb);|]
 
       historyIndex
         `shouldBe` [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle2"
@@ -200,20 +206,23 @@ spec = do
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender")
+    "transaction_sender",
+    "owners")
   VALUES ('0000000000000000000000000000000000000add',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add')
+    '0000000000000000000000000000000000000add',
+    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
   ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender;|]
+    transaction_sender = excluded.transaction_sender,
+    "owners" = excluded."owners";|]
 
       historyInsert
         `shouldBe` [r|INSERT INTO "history@Vehicle2" ("address",
@@ -221,13 +230,15 @@ spec = do
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender")
+    "transaction_sender",
+    "owners")
   VALUES ('0000000000000000000000000000000000000add',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add')
+    '0000000000000000000000000000000000000add',
+    '[{"hash":"Owner_hash_181999847806006","number":"18199984780605"}]')
   ON CONFLICT DO NOTHING;|]
 
   describe "String escaping" $ do
@@ -272,6 +283,7 @@ spec = do
     block_number text,
     transaction_hash text,
     transaction_sender text,
+    "\"owners\"" jsonb,
   PRIMARY KEY (address) );|]
 
       vehicleInsert
@@ -280,20 +292,23 @@ spec = do
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender")
+    "transaction_sender",
+    "\"owners\"")
   VALUES ('0000000000000000000000000000000000000add',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add')
+    '0000000000000000000000000000000000000add',
+    '[{"h''a\"''sh":"''''Owner_hash_181999847806006","number\"":"18199984780605"}]')
   ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender;|]
+    transaction_sender = excluded.transaction_sender,
+    "\"owners\"" = excluded."\"owners\"";|]
 
   it "can unparse all solidvm value types" $ do
     let testAdd = Address 0x98eaddede
@@ -365,6 +380,7 @@ spec = do
     transaction_hash text,
     transaction_sender text,
     "addr" text,
+    "array_nums" jsonb,
     "boolean" bool,
     "contract" text,
     "enum_val" text,
@@ -381,6 +397,7 @@ spec = do
     "transaction_hash",
     "transaction_sender",
     "addr",
+    "array_nums",
     "boolean",
     "contract",
     "enum_val",
@@ -394,6 +411,7 @@ spec = do
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
+    '["0","20","40","77","0"]',
     'True',
     NULL,
     '564',
@@ -408,6 +426,7 @@ spec = do
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     "addr" = excluded."addr",
+    "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",
@@ -568,6 +587,7 @@ spec = do
     transaction_hash text,
     transaction_sender text,
     "addr" text,
+    "array_nums" jsonb,
     "boolean" bool,
     "contract" text,
     "enum_val" text,
@@ -584,6 +604,7 @@ spec = do
     "transaction_hash",
     "transaction_sender",
     "addr",
+    "array_nums",
     "boolean",
     "contract",
     "enum_val",
@@ -597,6 +618,7 @@ spec = do
     '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
     '000000000000000000000000000000098eaddede',
     '00000000000000000000000000000000deadbeef',
+    '["0","20","40","77","0"]',
     'True',
     NULL,
     '564',
@@ -611,6 +633,7 @@ spec = do
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     "addr" = excluded."addr",
+    "array_nums" = excluded."array_nums",
     "boolean" = excluded."boolean",
     "contract" = excluded."contract",
     "enum_val" = excluded."enum_val",

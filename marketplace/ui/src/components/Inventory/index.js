@@ -192,7 +192,7 @@ const Inventory = ({ user }) => {
                     }
                   }}
                 >
-                  Add Inventory
+                  Add Item
                 </Button>
               </div>
             </div>
@@ -238,7 +238,7 @@ const Inventory = ({ user }) => {
                       }
                     }}
                   >
-                    Add Inventory
+                    Add Item
                   </Button>
                 </div>
               </div>

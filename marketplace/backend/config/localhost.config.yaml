@@ -15,8 +15,8 @@ marketplaceUiUrlPrefix: "/marketplace"
 nodes:
   - id: 0
     label: localhost
-    url: http://localhost
-    port: 30303
+    url: http://localhost:8080
+    port: 8080
     oauth:
       appTokenCookieName: asset_framework_session
       appTokenCookieMaxAge: 7776000000

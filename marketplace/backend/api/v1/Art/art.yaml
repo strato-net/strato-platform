@@ -37,15 +37,27 @@ definitions:
       machineArgs:
         type: object
         properties:
-          productId:
-            type: string
-          inventoryId:
-            type: string
           serialNumber:
             type: string
           status:
-            type: string
+            type: number
           comment:
             type: string
-          createdAt:
+          itemNumber:
+            type: number
+          name:
             type: string
+          description:
+            type: string
+          artist:
+            type: string
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          saleState:
+            type: number
+          paymentType:
+            type: number

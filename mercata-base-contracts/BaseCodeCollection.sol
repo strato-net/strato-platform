@@ -35,8 +35,8 @@ abstract contract Asset is PaymentType, SaleState{
     constructor(string _name, string _description, string[] _images, uint _price, SaleState _state, PaymentType _payment) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        owner  = Certificate(account(address(c), "main")).userAddress();
-        ownerCommonName = Certificate(account(address(c), "main")).commonName();
+        owner  = c.userAddress();
+        ownerCommonName = c.commonName();
         name = _name;
         description =_description;
         images =_images;
@@ -52,7 +52,7 @@ abstract contract Asset is PaymentType, SaleState{
                    + " can perform "
                    + action
                    + ".";
-        string commonName = Certificate(account(address(c), "main")).commonName();
+        string commonName = c.commonName();
         require(commonName == ownerCommonName, err);
         _;
     }
@@ -72,7 +72,7 @@ abstract contract Asset is PaymentType, SaleState{
     }
 
     function changePrice(uint _price) public requireOwner("Change Asset Price"){
-       price = _price;
+        price = _price;
     }
 
     function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){
@@ -103,12 +103,6 @@ abstract contract Sale is PaymentType, SaleState{
         PaymentType _payment
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        sellersCommonName = Certificate(account(address(c), "main")).commonName();
-        address currentOwner = assetToBeSold.owner();
-        string currentOwnerName = Certificate(account(currentOwner, "main")).commonName();
-        require(sellersCommonName == currentOwnerName, "Only the owner of the asset can open a bill of sale");
         sellersCommonName = assetToBeSold.ownerCommonName();
         purchasersCommonName = sellersCommonName;
         price = assetToBeSold.price();
@@ -124,9 +118,9 @@ abstract contract Sale is PaymentType, SaleState{
                    + " can perform "
                    + action
                    + ".";
-        string org = Certificate(account(address(c), "main")).organization();
+        string org = c.organization();
         require(org == sellersOrganization, err);
-        string commonName = Certificate(account(address(c), "main")).commonName();
+        string commonName = c.commonName();
         require(commonName == sellersCommonName, err);
     }
 

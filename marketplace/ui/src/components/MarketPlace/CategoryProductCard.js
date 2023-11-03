@@ -19,7 +19,7 @@ import {
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
-
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -122,7 +122,7 @@ const CategoryProductCard = ({ product, category }) => {
         <div className="flex justify-start items-center">
           <div className="m-4">
             <Image
-              src={product.imageUrl}
+              src={product.images && product.images.length > 0 ? product.images[0] : image_placeholder}
               width={200}
               height={180}
               style={{ objectFit: "contain" }}
@@ -147,9 +147,7 @@ const CategoryProductCard = ({ product, category }) => {
               <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
             </div>
             <Text className="text-secondryB text-sm" id="prod-category">
-              Sold By: {product.ownerOrganization.startsWith('Mercata Account')
-                ? product.ownerCommonName
-                : product.ownerOrganization}
+              Sold By: {product.ownerCommonName}
             </Text>
             <Paragraph
               ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
@@ -164,7 +162,7 @@ const CategoryProductCard = ({ product, category }) => {
               ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
-              $ {product.pricePerUnit}
+              $ {product.price}
             </Title>
             {product.availableQuantity !== 0 ?
               (
@@ -219,7 +217,7 @@ const CategoryProductCard = ({ product, category }) => {
                   </Button>
                   <Button
                     type="primary"
-                    id={`${product.name.replace(/ /g, "_")}-buy-now`}
+                    id={`${product.name}-buy-now`}
                     className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {

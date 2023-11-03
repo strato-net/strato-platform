@@ -4,7 +4,7 @@ import "/dapp/items/contracts/ItemStatus.sol";
 
 pragma es6;
 pragma strict;
-import <f1bf0f62ba0ca6d7c7b7486d33d0a264ba8e38ed>;
+import <a03b3af42743b41d406d6ddf018fcacea303d481>;
 
 /// @title A representation of Item assets
 contract Art is ItemStatus, Asset {
@@ -15,7 +15,7 @@ contract Art is ItemStatus, Asset {
     string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
     uint public createdDate;
-    uint public artQuantity;
+    string public artist;
 
     event OwnershipUpdate(
         string seller,
@@ -32,13 +32,13 @@ contract Art is ItemStatus, Asset {
         uint _createdDate,
         address _owner,
         string _name,
-        string _desc,
-        uint _artQuantity,
+        string _description,
+        string _artist,
         string[] _images,
         uint _price,
         SaleState _saleState,
         PaymentType _paymentType
-    ) public Asset(_name, _desc, _images, _price, _saleState, _paymentType ){
+    ) public Asset(_name, _description, _images, _price, _saleState, _paymentType ){
         owner = _owner;
 
         serialNumber = _serialNumber;
@@ -46,7 +46,7 @@ contract Art is ItemStatus, Asset {
         comment = _comment;
         createdDate = _createdDate;
         itemNumber = _itemNumber;
-        artQuantity = _artQuantity;
+        artist = _artist;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

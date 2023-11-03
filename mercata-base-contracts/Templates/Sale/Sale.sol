@@ -19,12 +19,6 @@ abstract contract Sale is PaymentType, SaleState{
         PaymentType _payment
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        sellersCommonName = Certificate(account(address(c), "main")).commonName();
-        address currentOwner = assetToBeSold.owner();
-        string currentOwnerName = Certificate(account(currentOwner, "main")).commonName();
-        require(sellersCommonName == currentOwnerName, "Only the owner of the asset can open a bill of sale");
         sellersCommonName = assetToBeSold.ownerCommonName();
         purchasersCommonName = sellersCommonName;
         price = assetToBeSold.price();
@@ -40,9 +34,9 @@ abstract contract Sale is PaymentType, SaleState{
                    + " can perform "
                    + action
                    + ".";
-        string org = Certificate(account(address(c), "main")).organization();
+        string org = c.organization();
         require(org == sellersOrganization, err);
-        string commonName = Certificate(account(address(c), "main")).commonName();
+        string commonName = c.commonName();
         require(commonName == sellersCommonName, err);
     }
 

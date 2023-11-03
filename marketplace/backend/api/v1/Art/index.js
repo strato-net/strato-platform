@@ -1,5 +1,5 @@
 import express from "express";
-import ArtController from "./Art.controller";
+import ArtController from "./art.controller";
 import { Art } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
