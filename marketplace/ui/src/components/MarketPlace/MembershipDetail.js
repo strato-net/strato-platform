@@ -82,7 +82,6 @@ const MembershipDetails = ({ user, users }) => {
     quantity: 1,
   };
 
-  const [listModalConfig, setListModalConfig] = useState({})
   const [activeTab, setActiveTab] = useState("Details");
   const [serviceList, setServiceList] = useState([]);
   const [savingsList, setSavingsList] = useState([]);
@@ -436,8 +435,6 @@ const MembershipDetails = ({ user, users }) => {
 
   const openListNowModal = () => {
     setVisible(true);
-    let config = listNowConfig("resaleMembership")
-    setListModalConfig(config)
   };
 
   const handleCreateFormSubmit = async (values) => {
@@ -1006,7 +1003,7 @@ const MembershipDetails = ({ user, users }) => {
       )}
       {visible && (
         <ListNowModal
-          config={listModalConfig}
+          config={listNowConfig("resaleMembership")}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}

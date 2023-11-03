@@ -1,24 +1,23 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Form,
   Modal,
   InputNumber,
   Button,
   Input,
-  Spin,
   Select,
-  Table,
   Typography,
   Row,
   Col,
 } from "antd";
+
 import helperJson from "../../helpers/helper.json";
 import { useInventoryState } from "../../contexts/inventory";
 import { useMembershipState } from "../../contexts/membership";
 import { useProductState } from "../../contexts/product";
-import { useParams } from "react-router-dom";
-const { columns, taxOptions, StatusValue } = helperJson;
-const { Text, Title } = Typography;
+
+const { StatusValue } = helperJson;
+const { Text } = Typography;
 
 const statusOptions = [
   { value: 1, label: "Published" },
@@ -38,21 +37,22 @@ const ListNowModal = ({
   id,
   membershipStatus,
   isCreateMembershipSubmitting,
-  config: { title, isMembershipNumber, quantityDisabled, priceDisabled, isStatusVisible, statusDropDown }
+  config: {
+    title,
+    isMembershipNumber,
+    quantityDisabled,
+    priceDisabled,
+    isStatusVisible,
+    statusDropDown,
+  },
 }) => {
+  const { isCreateInventorySubmitting, isinventoryUpdating, inventoryDetails } =
+    useInventoryState();
 
-  const {
-    isInventoriesLoading,
-    inventories,
-    isCreateInventorySubmitting,
-    isinventoryUpdating,
-    inventoryDetails,
-    Inventory,
-  } = useInventoryState();
   const { isuploadImageSubmitting } = useProductState();
   const seller = user?.user?.user?.organization || user?.user?.organization;
   const membership = formik.values.name;
-  let { isResaleMembershipSubmitting, purchasedMemberships, memberships } =
+  let { isResaleMembershipSubmitting } =
     useMembershipState();
 
   const isSubmit =
@@ -61,28 +61,6 @@ const ListNowModal = ({
     isuploadImageSubmitting ||
     isCreateInventorySubmitting ||
     isinventoryUpdating;
-
-  const handleFormatter = (value) => {
-    if (value === "" || value === ".") {
-      return "0.00";
-    }
-
-    const decimalParts = value.toString().split(".");
-    if (decimalParts.length === 1) {
-      return `${decimalParts[0]}.00`;
-    } else if (decimalParts[1].length === 1) {
-      return `${decimalParts[0]}.${decimalParts[1]}0`;
-    } else {
-      return `${decimalParts[0]}.${decimalParts[1].substring(0, 2)}`;
-    }
-  };
-
-  const handleParser = (value) => {
-    // Remove non-numeric characters and leading zeros
-    const numericValue = value.replace(/[^\d.-]/g, "");
-    const parsedValue = parseFloat(numericValue).toFixed(2);
-    return isNaN(parsedValue) ? "" : parsedValue;
-  };
 
   const handleStatus = (value) => {
     formik.setFieldValue("inventoryStatus", value);
@@ -103,11 +81,7 @@ const ListNowModal = ({
     <Modal
       style={{ maxWidth: "720px" }}
       width="auto"
-      title={
-        <Text className="text-xl font-semibold">
-          {title}
-        </Text>
-      }
+      title={<Text className="text-xl font-semibold">{title}</Text>}
       open={open}
       onCancel={handleCancel}
       onOk={formik.handleSubmit}
@@ -236,11 +210,9 @@ const ListNowModal = ({
                     </Col>
                   </Row>
                 }
-                // formatter={handleFormatter}
                 className="w-full"
                 size="large"
                 controls={false}
-                // parser={handleParser}
                 value={formik.values.taxPercentage}
                 onChange={(value) => {
                   let btnStatus = formik.values.isTaxPercentage;
@@ -285,13 +257,10 @@ const ListNowModal = ({
                     size="large"
                     defaultValue={
                       StatusValue[
-                      formik?.values?.tempInv?.status ||
-                      formik?.values?.inventoryStatus
+                        formik?.values?.tempInv?.status ||
+                          formik?.values?.inventoryStatus
                       ]
                     }
-                    // suffixIcon={<CaretDownOutlined />}
-                    // disabled={IsLoading}
-                    // style={{ width: 120 }}
                     onChange={(value) => {
                       handleStatus(value);
                     }}
