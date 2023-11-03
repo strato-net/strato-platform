@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { useMatch, useParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Carousel } from "react-responsive-carousel";
 import { useFormik, getIn } from "formik";
+import TagManager from "react-gtm-module";
+import * as yup from "yup";
+import dayjs from "dayjs";
 import {
   Row,
   Image,
@@ -14,39 +20,28 @@ import {
 } from "antd";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { listNowConfig } from "./listNowConfig";
-import { useMatch, useParams } from "react-router-dom";
-import { actions } from "../../contexts/inventory/actions";
+// actions 
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as productActions } from "../../contexts/product/actions";
-import { Carousel } from "react-responsive-carousel";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
 import { actions as itemActions } from "../../contexts/item/actions";
+import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
+// context state and dispatch
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { useProductDispatch, useProductState } from "../../contexts/product";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useMarketplaceDispatch, useMarketplaceState} from "../../contexts/marketplace";
+import { useAuthenticateState } from "../../contexts/authentication";
+// components
+import ListNowModal from "../Membership/ListNowModal";
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+// utils, css, assets, other.
 import routes from "../../helpers/routes";
-import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
-import { useNavigate, useLocation } from "react-router-dom";
 import useDebounce from "../UseDebounce";
 import "./index.css";
-import { useAuthenticateState } from "../../contexts/authentication";
-import ListNowModal from "../Membership/ListNowModal";
-import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
-import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
-import TagManager from "react-gtm-module";
-import dayjs from "dayjs";
 
 const StatusValue = {
   1: "Listed",
@@ -233,10 +228,10 @@ const MembershipDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (Id !== undefined && inventoryId && !membershipDetails) {
-      actions.fetchInventoryDetail(inventoryDispatch, inventoryId);
+      inventoryActions.fetchInventoryDetail(inventoryDispatch, inventoryId);
     } else if (Id !== undefined && membershipDetails) {
       const inventoryResult = Promise.resolve(
-        actions.fetchInventory(
+        inventoryActions.fetchInventory(
           inventoryDispatch,
           10,
           0,
@@ -541,7 +536,7 @@ const MembershipDetails = ({ user, users }) => {
             );
           })}
           <Paragraph>
-            <Text  className="font-bold text-grey font-poppin">
+            <Text className="font-bold text-grey font-poppin">
               Additional Info
             </Text>
             <Paragraph
@@ -555,10 +550,6 @@ const MembershipDetails = ({ user, users }) => {
               {membershipDetails?.additionalInfo ?? "--"}
             </Paragraph>
           </Paragraph>
-          {/* {true && <Paragraph>
-          <Text disabled className="font-bold" >Membership ID</Text>
-          <Text strong className="float-right">membershipId</Text>
-        </Paragraph>} */}
         </Col>
       </>
     );
