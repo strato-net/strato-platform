@@ -46,7 +46,7 @@ class ArtController {
         name: Joi.string().required(),
         description: Joi.string().required(),
         artist: Joi.string().required(),
-        images: Joi.array().items(Joi.string().uri()).required(),
+        images: Joi.array().items(Joi.string().optional()).required(),
         price: Joi.number().positive().required(),
         saleState: Joi.number().integer().min(0).max(3).required(),
         paymentType: Joi.number().integer().min(0).max(3).required(),

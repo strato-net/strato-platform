@@ -147,7 +147,7 @@ const TopSellingProductCard = () => {
                     <div className="flex flex-col items-center">
                       <Image
                         className="cursor-pointer"
-                        src={topSellingProduct.imageUrl ? topSellingProduct.imageUrl : image_placeholder}
+                        src={topSellingProduct.images && topSellingProduct.images.length > 0 ? topSellingProduct.images[0] : image_placeholder}
                         height={230}
                         width={230}
                         style={{ objectFit: "contain" }}

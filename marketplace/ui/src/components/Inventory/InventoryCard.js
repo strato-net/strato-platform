@@ -73,7 +73,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   return (
     <Card className="w-full mt-6">
       <div className="flex" id={id}>
-        <img className="w-52 object-contain" alt="" src={inventory.imageUrl ? inventory.imageUrl : image_placeholder} />
+        <img className="w-52 object-contain" alt="" src={inventory.images && inventory.images.length > 0 ? inventory.images[0] : image_placeholder} />
         <div className="ml-12 w-full">
           <div className="flex justify-between items-center">
             <div className="flex items-center">

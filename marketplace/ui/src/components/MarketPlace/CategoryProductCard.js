@@ -122,7 +122,7 @@ const CategoryProductCard = ({ product, category }) => {
         <div className="flex justify-start items-center">
           <div className="m-4">
             <Image
-              src={product.imageUrl ? product.imageUrl : image_placeholder}
+              src={product.images && product.images.length > 0 ? product.images[0] : image_placeholder}
               width={200}
               height={180}
               style={{ objectFit: "contain" }}
