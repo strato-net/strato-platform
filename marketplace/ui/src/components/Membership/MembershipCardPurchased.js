@@ -41,14 +41,22 @@ const MembershipCardPurchased = ({
   categorys,
   debouncedSearchTerm,
   membershipId,
-  isPurchasedList
+  cardConfig: {
+    isDuration,
+    issued,
+    qty,
+    isMembershipNumber,
+    isDescription,
+    configCase,
+    btnName
+  }
 }) => {
   const inventoryDispatch = useInventoryDispatch();
   const membershipDispatch = useMembershipDispatch();
   const membershipState = useMembershipState()
   const { type } = useParams()
-  const isIssued = type === "issued";
-  const isPurchased = type === "purchased";
+  // const isIssued = type === "issued";
+  // const isPurchased = type === "purchased";
   const {
     subCategory,
     manufacturer,
@@ -183,7 +191,7 @@ const MembershipCardPurchased = ({
   const handleCreateFormSubmit = async (values) => {
     if (user) {
       if (formik.values.price !== "" && inventories) {
-        if (isIssued) {
+        if (issued) {
           let taxPercentageAmountValue = formik.values.taxPercentageAmount ?? 0;
           let taxDollarAmountValue = formik.values.taxDollarAmount ?? 0;
           const inventoryBody = {
@@ -326,7 +334,7 @@ const MembershipCardPurchased = ({
                   </Button>
                 </Row>} */}
               </Col>
-              {!isPurchasedList &&
+              {isDescription &&
                 (<Col span={24} className="mt-2">
                   <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
                   <Paragraph
@@ -379,11 +387,11 @@ const MembershipCardPurchased = ({
                       formik.setFieldValue("inventoryStatus", membership.status);
                       formik.setFieldValue("isTaxPercentage", isPercent);
                       formik.setFieldValue("price", membership?.price);
-                      formik.setFieldValue("quantity", isPurchased ? 1 : null);
+                      formik.setFieldValue("quantity", qty);
                       formik.setFieldValue("taxPercentage", taxVal);
                       formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
                       formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
-                      openListNowModal(isPurchased ? "resaleMembership" : "AddInventory");
+                      openListNowModal(configCase);
                     }
                   }}
                   type={availableQuantity == 0 ? "default" : "primary"}
@@ -394,7 +402,7 @@ const MembershipCardPurchased = ({
                       <Text>{tagIcon()}</Text>
                       <Text className="text-white font-poppin">
                         &nbsp;
-                        {isPurchased ? "Edit Listing" : "Add Inventory"}
+                        {btnName}
                       </Text>
                     </Col>
                   </Row>
@@ -402,7 +410,7 @@ const MembershipCardPurchased = ({
                 {/* : null} */}
               </Col>
               <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17, offset: 1 }}
-                className={`border-grey shadow-lg leading-2 min-h-min rounded p-4 ${isPurchasedList ? "h-52" : "h-40"}`}>
+                className={`border-grey shadow-lg leading-2 min-h-min rounded p-4 ${isMembershipNumber ? "h-52" : "h-40"}`}>
                 <Paragraph >
                   <Text className="font-normal text-grey leading-5 font-poppin" >Sub Category</Text>
                   <Text className="float-right font-poppin leading-5">{subCategory ?? "--"}</Text>
@@ -411,7 +419,7 @@ const MembershipCardPurchased = ({
                   <Text className="font-normal text-grey leading-5 font-poppin" >Company Name</Text>
                   <Text className="float-right font-poppin leading-5">{manufacturer ?? "--"}</Text>
                 </Paragraph>
-                {isIssued
+                {isDuration
                   ? <Paragraph >
                     <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
                     <Text className="float-right font-poppin leading-5">{timePeriodInMonths ?? "--"} Month(s)</Text>
@@ -424,7 +432,7 @@ const MembershipCardPurchased = ({
                   <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
                   <Text type="success" className="float-right font-poppin leading-5">$ {savings ?? 0}</Text>
                 </Paragraph>
-                {membershipId && isPurchasedList && <Paragraph>
+                {isMembershipNumber && <Paragraph>
                   <Text className="font-normal text-grey leading-5 font-poppin" >Membership Number</Text>
                   <Text className="float-right font-poppin leading-5">{membershipId ?? "--"}</Text>
                 </Paragraph>}

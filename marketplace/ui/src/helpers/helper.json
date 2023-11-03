@@ -90,5 +90,23 @@
   "StatusValue": {
     "1": "Published",
     "2": "UnPublished"
+  },
+  "issuedCardConfig": {
+    "isDuration": true,
+    "issued": true,
+    "qty": null,
+    "isMembershipNumber": false,
+    "isDescription": true,
+    "configCase": "AddInventory",
+    "btnName": "Add Inventory"
+  },
+  "purchasedCardConfig": {
+    "isDuration": false,
+    "issued": false,
+    "qty": 1,
+    "isMembershipNumber": true,
+    "isDescription": false,
+    "configCase": "resaleMembership",
+    "btnName": "Edit Listing"
   }
 }

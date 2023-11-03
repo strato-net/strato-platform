@@ -9,6 +9,8 @@ import { actions as membershipActions } from "../../contexts/membership/actions"
 import { SearchOutlined } from "@ant-design/icons";
 import LoaderComponent from "../Loader/LoaderComponent";
 import NoProductComponent from "../NoProductFound/NoProductComponent";
+import helperJson from "../../../src/helpers/helper.json"
+const { purchasedCardConfig } = helperJson
 
 const PurchasedList = (
   user,
@@ -65,13 +67,13 @@ const PurchasedList = (
               return (
                 <Col span={12}>
                   <MembershipCardPurchased
+                    cardConfig={purchasedCardConfig}
                     user={user}
                     membership={product}
                     categorys={categorys}
                     subCategorys={subCategorys}
                     debouncedSearchTerm={debouncedSearchTerm}
                     membershipId={product.itemNumber}
-                    isPurchasedList={true}
                   />
                 </Col>
               );

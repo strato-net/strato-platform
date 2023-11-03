@@ -531,7 +531,7 @@ const MembershipDetails = ({ user, users }) => {
           {detailTabSchema.map((item, index) => {
             return (
               <Paragraph key={index}>
-                <Text disabled className="font-bold font-poppin">
+                <Text className="font-bold text-grey font-poppin">
                   {item.label}
                 </Text>
                 <Text strong className="float-right">
@@ -541,7 +541,7 @@ const MembershipDetails = ({ user, users }) => {
             );
           })}
           <Paragraph>
-            <Text disabled className="font-bold font-poppin">
+            <Text  className="font-bold text-grey font-poppin">
               Additional Info
             </Text>
             <Paragraph

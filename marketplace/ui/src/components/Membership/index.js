@@ -87,7 +87,7 @@ const Membership = (user) => {
     if (user.user) {
       membershipActions.sellerStripeStatus(dispatch, user?.user?.organization);
     }
-  }, [user]);
+  }, [user.user]);
 
   const navigate = useNavigate();
 

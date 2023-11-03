@@ -7,6 +7,9 @@ import { Images } from "../../images";
 import MembershipCardPurchased from "./MembershipCardPurchased";
 import LoaderComponent from "../Loader/LoaderComponent";
 import NoProductComponent from "../NoProductFound/NoProductComponent";
+import helperJson from "../../../src/helpers/helper.json"
+
+const { issuedCardConfig } = helperJson
 
 const IssuedList = ({ user, categorys, subCategorys, debouncedSearchTerm }) => {
 
@@ -42,6 +45,7 @@ const IssuedList = ({ user, categorys, subCategorys, debouncedSearchTerm }) => {
             return (
               <Col span={12} key={address}>
                 <MembershipCardPurchased
+                  cardConfig={issuedCardConfig}
                   user={user}
                   membership={{
                     ...product,
