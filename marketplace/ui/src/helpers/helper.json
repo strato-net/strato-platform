@@ -91,6 +91,20 @@
     "1": "Published",
     "2": "UnPublished"
   },
+  "statusOptions": [
+    {
+      "value": 1,
+      "label": "Published"
+    },
+    {
+      "value": 2,
+      "label": "Unpublished"
+    }
+  ],
+  "discountTypeVal": {
+    "true": "taxPercentageAmount",
+    "false": "taxDollarAmount"
+  },
   "issuedCardConfig": {
     "isDuration": true,
     "issued": true,
