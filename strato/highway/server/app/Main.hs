@@ -4,17 +4,14 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Main where
 
+import Strato.Server
 import BlockApps.Init
 import BlockApps.Logging (LogLevel (..), flags_minLogLevel)
 import Control.Monad
-import Data.Cache
-import Data.IORef
-import Data.Pool
-import Database.PostgreSQL.Simple
-import HFlags
 import Network.HTTP.Client hiding (Proxy)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
@@ -23,10 +20,11 @@ import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Servant.Options
 import Options
 import Servant
-import qualified Strato.Strato23.API as Strato23
-import qualified Strato.Strato23.Database.Migrations as Strato23
-import qualified Strato.Strato23.Monad as Strato23
-import qualified Strato.Strato23.Server as Strato23
+import Servant.Client (client, mkClientEnv, runClientM)
+import Servant.Client.Core (BaseUrl (BaseUrl), Scheme (Http))
+import Servant.Multipart.API
+import Servant.Multipart.Client
+import Text.RawString.QQ as TRQQ
 import System.Clock
 import System.IO
   ( BufferMode (..),
@@ -35,48 +33,51 @@ import System.IO
     stdout,
   )
 
+highway3DMacroFont :: String
+highway3DMacroFont =
+  [r|
+                 _____                    _____                    _____                    _____                    _____                    _____                _____          
+                /\    \                  /\    \                  /\    \                  /\    \                  /\    \                  /\    \              |\    \         
+               /::\____\                /::\    \                /::\    \                /::\____\                /::\____\                /::\    \             |:\____\        
+              /:::/    /                \:::\    \              /::::\    \              /:::/    /               /:::/    /               /::::\    \            |::|   |        
+             /:::/    /                  \:::\    \            /::::::\    \            /:::/    /               /:::/   _/___            /::::::\    \           |::|   |        
+            /:::/    /                    \:::\    \          /:::/\:::\    \          /:::/    /               /:::/   /\    \          /:::/\:::\    \          |::|   |        
+           /:::/____/                      \:::\    \        /:::/  \:::\    \        /:::/____/               /:::/   /::\____\        /:::/__\:::\    \         |::|   |        
+          /::::\    \                      /::::\    \      /:::/    \:::\    \      /::::\    \              /:::/   /:::/    /       /::::\   \:::\    \        |::|   |        
+         /::::::\    \   _____    ____    /::::::\    \    /:::/    / \:::\    \    /::::::\    \   _____    /:::/   /:::/   _/___    /::::::\   \:::\    \       |::|___|______  
+        /:::/\:::\    \ /\    \  /\   \  /:::/\:::\    \  /:::/    /   \:::\ ___\  /:::/\:::\    \ /\    \  /:::/___/:::/   /\    \  /:::/\:::\   \:::\    \      /::::::::\    \ 
+       /:::/  \:::\    /::\____\/::\   \/:::/  \:::\____\/:::/____/  ___\:::|    |/:::/  \:::\    /::\____\|:::|   /:::/   /::\____\/:::/  \:::\   \:::\____\    /::::::::::\____\
+       \::/    \:::\  /:::/    /\:::\  /:::/    \::/    /\:::\    \ /\  /:::|____|\::/    \:::\  /:::/    /|:::|__/:::/   /:::/    /\::/    \:::\  /:::/    /   /:::/~~~~/~~      
+        \/____/ \:::\/:::/    /  \:::\/:::/    / \/____/  \:::\    /::\ \::/    /  \/____/ \:::\/:::/    /  \:::\/:::/   /:::/    /  \/____/ \:::\/:::/    /   /:::/    /         
+                 \::::::/    /    \::::::/    /            \:::\   \:::\ \/____/            \::::::/    /    \::::::/   /:::/    /            \::::::/    /   /:::/    /          
+                  \::::/    /      \::::/____/              \:::\   \:::\____\               \::::/    /      \::::/___/:::/    /              \::::/    /   /:::/    /           
+                  /:::/    /        \:::\    \               \:::\  /:::/    /               /:::/    /        \:::\__/:::/    /               /:::/    /    \::/    /            
+                 /:::/    /          \:::\    \               \:::\/:::/    /               /:::/    /          \::::::::/    /               /:::/    /      \/____/             
+                /:::/    /            \:::\    \               \::::::/    /               /:::/    /            \::::::/    /               /:::/    /                           
+               /:::/    /              \:::\____\               \::::/    /               /:::/    /              \::::/    /               /:::/    /                            
+               \::/    /                \::/    /                \::/____/                \::/    /                \::/____/                \::/    /                             
+                \/____/                  \/____/                                           \/____/                  ~~                       \/____/                              
+                                                                                                                                                                           
+  |]
+
 main :: IO ()
 main = do
-  blockappsInit "blockapps-vault-wrapper-server"
-  forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
-  putStrLn . unlines $
-    [ "@@@  @@@  @@@@@@  @@@  @@@ @@@    @@@@@@@     @@@  @@@  @@@ @@@@@@@   @@@@@@  @@@@@@@  @@@@@@@  @@@@@@@@ @@@@@@@ ",
-      "@@@  @@@ @@@@@@@@ @@@  @@@ @@@    @@@@@@@     @@@  @@@  @@@ @@@@@@@@ @@@@@@@@ @@@@@@@@ @@@@@@@@ @@@@@@@@ @@@@@@@@",
-      "@@!  @@@ @@!  @@@ @@!  @@@ @@!      @@!       @@!  @@!  @@! @@!  @@@ @@!  @@@ @@!  @@@ @@!  @@@ @@!      @@!  @@@",
-      "!@!  @!@ !@!  @!@ !@!  @!@ !@!      !@!       !@!  !@!  !@! !@!  @!@ !@!  @!@ !@!  @!@ !@!  @!@ !@!      !@!  @!@",
-      "@!@  !@! @!@!@!@! @!@  !@! @!!      @!!       @!!  !!@  @!@ @!@!!@!  @!@!@!@! @!@@!@!  @!@@!@!  @!!!:!   @!@!!@! ",
-      "!@!  !!! !!!@!!!! !@!  !!! !!!      !!!       !@!  !!!  !@! !!@!@!   !!!@!!!! !!@!!!   !!@!!!   !!!!!:   !!@!@!  ",
-      ":!:  !!: !!:  !!! !!:  !!! !!:      !!:       !!:  !!:  !!: !!: :!!  !!:  !!! !!:      !!:      !!:      !!: :!! ",
-      " ::!!:!  :!:  !:! :!:  !:!  :!:     :!:       :!:  :!:  :!: :!:  !:! :!:  !:! :!:      :!:      :!:      :!:  !:!",
-      "  ::::   ::   ::: ::::: ::  :: ::::  ::        :::: :: :::  ::   ::: ::   :::  ::       ::       :: :::: ::   :::",
-      "   :      :   : :  : :  :  : :: : :  :          :: :  : :    :   : :  :   : :  :        :       : :: ::   :   : :"
-    ]
-  _ <- $initHFlags "Setup Vault Wrapper DBs"
-  let dbConnectInfo =
-        ConnectInfo
-          { connectHost = flags_pghost,
-            connectPort = read flags_pgport,
-            connectUser = flags_pguser,
-            connectPassword = flags_password,
-            connectDatabase = flags_database
-          }
-
-  conn <- connect dbConnectInfo
-  void $ Strato23.runMigrations conn
-  close conn
-
-  let poolConfig = defaultPoolConfig
-                    (connect dbConnectInfo)
-                    close
-                    3 -- timeout: 3 seconds
-                    20 -- max resources
-  pool <- newPool poolConfig
+  blockappsInit "blockapps-highway-wrapper-server"
+  putStrLn highway3DMacroFont
+  forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
   mgr <- newManager defaultManagerSettings
-  password <- newIORef Nothing
-  cache <- newCache . Just $ TimeSpec (fromIntegral flags_keyStoreCacheTimeout) 0
-  let env = Strato23.VaultWrapperEnv mgr pool password cache
-  run flags_port (appVaultWrapper env)
+  boundary <- genBoundary
+  let burl = BaseUrl Http "localhost" 8080 ""
+      runC cli = runClientM cli (mkClientEnv mgr burl)
+  resp <- runC $ client serverProxy (boundary, form)
+  print resp
+  --run 8080 $ server serverProxy
 
+
+  --let env = Strato23.VaultWrapperEnv mgr pool password cache
+  --run flags_port (appVaultWrapper env)
+
+{-
 appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
 appVaultWrapper env =
   prometheus
@@ -98,3 +99,4 @@ appVaultWrapper env =
       :<|> return Strato23.vaultWrapperSwagger
   where
     policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
+-}

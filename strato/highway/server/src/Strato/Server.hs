@@ -7,30 +7,40 @@
 
 module Strato.Server where
 
-import Control.Lens ((&), (.~), (?~))
+--import Control.Lens ((&), (.~), (?~))
+import Control.Monad.Logger
+import Control.Monad.IO.Unlift
+import Control.Monad.Trans.Resource
 import Data.Proxy
-import Data.Swagger as Swag
+--import Data.Swagger as Swag
 import Servant
-import Servant.Swagger (toSwagger)
-import Strato.Strato23.API
-import Strato.Strato23.Monad
-import Strato.Strato23.Server.Key
-import Strato.Strato23.Server.Password
-import Strato.Strato23.Server.Ping
-import Strato.Strato23.Server.Signature
-import Strato.Strato23.Server.User
+import Servant.Multipart
+import Servant.Server
+--import Servant.Swagger (toSwagger)
 
-highwayWrapper :: ServerT HighwayWrapperAPI HighwayM
+import API
+import Blockchain.Strato.Model.Keccak256
+import Strato.API
+import Strato.Monad
+import Strato.Server.GetS3File
+import Strato.Server.PutS3File
+
+
+--highwayWrapper :: ServerT HighwayWrapperAPI HighwayM
+--highwayWrapper :: (Keccak256 -> LoggingT IO ()) :<|> (MultipartData Mem -> LoggingT IO ())
 highwayWrapper =
   getS3File
     :<|> putS3File
+  --(getS3File :: Keccak256 -> LoggingT IO ())
+  --  :<|> (putS3File :: MultipartData Mem -> LoggingT IO ())
 
-serveHighwayWrapper :: HighwayWrapperEnv -> Server HighwayWrapperAPI
-serveHighwayWrapper env = hoistServer serverProxy (enterHighwayWrapper env) highwayWrapper
+--serveHighwayWrapper :: HighwayWrapperEnv -> Server HighwayWrapperAPI
+--serveHighwayWrapper env = hoistServer serverProxy (enterHighwayWrapper env) highwayWrapper
 
 serverProxy :: Proxy HighwayWrapperAPI
 serverProxy = Proxy
 
+{-
 highwayWrapperSwagger :: Swagger
 highwayWrapperSwagger =
   toSwagger (Proxy @HighwayWrapperAPI)
@@ -40,3 +50,4 @@ highwayWrapperSwagger =
     & basePath ?~ "/strato/v2.3"
 
 type HighwayWrapperDocsAPI = "swagger.json" :> Get '[JSON] Swagger
+-}

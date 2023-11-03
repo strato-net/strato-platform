@@ -15,23 +15,12 @@ module Strato.Monad where
 import BlockApps.Logging
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
-import qualified Crypto.Saltine.Core.SecretBox as SecretBox
-import qualified Data.ByteString.Lazy as LB
-import Data.Cache
-import Data.Foldable
-import Data.Pool (Pool, withResource)
-import Data.Profunctor.Product.Default
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Text.Encoding
-import Database.PostgreSQL.Simple (Connection, withTransaction)
 import GHC.Stack
 import Network.HTTP.Client
-import Opaleye
-import Opaleye.Internal.QueryArr
 import Servant
-import Strato.Strato23.Crypto
 import UnliftIO hiding (Handler (..))
 
 type HighwayM = ReaderT HighwayWrapperEnv (LoggingT IO)
@@ -66,9 +55,9 @@ data HighwayWrapperEnv = HighwayWrapperEnv
   }
 
 data HighwayWrapperError
-  =
-  | BadPutError 
-  | BadGetError
+  = BadGetError 
+  | BadPutError
+  | UserError Text
   | RuntimeError SomeException
   deriving (Show, Exception)
 
@@ -98,7 +87,7 @@ handleHighwayError = \case
     $logErrorS
       "handleHighwayError/BadPutError"
       "Could not push file contents to S3."
-    throwIO IncorrectPasswordError
+    throwIO BadPutError
   e@(RuntimeError _) -> do
     $logErrorS "handleHighwayError/RuntimeError" . Text.pack $
       show e ++ "\n  callstack missing for runtime errors"
@@ -114,27 +103,33 @@ enterHighwayWrapper env x = Handler $ do
     Right a -> return a
     Left e -> throwE $ reThrowError e
   where
-    reThrowError :: VaultHighwayError -> ServerError
+    reThrowError :: HighwayWrapperError -> ServerError
     reThrowError =
       \case
-        BadGetError err ->
+        BadGetError ->
           err404
             { errBody =
                 fromString $
                   unlines
                     [ "Bad GET Error!",
-                      "Could not find file.",
-                      "Error Message:",
-                      Text.unpack err
+                      "Could not find file."
                     ]
             }
-        BadPutError err ->
+        BadPutError ->
           err500
             { errBody =
                 fromString $
                   unlines
                     [ "Bad PUT Error!",
-                      "Upload of file was unsuccessful.",
+                      "Upload of file was unsuccessful."
+                    ]
+            }
+        UserError err ->
+          err500
+            { errBody =
+                fromString $
+                  unlines
+                    [ "User Error!",
                       "Error Message:",
                       Text.unpack err
                     ]
@@ -149,3 +144,7 @@ enterHighwayWrapper env x = Handler $ do
                       "Please contact your network administrator to have this problem fixed."
                     ]
             }
+
+getManager :: HighwayWrapperEnv
+           -> Manager
+getManager env = httpManager env

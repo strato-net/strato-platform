@@ -34,6 +34,8 @@ library:
   - lens
   - saltine
   - servant
+  - servant-multipart
+  - servant-multipart-client
   - servant-server
   - strato-model
   - swagger2

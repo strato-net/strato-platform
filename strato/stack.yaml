@@ -31,6 +31,8 @@ packages:
 - core/vm-tools/
 
 - highway/api
+- highway/client
+- highway/server
 
 - identity-provider/api
 - identity-provider/server

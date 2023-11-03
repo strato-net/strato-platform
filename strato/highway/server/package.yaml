@@ -1,6 +1,6 @@
 name:                blockapps-highway-wrapper-server
 version:             0.1.0.0
-github:              "githubuser/highway-wrapper"
+github:              "githubuser/blockapps-highway-wrapper-server"
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
@@ -21,7 +21,21 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - blockapps-highway-wrapper-api
+- bytestring
 - common-log
+- conduit
+- conduit-extra
+- http-conduit
+- monad-logger
+- servant-client
+- servant-client-core
+- servant-multipart
+- servant-multipart-api
+- servant-multipart-client
+- raw-strings-qq
+- resourcet
+- unix
+- unliftio-core
 - utf8-string
 
 library:
@@ -41,6 +55,7 @@ library:
     - product-profunctors
     - profunctors
     - saltine
+    - servant-multipart
     - servant-swagger
     - strato-model
     - swagger2
@@ -51,7 +66,6 @@ library:
     - servant-server
     - text
     - yaml
-
 
 executables:
   blockapps-highway-wrapper-server:
@@ -75,12 +89,11 @@ executables:
     ghc-options: -threaded 
 
 tests:
-  vault-wrapper-spec:
+  highway-wrapper-spec:
     source-dirs: test/
     main: Spec.hs
     dependencies:
       - blockapps-data
-      - blockapps-vault-wrapper-server
       - bytestring
       - clockwork
       - cryptonite
