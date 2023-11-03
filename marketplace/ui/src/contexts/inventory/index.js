@@ -22,6 +22,8 @@ const InventoriesProvider = ({ children }) => {
     onboardedSeller: null,
     stripeStatus: null,
     isLoadingStripeStatus: false,
+    uploadedImg : null,
+    isUploadImageSubmitting: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

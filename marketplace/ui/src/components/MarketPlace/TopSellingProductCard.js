@@ -21,6 +21,7 @@ import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const { Title, Text } = Typography;
 
@@ -146,7 +147,7 @@ const TopSellingProductCard = () => {
                     <div className="flex flex-col items-center">
                       <Image
                         className="cursor-pointer"
-                        src={topSellingProduct.imageUrl}
+                        src={topSellingProduct.imageUrl ? topSellingProduct.imageUrl : image_placeholder}
                         height={230}
                         width={230}
                         style={{ objectFit: "contain" }}
@@ -161,7 +162,7 @@ const TopSellingProductCard = () => {
                         {decodeURIComponent(topSellingProduct.name)}
                       </Text>
                       <Text className="mt-3 text-xl !text-primaryC font-semibold">
-                        ${topSellingProduct.pricePerUnit}
+                        ${topSellingProduct.price}
                       </Text>
                       <Text className="mt-1 text-sm !text-primaryB">
                         {topSellingProduct.leastSellableUnit}{" "}

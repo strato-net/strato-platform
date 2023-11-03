@@ -35,8 +35,8 @@ export const MAX_PRICE = 100000000;
 export const INVENTORY_STATUS = {
   PUBLISHED: 1,
   UNPUBLISHED: 2,
-  1: "Published",
-  2: "Unpublished",
+  "1": "Published",
+  "2": "Unpublished",
 };
 
 export const unitOfMeasures = [
@@ -91,3 +91,12 @@ export const APPROVAL_STATUS = {
   "Accept": 1,
   "Reject": 2,
 };
+
+export const CATEGORIES = [
+  "Art"
+]
+
+export const PAYMENT_TYPE = [
+  { name: "Cash", value: 1 },
+  { name: "STRAT", value: 2 }
+]
