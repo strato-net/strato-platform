@@ -27,6 +27,7 @@ dependencies:
 - conduit-extra
 - http-conduit
 - monad-logger
+- servant
 - servant-client
 - servant-client-core
 - servant-multipart
@@ -34,9 +35,7 @@ dependencies:
 - servant-multipart-client
 - raw-strings-qq
 - resourcet
-- unix
 - unliftio-core
-- utf8-string
 
 library:
   source-dirs: src

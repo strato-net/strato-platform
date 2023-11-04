@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Strato.Server.GetS3File
   ( getS3File
@@ -10,21 +11,22 @@ where
 
 import qualified Aws
 import qualified Aws.S3 as S3
-import           Control.Monad.IO.Class
+import           Conduit
+
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Resource
 import           Data.ByteString.Lazy as DBL
-import           Data.ByteString.Lazy.Char8 as DBLC8
-import           Data.ByteString.UTF8 as BLU
+import           Data.ByteString.Char8 as DBC8
+import           Data.Either (fromRight)
+import           Data.Proxy
 import           Data.Text as T
-import           Data.Conduit ((.|), runConduit)
-import           Data.Conduit.Binary (sinkFile)
 import           Data.Text.Encoding (decodeUtf8)
 import           Network.HTTP.Conduit (responseBody)
+import           Servant.API.ContentTypes
 
 --import           BlockApps.Logging
+import           Strato.API
 import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
 
@@ -40,12 +42,12 @@ import           Blockchain.Strato.Model.Keccak256
 --             , MonadUnliftIO m
 --             ) => Keccak256 -> HighwayM ()
 getS3File :: Keccak256
-          -> HighwayM ()
+          -> HighwayM ContentTypeAndBody
 getS3File keccakhash = do
   --Set up AWS credentials and the default configuration.
   $logInfoS "highway/getS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
-  cr  <- liftIO $ Aws.makeCredentials (BLU.fromString "AKIAV5NMROVZIZQY4OAE")
-                                      (BLU.fromString "4/AGZk38zd5kkHzsHmObyst8v+o2SjoESH8qAWQG")
+  cr  <- liftIO $ Aws.makeCredentials (DBC8.pack "AKIAV5NMROVZIZQY4OAE")
+                                      (DBC8.pack "4/AGZk38zd5kkHzsHmObyst8v+o2SjoESH8qAWQG")
   let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                               , Aws.credentials = cr
                               , Aws.logger      = Aws.defaultLog Aws.Warning
@@ -59,11 +61,18 @@ getS3File keccakhash = do
   st  <- askUnliftIO
   liftIO $ runResourceT $ do
     --Create a request object with S3.getObject and run the request with pureAws.
-    liftIO $ unliftIO st $ $logInfoS "highway/gets3File" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
+    liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
     S3.GetObjectResponse { S3.gorResponse = rsp } <-
       Aws.pureAws cfg s3cfg mgr $
         S3.getObject "mercata-testnet2" (decodeUtf8 $ keccak256ToByteString keccakhash)
     --Save the response to a file.
-    liftIO $ unliftIO st $ $logInfoS "highway/gets3File" $ T.pack $ "Saving the response (file contents) to a file."
-    runConduit $ responseBody rsp .| sinkFile (DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash)
-    return ()
+    liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Saving the response (file contents) to a file."
+    filecontents <- runConduit $ responseBody rsp .| sinkList -- $ DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash
+    let filecontentsf = fromRight (ContentTypeAndBody { contentTypeHeader = DBL.empty
+                                                      , contentTypeBody   = DBL.empty
+                                                      }
+                                  ) 
+                                  (mimeUnrender (Proxy @Web) (DBC8.fromStrict $ DBC8.concat filecontents))
+    return filecontentsf
+    --runConduit $ responseBody rsp .| sinkFile (DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash)
+    --return ()

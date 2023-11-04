@@ -1,5 +1,5 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE FlexibleContexts    #-}
+-- {-# LANGUAGE AllowAmbiguousTypes #-}
+--{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -16,15 +16,12 @@ import           Control.Monad.IO.Unlift
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
+import           Data.ByteString as DB
 import           Data.ByteString.Char8 as DBC8
-import           Data.ByteString.UTF8 as BLU
 import           Data.Text as T
 import           Data.Text.Encoding as DTE
 import           Network.HTTP.Conduit (RequestBody(..))
 import           Servant.Multipart
-import           Servant.Multipart.API
---import           System.IO
---import           System.Posix.Files
 
 import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
@@ -39,9 +36,7 @@ import           Blockchain.Strato.Model.Keccak256
 --             , MonadReader HighwayWrapperEnv m
 --             , MonadLogger m
 --             ) => MultipartData tag -> m ()
-putS3File :: ( MultipartResult tag ~ ByteString
-             )
-          => MultipartData tag 
+putS3File :: MultipartData Mem 
           -> HighwayM ()
 putS3File multipartdata =
   --Ensure we have only a single file input via form.
@@ -50,15 +45,16 @@ putS3File multipartdata =
              return ()
     True  -> do --Derive hash (Keccak256?) based on the file contents.
                 $logInfoS "highway/putS3File" $ T.pack $ "Deriving hash based on the file contents."
-                let content     = fdPayload    $
+                let content     = toStrict     $
+                                  fdPayload    $
                                   Prelude.head $
                                   files multipartdata
                 --contentf        <- liftIO $ DBC8.readFile content
                 let contenthash = decodeUtf8 $ keccak256ToByteString $ unsafeCreateKeccak256FromByteString content
                 --Set up AWS credentials and the default configuration.
                 $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
-                cr <- liftIO $ Aws.makeCredentials (BLU.fromString "AKIAV5NMROVZIZQY4OAE")
-                                                   (BLU.fromString "4/AGZk38zd5kkHzsHmObyst8v+o2SjoESH8qAWQG")
+                cr <- liftIO $ Aws.makeCredentials (DBC8.pack "AKIAV5NMROVZIZQY4OAE")
+                                                   (DBC8.pack "4/AGZk38zd5kkHzsHmObyst8v+o2SjoESH8qAWQG")
                 let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                                             , Aws.credentials = cr
                                             , Aws.logger      = Aws.defaultLog Aws.Warning

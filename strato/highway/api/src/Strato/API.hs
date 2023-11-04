@@ -13,7 +13,8 @@ module Strato.API
   )
 where
 
-import qualified Data.ByteString.Lazy               as BL
+import qualified Data.ByteString.Char8              as DBC8
+import qualified Data.ByteString.Lazy               as DBL
 import qualified Data.List.NonEmpty                 as NE
 import           Blockchain.Strato.Model.Keccak256
 import           Network.HTTP.Media ((//), (/:))
@@ -59,8 +60,8 @@ instance Accept Web where
                    , "image"       // "webp"
                    ]
 
-data ContentTypeAndBody = ContentTypeAndBody { contentTypeHeader :: BL.ByteString
-                                             , contentTypeBody   :: BL.ByteString
+data ContentTypeAndBody = ContentTypeAndBody { contentTypeHeader :: DBL.ByteString
+                                             , contentTypeBody   :: DBL.ByteString
                                              }
   deriving (Eq,Show)
 
@@ -68,20 +69,13 @@ instance MimeRender Web ContentTypeAndBody where --Is this correct?
   mimeRender _ (ContentTypeAndBody _ b) = b
 
 instance MimeUnrender Web ContentTypeAndBody where
-  mimeUnrender _ bs = Right $ ContentTypeAndBody { contentTypeHeader = bs --Need to double check
+  mimeUnrender a bs = Right $ ContentTypeAndBody { contentTypeHeader = DBL.fromStrict $ DBC8.pack $ show a --Need to double check
                                                  , contentTypeBody   = bs --both of these
                                                  } 
 
 instance AllCTRender '[Web] ContentTypeAndBody where
   handleAcceptH _ _ (ContentTypeAndBody h c) = Just (h,c)
 
-{-
-type HighwayAPI =
-  "gets3file" :> Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
-  :<|>
-  MultipartForm Mem (MultipartData Mem) :> Put '[JSON] ()
--}
-
 type HighwayGetS3File = "gets3file" :> Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
 
-type HighwayPutS3File = MultipartForm Mem (MultipartData Mem) :> Put '[JSON] ()
+type HighwayPutS3File = "puts3file" :> MultipartForm Mem (MultipartData Mem) :> Put '[JSON] ()
