@@ -65,7 +65,7 @@ import Blockchain.Stream.VMEvent
 import Blockchain.Stream.VMOutput
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
-import Control.Monad.Change.Modify (Accessible)
+import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -118,7 +118,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasStorageDB m,
     HasMemStorageDB m,
     (Ac.Account `Alters` AddressState) m,
-    Accessible RBDB.RedisConnection m
+    HasRedis m
   ) =>
   String ->
   m ([(Ad.Address, X509CertInfoState)], [ChainMemberParsedSet], ([(AccountInfo, CodeInfo)], Block))
@@ -129,7 +129,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
   -- Need to insert the X509 certificates INTO Redis
-  void . RBDB.withRedisBlockDB $ RBDB.insertRootCertificate
+  void . execRedis $ RBDB.insertRootCertificate
   $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
 
   extraCertInfoStates <-
@@ -137,7 +137,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
       ( \c -> do
           let c' = x509CertToCertInfoState c
               ua' = userAddress c'
-          insertCert <- RBDB.withRedisBlockDB $ RBDB.registerCertificate ua' c'
+          insertCert <- execRedis $ RBDB.registerCertificate ua' c'
           case insertCert of
             Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
             Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
@@ -145,7 +145,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
       )
       certs
 
-  insertValidators <- RBDB.withRedisBlockDB $ RBDB.addValidators validators
+  insertValidators <- execRedis $ RBDB.addValidators validators
   case insertValidators of
     Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
     Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
@@ -156,7 +156,7 @@ initializeGenesisBlock ::
   ( HasCodeDB m,
     HasHashDB m,
     Mem.HasMemAddressStateDB m,
-    Accessible RBDB.RedisConnection m,
+    HasRedis m,
     HasSQLDB m,
     HasStateDB m,
     HasStorageDB m,
@@ -182,7 +182,7 @@ initializeGenesisBlock genesisBlockName = do
 
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
-  void . RBDB.withRedisBlockDB $
+  void . execRedis $
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
       (blockDataNumber . blockBlockData $ genesisBlock)

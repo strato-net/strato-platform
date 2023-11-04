@@ -33,6 +33,7 @@ library:
   - entropy
   - ethereum-discovery
   - ethereum-rlp
+  - evm-solidity
   - extra
   - file-embed
   - filepath
@@ -50,9 +51,11 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
+  - redis-monad
   - resourcet
   - seqevents
   - servant-client
+  - sql-monad
   - strato-conf
   - strato-genesis
   - strato-index
