@@ -95,6 +95,7 @@ const Checkout = ({ user }) => {
             image: item.product.imageUrl,
             status: item.product.isActive ? "Active" : "Inactive",
           },
+          subCategory: item.product.subCategory,
           sellerOrganization: item.product.ownerOrganization,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.pricePerUnit,
