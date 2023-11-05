@@ -353,7 +353,6 @@ const MembershipCardPurchased = ({
                     preview={false}
                     fallback={noPreview}
                     src={productImageLocation[0]}
-                  // src="https://zos.alipayobjects.com/rmsportal/jkjgkEfvpUPVyRjUImniVslZfWPnJuuZ.png"
                   />
                   :
                   <Carousel showArrows={true} showThumbs={false} className="h-full mem-card-carousel" >
@@ -372,7 +371,6 @@ const MembershipCardPurchased = ({
                     })}
                   </Carousel>}
 
-                {/* {(!membership.product_with_inventory && isPurchasedList) ? */}
                 {availableQuantity == 0 ? "" : <Button
                   block={true}
                   className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
@@ -455,24 +453,6 @@ const MembershipCardPurchased = ({
                 </Col>
               </Row>}
           </Col>
-
-          {/* {open && (
-            <DeleteProductModal
-              open={open}
-              handleCancel={handleCancel}
-              product={state}
-              debouncedSearchTerm={debouncedSearchTerm}
-            />
-          )}
-          {editModalOpen && (
-            <UpdateProductModal
-              open={editModalOpen}
-              handleCancel={handleEditModalClose}
-              productToUpdate={state}
-              categorys={categorys}
-              debouncedSearchTerm={debouncedSearchTerm}
-            />
-          )} */}
         </Card>
       )}
       {visible && (

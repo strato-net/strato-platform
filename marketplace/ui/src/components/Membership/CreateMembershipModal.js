@@ -396,8 +396,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
 
   const openListNowModal = () => {
     setVisible(true);
-    let config = listNowConfig("create");
-    setListModalConfig(config)
   };
 
   const handleInputChange = (name, event) => {
@@ -868,7 +866,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
       </Modal>
       {visible && (
         <ListNowModal
-          config={listModalConfig}
+          config={listNowConfig("create")}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}

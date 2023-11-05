@@ -46,11 +46,10 @@ const ListNowModal = ({
     isCreateInventorySubmitting ||
     isinventoryUpdating;
 
-
-  const statusVal =
-    inventoryDetails?.status ||
-    membershipStatus ||
-    formik.values?.tempInv?.status;
+  // const statusVal =
+  //   inventoryDetails?.status ||
+  //   membershipStatus ||
+  //   formik.values?.tempInv?.status;
 
   const handleTypeBtn = (status) => {
     formik.setFieldValue("isTaxPercentage", status);
@@ -121,6 +120,7 @@ const ListNowModal = ({
                           <Col
                             span={12}
                             className="p-1"
+                            key={index}
                             style={{
                               backgroundColor: formik.values.isTaxPercentage === (index === 0) ? "#F2F2F5" : "",
                             }}

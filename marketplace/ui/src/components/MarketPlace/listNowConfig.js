@@ -47,7 +47,7 @@ export const listNowConfig = (caseType) => {
             hidden: false,
           },
           {
-            key: "taxPercentageAmount",
+            key: "taxPercentage",
             label: "Tax Percentage/Amount",
             type: "inputNumber",
             size: "large",
@@ -205,7 +205,7 @@ export const listNowConfig = (caseType) => {
             hidden: false,
           },
           {
-            key: "taxPercentageAmount",
+            key: "taxPercentage",
             label: "Tax Percentage/Amount",
             type: "inputNumber",
             size: "large",
@@ -284,7 +284,7 @@ export const listNowConfig = (caseType) => {
             hidden: false,
           },
           {
-            key: "taxPercentageAmount",
+            key: "taxPercentage",
             label: "Tax Percentage/Amount",
             type: "inputNumber",
             size: "large",
