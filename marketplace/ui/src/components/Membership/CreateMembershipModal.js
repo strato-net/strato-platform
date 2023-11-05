@@ -310,7 +310,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 timePeriodInMonths: updatedValues.duration,
                 additionalInfo: updatedValues.additionalInformation,
                 // If visible is true the List Now form is open and the membership is active
-                isActive: visible ? true : false,
+                // isActive: visible ? true : false,
+                isActive:true
               },
               membershipServiceArgs: updatedValues.services.map((service) => ({
                 serviceId: service.serviceId,
@@ -675,7 +676,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                   </Button> </Col>
                 </Row>
                 {formik.values.services.map((service, index) => (
-                  <Row className="mt-2" gutter={[12, 12]}>
+                  <Row className="mt-2" gutter={[12, 12]} key={index}>
                     <Col span={7}>
                       <Form.Item
                         label="Service Name"
