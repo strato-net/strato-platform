@@ -12,6 +12,7 @@
 
 module Strato.Monad where
 
+import Data.ByteString.Lazy hiding (map)
 import BlockApps.Logging
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
@@ -51,7 +52,8 @@ highwayWrapperError err = do
   throwIO err
 
 data HighwayWrapperEnv = HighwayWrapperEnv
-  { httpManager :: Manager
+  { httpManager       :: Manager
+  , generatedBoundary :: ByteString
   }
 
 data HighwayWrapperError

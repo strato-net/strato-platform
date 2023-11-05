@@ -70,12 +70,15 @@ instance MimeRender Web ContentTypeAndBody where --Is this correct?
 
 instance MimeUnrender Web ContentTypeAndBody where
   mimeUnrender a bs = Right $ ContentTypeAndBody { contentTypeHeader = DBL.fromStrict $ DBC8.pack $ show a --Need to double check
-                                                 , contentTypeBody   = bs --both of these
+                                                 , contentTypeBody   = bs                                  --both of these
                                                  } 
+
+instance MimeRender Web () where
+  mimeRender _ _ = DBL.empty
 
 instance AllCTRender '[Web] ContentTypeAndBody where
   handleAcceptH _ _ (ContentTypeAndBody h c) = Just (h,c)
 
 type HighwayGetS3File = "gets3file" :> Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
 
-type HighwayPutS3File = "puts3file" :> MultipartForm Mem (MultipartData Mem) :> Put '[JSON] ()
+type HighwayPutS3File = "puts3file" :> MultipartForm Mem (MultipartData Mem) :> Put '[Web] ()

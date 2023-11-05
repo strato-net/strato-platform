@@ -7,7 +7,9 @@
 
 module Strato.Server where
 
+--import Control.Lens ((&), (.~), (?~))
 import Data.Proxy
+--import Data.Swagger as Swag
 import Servant
 --import Servant.Swagger (toSwagger)
 import API

@@ -8,6 +8,8 @@
 
 module Main where
 
+import API
+import Strato.Monad
 import Strato.Server
 import BlockApps.Init
 import BlockApps.Logging (LogLevel (..), flags_minLogLevel)
@@ -17,15 +19,15 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
-import Network.Wai.Middleware.Servant.Options
-import Options
+--import Network.Wai.Middleware.Servant.Options
+--import Options
 import Servant
-import Servant.Client (client, mkClientEnv, runClientM)
-import Servant.Client.Core (BaseUrl (BaseUrl), Scheme (Http))
-import Servant.Multipart.API
+--import Servant.Client (client, mkClientEnv, runClientM)
+--import Servant.Client.Core (BaseUrl (BaseUrl), Scheme (Http))
+--import Servant.Multipart.API
 import Servant.Multipart.Client
 import Text.RawString.QQ as TRQQ
-import System.Clock
+--import System.Clock
 import System.IO
   ( BufferMode (..),
     hSetBuffering,
@@ -67,36 +69,27 @@ main = do
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
   mgr <- newManager defaultManagerSettings
   boundary <- genBoundary
-  let burl = BaseUrl Http "localhost" 8080 ""
-      runC cli = runClientM cli (mkClientEnv mgr burl)
-  resp <- runC $ client serverProxy (boundary, form)
-  print resp
-  --run 8080 $ server serverProxy
+  let env = HighwayWrapperEnv mgr boundary
+  run 8080 $ appHighwayWrapper env
 
-
-  --let env = Strato23.VaultWrapperEnv mgr pool password cache
-  --run flags_port (appVaultWrapper env)
-
-{-
-appVaultWrapper :: Strato23.VaultWrapperEnv -> Application
-appVaultWrapper env =
+appHighwayWrapper :: HighwayWrapperEnv -> Application
+appHighwayWrapper env =
   prometheus
     def
       { prometheusEndPoint = ["strato", "v2.3", "metrics"],
         prometheusInstrumentApp = False
       }
-    . instrumentApp "vault-wrapper"
+    . instrumentApp "highway-wrapper"
     . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
     . cors (const $ Just policy)
-    . provideOptions (Proxy @Strato23.VaultWrapperAPI)
+    -- . provideOptions (Proxy @HighwayWrapperAPI)
     . serve
       ( Proxy
-          @( "strato" :> "v2.3" :> Strato23.VaultWrapperAPI
-               :<|> "strato" :> "v2.3" :> Strato23.VaultWrapperDocsAPI
+          @( "strato" :> "v2.3" :> HighwayWrapperAPI
+           --    :<|> "strato" :> "v2.3" :> Strato23.VaultWrapperDocsAPI
            )
       )
-    $ Strato23.serveVaultWrapper env
-      :<|> return Strato23.vaultWrapperSwagger
+    $ serveHighwayWrapper env
+      -- :<|> return Strato23.vaultWrapperSwagger
   where
     policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
--}
