@@ -899,16 +899,7 @@ checkOverrides cc c funcName f =
                 Nothing -> functionType cc ctx funcName f
                 Just _ -> return $ bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
         p : ps -> case mOs of
-          Nothing ->
-            return $ bottom $
-              T.concat
-                [ "Function ",
-                  tFuncName,
-                  " is not marked as override, but its parent(s) ",
-                  T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc,
-                  " have a function by the same name"
-                ]
-                <$ ctx
+          Nothing ->typecheckFuncs cc ctx funcName f $ snd p
           Just [] -> case ps of
             [] -> typecheckFuncs cc ctx funcName f $ snd p
             _ ->

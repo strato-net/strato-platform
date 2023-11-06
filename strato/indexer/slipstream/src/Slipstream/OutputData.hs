@@ -82,7 +82,7 @@ import           Slipstream.SolidityValue
 import           SolidVM.Model.CodeCollection    hiding (contractName, contracts)
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
-import           Text.Format
+-- import           Text.Format
 import           Text.Printf
 import           Text.RawString.QQ
 import           UnliftIO.Exception              (SomeException, catch, handle)

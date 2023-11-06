@@ -1,62 +1,153 @@
-abstract contract SimpleSale is Sale{
+import <509>;
 
-    enum SaleState {
+pragma es6;
+pragma strict;
+
+contract Mercata{}
+
+contract PaymentType {
+enum PaymentType{
+        NONE,
+        CASH,
+        STRAT,
+        MAX
+    }
+}
+    
+contract SaleState{
+ enum SaleState {
         NONE,
         Created,
         Closed,
         MAX
+    }}
+
+abstract contract Asset is PaymentType, SaleState{
+    address public owner;
+    string public ownerCommonName;
+    string public name;
+    string public description;
+    string[] public images;
+    uint public price;
+
+    Sale public sale;
+
+    constructor(string _name, string _description, string[] _images, uint _price, SaleState _state, PaymentType _payment) {
+        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        owner  = Certificate(account(address(c), "main")).userAddress();
+        ownerCommonName = Certificate(account(address(c), "main")).commonName();
+        name = _name;
+        description =_description;
+        images =_images;
+        price = _price;
+        createSale(_state, _payment);
     }
+
+    modifier requireOwner(string action) {
+        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        string err = "Only "
+                   + ownerCommonName
+                   + " can perform "
+                   + action
+                   + ".";
+        string commonName = Certificate(account(address(c), "main")).commonName();
+        require(commonName == ownerCommonName, err);
+        _;
+    }
+
+    function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
+        return new SimpleSale(address(this), _state, _payment);
+    }
+
+    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
+        require(address(sale) == address(0), "An open bill of sale already exists for this asset");
+        sale = createBaseSale(_state, _payment);
+    }
+
+    function changeSaleState(SaleState _state) public requireOwner("Change Sale State"){
+        require(address(sale)!=address(0));
+        sale.changeSaleState(_state);
+    }
+
+    function changePrice(uint _price) public requireOwner("Change Asset Price"){
+       price = _price;
+    }
+
+    function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){
+        require(address(sale)!=address(0));
+        sale.changePaymentType(_payment);
+    }
+
+    function transferOwnership(string _newOwner) public requireOwner("Ownership transfer") {
+        require(msg.sender == address(sale), "Ownership transfer must originate from the active bill of sale");
+        ownerCommonName = _newOwner;
+        sale = Sale(address(0));
+    }
+}
+
+abstract contract Sale is PaymentType, SaleState{ 
+    string sellersCommonName;
+    string purchasersCommonName;
+    Asset assetToBeSold;
+    uint price;
+
     SaleState state;
+    PaymentType payment;
+
 
     constructor(
-        string _purchasersOrganization,
-        string _purchasersCommonName,
         address _assetToBeSold,
-        string _purchasePrice
-    ) Sale(_purchasersOrganization, _purchasersCommonName, _assetToBeSold, _purchasePrice){
-        state = SaleState.Created;
+        SaleState _state,
+        PaymentType _payment
+    ) {    
+        assetToBeSold = Asset(_assetToBeSold);
+        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        sellersCommonName = Certificate(account(address(c), "main")).commonName();
+        address currentOwner = assetToBeSold.owner();
+        string currentOwnerName = Certificate(account(currentOwner, "main")).commonName();
+        require(sellersCommonName == currentOwnerName, "Only the owner of the asset can open a bill of sale");
+        sellersCommonName = assetToBeSold.ownerCommonName();
+        purchasersCommonName = sellersCommonName;
+        price = assetToBeSold.price();
+        state = _state;
+        payment = _payment;
     }
 
-    function requirePurchaser(string action) {
+    modifier requireSeller(string action) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         string err = "Only "
-                   + purchasersCommonName
-                   + " from "
-                   + purchasersOrganization
-                   + " can "
-                   + action
-                   + ".";
-        string org = Certificate(account(address(c), "main")).organization();
-        require(org == purchasersOrganization, err);
-        string commonName = Certificate(account(address(c), "main")).commonName();
-        require(commonName == purchasersCommonName, err);
-    }
-
-    function requirePurchaserOrSeller(string action) {
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        string err = "Only "
-                   + purchasersCommonName
-                   + " from "
-                   + purchasersOrganization
-                   + " or "
                    + sellersCommonName
-                   + " from "
-                   + sellersOrganization
-                   + " can "
+                   + " can perform "
                    + action
                    + ".";
         string org = Certificate(account(address(c), "main")).organization();
+        require(org == sellersOrganization, err);
         string commonName = Certificate(account(address(c), "main")).commonName();
-        bool condition = (org == purchasersOrganization && commonName == purchasersCommonName)
-                      || (org == sellersOrganization && commonName == sellersCommonName);
-        require(condition, err);
+        require(commonName == sellersCommonName, err);
     }
 
-    function closeBillOfSale(
-    ) {
-        requirePurchaserOrSeller("close the bill of sale");
+    function changeSaleState(SaleState _state) override public requireSeller("Change Payment Type"){
+        state=_state;
+    }
+
+    function changePaymentType(PaymentType _payment) override public requireSeller("Change Payment Type"){
+        payment=_payment;
+    }
+
+
+    function transferOwnership(string _purchasersCommonName) override public requireSeller("Transfer Ownership of Asset") {
+        purchasersCommonName = _purchasersCommonName;
+        assetToBeSold.transferOwnership(purchasersCommonName);
         state = SaleState.Closed;
     }
+}
+
+contract SimpleSale is Sale{
+    constructor(address _assetToBeSold, SaleState _state, PaymentType _payment) Sale(_assetToBeSold, _state, _payment){
+    }
+    
 }
