@@ -24,20 +24,6 @@ import           Servant.Multipart
 
 data Web = Web
 
-{-
-instance toMultipart Mem Web where
-  toMultipart web = MultipartData [Input "web"]
-                                  [FileData "html"
-                                            web
-                                            "text/html"
-                                            web
-                                  FileData "css"
-                                            web
-                                            "text/css"
-                                            web                               
-                                  ]
--}
-
 instance Accept Web where
   contentTypes _ = "text" // "html" /: ("charset", "utf-8")
              NE.:| [ "text"        // "html"
