@@ -294,7 +294,7 @@ const MembershipCardPurchased = ({
                     {/* {decodeURIComponent(membership?.productName)} */}
                   </Text>
                 </Row>
-                <Row strong className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>
+                <Row className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>
                   <Col className="m-tp-5 w-2.5 h-2.5 rounded-md" style={{
                     borderRadius: '10%', backgroundColor: `${(status && statusColor[status]) ?? inventoriesCol} `,
                   }} > </Col>

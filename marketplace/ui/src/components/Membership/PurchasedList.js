@@ -73,7 +73,7 @@ const PurchasedList = (
           <Row className="w-full my-4 flex flex-row" gutter={[32, 16]}>
             {purchasedMemberships.map((product, index) => {
               return (
-                <Col span={12}>
+                <Col span={12} key={index}>
                   <MembershipCardPurchased
                     cardConfig={purchasedCardConfig}
                     user={user}

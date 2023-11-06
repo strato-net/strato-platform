@@ -65,7 +65,7 @@ const IssuedList = (
             transformedData["expiryDate"] = "";
             transformedData["status"] = item.status;
             return (
-              <Col span={12}>
+              <Col span={12} key={index}>
                 <MembershipCardPurchased
                   cardConfig={issuedCardConfig}
                   user={user}
