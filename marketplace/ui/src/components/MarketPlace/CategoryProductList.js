@@ -119,6 +119,12 @@ const CategoryProductList = ({ user }) => {
   const onChangeBrand = (e) => {
     let valuesChecked = checkValues(e, selectedBrands)
     setSelectedBrands(valuesChecked);
+    if (valuesChecked.length === 0) {
+      setProductList(marketplaceList);
+    } else {
+      let filteredBrandProduct = marketplaceList.filter((item) => valuesChecked.includes(item.manufacturer));
+      setProductList(filteredBrandProduct);
+    }
   };
   //============================Marketplace================================//
   useEffect(() => {
@@ -152,7 +158,7 @@ const CategoryProductList = ({ user }) => {
     selectedCategories,
     selectedSubCategories,
     // selectedProducts,
-    selectedBrands,
+    // selectedBrands,
     debouncedMinQty,
     debouncedMaxQty,
     debouncedMinPrice,
