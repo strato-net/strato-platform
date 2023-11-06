@@ -11,7 +11,7 @@ RUN yarn install
 
 ARG REACT_APP_SITE_ID
 
-ENV REACT_APP_SITE_ID $REACT_APP_SITE_ID
+ENV REACT_APP_SITE_ID=$REACT_APP_SITE_ID
 
 ### Builder
 FROM yarninstaller as builder
