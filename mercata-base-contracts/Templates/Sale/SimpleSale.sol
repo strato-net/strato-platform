@@ -130,16 +130,16 @@ abstract contract Sale is PaymentType, SaleState{
         require(commonName == sellersCommonName, err);
     }
 
-    function changeSaleState(SaleState _state) override public requireSeller("Change Payment Type"){
+    function changeSaleState(SaleState _state) public requireSeller("Change Payment Type"){
         state=_state;
     }
 
-    function changePaymentType(PaymentType _payment) override public requireSeller("Change Payment Type"){
+    function changePaymentType(PaymentType _payment) public requireSeller("Change Payment Type"){
         payment=_payment;
     }
 
 
-    function transferOwnership(string _purchasersCommonName) override public requireSeller("Transfer Ownership of Asset") {
+    function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") {
         purchasersCommonName = _purchasersCommonName;
         assetToBeSold.transferOwnership(purchasersCommonName);
         state = SaleState.Closed;
@@ -149,5 +149,5 @@ abstract contract Sale is PaymentType, SaleState{
 contract SimpleSale is Sale{
     constructor(address _assetToBeSold, SaleState _state, PaymentType _payment) Sale(_assetToBeSold, _state, _payment){
     }
-    
+
 }
