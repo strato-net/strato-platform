@@ -55,16 +55,12 @@ function marshalOut(_args) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const {offset, limit, ...restArgs} = args;
-    const queryLimit = limit ? limit : constants.TOP_SELLING_GET_LIMIT;
-    const inventoryResults = await inventoryJs.getAll(admin, {"offset": offset, "limit": queryLimit}, options);
+    const inventoryResults = await inventoryJs.getAll(admin, args, options);
     return inventoryResults.map(inventory => marshalOut(inventory));
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {
-    const {offset, limit, ...restArgs} = args;
-    const queryLimit = limit ? limit : constants.TOP_SELLING_GET_LIMIT;
-    const inventoryResults = await inventoryJs.getAll(admin, {"offset": offset, "limit": queryLimit}, options);
+    const inventoryResults = await inventoryJs.getAll(admin, args, options);
     return inventoryResults.map(inventory => marshalOut(inventory));
 }
 

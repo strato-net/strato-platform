@@ -23,7 +23,7 @@ export default {
   tempUploadDir: "./temp",
   buyerOrgName: "rejolut",
   sellerOrgName: "blockapps",
-  assetTableName: "BlockApps-AMMv1-Asset"
+  assetTableName: "BlockApps-Mercata-Asset"
 };
 
 export const STRIPE_ENV = {

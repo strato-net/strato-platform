@@ -1,19 +1,20 @@
 import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/items/rawMaterials/contracts/RawMaterial.sol";
 
-/// @title A representation of Item assets
+pragma es6;
+pragma strict;
+import <d816194227e1a7a780fff236a449604afeb36255>;
+
+/// @title A representation of Carbon assets
 contract Carbon is ItemStatus, Asset {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
-    address public inventoryId;
     string public serialNumber;
     ItemStatus public status;
     string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
-    uint public createdDate;
-    uint public carbonQuantity;
+    string public projectType;
 
     event OwnershipUpdate(
         string seller,
@@ -23,8 +24,6 @@ contract Carbon is ItemStatus, Asset {
     );
 
     constructor(
-        uint _uniqueProductCode,
-        address _inventoryId,
         string _serialNumber,
         ItemStatus _status,
         string _comment,
@@ -32,19 +31,20 @@ contract Carbon is ItemStatus, Asset {
         uint _createdDate,
         address _owner,
         string _name,
-        string _desc,
-        uint _carbonQuantity
-    ) public Asset(string _name, string _desc ){
+        string _description,
+        string[] _images,
+        uint _price,
+        string _projectType,
+        SaleState _saleState,
+        PaymentType _paymentType
+    ) public Asset(_name, _description, _images, _price, _createdDate, _saleState, _paymentType ){
         owner = _owner;
 
-        productId = _productId;
-        inventoryId = _inventoryId;
         serialNumber = _serialNumber;
         status = _status;
         comment = _comment;
-        createdDate = _createdDate;
         itemNumber = _itemNumber;
-        carbonQuantity = _carbonQuantity
+        projectType = _projectType;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

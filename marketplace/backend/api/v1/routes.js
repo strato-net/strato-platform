@@ -9,6 +9,9 @@ import product from './Product'
 import inventory from './Inventory'
 import item from './Item'
 import art from './Art'
+import carbon from './Carbon'
+import materials from './Materials'
+import clothing from './Clothing'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
 import eventType from './EventType'
@@ -29,6 +32,9 @@ import {
   Inventory,
   Item,
   Art,
+  Carbon,
+  Materials,
+  Clothing,
   Order,
   OrderLineItem,
   EventType,
@@ -50,6 +56,9 @@ router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)
 router.use(Art.prefix, art)
+router.use(Carbon.prefix, carbon)
+router.use(Clothing.prefix, clothing)
+router.use(Materials.prefix, materials)
 router.use(Order.prefix, order)
 router.use(OrderLineItem.prefix, orderLineItem)
 router.use(EventType.prefix, eventType)

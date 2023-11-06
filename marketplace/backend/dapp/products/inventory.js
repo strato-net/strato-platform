@@ -165,9 +165,8 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { org, ...modifiedOptions } = options;
-    const { offset, limit, ...restArgs } = args;
-    const inventories = await searchAllWithQueryArgs(contractName, {"offset": offset, "limit": limit}, modifiedOptions, admin);
+    const { range, ...restArgs } = args;
+    const inventories = await searchAllWithQueryArgs(contractName, restArgs, options, admin);
     return inventories.map((inventory) => marshalOut(inventory))
 }
 

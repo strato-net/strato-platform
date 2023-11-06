@@ -71,6 +71,24 @@ export const Art = {
   create: '/'
 }
 
+export const Carbon = {
+  prefix: '/carbon',
+  getAll: '/',
+  create: '/'
+}
+
+export const Materials = {
+  prefix: '/materials',
+  getAll: '/',
+  create: '/'
+}
+
+export const Clothing = {
+  prefix: '/clothing',
+  getAll: '/',
+  create: '/'
+}
+
 
 export const Order = {
   prefix: '/order',

@@ -6,12 +6,12 @@ import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
 
-const contractName = "Art";
-const contractFilename = `${util.cwd}/dapp/items/contracts/Art.sol`;
+const contractName = "Carbon";
+const contractFilename = `${util.cwd}/dapp/items/contracts/Carbon.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
 /** 
- * Uploads a new Art item 
+ * Uploads a new Carbon item 
  * @param user User token (typically an admin)
  * @param _constructorArgs Arguments of Item's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
@@ -119,7 +119,7 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing Art contract to a new user token. Useful for having multiple users test
+ * Bind an existing Carbon contract to a new user token. Useful for having multiple users test
  * the same contract.
  * @example <caption>Create an admin and user bound to the same new item contract.</caption>
  * const adminBoundContract = createArt(adminToken, args, options);
@@ -163,7 +163,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Art']` }, options, admin);
+    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Carbon']` }, options, admin);
     return inventories.map((inventory) => marshalOut(inventory));
   }
   
