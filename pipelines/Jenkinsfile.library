@@ -1131,6 +1131,8 @@ def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-st
       cd $(<_stratogs_path_tmp)
       myPub=$(./strato --get-pubkey)
       cd ..
+      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin
+      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/x509-generator strato-strato-1:/usr/local/bin
       sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
       sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
       sudo docker exec -e pubkey="${myPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
