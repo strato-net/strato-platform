@@ -38,6 +38,9 @@ const { Panel } = Collapse;
 const { Text } = Typography;
 
 const CategoryProductList = ({ user }) => {
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const [productList, setProductList] = useState([])
   const [category, setCategory] = useState("");
   const [brands, setBrands] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -105,6 +108,12 @@ const CategoryProductList = ({ user }) => {
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)
     setSelectedProducts(valuesChecked);
+    if (valuesChecked.length === 0) {
+      setProductList(marketplaceList)
+    } else {
+      let filteredProducts = marketplaceList.filter((item) => valuesChecked.includes(item.productId))
+      setProductList(filteredProducts);
+    }
   };
 
   const onChangeBrand = (e) => {
@@ -112,8 +121,6 @@ const CategoryProductList = ({ user }) => {
     setSelectedBrands(valuesChecked);
   };
   //============================Marketplace================================//
-  const marketplaceDispatch = useMarketplaceDispatch();
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
   useEffect(() => {
     if (category !== "" && hasChecked && !isAuthenticated) {
       actions.fetchMarketplace(
@@ -144,7 +151,7 @@ const CategoryProductList = ({ user }) => {
     marketplaceDispatch,
     selectedCategories,
     selectedSubCategories,
-    selectedProducts,
+    // selectedProducts,
     selectedBrands,
     debouncedMinQty,
     debouncedMaxQty,
@@ -165,6 +172,7 @@ const CategoryProductList = ({ user }) => {
           );
       setBrands(uniqueBrands);
     }
+    setProductList(marketplaceList)
   }, [marketplaceList]);
 
   //=========================Other functions===============================//
@@ -380,7 +388,7 @@ const CategoryProductList = ({ user }) => {
             </Text>
             {marketplaceList.length > 0 ? (
               <div className="mt-4 mb-8 mr-10" id="product-list">
-                {marketplaceList.map((product, index) => {
+                {productList.map((product, index) => {
                   const prodCategory = categorys.find(
                     (c) => c.name === product.category
                   );
