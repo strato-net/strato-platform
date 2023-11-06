@@ -90,7 +90,7 @@ const CategoryProductList = ({ user }) => {
   //=========================Sub-categories===============================//
 
   const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys } = useSubCategoryState();
+  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
 
   useEffect(() => {
     let categorys = null;
@@ -140,7 +140,7 @@ const CategoryProductList = ({ user }) => {
         debouncedMinPrice,
         debouncedMaxPrice
       );
-    } else if (category !== "") {
+    } else if (category !== "" && isAuthenticated) {
       actions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -203,6 +203,8 @@ const CategoryProductList = ({ user }) => {
     return tempValues;
   }
   //============================================================================//
+
+  const isLoading = issubCategorysLoading || isMarketplaceLoading;
 
   return (
     <div>
@@ -383,7 +385,7 @@ const CategoryProductList = ({ user }) => {
         </div>
 
         {/* Product list section */}
-        {isMarketplaceLoading ? (
+        {isLoading ? (
           <div className="h-96 w-9/12 flex justify-center items-center">
             <Spin spinning={isMarketplaceLoading} size="large" />
           </div>
