@@ -57,7 +57,6 @@ const MarketPlace = () => {
         </div>
       ) : (
         <div className="px-8 py-12">
-          {console.log("test")}
           <CategoryCard />
           {isTopSellingProductsLoading ? <div className="h-96 flex justify-center items-center">
             <Spin spinning={isTopSellingProductsLoading} size="large" />
