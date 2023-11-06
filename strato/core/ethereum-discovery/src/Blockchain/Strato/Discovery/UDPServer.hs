@@ -5,6 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE BlockArguments #-}
 
 {-# OPTIONS -fno-warn-deprecations #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
@@ -23,7 +24,6 @@ import Blockchain.Strato.Discovery.UDP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
-import Control.Applicative (liftA2)
 import Control.Monad.Catch
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -34,7 +34,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Either.Combinators
-import Data.Foldable (for_)
 import Data.Maybe (fromJust)
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
@@ -79,14 +78,11 @@ addPeersIfNeeded minPeers = do
       Right bondedPeers -> do
         peerNumber <- liftIO $ randomRIO (0, length bondedPeers - 1)
         let thePeer = bondedPeers !! peerNumber
-        mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ IPAsText $ pPeerIp thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
-        for_ mPeerAddr $ \peerAddr -> do
-          time <- liftIO $ round `fmap` getPOSIXTime
-          randomBytes <- liftIO $ getEntropy 64
-          updateLastMessage (T.pack "FindNeighbors") thePeer
-          sendPacket peerAddr $ FindNeighbors (NodeID randomBytes) (time + 50)
-          eErr <- disableUDPPeerForSeconds thePeer 10
-          whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
+        time <- liftIO $ round `fmap` getPOSIXTime
+        randomBytes <- liftIO $ getEntropy 64
+        sendPacket thePeer $ FindNeighbors (NodeID randomBytes) (time + 50)
+        eErr <- disableUDPPeerForSeconds thePeer 10
+        whenLeft eErr $ \err -> $logErrorS "addPeersIfNeeded" . T.pack $ "Unable to disable peer: " ++ show err
 
 attemptBond :: MonadDiscovery m => m ()
 attemptBond = do
@@ -94,12 +90,9 @@ attemptBond = do
   tcpPort <- Mod.access (Mod.Proxy @TCPPort)
   unbondedPeers <- getUnbondedPeers
   when (length unbondedPeers /= 0) . forM_ unbondedPeers $ \p -> do
-    let peerIpAddr = IPAsText $ pPeerIp p
-        peerUdpPort = UDPPort . fromIntegral $ pPeerUdpPort p
-    mPeerAddr <- A.select (A.Proxy @SockAddr) (Just peerIpAddr, peerUdpPort)
     time <- liftIO $ round `fmap` getPOSIXTime
     mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
-    for_ (liftA2 (,) mPeerAddr mServerAddr) $ \(peerAddr, serverAddr) ->
+    forM_ mServerAddr \serverAddr ->
       case getHostAddress serverAddr of
         Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
@@ -107,14 +100,13 @@ attemptBond = do
             -- if we've pinged before w/o a response, wait longer before next ping
             eErr <- lengthenPeerDisable' p
             whenLeft eErr $ \err -> $logErrorS "handleValidPacket/attemptBond" . T.pack $ "Unable to disable peer: " ++ show err
-          updateLastMessage (T.pack "Ping") p
-          sendPacket peerAddr $
+          sendPacket p $
             Ping
               4
               (Endpoint hostAddress udpPort tcpPort)
               ( Endpoint
                   (stringToIAddr $ T.unpack $ pPeerIp p)
-                  peerUdpPort
+                  (UDPPort . fromIntegral $ pPeerUdpPort p)
                   (TCPPort . fromIntegral $ pPeerTcpPort p)
               )
               (time + 50)
@@ -155,7 +147,8 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
   Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
     addPeer' otherUdpPort' otherTcpPort
     time <- liftIO $ round `fmap` getPOSIXTime
-    sendPacket addr $ Pong ep 4 (time + 50)
+    mPeer <- getPeerByIP' ip
+    sendPacket (fromJust mPeer) $ Pong ep 4 (time + 50)
     eErr' <- setPeerBondingState (sockAddrToIP addr) otherUdpPort 2
     whenLeft eErr' $ \err -> do
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
@@ -175,7 +168,8 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
         let nextTime = time + 50
         peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
         let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
-        sendPacket addr $ Neighbors theNeighbors nextTime
+        mPeer <- getPeerByIP' ip
+        sendPacket (fromJust mPeer) $ Neighbors theNeighbors nextTime
         where
           mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
           mkNodeId = pointToNodeID . fromJust . pPeerPubkey
@@ -183,7 +177,6 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
   Neighbors neighbors _ -> do
     let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors)
     thePeer <- getPeerByIP' ip
-    updateLastMessage (T.pack "Neighbors") $ fromJust thePeer
     neighborsExist <- doPeersExist neighborIPs
     if (neighborsExist == True)
       then do
