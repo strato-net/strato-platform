@@ -10,10 +10,11 @@ abstract contract Asset is PaymentType, SaleState{
     string public description;
     string[] public images;
     uint public price;
+    uint public createdDate;
 
     Sale public sale;
 
-    constructor(string _name, string _description, string[] _images, uint _price, SaleState _state, PaymentType _payment) {
+    constructor(string _name, string _description, string[] _images, uint _price, uint _createdDate, SaleState _state, PaymentType _payment) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         owner  = c.userAddress();
@@ -22,6 +23,7 @@ abstract contract Asset is PaymentType, SaleState{
         description =_description;
         images =_images;
         price = _price;
+        createdDate = _createdDate;
         createSale(_state, _payment);
     }
 
