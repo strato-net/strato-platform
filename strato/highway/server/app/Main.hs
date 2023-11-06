@@ -13,7 +13,12 @@ import Strato.Monad
 import Strato.Server
 import BlockApps.Init
 import BlockApps.Logging (LogLevel (..), flags_minLogLevel)
+import Options
+
+import Data.ByteString.Char8 as DBC8
+import Data.Text as T
 import Control.Monad
+import HFlags
 import Network.HTTP.Client hiding (Proxy)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
@@ -22,12 +27,8 @@ import Network.Wai.Middleware.RequestLogger
 --import Network.Wai.Middleware.Servant.Options
 --import Options
 import Servant
---import Servant.Client (client, mkClientEnv, runClientM)
---import Servant.Client.Core (BaseUrl (BaseUrl), Scheme (Http))
---import Servant.Multipart.API
 import Servant.Multipart.Client
 import Text.RawString.QQ as TRQQ
---import System.Clock
 import System.IO
   ( BufferMode (..),
     hSetBuffering,
@@ -65,11 +66,12 @@ highway3DMacroFont =
 main :: IO ()
 main = do
   blockappsInit "blockapps-highway-wrapper-server"
-  putStrLn highway3DMacroFont
+  Prelude.putStrLn highway3DMacroFont
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
+  _   <- $initHFlags "Setup Highway Wrapper AWS settings"
   mgr <- newManager defaultManagerSettings
   boundary <- genBoundary
-  let env = HighwayWrapperEnv mgr boundary
+  let env = HighwayWrapperEnv mgr boundary (DBC8.pack flags_awsaccesskeyid) (DBC8.pack flags_awssecretaccesskey) (T.pack flags_awss3bucket)
   run 8080 $ appHighwayWrapper env
 
 appHighwayWrapper :: HighwayWrapperEnv -> Application

@@ -31,23 +31,17 @@ import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
 
 
---getS3File :: ( MonadLogger (LoggingT m)
---             , MonadUnliftIO m
---             )
---          => Keccak256 -> HighwayM ()
---getS3File :: ( MonadUnliftIO m
---             ) => HighwayWrapperEnv -> Keccak256 -> HighwayM ()
---getS3File :: ( MonadLogger (LoggingT m)
---             , MonadReader HighwayWrapperEnv m
---             , MonadUnliftIO m
---             ) => Keccak256 -> HighwayM ()
 getS3File :: Keccak256
           -> HighwayM ContentTypeAndBody
 getS3File keccakhash = do
   --Set up AWS credentials and the default configuration.
   $logInfoS "highway/getS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
-  cr  <- liftIO $ Aws.makeCredentials (DBC8.pack "AKIAV5NMROVZIZQY4OAE")
-                                      (DBC8.pack "4/AGZk38zd5kkHzsHmObyst8v+o2SjoESH8qAWQG")
+  mgr     <- asks httpManager
+  awsakid <- asks awsaccesskeyid
+  awssak  <- asks awssecretaccesskey
+  awss3b  <- asks awss3bucket
+  cr      <- liftIO $ Aws.makeCredentials awsakid
+                                          awssak
   let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                               , Aws.credentials = cr
                               , Aws.logger      = Aws.defaultLog Aws.Warning
@@ -56,15 +50,13 @@ getS3File keccakhash = do
   let s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
   --Set up a ResourceT region with an available HTTP manager.
   $logInfoS "highway/getS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
-  --mgr <- liftIO $ newManager tlsManagerSettings
-  mgr <- asks httpManager
-  st  <- askUnliftIO
+  st      <- askUnliftIO
   liftIO $ runResourceT $ do
     --Create a request object with S3.getObject and run the request with pureAws.
     liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
     S3.GetObjectResponse { S3.gorResponse = rsp } <-
       Aws.pureAws cfg s3cfg mgr $
-        S3.getObject "mercata-testnet2" (decodeUtf8 $ keccak256ToByteString keccakhash)
+        S3.getObject awss3b (decodeUtf8 $ keccak256ToByteString keccakhash)
     --Save the response to a file.
     liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Saving the response (file contents) to a file."
     filecontents <- runConduit $ responseBody rsp .| sinkList -- $ DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash
@@ -74,5 +66,3 @@ getS3File keccakhash = do
                                   ) 
                                   (mimeUnrender (Proxy @Web) (DBC8.fromStrict $ DBC8.concat filecontents))
     return filecontentsf
-    --runConduit $ responseBody rsp .| sinkFile (DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash)
-    --return ()

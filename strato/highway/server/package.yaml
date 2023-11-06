@@ -81,6 +81,7 @@ executables:
       - resource-pool
       - servant-options
       - servant-server
+      - text
       - wai-cors
       - wai-extra
       - wai-middleware-prometheus

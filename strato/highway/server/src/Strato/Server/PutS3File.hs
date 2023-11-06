@@ -1,5 +1,3 @@
--- {-# LANGUAGE AllowAmbiguousTypes #-}
---{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -17,7 +15,6 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           Data.ByteString as DB
-import           Data.ByteString.Char8 as DBC8
 import           Data.Text as T
 import           Data.Text.Encoding as DTE
 import           Network.HTTP.Conduit (RequestBody(..))
@@ -27,15 +24,6 @@ import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
 
 
---putS3File :: ( MonadUnliftIO m
---             , MonadLogger m
---             )
---          => MultipartData Mem -> m ()
---putS3File :: ( MultipartResult tag ~ ByteString
---             , MonadUnliftIO m
---             , MonadReader HighwayWrapperEnv m
---             , MonadLogger m
---             ) => MultipartData tag -> m ()
 putS3File :: MultipartData Mem 
           -> HighwayM ()
 putS3File multipartdata =
@@ -49,12 +37,16 @@ putS3File multipartdata =
                                   fdPayload    $
                                   Prelude.head $
                                   files multipartdata
-                --contentf        <- liftIO $ DBC8.readFile content
+
                 let contenthash = decodeUtf8 $ keccak256ToByteString $ unsafeCreateKeccak256FromByteString content
                 --Set up AWS credentials and the default configuration.
                 $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
-                cr <- liftIO $ Aws.makeCredentials (DBC8.pack "AKIAV5NMROVZIZQY4OAE")
-                                                   (DBC8.pack "4/AGZk38zd5kkHzsHmObyst8v+o2SjoESH8qAWQG")
+                mgr     <- asks httpManager
+                awsakid <- asks awsaccesskeyid
+                awssak  <- asks awssecretaccesskey
+                awss3b  <- asks awss3bucket
+                cr      <- liftIO $ Aws.makeCredentials awsakid
+                                                        awssak
                 let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
                                             , Aws.credentials = cr
                                             , Aws.logger      = Aws.defaultLog Aws.Warning
@@ -63,16 +55,11 @@ putS3File multipartdata =
                 let s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
                 --Set up a ResourceT region with an available HTTP manager.
                 $logInfoS "highway/getS3File" $ T.pack $ "Setting up a ResourceT region with an available HTTP manager."
-                mgr <- asks httpManager
                 st  <- askUnliftIO
                 liftIO $ runResourceT $ do
-                  --Streams large file content, without buffering more than 10k in memory.
-                  --let streamer sink = withFile content ReadMode $ \h -> sink $ DBC8.hGet h 10240
-                  --size <- liftIO $ (fromIntegral . fileSize <$> getFileStatus content :: IO Integer)
-                  --let body = RequestBodyStream (fromInteger size) streamer
                   let body = RequestBodyBS content
                   --Create a request object with S3.getObject and run the request with pureAws.
                   liftIO $ unliftIO st $ $logInfoS "highway/putS3File" $ T.pack $ "Creating request object with getObject and running request via pureAws."
                   _ <- Aws.pureAws cfg s3cfg mgr $
-                         S3.putObject "mercata-testnet2" contenthash body
+                         S3.putObject awss3b contenthash body
                   return ()
