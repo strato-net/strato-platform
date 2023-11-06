@@ -59,6 +59,11 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
+  const getCategory = () => {
+    const parts = product.contract_name.split('-');
+    return parts[parts.length - 1];
+  };
+
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -144,7 +149,7 @@ const CategoryProductCard = ({ product, category }) => {
               >
                 {decodeURIComponent(product.name)}&nbsp;
               </Text>
-              <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
+              <Text className="text-secondryB text-sm" id="prod-category">({getCategory()})</Text>
             </div>
             <Text className="text-secondryB text-sm" id="prod-category">
               Sold By: {product.ownerCommonName}

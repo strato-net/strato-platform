@@ -50,6 +50,9 @@ const CreateInventoryModal = ({
     name: "",
     description: "",
     artist: "",
+    source: "",
+    projectType: "",
+    brand: "",
     images: null,
     price: null,
     paymentType: null,
@@ -90,7 +93,6 @@ const CreateInventoryModal = ({
         itemNumber: values.itemNumber,
         name: values.name,
         description: values.description,
-        artist: values.artist,
         images: (imageData ? [imageData.imageKey] : []),
         price: values.price,
         saleState: 1,
@@ -98,12 +100,47 @@ const CreateInventoryModal = ({
       },
     };
 
+    const finalBody = (body) => { 
+      switch (values.category) {
+        case 'Art': 
+          return body = {
+            itemArgs: {
+              ...body.itemArgs,
+              artist: values.artist,
+            }
+          }
+        case 'Carbon':
+          return body = {
+            itemArgs: {
+              ...body.itemArgs,
+              projectType: values.projectType,
+            }
+          }
+        case 'Clothing':
+          return body = {
+            itemArgs: {
+              ...body.itemArgs,
+              brand: values.brand,
+            }
+          }
+        case 'Materials':
+          return body = {
+            itemArgs: {
+              ...body.itemArgs,
+              source: values.source,
+            }
+          }
+        default:
+          break;
+      }
+    }
+
     TagManager.dataLayer({
       dataLayer: {
         event: 'create_item',
       },
     });
-    let isDone = await actions.createItem(dispatch, body, values.category);
+    let isDone = await actions.createItem(dispatch, finalBody(body), values.category);
 
     if (isDone) {
       if (page === 1)
@@ -121,6 +158,101 @@ const CreateInventoryModal = ({
       placement,
       key: 1,
     });
+  };
+
+  const categoricalProperties = () => {
+    switch (formik.values.category) {
+      case 'Art':
+        return (<div className="flex justify-between mt-4 ">
+            <Form.Item
+              label="Artist"
+              name="artist"
+              className="w-72"
+            >
+              <Input
+                label="artist"
+                placeholder="Enter Artist"
+                name="artist"
+                value={formik.values.artist}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.artist &&
+                formik.errors.artist && (
+                  <span className="text-error text-xs">
+                    {formik.errors.artist}
+                  </span>
+                )}
+            </Form.Item>
+          </div>)
+      case 'Carbon':
+        return (<div className="flex justify-between mt-4 ">
+            <Form.Item
+              label="Project Type"
+              name="projectType"
+              className="w-72"
+            >
+              <Input
+                label="projectType"
+                placeholder="Enter Project Type"
+                name="projectType"
+                value={formik.values.projectType}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.projectType &&
+                formik.errors.projectType && (
+                  <span className="text-error text-xs">
+                    {formik.errors.projectType}
+                  </span>
+                )}
+            </Form.Item>
+          </div>)
+      case 'Clothing':
+        return (<div className="flex justify-between mt-4 ">
+            <Form.Item
+              label="Brand"
+              name="brand"
+              className="w-72"
+            >
+              <Input
+                label="brand"
+                placeholder="Enter Clothing Brand"
+                name="brand"
+                value={formik.values.brand}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.brand &&
+                formik.errors.brand && (
+                  <span className="text-error text-xs">
+                    {formik.errors.brand}
+                  </span>
+                )}
+            </Form.Item>
+          </div>)
+      case 'Materials':
+        return (<div className="flex justify-between mt-4 ">
+            <Form.Item
+              label="Source"
+              name="source"
+              className="w-72"
+            >
+              <Input
+                label="source"
+                placeholder="Enter Material Source"
+                name="source"
+                value={formik.values.source}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.source &&
+                formik.errors.source && (
+                  <span className="text-error text-xs">
+                    {formik.errors.source}
+                  </span>
+                )}
+            </Form.Item>
+          </div>)
+      default:
+        break;
+    }
   };
 
   const disabled = isCreateInventorySubmitting || isUploadImageSubmitting;
@@ -198,46 +330,7 @@ const CreateInventoryModal = ({
                     )}
                 </Form.Item>
               </div>
-              <div className="flex justify-between mt-4 ">
-                <Form.Item
-                  label="Artist"
-                  name="artist"
-                  className="w-72"
-                >
-                  <Input
-                    label="artist"
-                    placeholder="Enter Artist"
-                    name="artist"
-                    value={formik.values.artist}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.artist &&
-                    formik.errors.artist && (
-                      <span className="text-error text-xs">
-                        {formik.errors.artist}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item
-                  label="Item Number"
-                  name="itemNumber"
-                  className="w-72"
-                >
-                  <Input
-                    label="itemNumber"
-                    placeholder="Enter Item Number"
-                    name="itemNumber"
-                    value={formik.values.itemNumber}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.itemNumber &&
-                    formik.errors.itemNumber && (
-                      <span className="text-error text-xs">
-                        {formik.errors.itemNumber}
-                      </span>
-                    )}
-                </Form.Item>
-              </div>
+              {categoricalProperties()}
               <div className="flex justify-between mt-4 ">
                 <Form.Item
                   label="Price"
@@ -343,25 +436,46 @@ const CreateInventoryModal = ({
                     </span>
                   )}
                 </Form.Item>
-                <Form.Item
-                  label="Serial Number"
-                  name="serialNumber"
-                  className="w-72"
-                >
-                  <Input
-                    label="serialNumber"
-                    placeholder="Enter Serial Number"
+                <div className="flex flex-col">
+                  <Form.Item
+                    label="Serial Number"
                     name="serialNumber"
-                    value={formik.values.serialNumber}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.serialNumber &&
-                    formik.errors.serialNumber && (
-                      <span className="text-error text-xs">
-                        {formik.errors.serialNumber}
-                      </span>
-                    )}
-                </Form.Item>
+                    className="w-72"
+                  >
+                    <Input
+                      label="serialNumber"
+                      placeholder="Enter Serial Number"
+                      name="serialNumber"
+                      value={formik.values.serialNumber}
+                      onChange={formik.handleChange}
+                    />
+                    {formik.touched.serialNumber &&
+                      formik.errors.serialNumber && (
+                        <span className="text-error text-xs">
+                          {formik.errors.serialNumber}
+                        </span>
+                      )}
+                  </Form.Item>
+                  <Form.Item
+                    label="Item Number"
+                    name="itemNumber"
+                    className="w-72 mt-4"
+                  >
+                    <Input
+                      label="itemNumber"
+                      placeholder="Enter Item Number"
+                      name="itemNumber"
+                      value={formik.values.itemNumber}
+                      onChange={formik.handleChange}
+                    />
+                    {formik.touched.itemNumber &&
+                      formik.errors.itemNumber && (
+                        <span className="text-error text-xs">
+                          {formik.errors.itemNumber}
+                        </span>
+                      )}
+                  </Form.Item>
+                </div>
               </div>
             </div>
           </Form>

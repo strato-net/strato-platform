@@ -93,7 +93,10 @@ export const APPROVAL_STATUS = {
 };
 
 export const CATEGORIES = [
-  "Art"
+  "Art",
+  "Carbon",
+  "Materials",
+  "Clothing"
 ]
 
 export const PAYMENT_TYPE = [

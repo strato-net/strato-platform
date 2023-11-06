@@ -311,11 +311,6 @@ const CategoryProductList = ({ user }) => {
                       value={selectedSubCategories}
                     >
                       <div className="flex flex-col gap-3">
-                        {subCategories.map((subcategory, index) => (
-                          <Checkbox value={subcategory.name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                            {subcategory.name}
-                          </Checkbox>
-                        ))}
                       </div>
                     </Checkbox.Group>
                   </Panel>
