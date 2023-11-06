@@ -9,10 +9,6 @@ COPY package*.json /usr/src/ui/
 COPY yarn.lock /usr/src/ui/
 RUN yarn install
 
-ARG REACT_APP_SITE_ID
-
-ENV REACT_APP_SITE_ID=$REACT_APP_SITE_ID
-
 ### Builder
 FROM yarninstaller as builder
 COPY . /usr/src/ui/
