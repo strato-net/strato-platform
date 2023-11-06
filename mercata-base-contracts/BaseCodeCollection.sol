@@ -140,3 +140,5 @@ abstract contract Sale is PaymentType, SaleState{
     }
 }
 
+
+<<<<<<< HEAD
