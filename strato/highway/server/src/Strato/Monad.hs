@@ -147,6 +147,6 @@ enterHighwayWrapper env x = Handler $ do
                     ]
             }
 
-getManager :: HighwayWrapperEnv
-           -> Manager
-getManager env = httpManager env
+--getManager :: HighwayWrapperEnv
+--           -> Manager
+--getManager env = httpManager env
