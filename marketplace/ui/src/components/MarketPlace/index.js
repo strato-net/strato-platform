@@ -26,7 +26,8 @@ const MarketPlace = () => {
     categoryActions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchTopSellingProducts(marketplaceDispatch, offset);
-    } else {
+    }
+    if (isAuthenticated) {
       marketplaceActions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
     }
   }, []);
