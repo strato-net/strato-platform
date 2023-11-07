@@ -219,7 +219,7 @@ const Checkout = ({ user }) => {
       align: "center",
       width: "160px",
       render: (text) => {
-        let qty = 0;
+        let qty = 1;
         let product;
         cartList.forEach((element) => {
           if (element.product.address === text) {

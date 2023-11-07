@@ -471,110 +471,111 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = { ...restArgs, batchId: util.uid() };
 
 
-    // const serialNo = [];
-    // const repeatedSerialNumber = [];
-    // const serialNumbers = []
-    // let transformedArray = [];
+    const serialNo = [];
+    const repeatedSerialNumber = [];
+    const serialNumbers = []
+    let transformedArray = [];
 
-    // if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-    //   for (let i = 0; i < serialNumber.length; i += 200) {
-    //     serialNo.push(serialNumber[i].itemSerialNumber)
-    //     const serialNumberArr = serialNo.slice(i, i + 200);
-    //     const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      for (let i = 0; i < serialNumber.length; i += 200) {
+        serialNo.push(serialNumber[i].itemSerialNumber)
+        const serialNumberArr = serialNo.slice(i, i + 200);
+        const items = await contract.getItems({ productId: restArgs.productAddress, serialNumber: serialNumberArr });
 
-    //     items.forEach(obj => {
-    //       const item = serialNumberArr.find(num => num === obj.serialNumber);
-    //       if (item) {
-    //         repeatedSerialNumber.push(item);
-    //       }
-    //     });
-    //   }
-    // }
-    // if (repeatedSerialNumber.length != 0) {
-    //   throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
-    // }
+        items.forEach(obj => {
+          const item = serialNumberArr.find(num => num === obj.serialNumber);
+          if (item) {
+            repeatedSerialNumber.push(item);
+          }
+        });
+      }
+    }
+    if (repeatedSerialNumber.length != 0) {
+      throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found", data: repeatedSerialNumber },);
+    }
 
-    // const productDetail = await managers.productManager.getProduct({ address: restArgs.productAddress }, getOptions);
+    const productDetail = await managers.productManager.getProduct({ address: restArgs.productAddress }, getOptions);
 
-    // if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
-    //   serialNumber.forEach(function (item) {
-    //     let rawMaterialProductNameArray = [];
-    //     let rawMaterialSerialNumberArray = [];
-    //     let rawMaterialProductIdArray = [];
+    if (serialNumber.length !== 0 || serialNumber.length !== undefined) {
+      serialNumber.forEach(function (item) {
+        let rawMaterialProductNameArray = [];
+        let rawMaterialSerialNumberArray = [];
+        let rawMaterialProductIdArray = [];
 
-    //     if (item.rawMaterials.length != 0) {
-    //       item.rawMaterials.forEach(function (rawMaterial) {
-    //         let rawMaterialProductName = rawMaterial.rawMaterialProductName;
-    //         let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
-    //         let rawMaterialProductId = rawMaterial.rawMaterialProductId;
+        if (item.rawMaterials.length != 0) {
+          item.rawMaterials.forEach(function (rawMaterial) {
+            let rawMaterialProductName = rawMaterial.rawMaterialProductName;
+            let rawMaterialSerialNumbers = rawMaterial.rawMaterialSerialNumbers;
+            let rawMaterialProductId = rawMaterial.rawMaterialProductId;
 
-    //         for (const element of rawMaterialSerialNumbers) {
-    //           rawMaterialProductNameArray.push(rawMaterialProductName);
-    //           rawMaterialSerialNumberArray.push(element);
-    //           rawMaterialProductIdArray.push(rawMaterialProductId);
-    //         }
-    //       });
-    //     }
+            for (const element of rawMaterialSerialNumbers) {
+              rawMaterialProductNameArray.push(rawMaterialProductName);
+              rawMaterialSerialNumberArray.push(element);
+              rawMaterialProductIdArray.push(rawMaterialProductId);
+            }
+          });
+        }
 
-    //     transformedArray.push({
-    //       "itemNumber": parseInt(util.uid()),
-    //       "serialNumber": item.itemSerialNumber,
-    //       "rawMaterialProductName": rawMaterialProductNameArray,
-    //       "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
-    //       "rawMaterialProductId": rawMaterialProductIdArray
-    //     });
-    //     serialNumbers.push(item.itemSerialNumber)
-    //   });
-    // }
+        transformedArray.push({
+          "itemNumber": parseInt(util.uid()),
+          "serialNumber": item.itemSerialNumber,
+          "rawMaterialProductName": rawMaterialProductNameArray,
+          "rawMaterialSerialNumber": rawMaterialSerialNumberArray,
+          "rawMaterialProductId": rawMaterialProductIdArray
+        });
+        serialNumbers.push(item.itemSerialNumber)
+      });
+    }
 
-    // if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Batch") {
-    //   transformedArray.push({
-    //     "itemNumber": parseInt(util.uid()),
-    //     "serialNumber": "",
-    //     "rawMaterialProductName": [],
-    //     "rawMaterialSerialNumber": [],
-    //     "rawMaterialProductId": []
-    //   });
-    // }
-    // else if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Individual") {
-    //   for (let i = 0; i < newArgs.quantity; i++) {
-    //     transformedArray.push({
-    //       "itemNumber": parseInt(util.uid()),
-    //       "serialNumber": "",
-    //       "rawMaterialProductName": [],
-    //       "rawMaterialSerialNumber": [],
-    //       "rawMaterialProductId": []
-    //     })
-    //   }
-    // }
+    if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Batch") {
+      transformedArray.push({
+        "itemNumber": parseInt(util.uid()),
+        "serialNumber": "",
+        "rawMaterialProductName": [],
+        "rawMaterialSerialNumber": [],
+        "rawMaterialProductId": []
+      });
+    }
+    else if ((serialNumber.length === 0 || serialNumber.length === undefined) && newArgs.inventoryType === "Individual") {
+      for (let i = 0; i < newArgs.quantity; i++) {
+        transformedArray.push({
+          "itemNumber": parseInt(util.uid()),
+          "serialNumber": "",
+          "rawMaterialProductName": [],
+          "rawMaterialSerialNumber": [],
+          "rawMaterialProductId": []
+        })
+      }
+    }
 
-    // const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
+    const [createInventoryStatus, createdInventoryAddress] = await managers.productManager.createInventory({ ...newArgs, createdDate, serialNumbers });
 
     /* hacky hacky hacky - temporary, only way to do it without a contract change */
-    // if (args.quantity === 0) {
-    //   return [
-    //     createInventoryStatus,
-    //     createdInventoryAddress,
-    //   ]
-    // }
-
-    const { userAddress, ...restArgsRest } = args;
+    if (args.quantity === 0) {
+      return [
+        createInventoryStatus,
+        createdInventoryAddress,
+      ]
+    }
 
     const itemParams = {
-      serialNumber,
-      status: restArgs.status,
-      comment: "",
-      itemNumber: 5,
+      itemObject: transformedArray,
       createdDate,
-      owner: userAddress,
-      name: "MonaPizza",
-      desc: "A painting",
-      artQuantity: 10,
+      comment: "",
+      productId: restArgs.productAddress,
+      status: restArgs.status,
+      inventoryId: createdInventoryAddress,
+
+      uniqueProductCode: productDetail.uniqueProductCode
     };
+    const [itemStatus, itemAddress, repeatedSerialNumbers] = await managers.itemManager.addItem(itemParams);
 
-    artJs.uploadContract({ userAddress, itemParams, options });
-
-    return [];
+    return [
+      itemStatus,
+      createdInventoryAddress,
+      itemAddress.slice(0, -1),
+      repeatedSerialNumbers.slice(0, -1),
+    ];
 
   };
   contract.updateInventory = async function (args, options = defaultOptions) {
