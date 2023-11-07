@@ -18,36 +18,42 @@ const reducer = (state, action) => {
       return {
         ...state,
         isMarketplaceLoading: true,
+        isMarketplaceInitialLoading: true
       };
     case actionDescriptors.fetchMarketplaceSuccessful:
       return {
         ...state,
         marketplaceList: action.payload,
         isMarketplaceLoading: false,
+        isMarketplaceInitialLoading: false
       };
     case actionDescriptors.fetchMarketplaceFailed:
       return {
         ...state,
         error: action.error,
         isMarketplaceLoading: false,
+        isMarketplaceInitialLoading: false
       };
-      case actionDescriptors.fetchMarketplaceLoggedIn:
-        return {
-          ...state,
-          isMarketplaceLoading: true,
-        };
-      case actionDescriptors.fetchMarketplaceLoggedInSuccessful:
-        return {
-          ...state,
-          marketplaceList: action.payload,
-          isMarketplaceLoading: false,
-        };
-      case actionDescriptors.fetchMarketplaceLoggedInFailed:
-        return {
-          ...state,
-          error: action.error,
-          isMarketplaceLoading: false,
-        };
+    case actionDescriptors.fetchMarketplaceLoggedIn:
+      return {
+        ...state,
+        isMarketplaceLoading: true,
+        isMarketplaceInitialLoading: true
+      };
+    case actionDescriptors.fetchMarketplaceLoggedInSuccessful:
+      return {
+        ...state,
+        marketplaceList: action.payload,
+        isMarketplaceLoading: false,
+        isMarketplaceInitialLoading: false
+      };
+    case actionDescriptors.fetchMarketplaceLoggedInFailed:
+      return {
+        ...state,
+        error: action.error,
+        isMarketplaceLoading: false,
+        isMarketplaceInitialLoading: false
+      };
     case actionDescriptors.fetchCartItems:
       return {
         ...state,
@@ -136,23 +142,23 @@ const reducer = (state, action) => {
         error: action.error,
         isTopSellingProductsLoading: false,
       };
-      case actionDescriptors.fetchTopSellingProductsLoggedIn:
-        return {
-          ...state,
-          isTopSellingProductsLoading: true,
-        };
-      case actionDescriptors.fetchTopSellingProductsLoggedInSuccessful:
-        return {
-          ...state,
-          topSellingProducts: action.payload,
-          isTopSellingProductsLoading: false,
-        };
-      case actionDescriptors.fetchTopSellingProductsLoggedInFailed:
-        return {
-          ...state,
-          error: action.error,
-          isTopSellingProductsLoading: false,
-        };
+    case actionDescriptors.fetchTopSellingProductsLoggedIn:
+      return {
+        ...state,
+        isTopSellingProductsLoading: true,
+      };
+    case actionDescriptors.fetchTopSellingProductsLoggedInSuccessful:
+      return {
+        ...state,
+        topSellingProducts: action.payload,
+        isTopSellingProductsLoading: false,
+      };
+    case actionDescriptors.fetchTopSellingProductsLoggedInFailed:
+      return {
+        ...state,
+        error: action.error,
+        isTopSellingProductsLoading: false,
+      };
 
     //shipping address adding
     case actionDescriptors.addShippingAddress:

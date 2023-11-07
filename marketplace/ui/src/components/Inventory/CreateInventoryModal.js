@@ -48,7 +48,7 @@ const CreateInventoryModal = ({
   const [uploadErr, setUploadErr] = useState("");
 
   //Sub-categories
-  const { issubCategorysLoading } = useSubCategoryState();
+  const { isSubCategorysLoading } = useSubCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } = useProductState();
   const { isCreateInventorySubmitting } = useInventoryState();
 
@@ -264,9 +264,9 @@ const CreateInventoryModal = ({
           Add Inventory
         </h1>
         <hr className="text-secondryD mt-3" />
-        {issubCategorysLoading ? (
+        {isSubCategorysLoading ? (
           <div className="h-44 flex justify-center items-center">
-            <Spin spinning={issubCategorysLoading} size="large" />
+            <Spin spinning={isSubCategorysLoading} size="large" />
           </div>
         ) : (
           <Form
@@ -322,7 +322,7 @@ const CreateInventoryModal = ({
                     name="subCategory.name"
                     id="subCategory"
                     disabled={false}
-                    loading={issubCategorysLoading}
+                    loading={isSubCategorysLoading}
                     value={formik.values.subCategory.name}
                     onChange={(value) => {
                       formik.setFieldValue("subCategory.name", value);

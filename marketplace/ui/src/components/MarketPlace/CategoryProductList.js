@@ -39,7 +39,7 @@ const { Text } = Typography;
 
 const CategoryProductList = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { marketplaceList, isMarketplaceLoading } = useMarketplaceState();
+  const { marketplaceList, isMarketplaceLoading, isMarketplaceInitialLoading } = useMarketplaceState();
   const [productList, setProductList] = useState([])
   const [category, setCategory] = useState("");
   const [brands, setBrands] = useState([]);
@@ -57,7 +57,7 @@ const CategoryProductList = ({ user }) => {
   const debouncedMinPrice = useDebounce(minPrice, 1000);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
-  const { categorys } = useCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
   let currentCategory;
 
   let { hasChecked, isAuthenticated } = useAuthenticateState();
@@ -90,7 +90,7 @@ const CategoryProductList = ({ user }) => {
   //=========================Sub-categories===============================//
 
   const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
 
   useEffect(() => {
     let categorys = null;
@@ -204,7 +204,7 @@ const CategoryProductList = ({ user }) => {
   }
   //============================================================================//
 
-  const isLoading = issubCategorysLoading || isMarketplaceLoading;
+  const isLoading = isSubCategorysLoading || isMarketplaceLoading || iscategorysLoading || isMarketplaceInitialLoading;
 
   return (
     <div>

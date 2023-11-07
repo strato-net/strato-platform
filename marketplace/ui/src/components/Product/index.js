@@ -48,7 +48,7 @@ const Product = () => {
   //Sub-categories
 
   const { categorys, iscategorysLoading } = useCategoryState();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
@@ -115,7 +115,7 @@ const Product = () => {
   return (
     <>
       {contextHolder}
-      {isProductsLoading || iscategorysLoading || issubCategorysLoading ? (
+      {isProductsLoading || iscategorysLoading || isSubCategorysLoading ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isProductsLoading} size="large" />
         </div>

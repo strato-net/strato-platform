@@ -74,7 +74,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     isCreateMembershipSubmitting,
   } = useMembershipState();
   const { services, isServicesLoading } = useServiceState();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
 
   // Dispatch for the membership context
   const serviceDispatch = useServiceDispatch();
@@ -522,13 +522,13 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                           name="subCategory"
                           // placeholder="Select Sub Category"
                           size="large"
-                          suffixIcon={issubCategorysLoading ? <Spin /> : <CaretDownOutlined />}
+                          suffixIcon={isSubCategorysLoading ? <Spin /> : <CaretDownOutlined />}
                           onChange={(value) => {
                             formik.setFieldValue("subCategory", value);
                           }}
                           value={formik.values.category}
                         >
-                          {!issubCategorysLoading &&
+                          {!isSubCategorysLoading &&
                             subCategorys.map((subCategory) => (
                               <Select.Option
                                 key={subCategory.name}

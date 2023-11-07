@@ -9,7 +9,7 @@ const SubCategorysProvider = ({ children }) => {
     subCategory: null,
     isCreateSubCategorySubmitting: false,
     subCategorys: [],
-    issubCategorysLoading: false,
+    isSubCategorysLoading: false,
     error: undefined,
     success: false,
     message: null,

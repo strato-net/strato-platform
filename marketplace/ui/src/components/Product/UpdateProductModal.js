@@ -29,7 +29,7 @@ const UpdateProductModal = ({
   const dispatch = useProductDispatch();
 
   //Sub-categories
-  const { issubCategorysLoading } = useSubCategoryState();
+  const { isSubCategorysLoading } = useSubCategoryState();
 
   const {
     isproductUpdating,
@@ -285,7 +285,7 @@ const UpdateProductModal = ({
                   allowClear
                   disabled={true}
                   name="subCategory.name"
-                  loading={issubCategorysLoading}
+                  loading={isSubCategorysLoading}
                   value={formik.values.subCategory.name}
                   onChange={(value) => {
                     formik.setFieldValue("subCategory.name", value);

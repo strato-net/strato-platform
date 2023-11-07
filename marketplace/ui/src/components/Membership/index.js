@@ -82,7 +82,7 @@ const Membership = (user) => {
   //Sub-categories
 
   const { categorys, iscategorysLoading } = useCategoryState();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
+  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
