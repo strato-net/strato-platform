@@ -2,54 +2,19 @@
     "categories": [
         {
             "name": "Art",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Art"
-                }
-            ]
+            "imageKey": ""
         },
         {
             "name": "Carbon",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Carbon Credit"
-                },
-                {
-                    "name": "Membership DAO"
-                }
-            ]
+            "imageKey": ""
         },
         {
             "name": "Materials",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Nickel Reserve"
-                },
-                {
-                    "name": "Nickel"
-                },
-                {
-                    "name": "Silver"
-                }
-            ]
+            "imageKey": ""
         },
         {
             "name": "Clothing",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Sneakers"
-                },
-                {
-                    "name": "Shirts"
-                },
-                {
-                    "name": "Pants"
-                }
-            ]
+            "imageKey": ""
         }
     ]
 }

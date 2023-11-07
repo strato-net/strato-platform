@@ -6,15 +6,15 @@ pragma es6;
 pragma strict;
 import <d816194227e1a7a780fff236a449604afeb36255>;
 
-/// @title A representation of Item assets
-contract Art is ItemStatus, Asset {
+/// @title A representation of Clothing assets
+contract Clothing is ItemStatus, Asset {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public serialNumber;
     ItemStatus public status;
     string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
-    string public artist;
+    string public brand;
 
     event OwnershipUpdate(
         string seller,
@@ -32,9 +32,9 @@ contract Art is ItemStatus, Asset {
         address _owner,
         string _name,
         string _description,
-        string _artist,
         string[] _images,
         uint _price,
+        string _brand,
         SaleState _saleState,
         PaymentType _paymentType
     ) public Asset(_name, _description, _images, _price, _createdDate, _saleState, _paymentType ){
@@ -44,7 +44,7 @@ contract Art is ItemStatus, Asset {
         status = _status;
         comment = _comment;
         itemNumber = _itemNumber;
-        artist = _artist;
+        brand = _brand;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

@@ -1,0 +1,63 @@
+paths:
+  /materials/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Materials
+      summary: Retrieve materials
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of materials
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Materials
+      summary: Create a material
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create materials
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createMaterials'
+      responses:
+        200:
+          description: Object of create materials
+
+definitions:
+  createMaterials:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          serialNumber:
+            type: string
+          status:
+            type: number
+          comment:
+            type: string
+          itemNumber:
+            type: number
+          name:
+            type: string
+          description:
+            type: string
+          source:
+            type: string
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          saleState:
+            type: number
+          paymentType:
+            type: number

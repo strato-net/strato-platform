@@ -11,6 +11,9 @@ import certificateJs from "/dapp/certificates/certificate";
 
 import itemJs from "/dapp/items/item";
 import artJs from "/dapp/items/art";
+import carbonJs from "/dapp/items/carbon";
+import materialsJs from "/dapp/items/materials";
+import clothingJs from "/dapp/items/clothing";
 
 import orderJs from "/dapp/orders/order";
 import orderLineJs from "/dapp/orders/orderLine";
@@ -618,8 +621,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+    const getOptions = { ...options, app: contractName };
+    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate' }, getOptions);
   };
   contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
     const { userAddress, queryValue, ...restArgs } = args;
@@ -633,24 +636,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+    const getOptions = { ...options, app: contractName };
     return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions);
+    const getOptions = { ...options, app: contractName };
+    return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
+    const getOptions = { ...options, app: contractName }
     // The issue with this is coming from the notEqualsValue. ServiceTokenUser gives BlockApps which returns nothing. Blockapps lowercase is needed to make the request work. 
     return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
   }
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions)
+    const getOptions = { ...options, app: contractName }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
   }
 
   contract.getItem = async function (args, options = optionsNoChainIds) {
@@ -710,8 +713,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getArts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return artJs.getAll(rawAdmin, { ...args, }, getOptions);
+    const getOptions = { ...options, app: contractName, };
+    return artJs.getAll(rawAdmin, args, getOptions);
   };
 
   // contract.transferOwnershipArt = async function (args, options = defaultOptions) {
@@ -729,6 +732,63 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // };
   // ------------------------------ ART ENDS --------------------------------
 
+  // ------------------------------ CARBON STARTS------------------------------
+
+  contract.createCarbon = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+    };
+    return carbonJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCarbons = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return carbonJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ CARBON ENDS--------------------------------
+
+  // ------------------------------ MATERIALS STARTS------------------------------
+
+  contract.createMaterials = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+    };
+    return materialsJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getMaterials = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return materialsJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ MATERIALS ENDS--------------------------------
+
+  // ------------------------------ CLOTHING STARTS------------------------------
+
+  contract.createClothing = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+    };
+    return clothingJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getClothings = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return clothingJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ CLOTHING ENDS--------------------------------
+
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.transferOwnershipSale = async function (args, options = defaultOptions) {
@@ -740,6 +800,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
+
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
