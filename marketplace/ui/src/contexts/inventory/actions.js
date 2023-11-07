@@ -413,6 +413,8 @@ const actions = {
   },
 
   createItem: async (dispatch, payload, category) => {
+    dispatch({ type: actionDescriptors.createItem });
+
     try {
       const response = await fetch(`${apiUrl}/${category}`, {
         method: HTTP_METHODS.POST,
