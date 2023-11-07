@@ -71,18 +71,21 @@ const reducer = (state, action) => {
       return {
         ...state,
         isProductDetailsLoading: true,
+        isInitialLoadProductDetails: true,
       };
     case actionDescriptors.fetchProductDetailsSuccessful:
       return {
         ...state,
         productDetails: action.payload,
         isProductDetailsLoading: false,
+        isInitialLoadProductDetails: false,
       };
     case actionDescriptors.fetchProductDetailsFailed:
       return {
         ...state,
         error: action.error,
         isProductDetailsLoading: false,
+        isInitialLoadProductDetails: false,
       };
 
     case actionDescriptors.uploadImage:

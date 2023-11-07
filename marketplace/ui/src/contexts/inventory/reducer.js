@@ -68,19 +68,22 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchInventoryDetail:
       return {
         ...state,
-        isInventoryDetailsLoading: true
+        isInventoryDetailsLoading: true,
+        isInitialLoadInventoryDetails: true,
       };
     case actionDescriptors.fetchInventoryDetailSuccessful:
       return {
         ...state,
         inventoryDetails: action.payload,
-        isInventoryDetailsLoading: false
+        isInventoryDetailsLoading: false,
+        isInitialLoadInventoryDetails: false
       };
     case actionDescriptors.fetchInventoryDetailFailed:
       return {
         ...state,
         error: action.error,
-        isInventoryDetailsLoading: false
+        isInventoryDetailsLoading: false,
+        isInitialLoadInventoryDetails: false
       };
     case actionDescriptors.onboardSellerToStripe:
       return {

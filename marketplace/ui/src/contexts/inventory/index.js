@@ -6,6 +6,9 @@ const InventoryDispatchContext = createContext();
 
 const InventoriesProvider = ({ children }) => {
   const initialState = {
+    isInventoryDetailsLoading: false,
+    isInitialLoadInventoryDetails: true,
+
     inventory: null,
     isCreateInventorySubmitting: false,
     inventories: [],
@@ -13,7 +16,6 @@ const InventoriesProvider = ({ children }) => {
     inventoryUpdateObject: null,
     isinventoryUpdating: false,
     inventoryDetails: null,
-    isInventoryDetailsLoading: false,
     error: undefined,
     success: false,
     message: null,

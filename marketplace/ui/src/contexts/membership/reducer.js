@@ -5,7 +5,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchMembershipFromDetails:
       return {
         ...state,
-        isMembershipLoading: true
+        isMembershipDetailLoading: true,
+        isInitialLoadMembershipDetail: true
       };
     case actionDescriptors.fetchMembershipFromDetailsSuccessful:
       return {
@@ -13,13 +14,15 @@ const reducer = (state, action) => {
         membershipServices: action.payload.membershipServices,
         membership: action.payload.membership,
         productFiles: action.payload.productFiles,
-        isMembershipLoading: false
+        isMembershipDetailLoading: false,
+        isInitialLoadMembershipDetail: false
       };
     case actionDescriptors.fetchMembershipFromDetailsFailed:
       return {
         ...state,
         error: action.error,
-        isMembershipLoading: false
+        isMembershipDetailLoading: false,
+        isInitialLoadMembershipDetail: false
       };
 
     case actionDescriptors.fetchPurchasedMemberships:
