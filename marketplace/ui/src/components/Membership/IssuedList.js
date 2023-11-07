@@ -56,8 +56,8 @@ const IssuedList = (
                   cardConfig={issuedCardConfig}
                   user={user}
                   membership={transformedData}
-                  categorys={categorys}
-                  subCategorys={subCategorys}
+                  // categorys={categorys}
+                  // subCategorys={subCategorys}
                   debouncedSearchTerm={debouncedSearchTerm}
                   membershipId={item.address}
                 />

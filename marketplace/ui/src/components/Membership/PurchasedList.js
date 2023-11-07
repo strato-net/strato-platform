@@ -40,8 +40,8 @@ const PurchasedList = (
                     cardConfig={purchasedCardConfig}
                     user={user}
                     membership={product}
-                    categorys={categorys}
-                    subCategorys={subCategorys}
+                    // categorys={categorys}
+                    // subCategorys={subCategorys}
                     debouncedSearchTerm={debouncedSearchTerm}
                     membershipId={product.itemNumber}
                   />
