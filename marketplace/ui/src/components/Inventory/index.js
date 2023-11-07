@@ -51,7 +51,7 @@ const Inventory = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
 
   const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
+  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } =
     useInventoryState();
 
   //items
@@ -266,7 +266,8 @@ const Inventory = ({ user }) => {
                 <Pagination
                   current={page}
                   onChange={onPageChange}
-                  total={total}
+                  total={inventoriesTotal}
+                  showSizeChanger={false}
                   className="flex justify-center my-5 "
                 />
                 <div className="pb-12"></div>

@@ -106,7 +106,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySearchSuccessful,
-          payload: body.data,
+          payload: {data: body.data.inventoriesWithImageUrl, count: body.data.count}
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
@@ -145,7 +145,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,
-          payload: body.data,
+          payload: {data: body.data.inventoriesWithImageUrl, count: body.data.count},
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
