@@ -16,8 +16,6 @@ RUN REACT_APP_IN_DOCKER=true REACT_APP_UI_VERSION=$(node -e "console.log(require
 
 ### Prod
 FROM base as prod
-ARG SITE_ID
-ENV SITE_ID=${SITE_ID}
 COPY docker-run.sh /usr/src/ui/
 COPY --from=builder /usr/src/ui/build build/
 EXPOSE 3003
