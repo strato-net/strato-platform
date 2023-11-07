@@ -2,8 +2,7 @@ import React, { useEffect } from "react";
 import { Col, Row, Spin, Image, Typography } from "antd";
 
 import MembershipCardPurchased from "./MembershipCardPurchased";
-import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
-import { actions as membershipActions } from "../../contexts/membership/actions";
+import { useMembershipState } from "../../contexts/membership";
 import { Images } from "../../images";
 import helperJson from "../../../src/helpers/helper.json"
 const { purchasedCardConfig } = helperJson
@@ -15,10 +14,7 @@ const PurchasedList = (
   subCategorys,
   debouncedSearchTerm
 ) => {
-  const dispatch = useMembershipDispatch();
   const { purchasedMemberships, isPurchasedMembershipLoading } = useMembershipState();
-
-  useEffect(() => { membershipActions.fetchPurchasedMemberships(dispatch) }, []);
 
   return (
     <>

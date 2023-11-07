@@ -33,6 +33,7 @@ const Membership = (user) => {
   let { state } = useLocation();
 
   const isPurchased = type === "purchased";
+  const isIssued = type === "issued";
   const isOpen = (state && user.user && state.isCalledFromHeader && isPurchased) ?? false
 
   const [open, setOpen] = useState(isOpen);
@@ -68,6 +69,15 @@ const Membership = (user) => {
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
+
+  useEffect(() => {
+    if (isPurchased) {
+      membershipActions.fetchPurchasedMemberships(membershipDispatch)
+    }
+    if (isIssued) {
+      membershipActions.fetchMembership(membershipDispatch);
+    }
+  }, [isPurchased]);
 
   const isRedirectLogin = hasChecked && !isAuthenticated && loginUrl !== undefined
 

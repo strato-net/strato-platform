@@ -1,8 +1,7 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Col, Row, Spin, Image, Typography } from "antd";
 
-import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
-import { actions } from "../../contexts/membership/actions";
+import { useMembershipState } from "../../contexts/membership";
 import { Images } from "../../images";
 import MembershipCardPurchased from "./MembershipCardPurchased";
 import helperJson from "../../../src/helpers/helper.json"
@@ -15,12 +14,7 @@ const IssuedList = (
   subCategorys,
   debouncedSearchTerm
 ) => {
-  const dispatch = useMembershipDispatch();
   const { memberships, isMembershipsLoading } = useMembershipState();
-
-  useEffect(() => {
-    actions.fetchMembership(dispatch);
-  }, []);
 
   const { Title } = Typography;
   return (
