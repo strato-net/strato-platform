@@ -674,7 +674,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const transferNumber = parseInt(util.uid());
 
     await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantityArray, isReduce: true })
-    return managers.itemManager.transferOwnership({ ...newArgs, dappAddress: contract.address, isGiftedTransfer: true, itemNumber: itemNumber, newQuantity: newQuantity, transferNumber: transferNumber });
+    return managers.itemManager.transferOwnership({ ...newArgs, dappAddress: contract.address, isUserTransfer: true, itemNumber: itemNumber, newQuantity: newQuantity, transferNumber: transferNumber });
   };
 
   contract.getAllItemTransferEvents = function (args, options = optionsNoChainIds) {
@@ -1094,7 +1094,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
 
           // Since this is called from the selling flow this should never be a gifted transfer and we don't need a transfer number.
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber, isGiftedTransfer: false, transferNumber: 0 });
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber, isUserTransfer: false, transferNumber: 0 });
           result.push({ status, productId, inventoryId });
         }
         return result;

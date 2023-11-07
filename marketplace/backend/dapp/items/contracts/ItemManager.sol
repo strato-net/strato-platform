@@ -201,7 +201,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _dappAddress,
         int _newQuantity,
         uint _itemNumber,
-        bool _isGiftedTransfer,
+        bool _isUserTransfer,
         uint _transferNumber
     ) public returns (uint, address, address) {
         Product_3 product;
@@ -313,7 +313,7 @@ contract ItemManager is ItemStatus, InventoryStatus {
             }
         }
 
-        if (_isGiftedTransfer == true) {
+        if (_isUserTransfer == true) {
             emit ItemTransfers(
                 tx.origin,
                 oldOwnerOrganization,
