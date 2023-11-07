@@ -1,16 +1,13 @@
 import React, { useEffect } from "react";
+import { Col, Row, Spin, Image, Typography } from "antd";
+
 import MembershipCardPurchased from "./MembershipCardPurchased";
-import { Col, Input, Row, Select, Spin } from "antd";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import { actions } from "../../contexts/membership/actions";
-import { Image, Typography } from "antd";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { actions as membershipActions } from "../../contexts/membership/actions";
 import { Images } from "../../images";
-import { SearchOutlined } from "@ant-design/icons";
 import helperJson from "../../../src/helpers/helper.json"
 const { purchasedCardConfig } = helperJson
+const { Title } = Typography;
 
 const PurchasedList = (
   user,
@@ -20,8 +17,9 @@ const PurchasedList = (
 ) => {
   const dispatch = useMembershipDispatch();
   const { purchasedMemberships, isPurchasedMembershipLoading } = useMembershipState();
-  useEffect(() => { actions.fetchPurchasedMemberships(dispatch) }, []);
-  const { Title } = Typography;
+
+  useEffect(() => { membershipActions.fetchPurchasedMemberships(dispatch) }, []);
+
   return (
     <>
       {isPurchasedMembershipLoading ? (
@@ -38,38 +36,6 @@ const PurchasedList = (
       ) : (
         <>
 
-          {/* <Row className="flex justify-start w-full">
-            <Col span={12} className="flex justify-between">
-            <Col span={8}>
-              <Input
-                size="large"
-                placeholder="Search Purchased Membership"
-                className="header-search rounded-full"
-                prefix={<SearchOutlined style={{ color: "#989898" }} />}
-              />
-            </Col>
-            <Col span={6} className="rounded-full">
-              <Select
-                defaultValue="lucy"
-                size="large"
-                className="rounded-full"
-                style={{ width: '100%', borderRadius:'50% !important' }}
-                disabled
-                options={[{ value: 'category', label: 'Category' }]}
-              />
-            </Col>
-            <Col span={6}>
-              <Select
-                defaultValue="lucy"
-                size="large"
-                className="rounded-full"
-                style={{ width: '100%' }}
-                disabled
-                options={[{ value: 'duration', label: 'Duration' }]}
-              />
-            </Col>
-            </Col>
-          </Row> */}
           <Row className="w-full my-4 flex flex-row" gutter={[32, 16]}>
             {purchasedMemberships.map((product, index) => {
               return (
