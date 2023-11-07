@@ -66,9 +66,9 @@ const Membership = (user) => {
     isLoadingStripeStatus,
   } = useMembershipState();
 
-  useEffect(() => {
-    categoryActions.fetchCategories(categoryDispatch);
-  }, []);
+  // useEffect(() => {
+  //   categoryActions.fetchCategories(categoryDispatch);
+  // }, []);
 
   useEffect(() => {
     if (isPurchased) {
@@ -77,15 +77,15 @@ const Membership = (user) => {
     if (isIssued) {
       membershipActions.fetchMembership(membershipDispatch);
     }
-  }, [isPurchased]);
-
-  const isRedirectLogin = hasChecked && !isAuthenticated && loginUrl !== undefined
+  }, [type]);
 
   useEffect(() => {
     if (user?.user?.organization) {
       membershipActions.sellerStripeStatus(membershipDispatch, user?.user?.organization);
     }
-  }, [user.user]);
+  }, [user?.user?.organization]);
+
+  const isRedirectLogin = hasChecked && !isAuthenticated && loginUrl !== undefined
 
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url);
