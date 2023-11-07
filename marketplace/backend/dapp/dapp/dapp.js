@@ -618,7 +618,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+    
+    const inventories = await managers.productManager.getInventories(
+      { ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+    const inventoryCount = await managers.productManager.inventoryCount(
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+    return {inventories: inventories, inventoryCount: inventoryCount}
   };
   contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
     const { userAddress, queryValue, ...restArgs } = args;
@@ -627,7 +636,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const productList = await managers.productManager.getProducts({ ...restArgs, limit: 2000, offset: 0, ownerOrganization: userOrganization, queryValue: encodedQueryValue }, getOptions);
     const productIds = productList.map(product => product.address);
     const { queryFields, ...restArgsPrime } = restArgs
-    return managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
+    const inventories = await managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
+    const inventoryCount = await managers.productManager.inventoryCount(
+      { ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds },
+      getOptions
+    );
+    return {inventories: inventories, inventoryCount: inventoryCount}
   };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
