@@ -114,7 +114,7 @@ services:
       context: .
       dockerfile: Dockerfile  # Specify the Dockerfile (if not named "Dockerfile" in the build context)
       args:
-        - ARG_NAME=value  # Define build-args as needed
+        - ARG_NAME=${REACT_APP_SITE_ID:-038fe3fa}  # Define build-args as needed
     image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
     logging:
