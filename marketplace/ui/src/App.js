@@ -29,7 +29,7 @@ const App = () => {
   const handleIdle = () => {
     setIsIdleModalOpen(true);
   }
-  const { idleTimer } = useIdleTimeout({ onIdle: handleIdle, idleTime: 110 })  // number is in minutes
+  const { idleTimer } = useIdleTimeout({ onIdle: handleIdle, idleTime: 100 })  // number is in minutes
   const stay = () => {
     setIsIdleModalOpen(false);
     idleTimer.reset();
