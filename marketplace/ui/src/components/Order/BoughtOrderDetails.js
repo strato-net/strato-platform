@@ -390,6 +390,10 @@ const BoughtOrderDetails = ({ user, users }) => {
                 disabled={status !== getStatus(1) || comment === "" || details.paymentSessionId !== ""}
                 onClick={() => {
                   handleCancelOrder()
+                  window.LOQ.push(['ready', async LO => {
+                    await LO.$internal.ready('events')
+                    LO.events.track('Order Details: Cancel Order')
+                  }])
                   TagManager.dataLayer({
                     dataLayer: {
                       event: 'orderDetails_bought_cancel_click',
