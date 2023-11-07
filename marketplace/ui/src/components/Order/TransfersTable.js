@@ -1,30 +1,25 @@
 import React, { useEffect, useState } from "react";
-import { DownOutlined, UpOutlined } from "@ant-design/icons";
-// import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
-// import { useNavigate, Link } from "react-router-dom";
 import { actions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination } from "antd";
-// import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 
 
-const TransfersTable = ({ user }) => {
+const TransfersTable = ({ user, selectedDate }) => {
   const dispatch = useItemDispatch();
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [order, setOrder] = useState("createdDate.desc");
   const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useItemState();
+  const [order, setOrder] = useState("desc")
 
-  console.log("itemTransfers", itemTransfers);
-
+  console.log("selectedDate", selectedDate)
   useEffect(() => {
-    actions.fetchItemTransfers(dispatch, limit, offset, user.userAddress);
-  }, [dispatch, limit, offset, user]);
+    actions.fetchItemTransfers(dispatch, limit, offset, user.organization, order, selectedDate);
+  }, [dispatch, limit, offset, user, order, selectedDate]);
 
   useEffect(() => {
     setPage(1);
@@ -52,9 +47,7 @@ const TransfersTable = ({ user }) => {
       });
     });
     setdata(items);
-    console.log("items", items); 
   }, [itemTransfers]);
-  console.log("data", data);
   
   const column = [
     {
@@ -65,32 +58,21 @@ const TransfersTable = ({ user }) => {
     },
     {
       title: "FROM",
-      dataIndex: "oldOwnerCommonName",
       key: "oldOwnerCommonName",
-      render: (text) => <p>{text}</p>,
+      render: (text, record) => <p>{record.oldOwnerOrganization.startsWith("Mercata Account") ? record.oldOwnerCommonName : record.oldOwnerOrganization}</p>,
     },
     {
       title: "TO",
-      dataIndex: "newOwnerCommonName",
       key: "newOwnerCommonName",
-      render: (text) => <p>{text}</p>,
+      render: (text, record) => <p>{record.newOwnerOrganization.startsWith("Mercata Account") ? record.newOwnerCommonName : record.newOwnerOrganization}</p>,
     },
     {
       dataIndex: "transferDate",
       key: "transferDate",
       render: (text) => <p>{text}</p>,
-      title: (
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div>DATE (MM/DD/YYYY)</div>
-          <div>
-            {order === "createdDate.desc" ? (
-              <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
-            ) : (
-              <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.desc")} />
-            )}
-          </div>
-        </div>
-      ),
+      title: "DATE",
+      sorter: true,
+      sortDirections: ["ascend", "descend", "ascend" ]
     },
     {
       title: "PRODUCT NAME",
@@ -113,6 +95,15 @@ const TransfersTable = ({ user }) => {
     setPage(page);
   };
 
+  const onChange = (pagination, filters, sorter) => {
+    console.log(sorter);
+    if (order === "desc") {
+      setOrder("asc")
+    } else {
+      setOrder("desc")
+    }
+  };
+
   return (
     <div>
       <DataTableComponent
@@ -121,6 +112,8 @@ const TransfersTable = ({ user }) => {
         isLoading={isFetchingItemTransfers}
         pagination={false}
         scrollX="100%"
+        rowKey={record => record.transferNumber}
+        onChange={onChange}
       />
       <Pagination
         current={page}

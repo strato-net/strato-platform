@@ -63,7 +63,6 @@ class ItemController {
 
       const itemTransfers = await dapp.getAllItemTransferEvents(query)
 
-      console.log('itemTransfers=====>', itemTransfers)
       rest.response.status200(res, itemTransfers)
 
       return next()

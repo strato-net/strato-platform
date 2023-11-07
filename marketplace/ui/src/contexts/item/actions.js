@@ -106,11 +106,17 @@ const actions = {
     }
   },
 
-  fetchItemTransfers: async (dispatch, limit, offset, owner = {}) => {
+  fetchItemTransfers: async (dispatch, limit, offset, ownerOrg, order, date) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
+    let range;
+    const end = date + 86400; // This is the end of the same day, needed for the range filter. 
+    if (date) {
+      range = `&range[]=transferDate,${date},${end}`
+    }
+    
     try {
-      const response = await fetch(`${apiUrl}/item/transfers?limit=${limit}&order=transferDate.desc&offset=${offset}&or=(oldOwner.eq.${owner},newOwner.eq.${owner})`, {
+      const response = await fetch(`${apiUrl}/item/transfers?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerOrganization.eq.${ownerOrg},newOwnerOrganization.eq.${ownerOrg})${range}`, {
         method: HTTP_METHODS.GET,
 
       });

@@ -8,6 +8,7 @@ const DataTableComponent = ({
   columns,
   data,
   isLoading,
+  onChange,
   offset,
   limit,
   setOffset,
@@ -43,6 +44,7 @@ const DataTableComponent = ({
         }
         rowKey={rowKey}
         rowSelection={rowSelection}
+        onChange={onChange}
         onRow={(record) => {
           return {
             onClick: (e) => {

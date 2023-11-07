@@ -241,12 +241,10 @@ contract ItemManager is ItemStatus, InventoryStatus {
         }
 
         Inventory oldInventory = Inventory(item.inventoryId());
-
-        // Old Owner Org will taken from the sender of the transaction. This will help clarify who sent the transaction
-        mapping (string => string) oldOwnerCert = getUserCert(msg.sender);
-        string oldOwnerOrganization = oldOwnerCert["organization"];
-        string oldOwnerCommonName = oldOwnerCert["commonName"];
-        string oldOwnerOrganizationalUnit = oldOwnerCert["organizationalUnit"];
+        
+        string oldOwnerOrganization = oldInventory.ownerOrganization();
+        string oldOwnerCommonName = oldInventory.ownerCommonName();
+        string oldOwnerOrganizationalUnit = oldInventory.ownerOrganizationalUnit();
 
 
         // get new owner organization
