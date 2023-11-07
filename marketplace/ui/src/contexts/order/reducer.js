@@ -169,6 +169,22 @@ const reducer = (state, action) => {
         error: action.error,
         issellerDetailsUpdating: false,
       };
+    case actionDescriptors.executeSale:
+      return {
+        ...state,
+        isCreatePaymentSubmitting: true,
+      }
+    case actionDescriptors.executeSaleSuccessful:
+      return {
+        ...state,
+        isCreatePaymentSubmitting: false,
+      }
+    case actionDescriptors.executeSaleFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreatePaymentSubmitting: false,
+      }
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

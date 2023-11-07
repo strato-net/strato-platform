@@ -13,7 +13,7 @@ enum PaymentType{
         MAX
     }
 }
-    
+
 contract SaleState{
  enum SaleState {
         NONE,
@@ -22,7 +22,24 @@ contract SaleState{
         MAX
     }}
 
-abstract contract Asset is PaymentType, SaleState{
+contract RestStatus {
+  uint constant OK = 200;
+  uint constant CREATED = 201;
+  uint constant ACCEPTED = 202;
+
+  uint constant BAD_REQUEST = 400;
+  uint constant UNAUTHORIZED = 401;
+  uint constant FORBIDDEN = 403;
+  uint constant NOT_FOUND = 404;
+  uint constant CONFLICT = 409;
+
+  uint constant INTERNAL_SERVER_ERROR = 500;
+  uint constant NOT_IMPLEMENTED = 501;
+  uint constant BAD_GATEWAY = 502;
+  uint constant GATEWAY_TIMEOUT = 504;
+}
+
+abstract contract Asset is PaymentType, SaleState, RestStatus{
     address public owner;
     string public ownerCommonName;
     string public name;
@@ -35,8 +52,8 @@ abstract contract Asset is PaymentType, SaleState{
     constructor(string _name, string _description, string[] _images, uint _price, SaleState _state, PaymentType _payment) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        owner  = Certificate(account(address(c), "main")).userAddress();
-        ownerCommonName = Certificate(account(address(c), "main")).commonName();
+        owner  = c.userAddress();
+        ownerCommonName = c.commonName();
         name = _name;
         description =_description;
         images =_images;
@@ -46,13 +63,13 @@ abstract contract Asset is PaymentType, SaleState{
 
     modifier requireOwner(string action) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
         string err = "Only "
                    + ownerCommonName
                    + " can perform "
                    + action
                    + ".";
-        string commonName = Certificate(account(address(c), "main")).commonName();
+        string commonName = c.commonName();
         require(commonName == ownerCommonName, err);
         _;
     }
@@ -61,23 +78,27 @@ abstract contract Asset is PaymentType, SaleState{
         return new SimpleSale(address(this), _state, _payment);
     }
 
-    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
+    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
         sale = createBaseSale(_state, _payment);
+        return RestStatus.OK;
     }
 
-    function changeSaleState(SaleState _state) public requireOwner("Change Sale State"){
+    function changeSaleState(SaleState _state) public requireOwner("Change Sale State") returns (uint) {
         require(address(sale)!=address(0));
         sale.changeSaleState(_state);
+        return RestStatus.OK;
     }
 
-    function changePrice(uint _price) public requireOwner("Change Asset Price"){
-       price = _price;
+    function changePrice(uint _price) public requireOwner("Change Asset Price") returns (uint) {
+        price = _price;
+        return RestStatus.OK;
     }
 
-    function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){
+    function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type") returns (uint) {
         require(address(sale)!=address(0));
         sale.changePaymentType(_payment);
+        return RestStatus.OK;
     }
 
     function transferOwnership(string _newOwner) public requireOwner("Ownership transfer") {
@@ -87,7 +108,7 @@ abstract contract Asset is PaymentType, SaleState{
     }
 }
 
-abstract contract Sale is PaymentType, SaleState{ 
+abstract contract Sale is PaymentType, SaleState, RestStatus{ 
     string sellersCommonName;
     string purchasersCommonName;
     Asset assetToBeSold;
@@ -103,12 +124,6 @@ abstract contract Sale is PaymentType, SaleState{
         PaymentType _payment
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        sellersCommonName = Certificate(account(address(c), "main")).commonName();
-        address currentOwner = assetToBeSold.owner();
-        string currentOwnerName = Certificate(account(currentOwner, "main")).commonName();
-        require(sellersCommonName == currentOwnerName, "Only the owner of the asset can open a bill of sale");
         sellersCommonName = assetToBeSold.ownerCommonName();
         purchasersCommonName = sellersCommonName;
         price = assetToBeSold.price();
@@ -118,15 +133,13 @@ abstract contract Sale is PaymentType, SaleState{
 
     modifier requireSeller(string action) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
         string err = "Only "
                    + sellersCommonName
                    + " can perform "
                    + action
                    + ".";
-        string org = Certificate(account(address(c), "main")).organization();
-        require(org == sellersOrganization, err);
-        string commonName = Certificate(account(address(c), "main")).commonName();
+        string commonName = c.commonName();
         require(commonName == sellersCommonName, err);
     }
 
@@ -138,16 +151,15 @@ abstract contract Sale is PaymentType, SaleState{
         payment=_payment;
     }
 
-
-    function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") {
+    function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") returns (uint) {
         purchasersCommonName = _purchasersCommonName;
         assetToBeSold.transferOwnership(purchasersCommonName);
         state = SaleState.Closed;
+        return RestStatus.OK;
     }
 }
 
 contract SimpleSale is Sale{
     constructor(address _assetToBeSold, SaleState _state, PaymentType _payment) Sale(_assetToBeSold, _state, _payment){
     }
-
 }

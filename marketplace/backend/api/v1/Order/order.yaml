@@ -113,6 +113,25 @@ paths:
       responses:         
         200:
           description: indicates success of transfer ownership
+  /order/sale:
+    post:
+      security:              
+        - bearerAuth: []      
+      tags:               
+        - Order        
+      summary: Call transferOwnership on Sale
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to transfer ownership
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/executeSale' 
+      responses:         
+        200:
+          description: indicates success of transfer ownership
 definitions:        
   fetchOrder:
     address:
@@ -198,6 +217,13 @@ definitions:
       address:
         type: string
       chainId:
+        type: string
+      newOwner:
+        type: string
+  executeSale:
+    type: object
+    properties:
+      assetAddress:
         type: string
       newOwner:
         type: string

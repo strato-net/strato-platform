@@ -25,6 +25,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const { Title, Text } = Typography;
 
@@ -46,11 +47,11 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.TAX) / 100;
+    return (item.product.price * CHARGES.TAX) / 100;
   };
 
   const calculateShipping = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
+    return (item.product.price * CHARGES.SHIPPING) / 100;
   };
 
   const storedData = useMemo(() => {
@@ -88,25 +89,26 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
+        const itemData = JSON.parse(item.product.data);
         modifiedValue.push({
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: item.product.imageUrl,
-            status: item.product.isActive ? "Active" : "Inactive",
+            image: item.product.images.length > 0 ? item.product.images[0] : image_placeholder,
+            status: "Active",
           },
-          sellerOrganization: item.product.ownerOrganization,
+          sellerOrganization: itemData.ownerOrganization,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: item.product.pricePerUnit,
-          quantity: item.product.address,
+          unitPrice: item.product.price,
+          quantity: 1,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.pricePerUnit * item.qty +
+            item.product.price +
             calculateShipping(item) +
             calculateTax(item),
           action: item.product.address,
-          qty: item.qty,
+          qty: 1,
         });
       });
 
@@ -127,7 +129,7 @@ const Checkout = ({ user }) => {
     setShipping(s);
     let sum = 0;
     cartList.forEach((item) => {
-      sum += item.product.pricePerUnit * item.qty;
+      sum += item.product.price;
     });
     setTotal(sum);
   }, [marketplaceDispatch, cartList]);
@@ -172,7 +174,7 @@ const Checkout = ({ user }) => {
       dataIndex: "item",
       render: (text) => {
         return (
-          <img className="w-16 h-16 object-cover" alt="" src={text.image} />
+          <img className="w-16 h-16 object-contain" alt="" src={text.image} />
         );
       },
     },

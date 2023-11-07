@@ -31,6 +31,9 @@ const actionDescriptors = {
   updateSellerDetailsFailed: "update_seller_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
+  executeSale: "execute_sale",
+  executeSaleSuccessful: "execute_sale_successful",
+  executeSaleFailed: "execute_sale_failed",
 };
 
 const actions = {
@@ -373,6 +376,46 @@ const actions = {
         error: "Error while updating Order",
       });
       actions.setMessage(dispatch, "Error while updating Order");
+    }
+  },
+
+  executeSale: async (dispatch, payload) => {
+    dispatch ({ type: actionDescriptors.executeSale });
+    
+    try {
+      const response = await fetch(`${apiUrl}/order/sale`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.executeSaleSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Sale executed successfully", true);
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.executeSaleFailed,
+        error: "Error while executing sale",
+      });
+      actions.setMessage(dispatch, "Error while executing sale");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.executeSaleFailed,
+        error: "Error while executing Sale",
+      });
+      actions.setMessage(dispatch, "Error while executing sale");
     }
   }
 };
