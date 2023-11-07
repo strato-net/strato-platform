@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-
+sed -i "s|__SITE_ID__|$SITE_ID|g" build/index.html
 # Creating .env file if using the relevant flags
 if [ -n "${ASSET_TABLE_NAME}" ] || [ -n "${SALE_TABLE_NAME}" ] || [ -n "${REACT_APP_SITE_ID}" ]; then
   if [ ! -f .env ]; then
