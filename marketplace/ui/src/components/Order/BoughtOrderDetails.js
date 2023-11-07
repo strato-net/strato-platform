@@ -121,7 +121,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           const body = {
             address: Id,
             updates: {
-              buyerComments: encodeURIComponent(comment),
+              buyerComments: encodeURIComponent('Stripe:' + intentBody.data.last_payment_error.message),
               status: 4,
             },
           };

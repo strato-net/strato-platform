@@ -295,7 +295,7 @@ const SoldOrderDetails = ({ user, users }) => {
             address: Id,
             updates: {
               status: 4,
-              sellerComments: encodeURIComponent(newComment),
+              sellerComments: encodeURIComponent('Stripe:' + intentBody.data.last_payment_error.message),
             },
           };
           

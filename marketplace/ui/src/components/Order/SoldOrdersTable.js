@@ -59,31 +59,10 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     const fetchData = async () => {
       const updatedData = await Promise.all(
         ordersSold.map(async (order) => {
-          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
+          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatus(5)) {
             try {
               setIsLoading(true);
-              const response = await fetch(
-                `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
-                {
-                  method: HTTP_METHODS.GET,
-                }
-              );
-  
-              const body = await response.json();
-  
-              if (response.status === RestStatus.OK) {
-                if (
-                  body.data["payment_status"] === "paid" &&
-                  getStatus(parseInt(order.status)) === "Payment Pending"
-                ) {
-                  // Update payment status
-                  let isDone = await actions.updateOrderStatus(dispatch, {
-                    orderAddress: order.address,
-                    status: 1,
-                  });
-
-                }
-              }
+              await validatePayment(order);
             } catch (err) {
               console.error(err);
             }
@@ -108,6 +87,32 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     fetchData();
   }, [ordersSold]);
   
+
+  const validatePayment = async (order) =>{
+    const response = await fetch(
+      `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
+      {
+        method: HTTP_METHODS.GET,
+      }
+    );
+
+    const body = await response.json();
+
+    if (response.status === RestStatus.OK) {
+      if (
+        body.data["payment_status"] === "paid" &&
+        getStatus(parseInt(order.status)) === getStatus(5)
+      ) {
+        // Update payment status
+        let isDone = await actions.updateOrderStatus(dispatch, {
+          orderAddress: order.address,
+          status: 1,
+        });
+
+      }
+    }
+  }
+
   const column = [
     {
       title: "Order Number".toUpperCase(),
