@@ -21,7 +21,7 @@ export default {
   Memberships: { label: "Membership", url: "/memberships/:type" },
   purchasedMemberships: { label: "Membership", url: "/memberships/purchased" },
   MembershipDetail: { label: "Membership Detail", url: "/memberships/:type/:id" },
-  ServiceUsage: { label: "ServiceUsage", url: "/memberships/serviceUsage/:serviceType" },
+  ServiceUsage: { label: "ServiceUsage", url: "/memberships/serviceUsage/:serviceType", booked: "/memberships/serviceUsage/booked", provided: "/memberships/serviceUsage/provided" },
   Inventories: { label: "Inventory", url: "/inventories" },
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id" },
   InventoryEventSerialNumberList: { label: "Inventory Event Serial Numbers", url: "/inventories/events/serialNumbers" },

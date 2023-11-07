@@ -1,96 +1,59 @@
 import React, { useState, useEffect } from "react";
-
-import {
-  Breadcrumb,
-  Input,
-  Button,
-  Col,
-  notification,
-  Dropdown,
-  Spin,
-  Image,
-  Typography,
-  Pagination,
-  Tabs,
-  Row,
-} from "antd";
-import { DownOutlined } from "@ant-design/icons";
-import MembershipCard from "./MembershipCard";
-import CreateMembershipModal from "./CreateMembershipModal";
-import { actions } from "../../contexts/membership/actions";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-
-import useDebounce from "../UseDebounce";
-//categories
-import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-//sub-categories
-import { useSubCategoryState } from "../../contexts/subCategory";
-import { Images } from "../../images";
-import ClickableCell from "../ClickableCell";
-import "./membership.css";
-import routes from "../../helpers/routes";
-import { useAuthenticateState } from "../../contexts/authentication";
 import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Button, Col, notification, Spin, Typography, Tabs, Row } from "antd";
+// Components
+import CreateMembershipModal from "./CreateMembershipModal";
 import PurchasedList from "./PurchasedList";
 import IssuedList from "./IssuedList";
-import ListNowIndex from "./ListNowIndex";
-import { createServiceIcon, sellServicesIcon, services, servicesIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+// Actions
+import { actions as membershipActions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as categoryActions } from "../../contexts/category/actions";
+// States and Dispatch
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { useSubCategoryState } from "../../contexts/subCategory";
+import { useAuthenticateState } from "../../contexts/authentication";
+// Assets, Utils
+import useDebounce from "../UseDebounce";
+import "./membership.css";
+import routes from "../../helpers/routes";
+import { createServiceIcon, servicesIcon } from "../../images/SVGComponents";
 import { setCookie } from "../../helpers/cookie";
 
-const { Search } = Input;
-const { Title, Text } = Typography;
+
+const { Text } = Typography;
+const limit = 10;
 
 const Membership = (user) => {
+  const navigate = useNavigate();
   const { type } = useParams();
-  const isPurchased = type === "purchased";
   let { state } = useLocation();
+
+  const isPurchased = type === "purchased";
   const isOpen = (state && user.user && state.isCalledFromHeader && isPurchased) ?? false
+
   const [open, setOpen] = useState(isOpen);
 
-  // useEffect(() => {
-  //   if (state && user.user) {
-  //     setOpen(state.isCalledFromHeader);
-  //   } else {
-  //     setOpen(false);
-  //   }
-  //   window.history.replaceState({}, "/memberships");
-  // }, [state]);
-
-  const dispatch = useMembershipDispatch();
-  const [api, contextHolder] = notification.useNotification();
-  const [queryValue, setQueryValue] = useState("");
-  const limit = 10;
-  const [offset, setOffset] = useState(0);
-  const [isSearch, setIsSearch] = useState(false);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(10);
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  // let [typeDispay, setTypeDisplay] = useState("purchased");
-  const [visible, setVisible] = useState(false);
-
-  //Categories
+  // Dispatch
+  const membershipDispatch = useMembershipDispatch();
   const categoryDispatch = useCategoryDispatch();
   const inventoryDispatch = useInventoryDispatch();
 
-  //Sub-categories
+  const [api, contextHolder] = notification.useNotification();
+  const [queryValue, setQueryValue] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(1);
+  const debouncedSearchTerm = useDebounce(queryValue, 1000);
 
+  // States
   const { categorys, iscategorysLoading } = useCategoryState();
   const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
-
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-
-  useEffect(() => {
-    categoryActions.fetchCategories(categoryDispatch);
-  }, []);
-
-  let {
+  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const inventoryState = useInventoryState();
+  const {
     memberships,
     isMembershipsLoading,
     isIssuedMembershipLoading,
@@ -101,64 +64,35 @@ const Membership = (user) => {
     stripeStatus,
     isLoadingStripeStatus,
   } = useMembershipState();
-  const membershipState = useMembershipState();
-  const inventoryState = useInventoryState();
-  // const success = membershipState.success || inventoryState.success;
-  // const message = membershipState.message || inventoryState.message;
 
   useEffect(() => {
-    if(user?.user?.organization){
-      actions.sellerStripeStatus(dispatch, user?.user?.organization);
+    categoryActions.fetchCategories(categoryDispatch);
+  }, []);
+
+  const isRedirectLogin = hasChecked && !isAuthenticated && loginUrl !== undefined
+
+  useEffect(() => {
+    if (user?.user?.organization) {
+      membershipActions.sellerStripeStatus(membershipDispatch, user?.user?.organization);
     }
   }, [user.user]);
-
-  const navigate = useNavigate();
 
   const onboardSeller = async () => {
     navigate(routes.OnboardingSellerToStripe.url);
   };
 
-  // useEffect(() => {
-  //   if (isSearch) {
-  //     setOffset(0);
-  //     actions.fetchMembership(dispatch, limit, 0, debouncedSearchTerm);
-  //     setIsSearch(false);
-  //   } else setIsSearch(true);
-  //   actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
-  // }, [limit, offset, debouncedSearchTerm]);
-
-  // useEffect(() => {
-  //   let len = memberships.length;
-  //   let total;
-  //   if (len === limit) total = page * 10 + limit;
-  //   else total = (page - 1) * 10 + limit;
-  //   setTotal(total);
-  // }, [memberships]);
-
   const showModal = () => {
-    hasChecked && !isAuthenticated && loginUrl !== undefined
+    isRedirectLogin
       ? (window.location.href = loginUrl)
       : setOpen(true);
   };
 
   const handleCancel = (message) => {
     if (message === "success") {
-      setOpen(false);
-      actions.fetchMembership(dispatch, limit, offset, debouncedSearchTerm);
+      membershipActions.fetchMembership(membershipDispatch, limit, offset, debouncedSearchTerm);
     } else {
-      setOpen(false);
     }
-  };
-
-  const queryHandle = (e) => {
-    setQueryValue(e.target.value);
-    setIsSearch(true);
-    setPage(1);
-  };
-
-  const onPageChange = (page) => {
-    setOffset((page - 1) * limit);
-    setPage(page);
+    setOpen(false);
   };
 
   const onChange = (key) => {
@@ -166,27 +100,14 @@ const Membership = (user) => {
     navigate(`/memberships/${key}`)
   };
 
+  const tabItems = [{ key: "purchased", isActive: isPurchased }, { key: "issued", isActive: !isPurchased }]
 
-  const items = [
-    {
-      key: "purchased",
-      label: <Text className="text-xl font-bold leading-6" style={{ color: isPurchased ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Purchased</Text>,
-    },
-    {
-      key: "issued",
-      label: <Text className="text-xl font-bold leading-6" style={{ color: type === "issued" ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>Issued</Text>,
-    },
-  ];
-  const closeSellModal = () => {
-    setVisible(false);
-  };
-
-  const openSellModal = () => {
-    setVisible(true);
-  };
+  const items = tabItems.map((item, index) => {
+    return { ...item, label: <Text className="text-xl font-bold leading-6 capitalize" style={{ color: item.isActive ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>{item.key}</Text> }
+  })
 
   const handleToastClose = () => {
-    actions.resetMessage(dispatch);
+    membershipActions.resetMessage(membershipDispatch);
     inventoryActions.resetMessage(inventoryDispatch);
   }
 
@@ -213,7 +134,8 @@ const Membership = (user) => {
     }
   };
 
-  const isPageLoading = stripeStatus === null || isLoadingStripeStatus
+  const isPageLoading = stripeStatus === null || isLoadingStripeStatus;
+  const isMembershipFound = isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading;
 
   return (
     <>
@@ -238,22 +160,13 @@ const Membership = (user) => {
                     </Row>
                     <Row>
                       <Typography.Text className="text-sm font-medium text-grey">
-                        {(isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading)
+                        {(isMembershipFound)
                           ? <Spin size="small" /> : (isPurchased ? purchasedMemberships?.length : memberships?.length)} {type} Memberships found
                       </Typography.Text>
                     </Row>
                   </Col>
                 </Row>
               </Col>
-              {/* <Col>
-                    <Dropdown.Button
-                        style={{ margin: '10px' }}
-                        icon={<DownOutlined />}
-                        menu={{ dummyData }}
-                    >
-                        All
-                    </Dropdown.Button>
-                </Col> */}
               <Col md={{ span: 16 }} lg={{ span: 14 }} xl={{ span: 16 }} className="py-0 m-0 pt-1">
                 <Col className="flex justify-between float-right">
                   <Button
@@ -265,11 +178,7 @@ const Membership = (user) => {
                       color: "white",
                     }}
                     onClick={() => {
-                      if (
-                        hasChecked &&
-                        !isAuthenticated &&
-                        loginUrl !== undefined
-                      ) {
+                      if (isRedirectLogin) {
                         window.location.href = loginUrl;
                       } else {
                         showModal();
@@ -278,56 +187,20 @@ const Membership = (user) => {
                   >
                     {createServiceIcon()} &nbsp; New Membership
                   </Button>
-                  {/* <Button
-                    id="add-product-button"
-                    // type="primary"
-                    style={{
-                      // backgroundColor: "green",
-                      color: "black",
-                    }}
-                    className="py-3 px-6 h-12 mx-4 bg-white align-middle font-semibold !hover:bg-primaryHover flex"
-                    onClick={() => {
-                      if (
-                        hasChecked &&
-                        !isAuthenticated &&
-                        loginUrl !== undefined
-                      ) {
-                        window.location.href = loginUrl;
-                      } else {
-                        setVisible(true);
-                      }
-                    }}
-                  >
-                    {sellServicesIcon()}  &nbsp; Sell Membership
-                  </Button> */}
                   <Button
                     id="add-product-button"
-                    // type="primary"
                     style={{
-                      // backgroundColor: "orange",
                       color: "black",
 
                     }}
                     className="py-3 px-6 mx-4 h-12 bg-white !hover:bg-primaryHover font-semibold flex"
                     onClick={() => {
                       setCookie("returnUrl", `/marketplace/memberships/serviceUsage/booked`, 10);
-                      navigate("/memberships/serviceUsage/booked")
+                      navigate(routes.ServiceUsage.booked)
                     }}
                   >
                     {servicesIcon()} &nbsp; Services
                   </Button>
-                  {/* <Button
-                    id="add-product-button"
-                    // type="primary"
-                    style={{
-                      // backgroundColor: "red",
-                      color: "black",
-
-                    }}
-                    className="py-3 px-6 h-12 bg-500 !hover:bg-primaryHover font-semibold"
-                  >
-                    Manage Services
-                  </Button> */}
                   <Button
                     id="add-product-button"
                     type={stripeStatus.detailsSubmitted ? "default" : "primary"}
@@ -335,11 +208,7 @@ const Membership = (user) => {
                     className="py-3 px-6 mx-4 h-12 bg-500 !hover:bg-primaryHover font-semibold"
                     disabled={stripeStatus.detailsSubmitted}
                     onClick={() => {
-                      if (
-                        hasChecked &&
-                        !isAuthenticated &&
-                        loginUrl !== undefined
-                      ) {
+                      if (isRedirectLogin) {
                         window.location.href = loginUrl;
                       } else {
                         onboardSeller();
@@ -348,8 +217,7 @@ const Membership = (user) => {
                   >
                     <span style={{ fontWeight: "normal" }}> Setup </span>
                     <span style={{ fontWeight: "900", margin: "0 5px" }}>
-                      {" "}
-                      Stripe{" "}
+                      Stripe
                     </span>
                     <span style={{ fontWeight: "normal" }}> Account</span>
                   </Button>
@@ -380,14 +248,7 @@ const Membership = (user) => {
             )}
             <div className="pb-12"></div>
           </Row>
-          {/* <Row>
-            <Pagination
-              current={page}
-              onChange={onPageChange}
-              total={total}
-              className="mx-auto"
-            />
-          </Row> */}
+
         </div>
       )}
       {open && (
@@ -399,19 +260,6 @@ const Membership = (user) => {
         //   resetPage={onPageChange}
         //   page={page}
         //   debouncedSearchTerm={debouncedSearchTerm}
-        />
-      )}
-      {visible && !isPageLoading && (
-        <ListNowIndex
-          open={visible}
-          user={user}
-          handleCancel={closeSellModal}
-          onClick={() => { setVisible(true) }}
-          // formik={formik}
-          type="Sale"
-        // id="None"
-        // getIn={getIn}
-        // isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
       {msg && openToast("bottom")}
