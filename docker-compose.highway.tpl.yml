@@ -1,0 +1,46 @@
+#highway-version:<VERSION>
+#strato-getting-started-min-version:4.0
+version: "1"
+volumes:
+  idpconfig:
+      driver: local
+services:
+  highway-wrapper:
+    environment:
+    - EXT_STORAGE_S3_ACCESS_KEY_ID=${EXT_STORAGE_S3_ACCESS_KEY_ID}
+    - EXT_STORAGE_S3_SECRET_ACCESS_KEY=${EXT_STORAGE_S3_SECRET_ACCESS_KEY}
+    - EXT_STORAGE_S3_BUCKET=${EXT_STORAGE_S3_BUCKET} 
+    build: .
+    image: ${HIGHWAYWRAPPER_IMAGE:-<REPO_URL>highway-wrapper:<VERSION>}
+    restart: unless-stopped
+    volumes: 
+      - ./highway-wrapper/certs:/highway-wrapper/certs:ro
+      - ./highway-wrapper/idconf.yaml:/highway-wrapper/idconf.yaml:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    depends_on:
+    - highway-wrapper
+    environment:
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    - HIGHWAY_WRAPPER_HOSTNAME=${HIGHWAY_WRAPPER_HOSTNAME}
+    - HIGHWAY_PORT=${HIGHWAY_PORT}
+    build: .
+    image: ${IDENTITYNGINX_IMAGE:-<REPO_URL>identity-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-8080}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-8081}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    - idpconfig:/config
+    - ./highway-wrapper/idconf.yaml:/tmp/idconf.yaml
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
