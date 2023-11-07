@@ -225,17 +225,13 @@ instance A.Selectable IPAsText ClosestPeers IO where
 
 instance A.Replaceable PPeer UdpEnableTime IO where
   replace _ peer' (UdpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do
-    -- TODO(tim): Reenable port selection
-    let peer = peer' {pPeerTcpPort = 30303}
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. enableTime]
+      SQL.updateWhere (thisPeer peer') [PPeerUdpEnableTime SQL.=. enableTime]
 
 instance A.Replaceable PPeer TcpEnableTime IO where
   replace _ peer' (TcpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do
-    -- TODO(tim): Reenable port selection
-    let peer = peer' {pPeerTcpPort = 30303}
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer) [PPeerEnableTime SQL.=. enableTime]
+      SQL.updateWhere (thisPeer peer') [PPeerEnableTime SQL.=. enableTime]
 
 instance A.Replaceable PPeer PeerDisable IO where
   replace _ peer d = withGlobalSQLPool $ \sqldb -> do
@@ -285,9 +281,8 @@ instance A.Replaceable PPeer PeerUdpDisable IO where
 
 instance A.Replaceable PPeer T.Text IO where
   replace _ peer' exception = withGlobalSQLPool $ \sqldb -> do
-    let peer = peer' {pPeerTcpPort = 30303}
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer) [PPeerDisableException SQL.=. exception]
+      SQL.updateWhere (thisPeer peer') [PPeerDisableException SQL.=. exception]
 
 instance A.Replaceable T.Text PPeer IO where
   replace _ message peer = withGlobalSQLPool $ \sqldb -> do
@@ -308,12 +303,12 @@ buildPeer :: (Maybe String, String, Int) -> PPeer
 buildPeer (mpk, ip, p) = buildPeerPoint (stringToPoint <$> mpk, ip, p)
 
 buildPeerPoint :: (Maybe Point, String, Int) -> PPeer
-buildPeerPoint (pubkeyMaybe, ip, _) =
+buildPeerPoint (pubkeyMaybe, ip, p) =
   let peer =
         PPeer
           { pPeerPubkey = pubkeyMaybe,
             pPeerIp = T.pack ip,
-            pPeerUdpPort = 30303, --TODO think about this....  Should the UDP port be the same as the TCP port by default?
+            pPeerUdpPort = p,
             pPeerTcpPort = 30303,
             pPeerNumSessions = 0,
             pPeerLastTotalDifficulty = 0,
@@ -443,9 +438,8 @@ lengthenPeerDisableBy ::
   m (Either SomeException ())
 lengthenPeerDisableBy secs peer' = try $ do
   currentTime <- liftIO getCurrentTime
-  let peer = peer' {pPeerTcpPort = 30303}
-      disable = SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
-  A.replace (A.Proxy @PeerDisable) peer disable
+  let disable = SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
+  A.replace (A.Proxy @PeerDisable) peer' disable
 
 -- A variation of 'lengthenPeerDisable' but for UDP instead, currently used for ethereum-discovery.
 lengthenPeerDisable' ::
@@ -454,21 +448,18 @@ lengthenPeerDisable' ::
   m (Either SomeException ())
 lengthenPeerDisable' peer' = try $ do
   currentTime <- liftIO getCurrentTime
-  let peer = peer' {pPeerTcpPort = 30303}
-      disable =
-        if (currentTime < pPeerDisableExpiration peer)
-          then ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral (pPeerNextUdpDisableWindowSeconds peer) `addUTCTime` currentTime) 2
+  let disable =
+        if (currentTime < pPeerDisableExpiration peer')
+          then ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral (pPeerNextUdpDisableWindowSeconds peer') `addUTCTime` currentTime) 2
           else SetPeerUdpDisableTime (UdpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
-  A.replace (A.Proxy @PeerUdpDisable) peer disable
+  A.replace (A.Proxy @PeerUdpDisable) peer' disable
 
 storeDisableException ::
   (MonadUnliftIO m, A.Replaceable PPeer T.Text m) =>
   PPeer ->
   T.Text ->
   m (Either SomeException ())
-storeDisableException peer' e = try $ do
-  let peer = peer' {pPeerTcpPort = 30303}
-  A.replace (A.Proxy) peer e
+storeDisableException peer' e = try $ A.replace (A.Proxy) peer' e
 
 -- TODO: Allow an empty public key in the Enode type
 peerToEnode :: PPeer -> Maybe Enode
@@ -524,6 +515,4 @@ resetPeerUdp ::
   (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m) =>
   PPeer ->
   m (Either SomeException ())
-resetPeerUdp peer' = try $ do
-  let peer = peer' {pPeerTcpPort = 30303}
-  A.replace (A.Proxy @PeerUdpDisable) peer ResetPeerUdpDisable
+resetPeerUdp peer' = try $ A.replace (A.Proxy @PeerUdpDisable) peer' ResetPeerUdpDisable
