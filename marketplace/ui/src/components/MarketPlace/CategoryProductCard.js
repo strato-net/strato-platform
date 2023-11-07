@@ -20,6 +20,7 @@ import {
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -156,19 +157,7 @@ const CategoryProductCard = ({ product, category }) => {
                 {product.name}&nbsp;
               </Text>
             </div>
-            <Paragraph
-              ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-              className="text-primaryC text-xs mt-2"
-              id="prod-desc"
-            >
-              {/* {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                <React.Fragment key={index}>
-                  {line}
-                  <br />
-                </React.Fragment>
-              ))} */}
-              {product.description}
-            </Paragraph>
+            <ParagraphEllipsis description={product.description} />
             <Title level={4} className="!mt-0" id="prod-price">
               ${product.pricePerUnit}
             </Title>

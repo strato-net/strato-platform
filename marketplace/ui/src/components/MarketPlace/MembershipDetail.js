@@ -45,6 +45,7 @@ import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import TagManager from "react-gtm-module";
 import dayjs from "dayjs";
+import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis";
 
 const StatusValue = {
   1: "Listed",
@@ -492,16 +493,7 @@ const MembershipDetails = ({ user }) => {
             <Text className="font-bold text-grey font-poppin">
               Additional Info
             </Text>
-            <Paragraph
-              ellipsis={{
-                rows: 2,
-                expandable: true,
-                symbol: <Text strong>more</Text>,
-              }}
-              className="float-right text-md font-regular h-auto"
-            >
-              {membershipDetails?.additionalInfo ?? "--"}
-            </Paragraph>
+            <ParagraphEllipsis description={membershipDetails?.additionalInfo ?? "--"} />
           </Paragraph>
           {/* {true && <Paragraph>
           <Text disabled className="font-bold" >Membership ID</Text>
@@ -571,6 +563,10 @@ const MembershipDetails = ({ user }) => {
       </Row>
     );
   };
+
+  const description = inventoryDetails?.description
+    ? inventoryDetails?.description
+    : productDetails?.description
 
   return (
     <>
@@ -885,24 +881,7 @@ const MembershipDetails = ({ user }) => {
           <Row className="max-w-4xl mx-auto mt-10">
             <Card className="w-full shadow-md">
               <Title level={3}> Description </Title>
-              <Paragraph
-                ellipsis={{
-                  rows: 2,
-                  expandable: true,
-                  symbol: <Text strong>Show more</Text>,
-                }}
-                className="text-primaryC text-[13px] mt-2"
-              >
-                {/* {decodeURIComponent(inventoryDetails?.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line ?? "--"}
-                    <br />
-                  </React.Fragment>
-                ))} */}
-                {inventoryDetails?.description
-                  ? inventoryDetails?.description
-                  : productDetails?.description}
-              </Paragraph>
+              <ParagraphEllipsis description={description} />
             </Card>
           </Row>
 
