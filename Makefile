@@ -11,6 +11,7 @@ $(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
 FAKEROOT=$(shell pwd)/.docker-work
+HIGHWAYDIR=${FAKEROOT}/highway-wrapper
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
 IDENTITYDIR=${FAKEROOT}/identity-provider
@@ -32,7 +33,7 @@ all: build_all docker-compose eks
 
 build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
-.PHONY: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway-wrapper nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -75,6 +76,7 @@ build_buildbase:
 
 build_common: build_buildbase
 	@echo building haskell libraries and creating directories
+	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
@@ -84,6 +86,7 @@ build_common: build_buildbase
 
 build_common_profiled: build_buildbase
 	@echo building haskell libraries and creating directories
+	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
@@ -103,6 +106,12 @@ hoogle: build_buildbase
 		stack build --haddock && \
 		stack hoogle generate --rebuild -- --local && \
 		stack hoogle -- server --local
+
+highway: build_common
+	 @echo Now building highway...
+	 cp strato/highway/doit.sh ${HIGHWAYDIR}
+	 docker build --target highway-wrapper --tag ${REPO_URL}highway-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	 docker tag ${REPO_URL}highway-wrapper:${VERSION} ${REPO_AWS_ECR_URL}highway-wrapper:${VERSION}
 
 strato: build_common
 	@echo Now building core-strato...
