@@ -263,19 +263,18 @@ const MembershipCardPurchased = ({
     }
   };
 
-  // const renderCustomPrevArrow = (clickHandler, hasPrev, label) => (
-  //   <button onClick={clickHandler} disabled={!hasPrev} className="custom-arrow .custom-prev-mem-carousel">
-  //     Previous
-  //   </button>
-  // );
-
-  // const renderCustomNextArrow = (clickHandler, hasNext, label) => (
-  //   <button onClick={clickHandler} disabled={!hasNext} className="custom-arrow custom-next-mem-carousel">
-  //     Next
-  //   </button>
-  // );
-
   const inventoriesCol = (Inventories && Inventories.length == 0) ? "red" : "green";
+  const cardDetail = [
+    { label: "Sub Category", value: subCategory, visible: true },
+    { label: "Company Name", value: manufacturer, visible: true },
+    {
+      label: isDuration ? "Duration" : "Expiry Date", value: isDuration
+        ? `${timePeriodInMonths ?? "--"} Month(s)`
+        : `${dayjs(expiryDate).format('MM-DD-YYYY') ?? "--"}`, visible: true
+    },
+    { label: "Savings", value: `$ ${savings ?? 0}`, visible: true },
+    { label: "Membership Number", value: membershipId, visible: isMembershipNumber },
+  ]
 
   return (
     <>
@@ -291,7 +290,6 @@ const MembershipCardPurchased = ({
                 <Row>
                   <Text level={4} className="font-poppin text-2xl lh-28">
                     {membership?.productName ?? "--"}
-                    {/* {decodeURIComponent(membership?.productName)} */}
                   </Text>
                 </Row>
                 <Row className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>
@@ -306,32 +304,6 @@ const MembershipCardPurchased = ({
                   <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
                   <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
                 </Row>
-                {/* {isPurchased && <Row className="px-2">
-                  <Button onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
-                      let isTaxpercentage = membership.taxDollarAmount === 0;
-                      formik.setFieldValue("name", membership.productName);
-                      // formik.setFieldValue("quantity", membership.productName);
-                      formik.setFieldValue("inventoryStatus", parseInt(membership.status));
-                      formik.setFieldValue("isTaxPercentage", isTaxpercentage);
-                      formik.setFieldValue("taxPercentage", taxVal);
-                      formik.setFieldValue("price", membership.price);
-                      formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
-                      formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
-                      if (status === '2') {
-                        setListed(1)
-                      } else {
-                        setListed(2)
-                      }
-                      openListNowModal();
-                    }
-                  }} >
-                    <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Edit</Text>
-                  </Button>
-                </Row>} */}
               </Col>
               {isDescription &&
                 (<Col span={24} className="mt-2">
@@ -366,7 +338,6 @@ const MembershipCardPurchased = ({
                         onClick={() => { setCarouselModel(true) }}
                         src={item}
                         fallback={noPreview}
-                      // src={membership.productImageLocation}
                       />
                     })}
                   </Carousel>}
@@ -408,41 +379,17 @@ const MembershipCardPurchased = ({
               </Col>
               <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17, offset: 1 }}
                 className={`border-grey shadow-lg leading-2 min-h-min rounded p-4 ${isMembershipNumber ? "h-52" : "h-40"}`}>
-                <Paragraph >
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Sub Category</Text>
-                  <Text className="float-right font-poppin leading-5">{subCategory ?? "--"}</Text>
-                </Paragraph>
-                <Paragraph >
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Company Name</Text>
-                  <Text className="float-right font-poppin leading-5">{manufacturer ?? "--"}</Text>
-                </Paragraph>
-                {isDuration
-                  ? <Paragraph >
-                    <Text className="font-normal text-grey leading-5 font-poppin" >Duration</Text>
-                    <Text className="float-right font-poppin leading-5">{timePeriodInMonths ?? "--"} Month(s)</Text>
-                  </Paragraph>
-                  : <Paragraph >
-                    <Text className="font-normal text-grey leading-5 font-poppin" >Expiry Date</Text>
-                    <Text className="float-right font-poppin leading-5">{dayjs(expiryDate).format('MM-DD-YYYY') ?? "--"}</Text>
-                  </Paragraph>}
-                <Paragraph >
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Savings</Text>
-                  <Text type="success" className="float-right font-poppin leading-5">$ {savings ?? 0}</Text>
-                </Paragraph>
-                {isMembershipNumber && <Paragraph>
-                  <Text className="font-normal text-grey leading-5 font-poppin" >Membership Number</Text>
-                  <Text className="float-right font-poppin leading-5">{membershipId ?? "--"}</Text>
-                </Paragraph>}
+                {cardDetail.map(({ label, value, visible }, index) => {
+                  return (visible && <Paragraph key={index}>
+                    <Text className="font-normal text-grey leading-5 font-poppin" >{label}</Text>
+                    <Text className="float-right font-poppin leading-5">{value ?? "--"}</Text>
+                  </Paragraph>)
+                })}
               </Col>
             </Row>
             {Inventories && Inventories?.length > 0 &&
               <Row className="mt-4">
                 <Col span={24}>
-                  {/* <Title level={5}>Inventories</Title> */}
-                  {/* <Collapse
-                    size="large"
-                    items={[{ key: '1', label: 'This is default size panel header', children: <Table bordered pagination={false} columns={columns} dataSource={data} /> }]}
-                  /> */}
                   <Collapse size="large" expandIconPosition='end'>
                     <Collapse.Panel key="1" header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>}>
                       <Table pagination={false}
@@ -480,25 +427,19 @@ const MembershipCardPurchased = ({
         onCancel={() => setCarouselModel(false)}
         width={1100}
         className="gallary-modal"
-      // height={'100%'}
       >
         <Row>
           <Col span={16} className="mx-auto ">
-            <Carousel showArrows={true} showThumbs={false}
-            // renderArrowPrev={renderCustomPrevArrow}
-            // renderArrowNext={renderCustomNextArrow}
-            >
+            <Carousel showArrows={true} showThumbs={false}>
               {productImageLocation && productImageLocation?.map((item) => {
                 return <Image
                   key={item}
                   className="object-covers"
                   width={'100%'}
-                  // height={390}
                   preview={false}
                   onClick={() => { setCarouselModel(true) }}
                   src={item}
                   fallback={noPreview}
-                // src={membership.productImageLocation}
                 />
               })}
             </Carousel>
