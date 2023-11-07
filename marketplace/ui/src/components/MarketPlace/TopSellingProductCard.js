@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie";
 
 const { Title, Text } = Typography;
 
@@ -176,6 +177,7 @@ const TopSellingProductCard = () => {
                           className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
                           onClick={() => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
                               TagManager.dataLayer({
@@ -196,6 +198,7 @@ const TopSellingProductCard = () => {
                         <div
                           onClick={() => {
                             if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
                               TagManager.dataLayer({

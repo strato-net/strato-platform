@@ -58,7 +58,6 @@ library:
     - persistent
     - primitive
     - raw-strings-qq
-    - relapse           # remove this
     - secp256k1-haskell
     - servant
     - servant-docs
