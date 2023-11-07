@@ -120,10 +120,10 @@ contract ProductManager is
         int _quantity,
         int _pricePerUnit,
         string _batchId,
-        string _inventoryType,
         InventoryStatus _status,
         uint _createdDate,
-        string[] _serialNumbers
+        string[] _serialNumbers,
+        string _inventoryType
     ) returns (uint256, address) {
         if (_serialNumbers.length == 0) {
             Product_3 product = Product_3(_productAddress);
@@ -132,10 +132,10 @@ contract ProductManager is
                     _quantity,
                     _pricePerUnit,
                     _batchId,
-                    _inventoryType,
                     _status,
                     _createdDate,
-                    tx.origin
+                    tx.origin,
+                    _inventoryType
                 );
         } else {
             for (uint256 i = 0; i < _serialNumbers.length; i++) {
@@ -160,10 +160,10 @@ contract ProductManager is
                     _quantity,
                     _pricePerUnit,
                     _batchId,
-                    _inventoryType,
                     _status,
                     _createdDate,
-                    tx.origin
+                    tx.origin,
+                    _inventoryType
                 );
         }
     }
@@ -230,17 +230,24 @@ contract ProductManager is
         uint256 isUpdated = existingInventory.updateQuantity(
             existingInventory.availableQuantity() - _quantity
         );
-        if (existingInventory.inventoryType() == "Batch") {
+
+        bool hasInventoryType = true;
+        try {
+            existingInventory.inventoryType();
+        } catch UnknownFunction {
+            hasInventoryType = false;
+        }
+        if (hasInventoryType && existingInventory.inventoryType() == "Batch") {
             (uint256 status, address inventoryAddress) = product.addInventory(
                 _quantity,
                 _price,
                 existingInventory.batchId(),
-                existingInventory.inventoryType(),
                 InventoryStatus.PUBLISHED,
                 block.timestamp,
-                tx.origin
+                tx.origin,
+                "Batch"
             );
-            Item_3 itemAddr = new Item_3(
+            Item_3 batch_item = new Item_3(
                 address(product),
                 product.uniqueProductCode(),
                 address(inventoryAddress),
@@ -254,16 +261,22 @@ contract ProductManager is
                 block.timestamp,
                 tx.origin
             );
+            batch_item.generateOwnershipHistory(
+                batch_item.ownerOrganization(),
+                batch_item.ownerOrganization(),
+                block.timestamp,
+                address(batch_item)
+            );
             return (status, inventoryAddress);
         } else {
             (uint256 status, address inventoryAddress) = product.addInventory(
                 _quantity,
                 _price,
                 existingInventory.batchId(),
-                existingInventory.inventoryType(),
                 InventoryStatus.PUBLISHED,
                 block.timestamp,
-                tx.origin
+                tx.origin,
+                "Individual"
             );
             for (int i = 0; i < _quantity; i++) {
                 Item_3 _item = Item_3(_itemsAddress[i]);

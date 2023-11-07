@@ -28,6 +28,7 @@ import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.TCPClientWithTimeout
 import Conduit
+import Control.Concurrent.Hierarchy
 import Control.Lens ((^.))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -45,8 +46,9 @@ runEthServer ::
   Int ->
   PeerRunner n m () ->
   m ()
-runEthServer listenPort runner = runServer (TCPPort listenPort) runner $ \c a ->
-  ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
+runEthServer listenPort runner =
+  runServer (TCPPort listenPort) runner $ \c a ->
+    ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
 
 ethServerHandler ::
   MonadP2P m =>
@@ -67,12 +69,16 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
         Nothing -> do
           $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ peerStr ++ ". rejecting violently."
         Just _ -> do
+          tmm <- liftIO newThreadMap
+          _   <- void $ liftIO $ newChild tmm $ \_ -> return ()
           (attempt :: Maybe SomeException) <-
             withCertifiedPeer p . withActivePeer p $
-              runEthServerConduit p pSource pSink seqSrc peerStr
+              runEthServerConduit p pSource pSink seqSrc peerStr tmm 
           case attempt of
-            Nothing -> $logDebugS "runEthServer" "Peer ran successfully!"
+            Nothing -> do _ <- liftIO $ killThreadHierarchy tmm
+                          $logDebugS "runEthServer" "Peer ran successfully!"
             Just err -> do
+              _ <- liftIO $ killThreadHierarchy tmm
               $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
               _ <- case err of
                 e' | Just WrongGenesisBlock <- fromException e' -> do
@@ -130,17 +136,17 @@ runEthServerConduit ::
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
   String ->
+  ThreadMap ->
   m (Maybe SomeException)
-runEthServerConduit p pSource pSink seqSrc peerStr = do
+runEthServerConduit p pSource pSink seqSrc peerStr tm = do
   myPubKey' <- getPub
-
   let myPubkey = secPubKeyToPoint myPubKey'
       otherPubKey = fromMaybe (error "programmer error: runEthServerConduit was called without a pubkey") $ pPeerPubkey p
   mConnectionResult <- timeout 2000000 $ pSource $$+ ethCryptAccept otherPubKey `fuseUpstream` pSink
   case mConnectionResult of
     Nothing -> pure $ Just $ toException $ HandshakeException "handshake timed out"
     Just (_, (outCtx, inCtx)) -> do
-      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx
+      !eventSource <- mkEthP2PEventSource pSource seqSrc peerStr inCtx tm
       !eventSink <- mkEthP2PEventConduit peerStr outCtx
       fmap (either Just (const Nothing)) . try . runConduit $
         eventSource
@@ -155,5 +161,4 @@ stratoP2PServer ::
 stratoP2PServer runner = do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
-
   runEthServer flags_listen runner

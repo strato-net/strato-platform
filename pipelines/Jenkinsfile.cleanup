@@ -47,7 +47,10 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = true)
     sh """
       sudo docker image prune --all --filter until=\$(expr $olderThanNumDays \\* 24)h -f
     """
-
+    
+    // Remove dangling images (tagged with <none>:<none>)
+    sh 'sudo docker system prune -f'
+    
     def diskspaceAvailableAfter = sh(
         returnStdout: true,
         script: "df | grep /datadrive | awk '{print \$4}'"
