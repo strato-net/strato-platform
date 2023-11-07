@@ -566,7 +566,11 @@ const MembershipDetails = ({ user }) => {
 
   const description = inventoryDetails?.description
     ? inventoryDetails?.description
-    : productDetails?.description
+    : productDetails?.description;
+
+  const membershipName = inventoryDetails?.name
+    ? inventoryDetails?.name
+    : productDetails?.name;
 
   return (
     <>
@@ -611,11 +615,9 @@ const MembershipDetails = ({ user }) => {
 
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
-                <Text className="text-2xl leading-8 font-semibold font-poppin">
-                  {inventoryDetails?.name
-                    ? inventoryDetails?.name
-                    : productDetails?.name}
-                </Text>
+                <Paragraph className="text-2xl !mb-0 leading-8 font-semibold font-poppin" ellipsis={{ rows: 1, tooltip: membershipName }} >
+                  {membershipName}
+                </Paragraph>
                 {isDuration ? (
                   <Row className="mb-1">
                     {watchIcon()}
