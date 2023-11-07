@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useFormik, getIn } from "formik";
-import { Card, Popover, Spin, Button, Row, Col, Typography, Image, Modal, Table, Collapse } from "antd";
-import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Card, Spin, Button, Row, Col, Typography, Image, Modal, Table, Collapse } from "antd";
+import { EditOutlined } from "@ant-design/icons";
 // import DeleteProductModal from "./DeleteProductModal";
 // import UpdateProductModal from "./UpdateProductModal";
 import helperJson from "../../helpers/helper.json"
@@ -27,7 +27,6 @@ const { purchasedCardColumn, statusColor, statusText } = helperJson;
 
 const { Text, Paragraph, Title } = Typography;
 
-
 const initialValues = {
   name: "",
   price: "",
@@ -35,12 +34,11 @@ const initialValues = {
   // isTaxPercentage:false,
 };
 
-
 const MembershipCardPurchased = ({
   user,
   membership,
-  categorys,
-  debouncedSearchTerm,
+  // categorys,
+  // debouncedSearchTerm,
   membershipId,
   cardConfig: {
     isDuration,
@@ -66,7 +64,7 @@ const MembershipCardPurchased = ({
     // membershipId,
     expiryDate,
     availableQuantity,
-    membershipAddress,
+    // membershipAddress,
     inventoryId,
     Inventories,
     itemNumber,
@@ -78,15 +76,9 @@ const MembershipCardPurchased = ({
   const [isEdit, setIsEdit] = useState(false)
   const [state, setState] = useState(null);
   const [listModalConfig, setListModalConfig] = useState({})
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [open, setOpen] = useState(false);
   const [carouselModel, setCarouselModel] = useState(false);
-  const [listed, setListed] = useState(0)
   const navigate = useNavigate();
-  const naviroute = routes.MembershipDetail.url;
   const [visible, setVisible] = useState(false);
-  const [listType, setListType] = useState("Sale");
-  const InventoriesLen = Inventories?.length > 0;
 
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
@@ -178,8 +170,6 @@ const MembershipCardPurchased = ({
   const closeListNowModal = () => {
     setVisible(false);
     setIsEdit(false);
-    setListType("Sale");
-    setListed(0);
   };
 
   const openListNowModal = (configCase) => {
