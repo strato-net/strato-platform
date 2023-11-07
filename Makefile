@@ -60,7 +60,7 @@ marketplace-backend:
 
 marketplace-ui:
 	@echo Now building marketplace-ui...
-	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} make --directory=marketplace/ui/
+	BASIL_DOCKER_TAG=${REPO_URL}marketplace-ui:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}marketplace-ui:${VERSION} SITE_ID=038fe3fa make --directory=marketplace/ui/
 
 eks:
 	@echo Now generating eks manifest files
