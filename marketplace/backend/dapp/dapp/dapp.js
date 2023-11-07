@@ -150,7 +150,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, org: managers.cirrusOrg, app: contractName, chainIds: [], };
+  const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -697,7 +697,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     );
   };
 
-  // ------------------------------ ART STARTS------------------------------
+  // ------------------------------ ART STARTS ------------------------------
 
   contract.createArt = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
@@ -727,8 +727,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   //   const chainOptions = { chainIds: [chainId], ...options };
   //   return artJs.update(rawAdmin, contract, updates, chainOptions);
   // };
-  // ------------------------------ ART ENDS--------------------------------
+  // ------------------------------ ART ENDS --------------------------------
 
+  // ------------------------------ SALE TEST STARTS ------------------------------
+
+  contract.transferOwnershipSale = async function (args, options = defaultOptions) {
+    const { assetAddress, newOwner } = args;
+    const saleContract = await orderJs.getSale(rawAdmin, {address: assetAddress}, options);
+    console.log("saleContract", saleContract)
+    const contract = { name: "SimpleSale", address: saleContract.address, };
+    return orderJs.transferOwnershipSale(rawAdmin, contract, options, newOwner);
+  };
+
+  // ------------------------------ SALE TEST ENDS ------------------------------
 
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {

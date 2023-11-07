@@ -161,6 +161,21 @@ class OrderController {
     }
   }
 
+  static async executeSale(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      OrderController.validateExecuteSaleSessionArgs(body)
+
+      const result = await dapp.transferOwnershipSale(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -283,6 +298,21 @@ class OrderController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create User Address Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateExecuteSaleSessionArgs(args) {
+    const executeSaleSchema = Joi.object({
+      assetAddress: Joi.string().required(),
+      newOwner: Joi.string().required()
+    }).required();
+
+    const validation = executeSaleSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Execute Sale Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

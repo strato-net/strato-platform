@@ -9,6 +9,7 @@ import {
   setSearchQueryOptionsPrime
 } from "/helpers/utils";
 import dayjs from "dayjs";
+import constants from "../../helpers/constants";
 
 const contractName = "Order";
 const contractFilename = `${util.cwd}/dapp/orders/contracts/Order.sol`;
@@ -415,6 +416,58 @@ async function transferOwnership(user, contract, options, newOwner) {
 }
 
 /**
+ * Get contract state via cirrus.
+ * @param args Lookup with an address.
+ * @returns Contract state in cirrus
+ */
+
+async function getSale(user, args, options) {
+  console.log("getSaleArgs", args);
+  console.log("getSaleOptions", options);
+  const { address, ...restArgs } = args;
+  let inventory;
+
+  const searchArgs = setSearchQueryOptions(restArgs, { key: 'assetToBeSold', value: address });
+  inventory = await searchOne(constants.saleTableName, searchArgs, options, user);
+  
+  if (!inventory) {
+      return undefined;
+  }
+
+
+  return marshalOut({
+      ...inventory,
+  });
+}
+
+/**
+ * Transfer the ownership of a SimpleSale
+ * @param newOwner The common name of the new owner of the SimpleSale.
+ */
+async function transferOwnershipSale(user, contract, options, newOwner) {
+
+  const callArgs = {
+    contract,
+    method: "transferOwnership",
+    args: util.usc({ purchasersCommonName: newOwner }),
+  };
+  const transferStatus = await rest.call(user, callArgs, options);
+
+  console.log("transferStatus", transferStatus);
+  console.log(parseInt(transferStatus, 10));
+  console.log(RestStatus.OK);
+  if (parseInt(transferStatus, 10) !== RestStatus.OK) {
+    throw new rest.RestError(
+      transferStatus,
+      "You cannot transfer the ownership of a Order you don't own",
+      { newOwner }
+    );
+  }
+
+  return transferStatus;
+}
+
+/**
  * Add a new organization to a order contract/chain.
  * @param {string} orgName The new organization to add
  */
@@ -617,7 +670,9 @@ export default {
   bindAddress,
   get,
   getAll,
+  getSale,
   transferOwnership,
+  transferOwnershipSale,
   updateBuyerDetails,
   updateSellerDetails,
   addOrderLine,

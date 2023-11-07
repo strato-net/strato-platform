@@ -84,6 +84,7 @@ export const Order = {
   paymentSession: '/payment/session/:session_id',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
+  executeSale: '/sale',
 }
 
 export const OrderLine = {
