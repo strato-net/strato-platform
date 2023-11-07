@@ -47,6 +47,13 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
 WORKDIR /var/lib/strato
 ENTRYPOINT ["/strato/doit.sh"]
 
+FROM built as highway-wrapper
+COPY ./highway-wrapper /highway-wrapper
+EXPOSE 8080
+HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
+  CMD curl --silent --output /dev/null --fail localhost:8080/strato/v2.3/_ping || exit 1
+ENTRYPOINT ["/highway-wrapper/doit.sh"]
+
 FROM built as vault-wrapper
 COPY ./vault-wrapper /vault-wrapper
 EXPOSE 8000

@@ -31,7 +31,7 @@ $(info )
 
 all: build_all docker-compose eks
 
-build_all: strato apex nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
+build_all: strato apex highway-wrapper nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
 .PHONY: strato apex highway-wrapper nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
 
@@ -107,11 +107,11 @@ hoogle: build_buildbase
 		stack hoogle generate --rebuild -- --local && \
 		stack hoogle -- server --local
 
-highway: build_common
-	 @echo Now building highway...
-	 cp strato/highway/doit.sh ${HIGHWAYDIR}
-	 docker build --target highway-wrapper --tag ${REPO_URL}highway-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	 docker tag ${REPO_URL}highway-wrapper:${VERSION} ${REPO_AWS_ECR_URL}highway-wrapper:${VERSION}
+highway-wrapper: build_common 
+	@echo Now building highway-wrapper...
+	cp strato/highway/doit.sh ${HIGHWAYDIR}
+	docker build --target highway-wrapper --tag ${REPO_URL}highway-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}highway-wrapper:${VERSION} ${REPO_AWS_ECR_URL}highway-wrapper:${VERSION}
 
 strato: build_common
 	@echo Now building core-strato...
