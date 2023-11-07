@@ -22,6 +22,7 @@ import { INVENTORY_STATUS } from "../../helpers/constants";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { listNowConfig } from "../MarketPlace/listNowConfig";
+import ParagraphEllipsis from "../../components/Ellipsis/ParagraphEllipsis"
 const { purchasedCardColumn, statusColor, statusText } = helperJson;
 
 const { Text, Paragraph, Title } = Typography;
@@ -308,11 +309,7 @@ const MembershipCardPurchased = ({
               {isDescription &&
                 (<Col span={24} className="mt-2">
                   <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
-                  <Paragraph
-                    ellipsis={{ rows: 2, expandable: true, symbol: <Text strong>...more</Text> }}
-                    className="text-sm mt-2 text-dark-grey font-normal leading-5 font-poppin">
-                    {description}
-                  </Paragraph>
+                  <ParagraphEllipsis description={description} className="text-dark-grey font-poppin" />
                 </Col>)}
             </Row>
             <Row className="mt-4">
