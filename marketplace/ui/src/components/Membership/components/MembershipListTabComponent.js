@@ -21,7 +21,7 @@ const MembershipListTabComponent = ({ props: { type, isPurchased, user, debounce
     />
   }]
   const items = tabItems.map((item, index) => {
-    return { ...item, label: <Text className="text-xl font-bold leading-6 capitalize" style={{ color: item.isActive ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>{item.key}</Text> }
+    return { ...item, label: <Text key={index} className="text-xl font-bold leading-6 capitalize" style={{ color: item.isActive ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>{item.key}</Text> }
   })
 
   const onChange = (key) => {

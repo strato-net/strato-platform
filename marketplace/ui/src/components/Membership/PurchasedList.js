@@ -19,7 +19,7 @@ const PurchasedList = (
       {isPurchasedMembershipLoading ? (
         <LoaderComponent />
       ) : purchasedMemberships.length === 0 ? (
-        <NoProductComponent />
+        <NoProductComponent text={"product"} />
       ) : (
         <>
           <Row className="w-full my-4 flex flex-row" gutter={[32, 16]}>

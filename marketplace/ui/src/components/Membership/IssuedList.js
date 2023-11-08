@@ -20,7 +20,7 @@ const IssuedList = (
       {isMembershipsLoading ? (
         <LoaderComponent />
       ) : memberships?.length === 0 ? (
-        <NoProductComponent />
+        <NoProductComponent text={"product"} />
       ) : (
         <Row className="w-full my-4 flex flex-row" gutter={[12, 12]}>
           {memberships?.map((item, index) => {

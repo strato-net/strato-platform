@@ -24,6 +24,7 @@ import TagManager from "react-gtm-module";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import LoaderComponent from "../Loader/LoaderComponent";
 import ToastComponent from "../ToastComponent/ToastComponent";
+import NoProductComponent from "../NoProductFound/NoProductComponent";
 
 const { Title, Text } = Typography;
 
@@ -356,12 +357,9 @@ const Checkout = ({ user }) => {
         <div>
           <BreadCrumbComponent />
           {
-            mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
-              <Image src={Images.noProductSymbol} preview={false} />
-              <Title level={3} className="mt-2">
-                No item found
-              </Title>
-            </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
+            mapData.length === 0
+              ? <NoProductComponent text={"item"} />
+              : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
           }
         </div>
       )}
