@@ -105,6 +105,8 @@ function bind(user, _contract, options) {
     getInventory(user, contract, args, _options);
   contract.getInventories = async (args, _options = defaultOptions) =>
     getInventories(user, contract, args, _options);
+  contract.inventoryCount = async (args, _options = defaultOptions) =>
+    inventoryCount(user, args, _options);
   contract.updateProduct = async (args) =>
     updateProduct(user, contract, args, options);
   contract.createProduct = async (args) =>
@@ -356,6 +358,13 @@ async function count(user, args, options) {
 }
 
 /**
+ * get all the inventory count
+ */
+async function inventoryCount(user, args, options) {
+  return inventoryJs.inventoryCount(user, args, options);
+}
+
+/**
  * get the inventory with product details
  */
 async function getInventory(user, contract, args, options) {
@@ -386,10 +395,12 @@ async function getInventories(admin, contract, args = {}, options) {
     const productIds = [
       ...new Set(inventories.map((inventory) => inventory.productId)),
     ];
+
     const products = await contract.getProducts(
       { address: [...productIds] },
       options
     );
+
     const inventoriesWithProductInfo = inventories
       .filter((inventory) => productIds.includes(inventory.productId))
       .map((inventory) => {
@@ -399,6 +410,7 @@ async function getInventories(admin, contract, args = {}, options) {
           ...newInventory,
         };
       });
+
     return inventoriesWithProductInfo;
   } catch (error) {
     throw error;

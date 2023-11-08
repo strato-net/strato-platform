@@ -32,31 +32,7 @@
                     "name": "Nickel"
                 },
                 {
-                    "name": "Gold"
-                },
-                {
-                    "name": "Copper"
-                },
-                {
-                    "name": "Aluminium"
-                },
-                {
-                    "name": "Zinc"
-                },
-                {
-                    "name": "Lead"
-                },
-                {
-                    "name": "Tin"
-                },
-                {
-                    "name": "Cobalt"
-                },
-                {
-                    "name": "Palladium"
-                },
-                {
-                    "name": "Platinum"
+                    "name": "Silver"
                 }
             ]
         },
@@ -72,6 +48,30 @@
                 },
                 {
                     "name": "Pants"
+                },
+                {
+                    "name": "Jackets"
+                },
+                {
+                    "name": "Accessories"
+                }
+            ]
+        },
+        {
+            "name": "Collectibles",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Trading Cards"
+                },
+                {
+                    "name": "Toys"
+                },
+                {
+                    "name": "Video Games"
+                },
+                {
+                    "name": "Vinyls"
                 }
             ]
         }

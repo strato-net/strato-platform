@@ -7,6 +7,7 @@ export const Images = {
   'clothing': require("./resources/categories/clothing.jpg"),
   'realEstate': require("./resources/categories/real_estate.png"),
   'materials': require("./resources/categories/materials.png"),
+  'collectibles': require("./resources/categories/collectibles.jpg"),
   'category1': require("./resources/categories/category1.png"),
   'category2': require("./resources/categories/category2.png"),
   'category3': require("./resources/categories/category3.png"),

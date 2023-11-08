@@ -1,5 +1,5 @@
 #strato-version:<VERSION>
-#strato-getting-started-min-version:4.0
+#strato-getting-started-min-version:4.2.1
 version: "3"
 volumes:
   marketplacedata:
@@ -63,7 +63,7 @@ services:
     - nginx
     environment:
     - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
-    - MP_DAPP_ADDRESS=${MP_DAPP_ADDRESS:-b1f61d54497efa49c28059435ca47ae8e5f92e56}
+    - MP_DAPP_ADDRESS=${MP_DAPP_ADDRESS:-038b2c5c70dc23ff707bdd92648666863a388a0d}
     - MP_API_DEBUG=${MP_API_DEBUG:-false}
     - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
     - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
@@ -91,6 +91,7 @@ services:
     - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
     - ORG_NAME='BlockApps' # TODO: can be removed?
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
     restart: unless-stopped

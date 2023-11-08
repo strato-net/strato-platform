@@ -796,7 +796,6 @@ spec = do
   ON CONFLICT (record_id, key) DO UPDATE SET
     record_id = excluded.record_id,
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,

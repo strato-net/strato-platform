@@ -96,8 +96,6 @@ import qualified SolidVM.Model.Storable as MS
 import           MaybeNamed
 import           Blockchain.Strato.Model.ChainId
 import           Blockchain.Data.RLP
- 
-
 
 newtype First b a = First {unFirst :: (a, b)}
 
@@ -112,7 +110,6 @@ data ProcessedMappingRow = ProcessedMappingRow
     application :: Text,
     contractname :: Text,
     mapname :: Text,
-    chain :: Text,
     blockHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
@@ -152,15 +149,6 @@ partialParseTableColumns = concat . mapM (fmap unwrapDoubleQuotes . listToMaybe 
 makeAccount :: Text -> Address -> Text
 makeAccount "" addr = tshow $ addr
 makeAccount chain addr =
-  T.concat
-    [ tshow $ addr,
-      ":",
-      chain
-    ]
-
-makeAccountM :: ProcessedMappingRow -> Text
-makeAccountM ProcessedMappingRow {chain = "", address = addr} = tshow $ addr
-makeAccountM ProcessedMappingRow {chain = chain, address = addr} =
   T.concat
     [ tshow $ addr,
       ":",
@@ -230,9 +218,7 @@ outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError conn
 
 baseColumns :: TableColumns
 baseColumns =
-  [ "record_id",
-    "address",
-    "chainId",
+  [ "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -242,9 +228,7 @@ baseColumns =
 
 baseMappingColumns :: TableColumns
 baseMappingColumns =
-  [ "record_id",
-    "address",
-    "chainId",
+  [ "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -256,9 +240,7 @@ baseMappingColumns =
 
 baseAbstractColumns :: TableColumns
 baseAbstractColumns =
-  [ "record_id",
-    "address",
-    "chainId",
+  [ "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -395,7 +377,7 @@ createForeignIndexesForJoins foreignKey = do
       <> wrapDoubleQuotes (columnName foreignKey)
       <> ") REFERENCES "
       <> tableNameToDoubleQuoteText (foreignTableName foreignKey)
-      <> " (record_id);"
+      <> " (address);"
 
 notifyPostgREST ::
   OutputM m =>
@@ -448,7 +430,7 @@ getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo
 getDeferredForeignKeysForMapping tableName o a =
   [ ForeignKeyInfo
       { tableName = tableName,
-        columnName = T.pack "record_id",
+        columnName = T.pack "address",
         foreignTableName =
           indexTableName o a $
             ( \case
@@ -797,7 +779,7 @@ insertForeignKeys conn contracts = do
             <> wrapDoubleQuotes theName
             <> "="
             <> wrapSingleQuotes (escapeQuotes $ T.pack $ show acct)
-            <> " WHERE record_id="
+            <> " WHERE address="
             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
             <> ";"
         `catch` \(e :: SomeException) -> do
@@ -807,7 +789,7 @@ insertForeignKeys conn contracts = do
               <> tableNameToDoubleQuoteText tableName
               <> " SET "
               <> wrapDoubleQuotes theName
-              <> "=null WHERE record_id="
+              <> "=null WHERE address="
               <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
 
 insertHistoryTable ::
@@ -842,9 +824,7 @@ createIndexTableQuery contract (o, a, n) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text",
-              "\"chainId\" text",
+            [ "address text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
@@ -852,7 +832,7 @@ createIndexTableQuery contract (o, a, n) =
               "transaction_sender text"
             ]
               ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
-          ",\n  PRIMARY KEY (record_id) );"
+          ",\n  PRIMARY KEY (address) );"
         ]
 
 createMappingTableQuery :: (Text, Text, Text, Text) -> Text
@@ -863,9 +843,7 @@ createMappingTableQuery (o, a, n, m) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text",
-              "\"chainId\" text",
+            [ "address text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
@@ -876,7 +854,7 @@ createMappingTableQuery (o, a, n, m) =
               "key text",
               "value text"
             ],
-          ",\n  PRIMARY KEY (record_id, key));"
+          ",\n  PRIMARY KEY (address, key));"
         ]
 
 createAbstractTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -888,9 +866,7 @@ createAbstractTableQuery contract (o, a, n) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text",
-              "\"chainId\" text",
+            [ "address text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
@@ -900,7 +876,7 @@ createAbstractTableQuery contract (o, a, n) =
               "data jsonb"
             ]
               ++ tableColumns (map (\(x, y) -> (labelToText x, y ^. varType)) list),
-          ",\n  PRIMARY KEY (record_id));"
+          ",\n  PRIMARY KEY (address));"
         ]
 
 createHistoryTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -912,9 +888,7 @@ createHistoryTableQuery contract (o, a, n) =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "record_id text",
-              "address text NOT NULL",
-              "\"chainId\" text NOT NULL",
+            [ "address text NOT NULL",
               "block_hash text NOT NULL",
               "block_timestamp text",
               "block_number text",
@@ -958,9 +932,7 @@ insertIndexTableQuery cs =
                     (E.contractName x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst list
                 baseVals =
-                  [ \c -> makeAccount (E.chain c) (E.address c),
-                    tshow . E.address,
-                    E.chain,
+                  [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
@@ -979,10 +951,8 @@ insertIndexTableQuery cs =
                       "\n  VALUES ",
                       inserts,
                       [r|
-  ON CONFLICT (record_id) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -1009,9 +979,7 @@ insertMappingTableQuery ms =
                     (mapname x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list)
                 baseVals =
-                  [ makeAccountM,
-                    tshow . address,
-                    chain,
+                  [ tshow . address,
                     T.pack . keccak256ToHex . blockHash,
                     tshow . blockTimestamp,
                     tshow . blockNumber,
@@ -1032,10 +1000,8 @@ insertMappingTableQuery ms =
                       "\n  VALUES ",
                       inserts,
                       [r|
-  ON CONFLICT (record_id, key) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address, key) DO UPDATE SET
     address = excluded.address,
-    "chainId" = excluded."chainId",
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -1063,9 +1029,7 @@ insertAbstractTableQuery cs =
                 list' = (map fst $ fillFirstEmptyEntries $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) list))
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ list'
                 baseVals =
-                  [ \c -> makeAccount (E.chain c) (E.address c),
-                    tshow . E.address,
-                    E.chain,
+                  [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
@@ -1084,9 +1048,7 @@ insertAbstractTableQuery cs =
                       "\n  VALUES ",
                       inserts,
                       [r|
-  ON CONFLICT (record_id) DO UPDATE SET
-    address = excluded.address,
-    "chainId" = excluded."chainId",
+  ON CONFLICT (address) DO UPDATE SET
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
@@ -1114,9 +1076,7 @@ insertHistoryTableQuery cs =
                     (E.contractName x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
                 baseVals =
-                  [ \c -> makeAccount (E.chain c) (E.address c),
-                    tshow . E.address,
-                    E.chain,
+                  [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
@@ -1175,9 +1135,7 @@ createEventTableQuery tableName ev =
           " (",
           csv $
             [ "id SERIAL NOT NULL",
-              "record_id text",
               "address text",
-              "\"chainId\" text",
               "block_hash text",
               "block_timestamp text",
               "block_number text",
@@ -1263,9 +1221,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
       keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumns) ++ filledArgs
       baseVals =
-        [ \e -> makeAccount (T.pack . maybe "" format $ (Action.evContractAccount $ eventEvent e) ^. accountChainId) ((Action.evContractAccount $ eventEvent e) ^. accountAddress),
-          tshow . _accountAddress . Action.evContractAccount . eventEvent,
-          T.pack . maybe "" format . _accountChainId . Action.evContractAccount . eventEvent,
+        [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,

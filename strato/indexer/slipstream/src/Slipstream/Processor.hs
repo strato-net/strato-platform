@@ -299,7 +299,6 @@ processedMappingRow mapping AggregateAction {..} ABIID {..} k v =
       application = actionApplication,
       contractname = aiName,
       mapname = mapping,
-      chain = aiChain,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,

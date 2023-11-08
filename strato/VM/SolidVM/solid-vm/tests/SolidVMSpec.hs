@@ -1293,18 +1293,6 @@ contract qq {
         )
         `shouldThrow` anyParseError
 
-    it "throw an error when there is an 'record_id' variable name" $
-      runTest
-        ( do
-            runBS
-              [r|
-
-contract qq {
-   uint record_id;
-}|]
-        )
-        `shouldThrow` anyReservedWordError
-
     it "throw an error when there is an 'transaction_hash' variable name" $
       runTest
         ( do
