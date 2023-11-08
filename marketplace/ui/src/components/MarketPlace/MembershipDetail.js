@@ -1,62 +1,65 @@
 import React, { useState, useEffect } from "react";
+import { useMatch, useParams, useNavigate, useLocation } from "react-router-dom";
+import { Carousel } from "react-responsive-carousel";
+import TagManager from "react-gtm-module";
 import { useFormik, getIn } from "formik";
+import * as yup from "yup";
+import dayjs from "dayjs";
 import {
   Row,
   Image,
   Button,
   Typography,
   Tabs,
-  Spin,
   notification,
   Col,
   Card,
   Table,
 } from "antd";
-import noPreview from "../../images/resources/noPreview.jpg";
-import { listNowConfig } from "./listNowConfig";
-import { useMatch, useParams } from "react-router-dom";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { actions as membershipActions } from "../../contexts/membership/actions";
-import { actions as productActions } from "../../contexts/product/actions";
-import { Carousel } from "react-responsive-carousel";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import routes from "../../helpers/routes";
+
+//Components
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis";
+// import ToastComponent from "../ToastComponent/ToastComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
+import ListNowModal from "../Membership/ListNowModal";
+//Actions
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
-import { useNavigate, useLocation } from "react-router-dom";
+import { actions as membershipActions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as productActions } from "../../contexts/product/actions";
+// Dispatch and States
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useProductDispatch, useProductState } from "../../contexts/product";
+import { useAuthenticateState } from "../../contexts/authentication";
+// Icons, images, config, routes, utils, constants, css.
+import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
+import noPreview from "../../images/resources/noPreview.jpg";
+import { INVENTORY_STATUS } from "../../helpers/constants";
+import { listNowConfig } from "./listNowConfig";
+import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
 import "./index.css";
-import { useAuthenticateState } from "../../contexts/authentication";
-import ListNowModal from "../Membership/ListNowModal";
-import * as yup from "yup";
-import { INVENTORY_STATUS } from "../../helpers/constants";
-import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
-import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
-import TagManager from "react-gtm-module";
-import dayjs from "dayjs";
-import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis";
-import LoaderComponent from "../Loader/LoaderComponent";
 
+const { Text, Paragraph, Title } = Typography;
 const StatusValue = {
   1: "Listed",
   2: "Not Listed",
 };
+const initialValues = {
+  name: "",
+  price: "",
+  quantity: 1,
+};
 
 const MembershipDetails = ({ user }) => {
   const { type } = useParams();
-
   const location = useLocation();
+  const navigate = useNavigate();
+  const { state, pathname } = useLocation();
+
   const queryParams = new URLSearchParams(location.search);
   const inventoryId = queryParams.get("inventoryId");
 
@@ -64,8 +67,6 @@ const MembershipDetails = ({ user }) => {
   const isPurchased = type === "purchased";
   const isMarket = type === "all";
   const isMarketPlace = !isIssued && !isPurchased;
-
-  const { state, pathname } = useLocation();
 
   let isCalledFromMembership = false;
 
@@ -75,13 +76,7 @@ const MembershipDetails = ({ user }) => {
     isCalledFromMembership = state.isCalledFromMembership;
   }
 
-  const initialValues = {
-    name: "",
-    price: "",
-    quantity: 1,
-  };
-
-  const [activeTab, setActiveTab] = useState("Details");
+  const [activeTab, setActiveTab] = useState("details");
   const [serviceList, setServiceList] = useState([]);
   const [savingsList, setSavingsList] = useState([]);
   const [totalSavings, setTotalSavings] = useState(0);
@@ -90,18 +85,24 @@ const MembershipDetails = ({ user }) => {
   const [membershipDetails, setMembershipDetails] = useState(undefined);
   const [allProductFiles, setAllProductFiles] = useState(undefined);
   const [visible, setVisible] = useState(false);
+  const [qty, setQty] = useState(1);
   const limit = 10,
     offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const {
-    membershipServices,
-    membership,
-    isInitialLoadMembershipDetail,
-    productFiles,
-  } = useMembershipState();
-  const serviceDispatch = useMembershipDispatch();
 
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  // Dispatch
+  const productDispatch = useProductDispatch();
+  const serviceDispatch = useMembershipDispatch();
+  const inventoryDispatch = useInventoryDispatch();
+  const membershipDispatch = useMembershipDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
+  // States
+  const { membershipServices, membership, isInitialLoadMembershipDetail, productFiles } = useMembershipState();
+  const { inventoryDetails, isCreateInventorySubmitting, isInitialLoadInventoryDetails } = useInventoryState();
+  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { productDetails, isInitialLoadProductDetails } = useProductState();
+  const { cartList } = useMarketplaceState();
+  // 
 
   useEffect(() => {
     if (Id !== undefined) {
@@ -179,21 +180,7 @@ const MembershipDetails = ({ user }) => {
     enableReinitialize: true,
   });
 
-  const { Text, Paragraph, Title } = Typography;
-  const [qty, setQty] = useState(1);
-  const inventoryDispatch = useInventoryDispatch();
-  const membershipDispatch = useMembershipDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const {
-    inventoryDetails,
-    isCreateInventorySubmitting,
-    isInitialLoadInventoryDetails,
-  } = useInventoryState();
-  const productDispatch = useProductDispatch();
-  const { productDetails, isInitialLoadProductDetails } = useProductState();
-  const marketplaceDispatch = useMarketplaceDispatch();
-  const { cartList } = useMarketplaceState();
-  const navigate = useNavigate();
 
   const routeMatch = useMatch({
     path: routes.MarketplaceProductDetail.url,
@@ -261,6 +248,14 @@ const MembershipDetails = ({ user }) => {
     isInitialLoadProductDetails,
     isInitialLoadInventoryDetails,
   ]);
+
+  // const openToast = (placement, isError, msg) => {
+  //   return (<ToastComponent
+  //     message={msg}
+  //     success={!isError}
+  //     placement={placement}
+  //   />)
+  // };
 
   const openToast = (placement, isError, msg) => {
     if (isError) {
@@ -406,29 +401,6 @@ const MembershipDetails = ({ user }) => {
               taxDollarAmount: formik.values.taxDollarAmount,
             },
           };
-          // const inventoryBody = {
-          //   productAddress: membershipDetails.productId,
-          //   quantity: formik.values.quantity,
-          //   pricePerUnit: formik.values.price,
-          //   // Generate random code for now
-          //   batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-          //   // Status should always be published if we use List Now
-          //   status: formik.values.inventoryStatus,
-          //   serialNumber: [],
-          //   taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
-          //   taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
-          // };
-          // if (isIssued) {
-          //   const createInventory = await inventoryActions.createInventory(
-          //     inventoryDispatch,
-          //     inventoryBody
-          //   )
-
-          //   if (createInventory) {
-          //     formik.resetForm();
-          //   }
-          //   setVisible(false);
-          // } else {
           const resaleMembership = await membershipActions.resaleMembership(
             membershipDispatch,
             resalePayload
@@ -573,11 +545,16 @@ const MembershipDetails = ({ user }) => {
     ? inventoryDetails?.name
     : productDetails?.name;
 
+  const TabItems = [
+    { key: "details", label: "", children: DetailTabCard() },
+    { key: "services", label: "", children: ServiceTabCard() }
+  ]
+
   return (
     <>
       {contextHolder}
       {isLoading ? (
-       <LoaderComponent  />
+        <LoaderComponent />
       ) : (
         <div>
           <BreadCrumbComponent
@@ -889,44 +866,24 @@ const MembershipDetails = ({ user }) => {
           <Row className="max-w-4xl mx-auto mt-10 mb-20">
             <Card className="w-full card-shadow-2">
               <Tabs
-                defaultActiveKey="1"
-                items={[
-                  {
-                    key: "Details",
-                    label: (
-                      <Text
-                        className="text-xl font-bold leading-6"
-                        style={{
-                          color:
-                            activeTab === "Details"
-                              ? "#181EAC"
-                              : "rgba(0, 0, 0, 0.4)",
-                        }}
-                      >
-                        Details
-                      </Text>
-                    ),
-                    children: DetailTabCard(),
-                  },
-                  {
-                    key: "Services",
-                    label: (
-                      <Text
-                        className="text-xl font-bold leading-6"
-                        style={{
-                          color:
-                            activeTab === "Services"
-                              ? "#181EAC"
-                              : "rgba(0, 0, 0, 0.4)",
-                        }}
-                      >
-                        Services
-                      </Text>
-                    ),
-                    children: ServiceTabCard(),
-                  },
-                ]}
-                onChange={handleTabChange}
+                defaultActiveKey="details"
+                items={TabItems.map((item, index) => {
+                  return {
+                    ...item, label: <Text
+                      className="text-xl font-bold leading-6 capitalize"
+                      style={{
+                        color:
+                          activeTab === item.key
+                            ? "#181EAC"
+                            : "rgba(0, 0, 0, 0.4)",
+                      }}
+                    >
+                      {item.key}
+                    </Text>
+                  }
+                })
+                }
+                onChange={(label) => { setActiveTab(label) }}
               />
             </Card>
           </Row>
