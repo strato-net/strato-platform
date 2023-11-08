@@ -1,61 +1,51 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import TagManager from "react-gtm-module";
 import {
   Layout,
   Input,
   Menu,
-  Image,
   Space,
   Badge,
   Avatar,
   Dropdown,
   Typography,
-  Spin,
-  Modal,
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined, DollarOutlined } from "@ant-design/icons";
-import { Images } from "../../images";
+import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined } from "@ant-design/icons";
+
 import "./header.css";
-import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
-import { useMembershipState, useMembershipDispatch } from "../../contexts/membership";
-import TagManager from "react-gtm-module";
 import { blockappLogo } from "../../images/SVGComponents";
-import { setCookie, getCookie } from "../../helpers/cookie";
-import ListNowIndex from "../../components/Membership/ListNowIndex";
-import { actions as membershipActions } from "../../contexts/membership/actions"
+import { setCookie } from "../../helpers/cookie";
 
 const { Title } = Typography;
 const { Header } = Layout;
 
 const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const navigate = useNavigate();
-  const { Text } = Typography;
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
   const { cartList } = useMarketplaceState();
-  const { isMembershipsLoading, memberships } = useMembershipState();
-  const membershipDispatch = useMembershipDispatch();
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
-  const [visible, setVisible] = useState(false)
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
 
-  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
+  // const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
 
   const navItems = [
     {
@@ -168,12 +158,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     else setRoleIndex(1)
   }, [user]);
 
-  // const handleSellModal = () => {
-  //   membershipActions.fetchMembership(membershipDispatch);
-  //   setVisible(true);
-  // }
-
-
   return (
     <Header className="!bg-white flex shadow-lg">
       <Space>
@@ -181,7 +165,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           className=" cursor-pointer"
           onClick={() => { navigate(routes.Marketplace.url) }}
         >
-          {/* <Image src={Images.logo} width={35} preview={false} /> */}
           {blockappLogo()}
         </div>
         {((roleIndex === undefined || roleIndex === 1) && !isOauth) ? null : <div className="ml-7 w-72">
@@ -309,20 +292,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             </Dropdown>
         }
       </Space>
-      {visible && (
-        <ListNowIndex
-          open={visible}
-          user={{ user: user }}
-          handleCancel={() => { setVisible(false) }}
-          onClick={() => { setVisible(true) }}
-          // formik={formik}
-          type="Sale"
-          isSellModal={true}
-        // id="None"
-        // getIn={getIn}
-        // isCreateMembershipSubmitting={isCreateInventorySubmitting}
-        />
-      )}
     </Header>
   );
 };
