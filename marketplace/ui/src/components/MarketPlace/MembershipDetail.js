@@ -14,10 +14,11 @@ import {
   notification,
   Col,
   Card,
-  Table,
 } from "antd";
 
 //Components
+import InformationCard from "../Membership/components/InformationCard";
+import ServiceTabCard from "../Membership/components/ServiceTabCard";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis";
 // import ToastComponent from "../ToastComponent/ToastComponent";
@@ -42,7 +43,7 @@ import { listNowConfig } from "./listNowConfig";
 import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
 import "./index.css";
-import SavingCard from "../Membership/components/SavingCard";
+
 
 const { Text, Paragraph, Title } = Typography;
 const StatusValue = {
@@ -325,59 +326,6 @@ const MembershipDetails = ({ user }) => {
     }
   };
 
-  const serviceColumn = [
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">Name</Text>
-      ),
-      dataIndex: "serviceName",
-      key: "name",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">
-          Description
-        </Text>
-      ),
-      dataIndex: "serviceDesc",
-      key: "serviceDesc",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">
-          Membership Price
-        </Text>
-      ),
-      dataIndex: "memberPrice",
-      key: "memberPrice",
-      render: (text) => (
-        <p className="text-left">${decodeURIComponent(text)}</p>
-      ),
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">
-          Non-Membership Price
-        </Text>
-      ),
-      dataIndex: "nonMemberPrice",
-      key: "nonMemberPrice",
-      render: (text) => (
-        <p className="text-left">${decodeURIComponent(text)}</p>
-      ),
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">Uses</Text>
-      ),
-      dataIndex: "uses",
-      key: "uses",
-      render: (text) => <p className="text-left">{decodeURIComponent(text)}</p>,
-    },
-  ];
-
   const closeListNowModal = () => {
     setVisible(false);
   };
@@ -438,69 +386,6 @@ const MembershipDetails = ({ user }) => {
     { label: "Additional Info", value: membershipDetails?.additionalInfo, type: "Paragraph" }
   ];
 
-  const DetailTabCard = () => {
-    return (
-      <>
-        <Text className="leading-6 text-lg block font-semibold pb-3">
-          Information
-        </Text>
-        <Col
-          xl={{ span: 14 }}
-          className="border-grey shadow-lg leading-2 w-full rounded-md p-4 "
-          style={{ height: "auto", display: "inline-block" }}
-        >
-          {detailTabSchema.map((item, index) => {
-            return (
-              <Paragraph key={index}>
-                <Text className="font-bold text-grey font-poppin">
-                  {item.label}
-                </Text>
-                {item.type === "Text" && <Text strong className="float-right">
-                  {item.value ?? "--"}
-                </Text>}
-                {item.type === "Paragraph" && <ParagraphEllipsis description={membershipDetails?.additionalInfo ?? "--"} />}
-              </Paragraph>
-            );
-          })}
-        </Col>
-      </>
-    );
-  };
-
-  const ServiceTabCard = () => {
-    return (
-      <Row>
-        <Text className="leading-6 text-lg block font-semibold pb-3">
-          Services
-        </Text>
-        <Col span={24}>
-          <Table
-            className="inventory-table"
-            columns={serviceColumn}
-            dataSource={serviceList}
-            pagination={false}
-            scroll={{ y: 300 }}
-          />
-        </Col>
-        <Text className="leading-6 text-lg block font-semibold pb-3 mt-4">
-          Savings
-        </Text>
-        <hr style={{ color: "grey" }} />
-        <Col span={24} className="max-h-96 overflow-y-auto">
-          <Row>
-            {savingsList.map(({ serviceName, serviceCost }, index) => {
-              return (
-                <Col span={8} key={index}>
-                  <SavingCard serviceName={serviceName} serviceCost={serviceCost} />
-                </Col>
-              );
-            })}
-          </Row>
-        </Col>
-      </Row>
-    );
-  };
-
   const description = inventoryDetails?.description
     ? inventoryDetails?.description
     : productDetails?.description;
@@ -510,8 +395,8 @@ const MembershipDetails = ({ user }) => {
     : productDetails?.name;
 
   const TabItems = [
-    { key: "details", label: "", children: DetailTabCard() },
-    { key: "services", label: "", children: ServiceTabCard() }
+    { key: "details", label: "", children: <InformationCard detailTabSchema={detailTabSchema} additionalInfo={membershipDetails?.additionalInfo} /> },
+    { key: "services", label: "", children: <ServiceTabCard serviceList={serviceList} savingsList={savingsList} /> }
   ]
 
   const isUnAuthenticated = hasChecked && !isAuthenticated && loginUrl !== undefined;
@@ -717,14 +602,9 @@ const MembershipDetails = ({ user }) => {
                         }}
                         disabled={isIssued}
                       >
-                        <Text
-                          className={`text-lg font-poppin text-white 
-                    `}
-                        >
-                          {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
+                        <Text className={`text-lg font-poppin text-white`} >
                           List for Sale
                         </Text>
-                        {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
                       </Button>
                     )}
                   </>
