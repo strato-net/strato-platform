@@ -1,18 +1,18 @@
-import React, { useEffect } from "react";
-import { Col, Row, Spin, Image, Typography } from "antd";
+import React from "react";
+import { Col, Row, Typography } from "antd";
 
 import MembershipCard from "./MembershipCard";
 import { useMembershipState } from "../../contexts/membership";
-import { Images } from "../../images";
 import helperJson from "../../../src/helpers/helper.json"
 import LoaderComponent from "../Loader/LoaderComponent";
+import NoProductComponent from "../NoProductFound/NoProductComponent";
 const { purchasedCardConfig } = helperJson
 const { Title } = Typography;
 
 const PurchasedList = (
   user,
-  categorys,
-  subCategorys,
+  // categorys,
+  // subCategorys,
   debouncedSearchTerm
 ) => {
   const { purchasedMemberships, isPurchasedMembershipLoading } = useMembershipState();
@@ -20,17 +20,11 @@ const PurchasedList = (
   return (
     <>
       {isPurchasedMembershipLoading ? (
-        <LoaderComponent  />
+        <LoaderComponent />
       ) : purchasedMemberships.length === 0 ? (
-        <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
-          <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
-          <Title level={3} className="mt-2">
-            No product found
-          </Title>
-        </div>
+        <NoProductComponent />
       ) : (
         <>
-
           <Row className="w-full my-4 flex flex-row" gutter={[32, 16]}>
             {purchasedMemberships.map((product, index) => {
               return (

@@ -1,11 +1,11 @@
 import React from "react";
-import { Col, Row, Spin, Image, Typography } from "antd";
+import { Col, Row } from "antd";
 
 import { useMembershipState } from "../../contexts/membership";
-import { Images } from "../../images";
 import MembershipCard from "./MembershipCard";
 import helperJson from "../../../src/helpers/helper.json"
 import LoaderComponent from "../Loader/LoaderComponent";
+import NoProductComponent from "../NoProductFound/NoProductComponent";
 
 const { issuedCardConfig } = helperJson
 
@@ -17,18 +17,12 @@ const IssuedList = (
 ) => {
   const { memberships, isMembershipsLoading } = useMembershipState();
 
-  const { Title } = Typography;
   return (
     <>
       {isMembershipsLoading ? (
-        <LoaderComponent  />
+        <LoaderComponent />
       ) : memberships?.length === 0 ? (
-        <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
-          <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
-          <Title level={3} className="mt-2">
-            No product found
-          </Title>
-        </div>
+        <NoProductComponent />
       ) : (
         <Row className="w-full my-4 flex flex-row" gutter={[12, 12]}>
           {memberships?.map((item, index) => {
