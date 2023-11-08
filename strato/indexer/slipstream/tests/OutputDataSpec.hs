@@ -741,7 +741,6 @@ spec = do
           application = "",
           contractname = "SwissArmy",
           mapname = "SwissArmyMapping",
-          chain = "<CHAIN>",
           blockHash = hash "<BLOCKHASH>",
           blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
           blockNumber = 123,
