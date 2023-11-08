@@ -252,7 +252,7 @@ const ConfirmOrder = () => {
       dataIndex: "item",
       render: (text) => {
         return (
-          <img className="w-16 h-16 object-cover" alt="" src={text.image} />
+          <img className="w-16 h-16 object-contain" alt="" src={text.image} />
         );
       },
     },
@@ -393,9 +393,13 @@ const ConfirmOrder = () => {
   };
 
   const handleTestConfirm = async () => {
-    const itemBeingBought = confirmOrderList[0].key;
+    let orderList = [];
+    confirmOrderList.forEach((item) => {
+      orderList.push(item.key);
+    });
+
     const body = {
-      assetAddress: itemBeingBought,
+      assetAddresses: orderList,
       newOwner: user.commonName,
     }
 
@@ -404,7 +408,7 @@ const ConfirmOrder = () => {
     if (isDone) {
       let updatedCart = [];
       cartList.forEach(cart => {
-        if (itemBeingBought !== cart.product.address) {
+        if (!orderList.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });

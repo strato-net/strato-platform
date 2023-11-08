@@ -305,7 +305,7 @@ class OrderController {
 
   static validateExecuteSaleSessionArgs(args) {
     const executeSaleSchema = Joi.object({
-      assetAddress: Joi.string().required(),
+      assetAddresses: Joi.array().min(1).items(Joi.string()).required(),
       newOwner: Joi.string().required()
     }).required();
 

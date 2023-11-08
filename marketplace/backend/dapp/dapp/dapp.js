@@ -623,7 +623,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, app: contractName };
-    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate' }, getOptions);
+    return managers.productManager.getInventories({ ...restArgs, owner: rawAdmin.address, sort: '-createdDate' }, getOptions);
   };
   contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
     const { userAddress, queryValue, ...restArgs } = args;
@@ -793,11 +793,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.transferOwnershipSale = async function (args, options = defaultOptions) {
-    const { assetAddress, newOwner } = args;
-    const saleContract = await orderJs.getSale(rawAdmin, {address: assetAddress}, options);
-    console.log("saleContract", saleContract)
-    const contract = { name: "SimpleSale", address: saleContract.address, };
-    return orderJs.transferOwnershipSale(rawAdmin, contract, options, newOwner);
+    const { assetAddresses, newOwner } = args;
+    let responses = [];
+
+    const saleContracts = await orderJs.getSales(rawAdmin, {addresses: assetAddresses}, options);
+    const saleContractsArray = Object.values(saleContracts);
+
+    // Change this to a manager to avoid mempool rejection
+    saleContractsArray.map((saleContract, index) => {
+      const contract = { name: "SimpleSale", address: saleContract.address, };
+      const transferStatus = orderJs.transferOwnershipSale(rawAdmin, contract, options, newOwner);
+      responses.push(transferStatus);
+    })
+    
+    return responses[0];
+    
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------

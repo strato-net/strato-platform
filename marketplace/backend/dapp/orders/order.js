@@ -421,22 +421,21 @@ async function transferOwnership(user, contract, options, newOwner) {
  * @returns Contract state in cirrus
  */
 
-async function getSale(user, args, options) {
-  console.log("getSaleArgs", args);
-  console.log("getSaleOptions", options);
-  const { address, ...restArgs } = args;
-  let inventory;
+async function getSales(user, args, options) {
+  const { addresses, ...restArgs } = args;
+  let inventories;
 
-  const searchArgs = setSearchQueryOptions(restArgs, { key: 'assetToBeSold', value: address });
-  inventory = await searchOne(constants.saleTableName, searchArgs, options, user);
+  const searchArgs = setSearchQueryOptionsPrime(restArgs, { key: 'assetToBeSold', value: addresses });
+  console.log(searchArgs);
+  inventories = await searchAllWithQueryArgs(constants.saleTableName, searchArgs, options, user);
   
-  if (!inventory) {
+  if (!inventories) {
       return undefined;
   }
 
 
   return marshalOut({
-      ...inventory,
+      ...inventories,
   });
 }
 
@@ -670,7 +669,7 @@ export default {
   bindAddress,
   get,
   getAll,
-  getSale,
+  getSales,
   transferOwnership,
   transferOwnershipSale,
   updateBuyerDetails,
