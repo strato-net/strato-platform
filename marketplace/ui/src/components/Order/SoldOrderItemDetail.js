@@ -15,6 +15,7 @@ import routes from "../../helpers/routes";
 import { EyeOutlined, SearchOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import ClickableCell from "../ClickableCell";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 
 const SoldOrderItemDetail = ({ user, users }) => {
@@ -134,9 +135,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
   const navigate = useNavigate();
 
   return details === null || isOrderLineDetailsLoading ? (
-    <div className="h-screen flex justify-center items-center">
-      <Spin spinning={isOrderLineDetailsLoading} size="large" />
-    </div>
+    <LoaderComponent  />
   ) : (
     <div>
       <div className="flex justify-between items-center mx-14  mt-14">

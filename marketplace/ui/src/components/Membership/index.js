@@ -19,6 +19,7 @@ import useDebounce from "../UseDebounce";
 import "./membership.css";
 import MembershipListTabComponent from "./components/MembershipListTabComponent";
 import MembershipHeader from "./components/MembershipHeader";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const limit = 10;
 
@@ -129,9 +130,7 @@ const Membership = (user) => {
     <>
       {contextHolder}
       {isPageLoading ? (
-        <div className="h-screen flex justify-center items-center mx-auto">
-          <Spin spinning={isLoadingStripeStatus} size="large" />
-        </div>
+       <LoaderComponent  />
       ) : (
         <div className="min-h-full">
           <BreadCrumbComponent />

@@ -49,6 +49,7 @@ import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const ProductDetails = ({ user, users }) => {
   const { state, pathname } = useLocation();
@@ -545,9 +546,7 @@ const ProductDetails = ({ user, users }) => {
         isInventoryDetailsLoading ||
         iscategorysLoading ||
         isSerialNumbersLoading ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isInventoryDetailsLoading} size="large" />
-        </div>
+          <LoaderComponent  />
       ) : (
         <div>
           <Row>

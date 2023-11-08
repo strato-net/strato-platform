@@ -46,6 +46,7 @@ import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import TagManager from "react-gtm-module";
 import dayjs from "dayjs";
 import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const StatusValue = {
   1: "Listed",
@@ -576,9 +577,7 @@ const MembershipDetails = ({ user }) => {
     <>
       {contextHolder}
       {isLoading ? (
-        <div className="h-screen flex justify-center mx-auto items-center">
-          <Spin spinning={isLoading} size="large" />
-        </div>
+       <LoaderComponent  />
       ) : (
         <div>
           <BreadCrumbComponent

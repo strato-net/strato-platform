@@ -26,6 +26,7 @@ import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Title, Text } = Typography;
 
@@ -48,7 +49,7 @@ const Checkout = ({ user }) => {
 
   const calculateTax = (item) => {
     let tax = item.product.taxDollarAmount === 0 ? Math.round(item.product.pricePerUnit * (item.product.taxPercentageAmount / 100)) : (item.product.taxDollarAmount)
-    return tax * item.qty   
+    return tax * item.qty
   };
 
   const calculateShipping = (item) => {
@@ -369,9 +370,7 @@ const Checkout = ({ user }) => {
     <div className="h-screen mx-14">
       {contextHolder}
       {isCreateOrderSubmitting ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isCreateOrderSubmitting} size="large" />
-        </div>
+        <LoaderComponent  />
       ) : (
         <div>
           <BreadCrumbComponent />

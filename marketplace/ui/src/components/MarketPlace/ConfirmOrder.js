@@ -37,6 +37,7 @@ import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { TextArea } = Input;
 
@@ -437,9 +438,7 @@ const ConfirmOrder = () => {
     <div className="h-screen mx-14  mt-14">
       {contextHolder}
       {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
-        </div>
+        <LoaderComponent  />
       ) : (
         <div className="pb-20">
           <Breadcrumb>

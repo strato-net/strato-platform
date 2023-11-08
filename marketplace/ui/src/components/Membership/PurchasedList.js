@@ -5,6 +5,7 @@ import MembershipCard from "./MembershipCard";
 import { useMembershipState } from "../../contexts/membership";
 import { Images } from "../../images";
 import helperJson from "../../../src/helpers/helper.json"
+import LoaderComponent from "../Loader/LoaderComponent";
 const { purchasedCardConfig } = helperJson
 const { Title } = Typography;
 
@@ -19,9 +20,7 @@ const PurchasedList = (
   return (
     <>
       {isPurchasedMembershipLoading ? (
-        <div className="h-screen flex justify-center items-center mx-auto">
-          <Spin spinning={isPurchasedMembershipLoading} size="large" />
-        </div>
+        <LoaderComponent  />
       ) : purchasedMemberships.length === 0 ? (
         <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
           <Image src={Images.noProductSymbol} height={'120px'} preview={false} />

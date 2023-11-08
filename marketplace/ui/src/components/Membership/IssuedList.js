@@ -5,6 +5,7 @@ import { useMembershipState } from "../../contexts/membership";
 import { Images } from "../../images";
 import MembershipCard from "./MembershipCard";
 import helperJson from "../../../src/helpers/helper.json"
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { issuedCardConfig } = helperJson
 
@@ -20,9 +21,7 @@ const IssuedList = (
   return (
     <>
       {isMembershipsLoading ? (
-        <div className="h-screen flex justify-center items-center mx-auto">
-          <Spin spinning={isMembershipsLoading} size="large" />
-        </div>
+        <LoaderComponent  />
       ) : memberships?.length === 0 ? (
         <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
           <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
