@@ -401,6 +401,25 @@ const MembershipDetails = ({ user }) => {
 
   const isUnAuthenticated = hasChecked && !isAuthenticated && loginUrl !== undefined;
 
+  const handleListNowModal = () => {
+    let taxVal =
+      inventoryDetails.taxPercentageAmount === 0
+        ? inventoryDetails.taxDollarAmount
+        : inventoryDetails.taxPercentageAmount;
+    let isTaxPercentage =
+      inventoryDetails.taxPercentageAmount === 0 ? false : true
+
+    formik.setFieldValue("name", inventoryDetails?.name);
+    formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
+    formik.setFieldValue("price", inventoryDetails?.pricePerUnit);
+    formik.setFieldValue("taxPercentage", taxVal);
+    formik.setFieldValue("isTaxPercentage", isTaxPercentage);
+    formik.setFieldValue("quantity", 1);
+    formik.setFieldValue("taxPercentageAmount", inventoryDetails.taxPercentageAmount);
+    formik.setFieldValue("taxDollarAmount", inventoryDetails.taxDollarAmount);
+    openListNowModal();
+  }
+
   return (
     <>
       {contextHolder}
@@ -571,33 +590,8 @@ const MembershipDetails = ({ user }) => {
                           if (isUnAuthenticated) {
                             window.location.href = loginUrl;
                           } else {
-                            let taxVal =
-                              inventoryDetails.taxPercentageAmount === 0
-                                ? inventoryDetails.taxDollarAmount
-                                : inventoryDetails.taxPercentageAmount;
-                            formik.setFieldValue(
-                              "name",
-                              inventoryDetails?.name
-                            );
-                            formik.setFieldValue(
-                              "inventoryStatus",
-                              inventoryDetails?.status
-                            );
-                            formik.setFieldValue(
-                              "price",
-                              inventoryDetails?.pricePerUnit
-                            );
-                            formik.setFieldValue("taxPercentage", taxVal);
-                            formik.setFieldValue("quantity", 1);
-                            formik.setFieldValue(
-                              "taxPercentageAmount",
-                              inventoryDetails.taxPercentageAmount
-                            );
-                            formik.setFieldValue(
-                              "taxDollarAmount",
-                              inventoryDetails.taxDollarAmount
-                            );
-                            openListNowModal();
+                            handleListNowModal()
+
                           }
                         }}
                         disabled={isIssued}
