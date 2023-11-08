@@ -27,17 +27,16 @@ const MembershipListTabComponent = ({ props: { type, isPurchased, user, debounce
         </Col>
       </Row>
       <Row className="mx-16">
-        {isPurchased ? (
-          <PurchasedList
+        {isPurchased
+          ? <PurchasedList
             user={user}
             debouncedSearchTerm={debouncedSearchTerm}
           />
-        ) : (
-          <IssuedList
+          : <IssuedList
             user={user}
             debouncedSearchTerm={debouncedSearchTerm}
           />
-        )}
+        }
         <div className="pb-12"></div>
       </Row>
     </>

@@ -7,7 +7,7 @@ import helperJson from "../../../src/helpers/helper.json"
 import LoaderComponent from "../Loader/LoaderComponent";
 import NoProductComponent from "../NoProductFound/NoProductComponent";
 
-const { issuedCardConfig } = helperJson
+const { issuedCardConfig } = helperJson;
 
 const IssuedList = (
   user,
@@ -53,7 +53,6 @@ const IssuedList = (
               </Col>
             );
           })}
-
         </Row>
       )}
     </>

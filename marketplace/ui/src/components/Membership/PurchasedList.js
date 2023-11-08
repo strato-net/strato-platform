@@ -1,13 +1,12 @@
 import React from "react";
-import { Col, Row, Typography } from "antd";
+import { Col, Row } from "antd";
 
 import MembershipCard from "./MembershipCard";
 import { useMembershipState } from "../../contexts/membership";
 import helperJson from "../../../src/helpers/helper.json"
 import LoaderComponent from "../Loader/LoaderComponent";
 import NoProductComponent from "../NoProductFound/NoProductComponent";
-const { purchasedCardConfig } = helperJson
-const { Title } = Typography;
+const { purchasedCardConfig } = helperJson;
 
 const PurchasedList = (
   user,
@@ -40,7 +39,6 @@ const PurchasedList = (
           </Row>
         </>
       )}
-
     </>
   );
 };
