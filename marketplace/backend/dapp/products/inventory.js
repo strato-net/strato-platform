@@ -160,9 +160,18 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { range, ...restArgs } = args;
-    const inventories = await searchAllWithQueryArgs(contractName, restArgs, options, admin);
-    return inventories.map((inventory) => marshalOut(inventory))
+    const { range, owner, ...restArgs } = args;
+    let inventories;
+
+    if (owner) {
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'owner', value: owner });
+        inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
+    }
+    else {
+        inventories = await searchAllWithQueryArgs(contractName, restArgs, options, admin);
+    }
+
+    return inventories ? inventories.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
 /**
