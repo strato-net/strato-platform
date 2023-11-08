@@ -42,6 +42,7 @@ import { listNowConfig } from "./listNowConfig";
 import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
 import "./index.css";
+import SavingCard from "../Membership/components/SavingCard";
 
 const { Text, Paragraph, Title } = Typography;
 const StatusValue = {
@@ -409,14 +410,9 @@ const MembershipDetails = ({ user }) => {
             formik.resetForm();
           }
           setVisible(false);
-          // }
         }
       }
     }
-  };
-
-  const handleTabChange = (label) => {
-    setActiveTab(label);
   };
 
   const detailTabSchema = [
@@ -425,18 +421,21 @@ const MembershipDetails = ({ user }) => {
       value: inventoryDetails?.ownerOrganization
         ? inventoryDetails?.ownerOrganization
         : productDetails?.ownerOrganization,
+      type: "Text"
     },
     {
       label: "Sub-Category",
       value: inventoryDetails?.subCategory
         ? inventoryDetails?.subCategory
         : productDetails?.subCategory,
+      type: "Text"
     },
     {
       label: `${isDuration ? "Time in Months" : "Expiry Date"}`,
       value: isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal,
+      type: "Text"
     },
-    // { label: "Additional Info", value: membershipDetails?.additionalInfo }
+    { label: "Additional Info", value: membershipDetails?.additionalInfo, type: "Paragraph" }
   ];
 
   const DetailTabCard = () => {
@@ -456,22 +455,13 @@ const MembershipDetails = ({ user }) => {
                 <Text className="font-bold text-grey font-poppin">
                   {item.label}
                 </Text>
-                <Text strong className="float-right">
+                {item.type === "Text" && <Text strong className="float-right">
                   {item.value ?? "--"}
-                </Text>
+                </Text>}
+                {item.type === "Paragraph" && <ParagraphEllipsis description={membershipDetails?.additionalInfo ?? "--"} />}
               </Paragraph>
             );
           })}
-          <Paragraph>
-            <Text className="font-bold text-grey font-poppin">
-              Additional Info
-            </Text>
-            <ParagraphEllipsis description={membershipDetails?.additionalInfo ?? "--"} />
-          </Paragraph>
-          {/* {true && <Paragraph>
-          <Text disabled className="font-bold" >Membership ID</Text>
-          <Text strong className="float-right">membershipId</Text>
-        </Paragraph>} */}
         </Col>
       </>
     );
@@ -501,33 +491,7 @@ const MembershipDetails = ({ user }) => {
             {savingsList.map(({ serviceName, serviceCost }, index) => {
               return (
                 <Col span={8} key={index}>
-                  <Card className="shadow-md m-2">
-                    <Row className="mt-2">
-                      <Col span={24}>
-                        <Text className="block text-base text-grey font-medium">
-                          Name
-                        </Text>
-                      </Col>
-                      <Col span={24}>
-                        <Text className="block text-lg ">{serviceName}</Text>
-                      </Col>
-                    </Row>
-                    <Row className="mt-2">
-                      <Col span={24}>
-                        <Text className="block text-base text-grey font-medium">
-                          Effective Cost Saving
-                        </Text>
-                      </Col>
-                      <Col span={24}>
-                        <Text
-                          className="block text-lg font-bold"
-                          style={{ color: "green" }}
-                        >
-                          $ {serviceCost ?? "--"}
-                        </Text>
-                      </Col>
-                    </Row>
-                  </Card>
+                  <SavingCard serviceName={serviceName} serviceCost={serviceCost} />
                 </Col>
               );
             })}
@@ -549,6 +513,8 @@ const MembershipDetails = ({ user }) => {
     { key: "details", label: "", children: DetailTabCard() },
     { key: "services", label: "", children: ServiceTabCard() }
   ]
+
+  const isUnAuthenticated = hasChecked && !isAuthenticated && loginUrl !== undefined;
 
   return (
     <>
@@ -594,24 +560,14 @@ const MembershipDetails = ({ user }) => {
                 <Paragraph className="text-2xl !mb-0 leading-8 font-semibold font-poppin" ellipsis={{ rows: 1, tooltip: membershipName }} >
                   {membershipName}
                 </Paragraph>
-                {isDuration ? (
-                  <Row className="mb-1">
-                    {watchIcon()}
-                    <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm">
-                      {membershipDetails?.timePeriodInMonths ?? ""} -month
-                      duration
-                    </Text>
-                  </Row>
-                ) : (
-                  <Row className="mb-1">
-                    <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm">
-                      Expiry Date:- &nbsp;
-                      {membershipDetails?.expiryDate
-                        ? expiryDateVal
-                        : "--"}
-                    </Text>
-                  </Row>
-                )}
+                <Row className="mb-1">
+                  {isDuration && watchIcon()}
+                  <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm">
+                    {isDuration
+                      ? `${membershipDetails?.timePeriodInMonths ?? ""} -month duration`
+                      : `Expiry Date:- ${membershipDetails?.expiryDate ? expiryDateVal : "--"}`}
+                  </Text>
+                </Row>
                 <Row className="flex justify-between h-20 mt-8">
                   <Col
                     span={11}
@@ -696,13 +652,6 @@ const MembershipDetails = ({ user }) => {
                     </Col>
                   </Row>
                 )}
-
-                {/* {isPurchased && <Row>
-                  <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
-                  <Col span={16} className="border border-grayLight rounded-md align-middle text-center mx-auto mt-12 h-14 py-2" >
-                    <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{inventoryDetails?.availableQuantity}</Text>
-                  </Col>
-                </Row>} */}
               </Card>
               <Row className="h-14 mt-4">
                 {inventoryDetails?.availableQuantity == 0 ? (
@@ -729,17 +678,12 @@ const MembershipDetails = ({ user }) => {
                   <>
                     {!isIssued && (
                       <Button
-                        // type={ownerSameAsUser ? "default" : "primary"}
                         type="primary"
                         block={true}
                         size="large"
                         className=" h-full py-4 h-px-56"
                         onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
+                          if (isUnAuthenticated) {
                             window.location.href = loginUrl;
                           } else {
                             let taxVal =
@@ -793,11 +737,7 @@ const MembershipDetails = ({ user }) => {
                         disabled={isIssued}
                         className="group border !h-14 border-primary hover:bg-primary"
                         onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
+                          if (isUnAuthenticated) {
                             window.location.href = loginUrl;
                           } else {
                             TagManager.dataLayer({
@@ -825,11 +765,7 @@ const MembershipDetails = ({ user }) => {
                         type="primary"
                         className="bg-primary !h-14 !hover:bg-primaryHover"
                         onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
+                          if (isUnAuthenticated) {
                             window.location.href = loginUrl;
                           } else {
                             TagManager.dataLayer({
@@ -844,7 +780,6 @@ const MembershipDetails = ({ user }) => {
                             navigate("/checkout");
                           }
                         }}
-                        // disabled={ownerSameAsUser()}
                         id="buyNow"
                       >
                         Buy Now
