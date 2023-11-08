@@ -9,7 +9,17 @@ const { Text } = Typography;
 const MembershipListTabComponent = ({ props: { type, isPurchased, user, debouncedSearchTerm } }) => {
   const navigate = useNavigate();
 
-  const tabItems = [{ key: "purchased", isActive: isPurchased }, { key: "issued", isActive: !isPurchased }]
+  const tabItems = [{
+    key: "purchased", isActive: isPurchased, children: <PurchasedList
+      user={user}
+      debouncedSearchTerm={debouncedSearchTerm}
+    />
+  }, {
+    key: "issued", isActive: !isPurchased, children: <IssuedList
+      user={user}
+      debouncedSearchTerm={debouncedSearchTerm}
+    />
+  }]
   const items = tabItems.map((item, index) => {
     return { ...item, label: <Text className="text-xl font-bold leading-6 capitalize" style={{ color: item.isActive ? "#181EAC" : "rgba(0, 0, 0, 0.4)" }}>{item.key}</Text> }
   })
@@ -27,16 +37,7 @@ const MembershipListTabComponent = ({ props: { type, isPurchased, user, debounce
         </Col>
       </Row>
       <Row className="mx-16">
-        {isPurchased
-          ? <PurchasedList
-            user={user}
-            debouncedSearchTerm={debouncedSearchTerm}
-          />
-          : <IssuedList
-            user={user}
-            debouncedSearchTerm={debouncedSearchTerm}
-          />
-        }
+        {/* issued and purchased */}
         <div className="pb-12"></div>
       </Row>
     </>
