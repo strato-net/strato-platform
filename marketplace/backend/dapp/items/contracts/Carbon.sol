@@ -1,4 +1,3 @@
-import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
@@ -7,7 +6,7 @@ pragma strict;
 import <d816194227e1a7a780fff236a449604afeb36255>;
 
 /// @title A representation of Carbon assets
-contract Carbon is ItemStatus, Asset {
+contract Carbon is ItemStatus, RestStatus, Asset {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public serialNumber;

@@ -31,7 +31,7 @@ contract OrderLineItem {
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerCommonName = ownerCert["commonName"];
-        sale.transferOwnership(ownerCommonName);
+        sale.transferOwnership(ownerCommonName, _sale);
     }
 
    

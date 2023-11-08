@@ -31,6 +31,9 @@ const actionDescriptors = {
   updateSellerDetailsFailed: "update_seller_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
+  createSale: "create_sale",
+  createSaleSuccessful: "create_sale_successful",
+  createSaleFailed: "create_sale_failed",
   executeSale: "execute_sale",
   executeSaleSuccessful: "execute_sale_successful",
   executeSaleFailed: "execute_sale_failed",
@@ -383,7 +386,7 @@ const actions = {
     dispatch ({ type: actionDescriptors.executeSale });
     
     try {
-      const response = await fetch(`${apiUrl}/order/sale`, {
+      const response = await fetch(`${apiUrl}/order/closeSale`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
@@ -417,7 +420,47 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while executing sale");
     }
-  }
+  },
+
+  createSale: async (dispatch, payload) => {
+    dispatch ({ type: actionDescriptors.createSale });
+    
+    try {
+      const response = await fetch(`${apiUrl}/order/sale`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.createSaleSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Sale created successfully", true);
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.createSaleFailed,
+        error: "Error while executing sale",
+      });
+      actions.setMessage(dispatch, "Error while creating sale");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.createSaleFailed,
+        error: "Error while creating Sale",
+      });
+      actions.setMessage(dispatch, "Error while creating sale");
+    }
+  },
 };
 
 export { actionDescriptors, actions };

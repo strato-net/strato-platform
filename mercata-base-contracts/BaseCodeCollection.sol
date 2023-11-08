@@ -40,6 +40,7 @@ contract RestStatus {
 }
 
 abstract contract Asset is PaymentType, SaleState, RestStatus{
+    address public owner;
     string public ownerCommonName;
     string public name;
     string public description;
@@ -52,6 +53,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     constructor(string _name, string _description, string[] _images, uint _price, uint _createdDate, SaleState _state, PaymentType _payment) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        owner  = c.userAddress();
         ownerCommonName = c.commonName();
         name = _name;
         description =_description;
@@ -101,9 +103,10 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
         return RestStatus.OK;
     }
 
-    function transferOwnership(string _newOwner) public requireOwner("Ownership transfer") {
+    function transferOwnership(string _newOwnerName, address _newOwnerAddress) public requireOwner("Ownership transfer") {
         require(msg.sender == address(sale), "Ownership transfer must originate from the active bill of sale");
-        ownerCommonName = _newOwner;
+        ownerCommonName = _newOwnerName;
+        owner = _newOwnerAddress;
         sale = Sale(address(0));
     }
 }
@@ -152,16 +155,39 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         payment=_payment;
     }
 
-    function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") returns (uint) {
+    function transferOwnership(string _purchasersCommonName, address _purchasersAddress) public requireSeller("Transfer Ownership of Asset") returns (uint) {
         saleOrderID = msg.sender;
         purchasersCommonName = _purchasersCommonName;
-        assetToBeSold.transferOwnership(purchasersCommonName);
+        assetToBeSold.transferOwnership(purchasersCommonName, _purchasersAddress);
         state = SaleState.Closed;
         return RestStatus.OK;
     }
 }
 
-contract SimpleSale is Sale{
+abstract contract Order is RestStatus {
+    address[] public saleAddresses;
+    string public sellerCommonName;
+    string public purchasersCommonName;
+    address public purchasersAddress;
+
+    constructor(address[] _saleAddresses, string _sellerCommonName, string _purchasersCommonName, address _purchasersAddress) external{
+        saleAddresses = _saleAddresses;
+        sellerCommonName = _sellerCommonName;
+        purchasersCommonName = _purchasersCommonName;
+        purchasersAddress = _purchasersAddress;
+    }
+    
+    function transferOwnership() external returns (uint) {
+        for (uint i = 0; i < saleAddresses.length; i++) {
+            Sale sale = Sale(saleAddresses[i]);
+            // Perform the ownership transfer
+            sale.transferOwnership(purchasersCommonName, purchasersAddress);
+        }
+        return RestStatus.OK;
+    }
+}
+
+contract SimpleSale is Sale {
     constructor(address _assetToBeSold, SaleState _state, PaymentType _payment) Sale(_assetToBeSold, _state, _payment){
     }
 }

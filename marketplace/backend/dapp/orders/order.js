@@ -416,57 +416,6 @@ async function transferOwnership(user, contract, options, newOwner) {
 }
 
 /**
- * Get contract state via cirrus.
- * @param args Lookup with an address.
- * @returns Contract state in cirrus
- */
-
-async function getSales(user, args, options) {
-  const { addresses, ...restArgs } = args;
-  let inventories;
-
-  const searchArgs = setSearchQueryOptionsPrime(restArgs, { key: 'assetToBeSold', value: addresses });
-  console.log(searchArgs);
-  inventories = await searchAllWithQueryArgs(constants.saleTableName, searchArgs, options, user);
-  
-  if (!inventories) {
-      return undefined;
-  }
-
-
-  return marshalOut({
-      ...inventories,
-  });
-}
-
-/**
- * Transfer the ownership of a SimpleSale
- * @param newOwner The common name of the new owner of the SimpleSale.
- */
-async function transferOwnershipSale(user, contract, options, newOwner) {
-
-  const callArgs = {
-    contract,
-    method: "transferOwnership",
-    args: util.usc({ purchasersCommonName: newOwner }),
-  };
-  const transferStatus = await rest.call(user, callArgs, options);
-
-  console.log("transferStatus", transferStatus);
-  console.log(parseInt(transferStatus, 10));
-  console.log(RestStatus.OK);
-  if (parseInt(transferStatus, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      transferStatus,
-      "You cannot transfer the ownership of a Order you don't own",
-      { newOwner }
-    );
-  }
-
-  return transferStatus;
-}
-
-/**
  * Add a new organization to a order contract/chain.
  * @param {string} orgName The new organization to add
  */
@@ -669,9 +618,7 @@ export default {
   bindAddress,
   get,
   getAll,
-  getSales,
   transferOwnership,
-  transferOwnershipSale,
   updateBuyerDetails,
   updateSellerDetails,
   addOrderLine,

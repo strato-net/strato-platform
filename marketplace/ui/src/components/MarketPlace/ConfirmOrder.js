@@ -394,21 +394,22 @@ const ConfirmOrder = () => {
 
   const handleTestConfirm = async () => {
     let orderList = [];
+    let sellerCommonName = confirmOrderList[0].sellerCommonName;
     confirmOrderList.forEach((item) => {
-      orderList.push(item.key);
+      orderList.push(item.saleAddress);
     });
 
     const body = {
-      assetAddresses: orderList,
-      newOwner: user.commonName,
+      saleAddresses: orderList,
+      sellerCommonName: sellerCommonName,
     }
 
-    let isDone = await orderActions.executeSale(orderDispatch, body);
+    let isDone = await orderActions.createSale(orderDispatch, body);
 
     if (isDone) {
       let updatedCart = [];
       cartList.forEach(cart => {
-        if (!orderList.includes(cart.product.address)) {
+        if (!orderList.includes(cart.product.sale)) {
           updatedCart.push(cart);
         }
       });

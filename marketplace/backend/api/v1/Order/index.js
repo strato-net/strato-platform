@@ -71,6 +71,13 @@ router.get(
 )
 
 router.post(
+  Order.createSaleOrder,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.createSaleOrder,
+)
+
+router.post(
   Order.executeSale,
   authHandler.authorizeRequest(),
   loadDapp,

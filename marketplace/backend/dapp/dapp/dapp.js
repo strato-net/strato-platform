@@ -15,6 +15,7 @@ import carbonJs from "/dapp/items/carbon";
 import materialsJs from "/dapp/items/materials";
 import clothingJs from "/dapp/items/clothing";
 
+import saleOrderJs from "dapp/orders/saleOrder";
 import orderJs from "/dapp/orders/order";
 import orderLineJs from "/dapp/orders/orderLine";
 
@@ -791,22 +792,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ SALE TEST STARTS ------------------------------
 
-  contract.transferOwnershipSale = async function (args, options = defaultOptions) {
-    const { assetAddresses, newOwner } = args;
-    let responses = [];
+  contract.createSaleOrder = async function (args, options = defaultOptions) {
+    const newArgs = {
+      ...args,
+      purchasersCommonName: userCert.commonName,
+      purchasersAddress: rawAdmin.address,
+    }
+    return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
+  }
 
-    const saleContracts = await orderJs.getSales(rawAdmin, {addresses: assetAddresses}, options);
-    const saleContractsArray = Object.values(saleContracts);
-
-    // Change this to a manager to avoid mempool rejection
-    saleContractsArray.map((saleContract, index) => {
-      const contract = { name: "SimpleSale", address: saleContract.address, };
-      const transferStatus = orderJs.transferOwnershipSale(rawAdmin, contract, options, newOwner);
-      responses.push(transferStatus);
-    })
-
-    return responses[0];
+  contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, ...restArgs } = args;
     
+    return saleOrderJs.transferOwnership(rawAdmin, saleOrderAddress, options);
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------

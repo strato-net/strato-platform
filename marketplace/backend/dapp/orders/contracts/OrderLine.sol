@@ -108,7 +108,6 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
         return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
       }
       isSerialUploaded=true;
-      order.updateOrderStatus(OrderStatus.AWAITING_SHIPMENT);
       return (RestStatus.OK,orderLineItems,items);
     }
 

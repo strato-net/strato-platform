@@ -161,11 +161,26 @@ class OrderController {
     }
   }
 
+  static async createSaleOrder(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      OrderController.validateCreateSaleOrderArgs(body)
+
+      const result = await dapp.createSaleOrder(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async executeSale(req, res, next) {
     try {
       const { dapp, body } = req
 
-      OrderController.validateExecuteSaleSessionArgs(body)
+      OrderController.validateExecuteSaleArgs(body)
 
       const result = await dapp.transferOwnershipSale(body)
       rest.response.status200(res, result)
@@ -303,10 +318,24 @@ class OrderController {
     }
   }
 
-  static validateExecuteSaleSessionArgs(args) {
+  static validateCreateSaleOrderArgs(args) {
+    const createSaleOrderSchema = Joi.object({
+      saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
+      sellerCommonName: Joi.string().required(),
+    }).required();
+
+    const validation = createSaleOrderSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Sale Order Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateExecuteSaleArgs(args) {
     const executeSaleSchema = Joi.object({
-      assetAddresses: Joi.array().min(1).items(Joi.string()).required(),
-      newOwner: Joi.string().required()
+      saleOrderAddress: Joi.string().required(),
     }).required();
 
     const validation = executeSaleSchema.validate(args);
