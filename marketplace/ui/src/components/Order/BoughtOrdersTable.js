@@ -25,19 +25,21 @@ const BoughtOrdersTable = ({ user }) => {
   const { orders, isordersLoading } = useOrderState();
 
   useEffect(() => {
-    actions.fetchOrder(
-      dispatch,
-      limit,
-      offset,
-      debouncedSearchTerm,
-      user?.organization
-    );
-  }, [dispatch, limit, offset, debouncedSearchTerm, user]);
+    if (user?.organization) {
+      actions.fetchOrder(
+        dispatch,
+        limit,
+        offset,
+        debouncedSearchTerm,
+        user?.organization
+      )
+    }
+  }, [dispatch, limit, offset, debouncedSearchTerm, user?.organization]);
 
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
   useEffect(() => {
-    
+
     let items = [];
     orders.forEach((order) => {
       items.push({
