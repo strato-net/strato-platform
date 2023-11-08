@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { notification, Spin } from "antd";
+import { notification } from "antd";
 // Components
 import CreateMembershipModal from "./CreateMembershipModal";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
@@ -130,7 +130,7 @@ const Membership = (user) => {
     <>
       {contextHolder}
       {isPageLoading ? (
-       <LoaderComponent  />
+        <LoaderComponent />
       ) : (
         <div className="min-h-full">
           <BreadCrumbComponent />
@@ -147,8 +147,6 @@ const Membership = (user) => {
               type,
               isPurchased,
               user,
-              // categorys,
-              // subCategorys,
               debouncedSearchTerm
             }} />
         </div>
@@ -158,7 +156,6 @@ const Membership = (user) => {
           open={open}
           user={user}
           handleCancel={handleCancel}
-        //   categorys={categorys}
         />
       )}
       {msg && openToast("bottom")}

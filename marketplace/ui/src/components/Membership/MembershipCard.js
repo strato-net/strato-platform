@@ -37,7 +37,6 @@ const initialValues = {
 const MembershipCard = ({
   user,
   membership,
-  // categorys,
   // debouncedSearchTerm,
   membershipId,
   cardConfig: {

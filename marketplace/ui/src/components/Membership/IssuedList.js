@@ -11,8 +11,6 @@ const { issuedCardConfig } = helperJson
 
 const IssuedList = (
   user,
-  // categorys,
-  // subCategorys,
   debouncedSearchTerm
 ) => {
   const { memberships, isMembershipsLoading } = useMembershipState();
@@ -49,8 +47,6 @@ const IssuedList = (
                   cardConfig={issuedCardConfig}
                   user={user}
                   membership={transformedData}
-                  // categorys={categorys}
-                  // subCategorys={subCategorys}
                   debouncedSearchTerm={debouncedSearchTerm}
                   membershipId={item.address}
                 />

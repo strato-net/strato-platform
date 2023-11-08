@@ -30,15 +30,11 @@ const MembershipListTabComponent = ({ props: { type, isPurchased, user, debounce
         {isPurchased ? (
           <PurchasedList
             user={user}
-            // categorys={categorys}
-            // subCategorys={subCategorys}
             debouncedSearchTerm={debouncedSearchTerm}
           />
         ) : (
           <IssuedList
             user={user}
-            // categorys={categorys}
-            // subCategorys={subCategorys}
             debouncedSearchTerm={debouncedSearchTerm}
           />
         )}

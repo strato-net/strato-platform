@@ -11,8 +11,6 @@ const { Title } = Typography;
 
 const PurchasedList = (
   user,
-  // categorys,
-  // subCategorys,
   debouncedSearchTerm
 ) => {
   const { purchasedMemberships, isPurchasedMembershipLoading } = useMembershipState();
@@ -33,8 +31,6 @@ const PurchasedList = (
                     cardConfig={purchasedCardConfig}
                     user={user}
                     membership={product}
-                    // categorys={categorys}
-                    // subCategorys={subCategorys}
                     debouncedSearchTerm={debouncedSearchTerm}
                     membershipId={product.itemNumber}
                   />
