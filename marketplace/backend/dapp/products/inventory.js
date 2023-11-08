@@ -143,17 +143,12 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-    const { org, ...modifiedOptions } = options;
-    const { uniqueInventoryID, address, ownerOrganization, offset, limit, ...restArgs } = args;
+    const { address, ...restArgs } = args;
     let inventory;
 
-    if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        inventory = await searchOne(contractName, {"offset": offset, "limit": limit}, modifiedOptions, user);
-    } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueInventoryID', value: uniqueInventoryID });
-        inventory = await searchOne(contractName, {"offset": offset, "limit": limit}, modifiedOptions, user);
-    }
+    const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
+    inventory = await searchOne(contractName, searchArgs, options, user);
+
     if (!inventory) {
         return undefined;
     }

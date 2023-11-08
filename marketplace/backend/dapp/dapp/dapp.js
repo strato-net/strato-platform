@@ -617,8 +617,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     );
   };
   contract.getInventory = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventory({ ...args, ownerOrganization: userOrganization }, getOptions);
+    const getOptions = { ...options, app: contractName, };
+    return managers.productManager.getInventory({ ...args }, getOptions);
   };
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args

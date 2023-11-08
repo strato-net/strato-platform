@@ -49,6 +49,7 @@ import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -413,41 +414,52 @@ const ProductDetails = ({ user, users }) => {
     return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
   };
 
+  const getCategory = (data) => {
+    const parts = data.contract_name.split('-');
+    return parts[parts.length - 1];
+  };
+
   const DescriptionComponent = () => {
-    return (
-      <Space direction="vertical">
-        <Space>
-          <DescTitle text="Product Id" />
-          <DescTitle text="                      :" />
-          <Text className="text-[13px]">{details.uniqueProductCode}</Text>
-        </Space>
+    const itemData = JSON.parse(details.data);
 
-        <Space>
-          <DescTitle text="Unique Product Code" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">{details.userUniqueProductCode ? details.userUniqueProductCode : " "}</Text>
-        </Space>
-        <Space>
-          <DescTitle text="Manufacturer" />
-          <DescTitle text="                :" />
-          <Text className="text-[13px]">{decodeURIComponent(details.manufacturer)}</Text>
-        </Space>
+    const categoryName = getCategory(details);
 
-        <Space>
-          <DescTitle text="Unit of Measurement" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">
-            {UNIT_OF_MEASUREMENTS[details.unitOfMeasurement]}
-          </Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Least Sellable Unit" />
-          <DescTitle text="       :" />
-          <Text className="text-[13px]">{details.leastSellableUnit}</Text>
-        </Space>
-      </Space>
-    );
+    switch (categoryName) {
+      case "Art":
+        return (<Space direction="vertical">
+          <Space>
+            <DescTitle text="Artist" />
+            <DescTitle text="                      :" />
+            <Text className="text-[13px]">{itemData.artist}</Text>
+          </Space>
+        </Space>)
+      case "Carbon":
+        return (<Space direction="vertical">
+          <Space>
+            <DescTitle text="Project Type" />
+            <DescTitle text="                      :" />
+            <Text className="text-[13px]">{itemData.projectType}</Text>
+          </Space>
+        </Space>)
+      case "Clothing":
+        return (<Space direction="vertical">
+          <Space>
+            <DescTitle text="Brand" />
+            <DescTitle text="                      :" />
+            <Text className="text-[13px]">{itemData.brand}</Text>
+          </Space>
+        </Space>)
+      case "Materials":
+        return (<Space direction="vertical">
+          <Space>
+            <DescTitle text="Source" />
+            <DescTitle text="                      :" />
+            <Text className="text-[13px]">{itemData.source}</Text>
+          </Space>
+        </Space>)
+      default:
+        break;
+    }
   };
 
   const EventDetailsComponent = ({ title, value, id }) => {
@@ -520,7 +532,7 @@ const ProductDetails = ({ user, users }) => {
           <div className="flex mx-16">
             <div className="w-1/2">
               <div className="h-96 flex items-center justify-center border border-grayLight">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.imageUrl} />
+                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images.length > 0 ? details.images[0] : image_placeholder} />
               </div>
               {details.availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
@@ -622,7 +634,7 @@ const ProductDetails = ({ user, users }) => {
                   {decodeURIComponent(details.name)}&nbsp;
                 </Text>
                 <Text className="font-medium text-sm text-secondryB ">
-                  ({categoryName})
+                  ({getCategory(details)})
                 </Text>
               </Row>
               <Paragraph
@@ -637,7 +649,7 @@ const ProductDetails = ({ user, users }) => {
                 ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
-                $ {details.pricePerUnit}
+                $ {details.price}
               </Title>
               {details.availableQuantity !== 0 ?
                 <Space>

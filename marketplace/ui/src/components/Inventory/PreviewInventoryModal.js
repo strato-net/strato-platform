@@ -3,6 +3,7 @@ import { Modal, Tabs,Button } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useAuthenticateState } from "../../contexts/authentication";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 
 const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
@@ -23,6 +24,68 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
     setQuantity(value);
   };
 
+  const getCategory = () => {
+    const parts = inventory.contract_name.split('-');
+    return parts[parts.length - 1];
+  };
+
+  const Description = ({ item }) => {
+    const itemData = JSON.parse(item.data);
+  
+    switch (getCategory()) {
+      case "Art":
+        return (
+          <div>
+            <div className="flex items-center">
+              <p className="text-primaryC text-sm w-44">Artist</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.artist}</p>
+            </div>
+          </div>
+        );
+      case "Carbon":
+        return (
+          <div>
+            <div className="flex items-center">
+              <p className="text-primaryC text-sm w-44">Project Type</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.projectType}</p>
+            </div>
+          </div>
+        );
+      case "Clothing":
+        return (
+          <div>
+            <div className="flex items-center">
+              <p className="text-primaryC text-sm w-44">Brand</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.brand}</p>
+            </div>
+          </div>
+        );
+      case "Materials":
+        return (
+          <div>
+            <div className="flex items-center">
+              <p className="text-primaryC text-sm w-44">Source</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.source}</p>
+            </div>
+          </div>
+        );
+      default:
+        break;
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -39,7 +102,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               <img
                 className="w-60 object-cover"
                 alt=""
-                src={inventory.imageUrl}
+                src={inventory.images.length > 0 ? inventory.images[0] : image_placeholder}
               />
               <div className="flex justify-center mt-16">
               <Button
@@ -76,14 +139,14 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
                   {decodeURIComponent(inventory.name)}
                 </h3>
                 <p className="font-medium text-secondryB text-base ml-2">
-                  ({category.name})
+                  ({getCategory()})
                 </p>
               </div>
               <p className="text-xs text-secondryB mt-1.5">
                 {decodeURIComponent(inventory.description)}
               </p>
               <h3 className="font-semibold text-primaryB text-xl mt-3">
-                $ {inventory.pricePerUnit}
+                $ {inventory.price}
               </h3>
               <h5 className="font-medium text-primaryB text-sm mt-3">
                 Quantity
@@ -129,43 +192,6 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
             </div>
           </div>     
     </Modal>
-  );
-};
-
-const Description = ({ data }) => {
-  return (
-    <div>
-      <div className="flex items-center">
-        <p className="text-primaryC text-sm w-44">Universal Product Code</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">{data.uniqueProductCode}</p>
-      </div>
-      <div className="flex mt-px items-center">
-        <p className="text-primaryC text-sm w-44">Manufacturer</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">{decodeURIComponent(data.manufacturer)}</p>
-      </div>
-      <div className="flex mt-px items-center">
-        <p className="text-primaryC text-sm w-44">Unit of Measurement</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {UNIT_OF_MEASUREMENTS[data.unitOfMeasurement]}
-        </p>
-      </div>
-      <div className="flex mt-px items-center">
-        <p className="text-primaryC text-sm w-44">Least Sellable Unit</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">{data.leastSellableUnit}</p>
-      </div>
-    </div>
   );
 };
 
