@@ -15,10 +15,7 @@ import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined } from "@ant-d
 
 import "./header.css";
 import routes from "../../helpers/routes";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
@@ -92,7 +89,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     // if (pathName.includes("/marketplace")) {
     //   setSelectedTab("0");
     // } else 
-    if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
+    if (pathName.includes("/order")) {
       setSelectedTab("1");
     } else if (pathName.includes("/inventories")) {
       setSelectedTab("2");
@@ -183,53 +180,27 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         disabledOverflow={true}
         className="h-16 decoration-black m-auto"
         onClick={(item) => {
+          const events = [
+            'view_marketplace_page',
+            'view_orders_page',
+            'view_inventory_page',
+            'view_products_page',
+            'view_events_page',
+            'view_storage_page',
+          ];
+
           setCookie("returnUrl", `/marketplace${navUrls[item.key]}`, 10);
-          setSelectedTab(item.key)
-          if (item.key === "0") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_marketplace_page',
-              },
-            });
-          }
-          if (item.key === "1") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_orders_page',
-              },
-            });
-          }
-          if (item.key === "2") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_inventory_page',
-              },
-            });
-          }
-          if (item.key === "3") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_products_page',
-              },
-            });
-          }
-          if (item.key === "4") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_events_page',
-              },
-            });
-            navigate(navUrls[item.key], { state: { tab: "EventType" } })
-          }
-          else {
+          setSelectedTab(item.key);
+          TagManager.dataLayer({
+            dataLayer: {
+              event: events[item.key],
+            },
+          });
+
+          if (item.key === 4) {
+            navigate(navUrls[item.key], { state: { tab: "EventType" } });
+          } else {
             navigate(navUrls[item.key]);
-          }
-          if (item.key === "5") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_storage_page',
-              }
-            });
           }
         }}
         items={navItems[roleIndex]?.items}
