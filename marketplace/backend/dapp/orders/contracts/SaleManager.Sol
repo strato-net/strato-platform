@@ -1,0 +1,11 @@
+import "../../../../../mercata-base-contracts/Sale.sol";
+
+contract SaleManager {
+    function transferMultipleAssetsOwnership(address[] saleAddresses, string newOwnerCommonName) external {
+        for (uint i = 0; i < saleAddresses.length; i++) {
+            Sale sale = Sale(saleAddresses[i]);
+            // Perform the ownership transfer
+            sale.transferOwnership(newOwnerCommonName);
+        }
+    }
+}

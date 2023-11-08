@@ -1,9 +1,10 @@
 import <509>;
+import "../marketplace/backend/blockapps-sol/lib/rest/contracts/RestStatus.sol";
 
 pragma es6;
 pragma strict;
 
-abstract contract Sale is PaymentType, SaleState{ 
+abstract contract Sale is PaymentType, SaleState, RestStatus{ 
     string sellersCommonName;
     string purchasersCommonName;
     Asset assetToBeSold;
@@ -28,14 +29,12 @@ abstract contract Sale is PaymentType, SaleState{
 
     modifier requireSeller(string action) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
         string err = "Only "
                    + sellersCommonName
                    + " can perform "
                    + action
                    + ".";
-        string org = c.organization();
-        require(org == sellersOrganization, err);
         string commonName = c.commonName();
         require(commonName == sellersCommonName, err);
     }
@@ -48,11 +47,10 @@ abstract contract Sale is PaymentType, SaleState{
         payment=_payment;
     }
 
-
-    function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") {
+    function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") returns (uint) {
         purchasersCommonName = _purchasersCommonName;
         assetToBeSold.transferOwnership(purchasersCommonName);
         state = SaleState.Closed;
+        return RestStatus.OK;
     }
 }
-
