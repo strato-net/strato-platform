@@ -6,23 +6,23 @@ import { EditOutlined } from "@ant-design/icons";
 // import UpdateProductModal from "./UpdateProductModal";
 import helperJson from "../../helpers/helper.json"
 import "./membership.css";
-import routes from "../../helpers/routes";
+// import routes from "../../helpers/routes";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
 import dayjs from 'dayjs';
-import ListNowModal from "../Membership/ListNowModal";
+import ListNowModal from "./ListNowModal";
 import * as yup from "yup";
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
 import { Carousel } from 'react-responsive-carousel';
-import { forwardArrowIcon, tag, tagIcon } from "../../images/SVGComponents";
+import { forwardArrowIcon, tagIcon } from "../../images/SVGComponents";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { listNowConfig } from "../MarketPlace/listNowConfig";
-import ParagraphEllipsis from "../../components/Ellipsis/ParagraphEllipsis"
+import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis"
 const { purchasedCardColumn, statusColor, statusText } = helperJson;
 
 const { Text, Paragraph, Title } = Typography;
@@ -34,7 +34,7 @@ const initialValues = {
   // isTaxPercentage:false,
 };
 
-const MembershipCardPurchased = ({
+const MembershipCard = ({
   user,
   membership,
   // categorys,
@@ -438,4 +438,4 @@ const MembershipCardPurchased = ({
   );
 };
 
-export default MembershipCardPurchased;
+export default MembershipCard;

@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Col, Row, Spin, Image, Typography } from "antd";
 
-import MembershipCardPurchased from "./MembershipCardPurchased";
+import MembershipCard from "./MembershipCard";
 import { useMembershipState } from "../../contexts/membership";
 import { Images } from "../../images";
 import helperJson from "../../../src/helpers/helper.json"
@@ -36,7 +36,7 @@ const PurchasedList = (
             {purchasedMemberships.map((product, index) => {
               return (
                 <Col span={12} key={index}>
-                  <MembershipCardPurchased
+                  <MembershipCard
                     cardConfig={purchasedCardConfig}
                     user={user}
                     membership={product}

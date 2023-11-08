@@ -3,7 +3,7 @@ import { Col, Row, Spin, Image, Typography } from "antd";
 
 import { useMembershipState } from "../../contexts/membership";
 import { Images } from "../../images";
-import MembershipCardPurchased from "./MembershipCardPurchased";
+import MembershipCard from "./MembershipCard";
 import helperJson from "../../../src/helpers/helper.json"
 
 const { issuedCardConfig } = helperJson
@@ -52,7 +52,7 @@ const IssuedList = (
             transformedData["status"] = item.status;
             return (
               <Col span={12} key={index}>
-                <MembershipCardPurchased
+                <MembershipCard
                   cardConfig={issuedCardConfig}
                   user={user}
                   membership={transformedData}
