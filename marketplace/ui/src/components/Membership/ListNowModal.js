@@ -25,7 +25,7 @@ const ListNowModal = ({
   user,
   formik,
   id,
-  membershipStatus,
+  // membershipStatus,
   isCreateMembershipSubmitting,
   config: {
     title,

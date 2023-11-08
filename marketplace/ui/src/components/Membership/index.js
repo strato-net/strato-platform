@@ -11,8 +11,8 @@ import { actions as inventoryActions } from "../../contexts/inventory/actions";
 // States and Dispatch
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useSubCategoryState } from "../../contexts/subCategory";
+// import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+// import { useSubCategoryState } from "../../contexts/subCategory";
 import { useAuthenticateState } from "../../contexts/authentication";
 // Assets, Utils
 import useDebounce from "../UseDebounce";

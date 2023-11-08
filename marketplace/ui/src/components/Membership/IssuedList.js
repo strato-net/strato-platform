@@ -10,8 +10,8 @@ const { issuedCardConfig } = helperJson
 
 const IssuedList = (
   user,
-  categorys,
-  subCategorys,
+  // categorys,
+  // subCategorys,
   debouncedSearchTerm
 ) => {
   const { memberships, isMembershipsLoading } = useMembershipState();

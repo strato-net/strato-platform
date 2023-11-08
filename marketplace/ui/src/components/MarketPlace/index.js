@@ -20,11 +20,11 @@ const MarketPlace = () => {
   const debouncedSearchTerm = useDebounce("", 1000);
   const { iscategorysLoading } = useCategoryState();
   const { topSellingProducts, isTopSellingProductsLoading } = useMarketplaceState();
-  let { hasChecked, isAuthenticated } = useAuthenticateState();
+  let { isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
     categoryActions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
-    if (hasChecked && !isAuthenticated) {
+    if (!isAuthenticated) {
       marketplaceActions.fetchTopSellingProducts(marketplaceDispatch, offset);
     }
     if (isAuthenticated) {
