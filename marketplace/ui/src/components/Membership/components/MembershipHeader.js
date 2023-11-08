@@ -36,11 +36,10 @@ const MembershipHeader = ({ type, isMembershipFound, isPurchased, showModal }) =
               </Row>
               <Row>
                 <Typography.Text className="text-sm font-medium text-grey">
-                  {isMembershipFound ? (
-                    <Spin size="small" />
-                  ) : (
-                    `${isPurchased ? purchasedMemberships?.length : memberships?.length} ${type} Memberships found`
-                  )}
+                  {isMembershipFound
+                    ? <Spin size="small" />
+                    : `${isPurchased ? purchasedMemberships?.length : memberships?.length} ${type} Memberships found`
+                  }
                 </Typography.Text>
               </Row>
             </Col>

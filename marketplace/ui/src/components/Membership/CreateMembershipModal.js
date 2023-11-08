@@ -55,18 +55,15 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
   const [memberDiscount, setMemberDiscount] = useState([1]);
   const [visible, setVisible] = useState(false);
   // States
-  const {
-    isCreateProductSubmitting,
-    isuploadImageSubmitting,
-    isCreateMembershipSubmitting,
-  } = useMembershipState();
-  const { services, isServicesLoading } = useServiceState();
+  const { isCreateProductSubmitting, isuploadImageSubmitting, isCreateMembershipSubmitting }
+    = useMembershipState();
   const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
+  const { services, isServicesLoading } = useServiceState();
 
   // Dispatch
-  const serviceDispatch = useServiceDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
   const inventoryDispatch = useInventoryDispatch();
+  const serviceDispatch = useServiceDispatch();
   const prodDispatch = useProductDispatch();
   const dispatch = useMembershipDispatch();
 
@@ -272,20 +269,20 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 // isActive: visible ? true : false,
                 isActive: true
               },
-              membershipServiceArgs: updatedValues.services.map((service) => ({
-                serviceId: service.serviceId,
-                membershipPrice: service.memberPrice ? service.memberPrice : calculateMemberPrice(service.serviceName, service.percentDiscount),
-                discountPrice: service.percentDiscount ? service.percentDiscount : calculateMemberDiscount(service.serviceName, service.memberPrice),
-                maxQuantity: service.numberOfUses,
+              membershipServiceArgs: updatedValues.services.map(({ serviceId, memberPrice, percentDiscount, numberOfUses, serviceName }) => ({
+                serviceId: serviceId,
+                membershipPrice: memberPrice ? memberPrice : calculateMemberPrice(serviceName, percentDiscount),
+                discountPrice: percentDiscount ? percentDiscount : calculateMemberDiscount(serviceName, memberPrice),
+                maxQuantity: numberOfUses,
                 createdDate: new Date().getTime(),
                 // If visible is true the List Now form is open and the membership is active
                 isActive: visible ? true : false,
               })),
               //TODO: where do I put the imageKey from the uploaded File?
-              productFileArgs: allFiles.map((file, index) => ({
-                fileLocation: `${file.imageKey}`,
-                fileHash: `${file.docHash}`,
-                fileName: `${file.originalName}`,
+              productFileArgs: allFiles.map(({ imageKey, docHash, originalName }, index) => ({
+                fileLocation: `${imageKey}`,
+                fileHash: `${docHash}`,
+                fileName: `${originalName}`,
                 uploadDate: new Date().getTime(),
                 createdDate: new Date().getTime(),
                 currentSection: 1,
@@ -444,7 +441,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
         <Row>
           <Col sm={24} md={18} xl={12} className="mx-auto" >
             <Form layout="vertical" className="mt-5">
-
               <Card className="mt-8 shadow-md">
                 <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4} className="leading-6"> Membership Details</Title></Row>
                 <Col className="mt-4">
@@ -611,10 +607,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                       {getIn(formik.errors, "images")}
                     </span>
                   )}
-
               </Card>
-
-
               <Card className="mt-5 shadow-md">
                 <Row>
                   <Col span={12}>

@@ -32,7 +32,9 @@ const ListNowModal = ({
     fields
   },
 }) => {
-  const { isCreateInventorySubmitting, isinventoryUpdating, inventoryDetails } =
+  const { isCreateInventorySubmitting, isinventoryUpdating, 
+    // inventoryDetails
+   } =
     useInventoryState();
 
   const { isuploadImageSubmitting } = useProductState();
