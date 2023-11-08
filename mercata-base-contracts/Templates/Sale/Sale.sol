@@ -9,7 +9,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
     string purchasersCommonName;
     Asset assetToBeSold;
     uint price;
-
+    address saleOrderID;
     SaleState state;
     PaymentType payment;
 
@@ -25,6 +25,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         price = assetToBeSold.price();
         state = _state;
         payment = _payment;
+        saleOrderID = address(0);
     }
 
     modifier requireSeller(string action) {
@@ -48,6 +49,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
     }
 
     function transferOwnership(string _purchasersCommonName) public requireSeller("Transfer Ownership of Asset") returns (uint) {
+        saleOrderID = msg.sender;
         purchasersCommonName = _purchasersCommonName;
         assetToBeSold.transferOwnership(purchasersCommonName);
         state = SaleState.Closed;
