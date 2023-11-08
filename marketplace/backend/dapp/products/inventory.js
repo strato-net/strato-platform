@@ -160,15 +160,17 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { range, owner, ...restArgs } = args;
+    const { range, ownerCommonName, ...restArgs } = args;
     let inventories;
 
-    if (owner) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'owner', value: owner });
+    if (ownerCommonName) {
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'ownerCommonName', value: ownerCommonName });
         inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     }
     else {
-        inventories = await searchAllWithQueryArgs(contractName, restArgs, options, admin);
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'sale', value: '0000000000000000000000000000000000000000', predicate: 'neq' });
+        console.log("no common name", searchArgs)
+        inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     }
 
     return inventories ? inventories.map((inventory) => marshalOut(inventory)) : undefined;

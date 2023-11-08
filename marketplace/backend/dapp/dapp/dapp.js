@@ -621,9 +621,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return managers.productManager.getInventory({ ...args }, getOptions);
   };
   contract.getInventories = async function (args, options = optionsNoChainIds) {
-    const { userAddress, ...restArgs } = args
     const getOptions = { ...options, app: contractName };
-    return managers.productManager.getInventories({ ...restArgs, owner: rawAdmin.address, sort: '-createdDate' }, getOptions);
+    return managers.productManager.getInventories({ ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
   };
   contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
     const { userAddress, queryValue, ...restArgs } = args;
@@ -805,7 +804,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const transferStatus = orderJs.transferOwnershipSale(rawAdmin, contract, options, newOwner);
       responses.push(transferStatus);
     })
-    
+
     return responses[0];
     
   };
