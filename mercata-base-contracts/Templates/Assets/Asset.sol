@@ -3,8 +3,8 @@ import <509>;
 pragma es6;
 pragma strict;
 
-abstract contract Asset is PaymentType, SaleState{
-    address public owner;
+abstract contract Asset is PaymentType, SaleState, RestStatus{
+    // address public owner;
     string public ownerCommonName;
     string public name;
     string public description;
@@ -17,7 +17,7 @@ abstract contract Asset is PaymentType, SaleState{
     constructor(string _name, string _description, string[] _images, uint _price, uint _createdDate, SaleState _state, PaymentType _payment) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        owner  = c.userAddress();
+        // owner  = c.userAddress();
         ownerCommonName = c.commonName();
         name = _name;
         description =_description;
@@ -29,7 +29,7 @@ abstract contract Asset is PaymentType, SaleState{
 
     modifier requireOwner(string action) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
+        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
         string err = "Only "
                    + ownerCommonName
                    + " can perform "
@@ -41,26 +41,30 @@ abstract contract Asset is PaymentType, SaleState{
     }
 
     function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
-        return new Sale(address(this), _state, _payment);
+        return new SimpleSale(address(this), _state, _payment);
     }
 
-    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") {// can be overridden
+    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
         sale = createBaseSale(_state, _payment);
+        return RestStatus.OK;
     }
 
-    function changeSaleState(SaleState _state) public requireOwner("Change Sale State"){
+    function changeSaleState(SaleState _state) public requireOwner("Change Sale State") returns (uint) {
         require(address(sale)!=address(0));
         sale.changeSaleState(_state);
+        return RestStatus.OK;
     }
 
-    function changePrice(uint _price) public requireOwner("Change Asset Price"){
+    function changePrice(uint _price) public requireOwner("Change Asset Price") returns (uint) {
         price = _price;
+        return RestStatus.OK;
     }
 
-    function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type"){
+    function changePaymentType(PaymentType _payment) public requireOwner("Change Payment Type") returns (uint) {
         require(address(sale)!=address(0));
         sale.changePaymentType(_payment);
+        return RestStatus.OK;
     }
 
     function transferOwnership(string _newOwner) public requireOwner("Ownership transfer") {
