@@ -15,6 +15,7 @@ import Servant
 import API
 import Strato.Monad
 import Strato.Server.GetS3File
+import Strato.Server.Ping
 import Strato.Server.PutS3File
 
 
@@ -22,6 +23,7 @@ highwayWrapper :: ServerT HighwayWrapperAPI HighwayM
 highwayWrapper =
   getS3File
     :<|> putS3File
+    :<|> ping
 
 serveHighwayWrapper :: HighwayWrapperEnv -> Server HighwayWrapperAPI
 serveHighwayWrapper env = hoistServer serverProxy (enterHighwayWrapper env) highwayWrapper

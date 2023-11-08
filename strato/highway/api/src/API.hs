@@ -13,3 +13,4 @@ import Strato.API
 type HighwayWrapperAPI =
   HighwayGetS3File
     :<|> HighwayPutS3File
+    :<|> HighwayPing

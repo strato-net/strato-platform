@@ -68,3 +68,5 @@ instance AllCTRender '[Web] ContentTypeAndBody where
 type HighwayGetS3File = "gets3file" :> Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
 
 type HighwayPutS3File = "puts3file" :> MultipartForm Mem (MultipartData Mem) :> Put '[Web] ()
+
+type HighwayPing      = "ping" :> Get '[JSON] Int

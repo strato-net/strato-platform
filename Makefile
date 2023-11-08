@@ -31,9 +31,9 @@ $(info )
 
 all: build_all docker-compose eks
 
-build_all: strato apex highway-wrapper nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
+build_all: strato apex highway-wrapper highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
-.PHONY: strato apex highway-wrapper nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway-wrapper highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -112,6 +112,10 @@ highway-wrapper: build_common
 	cp strato/highway/doit.sh ${HIGHWAYDIR}
 	docker build --target highway-wrapper --tag ${REPO_URL}highway-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}highway-wrapper:${VERSION} ${REPO_AWS_ECR_URL}highway-wrapper:${VERSION}
+
+highway-nginx:
+	@echo Now building highway-nginx...
+	BASIL_DOCKER_TAG=${REPO_URL}highway-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}highway-nginx:${VERSION} make --directory=highway-nginx/
 
 strato: build_common
 	@echo Now building core-strato...
