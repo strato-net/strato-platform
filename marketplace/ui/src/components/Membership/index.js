@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { notification } from "antd";
 // Components
 import CreateMembershipModal from "./CreateMembershipModal";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
@@ -20,6 +19,7 @@ import "./membership.css";
 import MembershipListTabComponent from "./components/MembershipListTabComponent";
 import MembershipHeader from "./components/MembershipHeader";
 import LoaderComponent from "../Loader/LoaderComponent";
+import ToastComponent from "../ToastComponent/ToastComponent";
 
 const limit = 10;
 
@@ -38,7 +38,6 @@ const Membership = (user) => {
   // const categoryDispatch = useCategoryDispatch();
   const inventoryDispatch = useInventoryDispatch();
 
-  const [api, contextHolder] = notification.useNotification();
   const [queryValue, setQueryValue] = useState("");
   const [offset, setOffset] = useState(0);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
@@ -101,34 +100,12 @@ const Membership = (user) => {
   }
 
   let msg = message || inventoryState.message;
-  const openToast = (placement) => {
-    if (success || inventoryState.success) {
-      api.success({
-        message: msg,
-        onClose: () => {
-          handleToastClose()
-        },
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: msg,
-        onClose: () => {
-          handleToastClose()
-        },
-        placement,
-        key: 2,
-      });
-    }
-  };
 
   const isPageLoading = stripeStatus === null || isLoadingStripeStatus;
   const isMembershipFound = isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading;
 
   return (
     <>
-      {contextHolder}
       {isPageLoading ? (
         <LoaderComponent />
       ) : (
@@ -158,7 +135,12 @@ const Membership = (user) => {
           handleCancel={handleCancel}
         />
       )}
-      {msg && openToast("bottom")}
+      {msg && <ToastComponent
+        message={msg}
+        success={success || inventoryState.success}
+        onClose={handleToastClose}
+        placement="bottom"
+      />}
     </>
   );
 };

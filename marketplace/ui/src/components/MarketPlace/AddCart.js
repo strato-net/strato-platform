@@ -1,8 +1,6 @@
 import {
-  Breadcrumb,
   Typography,
   notification,
-  Spin,
   Image,
   InputNumber
 } from "antd";
@@ -16,17 +14,16 @@ import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { Images } from "../../images";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { DeleteOutlined } from "@ant-design/icons";
 import "./index.css";
 import ConfirmOrderModel from "./ConfirmOrderModel";
 import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import LoaderComponent from "../Loader/LoaderComponent";
+import ToastComponent from "../ToastComponent/ToastComponent";
 
 const { Title, Text } = Typography;
 
@@ -34,7 +31,6 @@ const Checkout = ({ user }) => {
   const [open, setOpen] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
-  const [api, contextHolder] = notification.useNotification();
   const { cartList } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
@@ -62,7 +58,6 @@ const Checkout = ({ user }) => {
     if (cartData) {
       storedData = JSON.parse(cartData);
     }
-    // return JSON.parse(cartData ?? "");
   }, [window.localStorage.getItem("cartList")]);
 
   useEffect(() => {
@@ -129,37 +124,24 @@ const Checkout = ({ user }) => {
   }, [marketplaceDispatch, cartList]);
 
   const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
+    return (
+      <ToastComponent
+        message={msg}
+        success={!isError}
+        placement={placement}
+      />
+    );
   };
 
   const openToastOrder = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(orderDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(orderDispatch),
-        placement,
-        key: 2,
-      });
-    }
+    return (
+      <ToastComponent
+        message={message}
+        success={success}
+        placement={placement}
+        onClose={() => actions.resetMessage(orderDispatch)}
+      />
+    );
   };
 
   const columns = [
@@ -368,9 +350,8 @@ const Checkout = ({ user }) => {
 
   return (
     <div className="h-screen mx-14">
-      {contextHolder}
       {isCreateOrderSubmitting ? (
-        <LoaderComponent  />
+        <LoaderComponent />
       ) : (
         <div>
           <BreadCrumbComponent />
