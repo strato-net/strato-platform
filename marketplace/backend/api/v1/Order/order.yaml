@@ -223,7 +223,9 @@ definitions:
   executeSale:
     type: object
     properties:
-      assetAddress:
-        type: string
+      assetAddresses:
+        type: array
+        items:
+          type: string
       newOwner:
         type: string
