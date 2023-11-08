@@ -16,7 +16,7 @@ export const useIdleTimeout = ({ onIdle, idleTime }) => {
     }
     const idleTimer = useIdleTimer({
         timeout: idleTimeout,
-        promptBeforeIdle: idleTimeout - 300000,   // timeout minus 5 minutes
+        promptBeforeIdle: 300000,   // modal opens 5 minutes before automatic logout
         onPrompt: onIdle,
         onIdle: handleIdle,
     })
