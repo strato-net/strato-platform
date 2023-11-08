@@ -7,60 +7,46 @@ import {
   InputNumber,
   Select,
   Button,
-  Radio,
   Upload,
   Spin,
-  notification,
   Typography,
   Card,
   Row,
-  Col,
-  Space,
-  Image,
+  Col
 } from "antd";
-import { PlusOutlined, InboxOutlined, MinusOutlined, CaretDownOutlined, CheckCircleOutlined, DeleteOutlined } from "@ant-design/icons";
-import getSchema from "./MembershipSchema";
-import { listNowConfig } from "../MarketPlace/listNowConfig";
+import { PlusOutlined, MinusOutlined, CaretDownOutlined } from "@ant-design/icons";
 // import useDebounce from "../UseDebounce";
 
-// Actions for the membership context
-import { actions } from "../../contexts/membership/actions";
+// Actions
+import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as prodActions } from "../../contexts/product/actions";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import { useProductDispatch, useProductState } from "../../contexts/product";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
 import { actions as serviceActions } from "../../contexts/service/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
-
+// Dispatch and States
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useProductDispatch } from "../../contexts/product";
 import { useServiceState, useServiceDispatch } from "../../contexts/service";
-import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
+import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
 import { useInventoryDispatch } from "../../contexts/inventory";
-import ListNowModal from "./ListNowModal";
-import { INVENTORY_STATUS } from "../../helpers/constants";
+// Icons, config, constants, component.
 import { checkPrimary, checkSuccess, uploadIcon2, uploadImageIcon } from "../../images/SVGComponents"
+import { listNowConfig } from "../MarketPlace/listNowConfig";
+import { INVENTORY_STATUS } from "../../helpers/constants";
+import getSchema from "./MembershipSchema";
+import ListNowModal from "./ListNowModal";
+import helper from "../../helpers/helper.json";
 const { Text, Title } = Typography;
+const { initialValues, discountTypeBtn } = helper;
 
 const { Dragger } = Upload;
 
-const discountType = [
-  { label: "$", value: "price" },
-  { label: "%", value: "percent" }
-]
-
 const CreateMembershipModal = ({ open, handleCancel, user }) => {
   // const schema = getSchema();
-  const prodDispatch = useProductDispatch();
   const limit = 10;
   // Can update these values for service search later on
   const [offset, setOffset] = useState(0);
-  const dispatch = useMembershipDispatch();
-  const [listModalConfig, setListModalConfig] = useState({})
+
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -68,6 +54,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
   const [fileList, setFileList] = useState([]);
   const [memberDiscount, setMemberDiscount] = useState([1]);
   const [visible, setVisible] = useState(false);
+  // States
   const {
     isCreateProductSubmitting,
     isuploadImageSubmitting,
@@ -76,10 +63,12 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
   const { services, isServicesLoading } = useServiceState();
   const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
 
-  // Dispatch for the membership context
+  // Dispatch
   const serviceDispatch = useServiceDispatch();
   const subCategoryDispatch = useSubCategoryDispatch();
   const inventoryDispatch = useInventoryDispatch();
+  const prodDispatch = useProductDispatch();
+  const dispatch = useMembershipDispatch();
 
   const queryValue = user.user.organization;
 
@@ -88,31 +77,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     serviceActions.fetchService(serviceDispatch, limit, offset, queryValue);
     subCategoryActions.fetchSubCategory(subCategoryDispatch, "Membership");
   }, []);
-
-  const initialValues = {
-    name: "",
-    subCategory: "",
-    duration: "",
-    additionalInformation: "",
-    images: [],
-    description: "",
-    price: "",
-    quantity: "",
-    isTaxPercentage: false,
-    taxDollarAmount: 0,
-    taxPercentageAmount: 0,
-    taxPercentage: 0,
-    services: [
-      {
-        serviceId: "",
-        serviceName: "",
-        numberOfUses: "",
-        memberPrice: null,
-        percentDiscount: null,
-      },
-    ],
-    documents: [],
-  };
 
   const formik = useFormik({
     initialValues: initialValues,
@@ -161,7 +125,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
   }
 
   const selectAfter = (index) => {
-    return <Select defaultValue="$" onChange={(e) => { handleDiscountType(e, index) }} style={{ width: 60 }} options={discountType} />
+    return <Select defaultValue="$" onChange={(e) => { handleDiscountType(e, index) }} style={{ width: 60 }} options={discountTypeBtn} />
   }
 
   const uploadButton = (
@@ -239,9 +203,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
 
   const handleCreateFormSubmit = async (values) => {
     const updatedValues = checkDiscountType(memberDiscount);
-    // console.log("updated Values", updatedValues);
-    // console.log("values", values);
-
     // for every image in formki.values.images, upload it to s3 and get the url back
     const arrayOfImageData = [];
     const uploadImagePromises = values.images.map(async (image) => {
@@ -264,7 +225,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
       ).price;
 
       const memberPrice = servicePrice * (1 - memberDiscount / 100);
-
       return memberPrice;
     };
 
@@ -274,7 +234,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
       ).price;
 
       const memberDiscount = (1 - memberPrice / servicePrice) * 100;
-
       return memberDiscount;
     };
 
@@ -311,7 +270,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 additionalInfo: updatedValues.additionalInformation,
                 // If visible is true the List Now form is open and the membership is active
                 // isActive: visible ? true : false,
-                isActive:true
+                isActive: true
               },
               membershipServiceArgs: updatedValues.services.map((service) => ({
                 serviceId: service.serviceId,
@@ -336,14 +295,14 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
             switch (visible) {
               // If the List Now form is open we will create the membership and inventory otherwise we will just create the membership
               case false:
-                const isDone = await actions.createMembership(dispatch, body);
+                const isDone = await membershipActions.createMembership(dispatch, body);
                 if (isDone) {
                   formik.resetForm();
                   handleCancel("success");
                 }
                 break;
               case true:
-                const createMembership = await actions.createMembership(dispatch, body);
+                const createMembership = await membershipActions.createMembership(dispatch, body);
 
                 const productId = createMembership.productAddress;
                 const inventoryBody = {

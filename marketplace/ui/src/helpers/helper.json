@@ -122,5 +122,39 @@
     "isDescription": false,
     "configCase": "resaleMembership",
     "btnName": "Edit Listing"
-  }
+  },
+  "initialValues": {
+    "name": "",
+    "subCategory": "",
+    "duration": "",
+    "additionalInformation": "",
+    "images": [],
+    "description": "",
+    "price": "",
+    "quantity": "",
+    "isTaxPercentage": false,
+    "taxDollarAmount": 0,
+    "taxPercentageAmount": 0,
+    "taxPercentage": 0,
+    "services": [
+      {
+        "serviceId": "",
+        "serviceName": "",
+        "numberOfUses": "",
+        "memberPrice": null,
+        "percentDiscount": null
+      }
+    ],
+    "documents": []
+  },
+  "discountTypeBtn": [
+    {
+      "label": "$",
+      "value": "price"
+    },
+    {
+      "label": "%",
+      "value": "percent"
+    }
+  ]
 }
