@@ -1,48 +1,41 @@
-import {
-  Typography,
-  notification,
-  Image,
-  InputNumber
-} from "antd";
-import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { useNavigate } from "react-router-dom";
-import { useOrderState, useOrderDispatch } from "../../contexts/order";
-import { actions } from "../../contexts/marketplace/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
-import { Images } from "../../images";
 import { useState, useEffect } from "react";
-import { DeleteOutlined } from "@ant-design/icons";
-import "./index.css";
-import ConfirmOrderModel from "./ConfirmOrderModel";
-import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
-import CartComponent from "./CartComponent";
+import { useNavigate } from "react-router-dom";
+import { Typography, InputNumber } from "antd";
 import TagManager from "react-gtm-module";
+import { MinusOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+// Components
+import ConfirmOrderModel from "./ConfirmOrderModel";
+import CartComponent from "./CartComponent";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
 import LoaderComponent from "../Loader/LoaderComponent";
 import ToastComponent from "../ToastComponent/ToastComponent";
 import NoProductComponent from "../NoProductFound/NoProductComponent";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
+import { useOrderState, useOrderDispatch } from "../../contexts/order";
+// css, constants,
+import "./index.css";
+import { CHARGES, UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const Checkout = ({ user }) => {
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  // dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
-  const { cartList } = useMarketplaceState();
+  // states
   const { isCreateOrderSubmitting, message, success } = useOrderState();
+  const { cartList } = useMarketplaceState();
 
+  const [open, setOpen] = useState(false);
   const [tax, setTax] = useState(0);
   const [shipping, setShipping] = useState(0);
   const [total, setTotal] = useState(0);
   const [mapData, setmapData] = useState([])
-
-  const handleCancel = () => {
-    setOpen(false);
-  };
 
   const calculateTax = (item) => {
     let tax = item.product.taxDollarAmount === 0 ? Math.round(item.product.pricePerUnit * (item.product.taxPercentageAmount / 100)) : (item.product.taxDollarAmount)
@@ -62,7 +55,7 @@ const Checkout = ({ user }) => {
   }, [window.localStorage.getItem("cartList")]);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
   useEffect(() => {
@@ -140,7 +133,7 @@ const Checkout = ({ user }) => {
         message={message}
         success={success}
         placement={placement}
-        onClose={() => actions.resetMessage(orderDispatch)}
+        onClose={() => marketplaceActions.resetMessage(orderDispatch)}
       />
     );
   };
@@ -216,7 +209,7 @@ const Checkout = ({ user }) => {
                   if (element.product.address === product.address) {
                     if (items[index].qty - 1 <= product.availableQuantity) {
                       items[index].qty -= 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
+                      marketplaceActions.addItemToCart(marketplaceDispatch, items);
                     } else {
                       openToast(
                         "bottom",
@@ -239,11 +232,11 @@ const Checkout = ({ user }) => {
                   if (element.product.address === product.address) {
                     if (e <= product?.availableQuantity) {
                       items[index].qty = e;
-                      actions.addItemToCart(marketplaceDispatch, items);
+                      marketplaceActions.addItemToCart(marketplaceDispatch, items);
                     } else {
                       openToast("bottom", true, "Cannot add more than available quantity");
                       items[index].qty = product?.availableQuantity;
-                      actions.addItemToCart(marketplaceDispatch, items);
+                      marketplaceActions.addItemToCart(marketplaceDispatch, items);
                     }
                   }
                 });
@@ -255,7 +248,7 @@ const Checkout = ({ user }) => {
                   if (element.product.address === product.address) {
                     if (items[index].qty + 1 <= product.availableQuantity) {
                       items[index].qty += 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
+                      marketplaceActions.addItemToCart(marketplaceDispatch, items);
                     } else {
                       openToast(
                         "bottom",
@@ -315,7 +308,7 @@ const Checkout = ({ user }) => {
               }),
               1
             );
-            actions.deleteCartItem(marketplaceDispatch, items);
+            marketplaceActions.deleteCartItem(marketplaceDispatch, items);
           }}
           className="hover:text-error cursor-pointer text-xl"
         />
@@ -323,11 +316,8 @@ const Checkout = ({ user }) => {
     },
   ];
 
-
-  const navigate = useNavigate();
-
   const handleOrderConfirm = async () => {
-    handleCancel();
+    setOpen(false);
     let orderList = [];
     cartList?.forEach((item) => {
       orderList.push({ inventoryId: item.product.address, quantity: item.qty });
@@ -342,7 +332,7 @@ const Checkout = ({ user }) => {
 
     let isDone = await orderActions.createOrder(orderDispatch, body);
     if (isDone) {
-      actions.addItemToCart(marketplaceDispatch, []);
+      marketplaceActions.addItemToCart(marketplaceDispatch, []);
       setTimeout(function () {
         navigate(`/marketplace`);
       }, 2000);
@@ -351,21 +341,20 @@ const Checkout = ({ user }) => {
 
   return (
     <div className="h-screen mx-14">
-      {isCreateOrderSubmitting ? (
-        <LoaderComponent />
-      ) : (
-        <div>
+      {isCreateOrderSubmitting
+        ? <LoaderComponent />
+        : <div>
           <BreadCrumbComponent />
           {
             mapData.length === 0
               ? <NoProductComponent text={"item"} />
-              : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
+              : mapData.map((e, index) => <CartComponent key={index} columns={columns} data={e.value} />)
           }
         </div>
-      )}
+      }
       <ConfirmOrderModel
         open={open}
-        handleCancel={handleCancel}
+        handleCancel={() => { setOpen(false) }}
         handleConfirm={handleOrderConfirm}
       />
       {message && openToastOrder("bottom")}
