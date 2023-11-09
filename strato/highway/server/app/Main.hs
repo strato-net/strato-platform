@@ -78,7 +78,7 @@ appHighwayWrapper :: HighwayWrapperEnv -> Application
 appHighwayWrapper env =
   prometheus
     def
-      { prometheusEndPoint = ["strato", "v2.3", "metrics"],
+      { prometheusEndPoint = ["strato", "highway", "metrics"],
         prometheusInstrumentApp = False
       }
     . instrumentApp "highway-wrapper"
@@ -87,7 +87,7 @@ appHighwayWrapper env =
     -- . provideOptions (Proxy @HighwayWrapperAPI)
     . serve
       ( Proxy
-          @( "strato" :> "v2.3" :> HighwayWrapperAPI
+          @( "strato" :> "highway" :> HighwayWrapperAPI
            --    :<|> "strato" :> "v2.3" :> Strato23.VaultWrapperDocsAPI
            )
       )
