@@ -766,9 +766,7 @@ spec = do
     value text,
   PRIMARY KEY (address, key));|]
 
-    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "SwissArmy.SwissArmyMapping" ("record_id",
-    "address",
-    "chainId",
+    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "SwissArmy.SwissArmyMapping" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -778,9 +776,7 @@ spec = do
     "mapname",
     "key",
     "value")
-  VALUES ('000000000000000000000000000000098eaddede:<CHAIN>',
-    '000000000000000000000000000000098eaddede',
-    '<CHAIN>',
+  VALUES ('000000000000000000000000000000098eaddede',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
@@ -790,8 +786,7 @@ spec = do
     'SwissArmyMapping',
     'hi-key',
     'hi-value')
-  ON CONFLICT (record_id, key) DO UPDATE SET
-    record_id = excluded.record_id,
+  ON CONFLICT (address, key) DO UPDATE SET
     address = excluded.address,
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
