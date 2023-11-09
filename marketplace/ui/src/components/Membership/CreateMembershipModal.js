@@ -37,19 +37,19 @@ import getSchema from "./MembershipSchema";
 import ListNowModal from "./ListNowModal";
 import helper from "../../helpers/helper.json";
 const { Text, Title } = Typography;
-const { initialValues, discountTypeBtn } = helper;
+const { initialValues } = helper;
 
 const { Dragger } = Upload;
 
 const CreateMembershipModal = ({ open, handleCancel, user }) => {
   // const schema = getSchema();
-  const limit = 10;
+  var limit = 10, offset = 0;
   // Can update these values for service search later on
-  const [offset, setOffset] = useState(0);
+  // const [offset, setOffset] = useState(0);
 
-  const [previewImage, setPreviewImage] = useState("");
-  const [previewTitle, setPreviewTitle] = useState("");
-  const [previewOpen, setPreviewOpen] = useState(false);
+  // const [previewImage, setPreviewImage] = useState("");
+  // const [previewTitle, setPreviewTitle] = useState("");
+  // const [previewOpen, setPreviewOpen] = useState(false);
   const [imageList, setImageList] = useState([]);
   const [fileList, setFileList] = useState([]);
   const [memberDiscount, setMemberDiscount] = useState([1]);
@@ -99,11 +99,11 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     if (!file.url && !file.preview) {
       file.preview = await getBase64(file.originFileObj);
     }
-    setPreviewImage(file.url || file.preview);
-    setPreviewOpen(true);
-    setPreviewTitle(
-      file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
-    );
+    // setPreviewImage(file.url || file.preview);
+    // setPreviewOpen(true);
+    // setPreviewTitle(
+    //   file.name || file.url.substring(file.url.lastIndexOf("/") + 1)
+    // );
   };
 
   const handleImageChange = ({ fileList }) => {
@@ -121,18 +121,18 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     setMemberDiscount(updatedMemberDiscount);
   }
 
-  const selectAfter = (index) => {
-    return <Select defaultValue="$" onChange={(e) => { handleDiscountType(e, index) }} style={{ width: 60 }} options={discountTypeBtn} />
-  }
+  // const selectAfter = (index) => {
+  //   return <Select defaultValue="$" onChange={(e) => { handleDiscountType(e, index) }} style={{ width: 60 }} options={discountTypeBtn} />
+  // }
 
-  const uploadButton = (
-    <div
-      style={{ display: "inline-block", verticalAlign: "top", marginRight: 8 }}
-    >
-      <PlusOutlined />
-      <div>Upload</div>
-    </div>
-  );
+  // const uploadButton = (
+  //   <div
+  //     style={{ display: "inline-block", verticalAlign: "top", marginRight: 8 }}
+  //   >
+  //     <PlusOutlined />
+  //     <div>Upload</div>
+  //   </div>
+  // );
 
   const addServiceRow = () => {
     const updatedServices = [...formik.values.services];
@@ -359,14 +359,14 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     formik.setFieldValue(name, event.target.value);
   };
 
-  const handleChange = (info) => {
-    setFileList(info.fileList);
-  };
+  // const handleChange = (info) => {
+  //   setFileList(info.fileList);
+  // };
 
-  const handleRemove = (file) => {
-    const newFileList = fileList.filter((f) => f.uid !== file.uid);
-    setFileList(newFileList);
-  };
+  // const handleRemove = (file) => {
+  //   const newFileList = fileList.filter((f) => f.uid !== file.uid);
+  //   setFileList(newFileList);
+  // };
 
   const uploadText = (props) => {
     return (
@@ -634,7 +634,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         label="Service Name"
                         name={`serviceName_${index}`}
                         key={`serviceName_${index}`}
-                        value={formik.values.services[index].serviceName}
+                      // value={formik.values.services[index].serviceName}
                       >
                         <Select
                           id={`serviceName_${index}`}
@@ -679,7 +679,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         label="Number of Uses"
                         name={`numberOfUses_${index}`}
                         key={`numberOfUses_${index}`}
-                        value={service.numberOfUses}
+                      // value={service.numberOfUses}
                       >
                         <InputNumber
                           id={`numberOfUses_${index}`}
@@ -724,12 +724,12 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                           size="large"
                           addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
                             <Col span={12} className="p-1"
-                              style={{ backgroundColor: memberDiscount[index] == 2 ? "#F2F2F5" : "" }}
+                              style={{ backgroundColor: memberDiscount[index] === 2 ? "#F2F2F5" : "" }}
                               onClick={() => { handleDiscountType("Percent", index) }}>
                               %
                             </Col>
                             <Col span={12} className="p-1"
-                              style={{ backgroundColor: memberDiscount[index] != 2 ? "#F2F2F5" : "" }}
+                              style={{ backgroundColor: memberDiscount[index] !== 2 ? "#F2F2F5" : "" }}
                               onClick={() => { handleDiscountType("Dollar", index) }}>
                               $
                             </Col>
@@ -780,14 +780,14 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 <Row className="flex">{checkPrimary()} &nbsp; &nbsp; <Title level={4} className="leading-6"> Upload Documents</Title></Row>
                 <Row className="mt-5">
                   <Col span={24}>
-                    <Upload.Dragger
+                    <Dragger
                       {...props}
                       fileList={fileList}
                       // onChange={handleChange}
                       showUploadList={false}
                     >
                       {uploadText(uploadIcon2())}
-                    </Upload.Dragger>
+                    </Dragger>
                   </Col>
                 </Row>
 
