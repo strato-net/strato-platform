@@ -12,6 +12,8 @@ import {
 // Components
 import CategoryProductCard from "./CategoryProductCard";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import NoProductComponent from "../NoProductFound/NoProductComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
 // Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
@@ -22,12 +24,10 @@ import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/mark
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useAuthenticateState } from "../../contexts/authentication";
 // Utils, Constants
+import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
-import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
-import NoProductComponent from "../NoProductFound/NoProductComponent";
-import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -204,38 +204,6 @@ const CategoryProductList = ({ user }) => {
           <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
             <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
             <Divider className="m-0 mt-3" />
-
-            {/* Panel - Category */}
-            {/* {categorys.length > 0 && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Categories</Text>} key="1">
-                    <Checkbox.Group
-                      onChange={onChangeCategory}
-                      value={selectedCategories}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {categorys.filter(item => item.name === "Membership").map((category, index) => (
-                          <Checkbox value={category.name} key={index} className="m-0">
-                            {category.name}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )} */}
-
-            {/* Panel - Price */}
             <Collapse
               bordered={false}
               defaultActiveKey={1}
@@ -256,29 +224,6 @@ const CategoryProductList = ({ user }) => {
                 </Space>
               </Panel>
             </Collapse>
-            <Divider className="m-0" />
-
-            {/* Panel - Quantity */}
-            {/* <Collapse
-              bordered={false}
-              defaultActiveKey={1}
-              expandIconPosition="end"
-              ghost="true"
-              reverse={false}
-              className="pl-8 pr-7"
-            >
-              <Panel header={<Text strong>Quantity</Text>} key="1">
-              <Space>
-                  <InputNumber min={0} placeholder="min" onChange={(e) => {
-                    e === null ? setMinQty(0) : setMinQty(e)
-                  }} />
-                  -
-                  <InputNumber min={minPrice} placeholder="max" onChange={(e) => {
-                    e === null ? setMaxQty(MAX_QUANTITY) : setMaxQty(e)
-                  }} />
-                </Space>
-              </Panel>
-            </Collapse> */}
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}
@@ -323,7 +268,6 @@ const CategoryProductList = ({ user }) => {
                 >
                   <Panel header={<Text strong>Product</Text>} key="1">
                     <Checkbox.Group
-                      // onChange={onChangeProduct}
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
