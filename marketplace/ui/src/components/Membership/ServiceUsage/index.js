@@ -17,6 +17,8 @@ import {
   CloseOutlined,
 } from "@ant-design/icons";
 import { generateTableColumns } from "./tableColumns";
+import BreadCrumbComponent from "../../BreadCrumb/BreadCrumbComponent";
+
 import {
   useServiceUsageDispatch,
   useServiceUsageState,
@@ -29,15 +31,13 @@ import {
   useMembershipDispatch,
   useMembershipState,
 } from "../../../contexts/membership";
-import moment from "moment";
 import { useServiceDispatch, useServiceState } from "../../../contexts/service";
-import BreadCrumbComponent from "../../BreadCrumb/BreadCrumbComponent";
+
+
 import { actions as serviceUsageActions } from "../../../contexts/serviceUsage/actions";
 import { actions as servicesActions } from "../../../contexts/service/actions";
 import { actions as userAuthActions } from "../../../contexts/authentication/actions";
 import { actions as membershipActions } from "../../../contexts/membership/actions";
-
-const { TabPane } = Tabs;
 
 const limit = 10;
 const offset = 0;
@@ -87,7 +87,7 @@ const getNewRowSchema = (serviceType, address) => {
     itemId: "", //provider
     serviceId: "", //service
     paymentStatus: 1,
-    bookedUserAddress: serviceType == 'booked' ? address : '',
+    bookedUserAddress: serviceType === 'booked' ? address : '',
 
     providerLastUpdated: address, //user-address
     providerLastUpdatedDate: new Date().getTime().toString(),
@@ -169,7 +169,7 @@ const ServiceTable = () => {
     return { value: userAddress, label: commonName };
   });
 
-  const UserListData = serviceType == 'booked' ? userListData : issuedUserList;
+  const UserListData = serviceType === 'booked' ? userListData : issuedUserList;
 
   const [membershipList, setMembershipList] = useState(defaultMembership);
   const [serviceList, setServiceList] = useState(serviceListData);
@@ -188,7 +188,7 @@ const ServiceTable = () => {
 
   useEffect(() => {
     setMembershipList(defaultMembership);
-    if (serviceType == 'provided') {
+    if (serviceType === 'provided') {
       setUserList(UserListData);
     }
   }, [membership]);
@@ -198,7 +198,7 @@ const ServiceTable = () => {
   }, [serviceUsageState]);
 
   useEffect(() => {
-    if (serviceType == 'booked') {
+    if (serviceType === 'booked') {
       setUserList(UserListData);
     }
   }, [userCert]);
@@ -243,8 +243,8 @@ const ServiceTable = () => {
     const data = tableData.map((item, index) => {
       if (index === key) {
         item.editable = bool;
-        let manufacturer = membership?.purchasedMemberships.find(mId => mId.itemAddress == record.itemId).manufacturer;
-        if (type == 'edit') {
+        // let manufacturer = membership?.purchasedMemberships.find(mId => mId.itemAddress === record.itemId).manufacturer;
+        if (type === 'edit') {
           // servicesActions.fetchService(serviceDispatch, 10, offset, manufacturer);
         }
 
@@ -275,7 +275,7 @@ const ServiceTable = () => {
 
     if (type === "update") {
       if (isEdit) {
-        if (serviceType == "booked") {
+        if (serviceType === "booked") {
           serviceUsageActions.UpdateBookedServiceUsage(
             serviceUsageDispatch,
             updatedPayload
@@ -289,7 +289,7 @@ const ServiceTable = () => {
       } else {
         updatedDataObj.itemId = record.itemId;
         updatedDataObj.serviceId = record.serviceId;
-        if (serviceType == "booked") {
+        if (serviceType === "booked") {
           serviceUsageActions.createBookedServiceUsage(
             serviceUsageDispatch,
             updatedDataObj
@@ -460,6 +460,8 @@ const ServiceTable = () => {
   };
 
   const activeTabCheck = serviceType === "booked" ? "Provider" : "User";
+  const tabsItem = [{ label: "Booked", key: "booked", children: "", disabled: IsLoading }
+    , { label: "Provided", key: "provided", children: "", disabled: IsLoading }]
 
   return (
     <>
@@ -467,9 +469,7 @@ const ServiceTable = () => {
       <BreadCrumbComponent />
       <Row className="mt-2">
         <Col span={22} className="m-auto">
-          <Tabs activeKey={serviceType} onChange={handleChangeServiceUsageType}>
-            <TabPane tab="Booked" key="booked" disabled={IsLoading} />
-            <TabPane tab="Provided" key="provided" disabled={IsLoading} />
+          <Tabs activeKey={serviceType} onChange={handleChangeServiceUsageType} items={tabsItem} disabled={IsLoading}>
           </Tabs>
         </Col>
         <Col
@@ -483,8 +483,8 @@ const ServiceTable = () => {
             disabled={
               validationError ||
               IsLoading ||
-              (tableData && tableData?.length != 0 && !tableData[0]?.address) ||
-              page != 1
+              (tableData && tableData?.length !== 0 && !tableData[0]?.address) ||
+              page !== 1
             }
           >
             Add Service Use
@@ -505,7 +505,7 @@ const ServiceTable = () => {
               value={filterQuery[activeTabCheck]}
               onChange={(value, obj) => {
                 handleFilter(
-                  serviceType == "booked" ? obj.label : value,
+                  serviceType === "booked" ? obj.label : value,
                   activeTabCheck
                 );
               }}
@@ -529,7 +529,7 @@ const ServiceTable = () => {
             />
             <Button
               icon={<CloseOutlined />}
-              disabled={IsLoading || Object.keys(filterQuery).length == 0}
+              disabled={IsLoading || Object.keys(filterQuery).length === 0}
               onClick={clearFilter}
             />
           </span>

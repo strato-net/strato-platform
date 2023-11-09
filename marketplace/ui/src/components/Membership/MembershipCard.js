@@ -25,6 +25,7 @@ import { listNowConfig } from "../MarketPlace/listNowConfig";
 import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis"
 const { purchasedCardColumn, statusColor, statusText } = helperJson;
 
+const { Panel } = Collapse;
 const { Text, Paragraph, Title } = Typography;
 
 const initialValues = {
@@ -377,11 +378,11 @@ const MembershipCard = ({
               <Row className="mt-4">
                 <Col span={24}>
                   <Collapse size="large" expandIconPosition='end'>
-                    <Collapse.Panel key="1" header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>}>
+                    <Panel key="1" header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>}>
                       <Table pagination={false}
                         className="inventory-table"
                         rowClassName={"bg-white"} rowKey="key" columns={purchasedCardColumn} dataSource={data} />
-                    </Collapse.Panel>
+                    </Panel>
                   </Collapse>
                 </Col>
               </Row>}

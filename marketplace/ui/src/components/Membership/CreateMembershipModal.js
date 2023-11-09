@@ -43,7 +43,7 @@ const { Dragger } = Upload;
 
 const CreateMembershipModal = ({ open, handleCancel, user }) => {
   // const schema = getSchema();
-  var limit = 10, offset = 0;
+  const limit = 10, offset = 0;
   // Can update these values for service search later on
   // const [offset, setOffset] = useState(0);
 
@@ -447,24 +447,26 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                   <Row gutter={[12, 12]}>
                     <Col span={8}>
                       <Form.Item label="Membership Name" name="name">
-                        <Input
-                          id="name"
-                          name="name"
-                          type="text"
-                          size="large"
-                          // placeholder="Membership Name"
-                          onChange={(e) => {
-                            // formik.setFieldValue("name", e.target.value);
-                            handleInputChange("name", e)
-                          }}
-                          value={formik.values.name}
-                        />
-                        {getIn(formik.touched, "name") &&
-                          getIn(formik.errors, "name") && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, "name")}
-                            </span>
-                          )}
+                        <>
+                          <Input
+                            id="name"
+                            name="name"
+                            type="text"
+                            size="large"
+                            // placeholder="Membership Name"
+                            onChange={(e) => {
+                              // formik.setFieldValue("name", e.target.value);
+                              handleInputChange("name", e)
+                            }}
+                            value={formik.values.name}
+                          />
+                          {getIn(formik.touched, "name") &&
+                            getIn(formik.errors, "name") && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, "name")}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
                     <Col span={8}>
@@ -472,57 +474,61 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         label="Sub Category"
                         name="subCategory"
                       >
-                        <Select
-                          id="subCategory"
-                          name="subCategory"
-                          // placeholder="Select Sub Category"
-                          size="large"
-                          suffixIcon={isSubCategorysLoading ? <Spin /> : <CaretDownOutlined />}
-                          onChange={(value) => {
-                            formik.setFieldValue("subCategory", value);
-                          }}
-                          value={formik.values.category}
-                        >
-                          {!isSubCategorysLoading &&
-                            subCategorys.map((subCategory) => (
-                              <Select.Option
-                                key={subCategory.name}
-                                value={subCategory.name}
-                              >
-                                {subCategory.name}
-                              </Select.Option>
-                            ))}
-                        </Select>
-                        {getIn(formik.touched, "subCategory") &&
-                          getIn(formik.errors, "subCategory") && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, "subCategory")}
-                            </span>
-                          )}
+                        <>
+                          <Select
+                            id="subCategory"
+                            name="subCategory"
+                            // placeholder="Select Sub Category"
+                            size="large"
+                            suffixIcon={isSubCategorysLoading ? <Spin /> : <CaretDownOutlined />}
+                            onChange={(value) => {
+                              formik.setFieldValue("subCategory", value);
+                            }}
+                            value={formik.values.category}
+                          >
+                            {!isSubCategorysLoading &&
+                              subCategorys.map((subCategory) => (
+                                <Select.Option
+                                  key={subCategory.name}
+                                  value={subCategory.name}
+                                >
+                                  {subCategory.name}
+                                </Select.Option>
+                              ))}
+                          </Select>
+                          {getIn(formik.touched, "subCategory") &&
+                            getIn(formik.errors, "subCategory") && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, "subCategory")}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
                     <Col span={8}>
                       <Form.Item label="Duration (Months)" name="duration">
-                        <InputNumber
-                          id="duration"
-                          name="duration"
-                          // placeholder="Duration"
-                          type="number"
-                          size="large"
-                          min={0}
-                          controls={false}
-                          value={formik.values.duration}
-                          onChange={(value) => {
-                            formik.setFieldValue("duration", value);
-                          }}
-                          className="w-full"
-                        />
-                        {getIn(formik.touched, "duration") &&
-                          getIn(formik.errors, "duration") && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, "duration")}
-                            </span>
-                          )}
+                        <>
+                          <InputNumber
+                            id="duration"
+                            name="duration"
+                            // placeholder="Duration"
+                            type="number"
+                            size="large"
+                            min={0}
+                            controls={false}
+                            value={formik.values.duration}
+                            onChange={(value) => {
+                              formik.setFieldValue("duration", value);
+                            }}
+                            className="w-full"
+                          />
+                          {getIn(formik.touched, "duration") &&
+                            getIn(formik.errors, "duration") && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, "duration")}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
                   </Row>
@@ -534,50 +540,54 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         name="additionalInformation"
                       // className="col-span-2"
                       >
-                        <Input.TextArea
-                          id="additionalInformation"
-                          name="additionalInformation"
-                          // placeholder="Additional Information"
-                          type="text"
-                          size="large"
-                          onChange={(e) => {
-                            formik.setFieldValue(
-                              "additionalInformation",
-                              e.target.value
-                            );
-                          }}
-                          value={formik.values.additionalInformation}
-                        />
-                        {getIn(formik.touched, "additionalInformation") &&
-                          getIn(formik.errors, "additionalInformation") && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, "additionalInformation")}
-                            </span>
-                          )}
+                        <>
+                          <Input.TextArea
+                            id="additionalInformation"
+                            name="additionalInformation"
+                            // placeholder="Additional Information"
+                            type="text"
+                            size="large"
+                            onChange={(e) => {
+                              formik.setFieldValue(
+                                "additionalInformation",
+                                e.target.value
+                              );
+                            }}
+                            value={formik.values.additionalInformation}
+                          />
+                          {getIn(formik.touched, "additionalInformation") &&
+                            getIn(formik.errors, "additionalInformation") && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, "additionalInformation")}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
                   </Row>
                   <Row>
                     <Col span={24} className="mt-2">
                       <Form.Item label="Description" name="description">
-                        <Input.TextArea
-                          id="description"
-                          name="description"
-                          type="text"
-                          size="large"
-                          // placeholder="Description"
-                          onChange={(e) => {
-                            formik.setFieldValue("description", e.target.value);
-                          }}
-                          value={formik.values.description}
-                          className=""
-                        />
-                        {getIn(formik.touched, "description") &&
-                          getIn(formik.errors, "description") && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, "description")}
-                            </span>
-                          )}
+                        <>
+                          <Input.TextArea
+                            id="description"
+                            name="description"
+                            type="text"
+                            size="large"
+                            // placeholder="Description"
+                            onChange={(e) => {
+                              formik.setFieldValue("description", e.target.value);
+                            }}
+                            value={formik.values.description}
+                            className=""
+                          />
+                          {getIn(formik.touched, "description") &&
+                            getIn(formik.errors, "description") && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, "description")}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
                   </Row>
@@ -636,42 +646,44 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         key={`serviceName_${index}`}
                       // value={formik.values.services[index].serviceName}
                       >
-                        <Select
-                          id={`serviceName_${index}`}
-                          name={`serviceName_${index}`}
-                          size="large"
-                          // placeholder="Select Service"
-                          suffixIcon={isServicesLoading ? <Spin /> : <CaretDownOutlined />}
-                          onChange={(value) => {
-                            const updatedServices = [...formik.values.services];
-                            updatedServices[index] = {
-                              ...updatedServices[index],
-                              serviceName: value,
-                              serviceId: services.find(
-                                (service) => service.name === value
-                              ).address,
-                            };
-                            formik.setFieldValue("services", updatedServices);
-                          }}
-                          value={service.serviceName}
-                        >
-                          {/* TODO: We should think about how we want to load services. If its a long list it might not be the best way to display them this way. */}
-                          {isServicesLoading === false &&
-                            services.map((service) => (
-                              <Select.Option
-                                key={service.address}
-                                value={service.name}
-                              >
-                                {service.name}
-                              </Select.Option>
-                            ))}
-                        </Select>
-                        {getIn(formik.touched, `services[${index}].serviceName`) &&
-                          getIn(formik.errors, `services[${index}].serviceName`) && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, `services[${index}].serviceName`)}
-                            </span>
-                          )}
+                        <>
+                          <Select
+                            id={`serviceName_${index}`}
+                            name={`serviceName_${index}`}
+                            size="large"
+                            // placeholder="Select Service"
+                            suffixIcon={isServicesLoading ? <Spin /> : <CaretDownOutlined />}
+                            onChange={(value) => {
+                              const updatedServices = [...formik.values.services];
+                              updatedServices[index] = {
+                                ...updatedServices[index],
+                                serviceName: value,
+                                serviceId: services.find(
+                                  (service) => service.name === value
+                                ).address,
+                              };
+                              formik.setFieldValue("services", updatedServices);
+                            }}
+                            value={service.serviceName}
+                          >
+                            {/* TODO: We should think about how we want to load services. If its a long list it might not be the best way to display them this way. */}
+                            {isServicesLoading === false &&
+                              services.map((service) => (
+                                <Select.Option
+                                  key={service.address}
+                                  value={service.name}
+                                >
+                                  {service.name}
+                                </Select.Option>
+                              ))}
+                          </Select>
+                          {getIn(formik.touched, `services[${index}].serviceName`) &&
+                            getIn(formik.errors, `services[${index}].serviceName`) && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, `services[${index}].serviceName`)}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
                     <Col span={7}>
@@ -681,32 +693,34 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         key={`numberOfUses_${index}`}
                       // value={service.numberOfUses}
                       >
-                        <InputNumber
-                          id={`numberOfUses_${index}`}
-                          name={`numberOfUses_${index}`}
-                          type="number"
-                          size="large"
-                          // placeholder="Number of Uses"
-                          min={0}
-                          className="w-full"
-                          controls={false}
-                          value={service.numberOfUses}
-                          onChange={(value) => {
-                            const updatedServices = [...formik.values.services];
-                            updatedServices[index] = {
-                              ...updatedServices[index],
-                              numberOfUses: value,
-                            };
-                            formik.setFieldValue("services", updatedServices);
-                          }}
+                        <>
+                          <InputNumber
+                            id={`numberOfUses_${index}`}
+                            name={`numberOfUses_${index}`}
+                            type="number"
+                            size="large"
+                            // placeholder="Number of Uses"
+                            min={0}
+                            className="w-full"
+                            controls={false}
+                            value={service.numberOfUses}
+                            onChange={(value) => {
+                              const updatedServices = [...formik.values.services];
+                              updatedServices[index] = {
+                                ...updatedServices[index],
+                                numberOfUses: value,
+                              };
+                              formik.setFieldValue("services", updatedServices);
+                            }}
 
-                        />
-                        {getIn(formik.touched, `services[${index}].numberOfUses`) &&
-                          getIn(formik.errors, `services[${index}].numberOfUses`) && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, `services[${index}].numberOfUses`)}
-                            </span>
-                          )}
+                          />
+                          {getIn(formik.touched, `services[${index}].numberOfUses`) &&
+                            getIn(formik.errors, `services[${index}].numberOfUses`) && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, `services[${index}].numberOfUses`)}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
 
@@ -716,46 +730,48 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                         name={`memberPrice_${index}`}
                         key={`memberPrice_${index}`}
                       >
-                        <InputNumber
-                          id={`memberPrice_${index}`}
-                          name={`memberPrice_${index}`}
-                          // placeholder="Discount"
-                          type="number"
-                          size="large"
-                          addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
-                            <Col span={12} className="p-1"
-                              style={{ backgroundColor: memberDiscount[index] === 2 ? "#F2F2F5" : "" }}
-                              onClick={() => { handleDiscountType("Percent", index) }}>
-                              %
-                            </Col>
-                            <Col span={12} className="p-1"
-                              style={{ backgroundColor: memberDiscount[index] !== 2 ? "#F2F2F5" : "" }}
-                              onClick={() => { handleDiscountType("Dollar", index) }}>
-                              $
-                            </Col>
-                          </Row>}
-                          controls={false}
-                          min={0}
-                          value={service.memberPrice}
-                          onChange={(value) => {
-                            const updatedServices = [...formik.values.services];
-                            updatedServices[index] = {
-                              ...updatedServices[index],
-                              memberPrice: value,
-                              percentDiscount: value, // Update both fields with the same value later on we will remove the one that is not being used
-                            };
-                            formik.setFieldValue("services", updatedServices);
-                          }}
+                        <>
+                          <InputNumber
+                            id={`memberPrice_${index}`}
+                            name={`memberPrice_${index}`}
+                            // placeholder="Discount"
+                            type="number"
+                            size="large"
+                            addonAfter={<Row className="flex w-16 h-8 border-grey rounded-md justify-between cursor-pointer">
+                              <Col span={12} className="p-1"
+                                style={{ backgroundColor: memberDiscount[index] === 2 ? "#F2F2F5" : "" }}
+                                onClick={() => { handleDiscountType("Percent", index) }}>
+                                %
+                              </Col>
+                              <Col span={12} className="p-1"
+                                style={{ backgroundColor: memberDiscount[index] !== 2 ? "#F2F2F5" : "" }}
+                                onClick={() => { handleDiscountType("Dollar", index) }}>
+                                $
+                              </Col>
+                            </Row>}
+                            controls={false}
+                            min={0}
+                            value={service.memberPrice}
+                            onChange={(value) => {
+                              const updatedServices = [...formik.values.services];
+                              updatedServices[index] = {
+                                ...updatedServices[index],
+                                memberPrice: value,
+                                percentDiscount: value, // Update both fields with the same value later on we will remove the one that is not being used
+                              };
+                              formik.setFieldValue("services", updatedServices);
+                            }}
 
-                        // addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
-                        />
-                        {/* We should throw the formik error to say we need either the discount price or  */}
-                        {getIn(formik.touched, `services[${index}].memberPrice`) &&
-                          getIn(formik.errors, `services[${index}].memberPrice`) && (
-                            <span className="text-error text-xs">
-                              {getIn(formik.errors, `services[${index}].memberPrice`)}
-                            </span>
-                          )}
+                          // addonBefore={memberDiscount[index] === 1 ? "$" : "%"}
+                          />
+                          {/* We should throw the formik error to say we need either the discount price or  */}
+                          {getIn(formik.touched, `services[${index}].memberPrice`) &&
+                            getIn(formik.errors, `services[${index}].memberPrice`) && (
+                              <span className="text-error text-xs">
+                                {getIn(formik.errors, `services[${index}].memberPrice`)}
+                              </span>
+                            )}
+                        </>
                       </Form.Item>
                     </Col>
                     {/* </div> */}
