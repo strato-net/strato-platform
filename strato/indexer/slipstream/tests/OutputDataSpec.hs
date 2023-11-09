@@ -754,8 +754,7 @@ spec = do
     [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
         runLoggingT . runConduit $ createInsertsMapping g input .| sinkList
 
-    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy.SwissArmyMapping" (record_id text,
-    address text,
+    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy.SwissArmyMapping" (address text,
     "chainId" text,
     block_hash text,
     block_timestamp text,
@@ -766,7 +765,7 @@ spec = do
     mapname text,
     key text,
     value text,
-  PRIMARY KEY (record_id, key));|]
+  PRIMARY KEY (address, key));|]
 
     swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "SwissArmy.SwissArmyMapping" ("record_id",
     "address",
