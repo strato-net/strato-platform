@@ -41,7 +41,7 @@ const Membership = (user) => {
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
 
   // States
-  // const { categorys, iscategorysLoading } = useCategoryState();
+  // const { categorys, isCategorysLoading } = useCategoryState();
   // const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
   const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const inventoryState = useInventoryState();

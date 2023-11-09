@@ -79,7 +79,7 @@ const CreateEventModal = ({
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys, isCategorysLoading } = useCategoryState();
 
   //product
   const productDispatch = useProductDispatch();
@@ -252,7 +252,7 @@ const CreateEventModal = ({
         ]}
       >
         <Divider />
-        {isEventTypesLoading || iscategorysLoading ? (
+        {isEventTypesLoading || isCategorysLoading ? (
           <div className="h-96 flex justify-center items-center">
             <Spin size="large" />
           </div>
@@ -300,7 +300,7 @@ const CreateEventModal = ({
                     showSearch
                     name="subCategory.name"
                     disabled={false}
-                    loading={iscategorysLoading}
+                    loading={isCategorysLoading}
                     value={formik.values.subCategory.name}
                     onChange={(value) => {
                       formik.setFieldValue("subCategory.name", value);

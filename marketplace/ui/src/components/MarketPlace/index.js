@@ -18,7 +18,7 @@ const MarketPlace = () => {
   const dispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { iscategorysLoading } = useCategoryState();
+  const { isCategorysLoading } = useCategoryState();
   const { topSellingProducts, isTopSellingProductsLoading } = useMarketplaceState();
   let { isAuthenticated } = useAuthenticateState();
 
@@ -52,9 +52,9 @@ const MarketPlace = () => {
           style={{ objectFit: "cover" }}
           preview={false} width="100%" />
       </div>
-      {iscategorysLoading ? (
+      {isCategorysLoading ? (
         <div className="h-96 flex justify-center items-center">
-          <Spin spinning={iscategorysLoading} size="large" />
+          <Spin spinning={isCategorysLoading} size="large" />
         </div>
       ) : (
         <div className="px-8 py-12">

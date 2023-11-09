@@ -30,7 +30,7 @@ const UpdateInventoryModal = ({
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
 
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys, isCategorysLoading } = useCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
   
@@ -152,9 +152,9 @@ const UpdateInventoryModal = ({
         Edit Inventory
       </h1>
       <hr className="text-secondryD mt-3" />
-      {inventoryToUpdate && iscategorysLoading ? (
+      {inventoryToUpdate && isCategorysLoading ? (
         <div className="h-44 flex justify-center items-center">
-          <Spin spinning={iscategorysLoading} size="large" />
+          <Spin spinning={isCategorysLoading} size="large" />
         </div>
       ) : (
         <Form layout="vertical" className="mt-5" onSubmit={formik.handleSubmit}>

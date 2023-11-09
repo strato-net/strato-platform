@@ -103,7 +103,7 @@ const ProductDetails = ({ user, users }) => {
   const categoryDispatch = useCategoryDispatch();
   const [categoryName, setCategoryName] = useState("");
   const [api, contextHolder] = notification.useNotification();
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys, isCategorysLoading } = useCategoryState();
   const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
@@ -544,7 +544,7 @@ const ProductDetails = ({ user, users }) => {
       {contextHolder}
       {details === null ||
         isInventoryDetailsLoading ||
-        iscategorysLoading ||
+        isCategorysLoading ||
         isSerialNumbersLoading ? (
           <LoaderComponent  />
       ) : (

@@ -34,19 +34,19 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchCategory:
       return {
         ...state,
-        iscategorysLoading: true
+        isCategorysLoading: true
       };
     case actionDescriptors.fetchCategorySuccessful:
       return {
         ...state,
         categorys: action.payload,
-        iscategorysLoading: false
+        isCategorysLoading: false
       };
     case actionDescriptors.fetchCategoryFailed:
       return {
         ...state,
         error: action.error,
-        iscategorysLoading: false
+        isCategorysLoading: false
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

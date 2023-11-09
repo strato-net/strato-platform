@@ -48,7 +48,7 @@ const Product = () => {
 
   //Sub-categories
 
-  const { categorys, iscategorysLoading } = useCategoryState();
+  const { categorys, isCategorysLoading } = useCategoryState();
   const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
@@ -116,7 +116,7 @@ const Product = () => {
   return (
     <>
       {contextHolder}
-      {isProductsLoading || iscategorysLoading || isSubCategorysLoading ? (
+      {isProductsLoading || isCategorysLoading || isSubCategorysLoading ? (
         <LoaderComponent  />
       ) : (
         <div className="mx-16 mt-14 h-screen">

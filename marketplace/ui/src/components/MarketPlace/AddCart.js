@@ -35,7 +35,7 @@ const Checkout = ({ user }) => {
   const [tax, setTax] = useState(0);
   const [shipping, setShipping] = useState(0);
   const [total, setTotal] = useState(0);
-  const [mapData, setmapData] = useState([])
+  const [mapData, setMapData] = useState([])
 
   const calculateTax = (item) => {
     let tax = item.product.taxDollarAmount === 0 ? Math.round(item.product.pricePerUnit * (item.product.taxPercentageAmount / 100)) : (item.product.taxDollarAmount)
@@ -98,7 +98,7 @@ const Checkout = ({ user }) => {
       return { key: key, value: modifiedValue };
     });
 
-    setmapData(mapDataArray)
+    setMapData(mapDataArray)
 
     let t = 0;
     cartList?.forEach((item) => {
