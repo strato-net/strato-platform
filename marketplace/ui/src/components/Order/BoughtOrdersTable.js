@@ -33,11 +33,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       dispatch,
       limit,
       offset,
-      debouncedSearchTerm,
-      user?.organization,
-      order,
-      selectedDate,
-      filter
+      user?.commonName,
     );
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
   
@@ -57,9 +53,9 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         chainId: order.chainId,
         key: order.address,
         orderNumber: order,
-        sellerOrganization: order.sellerOrganization,
-        orderTotal: order.orderTotal,
-        date: getStringDate(order.orderDate, US_DATE_FORMAT),
+        sellerCommonName: order.sellerCommonName,
+        orderTotal: order.totalPrice,
+        date: getStringDate(order.createdDate, US_DATE_FORMAT),
         status: getStatus(parseInt(order.status)),
         invoice: order,
       });
@@ -88,8 +84,8 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     },
     {
       title: "seller".toUpperCase(),
-      dataIndex: "sellerOrganization",
-      key: "sellerOrganization",
+      dataIndex: "sellerCommonName",
+      key: "sellerCommonName",
       render: (text) => <p>{text}</p>,
     },
     {
@@ -103,7 +99,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       key: "date",
       render: (text) => <p>{text}</p>,
       title: (
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <div className="mt-2" style={{ display: "flex", justifyContent: "space-between" }}>
           <div>{"Date (mm/dd/yyyy)".toUpperCase()}</div>
           <div>
             {order === "createdDate.desc" ? (

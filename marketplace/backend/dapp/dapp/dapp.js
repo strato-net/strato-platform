@@ -793,12 +793,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args,
       purchasersCommonName: userCert.commonName,
       purchasersAddress: rawAdmin.address,
+      orderId: util.uid(),
+      createdDate: createdDate,
     }
     return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
+  }
+
+  contract.getSaleOrders = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName, };
+    
+    return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
   contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {

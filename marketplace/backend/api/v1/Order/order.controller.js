@@ -39,7 +39,7 @@ class OrderController {
     try {
       const { dapp, query } = req
 
-      const orders = await dapp.getOrders({ ...query })
+      const orders = await dapp.getSaleOrders({ ...query })
       rest.response.status200(res, orders)
 
       return next()
@@ -322,11 +322,13 @@ class OrderController {
     const createSaleOrderSchema = Joi.object({
       saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
       sellerCommonName: Joi.string().required(),
+      totalPrice: Joi.number().required(),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);
 
     if (validation.error) {
+      console.log(validation.error);
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Sale Order Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })

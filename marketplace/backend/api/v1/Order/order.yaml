@@ -248,6 +248,8 @@ definitions:
           type: string
       sellerCommonName:
         type: string
+      totalPrice:
+        type: number
   executeSale:
     type: object
     properties:

@@ -20,7 +20,19 @@ contract SaleState{
         Created,
         Closed,
         MAX
-    }}
+    }
+}
+
+contract OrderStatus{
+    enum OrderStatus{
+        NULL,
+        AWAITING_FULFILLMENT,
+        AWAITING_SHIPMENT,
+        CLOSED,
+        CANCELED,
+        MAX
+    }
+}
 
 contract RestStatus {
   uint constant OK = 200;
@@ -112,13 +124,13 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
 }
 
 abstract contract Sale is PaymentType, SaleState, RestStatus{ 
-    string sellersCommonName;
-    string purchasersCommonName;
-    Asset assetToBeSold;
-    uint price;
-    address saleOrderID;
-    SaleState state;
-    PaymentType payment;
+    string public sellersCommonName;
+    string public purchasersCommonName;
+    Asset public assetToBeSold;
+    uint public price;
+    uint public saleOrderID;
+    SaleState public state;
+    PaymentType public payment;
 
 
     constructor(
@@ -132,7 +144,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         price = assetToBeSold.price();
         state = _state;
         payment = _payment;
-        saleOrderID = address(0);
+        saleOrderID = 0;
     }
 
     modifier requireSeller(string action) {
@@ -155,8 +167,8 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         payment=_payment;
     }
 
-    function transferOwnership(string _purchasersCommonName, address _purchasersAddress) public requireSeller("Transfer Ownership of Asset") returns (uint) {
-        saleOrderID = msg.sender;
+    function transferOwnership(string _purchasersCommonName, address _purchasersAddress, uint _orderId) public requireSeller("Transfer Ownership of Asset") returns (uint) {
+        saleOrderID = _orderId;
         purchasersCommonName = _purchasersCommonName;
         assetToBeSold.transferOwnership(purchasersCommonName, _purchasersAddress);
         state = SaleState.Closed;
@@ -164,25 +176,42 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
     }
 }
 
-abstract contract Order is RestStatus {
+abstract contract Order is RestStatus, OrderStatus {
+    uint public orderId;
     address[] public saleAddresses;
     string public sellerCommonName;
     string public purchasersCommonName;
     address public purchasersAddress;
+    uint public createdDate;
+    uint public totalPrice;
+    OrderStatus public status;
 
-    constructor(address[] _saleAddresses, string _sellerCommonName, string _purchasersCommonName, address _purchasersAddress) external{
+    constructor(
+        uint _orderId,
+        address[] _saleAddresses, 
+        string _sellerCommonName, 
+        string _purchasersCommonName, 
+        address _purchasersAddress,
+        uint _createdDate,
+        uint _totalPrice
+    ) external{
+        orderId = _orderId;
         saleAddresses = _saleAddresses;
         sellerCommonName = _sellerCommonName;
         purchasersCommonName = _purchasersCommonName;
         purchasersAddress = _purchasersAddress;
+        createdDate = _createdDate;
+        totalPrice = _totalPrice;
+        status = OrderStatus.AWAITING_FULFILLMENT;
     }
     
     function transferOwnership() external returns (uint) {
         for (uint i = 0; i < saleAddresses.length; i++) {
             Sale sale = Sale(saleAddresses[i]);
             // Perform the ownership transfer
-            sale.transferOwnership(purchasersCommonName, purchasersAddress);
+            sale.transferOwnership(purchasersCommonName, purchasersAddress, orderId);
         }
+        status = OrderStatus.CLOSED;
         return RestStatus.OK;
     }
 }

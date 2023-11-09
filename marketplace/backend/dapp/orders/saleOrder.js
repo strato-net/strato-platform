@@ -178,15 +178,12 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-  const orders = await searchAllWithQueryArgs(
-    contractName,
-    args,
-    options,
-    admin
-  );
+  let saleOrders;
 
-  const queryArgs = await searchAllWithQueryArgs(
-    contractName,
+  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, options, admin);
+
+  const count = await searchAllWithQueryArgs(
+    constants.orderTableName,
     {
     ...args,
     limit: undefined,
@@ -200,7 +197,7 @@ async function getAll(admin, args = {}, options) {
     admin
   );
 
-  return { orders: orders.map((order) => marshalOut(order)), total: queryArgs[0].count}
+  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: count[0].count } : undefined;
 }
 
 /**

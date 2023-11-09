@@ -25,6 +25,7 @@ export default {
   sellerOrgName: "blockapps",
   assetTableName: "BlockApps-Mercata-Asset",
   saleTableName: "BlockApps-Mercata-Sale",
+  orderTableName: "BlockApps-Mercata-Order",
 };
 
 export const STRIPE_ENV = {

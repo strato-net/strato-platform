@@ -5,11 +5,21 @@ import <d816194227e1a7a780fff236a449604afeb36255>;
 contract SaleOrder is Order {
 
     constructor(
+        uint _orderId,
         address[] _saleAddresses,
         string _sellerCommonName,
         string _purchasersCommonName,
-        address _purchasersAddress
-    ) external Order(_saleAddresses, _sellerCommonName, _purchasersCommonName, _purchasersAddress){
+        address _purchasersAddress,
+        uint _createdDate,
+        uint _totalPrice
+    ) external Order(
+        _orderId, 
+        _saleAddresses, 
+        _sellerCommonName, 
+        _purchasersCommonName, 
+        _purchasersAddress, 
+        _createdDate, 
+        _totalPrice){
 
     }
 
