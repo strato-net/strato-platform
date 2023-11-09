@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
+import { useMatch } from "react-router-dom";
 import {
-  Breadcrumb,
   Collapse,
   Divider,
   Typography,
@@ -8,38 +9,40 @@ import {
   InputNumber,
   Space,
 } from "antd";
+// Components
 import CategoryProductCard from "./CategoryProductCard";
-//categories
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+// Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { useEffect, useState } from "react";
-//sub-categories
 import { actions as subCategoryActions } from "../../contexts/subCategory/actions";
-import {
-  useSubCategoryDispatch,
-  useSubCategoryState,
-} from "../../contexts/subCategory";
-//Marketplace
-import { actions } from "../../contexts/marketplace/actions";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+// Dispatch and Actions
+import { useSubCategoryDispatch, useSubCategoryState } from "../../contexts/subCategory";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { useAuthenticateState } from "../../contexts/authentication";
+// Utils, Constants
 import { arrayToStr } from "../../helpers/utils";
 import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
-import { useMatch } from "react-router-dom";
 import { MAX_QUANTITY, MAX_PRICE } from "../../helpers/constants";
-import ClickableCell from "../ClickableCell";
-import { useAuthenticateState } from "../../contexts/authentication";
-import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import NoProductComponent from "../NoProductFound/NoProductComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
 
 const CategoryProductList = ({ user }) => {
+  // Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
+  const subCategoryDispatch = useSubCategoryDispatch();
+  const categoryDispatch = useCategoryDispatch();
+  // States
   const { marketplaceList, isMarketplaceLoading, isMarketplaceInitialLoading } = useMarketplaceState();
+  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
+  const { hasChecked, isAuthenticated } = useAuthenticateState();
+  const { categorys, iscategorysLoading } = useCategoryState();
+
   const [productList, setProductList] = useState([])
   const [category, setCategory] = useState("");
   const [brands, setBrands] = useState([]);
@@ -55,12 +58,8 @@ const CategoryProductList = ({ user }) => {
   const debouncedMinQty = useDebounce(minQty, 1000);
   const debouncedMaxPrice = useDebounce(maxPrice, 1000);
   const debouncedMinPrice = useDebounce(minPrice, 1000);
-  //=========================Categories===============================//
-  const categoryDispatch = useCategoryDispatch();
-  const { categorys, iscategorysLoading } = useCategoryState();
-  let currentCategory;
 
-  let { hasChecked, isAuthenticated } = useAuthenticateState();
+  let currentCategory;
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -71,11 +70,11 @@ const CategoryProductList = ({ user }) => {
     strict: true,
   });
 
-  const onChangeCategory = (checkedValues) => {
-    setSelectedCategories(checkedValues);
-    currentCategory = categorys.find((c) => c.name === checkedValues);
-    if (checkedValues.length) clearSelection();
-  };
+  // const onChangeCategory = (checkedValues) => {
+  //   setSelectedCategories(checkedValues);
+  //   currentCategory = categorys.find((c) => c.name === checkedValues);
+  //   if (checkedValues.length) clearSelection();
+  // };
 
   useEffect(() => {
     let param = routeMatch?.params?.category;
@@ -87,10 +86,6 @@ const CategoryProductList = ({ user }) => {
 
   currentCategory = categorys.find((c) => c.name === category);
   currentCategory ?? (currentCategory = " ");
-  //=========================Sub-categories===============================//
-
-  const subCategoryDispatch = useSubCategoryDispatch();
-  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
 
   useEffect(() => {
     let categorys = null;
@@ -126,10 +121,10 @@ const CategoryProductList = ({ user }) => {
       setProductList(filteredBrandProduct);
     }
   };
-  //============================Marketplace================================//
+
   useEffect(() => {
     if (category !== "" && hasChecked && !isAuthenticated) {
-      actions.fetchMarketplace(
+      marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
@@ -141,7 +136,7 @@ const CategoryProductList = ({ user }) => {
         debouncedMaxPrice
       );
     } else if (category !== "" && isAuthenticated) {
-      actions.fetchMarketplaceLoggedIn(
+      marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
         arrayToStr(selectedSubCategories),
@@ -168,28 +163,24 @@ const CategoryProductList = ({ user }) => {
     isAuthenticated,
   ]);
 
-  //============================Manufacturers/Brands=============================//
   useEffect(() => {
     if (marketplaceList.length > 0) {
       var uniqueBrands =
         marketplaceList.map((p) => p.manufacturer)
           .filter(
-            (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
+            (manufacturer, index, arr) => arr.indexOf(manufacturer) === index
           );
       setBrands(uniqueBrands);
     }
     setProductList(marketplaceList)
   }, [marketplaceList]);
 
-  //=========================Other functions===============================//
+  // const clearSelection = () => {
+  //   setSelectedSubCategories([]);
+  //   setSelectedProducts([]);
+  //   setSelectedBrands([]);
+  // };
 
-  const clearSelection = () => {
-    setSelectedSubCategories([]);
-    setSelectedProducts([]);
-    setSelectedBrands([]);
-  };
-
-  //=============================================================================//
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
     const existingIndex = tempValues.indexOf(e.target.value);
@@ -202,7 +193,6 @@ const CategoryProductList = ({ user }) => {
     }
     return tempValues;
   }
-  //============================================================================//
 
   const isLoading = isSubCategorysLoading || isMarketplaceLoading || iscategorysLoading || isMarketplaceInitialLoading;
 
@@ -305,13 +295,12 @@ const CategoryProductList = ({ user }) => {
                 >
                   <Panel header={<Text strong>Sub-Category</Text>} key="1">
                     <Checkbox.Group
-                      // onChange={onChangeSubCategory}
                       value={selectedSubCategories}
                     >
                       <div className="flex flex-col gap-3">
-                        {subCategorys.map((subcategory, index) => (
-                          <Checkbox value={subcategory.name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                            {subcategory.name}
+                        {subCategorys.map(({ name }, index) => (
+                          <Checkbox value={name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                            {name}
                           </Checkbox>
                         ))}
                       </div>
@@ -339,9 +328,9 @@ const CategoryProductList = ({ user }) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {marketplaceList.map((product, index) => (
-                          <Checkbox value={product.productId} key={index} className="m-0" onChange={onChangeProduct}>
-                            {product.name}
+                        {marketplaceList.map(({ productId, name }, index) => (
+                          <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
+                            {name}
                           </Checkbox>
                         ))}
                       </div>
@@ -385,37 +374,32 @@ const CategoryProductList = ({ user }) => {
         </div>
 
         {/* Product list section */}
-        {isLoading ? (
-          <div className="h-96 w-9/12 flex justify-center items-center">
-            <Spin spinning={isMarketplaceLoading} size="large" />
-          </div>
-        ) : (
-          <div className="w-9/12 mb-12">
-            <Text className="text-sm text-secondryB">
-              {marketplaceList.length} Products found
-            </Text>
-            {marketplaceList.length > 0 ? (
-              <div className="mt-4 mb-8 mr-10" id="product-list">
-                {productList.map((product, index) => {
-                  const prodCategory = categorys.find(
-                    (c) => c.name === product.category
-                  );
-                  return (
-                    <CategoryProductCard
-                      product={product}
-                      key={index}
-                      category={prodCategory == null ? "" : prodCategory.name}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-96 flex justify-center items-center" id="product-list">
-                No data found
-              </div>
-            )}
-          </div>
-        )}
+        {isLoading
+          ? <LoaderComponent />
+          : (
+            <div className="w-9/12 mb-12">
+              <Text className="text-sm text-secondryB">
+                {marketplaceList.length} Products found
+              </Text>
+              {marketplaceList.length > 0
+                ? <div className="mt-4 mb-8 mr-10" id="product-list">
+                  {productList.map((product, index) => {
+                    const prodCategory = categorys.find(
+                      (c) => c.name === product.category
+                    );
+                    return (
+                      <CategoryProductCard
+                        product={product}
+                        key={index}
+                        category={prodCategory == null ? "" : prodCategory.name}
+                      />
+                    );
+                  })}
+                </div>
+                : <NoProductComponent text={"Product"} />
+              }
+            </div>
+          )}
       </div>
     </div>
   );
