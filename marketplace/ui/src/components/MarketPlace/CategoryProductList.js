@@ -103,21 +103,40 @@ const CategoryProductList = ({ user }) => {
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)
     setSelectedProducts(valuesChecked);
-    if (valuesChecked.length === 0) {
+    if (valuesChecked.length === 0 && selectedBrands.length === 0) {
       setProductList(marketplaceList)
     } else {
-      let filteredProducts = marketplaceList.filter((item) => valuesChecked.includes(item.productId))
-      setProductList(filteredProducts);
+      let filteredBrandProduct;
+      if (valuesChecked.length !== 0 && selectedBrands.length !== 0) {
+        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.productId) && selectedBrands.includes(item.manufacturer)));
+      }
+      if (valuesChecked.length === 0 && selectedBrands.length !== 0) {
+        filteredBrandProduct = marketplaceList.filter((item) => (selectedBrands.includes(item.manufacturer)));
+      }
+      if (valuesChecked.length !== 0 && selectedBrands.length === 0) {
+        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.productId)));
+      }
+      setProductList(filteredBrandProduct);
     }
   };
 
   const onChangeBrand = (e) => {
     let valuesChecked = checkValues(e, selectedBrands)
     setSelectedBrands(valuesChecked);
-    if (valuesChecked.length === 0) {
+
+    if (valuesChecked.length === 0 && selectedProducts.length === 0) {
       setProductList(marketplaceList);
     } else {
-      let filteredBrandProduct = marketplaceList.filter((item) => valuesChecked.includes(item.manufacturer));
+      let filteredBrandProduct;
+      if (valuesChecked.length !== 0 && selectedProducts.length !== 0) {
+        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.manufacturer) && selectedProducts.includes(item.productId)));
+      }
+      if (valuesChecked.length === 0 && selectedProducts.length !== 0) {
+        filteredBrandProduct = marketplaceList.filter((item) => (selectedProducts.includes(item.productId)));
+      }
+      if (valuesChecked.length !== 0 && selectedProducts.length === 0) {
+        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.manufacturer)));
+      }
       setProductList(filteredBrandProduct);
     }
   };
@@ -271,7 +290,7 @@ const CategoryProductList = ({ user }) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {marketplaceList.map(({ productId, name }, index) => (
+                        {(selectedBrands.length > 0 ? productList : marketplaceList).map(({ productId, name }, index) => (
                           <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
                             {name}
                           </Checkbox>
