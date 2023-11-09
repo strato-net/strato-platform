@@ -21,7 +21,7 @@ import MembershipHeader from "./components/MembershipHeader";
 import LoaderComponent from "../Loader/LoaderComponent";
 import ToastComponent from "../ToastComponent/ToastComponent";
 
-const limit = 10;
+const limit = 10, offset = 0, queryValue = "";
 
 const Membership = (user) => {
   const { type } = useParams();
@@ -38,8 +38,6 @@ const Membership = (user) => {
   // const categoryDispatch = useCategoryDispatch();
   const inventoryDispatch = useInventoryDispatch();
 
-  const [queryValue, setQueryValue] = useState("");
-  const [offset, setOffset] = useState(0);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
 
   // States
@@ -89,8 +87,8 @@ const Membership = (user) => {
   const handleCancel = (message) => {
     if (message === "success") {
       membershipActions.fetchMembership(membershipDispatch, limit, offset, debouncedSearchTerm);
-    } else {
     }
+
     setOpen(false);
   };
 
@@ -103,13 +101,12 @@ const Membership = (user) => {
 
   const isPageLoading = stripeStatus === null || isLoadingStripeStatus;
   const isMembershipFound = isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading;
-
+  const listTabProps = { type, isPurchased, user, debouncedSearchTerm }
   return (
     <>
-      {isPageLoading ? (
-        <LoaderComponent />
-      ) : (
-        <div className="min-h-full">
+      {isPageLoading
+        ? <LoaderComponent />
+        : <div className="min-h-full">
           <BreadCrumbComponent />
           <MembershipHeader
             type={type}
@@ -120,14 +117,9 @@ const Membership = (user) => {
             showModal={() => { showModal() }}
           />
           <MembershipListTabComponent
-            props={{
-              type,
-              isPurchased,
-              user,
-              debouncedSearchTerm
-            }} />
+            props={listTabProps} />
         </div>
-      )}
+      }
       {open && (
         <CreateMembershipModal
           open={open}

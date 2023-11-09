@@ -510,7 +510,7 @@ const MembershipDetails = ({ user }) => {
                       style={{ borderBottom: "1px solid #d3d3d3" }}
                     ></Row>
                     <Col span={24} className="border-t-1 h-20 mt-8">
-                      {inventoryDetails?.availableQuantity != 0 ? (
+                      {inventoryDetails?.availableQuantity !== 0 ? (
                         <Row className="flex justify-between h-10 mt-5">
                           <Col span={4} className="rounded-md h-14">
                             <Button
@@ -558,7 +558,7 @@ const MembershipDetails = ({ user }) => {
                 )}
               </Card>
               <Row className="h-14 mt-4">
-                {inventoryDetails?.availableQuantity == 0 ? (
+                {inventoryDetails?.availableQuantity === 0 ? (
                   <Button
                     block={true}
                     type="primary"
