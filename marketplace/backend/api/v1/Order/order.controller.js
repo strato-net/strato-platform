@@ -14,19 +14,24 @@ class OrderController {
       const { dapp, params } = req
       const { address } = params
 
-      let args
-      let chainOptions = options
+      let args;
+      let chainOptions = options;
 
       if (address) {
         args = { address }
       }
 
-      const order = await dapp.getOrder(args, chainOptions)
-      const orderLinesWithImageUrl = order.orderLines.map(orderLine => ({
-        ...orderLine,
-        imageUrl: getSignedUrlFromS3(orderLine.imageKey, req.app.get(constants.s3ParamName))
-      }))
-      const result = { ...order, orderLines: orderLinesWithImageUrl }
+      const order = await dapp.getOrder(args, chainOptions);
+      const assetsWithImageUrl = order.assets.map(asset => (
+        asset.images && asset.images.length > 0 ?
+        {
+          ...asset,
+          images: asset.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName)))),
+        }
+        :
+        asset
+      ))
+      const result = { ...order, assets: assetsWithImageUrl }
       rest.response.status200(res, result)
 
       return next()
@@ -323,6 +328,7 @@ class OrderController {
       saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
       sellerCommonName: Joi.string().required(),
       totalPrice: Joi.number().required(),
+      shippingAddress: Joi.string().required(),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);

@@ -810,6 +810,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
+  contract.getOrder = async function (args, options = defaultOptions) {
+    try {
+      const order = await saleOrderJs.get(rawAdmin, args, options);
+      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const userContactAddress = await userAddressJs.get(rawAdmin, { address: order.shippingAddress }, getOptions);
+      const assets = await managers.productManager.getInventories({ saleAddresses: order.saleAddresses }, options);
+      const result = { userContactAddress, order, assets };
+
+      return result;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching the order");
+    }
+  };
+
   contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
     const { saleOrderAddress, ...restArgs } = args;
     
@@ -1218,67 +1235,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
-    }
-  };
-
-  contract.getOrder = async function (args, options = optionsNoChainIds) {
-    try {
-
-      const { address, ...newArgs } = args;
-
-      const createOptions = { ...options, org: managers.cirrusOrg, app: contractName };
-      const optionsWithChainId = { ...options, org: managers.cirrusOrg };
-
-      const order = managers.orderManager.getOrder(args, createOptions);
-      const orderLines = managers.orderManager.getOrderLines({ orderAddress: address }, createOptions);
-
-      const response = await Promise.allSettled([order, orderLines]);
-      const userContactAddress = await userAddressJs.get(rawAdmin, { address: response[0].value.shippingAddress }, createOptions)
-      const result = { userContactAddress, ...response[0].value, orderLines: response[1].value, };
-
-      for (let i = 0; i < result.orderLines.length; i++) {
-        const { productId, inventoryId } = result.orderLines[i];
-        const items = await managers.itemManager.getItems({ productId, inventoryId }, createOptions);
-
-        if (items === null || items === undefined || items.length === 0) {
-          result.orderLines[i].containsSerialNumber = false;
-        }
-        else if (items.length > 0 && items[0].serialNumber == "") {
-          result.orderLines[i].containsSerialNumber = false;
-        } else {
-          result.orderLines[i].containsSerialNumber = true;
-        }
-      }
-
-      const productIds = [
-        ...new Set(result.orderLines.map((orderLines) => orderLines.productId)),
-      ];
-      const { chainIds, ...newOptions } = options;
-
-      const products = await managers.productManager.getProducts({ address: [...productIds], chainId: contract.chainId }, createOptions);
-
-      if (!products || products.length === 0) {
-        throw new rest.RestError(RestStatus.NOT_FOUND, "Products not found");
-      }
-
-      result.orderLines.forEach((orderLine) => {
-        const product = products.find(
-          (product) => product.address === orderLine.productId
-        );
-        if (product) {
-          orderLine.productName = product.name;
-          orderLine.manufacturer = product.manufacturer;
-          orderLine.imageKey = product.imageKey;
-          orderLine.amount = orderLine.pricePerUnit * orderLine.quantity + orderLine.shippingCharges + orderLine.tax;
-        }
-      });
-
-      return result;
-    } catch (error) {
-      if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
-      }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while Fetching  the Order");
     }
   };
 

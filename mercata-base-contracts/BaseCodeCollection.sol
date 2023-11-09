@@ -185,6 +185,7 @@ abstract contract Order is RestStatus, OrderStatus {
     uint public createdDate;
     uint public totalPrice;
     OrderStatus public status;
+    address public shippingAddress;
 
     constructor(
         uint _orderId,
@@ -193,7 +194,8 @@ abstract contract Order is RestStatus, OrderStatus {
         string _purchasersCommonName, 
         address _purchasersAddress,
         uint _createdDate,
-        uint _totalPrice
+        uint _totalPrice,
+        address _shippingAddress
     ) external{
         orderId = _orderId;
         saleAddresses = _saleAddresses;
@@ -203,6 +205,7 @@ abstract contract Order is RestStatus, OrderStatus {
         createdDate = _createdDate;
         totalPrice = _totalPrice;
         status = OrderStatus.AWAITING_FULFILLMENT;
+        shippingAddress = _shippingAddress;
     }
     
     function transferOwnership() external returns (uint) {

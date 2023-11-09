@@ -27,6 +27,7 @@ import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
 import TagManager from "react-gtm-module";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
@@ -126,24 +127,23 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (orderDetails) {
-      setStatus(getStatus(parseInt(orderDetails.status)));
+      setStatus(getStatus(parseInt(orderDetails.order.status)));
       setcomment(orderDetails.buyerComments);
 
       let items = [];
-      orderDetails.orderLines.forEach((prod) => {
+      orderDetails.assets.forEach((prod) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.imageUrl,
-          productName: prod.productName,
-          manufacturer: prod.manufacturer,
-          unitPrice: prod.pricePerUnit,
-          quantity: prod.quantity,
-          shippingCharges: prod.shippingCharges,
-          amount: prod.amount,
+          productImage: prod.images.length > 0 ? prod.images[0] : image_placeholder,
+          productName: prod.name,
+          unitPrice: prod.price,
+          quantity: prod.quantity ? prod.quantity : 1,
+          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
+          amount: prod.amount ? prod.amount : prod.price,
           serialNumber: prod,
-          tax: prod.tax,
+          tax: prod.tax ? prod.tax : 0,
         });
       });
       setdata(items);
@@ -200,7 +200,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       title: "",
       dataIndex: "productImage",
       key: "productImage",
-      render: (text) => <Image width={75} height={60} src={text} />,
+      render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
     },
     {
       title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
@@ -238,13 +238,6 @@ const BoughtOrderDetails = ({ user, users }) => {
           </p>
         </div>
       ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">MANUFACTURER</Text>,
-      dataIndex: "manufacturer",
-      key: "manufacturer",
-      align: "center",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -327,7 +320,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-primary">
-              {details.orderId}
+              {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -341,23 +334,23 @@ const BoughtOrderDetails = ({ user, users }) => {
               }
             </div>
             <Row className="my-6 justify-between">
-              <OrderData title="NUMBER" value={`#${details.orderId}`} />
+              <OrderData title="NUMBER" value={`#${details.order.orderId}`} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="BUYER"
-                value={details.buyerOrganization}
+                value={details.order.purchasersCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="SELLER"
-                value={details.sellerOrganization}
+                value={details.order.sellerCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData title="TOTAL ($)" value={details.orderTotal} />
+              <OrderData title="TOTAL ($)" value={details.order.totalPrice} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="DATE"
-                value={getStringDate(details.orderDate, US_DATE_FORMAT)}
+                value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <Col>

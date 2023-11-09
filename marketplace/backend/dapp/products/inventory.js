@@ -110,7 +110,7 @@ function marshalOut(_args) {
 function bind(user, _contract, options) {
     const contract = { ..._contract };
 
-    contract.get = async (args = { address: contract.address }) => get(user, args, options);
+    contract.get = async (args) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
@@ -143,11 +143,9 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-    const { address, ...restArgs } = args;
     let inventory;
 
-    const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-    inventory = await searchOne(contractName, searchArgs, options, user);
+    inventory = await searchOne(contractName, args, options, user);
 
     if (!inventory) {
         return undefined;
@@ -160,16 +158,18 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { range, ownerCommonName, ...restArgs } = args;
+    const { range, ownerCommonName, saleAddresses, ...restArgs } = args;
     let inventories;
 
     if (ownerCommonName) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'ownerCommonName', value: ownerCommonName });
         inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     }
+    else if (saleAddresses) {
+        inventories = await searchAllWithQueryArgs(contractName, { sale: saleAddresses }, options, admin);
+    }
     else {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'sale', value: '0000000000000000000000000000000000000000', predicate: 'neq' });
-        console.log("no common name", searchArgs)
         inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     }
 

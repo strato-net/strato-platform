@@ -11,7 +11,8 @@ contract SaleOrder is Order {
         string _purchasersCommonName,
         address _purchasersAddress,
         uint _createdDate,
-        uint _totalPrice
+        uint _totalPrice,
+        address _shippingAddress
     ) external Order(
         _orderId, 
         _saleAddresses, 
@@ -19,7 +20,9 @@ contract SaleOrder is Order {
         _purchasersCommonName, 
         _purchasersAddress, 
         _createdDate, 
-        _totalPrice){
+        _totalPrice,
+        _shippingAddress
+        ){
 
     }
 

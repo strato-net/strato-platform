@@ -250,6 +250,8 @@ definitions:
         type: string
       totalPrice:
         type: number
+      shippingAddress:
+        type: string
   executeSale:
     type: object
     properties:

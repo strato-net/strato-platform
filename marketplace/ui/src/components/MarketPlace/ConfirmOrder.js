@@ -403,6 +403,7 @@ const ConfirmOrder = () => {
       saleAddresses: orderList,
       sellerCommonName: sellerCommonName,
       totalPrice: total + tax + shipping,
+      shippingAddress: userAddresses[selectedAddress].address,
     }
 
     let isDone = await orderActions.createSale(orderDispatch, body);

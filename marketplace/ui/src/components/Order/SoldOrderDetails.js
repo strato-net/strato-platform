@@ -32,6 +32,7 @@ import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
 import TagManager from "react-gtm-module";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -83,7 +84,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (orderDetails) {
-      setStatus(getStatus(parseInt(orderDetails.status)));
+      setStatus(getStatus(parseInt(orderDetails.order.status)));
       setcomment(orderDetails.sellerComments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
       if (orderDetails.fullfilmentDate === 0 || orderDetails.fullfilmentDate === null || orderDetails.fullfilmentDate === undefined) {
@@ -93,20 +94,19 @@ const SoldOrderDetails = ({ user, users }) => {
       }
 
       let items = [];
-      orderDetails.orderLines.forEach((prod) => {
+      orderDetails.assets.forEach((prod) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.imageUrl,
-          productName: prod.productName,
-          manufacturer: prod.manufacturer,
-          unitPrice: prod.pricePerUnit,
-          quantity: prod.quantity,
-          shippingCharges: prod.shippingCharges,
-          amount: prod.amount,
+          productImage: prod.images.length > 0 ? prod.images[0] : image_placeholder,
+          productName: prod.name,
+          unitPrice: prod.price,
+          quantity: prod.quantity ? prod.quantity : 1,
+          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
+          amount: prod.amount ? prod.amount : prod.price,
           serialNumber: prod,
-          tax: prod.tax,
+          tax: prod.tax ? prod.tax : 0,
         });
       });
       setdata(items);
@@ -201,13 +201,13 @@ const SoldOrderDetails = ({ user, users }) => {
     if (orderDetails === null) {
       return serialsUploaded;
     }
-    for (const orderLine of orderDetails.orderLines) {
-      if (orderLine.containsSerialNumber === true) {
-        if (orderLine.isSerialUploaded === false) {
-          serialsUploaded = false;
-        }
-      }
-    }
+    // for (const orderLine of orderDetails.orderLines) {
+    //   if (orderLine.containsSerialNumber === true) {
+    //     if (orderLine.isSerialUploaded === false) {
+    //       serialsUploaded = false;
+    //     }
+    //   }
+    // }
     return serialsUploaded;
   };
 
@@ -323,7 +323,7 @@ const SoldOrderDetails = ({ user, users }) => {
       title: "",
       dataIndex: "productImage",
       key: "productImage",
-      render: (text) => <Image width={75} height={60} src={text} />,
+      render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
     },
     {
       title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
@@ -377,13 +377,6 @@ const SoldOrderDetails = ({ user, users }) => {
           );
         }
       }
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">MANUFACTURER</Text>,
-      dataIndex: "manufacturer",
-      key: "manufacturer",
-      align: "center",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -474,7 +467,7 @@ const SoldOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-primary">
-              {details.orderId}
+              {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -511,23 +504,23 @@ const SoldOrderDetails = ({ user, users }) => {
               </Button>
             </div>
             <Row className="my-6 justify-between">
-              <OrderData title="NUMBER" value={`#${details.orderId}`} />
+              <OrderData title="NUMBER" value={`#${details.order.orderId}`} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="BUYER"
-                value={details.buyerOrganization}
+                value={details.order.purchasersCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="SELLER"
-                value={details.sellerOrganization}
+                value={details.order.sellerCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData title="TOTAL ($)" value={details.orderTotal} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="DATE"
-                value={getStringDate(details.orderDate, US_DATE_FORMAT)}
+                value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
 
@@ -605,11 +598,11 @@ const SoldOrderDetails = ({ user, users }) => {
                     selectedDate
                   }
                   disabledDate={(current) => {
-                    const timestamp = Number(details.orderDate);
+                    const timestamp = Number(details.order.createdDate);
                     if (Number.isNaN(timestamp)) {
                       return "";
                     }
-                    const adjustedTime = details.orderDate < 1000000000000 ? details.orderDate * 1000 : details.orderDate;
+                    const adjustedTime = details.order.createdDate < 1000000000000 ? details.order.createdDate * 1000 : details.order.createdDate;
                     const specificDate = dayjs(adjustedTime);
                     const currentDate = dayjs();
                     const selectedDate = dayjs(current);

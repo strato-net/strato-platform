@@ -115,7 +115,7 @@ function marshalOut(_args) {
 function bind(user, _contract, options) {
   const contract = { ..._contract };
 
-  contract.get = async (args = { address: contract.address }) =>
+  contract.get = async (args) =>
     get(user, args, options);
   contract.getState = async () => getState(user, contract, options);
   contract.transferOwnership = async (newOwner) =>
@@ -152,22 +152,15 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-  const { uniqueOrderID, address, ...restArgs } = args;
+  const { address, ...restArgs } = args;
   let order;
 
-  if (address) {
-    const searchArgs = setSearchQueryOptions(restArgs, {
-      key: "address",
-      value: address,
-    });
-    order = await searchOne(contractName, searchArgs, options, user);
-  } else {
-    const searchArgs = setSearchQueryOptions(restArgs, {
-      key: "uniqueOrderID",
-      value: uniqueOrderID,
-    });
-    order = await searchOne(contractName, searchArgs, options, user);
-  }
+  const searchArgs = setSearchQueryOptions(restArgs, {
+    key: "address",
+    value: address,
+  });
+  order = await searchOne(constants.orderTableName, searchArgs, options, user);
+
   if (!order) {
     return undefined;
   }
