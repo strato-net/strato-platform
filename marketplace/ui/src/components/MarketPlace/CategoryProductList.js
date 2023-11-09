@@ -63,7 +63,7 @@ const CategoryProductList = ({ user }) => {
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
-  }, [categoryDispatch]);
+  }, []);
 
   const routeMatch = useMatch({
     path: routes.MarketplaceProductList.url,
@@ -93,7 +93,7 @@ const CategoryProductList = ({ user }) => {
       categorys = arrayToStr(selectedCategories);
       subCategoryActions.fetchSubCategoryList(subCategoryDispatch, categorys);
     }
-  }, [subCategoryDispatch, selectedCategories]);
+  }, [selectedCategories]);
 
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
@@ -149,7 +149,6 @@ const CategoryProductList = ({ user }) => {
       );
     }
   }, [
-    marketplaceDispatch,
     selectedCategories,
     selectedSubCategories,
     // selectedProducts,
