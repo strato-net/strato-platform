@@ -755,7 +755,6 @@ spec = do
         runLoggingT . runConduit $ createInsertsMapping g input .| sinkList
 
     swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy.SwissArmyMapping" (address text,
-    "chainId" text,
     block_hash text,
     block_timestamp text,
     block_number text,
