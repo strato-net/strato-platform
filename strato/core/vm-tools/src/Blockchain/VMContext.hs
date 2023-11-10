@@ -154,7 +154,8 @@ import UnliftIO
 knownFailedTxs :: S.Set Keccak256
 knownFailedTxs =
   S.fromList
-    [ keccak256FromHex "d924cd206a64fe1a6acd77af0a25f2acc4acd23d5a169caf2e701cb9cfc3d7d8"
+    [ keccak256FromHex "d924cd206a64fe1a6acd77af0a25f2acc4acd23d5a169caf2e701cb9cfc3d7d8",
+      keccak256FromHex "3058b1027e6e69d6faa9e13fb897c10343ae8cd0d302404a70aee9d2bad316da"
     ]
 
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
