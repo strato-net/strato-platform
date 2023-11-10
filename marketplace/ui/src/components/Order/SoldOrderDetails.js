@@ -100,7 +100,7 @@ const SoldOrderDetails = ({ user, users }) => {
           chainId: prod.chainId,
           key: prod.address,
           productImage: prod.images.length > 0 ? prod.images[0] : image_placeholder,
-          productName: prod.name,
+          productName: prod,
           unitPrice: prod.price,
           quantity: prod.quantity ? prod.quantity : 1,
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
@@ -329,7 +329,15 @@ const SoldOrderDetails = ({ user, users }) => {
       title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
       dataIndex: "productName",
       key: "productName",
-      render: (text) => <p className="text-primary text-[17px]">{decodeURIComponent(text)}</p>,
+      render: (text) => (
+        <p
+          // href={routes.BoughtOrderDetails.url}
+          className="text-primary text-[17px] cursor-pointer"
+          onClick={() => {navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+        >
+          {decodeURIComponent(text.name)}
+        </p>
+      ),
     },
     {
       title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,

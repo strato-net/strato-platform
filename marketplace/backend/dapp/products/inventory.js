@@ -143,9 +143,14 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
+    const { address, ...restArgs } = args;
     let inventory;
 
-    inventory = await searchOne(contractName, args, options, user);
+    const searchArgs = setSearchQueryOptions(restArgs, {
+        key: "address",
+        value: address,
+    });
+    inventory = await searchOne(contractName, searchArgs, options, user);
 
     if (!inventory) {
         return undefined;
