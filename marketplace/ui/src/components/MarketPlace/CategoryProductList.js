@@ -94,6 +94,39 @@ const CategoryProductList = ({ user }) => {
     }
   }, [selectedCategories]);
 
+  const applyFilters = () => {
+    let filteredList = marketplaceList;
+
+    if (selectedSubCategories.length > 0) {
+      filteredList = filteredList.filter(item =>
+        selectedSubCategories.includes(item.subCategory)
+      );
+    }
+
+    if (selectedProducts.length > 0) {
+      filteredList = filteredList.filter(item =>
+        selectedProducts.includes(item.productId)
+      );
+    }
+
+    if (selectedBrands.length > 0) {
+      filteredList = filteredList.filter(item =>
+        selectedBrands.includes(item.manufacturer)
+      );
+    }
+
+    setProductList(filteredList);
+  };
+
+
+  useEffect(() => {
+    applyFilters();
+  }, [
+    selectedSubCategories,
+    selectedProducts,
+    selectedBrands
+  ]);
+
   const onChangeSubCategory = (e) => {
     let valuesChecked = checkValues(e, selectedSubCategories)
     setSelectedSubCategories(valuesChecked);
@@ -102,42 +135,11 @@ const CategoryProductList = ({ user }) => {
   const onChangeProduct = (e) => {
     let valuesChecked = checkValues(e, selectedProducts)
     setSelectedProducts(valuesChecked);
-    if (valuesChecked.length === 0 && selectedBrands.length === 0) {
-      setProductList(marketplaceList)
-    } else {
-      let filteredBrandProduct;
-      if (valuesChecked.length !== 0 && selectedBrands.length !== 0) {
-        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.productId) && selectedBrands.includes(item.manufacturer)));
-      }
-      if (valuesChecked.length === 0 && selectedBrands.length !== 0) {
-        filteredBrandProduct = marketplaceList.filter((item) => (selectedBrands.includes(item.manufacturer)));
-      }
-      if (valuesChecked.length !== 0 && selectedBrands.length === 0) {
-        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.productId)));
-      }
-      setProductList(filteredBrandProduct);
-    }
   };
 
   const onChangeBrand = (e) => {
     let valuesChecked = checkValues(e, selectedBrands)
     setSelectedBrands(valuesChecked);
-
-    if (valuesChecked.length === 0 && selectedProducts.length === 0) {
-      setProductList(marketplaceList);
-    } else {
-      let filteredBrandProduct;
-      if (valuesChecked.length !== 0 && selectedProducts.length !== 0) {
-        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.manufacturer) && selectedProducts.includes(item.productId)));
-      }
-      if (valuesChecked.length === 0 && selectedProducts.length !== 0) {
-        filteredBrandProduct = marketplaceList.filter((item) => (selectedProducts.includes(item.productId)));
-      }
-      if (valuesChecked.length !== 0 && selectedProducts.length === 0) {
-        filteredBrandProduct = marketplaceList.filter((item) => (valuesChecked.includes(item.manufacturer)));
-      }
-      setProductList(filteredBrandProduct);
-    }
   };
 
   useEffect(() => {
@@ -168,7 +170,7 @@ const CategoryProductList = ({ user }) => {
     }
   }, [
     selectedCategories,
-    selectedSubCategories,
+    // selectedSubCategories,
     // selectedProducts,
     // selectedBrands,
     debouncedMinQty,
