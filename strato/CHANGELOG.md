@@ -49,6 +49,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
+- POST `/transaction` contract creation calls redirected to the corresponding User contract
 - optimized logic flow in p2p to prevent sync stalls
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table

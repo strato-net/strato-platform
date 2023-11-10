@@ -78,5 +78,6 @@ share
         parent Address
         publicKey String
         userAddress Address
+        Primary address
         deriving Eq Generic Show
 |]

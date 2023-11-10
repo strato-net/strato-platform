@@ -49,6 +49,7 @@ module Blockchain.VMContext
     vmGasCap,
     hasBlockstanbul,
     blockRequested,
+    runningTests,
     txRunResultsCache,
     debugSettings,
     dbs,
@@ -73,6 +74,7 @@ module Blockchain.VMContext
     purgeStorageMap,
     getContextBestBlockInfo,
     putContextBestBlockInfo,
+    checkIfRunningTests,
     compactContextM,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
@@ -213,6 +215,7 @@ data ContextState = ContextState
     _vmGasCap :: !Gas,
     _hasBlockstanbul :: !Bool,
     _blockRequested :: !Bool,
+    _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings)
   }
@@ -229,6 +232,7 @@ instance Default ContextState where
         _vmGasCap = Gas flags_gasLimit,
         _hasBlockstanbul = True,
         _blockRequested = False,
+        _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing
       }
@@ -624,6 +628,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _hasBlockstanbul = False,
               _vmGasCap = 100000,
               _blockRequested = False,
+              _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing
             }
@@ -774,6 +779,9 @@ getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy
 
 putContextBestBlockInfo :: Mod.Modifiable ContextState m => ContextBestBlockInfo -> m ()
 putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlockInfo new
+
+checkIfRunningTests :: (Functor m, Mod.Accessible ContextState m) => m Bool
+checkIfRunningTests = _runningTests <$> Mod.access Mod.Proxy
 
 compactContextM :: ContextM ()
 compactContextM = modify' force
