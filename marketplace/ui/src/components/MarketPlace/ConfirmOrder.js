@@ -1,44 +1,43 @@
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import TagManager from "react-gtm-module";
+import { useFormik } from "formik";
+import * as yup from "yup";
 import {
   Breadcrumb,
   Typography,
   Row,
   Divider,
-  notification,
   Spin,
   Card,
-} from "antd";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { useNavigate } from "react-router-dom";
-import { useOrderState, useOrderDispatch } from "../../contexts/order";
-import { useAuthenticateState } from "../../contexts/authentication";
-import { actions } from "../../contexts/marketplace/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
-import {
   Form,
   Input,
 } from "antd";
-import { useState, useEffect, useMemo } from "react";
-import { actions as inventoryAction } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
+// Components
+import ToastComponent from "../ToastComponent/ToastComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
 import DataTableComponent from "../DataTableComponent";
-import { useFormik } from "formik";
-import * as yup from "yup";
-import "./index.css";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import ConfirmOrderModel from "./ConfirmOrderModel";
+import AddressComponent from "./AddressComponent";
+// Dispatch and State
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useOrderState, useOrderDispatch } from "../../contexts/order";
+import { useAuthenticateState } from "../../contexts/authentication";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { actions as inventoryAction } from "../../contexts/inventory/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+// Utils, Css, 
+import "./index.css";
+import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
+import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import helper from "../../helpers/helper.json"
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
-import AddressComponent from "./AddressComponent";
-import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
-import TagManager from "react-gtm-module";
-import LoaderComponent from "../Loader/LoaderComponent";
 
+const { confirmOrderInitialValue } = helper;
+const { Text } = Typography;
 const { TextArea } = Input;
 
 const ShippingDetailsSchema = () => {
@@ -77,25 +76,25 @@ const ShippingDetailsSchema = () => {
 };
 
 const ConfirmOrder = () => {
-  const { Text } = Typography;
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  // Dispatch
   const marketplaceDispatch = useMarketplaceDispatch();
+  const inventoryDispatch = useInventoryDispatch();
   const orderDispatch = useOrderDispatch();
-  const [api, contextHolder] = notification.useNotification();
-  const [selectedAddress, setSelectedAddress] = useState(0);
+  // States
   const { cartList, confirmOrderList, isAddingShippingAddress, userAddresses, isLoadingUserAddresses } = useMarketplaceState();
+  const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
+  const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
+  const { isLoadingStripeStatus, stripeStatus } = useInventoryState();
+
+  const [open, setOpen] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState(0);
   const { user } = useAuthenticateState();
   const userOrganization = user?.organization
-  const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [data, setData] = useState([]);
   const [tax, setTax] = useState(0);
   const [shipping, setShipping] = useState(0);
   const [total, setTotal] = useState(0);
-  const inventoryDispatch = useInventoryDispatch();
-  const { isLoadingStripeStatus, stripeStatus } = useInventoryState();
-  const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
-
-
   const [showAddress, setshowAddress] = useState(false);
 
   const handleCancel = () => {
@@ -103,7 +102,7 @@ const ConfirmOrder = () => {
   };
 
   useEffect(() => {
-    actions.fetchUserAddresses(marketplaceDispatch);
+    marketplaceActions.fetchUserAddresses(marketplaceDispatch);
   }, [marketplaceDispatch])
 
   const storedData = useMemo(() => {
@@ -111,11 +110,11 @@ const ConfirmOrder = () => {
   }, []);
 
   useEffect(() => {
-    actions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchConfirmOrderItems(marketplaceDispatch, storedData);
     let cartData = [];
     confirmOrderList.forEach((item) => {
       let amount = ((item.unitPrice * item.qty) + item.tax)
-      cartData.push({...item, amount});
+      cartData.push({ ...item, amount });
     });
 
     setData(cartData);
@@ -137,58 +136,25 @@ const ConfirmOrder = () => {
   }, [marketplaceDispatch, confirmOrderList, storedData]);
 
   const openToastOrder = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 2,
-      });
-    }
+    return <ToastComponent
+      message={message}
+      success={success}
+      placement={placement}
+      onClose={() => orderActions.resetMessage(orderDispatch)}
+    />
   };
 
   const openToastMarketplace = (placement) => {
-    if (marketplaceSuccess) {
-      api.success({
-        message: marketplaceMessage,
-        onClose: actions.resetMessage(marketplaceDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: marketplaceMessage,
-        onClose: actions.resetMessage(marketplaceDispatch),
-        placement,
-        key: 2,
-      });
-    }
+    return <ToastComponent
+      message={marketplaceMessage}
+      success={marketplaceSuccess}
+      placement={placement}
+      onClose={() => marketplaceActions.resetMessage(marketplaceDispatch)}
+    />
   };
 
-
   const formik = useFormik({
-    initialValues: {
-      sameAddress: true,
-      state: "",
-      name: "",
-      zipcode: "",
-      addressLine1: "",
-      addressLine2: "",
-      city: "",
-      state_b: "",
-      name_b: "",
-      zipcode_b: "",
-      addressLine1_b: "",
-      addressLine2_b: "",
-      city_b: "",
-    },
+    initialValues: confirmOrderInitialValue,
     validationSchema: ShippingDetailsSchema,
     onSubmit: function (values) {
       handleFormSubmit(values)
@@ -236,9 +202,9 @@ const ConfirmOrder = () => {
         event: 'add_shipping_address',
       },
     });
-    let res = await actions.addShippingAddress(marketplaceDispatch, body);
+    let res = await marketplaceActions.addShippingAddress(marketplaceDispatch, body);
     if (res != null) {
-      await actions.fetchUserAddresses(marketplaceDispatch);
+      await marketplaceActions.fetchUserAddresses(marketplaceDispatch);
     }
   };
 
@@ -313,8 +279,6 @@ const ConfirmOrder = () => {
       render: (text) => <p className="text-center">{Math.trunc(text)}</p>,
     },
   ];
-
-  const navigate = useNavigate();
 
   const handleOrderConfirm = async () => {
     let concatenatedOrderString = "";
@@ -393,7 +357,7 @@ const ConfirmOrder = () => {
           updatedCart.push(cart);
         }
       });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
+      marketplaceActions.addItemToCart(marketplaceDispatch, updatedCart);
       setTimeout(function () {
         navigate(`/orders`, { state: { defaultKey: "Bought" } });
       }, 2000);
@@ -436,9 +400,8 @@ const ConfirmOrder = () => {
 
   return (
     <div className="h-screen mx-14  mt-14">
-      {contextHolder}
       {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
-        <LoaderComponent  />
+        <LoaderComponent />
       ) : (
         <div className="pb-20">
           <Breadcrumb>
@@ -518,65 +481,73 @@ const ConfirmOrder = () => {
                 <div>
                   <div className="flex justify-between mb-4">
                     <Form.Item label="Name" name="name" className="w-72">
-                      <Input
-                        label="name"
-                        name="name"
-                        placeholder="Enter Name"
-                        value={formik.values.name}
-                        onChange={formik.handleChange}
-                      />
-                      {formik.touched.name && formik.errors.name && (
-                        <span className="text-error text-xs">
-                          {formik.errors.name}
-                        </span>
-                      )}
+                      <>
+                        <Input
+                          label="name"
+                          name="name"
+                          placeholder="Enter Name"
+                          value={formik.values.name}
+                          onChange={formik.handleChange}
+                        />
+                        {formik.touched.name && formik.errors.name && (
+                          <span className="text-error text-xs">
+                            {formik.errors.name}
+                          </span>
+                        )}
+                      </>
                     </Form.Item>
 
                     <Form.Item label="Zipcode" name="zipcode" className="w-72">
-                      <Input
-                        label="zipcode"
-                        name="zipcode"
-                        placeholder="Enter Zipcode"
-                        value={formik.values.zipcode}
-                        onChange={formik.handleChange}
-                      />
-                      {formik.touched.zipcode && formik.errors.zipcode && (
-                        <span className="text-error text-xs">
-                          {formik.errors.zipcode}
-                        </span>
-                      )}
+                      <>
+                        <Input
+                          label="zipcode"
+                          name="zipcode"
+                          placeholder="Enter Zipcode"
+                          value={formik.values.zipcode}
+                          onChange={formik.handleChange}
+                        />
+                        {formik.touched.zipcode && formik.errors.zipcode && (
+                          <span className="text-error text-xs">
+                            {formik.errors.zipcode}
+                          </span>
+                        )}
+                      </>
                     </Form.Item>
                   </div>
 
                   <div className="flex justify-between mb-4">
                     <Form.Item label="State" name="state" className="w-72">
-                      <Input
-                        label="state"
-                        name="state"
-                        placeholder="Enter State"
-                        value={formik.values.state}
-                        onChange={formik.handleChange}
-                      />
-                      {formik.touched.state && formik.errors.state && (
-                        <span className="text-error text-xs">
-                          {formik.errors.state}
-                        </span>
-                      )}
+                      <>
+                        <Input
+                          label="state"
+                          name="state"
+                          placeholder="Enter State"
+                          value={formik.values.state}
+                          onChange={formik.handleChange}
+                        />
+                        {formik.touched.state && formik.errors.state && (
+                          <span className="text-error text-xs">
+                            {formik.errors.state}
+                          </span>
+                        )}
+                      </>
                     </Form.Item>
 
                     <Form.Item label="City" name="city" className="w-72">
-                      <Input
-                        label="city"
-                        name="city"
-                        placeholder="Enter City"
-                        value={formik.values.city}
-                        onChange={formik.handleChange}
-                      />
-                      {formik.touched.city && formik.errors.city && (
-                        <span className="text-error text-xs">
-                          {formik.errors.city}
-                        </span>
-                      )}
+                      <>
+                        <Input
+                          label="city"
+                          name="city"
+                          placeholder="Enter City"
+                          value={formik.values.city}
+                          onChange={formik.handleChange}
+                        />
+                        {formik.touched.city && formik.errors.city && (
+                          <span className="text-error text-xs">
+                            {formik.errors.city}
+                          </span>
+                        )}
+                      </>
                     </Form.Item>
                   </div>
 
@@ -585,19 +556,20 @@ const ConfirmOrder = () => {
                       label="Address Line 1"
                       name="addressLine1"
                       className="w-72"
-                    >
-                      <TextArea
-                        rows={3}
-                        name="addressLine1"
-                        placeholder="Enter Address Line 1"
-                        value={formik.values.addressLine1}
-                        onChange={formik.handleChange}
-                      />
-                      {formik.touched.addressLine1 && formik.errors.addressLine1 && (
-                        <span className="text-error text-xs">
-                          {formik.errors.addressLine1}
-                        </span>
-                      )}
+                    ><>
+                        <TextArea
+                          rows={3}
+                          name="addressLine1"
+                          placeholder="Enter Address Line 1"
+                          value={formik.values.addressLine1}
+                          onChange={formik.handleChange}
+                        />
+                        {formik.touched.addressLine1 && formik.errors.addressLine1 && (
+                          <span className="text-error text-xs">
+                            {formik.errors.addressLine1}
+                          </span>
+                        )}
+                      </>
                     </Form.Item>
 
                     <Form.Item
@@ -605,18 +577,20 @@ const ConfirmOrder = () => {
                       name="addressLine2"
                       className="w-72"
                     >
-                      <TextArea
-                        rows={3}
-                        name="addressLine2"
-                        placeholder="Enter Address Line 2"
-                        value={formik.values.addressLine2}
-                        onChange={formik.handleChange}
-                      />
-                      {formik.touched.addressLine2 && formik.errors.addressLine2 && (
-                        <span className="text-error text-xs">
-                          {formik.errors.addressLine2}
-                        </span>
-                      )}
+                      <>
+                        <TextArea
+                          rows={3}
+                          name="addressLine2"
+                          placeholder="Enter Address Line 2"
+                          value={formik.values.addressLine2}
+                          onChange={formik.handleChange}
+                        />
+                        {formik.touched.addressLine2 && formik.errors.addressLine2 && (
+                          <span className="text-error text-xs">
+                            {formik.errors.addressLine2}
+                          </span>
+                        )}
+                      </>
                     </Form.Item>
 
                   </div>
@@ -656,65 +630,73 @@ const ConfirmOrder = () => {
                         <div>
                           <div className="flex justify-between mb-4">
                             <Form.Item label="Name" name="name" className="w-72">
-                              <Input
-                                label="name"
-                                name="name"
-                                placeholder="Enter Name"
-                                value={formik.values.name}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.name && formik.errors.name && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.name}
-                                </span>
-                              )}
+                              <>
+                                <Input
+                                  label="name"
+                                  name="name"
+                                  placeholder="Enter Name"
+                                  value={formik.values.name}
+                                  onChange={formik.handleChange}
+                                />
+                                {formik.touched.name && formik.errors.name && (
+                                  <span className="text-error text-xs">
+                                    {formik.errors.name}
+                                  </span>
+                                )}
+                              </>
                             </Form.Item>
 
                             <Form.Item label="Zipcode" name="zipcode" className="w-72">
-                              <Input
-                                label="zipcode"
-                                name="zipcode"
-                                placeholder="Enter Zipcode"
-                                value={formik.values.zipcode}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.zipcode && formik.errors.zipcode && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.zipcode}
-                                </span>
-                              )}
+                              <>
+                                <Input
+                                  label="zipcode"
+                                  name="zipcode"
+                                  placeholder="Enter Zipcode"
+                                  value={formik.values.zipcode}
+                                  onChange={formik.handleChange}
+                                />
+                                {formik.touched.zipcode && formik.errors.zipcode && (
+                                  <span className="text-error text-xs">
+                                    {formik.errors.zipcode}
+                                  </span>
+                                )}
+                              </>
                             </Form.Item>
                           </div>
 
                           <div className="flex justify-between mb-4">
                             <Form.Item label="State" name="state" className="w-72">
-                              <Input
-                                label="state"
-                                name="state"
-                                placeholder="Enter State"
-                                value={formik.values.state}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.state && formik.errors.state && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.state}
-                                </span>
-                              )}
+                              <>
+                                <Input
+                                  label="state"
+                                  name="state"
+                                  placeholder="Enter State"
+                                  value={formik.values.state}
+                                  onChange={formik.handleChange}
+                                />
+                                {formik.touched.state && formik.errors.state && (
+                                  <span className="text-error text-xs">
+                                    {formik.errors.state}
+                                  </span>
+                                )}
+                              </>
                             </Form.Item>
 
                             <Form.Item label="City" name="city" className="w-72">
-                              <Input
-                                label="city"
-                                name="city"
-                                placeholder="Enter City"
-                                value={formik.values.city}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.city && formik.errors.city && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.city}
-                                </span>
-                              )}
+                              <>
+                                <Input
+                                  label="city"
+                                  name="city"
+                                  placeholder="Enter City"
+                                  value={formik.values.city}
+                                  onChange={formik.handleChange}
+                                />
+                                {formik.touched.city && formik.errors.city && (
+                                  <span className="text-error text-xs">
+                                    {formik.errors.city}
+                                  </span>
+                                )}
+                              </>
                             </Form.Item>
                           </div>
 
@@ -723,42 +705,42 @@ const ConfirmOrder = () => {
                               label="Address Line 1"
                               name="addressLine1"
                               className="w-72"
-                            >
-                              <TextArea
-                                rows={3}
-                                name="addressLine1"
-                                placeholder="Enter Address Line 1"
-                                value={formik.values.addressLine1}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.addressLine1 && formik.errors.addressLine1 && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.addressLine1}
-                                </span>
-                              )}
+                            ><>
+                                <TextArea
+                                  rows={3}
+                                  name="addressLine1"
+                                  placeholder="Enter Address Line 1"
+                                  value={formik.values.addressLine1}
+                                  onChange={formik.handleChange}
+                                />
+                                {formik.touched.addressLine1 && formik.errors.addressLine1 && (
+                                  <span className="text-error text-xs">
+                                    {formik.errors.addressLine1}
+                                  </span>
+                                )}
+                              </>
                             </Form.Item>
 
                             <Form.Item
                               label="Address Line 2"
                               name="addressLine2"
                               className="w-72"
-                            >
-                              <TextArea
-                                rows={3}
-                                name="addressLine2"
-                                placeholder="Enter Address Line 2"
-                                value={formik.values.addressLine2}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.addressLine2 && formik.errors.addressLine2 && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.addressLine2}
-                                </span>
-                              )}
+                            > <>
+                                <TextArea
+                                  rows={3}
+                                  name="addressLine2"
+                                  placeholder="Enter Address Line 2"
+                                  value={formik.values.addressLine2}
+                                  onChange={formik.handleChange}
+                                />
+                                {formik.touched.addressLine2 && formik.errors.addressLine2 && (
+                                  <span className="text-error text-xs">
+                                    {formik.errors.addressLine2}
+                                  </span>
+                                )}
+                              </>
                             </Form.Item>
-
                           </div>
-
                         </div>
                         <div className="flex justify-end mt-8">
                           <div id="add-address-button" className="cursor-pointer justify-center flex items-center w-44 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white"
@@ -795,7 +777,7 @@ const ConfirmOrder = () => {
         handleCancel={handleCancel}
         handleConfirm={handleOrderConfirm}
       />
-      {marketplaceMessage && openToastMarketplace("Bottom")}
+      {marketplaceMessage && openToastMarketplace("bottom")}
       {message && openToastOrder("bottom")}
     </div>
   );
