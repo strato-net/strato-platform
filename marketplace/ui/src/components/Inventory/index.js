@@ -74,6 +74,27 @@ const Inventory = ({ user }) => {
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.organization);
   }, [dispatch, user]);
+  
+  useEffect(() => {
+    const placement = 'bottom'; // Set placement to 'bottomCenter'
+  
+    if (stripeStatus !== null && stripeStatus !== undefined) {
+      const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
+  
+      if (!chargesEnabled || !detailsSubmitted || !payoutsEnabled) {
+        
+        setTimeout(() => {
+          api.error({
+            key: 1,
+            message: "Something went wrong with your Stripe account.",
+            description: "Please connect again.",
+            onClose: () => actions.resetMessage(dispatch),
+            placement,
+          });
+        }, 1000);
+      }
+    }
+  }, [stripeStatus]);  
 
   useEffect(() => {
     let len = inventories.length;
@@ -153,16 +174,10 @@ const Inventory = ({ user }) => {
     <>
       {contextHolder}
       {stripeStatus == null || isInventoriesLoading || isLoadingStripeStatus ? (
-        console.log("loading stripeStatus: ", stripeStatus),
-        console.log("loading isInventoriesLoading: ", isInventoriesLoading),
-        console.log("loading isLoadingStripeStatus: ", isLoadingStripeStatus),
         <div className="h-screen flex justify-center items-center">
           <Spin size="large" />
         </div>
       ) : (
-        console.log("noInventory stripeStatus: ", stripeStatus),
-        console.log("noInventory isInventoriesLoading: ", isInventoriesLoading),
-        console.log("noInventory isLoadingStripeStatus: ", isLoadingStripeStatus),
         <div className="mx-16 mt-14">
           {inventories.length === 0 && offset === 0 ? (
             <div className="h-screen justify-center flex flex-col items-center">
@@ -204,9 +219,6 @@ const Inventory = ({ user }) => {
               </div>
             </div>
           ) : (
-            console.log("Inventory stripeStatus: ", stripeStatus),
-            console.log("Inventory isInventoriesLoading: ", isInventoriesLoading),
-            console.log("Inventory isLoadingStripeStatus: ", isLoadingStripeStatus),
             <>
               <div className="flex justify-between">
                 <Breadcrumb>
