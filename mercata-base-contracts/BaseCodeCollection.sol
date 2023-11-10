@@ -89,7 +89,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     }
 
     function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
-        return new SimpleSale(address(this), _state, _payment);
+        return Sale(new SimpleSale(address(this), _state, _payment));
     }
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
