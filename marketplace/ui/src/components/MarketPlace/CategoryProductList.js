@@ -5,7 +5,6 @@ import {
   Divider,
   Typography,
   Checkbox,
-  Spin,
   InputNumber,
   Space,
 } from "antd";
@@ -290,7 +289,7 @@ const CategoryProductList = ({ user }) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {(selectedBrands.length > 0 ? productList : marketplaceList).map(({ productId, name }, index) => (
+                        {((selectedBrands.length > 0 || selectedSubCategories.length > 0) ? productList : marketplaceList).map(({ productId, name }, index) => (
                           <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
                             {name}
                           </Checkbox>
