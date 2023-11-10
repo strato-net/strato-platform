@@ -195,5 +195,23 @@
     "addressLine1_b": "",
     "addressLine2_b": "",
     "city_b": ""
-  }
+  },
+  "orderTableFilter": [
+    {
+      "text": "Awaiting Fulfillment",
+      "value": "Awaiting Fulfillment"
+    },
+    {
+      "text": "Awaiting Shipment",
+      "value": "Awaiting Shipment"
+    },
+    {
+      "text": "Canceled",
+      "value": "Canceled"
+    },
+    {
+      "text": "Closed",
+      "value": "Closed"
+    }
+  ]
 }

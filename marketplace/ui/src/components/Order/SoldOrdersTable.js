@@ -1,32 +1,41 @@
 import React, { useEffect, useState } from "react";
-import classNames from "classnames";
+import { useNavigate, Link } from "react-router-dom";
 import { EyeOutlined } from "@ant-design/icons";
+import TagManager from "react-gtm-module";
+import { Pagination } from "antd";
+import classNames from "classnames";
+
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus } from "./constant";
-import { getStringDate } from "../../helpers/utils";
-import { useNavigate, Link } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
+// Actions
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import useDebounce from "../UseDebounce";
+// Utils, Constants,
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination } from "antd";
-import TagManager from "react-gtm-module";
+import { getStringDate } from "../../helpers/utils";
+import helper from "../../helpers/helper.json";
+import useDebounce from "../UseDebounce";
+import { getStatus } from "./constant";
 
+const { orderTableFilter } = helper;
 
 const SoldOrdersTable = ({ user }) => {
+  const navigate = useNavigate();
+
   const dispatch = useOrderDispatch();
+  const { ordersSold, isordersSoldLoading } = useOrderState();
+
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(10);
   const [page, setPage] = useState(1);
-
-  const { ordersSold, isordersSoldLoading } = useOrderState();
+  const [data, setdata] = useState([]);
 
   useEffect(() => {
     if (user?.organization) {
-      actions.fetchOrderSold(
+      orderActions.fetchOrderSold(
         dispatch,
         limit,
         offset,
@@ -36,8 +45,6 @@ const SoldOrdersTable = ({ user }) => {
     }
   }, [dispatch, limit, offset, debouncedSearchTerm, user?.organization]);
 
-  const navigate = useNavigate();
-  const [data, setdata] = useState([]);
   useEffect(() => {
     let items = [];
     ordersSold.forEach((order) => {
@@ -122,24 +129,7 @@ const SoldOrdersTable = ({ user }) => {
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),
-      filters: [
-        {
-          text: "Awaiting Fulfillment",
-          value: "Awaiting Fulfillment",
-        },
-        {
-          text: "Awaiting Shipment",
-          value: "Awaiting Shipment",
-        },
-        {
-          text: "Canceled",
-          value: "Canceled",
-        },
-        {
-          text: "Closed",
-          value: "Closed",
-        },
-      ],
+      filters: orderTableFilter,
       onFilter: (value, record) => record.status.startsWith(value),
       filterSearch: true,
       width: "15%",

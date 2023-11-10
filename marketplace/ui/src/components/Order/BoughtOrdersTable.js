@@ -1,18 +1,24 @@
 import React, { useEffect, useState } from "react";
-import classNames from "classnames";
+import { useNavigate, Link } from "react-router-dom";
 import { EyeOutlined } from "@ant-design/icons";
-import routes from "../../helpers/routes";
+import TagManager from "react-gtm-module";
+import classNames from "classnames";
+import { Pagination } from "antd";
+// Components
 import DataTableComponent from "../DataTableComponent";
+
+import routes from "../../helpers/routes";
 import { getStatus } from "./constant";
 import { getStringDate } from "../../helpers/utils";
-import { useNavigate, Link } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
+// Actions
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
+// Utils, Constants.
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination } from "antd";
-import TagManager from "react-gtm-module";
-
+import helper from "../../helpers/helper.json";
+const { orderTableFilter } = helper;
 
 const BoughtOrdersTable = ({ user }) => {
   const dispatch = useOrderDispatch();
@@ -26,7 +32,7 @@ const BoughtOrdersTable = ({ user }) => {
 
   useEffect(() => {
     if (user?.organization) {
-      actions.fetchOrder(
+      orderActions.fetchOrder(
         dispatch,
         limit,
         offset,
@@ -123,24 +129,7 @@ const BoughtOrdersTable = ({ user }) => {
       dataIndex: "status",
       key: "status",
       render: (text) => statusComponent(text),
-      filters: [
-        {
-          text: "Awaiting Fulfillment",
-          value: "Awaiting Fulfillment",
-        },
-        {
-          text: "Awaiting Shipment",
-          value: "Awaiting Shipment",
-        },
-        {
-          text: "Canceled",
-          value: "Canceled",
-        },
-        {
-          text: "Closed",
-          value: "Closed",
-        },
-      ],
+      filters: orderTableFilter,
       onFilter: (value, record) => record.status.startsWith(value),
       filterSearch: true,
       width: "15%",
