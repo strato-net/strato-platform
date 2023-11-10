@@ -115,16 +115,24 @@ const CategoryProductList = ({ user }) => {
       );
     }
 
+    if (debouncedMinPrice || debouncedMaxPrice) {
+      filteredList = filteredList.filter(item =>
+        (!debouncedMinPrice || item.pricePerUnit >= debouncedMinPrice) &&
+        (!debouncedMaxPrice || item.pricePerUnit <= debouncedMaxPrice)
+      );
+    }
+
     setProductList(filteredList);
   };
-
 
   useEffect(() => {
     applyFilters();
   }, [
     selectedSubCategories,
     selectedProducts,
-    selectedBrands
+    selectedBrands,
+    debouncedMinPrice,
+    debouncedMaxPrice
   ]);
 
   const onChangeSubCategory = (e) => {
@@ -175,8 +183,8 @@ const CategoryProductList = ({ user }) => {
     // selectedBrands,
     debouncedMinQty,
     debouncedMaxQty,
-    debouncedMinPrice,
-    debouncedMaxPrice,
+    // debouncedMinPrice,
+    // debouncedMaxPrice,
     category,
     hasChecked,
     isAuthenticated,
