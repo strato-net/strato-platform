@@ -150,6 +150,7 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
+  const availableQuantity = details?.availableQuantity;
 
   useEffect(() => {
     if (categorys.length && details) {
@@ -657,8 +658,8 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex items-center my-2 ml-5" id="quantity">
                     <div
                       onClick={subtract}
-                      className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <MinusOutlined className="text-xs text-secondryD" />
+                      className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+                      <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
                     </div>
                     <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
                       onChange={e => {
@@ -675,8 +676,8 @@ const ProductDetails = ({ user, users }) => {
                       }} />
                     <div
                       onClick={add}
-                      className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                      <PlusOutlined className="text-xs text-secondryC" />
+                      className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+                      <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
                     </div>
                   </div>
                 </Space>

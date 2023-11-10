@@ -39,6 +39,7 @@ library:
     - directory
     - deepseq
     - esqueleto
+    - ethereum-rlp
     - extra
     - filepath
     - format
@@ -55,7 +56,6 @@ library:
     - process
     - product-profunctors
     - profunctors
-    - relapse
     - resource-pool
     - saltine
     - secp256k1-haskell

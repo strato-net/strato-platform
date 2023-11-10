@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useLocation } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
+import TransfersTable from "./TransfersTable";
 import dayjs from "dayjs";
 
 const { Search } = Input;
@@ -59,6 +60,11 @@ const Order = ({ user }) => {
             key: "Bought",
             children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>,
           },
+          {
+            label: <p id="transfers-tab" className="font-medium text-base">Transfers</p>,
+            key: "Transfers",
+            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()}/>,
+          }
         ]}
       />
     </div>

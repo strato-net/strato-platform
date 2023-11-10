@@ -367,6 +367,7 @@ const ConfirmOrder = () => {
         quantity: item.qty,
         name: item.item.name,
         unitPrice: item.unitPrice,
+        subCategory: item.subCategory ? item.subCategory : " ",
       });
     });
 

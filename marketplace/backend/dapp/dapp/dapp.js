@@ -601,7 +601,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     console.log('dapp.getProducts - userOrganization', userOrganization)
     const products = await managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization, notEqualsField: 'category', notEqualsValue: 'Membership' },
       getOptions
     );
     const productCount = await managers.productManager.count(
