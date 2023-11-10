@@ -675,7 +675,6 @@ spec = do
   --   block_number text,
   --   transaction_hash text,
   --   transaction_sender text,
-    "\"owners\"" jsonb,
   --   "addr" text,
   --   "boolean" bool,
   --   "contract" text,
@@ -957,8 +956,7 @@ spec = do
   --   block_number text,
   --   transaction_hash text,
   --   transaction_sender text,
-  --    "array_nums" jsonb,
-   contract_name text,
+  --   contract_name text,
   --   "addr" text,
   --   data jsonb,
   -- PRIMARY KEY (record_id));|]
@@ -993,4 +991,3 @@ spec = do
   --   transaction_sender = excluded.transaction_sender,
   --   contract_name = excluded.contract_name,
   --   data = excluded.data;|]
-
