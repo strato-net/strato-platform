@@ -35,6 +35,7 @@ import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import helper from "../../helpers/helper.json"
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
+import { columnsConfig } from "../Membership/components/ConfirmOrderConfig";
 
 const { confirmOrderInitialValue } = helper;
 const { Text } = Typography;
@@ -208,77 +209,6 @@ const ConfirmOrder = () => {
     }
   };
 
-  const columns = [
-    {
-      title: <Text className="text-primaryC text-[13px]"></Text>,
-      dataIndex: "item",
-      render: (text) => {
-        return (
-          <img className="w-16 h-16 object-cover" alt="" src={text.image} />
-        );
-      },
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM</Text>,
-      dataIndex: "item",
-      render: (text) => {
-        return (
-          <p className="text-primary text-[17px]">{text.name}</p>
-        );
-      },
-
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
-      ),
-      dataIndex: "sellerOrganization",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-      width: "12%"
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">UNIT OF MEASUREMENT</Text>
-      ),
-      dataIndex: "unitOfMeasure",
-      align: "center",
-      render: (text) => <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>,
-      width: "12%"
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
-      dataIndex: "unitPrice",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
-      dataIndex: "qty",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
-      dataIndex: "tax",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
-      dataIndex: "amount",
-      align: "center",
-      render: (text) => <p className="text-center">{Math.trunc(text)}</p>,
-    },
-  ];
 
   const handleOrderConfirm = async () => {
     let concatenatedOrderString = "";
@@ -431,7 +361,7 @@ const ConfirmOrder = () => {
               //   ...rowSelection,
               // }}
               scrollX="100%"
-              columns={columns}
+              columns={columnsConfig}
               data={data}
               pagination={false}
             />

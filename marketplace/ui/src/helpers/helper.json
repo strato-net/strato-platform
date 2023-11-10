@@ -180,5 +180,20 @@
     "paymentStatus",
     "providerLastUpdated",
     "providerLastUpdatedDate"
-  ]
+  ],
+  "confirmOrderInitialValue": {
+    "sameAddress": true,
+    "state": "",
+    "name": "",
+    "zipcode": "",
+    "addressLine1": "",
+    "addressLine2": "",
+    "city": "",
+    "state_b": "",
+    "name_b": "",
+    "zipcode_b": "",
+    "addressLine1_b": "",
+    "addressLine2_b": "",
+    "city_b": ""
+  }
 }
