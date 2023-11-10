@@ -242,11 +242,11 @@ const CategoryProductList = ({ user }) => {
             >
               <Panel header={<Text strong>Price</Text>} key="1">
                 <Space>
-                  <InputNumber min={0} prefix='$' placeholder="min" onChange={(e) => {
+                  <InputNumber min={0} prefix='$' placeholder="min" controls={false} onChange={(e) => {
                     e === null ? setMinPrice(0) : setMinPrice(e)
                   }} />
                   -
-                  <InputNumber min={minPrice} prefix='$' placeholder="max" onChange={(e) => {
+                  <InputNumber min={minPrice} prefix='$' placeholder="max" controls={false} onChange={(e) => {
                     e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
                   }} />
                 </Space>
@@ -254,7 +254,6 @@ const CategoryProductList = ({ user }) => {
             </Collapse>
             <Divider className="m-0" />
 
-            {/* Panel - SubCategory */}
             {currentCategory && (
               <>
                 <Collapse
@@ -283,7 +282,6 @@ const CategoryProductList = ({ user }) => {
               </>
             )}
 
-            {/* Panel - Product */}
             {marketplaceList.length > 0 && (
               <>
                 <Collapse
@@ -299,7 +297,7 @@ const CategoryProductList = ({ user }) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {((selectedBrands.length > 0 || selectedSubCategories.length > 0) ? productList : marketplaceList).map(({ productId, name }, index) => (
+                        {((selectedBrands.length > 0 || selectedSubCategories.length > 0 || debouncedMinPrice !== 0) ? productList : marketplaceList).map(({ productId, name }, index) => (
                           <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
                             {name}
                           </Checkbox>
@@ -312,7 +310,6 @@ const CategoryProductList = ({ user }) => {
               </>
             )}
 
-            {/* Panel - Manufacturer/Brand */}
             {brands.length > 0 && marketplaceList.length > 0 && (
               <>
                 <Collapse
@@ -344,7 +341,6 @@ const CategoryProductList = ({ user }) => {
           </div>
         </div>
 
-        {/* Product list section */}
         {isLoading
           ? <LoaderComponent />
           : (
