@@ -150,7 +150,3 @@ enterHighwayWrapper env x = Handler $ do
                       "Please contact your network administrator to have this problem fixed."
                     ]
             }
-
---getManager :: HighwayWrapperEnv
---           -> Manager
---getManager env = httpManager env

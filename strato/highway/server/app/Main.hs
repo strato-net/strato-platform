@@ -12,7 +12,6 @@ import API
 import Strato.Monad
 import Strato.Server
 import BlockApps.Init
---import BlockApps.Logging (LogLevel (..), flags_minLogLevel)
 import Options
 
 import Data.ByteString.Char8 as DBC8
@@ -23,9 +22,6 @@ import Network.HTTP.Client hiding (Proxy)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
---import Network.Wai.Middleware.RequestLogger
---import Network.Wai.Middleware.Servant.Options
---import Options
 import Servant
 import Servant.Multipart.Client
 import Text.RawString.QQ as TRQQ
@@ -82,16 +78,12 @@ appHighwayWrapper env =
         prometheusInstrumentApp = False
       }
     . instrumentApp "highway-wrapper"
-    -- . (if flags_minLogLevel == LevelDebug then logStdoutDev else logStdout)
     . cors (const $ Just policy)
-    -- . provideOptions (Proxy @HighwayWrapperAPI)
     . serve
       ( Proxy
           @( "highway" :> HighwayWrapperAPI
-           --    :<|> "strato" :> "v2.3" :> Strato23.VaultWrapperDocsAPI
            )
       )
     $ serveHighwayWrapper env
-      -- :<|> return Strato23.vaultWrapperSwagger
   where
     policy = simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]}
