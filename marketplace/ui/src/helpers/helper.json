@@ -156,5 +156,29 @@
       "label": "%",
       "value": "percent"
     }
+  ],
+  "statusOptionServiceUsage": [
+    {
+      "value": 1,
+      "label": "Requested"
+    },
+    {
+      "value": 2,
+      "label": "Cancelled"
+    },
+    {
+      "value": 3,
+      "label": "Completed"
+    }
+  ],
+  "UpdatePayloadKeys": [
+    "summary",
+    "serviceDate",
+    "providerComment",
+    "status",
+    "pricePaid",
+    "paymentStatus",
+    "providerLastUpdated",
+    "providerLastUpdatedDate"
   ]
 }

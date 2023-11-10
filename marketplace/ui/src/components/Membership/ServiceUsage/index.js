@@ -1,4 +1,3 @@
-import "./index.css";
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -11,53 +10,26 @@ import {
   Typography,
   notification,
 } from "antd";
-import {
-  PlusOutlined,
-  CaretDownOutlined,
-  CloseOutlined,
-} from "@ant-design/icons";
+
 import { generateTableColumns } from "./tableColumns";
 import BreadCrumbComponent from "../../BreadCrumb/BreadCrumbComponent";
-
-import {
-  useServiceUsageDispatch,
-  useServiceUsageState,
-} from "../../../contexts/serviceUsage";
-import {
-  useAuthenticateDispatch,
-  useAuthenticateState,
-} from "../../../contexts/authentication";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../../contexts/membership";
+// Dispatch and States
+import { useServiceUsageDispatch, useServiceUsageState } from "../../../contexts/serviceUsage";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../../contexts/authentication";
+import { useMembershipDispatch, useMembershipState } from "../../../contexts/membership";
 import { useServiceDispatch, useServiceState } from "../../../contexts/service";
-
-
+// Actions
 import { actions as serviceUsageActions } from "../../../contexts/serviceUsage/actions";
 import { actions as servicesActions } from "../../../contexts/service/actions";
 import { actions as userAuthActions } from "../../../contexts/authentication/actions";
 import { actions as membershipActions } from "../../../contexts/membership/actions";
+// utils, css, 
+import { PlusOutlined, CaretDownOutlined, CloseOutlined } from "@ant-design/icons";
+import helper from "../../../helpers/helper.json"
+import "./index.css";
+const { statusOptionServiceUsage, UpdatePayloadKeys } = helper;
 
-const limit = 10;
-const offset = 0;
-
-const statusOptions = [
-  { value: 1, label: "Requested" },
-  { value: 2, label: "Cancelled" },
-  { value: 3, label: "Completed" },
-];
-
-const UpdatePayloadKeys = [
-  "summary",
-  "serviceDate",
-  "providerComment",
-  "status",
-  "pricePaid",
-  "paymentStatus",
-  "providerLastUpdated",
-  "providerLastUpdatedDate",
-];
+const limit = 10, offset = 0;
 
 const getProviderOptions = (data) => {
   const uniqueManufacturers = new Set();
@@ -99,11 +71,12 @@ const ServiceTable = () => {
   let { serviceType } = useParams();
 
   const [api, contextHolder] = notification.useNotification();
+  // Dispatch
   const serviceUsageDispatch = useServiceUsageDispatch();
   const serviceDispatch = useServiceDispatch();
   const authUserDispatch = useAuthenticateDispatch();
   const membershipDispatch = useMembershipDispatch();
-
+  // states
   const userCert = useAuthenticateState();
   const servicesState = useServiceState();
   const membership = useMembershipState();
@@ -416,7 +389,7 @@ const ServiceTable = () => {
   const columns = generateTableColumns({
     isEdit,
     isNewRow,
-    statusOptions,
+    statusOptionServiceUsage,
     serviceType,
     username,
     organization,
@@ -525,7 +498,7 @@ const ServiceTable = () => {
               onChange={(value) => {
                 handleFilter(value, "status");
               }}
-              options={statusOptions}
+              options={statusOptionServiceUsage}
             />
             <Button
               icon={<CloseOutlined />}
