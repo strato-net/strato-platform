@@ -70,13 +70,25 @@ const ProcessingOrder = () => {
 
       const body = await response.json();
       if (response.status === RestStatus.OK) {
-        if (JSON.parse(body.data.metadata.cart) !== {}) {
           if (body.data["payment_status"] === "paid") {
-            const cart = JSON.parse(body.data.metadata.cart);
+            const cartData = body.data.metadata;
+            // Convert the orderList items to an array of objects
+            const orderList = Object.keys(cartData)
+              .filter(key => key.startsWith('orderList'))
+              .map(key => JSON.parse(cartData[key]));
+            // Order Creation
+            const cart = {
+              buyerOrganization: cartData.buyerOrganization,
+              orderList: orderList,
+              orderTotal: parseInt(cartData.orderTotal),
+              shippingAddress: cartData.shippingAddress,
+              tax: parseInt(cartData.tax),
+              user: cartData.user,
+              email: cartData.email
+            };
             let object = { paymentSessionId: sessionId, ...cart };
             handleOrderConfirm(object);
           }
-        }
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         seterror("Cannot find session ID");
         setTimeout(function () {
