@@ -9,7 +9,6 @@ module SolidVM.Solidity.Parse.ParserTypes where
 
 --import           Control.Monad
 --import           Data.Either.Extra
---import           Data.Maybe
 --import           Data.SemVer
 --import qualified Data.Text as T
 
@@ -40,7 +39,8 @@ data ParserState = ParserState
   { contractName :: ContractName,
     pragmaVersion :: PragmaVersion,
     pragmas :: M.Map String String,
-    userDefinedTypes :: (M.Map String String)
+    userDefinedTypes :: (M.Map String String),
+    contractSrcLength :: Int
   }
 
 -- TODO: add lenses to make the referencing and changing of the parser state faster
@@ -48,7 +48,10 @@ data ParserState = ParserState
 type SolidityParser = Parsec SourceCode ParserState
 
 initialParserState :: ParserState
-initialParserState = ParserState "" "" M.empty M.empty
+initialParserState = ParserState "" "" M.empty M.empty 0
+
+initialParserStateWithLength :: Int -> ParserState
+initialParserStateWithLength srcLength = ParserState "" "" M.empty M.empty srcLength
 
 --given inputs set the parser state
 setParserState :: ParserState -> SolidityParser ()
@@ -60,7 +63,7 @@ setPragmaVersion :: PragmaVersion -> SolidityParser ()
 setPragmaVersion p =
   do
     ParserState {..} <- getState
-    putState (ParserState contractName p pragmas userDefinedTypes)
+    putState (ParserState contractName p pragmas userDefinedTypes contractSrcLength)
 
 --Change the contract name of the ParserState with a given input
 setContractName :: ContractName -> SolidityParser ()
@@ -68,19 +71,19 @@ setContractName :: ContractName -> SolidityParser ()
 setContractName cn =
   do
     ParserState {..} <- getState
-    putState (ParserState cn pragmaVersion pragmas userDefinedTypes)
+    putState (ParserState cn pragmaVersion pragmas userDefinedTypes contractSrcLength)
 
 addPragma :: String -> String -> SolidityParser ()
 addPragma k v = do
   ParserState {..} <- getState
-  putState $ ParserState contractName pragmaVersion (M.insert k v pragmas) userDefinedTypes
+  putState $ ParserState contractName pragmaVersion (M.insert k v pragmas) userDefinedTypes contractSrcLength
 
 addUserDefinedType :: String -> String -> SolidityParser ()
 addUserDefinedType k v =
   --putState (ParserState contractName pragmaVersion (M.insert k v userDefinedTypes )) =<< ParserState{..} =<< getState
   do
     ParserState {..} <- getState
-    putState (ParserState contractName pragmaVersion pragmas (M.insert k v userDefinedTypes))
+    putState (ParserState contractName pragmaVersion pragmas (M.insert k v userDefinedTypes) contractSrcLength)
 
 -- Get the contract name from the parser state
 getContractName :: SolidityParser ContractName
@@ -103,6 +106,9 @@ isInUserDefinedTypes nam = M.member nam . userDefinedTypes <$> getState
 -- Get the pragmaVersion from the parser state
 getUserDefinedType :: String -> SolidityParser (Maybe String)
 getUserDefinedType nam = M.lookup nam . userDefinedTypes <$> getState
+
+getContractSrcLength :: SolidityParser Int
+getContractSrcLength = contractSrcLength <$> getState
 
 -- | Not actually used.
 type SolidityValue = String

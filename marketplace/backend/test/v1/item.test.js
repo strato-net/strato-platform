@@ -10,8 +10,8 @@ import dappJs from '../../dapp/dapp/dapp'
 
 import { productArgs, updateProductArgs } from './factories/product'
 import { inventoryArgs } from './factories/inventory'
-import { itemArgs, updateItemArgs } from './factories/item'
-import { Item, Product, Inventory, Organizations } from '../../api/v1/endpoints'
+import { itemArgs, transferItemArgs, updateItemArgs } from './factories/item'
+import { Item, Product, Inventory, Organizations, Order } from '../../api/v1/endpoints'
 const options = { config }
 
 const loadEnv = dotenv.config()
@@ -125,5 +125,72 @@ describe('Item End-To-End Tests', function () {
     assert.isDefined(getRawMaterials.body, 'body should be defined');
     assert.isDefined(getRawMaterials.body.data, 'body should be defined');
   });
+
+  it("Transfer Ownership of an Item", async () => {
+    // create product
+    const createProductArgs = {
+      ...productArgs(util.uid()),
+    }
+
+    const createProductResponse = await post(
+      Product.prefix,
+      Product.create,
+      createProductArgs,
+      orgAdmin.token
+    )
+
+    assert.equal(createProductResponse.status, 200, 'should be 200');
+    assert.isDefined(createProductResponse.body, 'body should be defined');
+
+
+    // create inventory
+    const createInventoryArgs = {
+      ...inventoryArgs(createProductResponse.body.data[1], util.uid()),
+    }
+
+
+    const createInventoryResponse = await post(
+      Inventory.prefix,
+      Inventory.create,
+      createInventoryArgs,
+      orgAdmin.token,
+    )
+
+    assert.equal(createInventoryResponse.status, 200, 'should be 200');
+    assert.isDefined(createInventoryResponse.body, 'body should be defined')
+
+    // get item address
+    const itemAddress = createInventoryResponse.body.data[2].split(',')
+
+    // Remove the last item in the array which is an empty string
+    const itemsArrCleaned = itemAddress.slice(0, itemAddress.length - 1)
+
+
+    // transfer ownership of item
+    let newOwner = "e8a213bc06999d704ee89b29c7262fb67e3ea72f"
+    const transferOwnershipArgs = {
+      // Hard coded new owner address. TODO: update this with a dynamic address
+      ...transferItemArgs(itemsArrCleaned, newOwner),
+    }
+
+    const transferOwnershipResponse = await put(
+      Item.prefix,
+      Item.transferOwnership,
+      transferOwnershipArgs,
+      orgAdmin.token,
+    )
+
+    const transferedItems = await get(
+      Item.prefix,
+      Item.getAll,
+      {productId: transferOwnershipResponse.body.data[1]},
+      orgAdmin.token,
+    )
+
+    assert.equal(transferOwnershipResponse.status, 200, 'should be 200');
+    assert.isDefined(transferOwnershipResponse.body, 'body should be defined')
+    assert.isDefined(transferOwnershipResponse.body.data, 'body.data should be defined')
+    assert.equal(transferedItems.body.data[0].owner, newOwner, 'owner should be updated')
+  })
 
 })

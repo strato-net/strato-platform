@@ -1397,8 +1397,7 @@ getVarTypeByName' name ctx = do
     Nothing -> do
       c <- asks contract
       cc <- asks codeCollection
-      let mVarDecl =
-            ((_varType &&& const ctx) <$> M.lookup name (_storageDefs c))
+      let mVarDecl = ((_varType &&& const ctx) <$> M.lookup name (_storageDefs c))
               <|> ((_constType &&& const ctx) <$> M.lookup name (_constants c))
               <|> ((_constType &&& const ctx) <$> M.lookup name (_flConstants cc))
               <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
@@ -1433,21 +1432,26 @@ getVarTypeByName' name ctx = do
         Nothing ->
           getFunctionByNameRecursively name ctx >>= \case
             b@Bottom {} -> do
-              pure $ case M.lookup name $ _contracts cc of
-                Just _ ->
+              case M.lookup name $ _contracts cc of
+                Just Contract{_parents=ps} -> do
                   let ctrct = Static (SVMType.Contract name) ctx
                       lbl = Static (SVMType.UnknownLabel name Nothing) ctx
-                   in Sum $
+                      pContracts = (\p -> Static (SVMType.Contract p) ctx) <$> ps
+                      pLabels = (\p -> Static (SVMType.UnknownLabel p Nothing) ctx) <$> ps
+                      cs = M.keys . M.filter (elem name . _parents) $ _contracts cc
+                      cContracts = (\p -> Static (SVMType.Contract p) ctx) <$> cs
+                      cLabels = (\p -> Static (SVMType.UnknownLabel p Nothing) ctx) <$> cs
+                  pure . Sum $
                         ctrct
                           :| [ Function
-                                 (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl]))
+                                 (Sum (Static (SVMType.Account False) ctx :| [ctrct, lbl] ++ pContracts ++ pLabels ++ cContracts ++ cLabels))
                                  ctrct
                                  ctx
                                  []
                                  []
                                  False
                              ]
-                Nothing -> do
+                Nothing -> pure $ do
                   case M.lookup name $ _flFuncs cc of
                     Just f -> functionType cc ctx name f
                     Nothing -> b
