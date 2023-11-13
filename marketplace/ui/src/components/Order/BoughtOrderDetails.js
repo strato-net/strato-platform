@@ -99,7 +99,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const validatePayment = async(paymentSessionId) => {
     //if payment session exists and status = Payment Pending
     // OR if payment session exists and comment is not set and status = Cancelled
-    if(paymentSessionId !== "" && getStatus(parseInt(orderDetails.status)) === getStatus(5) || comment==="" && paymentSessionId!=="" && getStatus(parseInt(orderDetails.status)) === getStatus(4)) {
+    if((paymentSessionId !== "" && getStatus(parseInt(orderDetails.status)) === getStatus(5)) || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === getStatus(4)))) {
       try{
         const intentResponse = await fetch(
           `${apiUrl}/order/payment/intent/sessions/${paymentSessionId}`,

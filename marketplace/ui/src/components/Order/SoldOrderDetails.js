@@ -273,7 +273,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const validatePayment = async (paymentSessionId) => {
     //if payment session exists and status = Payment Pending
     // OR if payment session exists and comment is not set and status = Cancelled
-    if (paymentSessionId !== "" && getStatus(parseInt(orderDetails.status)) === getStatus(5) || comment==="" && paymentSessionId!=="" && getStatus(parseInt(orderDetails.status)) === getStatus(4)) {
+    if (((paymentSessionId !== "") && (getStatus(parseInt(orderDetails.status)) === getStatus(5))) || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === getStatus(4)))) {
       try {
         const intentResponse = await fetch(
           `${apiUrl}/order/payment/intent/sessions/${paymentSessionId}`,
@@ -287,7 +287,7 @@ const SoldOrderDetails = ({ user, users }) => {
         //Set the Comment with Status Message
         if(intentBody.data.last_payment_error.message) setcomment('Stripe:'+intentBody.data.last_payment_error.message);
 
-        if (intentBody.data.status === 'requires_payment_method' && getStatus(parseInt(orderDetails.status)) !== getStatus(4)) {
+        if (intentBody.data.status === 'requires_payment_method' && (getStatus(parseInt(orderDetails.status)) !== getStatus(4))) {
           //If any payment failure exists, and STATUS != Cancelled 
           const newComment = 'Stripe:' + intentBody.data.last_payment_error.message;
   
