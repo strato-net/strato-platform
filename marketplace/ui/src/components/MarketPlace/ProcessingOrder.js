@@ -58,6 +58,24 @@ const ProcessingOrder = () => {
 
   }, [sessionId])
 
+  const restructureData = (cartData) =>{
+    // Convert the orderList items to an array of objects
+    const orderList = Object.keys(cartData)
+    .filter(key => key.startsWith('orderList'))
+    .map(key => JSON.parse(cartData[key]));
+    
+    //Prepare Cart Details
+    const cart = {
+      buyerOrganization: cartData.buyerOrganization,
+      orderList: orderList,
+      orderTotal: parseInt(cartData.orderTotal),
+      shippingAddress: cartData.shippingAddress,
+      tax: parseInt(cartData.tax),
+      user: cartData.user,
+      email: cartData.email
+    };
+    return cart;
+  }
 
   const getCartData = async () => {
     try {
@@ -70,22 +88,8 @@ const ProcessingOrder = () => {
 
       const body = await response.json();
       if (response.status === RestStatus.OK) {
+        const cart = restructureData(body.data.metadata);
           if (body.data["payment_status"] === "paid") {
-            const cartData = body.data.metadata;
-            // Convert the orderList items to an array of objects
-            const orderList = Object.keys(cartData)
-              .filter(key => key.startsWith('orderList'))
-              .map(key => JSON.parse(cartData[key]));
-            // Order Creation
-            const cart = {
-              buyerOrganization: cartData.buyerOrganization,
-              orderList: orderList,
-              orderTotal: parseInt(cartData.orderTotal),
-              shippingAddress: cartData.shippingAddress,
-              tax: parseInt(cartData.tax),
-              user: cartData.user,
-              email: cartData.email
-            };
             let object = { paymentSessionId: sessionId, ...cart };
             handleOrderConfirm(object);
           }
