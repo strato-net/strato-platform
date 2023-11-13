@@ -153,6 +153,12 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
         order: value,
       }
     }
+    if (key === 'or') {
+      return {
+        ...agg,
+        or: value,
+      }
+    }
     if (!value && typeof value != 'boolean') {
       return agg
     }
