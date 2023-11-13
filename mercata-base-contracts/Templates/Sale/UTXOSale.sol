@@ -19,9 +19,6 @@ contract UTXOSale is Sale {
         // Transfer ownership of the new asset to the purchaser
         UTXO(newAssetAddress).transferOwnership(_purchasersCommonName);
 
-        // Update the sale state
-        transferOwnership(_purchasersCommonName);
-
         return newAssetAddress;
     }
 }
