@@ -1,18 +1,10 @@
 #!/bin/bash
 
-set -ex
-
-minLogLevel=LevelInfo
-if [ "${VAULTWRAPPER_DEBUG:-false}" == true ]; then
-  minLogLevel=LevelDebug
-fi
-
 echo "Environment variables:
 highway-wrapper:
 --awsaccesskeyid=\$awsaccesskeyid="AKIAV5NMROVZIZQY4OAE"
 --awssecretaccesskey=\$awssecretaccesskey="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"
 --awss3bucket=\$awss3bucket="mercata-testnet2"
---minLogLevel="${minLogLevel}"
 "
 
 echo 'Starting up Highway...'
