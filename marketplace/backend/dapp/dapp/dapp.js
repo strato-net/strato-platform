@@ -377,8 +377,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
     const { saleOrderAddress, ...restArgs } = args;
-    
-    return saleOrderJs.transferOwnership(rawAdmin, saleOrderAddress, options);
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.transferOwnership(rawAdmin, contract, options);
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------

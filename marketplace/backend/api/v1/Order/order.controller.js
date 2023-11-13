@@ -190,7 +190,7 @@ class OrderController {
 
       OrderController.validateExecuteSaleArgs(body)
 
-      const result = await dapp.transferOwnershipSale(body)
+      const result = await dapp.saleOrderTransferOwnership(body)
       rest.response.status200(res, result)
 
       return next()

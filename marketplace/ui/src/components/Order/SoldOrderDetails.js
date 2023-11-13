@@ -215,50 +215,11 @@ const SoldOrderDetails = ({ user, users }) => {
     let body = {};
     let isDone=false;
 
-    for (let i = 0; i < orderDetails.orderLines.length; i++) {
-      setselectedProd(orderDetails.orderLines[i]);
+    body = {
+      saleOrderAddress: details.order.address,
+    };
 
-      // Here we are skipping the createOrderLineItem if the serial number is already uploaded. 
-      // If the serial number is uploaded an orderLineItem is already created.
-      if (details.orderLines[i].containsSerialNumber === true) {
-        continue;
-      } else {
-        body = {
-          orderId: details.orderId,
-          orderAddress: details.address,
-          orderLineId: details.orderLines[i].address,
-          serialNumber: [],
-          quantity: details.orderLines[i].quantity,
-        };
-
-        isDone= await actions.createOrderLineItem(dispatch, body);
-      }
-    }
-    
-      
-    body = {};
-    if (selectedDate == null) {
-      body = {
-        address: Id,
-
-        updates: {
-          sellerComments: comment,
-          status: parseInt(getStatusByValue(status)),
-
-        },
-      };
-    } else {
-      body = {
-        address: Id,
-
-        updates: {
-          sellerComments: comment,
-          status: 3,
-          fullfilmentDate: dayjs(selectedDate).unix(),
-        },
-      };
-    }
-    isDone = await actions.updateSellerDetails(dispatch, body);
+    isDone = await actions.executeSale(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
       await actions.fetchOrderDetails(dispatch, Id);
