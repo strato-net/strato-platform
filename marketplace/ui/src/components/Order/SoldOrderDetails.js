@@ -524,7 +524,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 value={details.order.sellerCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData title="TOTAL ($)" value={details.orderTotal} />
+              <OrderData title="TOTAL ($)" value={details.order.totalPrice} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="DATE"

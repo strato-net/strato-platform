@@ -5,7 +5,6 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "./OrderLineItem.sol";
 import "./Order.sol";
 import "./OrderStatus.sol";
-import "/dapp/items/contracts/Art.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets

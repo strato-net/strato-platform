@@ -1,11 +1,12 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
+import "/dapp/orders/contracts/SimpleSale.sol";
 
 pragma es6;
 pragma strict;
 import <d816194227e1a7a780fff236a449604afeb36255>;
 
-/// @title A representation of Item assets
+/// @title A representation of Art assets
 contract Art is ItemStatus, RestStatus, Asset {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
@@ -36,7 +37,7 @@ contract Art is ItemStatus, RestStatus, Asset {
         uint _price,
         SaleState _saleState,
         PaymentType _paymentType
-    ) public Asset(_name, _description, _images, _price, _createdDate, _saleState, _paymentType ){
+    ) public Asset(_name, _description, _images, _price, _createdDate){
         owner = _owner;
 
         serialNumber = _serialNumber;
@@ -50,6 +51,17 @@ contract Art is ItemStatus, RestStatus, Asset {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
+        createSale(_saleState, _paymentType);
+    }
+
+    function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
+        return Sale(new SimpleSale(address(this), _state, _payment));
+    }
+
+    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
+        require(address(sale) == address(0), "An open bill of sale already exists for this asset");
+        sale = createBaseSale(_state, _payment);
+        return RestStatus.OK;
     }
 
     function update(

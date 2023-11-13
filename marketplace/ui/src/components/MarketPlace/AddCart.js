@@ -200,12 +200,12 @@ const Checkout = ({ user }) => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">UNIT OF MEASUREMENT</Text>
+        <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
       ),
-      dataIndex: "unitOfMeasure",
+      dataIndex: "sellerCommonName",
       align: "center",
       render: (text) => (
-        <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>
+        <p className="text-center">{text}</p>
       ),
       width: "12%"
     },
