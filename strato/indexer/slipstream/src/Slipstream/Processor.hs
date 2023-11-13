@@ -383,7 +383,7 @@ getMapNamesFromContract c =
 
 getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
 getAbstractParentsFromContract c cc =
-  -- recursively obtain a grandparent contracts
+  -- recursively obtain parent + grandparent contracts
   -- ex. B is A, C is B, then C should also be A
   let go [] = []
       go xs = xs ++ (go $ getContractsForParents (concatMap (^. parents) xs) ccc)
