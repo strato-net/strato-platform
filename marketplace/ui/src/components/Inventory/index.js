@@ -8,6 +8,7 @@ import {
   Spin,
   Typography,
   Image,
+  Tooltip
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
@@ -201,21 +202,32 @@ const Inventory = ({ user }) => {
                 >
                   {"Connect Stripe"}
                 </Button>
-                <Button
-                  id="add-inventory-button"
-                  type="primary"
-                  className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      showModal()
-                    }
-                  }}
-                  disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
-                >
-                  Add Inventory
-                </Button>
+                <Tooltip
+                  title={
+                    stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
+                      ? ""
+                      : "Please connect to Stripe first"
+                  }
+                  placement="bottom"
+                  >
+                  <div>
+                    <Button
+                      id="add-inventory-button"
+                      type="primary"
+                      className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
+                      onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          window.location.href = loginUrl;
+                        } else {
+                          showModal()
+                        }
+                      }}
+                      disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+                    >
+                      Add Inventory
+                    </Button>
+                  </div>
+                </Tooltip>
               </div>
             </div>
           ) : (
@@ -252,18 +264,29 @@ const Inventory = ({ user }) => {
                   >
                     {"Connect Stripe"}
                   </Button>
-                  <Button id="add-inventory-button" type="primary" className="w-48"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        showModal()
-                      }
-                    }}
-                    disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+                  <Tooltip
+                    title={
+                      stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
+                        ? ""
+                        : "Please connect to Stripe first"
+                    }
+                    placement="bottom"
                   >
-                    Add Inventory
-                  </Button>
+                    <div>
+                      <Button id="add-inventory-button" type="primary" className="w-48"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            showModal()
+                          }
+                        }}
+                        disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+                      >
+                        Add Inventory
+                      </Button>
+                    </div>
+                  </Tooltip>
                 </div>
               </div>
               <>
