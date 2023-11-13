@@ -49,6 +49,7 @@ library:
   - split
   - strato-model
   - text
+  - time
   - transformers
   - unliftio
   - utf8-string
