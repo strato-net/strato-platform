@@ -283,8 +283,9 @@ pipeline {
                 dir("strato-getting-started"){
                   sh 'sudo cp /datadrive/letsencrypt-ssl/server.pem ssl/certs/'
                   sh 'sudo cp /datadrive/letsencrypt-ssl/server.key ssl/private/'
-                  sh 'sudo ./strato --wipe || true'
-                  sh 'sudo ./vault --wipe || true'
+                  // Double-wiping to prevent situation when docker compose throws erroneous failure on first attempt (possibly a bug in dc)
+                  sh 'sudo ./strato --wipe || sudo ./strato --wipe'
+                  sh 'sudo ./vault --wipe || sudo ./vault --wipe'
                   sh 'mv genesis-block-official.json genesis-block.json'
                   sh './run-vault.sh'
                   // run again but connecting to mercata-hydrogen this time
