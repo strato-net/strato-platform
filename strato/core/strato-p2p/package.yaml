@@ -24,8 +24,10 @@ executables:
       - hflags
       - lifted-async
       - ordered-containers
+      - resourcet
       - strato-model
       - strato-p2p
+      - thread-hierarchy
       - unagi-chan
       - wai-middleware-prometheus
       - warp
@@ -45,6 +47,7 @@ library:
     - blockapps-vault-wrapper-client
     - blockstanbul
     - bytestring
+    - concurrency
     - conduit
     - conduit-extra
     - containers
@@ -95,6 +98,7 @@ library:
     - strato-redis-blockdb
     - text
     - these
+    - thread-hierarchy
     - time
     - transformers
     - unagi-chan
@@ -102,7 +106,6 @@ library:
     - unliftio 
     - warp
     - x509-certs
-
 
 tests:
   strato-p2p-client-test:
@@ -149,9 +152,9 @@ tests:
       - strato-sequencer
       - strato-redis-blockdb
       - text
+      - thread-hierarchy
       - time
       - unliftio
       - vm-runner
       - vm-tools
-      - x509-certs
-  
+      - x509-certs 

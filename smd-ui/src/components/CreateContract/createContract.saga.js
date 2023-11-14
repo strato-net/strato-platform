@@ -21,9 +21,9 @@ import { createUrl } from '../../lib/url';
 const getXabiUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
-export function createContractApiCall(contract, src, username, address, password, args, chainid, metadata) {
+export function createContractApiCall(contract, src, username, address, password, args, chainid, metadata, useWallet) {
   const isOauth = isOauthEnabled();
-  const options = isOauth ? { query: { resolve: true, chainid } } : { params: { username, address }, query: { resolve: true, chainid } };
+  const options = isOauth ? { query: { resolve: true, chainid, use_wallet: useWallet } } : { params: { username, address }, query: { resolve: true, chainid } };
   const prefix = isOauth ? env.STRATO_URL_V23 : env.BLOC_URL;
   const url = prefix + createUrl(isOauth ? "/transaction" : "/users/::username/::address/contract", options);
 
@@ -128,7 +128,16 @@ export function compileContractApiCall(contractName, source, solidvm) {
 
 export function* createContract(action) {
   try {
-    let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments, action.payload.chainId, action.payload.metadata);
+    let response = yield call( createContractApiCall
+                             , action.payload.contract
+                             , action.payload.fileText
+                             , action.payload.username
+                             , action.payload.address
+                             , action.payload.password
+                             , action.payload.arguments
+                             , action.payload.chainId
+                             , action.payload.metadata
+                             , action.payload.useWallet);
     if (typeof response === "string") {
       yield put(createContractFailure(response));
     } else {

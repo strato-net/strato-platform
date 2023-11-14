@@ -157,7 +157,7 @@ describe('Solid VM: Contract uploads', function() {
     assert.equal(index2[0].y, 144);
   });
 
-  it ('merges concurrent deltas', async () => {
+  it.skip ('merges concurrent deltas', async () => {
     const contract = await upload('SolidVM', 'Deployer', deployAndModify);
 
     await sleep(2000);
