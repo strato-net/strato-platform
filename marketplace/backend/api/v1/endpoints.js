@@ -43,6 +43,7 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
+  search: '/search',
   get: '/:address',
   getAll: '/',
   create: '/',
@@ -61,6 +62,7 @@ export const Item = {
   update: '/update',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
+  transfers: '/transfers',
   getRawMaterials: '/rawmaterials'
 }
 

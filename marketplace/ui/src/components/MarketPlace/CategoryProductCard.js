@@ -18,6 +18,7 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie";
 
 
 const { Title, Text, Paragraph } = Typography;
@@ -41,6 +42,7 @@ const CategoryProductCard = ({ product, category }) => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductDetail.url;
   const [qty, setQty] = useState(1);
+  const availableQuantity = product.availableQuantity;
 
   const subtract = () => {
     if (qty !== 1) {
@@ -145,6 +147,11 @@ const CategoryProductCard = ({ product, category }) => {
               </Text>
               <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
             </div>
+            <Text className="text-secondryB text-sm" id="prod-category">
+              Sold By: {product.ownerOrganization.startsWith('Mercata Account')
+                ? product.ownerCommonName
+                : product.ownerOrganization}
+            </Text>
             <Paragraph
               ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
               className="text-primaryC text-xs mt-2"
@@ -168,8 +175,8 @@ const CategoryProductCard = ({ product, category }) => {
                     <div className="ml-5 flex items-center my-2" id="prod-quantity">
                       <div
                         onClick={subtract}
-                        className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                        <MinusOutlined className="text-xs text-secondryD" />
+                        className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+                        <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
                       </div>
                       <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
                         onChange={e => {
@@ -186,8 +193,8 @@ const CategoryProductCard = ({ product, category }) => {
                         }} />
                       <div
                         onClick={add}
-                        className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-                        <PlusOutlined className="text-xs text-secondryC" />
+                        className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+                        <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
                       </div>
                     </div>
                   </div>
@@ -195,6 +202,7 @@ const CategoryProductCard = ({ product, category }) => {
                     className="group w-40 h-9 border border-primary hover:bg-primary"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({
@@ -216,6 +224,7 @@ const CategoryProductCard = ({ product, category }) => {
                     className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
                         TagManager.dataLayer({

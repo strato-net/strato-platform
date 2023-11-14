@@ -99,13 +99,6 @@ Storage json
     value HexStorage
     deriving Eq Read Show
 
-ContractDetailsRef
-    account Account Maybe
-    codeHash CodePtr
-    name Text
-    xabi Xabi
-    deriving Eq Show
-
 TransactionResult json
     blockHash Keccak256
     transactionHash Keccak256
@@ -134,30 +127,6 @@ UserN json
     numLogins Int
     verified Bool
     verkey BS.ByteString
-    deriving Eq Read Show
-
-UserData json
-    encryptedWallet String
-    address Address
-    userId UserNId
-    deriving Eq Read Show
-
-BlockApp json
-    name String
-    developerName String
-    developerEmail String
-    appUrl String
-    repoUrl String Maybe
-    loginPassHash BS.ByteString
-    verified Bool
-    verkey BS.ByteString
-    deriving Eq Read Show
-
-BlockAppLogin json
-    userId UserNId
-    blockAppId BlockAppId
-    timestamp UTCTime
-    ip String
     deriving Eq Read Show
 
 Extra

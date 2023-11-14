@@ -21,9 +21,9 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import { Images } from "../../images";
-//events
-import { actions as eventActions } from "../../contexts/event/actions";
-import { useEventDispatch, useEventState } from "../../contexts/event";
+//items
+import { actions as itemActions } from "../../contexts/item/actions";
+import { useItemDispatch, useItemState} from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -35,40 +35,44 @@ const { Title, Text } = Typography;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
-  const debouncedSearchTerm = useDebounce("", 1000);
+  const [queryValue, setQueryValue] = useState("");
+  const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(10);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
+  const [isSearch, setIsSearch] = useState(false);
 
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   //Categories
   const categoryDispatch = useCategoryDispatch();
-  
-  const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
-  useInventoryState();
 
-  //events
-  const eventsDispatch = useEventDispatch();
+  const { categorys } = useCategoryState();
+  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } =
+    useInventoryState();
+
+  //items
+  const itemDispatch = useItemDispatch();
   const {
-    message: eventMsg,
-    success: eventSuccess
-  } = useEventState();
+    message: itemMsg,
+    success: itemSuccess
+  } = useItemState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
   useEffect(() => {
-    actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm);
+    if (isSearch) {
+      actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
+    } else actions.fetchInventory(dispatch, limit, offset, "");
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
-       actions.sellerStripeStatus(dispatch, user?.organization);
+    actions.sellerStripeStatus(dispatch, user?.organization);
   }, [dispatch, user]);
 
   useEffect(() => {
@@ -105,23 +109,34 @@ const Inventory = ({ user }) => {
     }
   };
 
+  const queryHandle = (e) => {
+    if (e.length === 0 || e === "") {
+      setIsSearch(false)
+    } else {
+      setIsSearch(true)
+    }
+    setQueryValue(e);
+    setOffset(0);
+    setPage(1);
+  };
+
   const onPageChange = (page) => {
     setOffset((page - 1) * limit);
     setPage(page);
   };
 
-  const eventToast = (placement) => {
-    if (eventSuccess) {
+  const itemToast = (placement) => {
+    if (itemSuccess) {
       api.success({
-        message: eventMsg,
-        onClose: eventActions.resetMessage(eventsDispatch),
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 3,
       });
     } else {
       api.error({
-        message: eventMsg,
-        onClose: eventActions.resetMessage(eventsDispatch),
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 4,
       });
@@ -162,7 +177,7 @@ const Inventory = ({ user }) => {
                     }
                   }}
                   disabled={stripeStatus.detailsSubmitted}
-                  >
+                >
                   {"Connect Stripe"}
                 </Button>
                 <Button
@@ -197,7 +212,12 @@ const Inventory = ({ user }) => {
                   </Breadcrumb.Item>
                 </Breadcrumb>
                 <div className="flex">
-                  <Search placeholder="Search" className="w-80 mr-3" />
+                  <Search
+                    placeholder="Search"
+                    className="w-80 mr-6"
+                    allowClear
+                    onSearch={queryHandle}
+                  />
                   <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -246,7 +266,8 @@ const Inventory = ({ user }) => {
                 <Pagination
                   current={page}
                   onChange={onPageChange}
-                  total={total}
+                  total={inventoriesTotal}
+                  showSizeChanger={false}
                   className="flex justify-center my-5 "
                 />
                 <div className="pb-12"></div>
@@ -266,7 +287,7 @@ const Inventory = ({ user }) => {
         />
       )}
       {message && openToast("bottom")}
-      {eventMsg && eventToast("bottom")}
+      {itemMsg && itemToast("bottom")}
     </>
   );
 };

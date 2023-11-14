@@ -595,14 +595,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
     console.log('dapp.getProducts - userOrganization', userOrganization)
     const products = await managers.productManager.getProducts(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization, notEqualsField: 'category', notEqualsValue: 'Membership' },
       getOptions
     );
     const productCount = await managers.productManager.count(
-      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization, notEqualsField: 'category', notEqualsValue: 'Membership' },
       getOptions
     );
-    return {products: products, productCount: productCount}
+    return { products: products, productCount: productCount }
   };
   contract.getProductNames = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
@@ -618,7 +618,30 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const { userAddress, ...restArgs } = args
     const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
-    return managers.productManager.getInventories({ ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization }, getOptions);
+    
+    const inventories = await managers.productManager.getInventories(
+      { ...restArgs, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+    const inventoryCount = await managers.productManager.inventoryCount(
+      { ...args, sort: '-createdDate', ownerOrganization: userOrganization },
+      getOptions
+    );
+    return {inventories: inventories, inventoryCount: inventoryCount}
+  };
+  contract.getInventoriesSearch = async function (args, options = optionsNoChainIds) {
+    const { userAddress, queryValue, ...restArgs } = args;
+    const encodedQueryValue = encodeURIComponent(queryValue);
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    const productList = await managers.productManager.getProducts({ ...restArgs, limit: 2000, offset: 0, ownerOrganization: userOrganization, queryValue: encodedQueryValue }, getOptions);
+    const productIds = productList.map(product => product.address);
+    const { queryFields, ...restArgsPrime } = restArgs
+    const inventories = await managers.productManager.getInventories({ ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds }, getOptions);
+    const inventoryCount = await managers.productManager.inventoryCount(
+      { ...restArgsPrime, sort: '-createdDate', ownerOrganization: userOrganization, productId: productIds },
+      getOptions
+    );
+    return {inventories: inventories, inventoryCount: inventoryCount}
   };
   // ------------------------------ PRODUCT MANAGER ENDS--------------------------------
 
@@ -658,10 +681,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.transferOwnershipItem = async function (args, options = defaultOptions) {
-    const { address, chainId, newOwner } = args;
-    const contract = { name: itemJs.contractName, address: address, };
-    const chainOptions = { chainIds: [chainId], ...options };
-    return itemJs.transferOwnership(rawAdmin, contract, chainOptions, newOwner);
+    const { newQuantity, inventoryId, ...newArgs } = args
+    const inventoryIdArray = [inventoryId];
+    const quantityArray = [newQuantity];
+    const itemNumber = parseInt(util.uid());
+    const transferNumber = parseInt(util.uid());
+
+    await managers.productManager.updateInventoriesQuantities({ inventories: inventoryIdArray, quantities: quantityArray, isReduce: true })
+    return managers.itemManager.transferOwnership({ ...newArgs, dappAddress: contract.address, isUserTransfer: true, itemNumber: itemNumber, newQuantity: newQuantity, transferNumber: transferNumber });
+  };
+
+  contract.getAllItemTransferEvents = function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
+    return managers.itemManager.getAllItemTransferEvents(args, getOptions);
   };
 
   contract.auditItem = async function (args, options = defaultOptions) {
@@ -1074,7 +1106,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         for (let orderLine of orderLines) {
           const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLine.address }, createOptions);
           const itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber });
+
+          // Since this is called from the selling flow this should never be a gifted transfer and we don't need a transfer number.
+          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, newQuantity: orderLine.quantity, dappAddress, itemNumber, isUserTransfer: false, transferNumber: 0 });
           result.push({ status, productId, inventoryId });
         }
         return result;
@@ -1233,7 +1267,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const [status, orderLineItems, _items] = await managers.orderManager.addOrderLineItems(_args);
       const result = orderLineItems.split(",");
       const inventory = await contract.getInventory({ address: items[0].inventoryId, });
-      if (inventory.inventoryType === "Individual") {
+      if (inventory.inventoryType === "Individual" || !inventory.inventoryType) {
         const [soldStatus] = await managers.itemManager.updateItem({
           itemsAddress: itemsAddresses,
           status: ITEM_STATUS.SOLD,
