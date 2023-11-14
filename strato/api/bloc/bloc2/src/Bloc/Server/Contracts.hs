@@ -19,7 +19,7 @@ import BlockApps.Logging
 import BlockApps.SolidVMStorageDecoder
 import BlockApps.Solidity.Parse.Parser (parseXabi)
 import BlockApps.Solidity.Value
-import BlockApps.Solidity.Xabi hiding (Func, Public)
+import BlockApps.Solidity.Xabi hiding (Func, Public, External)
 import BlockApps.Solidity.Xabi.Type (indexedTypeType)
 import BlockApps.Solidity.XabiContract
 import BlockApps.SolidityVarReader
