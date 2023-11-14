@@ -206,6 +206,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
           ++ (decodeSolidVMValues $ map (key &&& value) storage')
     (StorageAddress {kind = SolidVM} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
+    ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')
     _ ->
       error $ "EVM contract state indexing no longer supported"
   $logDebugS "getContractsState/storage" $

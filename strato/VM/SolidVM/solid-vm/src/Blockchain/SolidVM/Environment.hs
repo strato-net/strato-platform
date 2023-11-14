@@ -19,5 +19,6 @@ data Environment = Environment
     origin :: Account,
     blockHeader :: BlockData,
     txHash :: Keccak256,
-    metadata :: Maybe (M.Map T.Text T.Text)
+    metadata :: Maybe (M.Map T.Text T.Text),
+    runningTests :: Bool
   }

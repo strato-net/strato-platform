@@ -14,6 +14,7 @@ module Blockchain.SeqEventNotify (
   ) where
 
 import           Conduit
+--import           Control.Concurrent (myThreadId)
 import           Control.Concurrent.Chan.Unagi
 import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad
