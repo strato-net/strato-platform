@@ -4,7 +4,7 @@ import "/dapp/orders/contracts/SimpleSale.sol";
 
 pragma es6;
 pragma strict;
-import <1e23e3989728fa5fc5ca6d6d3cd01cdc889434f9>;
+import <d816194227e1a7a780fff236a449604afeb36255>;
 
 /// @title A representation of Materials assets
 contract Materials is ItemStatus, RestStatus, Asset {
@@ -51,15 +51,16 @@ contract Materials is ItemStatus, RestStatus, Asset {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        createSale(_saleState, _paymentType);
+        createSale(_saleState, _paymentType, _price);
     }
 
     function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
         return Sale(new SimpleSale(address(this), _state, _payment));
     }
 
-    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
+    function createSale(SaleState _state, PaymentType _payment, uint _price) public requireOwner("Create sale") returns (uint) {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
+        changePrice(_price);
         sale = createBaseSale(_state, _payment);
         return RestStatus.OK;
     }

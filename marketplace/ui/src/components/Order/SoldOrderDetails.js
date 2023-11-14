@@ -87,10 +87,10 @@ const SoldOrderDetails = ({ user, users }) => {
       setStatus(getStatus(parseInt(orderDetails.order.status)));
       setcomment(orderDetails.sellerComments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
-      if (orderDetails.fullfilmentDate === 0 || orderDetails.fullfilmentDate === null || orderDetails.fullfilmentDate === undefined) {
+      if (orderDetails.fulfillmentDate === 0 || orderDetails.fulfillmentDate === null || orderDetails.fulfillmentDate === undefined) {
         setSelectedDate(null);
       } else {
-        setSelectedDate(dayjs.unix(orderDetails.fullfilmentDate));
+        setSelectedDate(dayjs.unix(orderDetails.fulfillmentDate));
       }
 
       let items = [];
@@ -217,6 +217,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
     body = {
       saleOrderAddress: details.order.address,
+      fulfillmentDate: dayjs(selectedDate).unix(),
     };
 
     isDone = await actions.executeSale(dispatch, body);
@@ -240,7 +241,7 @@ const SoldOrderDetails = ({ user, users }) => {
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
           sellerComments: comment,
-          // fullfilmentDate: dayjs(selectedDate).unix(),
+          // fulfillmentDate: dayjs(selectedDate).unix(),
         },
       };
     } else {

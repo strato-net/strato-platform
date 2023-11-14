@@ -363,7 +363,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: order.shippingAddress }, getOptions);
-      const assets = await inventoryJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: order.assetAddresses }, options);
       const result = { userContactAddress, order, assets };
 
       return result;
@@ -376,9 +376,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, ...restArgs } = args;
+    const { saleOrderAddress, fulfillmentDate, ...restArgs } = args;
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.transferOwnership(rawAdmin, contract, options);
+    return saleOrderJs.transferOwnership(rawAdmin, contract, options, fulfillmentDate);
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------

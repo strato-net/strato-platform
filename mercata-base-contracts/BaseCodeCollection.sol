@@ -95,6 +95,11 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
 
     function changePrice(uint _price) public requireOwner("Change Asset Price") returns (uint) {
         price = _price;
+
+        if (address(sale)!=address(0)) {
+            sale.changePrice(price);
+        }
+        
         return RestStatus.OK;
     }
 
@@ -148,6 +153,10 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         require(commonName == sellersCommonName, err);
     }
 
+    function changePrice(uint _price) public requireSeller("Change Price"){
+        price=_price;
+    }
+
     function changeSaleState(SaleState _state) public requireSeller("Change Payment Type"){
         state=_state;
     }
@@ -167,7 +176,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
 
 abstract contract Order is RestStatus, OrderStatus {
     uint public orderId;
-    address[] public saleAddresses;
+    address[] public assetAddresses;
     string public sellerCommonName;
     string public purchasersCommonName;
     address public purchasersAddress;
@@ -175,10 +184,11 @@ abstract contract Order is RestStatus, OrderStatus {
     uint public totalPrice;
     OrderStatus public status;
     address public shippingAddress;
+    uint public fulfillmentDate;
 
     constructor(
         uint _orderId,
-        address[] _saleAddresses, 
+        address[] _assetAddresses, 
         string _sellerCommonName, 
         string _purchasersCommonName, 
         address _purchasersAddress,
@@ -187,7 +197,7 @@ abstract contract Order is RestStatus, OrderStatus {
         address _shippingAddress
     ) external{
         orderId = _orderId;
-        saleAddresses = _saleAddresses;
+        assetAddresses = _assetAddresses;
         sellerCommonName = _sellerCommonName;
         purchasersCommonName = _purchasersCommonName;
         purchasersAddress = _purchasersAddress;
@@ -197,9 +207,10 @@ abstract contract Order is RestStatus, OrderStatus {
         shippingAddress = _shippingAddress;
     }
     
-    function transferOwnership() external returns (uint) {
-        for (uint i = 0; i < saleAddresses.length; i++) {
-            Sale sale = Sale(saleAddresses[i]);
+    function transferOwnership(uint _fulfillmentDate) external returns (uint) {
+        fulfillmentDate = _fulfillmentDate;
+        for (uint i = 0; i < assetAddresses.length; i++) {
+            Sale sale = Sale(Asset(assetAddresses[i]).sale());
             // Perform the ownership transfer
             sale.transferOwnership(purchasersCommonName, purchasersAddress, orderId);
         }

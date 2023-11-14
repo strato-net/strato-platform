@@ -206,12 +206,12 @@ async function getState(user, contract, options) {
  * Transfer the ownership of a SimpleSale
  * @param newOwner The common name of the new owner of the SimpleSale.
  */
-async function transferOwnership(user, contract, options) {
+async function transferOwnership(user, contract, options, fulfillmentDate) {
 
   const callArgs = {
     contract,
     method: "transferOwnership",
-    args: util.usc({}),
+    args: util.usc({ fulfillmentDate: fulfillmentDate }),
   };
   const transferStatus = await rest.call(user, callArgs, options);
 

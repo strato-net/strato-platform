@@ -397,11 +397,11 @@ const ConfirmOrder = () => {
     let orderList = [];
     let sellerCommonName = confirmOrderList[0].sellerCommonName;
     confirmOrderList.forEach((item) => {
-      orderList.push(item.saleAddress);
+      orderList.push(item.key);
     });
 
     const body = {
-      saleAddresses: orderList,
+      assetAddresses: orderList,
       sellerCommonName: sellerCommonName,
       totalPrice: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
@@ -412,7 +412,7 @@ const ConfirmOrder = () => {
     if (isDone) {
       let updatedCart = [];
       cartList.forEach(cart => {
-        if (!orderList.includes(cart.product.sale)) {
+        if (!orderList.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });

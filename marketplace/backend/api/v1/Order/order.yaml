@@ -242,7 +242,7 @@ definitions:
   createSaleOrder:
     type: object
     properties:
-      saleAddresses:
+      assetAddresses:
         type: array
         items:
           type: string
@@ -257,3 +257,5 @@ definitions:
     properties:
       saleOrderAddress:
         type: string
+      fulfillmentDate:
+        type: number

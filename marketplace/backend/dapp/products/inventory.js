@@ -163,15 +163,15 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { range, ownerCommonName, saleAddresses, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, ...restArgs } = args;
     let inventories;
 
     if (ownerCommonName) {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'ownerCommonName', value: ownerCommonName });
         inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     }
-    else if (saleAddresses) {
-        inventories = await searchAllWithQueryArgs(contractName, { sale: saleAddresses }, options, admin);
+    else if (assetAddresses) {
+        inventories = await searchAllWithQueryArgs(contractName, { address: assetAddresses }, options, admin);
     }
     else {
         const searchArgs = setSearchQueryOptions(restArgs, { key: 'sale', value: '0000000000000000000000000000000000000000', predicate: 'neq' });

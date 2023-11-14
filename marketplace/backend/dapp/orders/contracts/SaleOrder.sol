@@ -1,12 +1,12 @@
 pragma es6;
 pragma strict;
-import <1e23e3989728fa5fc5ca6d6d3cd01cdc889434f9>;
+import <d816194227e1a7a780fff236a449604afeb36255>;
 
 contract SaleOrder is Order {
 
     constructor(
         uint _orderId,
-        address[] _saleAddresses,
+        address[] _assetAddresses,
         string _sellerCommonName,
         string _purchasersCommonName,
         address _purchasersAddress,
@@ -15,7 +15,7 @@ contract SaleOrder is Order {
         address _shippingAddress
     ) external Order(
         _orderId, 
-        _saleAddresses, 
+        _assetAddresses, 
         _sellerCommonName, 
         _purchasersCommonName, 
         _purchasersAddress, 

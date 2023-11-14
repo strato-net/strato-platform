@@ -99,8 +99,8 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       key: "date",
       render: (text) => <p>{text}</p>,
       title: (
-        <div className="mt-2" style={{ display: "flex", justifyContent: "space-between" }}>
-          <div className="align-middle">{"Date (mm/dd/yyyy)".toUpperCase()}</div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div className="mt-1.5">{"Date (mm/dd/yyyy)".toUpperCase()}</div>
           <div>
             {order === "createdDate.desc" ? (
               <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
