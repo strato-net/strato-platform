@@ -16,74 +16,6 @@
 
 
 local openidc = require("resty.openidc")
-local cjson_s = require("cjson.safe")
-local unb64 = ngx.decode_base64
-
-local config = require("cfg-loader")
-assert(type(config) == "table", "Config should be in the expected format.")
-
-local function get_bearer_access_token_from_header(header)
-  local err
-  local divider = header:find(' ')
-  if divider == 0 or string.lower(header:sub(0, divider - 1)) ~= string.lower("Bearer") then
-    err = "no Bearer authorization header value found"
-    ngx.log(ngx.ERR, err)
-    return nil, err
-  end
-
-  local access_token = header:sub(divider + 1)
-  if access_token == nil then
-    err = "no Bearer access token value found"
-    ngx.log(ngx.ERR, err)
-    return nil, err
-  end
-
-  return access_token, err
-end
-
-
--- From lua-resty-openidc
-local function openidc_base64_url_decode(input)
-  local reminder = #input % 4
-  if reminder > 0 then
-    local padlen = 4 - reminder
-    input = input .. string.rep('=', padlen)
-  end
-  input = input:gsub('%-', '+'):gsub('_', '/')
-  return unb64(input)
-end
-
-
-local function get_access_token_issuer_unverified(header)
-  local access_token, err1 = get_bearer_access_token_from_header(header)
-  if err or not access_token then
-    ngx.status = 401
-    ngx.say("Wrong Authorization header format. Error: " .. (err or 'unknown error'))
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
-    return
-  end
-  local enc_hdr, enc_payload, enc_sign = string.match(header, '^(.+)%.(.+)%.(.*)$')
-  if not enc_hdr or not enc_payload or not enc_sign then
-    ngx.status = 401
-    ngx.say("Authorization error: Wrong JWT format")
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
-    return
-  end
-  local payload = cjson_s.decode(openidc_base64_url_decode(enc_payload))
-  if payload then
-    if not payload['iss'] then
-      ngx.status = 401
-      ngx.say("Authorization error: No 'iss' in JWT payload")
-      ngx.exit(ngx.HTTP_UNAUTHORIZED)
-      return
-    end
-    return payload['iss']
-  end
-  ngx.status = 401
-  ngx.say("Authorization error: Wrong access token format.")
-  ngx.exit(ngx.HTTP_UNAUTHORIZED)
-  return
-end
 
 local function isEmpty(s)
   return s == nil or s == ''
@@ -93,41 +25,48 @@ local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_
 
 local id_provider = ''
 local unique_name = ''
-local common_name = ''
-local email = ''
 local user_access_token = ''
 local verify_res = ''
 local verify_err = ''
 
+local verify_opts = {
+  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
+  accept_none_alg = false,
+  accept_unsupported_alg = false
+}
+
+local authenticate_opts = {
+  redirect_uri = "/auth/openidc/return",
+  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  client_id = "<CLIENT_ID_PLACEHOLDER>",
+  client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
+  scope = "<OAUTH_SCOPE_PLACEHOLDER>",
+  token_endpoint_auth_method = "client_secret_post",
+  ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
+  redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
+  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
+  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
+  renew_access_token_on_expiry = true,
+  access_token_expires_in = 300,
+  logout_path = "/auth/logout",
+  post_logout_redirect_uri = node_host_with_protocol,
+  -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
+  revoke_tokens_on_logout = true
+}
+
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
 if ngx.req.get_headers()["Authorization"] then
-  local header = ngx.req.get_headers()["Authorization"]
-  local identity_providers = config["identity_providers_keyed"]
-  id_provider = get_access_token_issuer_unverified(header)
-  local provider_data = identity_providers[id_provider]
-
-  if not provider_data then
-    ngx.status = 401
-    ngx.say("Authorization error: Unsupported access token issuer (unknown identity provider)")
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
-  end
-
-  local verify_opts = {
-    discovery = provider_data['DISCOVERY_URL'],
-    ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
-    accept_none_alg = false,
-    accept_unsupported_alg = false
-  }
-
   verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
 
   if verify_err or not verify_res then
-    ngx.status = 401
+    ngx.status = 403
     ngx.say("Authorization header is provided but the bearer token is invalid or expired: " .. (verify_err or 'unknown error'))
-    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+    ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 
   -- Token from Authorization header is verified at this point - can blindly get raw token from header by dropping "Bearer " prefix
+  local header = ngx.req.get_headers()["Authorization"]
   local divider = header:find(' ')
   user_access_token = header:sub(divider + 1)
 
@@ -137,20 +76,6 @@ if ngx.req.get_headers()["Authorization"] then
 
   if verify_res['sub'] ~= nil then
     unique_name = verify_res['sub']
-  end
-
-  if verify_res['name'] then
-    common_name = verify_res['name']
-  elseif verify_res['preferred_username'] then
-    common_name = verify_res['preferred_username']
-  end
-
-  if verify_res['email'] then
-    email = verify_res['email']
-  end
-  
-  if verify_res['company'] ~= nil then
-    ngx.req.set_uri_args({company = verify_res['company']})
   end
 
 else
@@ -170,14 +95,5 @@ end
 if unique_name ~= '' then
   ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 end
-
-if common_name ~= '' then
-  ngx.req.set_header("X-USER-COMMON-NAME", common_name)
-end
-
-if email ~= '' then
-  ngx.req.set_header("X-USER-EMAIL", email)
-end
-
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")
