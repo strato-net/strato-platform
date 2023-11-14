@@ -72,8 +72,7 @@ initHighway = do
   liftIO $ forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
   args <- liftIO $ $initHFlags "Setup Highway Wrapper AWS settings"
   case args of
-    []    -> do --st <- askUnliftIO
-                $logErrorS "highway/initHighway" $ T.pack $ "No highway env variables were passed in."
+    []    -> do $logErrorS "highway/initHighway" $ T.pack $ "No highway env variables were passed in."
                 return ()
     _     -> do $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
                 mgr <- liftIO $ newManager defaultManagerSettings
