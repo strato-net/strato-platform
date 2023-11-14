@@ -1055,7 +1055,7 @@ insertAbstractTableQuery cs =
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
     data = excluded.data|],
-                      if null list then "" else ",\n    ",
+                      if null list then "" else "\n    ",
                       tableUpsert $ list',
                       ";"
                     ]
