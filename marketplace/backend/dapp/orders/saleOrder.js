@@ -118,8 +118,6 @@ function bind(user, _contract, options) {
   contract.get = async (args) =>
     get(user, args, options);
   contract.getState = async () => getState(user, contract, options);
-  contract.transferOwnership = async (newOwner) =>
-    transferOwnership(user, contract, options, newOwner);
   contract.getHistory = async (args, options = contractOptions) =>
     getHistory(user, chainId, args, options);
   contract.chainIds = options.chainIds;

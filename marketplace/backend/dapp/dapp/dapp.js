@@ -340,6 +340,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ SALE TEST STARTS ------------------------------
 
+  contract.resellItem = async function (args, options = defaultOptions) {
+    const { itemContract, itemAddress, ...restArgs } = args;
+    const newArgs = {
+      ...restArgs,
+      state: 1,
+    }
+    const contract = { name: itemContract, address: itemAddress };
+    return inventoryJs.resellItem(rawAdmin, contract, newArgs, options);
+  }
+
   contract.createSaleOrder = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {

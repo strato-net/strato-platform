@@ -1,14 +1,17 @@
-import { Button, Input, InputNumber, Modal, Table } from "antd";
+import { Button, Input, InputNumber, Modal, Select, Table } from "antd";
 import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as itemActions } from "../../contexts/item/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useItemDispatch, useItemState } from "../../contexts/item";
+import { PAYMENT_TYPE } from "../../helpers/constants";
 
+const { Option } = Select;
 
 const ResellModal = ({ open, handleCancel, inventory }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
+    const [paymentType, setPaymentType] = useState(1);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const itemDispatch = useItemDispatch();
@@ -33,16 +36,29 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
         };
     }, [quantity])
     const columns = [
+        // {
+        //     title: "Quantity Available",
+        //     dataIndex: "availableQuantity",
+        //     align: "center"
+        // },
         {
-            title: "Quantity Available",
-            dataIndex: "availableQuantity",
-            align: "center"
-        },
-        {
-            title: "Set Quantity",
+            title: "Set Payment Type",
             align: "center",
             render: () => (
-                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                <Select 
+                  id="paymentType"
+                  placeholder="Cash"
+                  name="paymentType"
+                  value={paymentType}
+                  min={1} 
+                  onChange={(value) => setPaymentType(value)} 
+                >
+                    {PAYMENT_TYPE.map((e, index) => (
+                      <Option value={e.value} key={index}>
+                        {e.name}
+                      </Option>
+                    ))}
+                </Select>
             )
         },
         {
@@ -54,22 +70,22 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
         }
     ];
 
+    const getCategory = () => {
+        const parts = inventory.contract_name.split('-');
+        return parts[parts.length - 1];
+      };
 
     const handleSubmit = async () => {
-        const itemsAddress = items.map((item) => item.address)
-
         const body = {
-            inventoryId: inventory.address,
-            quantity: quantity,
+            itemContract: getCategory(),
+            itemAddress: inventory.address,
+            payment: paymentType,
             price: pricePerUnit,
-            itemsAddress: itemsAddress
         };
-        if (quantity > 0 && quantity <= inventory.availableQuantity) {
-            let isDone = await actions.resellInventory(inventoryDispatch, body);
-            if (isDone) {
-                actions.fetchInventory(inventoryDispatch, 10, 0, "");
-                handleCancel();
-            }
+        let isDone = await actions.resellInventory(inventoryDispatch, body);
+        if (isDone) {
+            actions.fetchInventory(inventoryDispatch, 10, 0, "");
+            handleCancel();
         }
     }
 

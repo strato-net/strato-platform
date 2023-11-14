@@ -113,9 +113,9 @@ class InventoryController {
     try {
       const { dapp, body } = req
 
-      InventoryController.validateResellInventoryArgs(body)
+      InventoryController.validateResellItemArgs(body)
 
-      const result = await dapp.resellInventory(body)
+      const result = await dapp.resellItem(body)
       rest.response.status200(res, result)
 
       return next()
@@ -202,19 +202,19 @@ class InventoryController {
     }
   }
 
-  static validateResellInventoryArgs(args) {
-    const resellInventorySchema = Joi.object({
-      inventoryId: Joi.string().required(),
-      quantity: Joi.number().integer().min(1).required(),
+  static validateResellItemArgs(args) {
+    const resellItemSchema = Joi.object({
+      itemContract: Joi.string().required(),
+      itemAddress: Joi.string().required(),
+      payment: Joi.number().integer().min(0).max(3).required(),
       price: Joi.number().integer().greater(0).required(),
-      itemsAddress: Joi.array().required()
     });
 
-    const validation = resellInventorySchema.validate(args);
+    const validation = resellItemSchema.validate(args);
 
     if (validation.error) {
       console.log('validation error: ', validation.error)
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Resell Inventory Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Resell Item Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

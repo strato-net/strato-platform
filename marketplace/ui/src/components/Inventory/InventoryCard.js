@@ -221,18 +221,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               {itemData.serialNumber ? itemData.serialNumber : "No Serial Number Available"}
             </p>
           </div>
-          <div className="flex mt-2.5">
-            <div
-              className={classNames(
-                itemData.status === "1"
-                  ? "text-primary bg-[#EBF7FF]"
-                  : "text-error bg-[#FFF0F0]",
-                "text-center py-1 rounded w-28 text-sm "
-              )}
-            >
-              <p>{INVENTORY_STATUS[itemData.status]}</p>
-            </div>
-          </div>
+          { inventory.sale === '0000000000000000000000000000000000000000' ?
+            (<div className="flex mt-2.5">
+              <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">
+                <p>UNPUBLISHED</p>
+              </div>
+            </div>)
+            :
+            (<div className="flex mt-2.5">
+              <div className="text-primary bg-[#EBF7FF] text-center py-1 rounded w-28 text-sm">
+                <p>PUBLISHED</p>
+              </div>
+            </div>)
+          }
         </div>
       </div>
       {open && (
