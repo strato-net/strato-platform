@@ -176,7 +176,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
 
 abstract contract Order is RestStatus, OrderStatus {
     uint public orderId;
-    address[] public assetAddresses;
+    address[] public saleAddresses;
     string public sellerCommonName;
     string public purchasersCommonName;
     address public purchasersAddress;
@@ -188,7 +188,7 @@ abstract contract Order is RestStatus, OrderStatus {
 
     constructor(
         uint _orderId,
-        address[] _assetAddresses, 
+        address[] _saleAddresses, 
         string _sellerCommonName, 
         string _purchasersCommonName, 
         address _purchasersAddress,
@@ -197,7 +197,7 @@ abstract contract Order is RestStatus, OrderStatus {
         address _shippingAddress
     ) external{
         orderId = _orderId;
-        assetAddresses = _assetAddresses;
+        saleAddresses = _saleAddresses;
         sellerCommonName = _sellerCommonName;
         purchasersCommonName = _purchasersCommonName;
         purchasersAddress = _purchasersAddress;
@@ -209,8 +209,8 @@ abstract contract Order is RestStatus, OrderStatus {
     
     function transferOwnership(uint _fulfillmentDate) external returns (uint) {
         fulfillmentDate = _fulfillmentDate;
-        for (uint i = 0; i < assetAddresses.length; i++) {
-            Sale sale = Sale(Asset(assetAddresses[i]).sale());
+        for (uint i = 0; i < saleAddresses.length; i++) {
+            Sale sale = Sale(saleAddresses[i]);
             // Perform the ownership transfer
             sale.transferOwnership(purchasersCommonName, purchasersAddress, orderId);
         }

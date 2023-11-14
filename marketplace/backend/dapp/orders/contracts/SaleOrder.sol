@@ -6,7 +6,7 @@ contract SaleOrder is Order {
 
     constructor(
         uint _orderId,
-        address[] _assetAddresses,
+        address[] _saleAddresses,
         string _sellerCommonName,
         string _purchasersCommonName,
         address _purchasersAddress,
@@ -15,7 +15,7 @@ contract SaleOrder is Order {
         address _shippingAddress
     ) external Order(
         _orderId, 
-        _assetAddresses, 
+        _saleAddresses, 
         _sellerCommonName, 
         _purchasersCommonName, 
         _purchasersAddress, 

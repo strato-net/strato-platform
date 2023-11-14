@@ -242,7 +242,7 @@ definitions:
   createSaleOrder:
     type: object
     properties:
-      assetAddresses:
+      saleAddresses:
         type: array
         items:
           type: string
