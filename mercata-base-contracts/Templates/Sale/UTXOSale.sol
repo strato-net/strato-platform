@@ -1,4 +1,4 @@
-contract UTXOSale is Sale {
+abstract contract UTXOSale is Sale {
 
     constructor(
         address _assetToBeSold,
@@ -7,8 +7,14 @@ contract UTXOSale is Sale {
     ) Sale(_assetToBeSold, _state, _payment) {
     }
 
+
+    function transferOwnership(uint splitUnits, string _purchasersCommonName, address _purchasersAddress) public requireSeller("Transfer Ownership of Asset") returns (uint) {
+        executeUTXOSale(splitUnits, _purchasersCommonName, _purchasersAddress);
+        return RestStatus.OK;
+    }
+
     // Function to execute the UTXO sale
-    function executeUTXOSale(uint splitUnits, string memory _purchasersCommonName) public requireSeller("Execute UTXO Sale") returns (address newAssetAddress) {
+    function executeUTXOSale(uint splitUnits, string _purchasersCommonName, address _purchasersAddress) public requireSeller("Execute UTXO Sale") returns (address newAssetAddress) {
         // Before executing the sale, ensure the asset is a UTXO asset
         UTXO utxoAsset = UTXO(address(assetToBeSold));
         require(splitUnits <= utxoAsset.units(), "Cannot sell more units than available");
@@ -17,8 +23,10 @@ contract UTXOSale is Sale {
         newAssetAddress = utxoAsset.splitAsset(splitUnits, _purchasersCommonName);
 
         // Transfer ownership of the new asset to the purchaser
-        UTXO(newAssetAddress).transferOwnership(_purchasersCommonName);
+        Asset(newAssetAddress).transferOwnership(_purchasersCommonName, _purchasersAddress);
 
         return newAssetAddress;
     }
+
+
 }

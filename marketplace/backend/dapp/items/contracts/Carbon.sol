@@ -7,7 +7,7 @@ pragma strict;
 import <1e23e3989728fa5fc5ca6d6d3cd01cdc889434f9>;
 
 /// @title A representation of Carbon assets
-contract Carbon is ItemStatus, RestStatus, Asset {
+contract Carbon is ItemStatus, RestStatus, UTXO {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public serialNumber;
@@ -37,10 +37,9 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         string _projectType,
         SaleState _saleState,
         PaymentType _paymentType
-    ) public Asset(_name, _description, _images, _price, _createdDate){
+    ) public UTXO(_name, _description, _images, _price, _createdDate, _units, _serialNumber){
         owner = _owner;
 
-        serialNumber = _serialNumber;
         status = _status;
         comment = _comment;
         itemNumber = _itemNumber;
@@ -54,16 +53,11 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         createSale(_saleState, _paymentType);
     }
 
-    function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
-        return Sale(new SimpleSale(address(this), _state, _payment));
-    }
-
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = createBaseSale(_state, _payment);
+        sale = Sale(new CarbonSale(address(this), _state, _payment));
         return RestStatus.OK;
     }
-
     function update(
         ItemStatus _status,
         string _comment,
