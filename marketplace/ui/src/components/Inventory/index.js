@@ -81,8 +81,11 @@ const Inventory = ({ user }) => {
   
     if (stripeStatus !== null && stripeStatus !== undefined) {
       const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
+      
+      const isOnboardedSuccess = ( chargesEnabled && detailsSubmitted && payoutsEnabled ) 
+      const isOnboardNotStarted = ( !chargesEnabled && !detailsSubmitted && !payoutsEnabled )
   
-      if (!( ( chargesEnabled && detailsSubmitted && payoutsEnabled ) || ( !chargesEnabled && !detailsSubmitted && !payoutsEnabled ) ) ) {
+      if (!( isOnboardedSuccess || isOnboardNotStarted ) ) {
         
         setTimeout(() => {
           api.error({
