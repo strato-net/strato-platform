@@ -55,7 +55,7 @@ contract Art is ItemStatus, RestStatus, Asset {
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         Sale sale = Sale(new ArtSale(address(this), _state, _payment));
-        whitelistSale.push(sale);
+        whitelistedSales.push(sale);
         return RestStatus.OK;
     }
 
