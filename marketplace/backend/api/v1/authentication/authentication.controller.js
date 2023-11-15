@@ -31,12 +31,16 @@ class AuthenticationController {
 
     try {
       const tokensResponse = await oauth.getAccessTokenByAuthCode(code)
+      console.log("tokensResponse", tokensResponse)
+      console.log("tokensResponse.token", tokensResponse.token)
       accessToken = tokensResponse.token[
         config.nodes[0].oauth.tokenField
           ? config.nodes[0].oauth.tokenField
           : 'access_token'
       ]
+      console.log("accessToken", accessToken)
       const decodedToken = jwtDecode(accessToken)
+      console.log("decodedToken", decodedToken)
       accessTokenExpiration = decodedToken.exp
       refreshToken = tokensResponse.token.refresh_token
       username = decodedToken.preferred_username
@@ -49,6 +53,20 @@ class AuthenticationController {
           return next(e)
         }
       }
+
+      res.cookie(oauth.getCookieNameAccessToken(), accessToken, {
+        maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
+        httpOnly: true,
+      })
+      res.cookie(oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
+        maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
+        httpOnly: true,
+      })
+      res.cookie(oauth.getCookieNameRefreshToken(), refreshToken, {
+        maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
+        httpOnly: true,
+      })
+
       const userCredentials = { token: accessToken }
       const userResponse = await oauthHelper.getStratoUserFromToken(accessToken)
       const user = { ...userResponse.user, ...userCredentials }
@@ -82,19 +100,6 @@ class AuthenticationController {
       rest.response.status(RestStatus.FORBIDDEN, res)
       return next()
     }
-
-    res.cookie(oauth.getCookieNameAccessToken(), accessToken, {
-      maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
-      httpOnly: true,
-    })
-    res.cookie(oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
-      maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
-      httpOnly: true,
-    })
-    res.cookie(oauth.getCookieNameRefreshToken(), refreshToken, {
-      maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
-      httpOnly: true,
-    })
 
     // check if user exists - if not, create them
 

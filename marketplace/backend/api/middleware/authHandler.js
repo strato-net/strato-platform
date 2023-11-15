@@ -6,14 +6,20 @@ import config from '/load.config'
 
 const getTokenFromCookie = async (req, res) => {
   const tokenName = req.app.oauth.getCookieNameAccessToken()
+  console.log("getTokenFromCookie tokenName: ", tokenName)
+  console.log("getTokenFromCookie req.cookies: ", req.cookies)
+  console.log("req.cookies[tokenName]: ", req.cookies[tokenName])
   if (req.cookies[tokenName]) {
     try {
       await req.app.oauth.validateAndGetNewToken(req, res)
+      console.log("getTokenFromCookie req: ", req)
+      console.log("getTokenFromCookie res: ", res)
       return req.cookies[tokenName] // the cookie may have the updated value here after validateAndGetNewToken()
     } catch (err) {
       console.log(
         'Access token is either invalid or expired and could not been refreshed',
       )
+      console.log(err)
     }
   }
   return null
@@ -59,7 +65,7 @@ class AuthHandler {
               res,
               'Access token is not a valid JWT',
             )
-            return next()
+            return next(err)
           }
           try {
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
@@ -78,14 +84,14 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
-        return next()
+        return rest.response.status(RestStatus.UNAUTHORIZED, res, {
+          loginUrl: getLoginUrl(req),
+        })
       }
 
-      rest.response.status(RestStatus.UNAUTHORIZED, res, {
+      return rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })
-      return next()
     }
   }
 
