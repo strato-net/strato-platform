@@ -1,4 +1,3 @@
-import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/orders/contracts/orders/Sales/ArtSale.sol";
 
@@ -56,7 +55,7 @@ contract Art is ItemStatus, RestStatus, Asset {
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = new ArtSale(address(this), _state, _payment);
+        sale = Sale(new ArtSale(address(this), _state, _payment));
         whitelistSale.push(sale);
         return RestStatus.OK;
     }
@@ -108,4 +107,10 @@ contract Art is ItemStatus, RestStatus, Asset {
         );
         return RestStatus.OK;
     }
+}
+
+contract ArtSale is Sale{
+    constructor(address _assetToBeSold, SaleState _state, PaymentType _payment) Sale(_assetToBeSold, _state, _payment){
+    }
+
 }
