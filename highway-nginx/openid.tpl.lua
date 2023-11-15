@@ -23,9 +23,6 @@ end
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
-local id_provider = ''
-local unique_name = ''
-local user_access_token = ''
 local verify_res = ''
 local verify_err = ''
 
@@ -34,25 +31,6 @@ local verify_opts = {
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   accept_none_alg = false,
   accept_unsupported_alg = false
-}
-
-local authenticate_opts = {
-  redirect_uri = "/auth/openidc/return",
-  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
-  client_id = "<CLIENT_ID_PLACEHOLDER>",
-  client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
-  scope = "<OAUTH_SCOPE_PLACEHOLDER>",
-  token_endpoint_auth_method = "client_secret_post",
-  ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
-  redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
-  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
-  renew_access_token_on_expiry = true,
-  access_token_expires_in = 300,
-  logout_path = "/auth/logout",
-  post_logout_redirect_uri = node_host_with_protocol,
-  -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
-  revoke_tokens_on_logout = true
 }
 
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
@@ -65,35 +43,11 @@ if ngx.req.get_headers()["Authorization"] then
     ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 
-  -- Token from Authorization header is verified at this point - can blindly get raw token from header by dropping "Bearer " prefix
-  local header = ngx.req.get_headers()["Authorization"]
-  local divider = header:find(' ')
-  user_access_token = header:sub(divider + 1)
-
-  if verify_res['iss'] ~= nil then
-    id_provider = verify_res['iss']
-  end
-
-  if verify_res['sub'] ~= nil then
-    unique_name = verify_res['sub']
-  end
-
 else
   ngx.status = 401
   ngx.say("No Authorization header is provided with the request.")
   ngx.exit(ngx.HTTP_UNAUTHORIZED)
 end
 
-if user_access_token ~= '' then
-  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
-end
-
-if id_provider ~= '' then
-  ngx.req.set_header("X-IDENTITY-PROVIDER-ID", id_provider)
-end
-
-if unique_name ~= '' then
-  ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
-end
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")
