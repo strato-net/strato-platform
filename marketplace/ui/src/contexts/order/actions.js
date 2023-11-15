@@ -232,17 +232,21 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter) => {
+  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
     dispatch({ type: actionDescriptors.fetchOrder });
 
     let query = "";
     if (selectedDate) {
-      query += `&createdDate=${selectedDate}`;
+      let end = selectedDate + 86400;
+      query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
+    }
+    if (filter) {
+      query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
     }
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}&purchasersCommonName=${commonName}${query}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&order=${order}&purchasersCommonName=${commonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -263,17 +267,21 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter) => {
+  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
     dispatch({ type: actionDescriptors.fetchOrderSold });
 
     let query = "";
     if (selectedDate) {
-      query += `&createdDate=${selectedDate}`;
+      let end = selectedDate + 86400;
+      query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
+    }
+    if (filter) {
+      query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
     }
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&sellerCommonName=${commonName}${query}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellerCommonName=${commonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
