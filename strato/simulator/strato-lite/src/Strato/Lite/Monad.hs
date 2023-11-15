@@ -993,6 +993,16 @@ instance MonadReader P2PPeer m => A.Selectable (Maybe IPAsText, UDPPort) SockAdd
     myIP <- lift $ asks _p2pMyIPAddress
     pure $ ipAndPortToSockAddr myIP udpPort
 
+instance MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
+  access _ = do
+    valCMPSs <- Set.toList <$> use p2pValidators
+    cmpsToX509 <- use parsedSetToX509Map
+    let valAdds = catMaybes $ (\valCMPS -> userAddress <$> cmpsToX509 M.!? valCMPS) <$> valCMPSs
+    return $ ValidatorAddresses valAdds
+
+instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
+  access = lift . Mod.access
+
 instance MonadIO m => A.Selectable IPAsText ClosestPeers (MonadTest m) where
   select _ (IPAsText t) = Just . ClosestPeers . filter f . M.elems <$> use stringPPeerMap
     where

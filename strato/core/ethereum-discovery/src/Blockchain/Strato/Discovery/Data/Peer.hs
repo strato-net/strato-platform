@@ -30,6 +30,7 @@ import Blockchain.Data.PubKey
 import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Discovery.Metrics
+import Blockchain.Strato.Model.Address (Address, fromPublicKey)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util (byteString2Integer)
@@ -41,6 +42,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.List (sortBy)
+import Data.Maybe (fromJust)
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
@@ -70,8 +73,6 @@ PPeer
     lastBestBlockHash Keccak256
     bondState Int
     activeState Int
---    activeThread Bool
---    activeThreadId Int Maybe
     version T.Text
     disableException T.Text
     nextDisableWindowSeconds Int default=5
@@ -106,6 +107,8 @@ newtype UdpEnableTime = UdpEnableTime UTCTime deriving (Eq, Ord)
 newtype TcpEnableTime = TcpEnableTime UTCTime deriving (Eq, Ord)
 
 newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
+
+newtype ValidatorAddresses = ValidatorAddresses {unValidatorAddresses :: [Address]}
 
 data PeerDisable
   = ExtendPeerDisableTime
@@ -488,16 +491,24 @@ pointToNodeID PointO = error "called pointToNodeID with PointO, we can't handle 
 pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
 
 getPeersClosestTo ::
-  (A.Selectable IPAsText ClosestPeers m) =>
+  ( A.Selectable IPAsText ClosestPeers m
+  , Mod.Accessible ValidatorAddresses m
+  ) =>
   NodeID ->
   T.Text ->
   Point -> -- what am I supposed to do with this?
   m [PPeer]
-getPeersClosestTo targetNID requesterIP _ = 
-  let targetPt = nodeIDToPoint targetNID
-  in take 20 . 
-    sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) ((dist targetPt (pPeerPubkey peerB)))) .
-    maybe [] unClosestPeers <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)
+getPeersClosestTo targetNID requesterIP _ = do 
+    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)
+    ValidatorAddresses valAdds <- Mod.access (Mod.Proxy @ValidatorAddresses)
+    let targetPt = nodeIDToPoint targetNID
+        (vals, nonvals) = Set.partition (\p -> (fromPublicKey . pointToSecPubKey . fromJust $ pPeerPubkey p) `elem` valAdds) peers
+    return $
+      Set.toList vals ++
+      (take 20 . 
+      sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) ((dist targetPt (pPeerPubkey peerB)))) $
+      Set.toList nonvals) --more efficient way?
+      
   where 
     dist :: Point -> Maybe Point -> B.ByteString
     dist (Point x1 y1) (Just (Point x2 y2)) = -- pythagorean theorem is overrated

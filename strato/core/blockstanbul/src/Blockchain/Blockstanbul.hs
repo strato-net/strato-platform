@@ -1,5 +1,5 @@
 module Blockchain.Blockstanbul
-  ( BlockstanbulContext,
+  ( BlockstanbulContext (..),
     HasBlockstanbulContext (..),
     newContext,
     sendMessages,
