@@ -58,6 +58,7 @@ import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions ()
+import Wiring ()
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.DeepSeq

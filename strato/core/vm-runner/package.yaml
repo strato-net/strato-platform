@@ -18,6 +18,7 @@ library:
     - Blockchain.BlockChain
     - Blockchain.Event
     - Executable.EthereumVM
+    - Executable.EthereumVM2
   ghc-options: -Wall -O2
   dependencies:
   - ansi-wl-pprint
@@ -90,21 +91,44 @@ tests:
     source-dirs: test/
     main: Spec.hs
     dependencies:
+      - ansi-wl-pprint
       - base16-bytestring
       - blockapps-data
+      - blockapps-datadefs
+      - blockapps-init
       - blockapps-mpdbs
       - bytestring
       - common-log
       - containers
+      - data-default
+      - debugger
+      - deepseq
+      - directory
+      - ethereum-rlp
       - ethereum-vm
+      - exceptions
+      - extra
+      - hedis
       - hflags
       - hspec
       - hspec-expectations-lifted
       - labeled-error
+      - lens
+      - leveldb-haskell
       - merkle-patricia-db
+      - milena
       - monad-alter
+      - mtl
+      - nibblestring
+      - persistent-sqlite
+      - resourcet
+      - solid-vm-model
       - strato-conf
       - strato-model
+      - strato-redis-blockdb
+      - strato-statediff
+      - text
+      - unliftio
       - vm-runner
       - vm-tools
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic

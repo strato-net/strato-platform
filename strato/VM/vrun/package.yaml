@@ -17,20 +17,46 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
+- ansi-wl-pprint
 - blockapps-data
 - blockapps-datadefs
+- blockapps-init
 - blockapps-mpdbs
 - bytestring
 - common-log
+- containers
+- data-default
+- debugger
+- deepseq
+- directory
+- ethereum-rlp
+- exceptions
+- extra
+- hedis
 - hflags
+- lens
+- leveldb-haskell
 - merkle-patricia-db
+- milena
+- monad-alter
+- mtl
+- nibblestring
+- persistent-sqlite
 - prometheus-client
+- resourcet
 - strato-model
+- strato-redis-blockdb
+- strato-statediff
 - seqevents
+- strato-conf
+- solid-vm-model
+- text
 - time
 - transformers
+- unliftio
 - vm-runner
 - vm-tools
+- x509-certs
 
 executables:
   vrun:

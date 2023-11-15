@@ -10,35 +10,24 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Executable.EthereumVM
-  ( ethereumVM,
-    handleVmEvents,
-    writeBlockSummary,
+  ( ethereumVM
   )
 where
 
 --import           Data.List.Split                       (chunksOf)
 
-import BlockApps.Crossmon
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
-import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
-import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
-import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
-import Blockchain.Data.Block (BestBlock (..), WorldBestBlock (..))
 import Blockchain.Data.BlockHeader (extraData2TxsLen)
-import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs (BlockData (..), TransactionResult (..), blockDataExtraData, blockDataNumber)
-import Blockchain.Data.ExecResults
+import Blockchain.Data.DataDefs (BlockData (..), blockDataExtraData)
 import Blockchain.Data.GenesisBlock
 import qualified Blockchain.Data.TXOrigin as TO
-import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
 import Blockchain.Event
@@ -46,18 +35,9 @@ import Blockchain.JsonRpcCommand
 import qualified Blockchain.MilenaTools as K
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Kafka (writeIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Gas (Gas (..))
-import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
-import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
@@ -66,16 +46,14 @@ import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.VMOptions
+import Blockchain.Wiring ()
 import Conduit hiding (Flush)
-import Control.Applicative ((<|>))
-import Control.Arrow ((&&&), (***))
 import Control.Concurrent.STM (TQueue, atomically, readTQueue, writeTQueue)
 import Control.Lens hiding (Context)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader (ask, runReaderT)
-import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.DList as DL
@@ -84,18 +62,13 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Proxy
-import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Traversable (for)
 import Debugger
+import Executable.EthereumVM2
 import Executable.EVMCheckpoint
 import Executable.EVMFlags
 import qualified Network.Kafka.Protocol as KP
-import Prometheus
-import qualified Text.Colors as CL
 import Text.Format (format)
-import Text.Printf
-import Text.Tools
 import UnliftIO (race_)
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
@@ -140,357 +113,6 @@ ethereumVM d = runResourceT $ do
         -- withCertroot <- withChainroot . unCertRoot <$> Mod.get Proxy
         setCheckpoint newOffset withChainroot
 
-microtimeCutoff :: Microtime
-microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
-{-# NOINLINE microtimeCutoff #-}
-
-handleVmEvents ::
-  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
-  Bool ->
-  ConduitT VmInEventBatch VmOutEvent m ()
-handleVmEvents useSyncMode = awaitForever $ \InBatch {..} -> do
-  rpcResps <- lift $ do
-    bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
-    resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
-    recordSeqEventCount bLen tLen
-    pure resps
-  yieldMany $! uncurry OutJSONRPC <$> rpcResps
-
-  numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
-  yieldMany $ outputPrivateTransactions privateTxs
-  processBlocksAndNewChains blocksAndNewChains
-
-  mNewBlock <- lift $ do
-    Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
-    -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
-    -- todo: which may fail
-    isCaughtUp <- shouldProcessNewTransactions useSyncMode
-    bState <- Bagger.getBaggerState
-    pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
-    reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
-    let makeLazyBlocks = False --lazyBlocks $ quarryConfig ethConf -- TODO?: Remove reference to ethConf
-        pending = B.pending bState
-        priv = toList . B.privateHashes $ B.miningCache bState
-        hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
-        shouldOutputBlocks =
-          isCaughtUp
-            && ( if pbft
-                   then reqd && hasTxs
-                   else not makeLazyBlocks || hasTxs
-               )
-    $logInfoS "evm/loop/newBlock" . T.pack $
-      printf
-        "Num poolable: %d, num pending: %d"
-        numPoolable
-        (M.size pending)
-    multilineLog "evm/loop/newBlock" $
-      boringBox
-        [ CL.yellow "Decision making for block creation:",
-          "isCaughtUp: " ++ formatBool isCaughtUp,
-          "pbft: " ++ formatBool pbft,
-          "reqd: " ++ formatBool reqd,
-          "hasTxs: " ++ formatBool hasTxs,
-          "makeLazyBlocks: " ++ formatBool makeLazyBlocks,
-          "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
-        ]
-    when (pbft && shouldOutputBlocks) $
-      Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested .~ False)
-    $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
-    $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
-    $logInfoS "evm/loop/newBlock" "about to evaluate shouldOutputBlocks"
-    if shouldOutputBlocks
-      then do
-        $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-        newBlock <- Bagger.makeNewBlock mineTransactions
-        pure $ Just newBlock
-      else pure Nothing
-  traverse_ (yield . OutBlock) mNewBlock
-
-groupEithers :: [Either a b] -> [Either [a] [b]]
-groupEithers = foldr f []
-  where
-    f (Left l) b =
-      let ~(ls, es) = case b of
-            (Left ls') : es' -> (ls', es')
-            es' -> ([], es')
-       in (Left $ l : ls) : es
-    f (Right r) b =
-      let ~(rs, es) = case b of
-            (Right rs') : es' -> (rs', es')
-            es' -> ([], es')
-       in (Right $ r : rs) : es
-
-processBlocksAndNewChains ::
-  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
-  [Either OutputGenesis OutputBlock] ->
-  ConduitT a VmOutEvent m ()
-processBlocksAndNewChains blocksAndChains = do
-  let !grouped = groupEithers blocksAndChains
-  for_ grouped $ \case
-    Left newChains -> outputNewChains =<< insertNewChains newChains
-    Right blocks -> processBlocks blocks
-
-insertNewChains ::
-  VMBase m =>
-  [OutputGenesis] ->
-  ConduitT a VmOutEvent m [(Word256, ChainInfo, Keccak256, [ExecResults])]
-insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
-  let (cId, cInfo) = ogGenesisInfo
-  $logInfoS "insertNewChains" $ T.pack $ "Inserting Chain ID: " ++ CL.yellow (format cId)
-  $logDebugS "insertNewChains" $ T.pack $ "With ChainInfo: " ++ show cInfo
-  mGSR <- getGenesisStateRoot $ Just cId
-  case mGSR of
-    Just gsr -> do
-      $logInfoS "insertNewChains" $ T.pack $ "We already have a genesis state root for this chain. It's " ++ format gsr
-      return Nothing
-    Nothing -> do
-      let cBlock = creationBlock $ chainInfo cInfo
-          pChains = parentChains $ chainInfo cInfo
-      bHash <-
-        if cBlock /= Keccak256.zeroHash
-          then pure cBlock
-          else do
-            mBB <- getChainGenesisInfo Nothing
-            case mBB of
-              Just (bb, _, _) -> pure bb
-              Nothing -> error "insertNewChains: could not find non-zero block hash to run from. Chain DB not bootstrapped correctly"
-
-      withCurrentBlockHash bHash $ do
-        $logInfoS "insertNewChains" $ T.pack $ "This is a new chain!"
-        let theVM = T.unpack $ fromMaybe "EVM" $ M.lookup "VM" $ chainMetadata (chainInfo cInfo)
-            tHash = Keccak256.unsafeCreateKeccak256FromWord256 cId
-        sr' <- chainInfoToGenesisState theVM (Just cId) cInfo
-        void $ putChainGenesisInfo (Just cId) cBlock sr' pChains
-        (kind, (sr, addrsCreated, mExecResults)) <-
-          case theVM of
-            "SolidVM" -> lift $ (SolidVM,) <$> runChainConstructors cId cInfo
-            _ -> return (EVM, (sr', [], [])) -- TODO: add contracts from accountInfo list?
-        case catMaybes $ erException <$> mExecResults of
-          [] -> do
-            yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
-            yieldMany . concat $! map (OutEvent . mkEventEntry (Just cId)) . erEvents <$> mExecResults
-            let (orgName, appName) = case mExecResults of
-                  [] -> ("", "")
-                  x : _ -> (erOrgName x, erAppName x)
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                TransactionResult
-                  { transactionResultBlockHash = cBlock,
-                    transactionResultTransactionHash = tHash,
-                    transactionResultMessage = "Success!",
-                    transactionResultResponse = case kind of
-                      EVM -> ""
-                      SolidVM -> "()",
-                    transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
-                    transactionResultGasUsed = 0,
-                    transactionResultEtherUsed = 0,
-                    transactionResultContractsCreated = intercalate "," $ map show addrsCreated,
-                    transactionResultContractsDeleted = "",
-                    transactionResultStateDiff = "",
-                    transactionResultTime = 0.0,
-                    transactionResultNewStorage = "",
-                    transactionResultDeletedStorage = "",
-                    transactionResultStatus = Just Success,
-                    transactionResultChainId = Just cId,
-                    transactionResultKind = Just kind,
-                    transactionResultOrgName = orgName,
-                    transactionResultAppName = appName
-                  }
-            Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
-          x : _ -> do
-            let fmt = either show show x
-            when flags_createTransactionResults $
-              yield . OutTXR $
-                TransactionResult
-                  { transactionResultBlockHash = cBlock,
-                    transactionResultTransactionHash = tHash,
-                    transactionResultMessage = fmt,
-                    transactionResultResponse = case kind of
-                      EVM -> ""
-                      SolidVM -> "()",
-                    transactionResultTrace = unlines $ unlines . reverse . erTrace <$> mExecResults,
-                    transactionResultGasUsed = 0,
-                    transactionResultEtherUsed = 0,
-                    transactionResultContractsCreated = "",
-                    transactionResultContractsDeleted = "",
-                    transactionResultStateDiff = "",
-                    transactionResultTime = 0.0,
-                    transactionResultNewStorage = "",
-                    transactionResultDeletedStorage = "",
-                    transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
-                    transactionResultChainId = Just cId,
-                    transactionResultKind = Just kind,
-                    transactionResultOrgName = "",
-                    transactionResultAppName = ""
-                  }
-            return Nothing
-
-outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
-outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
-  yield . OutIndexEvent $! NewChainInfo cId cInfo
-  let org = fromMaybe "" $ do
-        e <- listToMaybe execr
-        a <- erAction e
-        d <- listToMaybe . M.toList $ a ^. Action.actionData
-        pure $ d ^. _2 . Action.actionDataOrganization
-      app = fromMaybe "" $ do
-        e <- listToMaybe execr
-        a <- erAction e
-        d <- listToMaybe . M.toList $ a ^. Action.actionData
-        pure $ d ^. _2 . Action.actionDataApplication
-  yield $ OutToStateDiff cId cInfo bHash org app
-  for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
-  for_ (concatMap erEvents execr) $ yield . OutEvent . mkEventEntry (Just cId)
-
-processBlocks ::
-  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
-  [OutputBlock] ->
-  ConduitT a VmOutEvent m ()
-processBlocks blocks = do
-  $logInfoS "evm/processBlocks" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
-  processBlockSummaries blocks
-  addBlocks blocks
-
-processBlockSummaries ::
-  ( MonadIO m,
-    MonadLogger m,
-    HasBlockSummaryDB m
-  ) =>
-  [OutputBlock] ->
-  m ()
-processBlockSummaries = mapM_ $ \b -> do
-  let number = blockDataNumber $ obBlockData b
-      txCount = length $ obReceiptTransactions b
-  recordMaxBlockNumber "vm_seqevents" number
-  $logDebugS "evm/processBlockSummaries" . T.pack $
-    concat
-      [ "Received block number ",
-        show number,
-        " with ",
-        show txCount,
-        " transactions from seqEvents"
-      ]
-  writeBlockSummary b
-
-processTransactions ::
-  ( Bagger.MonadBagger m
-  ) =>
-  [(Timestamp, OutputTx)] ->
-  m ([VmOutEvent], Int)
-processTransactions = uncurry (fmap . (,)) . (outputTransactions &&& getNumPoolable)
-
-getNumPoolable ::
-  ( Bagger.MonadBagger m
-  ) =>
-  [(Timestamp, OutputTx)] ->
-  m Int
-getNumPoolable txPairs = do
-  $logDebugS "evm/getNumPoolable" $ T.pack $ "allTxs :: " ++ show txPairs
-  let allNewTxs = filter (isNothing . txChainId . otBaseTx . snd) txPairs -- PrivateHashTXs have chainId = Nothing
-  !currentMicrotime <- liftIO getCurrentMicrotime
-  $logInfoS "evm/getNumPoolable" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
-
-  forM_ allNewTxs $ \(ts, _) ->
-    $logInfoS "evm/getNumPoolable/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
-  let !poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
-  $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
-  unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
-  return $ length poolableNewTxs
-
-outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
-outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
-
-outputPrivateTransactions :: [OutputTx] -> [VmOutEvent]
-outputPrivateTransactions = map $ OutIndexEvent . IndexPrivateTx
-
--- TODO: maybe move this into solid-vm?
-runChainConstructors :: SolidVM.SolidVMBase m => Word256 -> ChainInfo -> m (MP.StateRoot, [Address], [ExecResults])
-runChainConstructors cId cInfo = do
-  -- We are inventing the rules of how the constructor should run when a chain is created.
-  -- Since all VM runs need some environment variables passed in, we need to define what all of
-  -- those variables should be.  The truth is, most of these variables are rarely used, but we
-  -- still need to pre-decide what they should be else the VM would crash whenever they are used.
-  -- I've set most of these variables to default dummy values below...  We might decide to refine
-  -- some of these variables in the future.
-
-  let getSrcBS = BC.pack . T.unpack . codeInfoSource
-      getCodeHash ci = Keccak256.hash $ getSrcBS ci
-      codeHashMap = M.fromList . map (getCodeHash &&& codeInfoSource) $ codeInfo $ chainInfo cInfo
-      resolveSrc a ch = do
-        mcp <- resolveCodePtr (Just cId) ch
-        msrc <- runMaybeT $ do
-          cp <- MaybeT $ pure mcp
-          hsh <- MaybeT $
-            pure $ case cp of
-              SolidVMCode _ h -> Just h
-              EVMCode h -> Just h
-              CodeAtAccount _ _ -> Nothing
-          (MaybeT $ pure $ M.lookup hsh codeHashMap)
-            <|> MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
-        pure $ Just (a, msrc)
-      sender = Account (fromMaybe 0 $ whoSignedThisChainInfo cInfo) $ Just cId
-  curBlockHash <- Mod.get (Mod.Proxy @CurrentBlockHash)
-  curBlockSummary <- getBSum $ unCurrentBlockHash curBlockHash
-  (addrs, actions) <- fmap (unzip . catMaybes) . for (accountInfo $ chainInfo cInfo) $ \aInfo -> do
-    addrSrc <- case aInfo of
-      NonContract {} -> pure Nothing
-      ContractNoStorage a _ ch -> resolveSrc a ch
-      ContractWithStorage a _ ch _ -> resolveSrc a ch
-      SolidVMContractWithStorage a _ ch _ -> resolveSrc a ch
-    for addrSrc $ \(addr, ms) ->
-      (addr,)
-        <$> SolidVM.call
-          False --isRunningTests
-          True --isHomestead
-          False --noValueTransfer
-          True -- isRunChainConstructors
-          S.empty --pre-existing suicide list
-          ( BlockData
-              (Keccak256.unsafeCreateKeccak256FromWord256 0)
-              (Keccak256.unsafeCreateKeccak256FromWord256 0)
-              emptyChainMember
-              MP.emptyTriePtr
-              MP.emptyTriePtr
-              MP.emptyTriePtr
-              ""
-              0
-              0 --block number
-              (toInteger flags_gasLimit)
-              0
-              (bSumTimestamp curBlockSummary)
-              ""
-              0
-              (Keccak256.unsafeCreateKeccak256FromWord256 0)
-          )
-          0 --callDepth
-          (Account 0 $ Just cId) --receiveAddress
-          (Account addr $ Just cId) --codeAddress
-          sender
-          0 --value
-          1 --gasPrice
-          ""
-          (Gas $ toInteger flags_gasLimit) --availableGas
-          sender
-          (Keccak256.unsafeCreateKeccak256FromWord256 0)
-          (Just cId)
-          ( Just $
-              M.fromList $
-                [ ("args", fromMaybe "()" (M.lookup "args" . chainMetadata $ chainInfo cInfo)),
-                  ("funcName", "<constructor>"),
-                  ("history", fromMaybe "" (M.lookup "history" . chainMetadata $ chainInfo cInfo))
-                ]
-                  ++ case ms of Nothing -> []; Just s -> [("src", s)]
-          )
-
-  -- let evs = Action._events <$> actions
-  -- logInfoS "Events" (T.pack $ show evs)
-
-  flushMemStorageDB
-  Mem.flushMemAddressStateDB
-
-  sr <- A.lookupWithDefault (Proxy @MP.StateRoot) (Just cId)
-  return (sr, addrs, actions)
-
 initializeCheckpointAndBlockSummary ::
   ( HasBlockSummaryDB m,
     Mod.Modifiable BlockHashRoot m,
@@ -519,41 +141,6 @@ outputBlockToEvmCheckpoint block =
       cbbi = ContextBestBlockInfo sha header td txL uncL
       sr = blockDataStateRoot header
    in EVMCheckpoint sha header cbbi sr
-
-writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
-writeBlockSummary block =
-  let sha = outputBlockHash block
-      header = obBlockData block
-      td = obTotalDifficulty block
-      txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header td txCnt)
-
-shouldProcessNewTransactions ::
-  ( MonadLogger m,
-    Mod.Accessible (Maybe WorldBestBlock) m,
-    HasBlockSummaryDB m
-  ) =>
-  Bool ->
-  m Bool -- todo: probably shouldn't do it by number, but tdiff.
-shouldProcessNewTransactions useSyncMode =
-  if useSyncMode
-    then do
-      worldBestBlock <- fmap unWorldBestBlock <$> Mod.access (Mod.Proxy @(Maybe WorldBestBlock))
-      case worldBestBlock of
-        Nothing -> do
-          $logInfoS "shouldProcessNewTransactions" "got Nothing from worldBestBlockInfo, playing it safe and not mining Txs"
-          return False -- we either had no peers or some other error, lets play it safe
-        Just (BestBlock worldBestSha _ _) -> do
-          didRunBest <- hasBSum worldBestSha
-          let msg =
-                if didRunBest
-                  then "found blockSummary for worldBestSha " ++ format worldBestSha ++ ", will mine"
-                  else "A peer has claimed that block hash " ++ format worldBestSha ++ " is the best block, but we don't have this block yet. We are behind, mining is futile, bagger is shutting down (until we are caught up)."
-          $logInfoS "shouldProcessNewTransactions" (T.pack msg)
-          return didRunBest -- todo, verify TDiff etc.
-    else do
-      $logInfoS "shouldProcessNewTransactions" "useSyncMode == false, will process all new TXs"
-      return True
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries events = do
@@ -635,76 +222,6 @@ sendOutEvent (OutASM asm) =
         ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
 sendOutEvent (OutBlock o) = void . K.withKafkaRetry1s $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
-
--- sendOutEvents :: VmOutEventBatch -> ContextM ()
--- sendOutEvents OutBatch{..} = do
---   let
---     filterOutEvents :: Action -> Action
---     filterOutEvents x = x{Action._events=Seq.empty}
--- --    filterOutMetadata :: Action -> Action
--- --    filterOutMetadata x = x{Action._metadata=Nothing}
---
---     extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
---     extractCodeCollectionAddedMessages a =
---       case (join $ fmap (M.lookup "src") $ a^.Action.metadata,
---             join $ fmap (M.lookup "name") $ a^.Action.metadata,
---             M.toList $ a^.Action.actionData) of
---         (Just c, Just n, first:_) -> Just $ CodeCollectionAdded {
---             ccString = c,
---             codePtr =
---                 case join $ fmap (M.lookup "VM") $ a^.Action.metadata of
---                   Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ BC.pack $ T.unpack c
---                   Just "EVM" -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c
---                   Just v -> error $ "Unknown VM: " ++ show v
---                   Nothing -> EVMCode $ Keccak256.hash $ BC.pack $ T.unpack c,
---             organization = first^._2.Action.actionDataOrganization,
---             application = n,
---             historyList=
---                 case join $ fmap (M.lookup "history") (a^.Action.metadata) of
---                   Nothing -> []
---                   Just v -> T.splitOn "," v
---           }
---         _ -> Nothing
---
---   for_ outJSONRPCs $ liftIO . uncurry produceResponse
---   for_ outToStateDiffs $ \(cId, cInfo, bHash, org, app) ->
---     withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
---   traverse_ commitSqlDiffs outStateDiffs
---   when (not flags_sqlDiff) $
---     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
---       forM_ outASMs $ \asm -> do
---         updateSQLBalanceAndNonce $
---           [ (theAccount,
---              (addressStateBalance asMod, addressStateNonce asMod))
---           | (theAccount, Mem.ASModification asMod) <- M.toList asm
---           ]
---
---   let ccEvents = concat (map (maybeToList . extractCodeCollectionAddedMessages) (toList outActions))
---       eventEvents = concat (map (map EventEmitted . toList . Action._events) (toList outActions))
---       actionEvents = map (NewAction . filterOutEvents) (toList outActions)
---       --actionEvents =  map (NewAction . filterOutMetadata . filterOutEvents) (toList outActions)
---       trEvents = map NewTransactionResult $ toList outTXRs
---
---   loopTimeit "produceVMEvents" $ do
---     $logInfoS "sendOutEvents" $ "outputting VMEvents"
---     _ <- produceVMEvents $ ccEvents ++ eventEvents ++ actionEvents ++ trEvents
---     return ()
---
---   loopTimeit "produceUnminedBlocksM" $
---     void . K.withKafkaRetry1s . produceUnminedBlocksM $
---       outputBlockToBlock <$> toList outBlocks
---   void . K.withKafkaRetry1s . writeIndexEvents $ toList outIndexEvents
---   loopTimeit "flushLogEntries" $ do
---     void . K.withKafkaRetry1s $ writeIndexEvents (LogDBEntry <$> toList outLogs)
---   loopTimeit "flushEventEntries" $ do
---     void . K.withKafkaRetry1s $ writeIndexEvents (EventDBEntry <$> toList outEvents)
--- -- I've moved the transaction result indexing to slipstream and the VMEvent stream, above
--- -- I'll keep the old code commented out below until we verify that the changes all work.
--- --  loopTimeit "flushTransactionResults" $ do
--- --    let q = toList outTXRs
--- --        toWrite = chunksOf 2000 $ TxResult <$> q
--- --    recordTxrFlush $ length q
--- --    mapM_ (K.withKafkaRetry1s . writeIndexEvents) toWrite
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"

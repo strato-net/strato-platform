@@ -31,6 +31,7 @@ import Data.Time.Clock.POSIX
 import Executable.EVMFlags ()
 import HFlags
 import Prometheus
+import Wiring ()
 
 main :: IO ()
 main = do

@@ -34,6 +34,7 @@ import qualified LabeledError
 import Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted as L
 import Test.Hspec.Runner
+import Wiring ()
 import Prelude hiding (print)
 
 {-# NOINLINE exampleCode #-}

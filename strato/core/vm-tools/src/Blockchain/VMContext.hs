@@ -16,6 +16,8 @@
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 {-# OPTIONS -fno-warn-deprecations #-}
+{-# OPTIONS -fno-warn-unused-imports #-}
+{-# OPTIONS -fno-warn-unused-top-binds #-}
 
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
@@ -33,6 +35,7 @@ module Blockchain.VMContext
     stateDB,
     hashDB,
     codeDB,
+    getBlockSummaryDB,
     blockSummaryDB,
     kafkaState,
     redisPool,
@@ -76,6 +79,13 @@ module Blockchain.VMContext
     compactContextM,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
+    modify,
+    get,
+    gets,
+    getHashDB,
+    getCodeDB,
+    getStateDB,
+    put
   )
 where
 
@@ -360,7 +370,7 @@ contextModify' = modify'
 
 instance Show Context where
   show = const "<context>"
-
+{-
 instance Mod.Modifiable ContextState ContextM where
   get _ = get
   put _ = put
@@ -502,7 +512,7 @@ instance (Address `A.Selectable` X509Certificate) ContextM where
       case mBString of
         Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
         _ -> pure Nothing
-
+-}
 lookupX509AddrFromCBHash ::
   ( MonadLogger m,
     (A.Alters (Account, B.ByteString) B.ByteString) m
@@ -517,7 +527,7 @@ lookupX509AddrFromCBHash k = do
   case mAccount of
     Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
     _ -> pure Nothing
-
+{-
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   lookup _ = genericLookupHashDB $ getHashDB
   insert _ = genericInsertHashDB $ getHashDB
@@ -558,7 +568,7 @@ instance Mod.Modifiable GasCap ContextM where
   put _ (GasCap g) = do
     contextModify (vmGasCap .~ g)
     $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
-
+-}
 runTestContextM ::
   ( MonadUnliftIO m,
     HasStateDB (ReaderT Context (ResourceT m))

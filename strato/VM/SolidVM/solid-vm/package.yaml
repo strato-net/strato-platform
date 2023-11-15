@@ -78,46 +78,63 @@ tests:
     main: Main.hs
     ghc-options: -dynamic
     dependencies:
-      - strato-init
+      - QuickCheck
       - aeson
-      - json-stream
-      - seqevents
-      - mtl
-      - crypto-api
-      - binary
-      - blockapps-data
-      - core-api2
-      - strato-genesis
+      - ansi-wl-pprint
       - async
       - base16-bytestring
+      - binary
+      - blockapps-data
       - blockapps-datadefs
+      - blockapps-init
       - blockapps-mpdbs
       - bytestring
       - common-log
       - containers
+      - core-api2
+      - crypto-api
+      - data-default
+      - debugger
       - deepseq
+      - directory
       - ethereum-rlp
+      - exceptions
+      - extra
+      - hedis
       - hflags
       - hspec
       - hspec-expectations-lifted
+      - json-stream
       - labeled-error
       - lens
+      - leveldb-haskell
       - merkle-patricia-db
+      - milena
       - monad-alter
+      - mtl
+      - nibblestring
+      - persistent-sqlite
       - raw-strings-qq
+      - resourcet
+      - seqevents
       - solid-vm
       - solid-vm-model
+      - solid-vm-parser
       - solid-vm-static-analysis
       - source-tools
+      - strato-conf
+      - strato-genesis
+      - strato-init
       - strato-model
+      - strato-redis-blockdb
+      - strato-statediff
+      - test-framework
       - text
       - time
-      - vm-tools
-      - utf8-string
-      - test-framework
-      - QuickCheck
-      - solid-vm-parser
       - transformers
+      - unliftio
+      - utf8-string
+      - vm-tools
 
 benchmarks:
     codebench:

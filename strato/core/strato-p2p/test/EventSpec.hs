@@ -110,7 +110,7 @@ import Data.Time.Clock (getCurrentTime)
 import Data.Traversable (for)
 import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
-import Executable.EthereumVM
+import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient
 import Executable.StratoP2PServer

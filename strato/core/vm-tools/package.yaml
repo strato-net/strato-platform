@@ -41,6 +41,7 @@ library:
     - Blockchain.VMOptions
     - Blockchain.VM.VMException
     - Blockchain.VMMetrics
+    - Blockchain.Wiring
     - Executable.EVMFlags
   ghc-options: -Wall -O2
   dependencies:
