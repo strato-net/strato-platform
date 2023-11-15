@@ -43,11 +43,15 @@ class AuthHandler {
   static authorizeRequest(allowAnonAccess = false) {
     return async function (req, res, next) {
       try {
+        // ONLY can get token from getTokenFromCookie() in NON-dockerized mode
         let token = await getTokenFromCookie(req, res)
         let address
         if (!token) {
+          // Gets the token from the header from nginx in dockerized mode
           token = await getTokenFromHeader(req)
+          console.log("token from header: ", token)
         }
+        console.log("token: ", token)
         let isServiceUser = false
         if (!token && allowAnonAccess === true) {
           token = await oauthHelper.getServiceToken()
@@ -84,14 +88,18 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        return rest.response.status(RestStatus.UNAUTHORIZED, res, {
+        console.log("reaches here1")
+        rest.response.status(RestStatus.UNAUTHORIZED, res, {
           loginUrl: getLoginUrl(req),
         })
+        return next(err)
       }
-
-      return rest.response.status(RestStatus.UNAUTHORIZED, res, {
+      console.log("reaches here2")
+      rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })
+      
+      return next(new Error('Authorization required'))
     }
   }
 
