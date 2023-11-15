@@ -57,7 +57,7 @@ contract Art is ItemStatus, RestStatus, Asset {
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
         sale = new ArtSale(address(this), _state, _payment);
-        whitelistSale(sale);
+        whitelistSale.push(sale);
         return RestStatus.OK;
     }
 
