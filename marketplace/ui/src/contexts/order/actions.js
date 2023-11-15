@@ -232,12 +232,17 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, commonName) => {
+  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter) => {
     dispatch({ type: actionDescriptors.fetchOrder });
+
+    let query = "";
+    if (selectedDate) {
+      query += `&createdDate=${selectedDate}`;
+    }
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}&purchasersCommonName=${commonName}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&purchasersCommonName=${commonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -258,12 +263,17 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, commonName) => {
+  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter) => {
     dispatch({ type: actionDescriptors.fetchOrderSold });
+
+    let query = "";
+    if (selectedDate) {
+      query += `&createdDate=${selectedDate}`;
+    }
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&sellerCommonName=${commonName}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&sellerCommonName=${commonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }

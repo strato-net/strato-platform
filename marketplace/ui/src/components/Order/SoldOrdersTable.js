@@ -34,6 +34,8 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       limit,
       offset,
       user?.commonName,
+      selectedDate,
+      filter
     );
 
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
