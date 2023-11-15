@@ -1,6 +1,6 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/orders/contracts/SimpleSale.sol";
+import "/dapp/orders/contracts/orders/Sales/ArtSale.sol";
 
 pragma es6;
 pragma strict;
@@ -56,7 +56,8 @@ contract Art is ItemStatus, RestStatus, Asset {
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = Sale(new ArtSale(address(this), _state, _payment));
+        sale = new ArtSale(address(this), _state, _payment);
+        whitelistSale(sale);
         return RestStatus.OK;
     }
 

@@ -6,4 +6,5 @@ import <1e23e3989728fa5fc5ca6d6d3cd01cdc889434f9>;
 contract ArtSale is Sale{
     constructor(address _assetToBeSold, SaleState _state, PaymentType _payment) Sale(_assetToBeSold, _state, _payment){
     }
+
 }
