@@ -70,15 +70,21 @@ initHighway = do
   liftIO $ blockappsInit "blockapps-highway-wrapper-server"
   liftIO $ Prelude.putStrLn highway3DMacroFont
   liftIO $ forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
-  args <- liftIO $ $initHFlags "Setup Highway Wrapper AWS settings"
-  case args of
-    []    -> do $logErrorS "highway/initHighway" $ T.pack $ "No highway env variables were passed in."
-                return ()
-    _     -> do $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
-                mgr <- liftIO $ newManager defaultManagerSettings
-                boundary <- liftIO genBoundary
-                let env = HighwayWrapperEnv mgr boundary (DBC8.pack flags_awsaccesskeyid) (DBC8.pack flags_awssecretaccesskey) (T.pack flags_awss3bucket)
-                liftIO $ run 8080 $ appHighwayWrapper env
+  _ <- liftIO $ $initHFlags "Setup Highway Wrapper AWS settings"
+  case Prelude.null flags_awsaccesskeyid of
+      True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS Access Key ID highway env variable was not passed in."
+                  return ()
+      False -> case Prelude.null flags_awssecretaccesskey of
+                 True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS Secret Access Key highway env variable was not passed in."
+                             return ()
+                 False -> case Prelude.null flags_awss3bucket of
+                            True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS S3 Bucket highway env variable was not passed in."
+                                        return ()
+                            False -> do $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
+                                        mgr <- liftIO $ newManager defaultManagerSettings
+                                        boundary <- liftIO genBoundary
+                                        let env = HighwayWrapperEnv mgr boundary (DBC8.pack flags_awsaccesskeyid) (DBC8.pack flags_awssecretaccesskey) (T.pack flags_awss3bucket)
+                                        liftIO $ run 8080 $ appHighwayWrapper env
 
 appHighwayWrapper :: HighwayWrapperEnv -> Application
 appHighwayWrapper env =
