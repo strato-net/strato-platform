@@ -41,7 +41,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   cp /tmp/openid.tpl.lua /tmp/openid.lua
 
-  sed -i 's/<OAUTH_DISCOVERY_URL_PLACEHOLDER>/OAUTH_DISCOVERY_URL' /tmp/openid.lua
+  sed -i "s/<OAUTH_DISCOVERY_URL_PLACEHOLDER>/$OAUTH_DISCOVERY_URL/" /tmp/openid.lua
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
