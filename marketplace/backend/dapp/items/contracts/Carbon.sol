@@ -56,7 +56,7 @@ contract Carbon is ItemStatus, RestStatus, UTXO {
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         Sale sale = Sale(new CarbonSale(address(this), _state, _payment));
-        whitelistedSales.push(sale);
+        whitelistedSales.push(address(sale));
         return RestStatus.OK;
     }
 

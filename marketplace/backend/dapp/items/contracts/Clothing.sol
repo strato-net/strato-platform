@@ -56,7 +56,7 @@ contract Clothing is ItemStatus, RestStatus, Asset {
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         Sale sale = Sale(new ClothingSale(address(this), _state, _payment));
-        whitelistedSales.push(sale);
+        whitelistedSales.push(address(sale));
         return RestStatus.OK;
     }
 
