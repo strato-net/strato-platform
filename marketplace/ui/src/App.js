@@ -21,23 +21,6 @@ const App = () => {
 
   const { user, loginUrl, users, isAuthenticated } = useAuthenticateState();
 
-  // Getting User information for Lucky Orange
-  // See documentation here: https://developers.luckyorange.com/libraries/browser
-
-  // window.LOQ = window.LOQ || [];
-  // window.LOQ.push([
-  //   "ready",
-  //   async (LO) => {
-  //     // Track an event
-  //     await LO.$internal.ready("events");
-  //     LO.events.track("My Event");
-
-  //     // Or, identify a visitor
-  //     await LO.$internal.ready("visitor");
-  //     LO.visitor.identify({ email: "test@example.com" });
-  //   },
-  // ]);
-
   window.LOQ = window.LOQ || [];
   window.LOQ.push([
     "ready",
@@ -51,7 +34,8 @@ const App = () => {
   ]);
 
   // Using this to delete our returnUrl cookie after login
-  if (getCookie("returnUrl") && isAuthenticated) {
+  if (getCookie('returnUrl') && isAuthenticated) {
+    window.location.href = getCookie('returnUrl');
     delete_cookie("returnUrl");
   }
 
