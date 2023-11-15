@@ -55,8 +55,7 @@ contract Carbon is ItemStatus, RestStatus, UTXO {
     }
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
-        require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = Sale(new CarbonSale(address(this), _state, _payment));
+        Sale sale = Sale(new CarbonSale(address(this), _state, _payment));
         whitelistSale.push(sale);
         return RestStatus.OK;
     }
