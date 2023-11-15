@@ -7,32 +7,32 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
-module SolidVM.Model.CodeCollection
-  ( CodeCollectionF (..),
-    CodeCollection,
-    emptyCodeCollection,
-    flFuncs,
-    contracts,
-    getParents,
-    flConstants,
-    flStructs,
-    flEnums,
-    flErrors,
-    pragmas,
-    imports,
-    usesStrictModifiers,
-    module SolidVM.Model.CodeCollection.Contract,
-    --module SolidVM.Model.CodeCollection.Def,
-    module SolidVM.Model.CodeCollection.Function,
-    module SolidVM.Model.CodeCollection.Import,
-    module SolidVM.Model.CodeCollection.Statement,
-    module SolidVM.Model.CodeCollection.ConstantDecl,
-    --module SolidVM.Model.CodeCollection.Type,
-    module SolidVM.Model.CodeCollection.VariableDecl,
-    module SolidVM.Model.CodeCollection.Event,
-    module SolidVM.Model.CodeCollection.VarDef,
-  )
-where
+module SolidVM.Model.CodeCollection (
+  CodeCollectionF(..),
+  CodeCollection,
+  emptyCodeCollection,
+  flFuncs,
+  contracts,
+  getParents,
+  flConstants,
+  flStructs,
+  flEnums,
+  flErrors,
+  pragmas,  
+  imports,
+  usesStrictModifiers,
+  getContractsBySolidString,
+  module SolidVM.Model.CodeCollection.Contract,
+  --module SolidVM.Model.CodeCollection.Def,
+  module SolidVM.Model.CodeCollection.Function,
+  module SolidVM.Model.CodeCollection.Import,
+  module SolidVM.Model.CodeCollection.Statement,
+  module SolidVM.Model.CodeCollection.ConstantDecl,
+  --module SolidVM.Model.CodeCollection.Type,
+  module SolidVM.Model.CodeCollection.VariableDecl,
+  module SolidVM.Model.CodeCollection.Event,
+  module SolidVM.Model.CodeCollection.VarDef
+  ) where
 
 import Blockchain.SolidVM.Exception
 import Control.DeepSeq
@@ -141,3 +141,7 @@ instance Arbitrary CodeCollection where
 
 usesStrictModifiers :: CodeCollectionF a -> Bool
 usesStrictModifiers = isJust . find ((== "strict") . fst) . _pragmas
+
+-- Function to get all ContractF values matching a SolidString
+getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (ContractF a)
+getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)

@@ -1,5 +1,5 @@
 #vault-version:<VERSION>
-#strato-getting-started-min-version:4.0
+#strato-getting-started-min-version:4.2.1
 version: "3"
 volumes:
   idpconfig:

@@ -233,6 +233,11 @@ const ConfirmOrder = () => {
       ...billingAddr
     };
 
+    window.LOQ.push(['ready', async LO => {
+      // Track an event
+      await LO.$internal.ready('events')
+      LO.events.track('Add Shipping Address')
+    }])
     TagManager.dataLayer({
       dataLayer: {
         event: 'add_shipping_address',
@@ -337,7 +342,7 @@ const ConfirmOrder = () => {
       orderTotal: total + tax + shipping,
       shippingAddress: userAddresses[selectedAddress].address,
     };
-
+    
     TagManager.dataLayer({
       dataLayer: {
         event: 'pay_later_button',
@@ -367,6 +372,7 @@ const ConfirmOrder = () => {
         quantity: item.qty,
         name: item.item.name,
         unitPrice: item.unitPrice,
+        subCategory: item.subCategory ? item.subCategory : " ",
       });
     });
 
@@ -380,6 +386,11 @@ const ConfirmOrder = () => {
       user: user.commonName,
       email: user.preferred_username,
     };
+    window.LOQ.push(['ready', async LO => {
+      // Track an event
+      await LO.$internal.ready('events')
+      LO.events.track('Buy Now Button')
+    }])
     TagManager.dataLayer({
       dataLayer: {
         event: 'pay_now_button',

@@ -21,6 +21,10 @@ const DeleteProductModal = ({
         productAddress: product.address,
       };
      
+      window.LOQ.push(['ready', async LO => {
+        await LO.$internal.ready('events')
+        LO.events.track('Delete Product')
+      }])
       TagManager.dataLayer({
         dataLayer: {
           event: 'delete_product',
