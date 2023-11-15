@@ -1,6 +1,5 @@
 import <509>;
 
-import 
 pragma es6;
 pragma strict;
 
