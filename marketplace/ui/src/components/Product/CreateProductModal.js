@@ -80,7 +80,14 @@ const CreateProductModal = ({
           userUniqueProductCode:values.userUniqueProductCode,
         },
       };
-
+      window.LOQ.push(['ready', async LO => {
+        await LO.$internal.ready('events')
+        LO.events.track('Create Product', {
+          product: values.name,
+          category: values.category.name,
+          subCategory: values.subCategory.name
+        })
+      }])
       TagManager.dataLayer({
         dataLayer: {
           event: 'create_product',
