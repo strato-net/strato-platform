@@ -257,7 +257,9 @@ function newnode {
 
   echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible "${aclFlag}" "${txsFlag}" "${gasFlag}" "${idServer}" "${urFlag}" "${ucFlag}" "${ubFlag}" "${udFlag}" +RTS -N1 >> logs/strato-api 2>&1
+  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible \
+    --networkID=$networkID "${networkFlag}" "${aclFlag}" "${txsFlag}" "${gasFlag}" "${idServer}" "${urFlag}" "${ucFlag}" \
+    "${ubFlag}" "${udFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${evmCompatible}" = true ]; then
       echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."

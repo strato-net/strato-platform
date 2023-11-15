@@ -21,6 +21,22 @@ contract ItemManager is ItemStatus, InventoryStatus {
         string[] rawMaterialProductId;
     }
 
+    event ItemTransfers(
+        address indexed oldOwner,
+        string oldOwnerOrganization,
+        string oldOwnerOrganizationalUnit,
+        string oldOwnerCommonName,
+        address indexed newOwner,
+        string newOwnerOrganization,
+        string newOwnerOrganizationalUnit,
+        string newOwnerCommonName,
+        address indexed inventoryId,
+        string productName,
+        uint transferNumber,
+        uint quantity,
+        uint transferDate
+    );
+
     function addItem(
         address _productId,
         address _inventoryId,
@@ -184,11 +200,14 @@ contract ItemManager is ItemStatus, InventoryStatus {
         address _newOwner,
         address _dappAddress,
         int _newQuantity,
-        uint _itemNumber
+        uint _itemNumber,
+        bool _isUserTransfer,
+        uint _transferNumber
     ) public returns (uint, address, address) {
         Product_3 product;
         Inventory inventory;
         Item_3 item = Item_3(_itemsAddress[0]);
+
 
         // get Dapp contract from dapp chain
         Dapp dapp = Dapp(address(_dappAddress));
@@ -201,39 +220,56 @@ contract ItemManager is ItemStatus, InventoryStatus {
         );
 
         if (productAddress == address(0)) {
-                    address addr = productManager.addProductForBuyer(
-                        oldProduct.name(),
-                        oldProduct.description(),
-                        oldProduct.manufacturer(),
-                        oldProduct.unitOfMeasurement(),
-                        oldProduct.userUniqueProductCode(),
-                        oldProduct.uniqueProductCode(),
-                        oldProduct.leastSellableUnit(),
-                        oldProduct.imageKey(),
-                        oldProduct.isActive(),
-                        oldProduct.category(),
-                        oldProduct.subCategory(),
-                        block.timestamp,
-                        _newOwner
-                    );
-                    product = Product_3(addr);
-                } else {
-                    product = Product_3(productAddress);
-                }
+            address addr = productManager.addProductForBuyer(
+                oldProduct.name(),
+                oldProduct.description(),
+                oldProduct.manufacturer(),
+                oldProduct.unitOfMeasurement(),
+                oldProduct.userUniqueProductCode(),
+                oldProduct.uniqueProductCode(),
+                oldProduct.leastSellableUnit(),
+                oldProduct.imageKey(),
+                oldProduct.isActive(),
+                oldProduct.category(),
+                oldProduct.subCategory(),
+                block.timestamp,
+                _newOwner
+            );
+            product = Product_3(addr);
+        } else {
+            product = Product_3(productAddress);
+        }
 
         Inventory oldInventory = Inventory(item.inventoryId());
+        
+        string oldOwnerOrganization = oldInventory.ownerOrganization();
+        string oldOwnerCommonName = oldInventory.ownerCommonName();
+        string oldOwnerOrganizationalUnit = oldInventory.ownerOrganizationalUnit();
 
-        if (oldInventory.inventoryType() == "Batch") {
+
+        // get new owner organization
+        mapping(string => string) ownerCert = getUserCert(_newOwner);
+        string newOwnerOrganization = ownerCert["organization"];
+        string newOwnerCommonName = ownerCert["commonName"];
+        string newOwnerOrganizationalUnit = ownerCert["organizationalUnit"];
+
+        bool hasInventoryType = true;
+        try {
+            oldInventory.inventoryType();
+        } catch UnknownFunction {
+            hasInventoryType = false;
+        }
+        if (hasInventoryType && oldInventory.inventoryType() == "Batch") {
             (uint status, address inventory) = product.addInventory(
                 _newQuantity,
                 oldInventory.pricePerUnit(),
                 oldInventory.batchId(),
-                oldInventory.inventoryType(),
                 InventoryStatus.UNPUBLISHED,
                 block.timestamp,
-                _newOwner
+                _newOwner,
+                "Batch"
             );
-            Item_3 itemAddr = new Item_3(
+            Item_3 batch_item = new Item_3(
                 address(product),
                 oldProduct.uniqueProductCode(),
                 address(inventory),
@@ -247,18 +283,25 @@ contract ItemManager is ItemStatus, InventoryStatus {
                 block.timestamp,
                 _newOwner
             );
-            address itemContractAddress = address(itemAddr);
+            address itemContractAddress = address(batch_item);
             itemProductIdMapping[itemContractAddress] = address(product);
             itemInventoryIdMapping[itemContractAddress] = address(inventory);
+
+            item.generateOwnershipHistory(
+                oldInventory.ownerOrganization(),
+                batch_item.ownerOrganization(),
+                block.timestamp,
+                address(batch_item)
+            );
         } else {
             (uint status, address inventory) = product.addInventory(
                 _itemsAddress.length,
                 oldInventory.pricePerUnit(),
                 oldInventory.batchId(),
-                oldInventory.inventoryType(),
                 InventoryStatus.UNPUBLISHED,
                 block.timestamp,
-                _newOwner
+                _newOwner,
+                "Individual"
             );
             for (uint i = 0; i < _itemsAddress.length; i++) {
                 Item_3 _item = Item_3(_itemsAddress[i]);
@@ -268,6 +311,24 @@ contract ItemManager is ItemStatus, InventoryStatus {
                     address(inventory)
                 );
             }
+        }
+
+        if (_isUserTransfer == true) {
+            emit ItemTransfers(
+                tx.origin,
+                oldOwnerOrganization,
+                oldOwnerOrganizationalUnit,
+                oldOwnerCommonName,
+                _newOwner,
+                newOwnerOrganization,
+                newOwnerOrganizationalUnit,
+                newOwnerCommonName,
+                address(inventory),
+                product.name(),
+                _transferNumber,
+                _newQuantity,
+                block.timestamp
+            );
         }
 
         return (RestStatus.OK, address(product), address(inventory));

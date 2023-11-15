@@ -19,7 +19,7 @@ const CategoryCard = () => {
     Images.carbon,
     Images.materials,
     Images.clothing,
-    
+    Images.collectibles,
   ];
 
   return (
@@ -44,6 +44,11 @@ const CategoryCard = () => {
               className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
+                window.LOQ.push(['ready', async LO => {
+                  // Track an event
+                  await LO.$internal.ready('events')
+                  LO.events.track(`Homepage Filter - ${category.name}`)
+                }])
                 TagManager.dataLayer({
                   dataLayer: {
                     event: `${category.name}_filter_homepage`

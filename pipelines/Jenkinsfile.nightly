@@ -80,7 +80,6 @@ pipeline {
             writeFile file: "run.sh", text: """#!/bin/bash
               sudo \\
                 NODE_HOST=\$(</host) \\
-                BLOC_DEBUG=true \\
                 SLIPSTREAM_OPTIONAL=false \\
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
                 OAUTH_CLIENT_ID=dev \\
@@ -223,11 +222,11 @@ pipeline {
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
-                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
-                withCredentials([
-                    usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
-                ]) {
-                  dir ('strato-worktree') {
+                dir ('strato-worktree') {
+                  archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, devops/**"
+                  withCredentials([
+                      usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
+                  ]) {
                     sh '''#!/bin/bash -le
                       set -x
                       version=$(grep -oP "#strato-version:\\K[^#]*" docker-compose.yml)
@@ -241,6 +240,7 @@ pipeline {
                     '''
                   }
                 }
+
               }
             }
             
@@ -310,8 +310,8 @@ pipeline {
               ./run_unit_tests.sh --coverage
             '''
             dir('strato-worktree/strato') {
-              archiveArtifacts artifacts: ".stack-work/**/hpc/**/*.html, .stack-work/**/hpc/index.html", fingerprint: true
-            }
+              zip dir: 'hpc/', archive: true, zipFile: 'hpc.zip', overwrite: true
+            }   
           }
         }
 

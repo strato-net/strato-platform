@@ -8,6 +8,9 @@ const actionDescriptors = {
   fetchInventory: "fetch_inventories",
   fetchInventorySuccessful: "fetch_inventory_successful",
   fetchInventoryFailed: "fetch_inventory_failed",
+  fetchInventorySearch: "fetch_inventory_search",
+  fetchInventorySearchSuccessful: "fetch_inventory_search_successful",
+  fetchInventorySearchFailed: "fetch_inventory_search_failed",
   fetchInventoryDetail: "fetch_inventory_detail",
   fetchInventoryDetailSuccessful: "fetch_inventory_detail_successful",
   fetchInventoryDetailFailed: "fetch_inventory_detail_failed",
@@ -84,6 +87,46 @@ const actions = {
     }
   },
 
+  fetchInventorySearch: async (dispatch, limit, offset, queryValue) => {
+    const query = queryValue
+    ? `&queryValue=${queryValue}&queryFields=name`
+    : "";
+
+    dispatch({ type: actionDescriptors.fetchInventorySearch });
+
+    try {
+      const response = await fetch(
+        `${apiUrl}/inventory/search?limit=${limit}&offset=${offset}${query}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchInventorySearchSuccessful,
+          payload: {data: body.data.inventoriesWithImageUrl, count: body.data.count}
+        });
+        return;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.fetchInventorySearchFailed,
+          error: "Error while fetching Inventory",
+        });
+      }
+      dispatch({
+        type: actionDescriptors.fetchInventorySearchFailed,
+        error: body.error,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchInventorySearchFailed,
+        error: "Error while fetching Inventory",
+      });
+    }
+  },
+
   fetchInventory: async (dispatch, limit, offset, queryValue) => {
     const query = queryValue ? `&productId=${queryValue}` : "";
 
@@ -102,7 +145,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchInventorySuccessful,
-          payload: body.data,
+          payload: {data: body.data.inventoriesWithImageUrl, count: body.data.count},
         });
         return;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {

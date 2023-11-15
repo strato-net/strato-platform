@@ -68,7 +68,7 @@ eks:
 	cd devops/eks/strato && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' strato-platform-manifest.tpl.yaml > strato-platform-manifest.yaml
 	cd devops/eks/vault && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-vault-deployment.tpl.yaml > eks-vault-deployment.yaml
 	#TODO: create eks manifest for identity server
-    #cd devops/eks/identity && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-identity-deployment.tpl.yaml > eks-identity-deployment.yaml
+	#cd devops/eks/identity && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-identity-deployment.tpl.yaml > eks-identity-deployment.yaml
 
 build_buildbase:
 	@echo building buildbase...
@@ -92,6 +92,15 @@ build_common_profiled: build_buildbase
 	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
+		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
+build_common_fast: build_buildbase
+	@echo building haskell libraries and creating directories
+	mkdir -p ${STRATODIR}
+	mkdir -p ${VAULTDIR}
+	mkdir -p ${IDENTITYDIR}
+	cd strato && stack build \
+		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 pretty: build_buildbase
@@ -119,6 +128,20 @@ highway-nginx:
 
 strato: build_common
 	@echo Now building core-strato...
+	cp -fr strato/licenses ${STRATODIR}
+	cp strato/doit.sh ${STRATODIR}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+
+develop: build_common_fast
+	@echo Now building core-strato using --fast...
+	cp -fr strato/licenses ${STRATODIR}
+	cp strato/doit.sh ${STRATODIR}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+
+profile: build_common_profiled
+	@echo Now building core-strato using --profile...
 	cp -fr strato/licenses ${STRATODIR}
 	cp strato/doit.sh ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}

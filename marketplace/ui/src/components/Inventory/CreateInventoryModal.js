@@ -119,7 +119,12 @@ const CreateInventoryModal = ({
       serialNumber: values.serialNumber.serialNumArr,
       inventoryType: values.inventoryType
     };
-
+    window.LOQ = window.LOQ || []
+    window.LOQ.push(['ready', async LO => {
+        // Track an event
+        await LO.$internal.ready('events')
+        LO.events.track('Create Inventory', {category: values.category.name, product: values.productName.name})
+    }])
     TagManager.dataLayer({
       dataLayer: {
         event: 'create_inventory',
@@ -372,7 +377,8 @@ const CreateInventoryModal = ({
                           (e) => e.address === value
                           );
                         }
-                        formik.setFieldValue("productName.name", selectedProduct.name);
+                        var pname = (selectedProduct?.name !== null && selectedProduct?.name !== undefined) ? decodeURIComponent(selectedProduct.name) : null
+                        formik.setFieldValue("productName.name", pname);
                         formik.setFieldValue(
                           "productName.address",
                           selectedProduct.address
