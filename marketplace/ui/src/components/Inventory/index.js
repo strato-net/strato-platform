@@ -82,7 +82,7 @@ const Inventory = ({ user }) => {
     if (stripeStatus !== null && stripeStatus !== undefined) {
       const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
   
-      if (chargesEnabled !== detailsSubmitted || chargesEnabled !== payoutsEnabled || detailsSubmitted !== payoutsEnabled) {
+      if (!( ( chargesEnabled && detailsSubmitted && payoutsEnabled ) || ( !chargesEnabled && !detailsSubmitted && !payoutsEnabled ) ) ) {
         
         setTimeout(() => {
           api.error({
