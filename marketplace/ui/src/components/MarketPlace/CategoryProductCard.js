@@ -205,6 +205,15 @@ const CategoryProductCard = ({ product, category }) => {
                         setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
+                        window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Add to Cart (from marketplace)', {
+                            product: product.name,
+                            category: product.category,
+                            productId: product.productId
+                          })
+                        }])
                         TagManager.dataLayer({
                           dataLayer: {
                             event: 'add_to_cart_from_marketplace',
@@ -227,6 +236,15 @@ const CategoryProductCard = ({ product, category }) => {
                         setCookie("returnUrl", `/marketplace/productList/${product.address}`, 10);
                         window.location.href = loginUrl;
                       } else {
+                        window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Buy Now (from marketplace)', {
+                            product: product.name,
+                            category: product.category,
+                            productId: product.productId
+                          })
+                        }])
                         TagManager.dataLayer({
                           dataLayer: {
                             event: 'buy_now_from_marketplace',
@@ -251,6 +269,15 @@ const CategoryProductCard = ({ product, category }) => {
                   className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                   href={`mailto:sales@blockapps.net`}
                   onClick={() => {
+                    window.LOQ.push(['ready', async LO => {
+                      // Track an event
+                      await LO.$internal.ready('events')
+                      LO.events.track('Contact Sales (from category card)', {
+                        product: product.name,
+                        category: product.category,
+                        productId: product.productId
+                      })
+                    }])
                     TagManager.dataLayer({
                       dataLayer: {
                         event: 'contact_sales_from_category_card',
