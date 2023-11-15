@@ -427,7 +427,35 @@ numberUnit = do
     <|> (reserved "ether" >> return Ether)
 
 parseArgs :: SolidityParser [Expression]
-parseArgs = parens $ commaSep literal
+parseArgs = (try $ parens $ commaSep literal) <|> parseCreateArgs
+
+parseCreateArgs :: SolidityParser [Expression]
+parseCreateArgs = do
+  void $ char '('
+  str1 <- uncurry StringLiteral <$> withPosition stringLiteral  -- Contract Name
+  void $ char ','
+  str2 <- uncurry StringLiteral <$> withPosition parseCreateContractSrc  -- Contract Src
+  str3 <- uncurry StringLiteral <$> withPosition parseCreateConstructArgs -- Constructor Args
+  return [str1, str2, str3]
+
+parseCreateContractSrc :: SolidityParser String
+parseCreateContractSrc = do
+  srcLength <- getContractSrcLength
+  void $ string "\""
+  case srcLength of
+    0 -> manyTill anyChar (try (void $ string "\",\"("))
+    _ -> count srcLength anyChar
+
+parseCreateConstructArgs :: SolidityParser String
+parseCreateConstructArgs = do
+  srcLength <- getContractSrcLength
+  case srcLength of
+    0 -> do
+      content <- manyTill anyChar (try $ (void $ string "\")") <* eof)
+      return ('(' : content)
+    _ -> do
+      void $ string "\",\""
+      manyTill anyChar (try $ (void $ string "\")") <* eof)
 
 parseExternalCallArgs :: SolidityParser (SolidString, [SVMType.Type])
 parseExternalCallArgs = do
