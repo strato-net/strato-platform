@@ -12,7 +12,6 @@ data EventException
   | EventBeforeHandshake Message
   | WrongGenesisBlock
   | NetworkIDMismatch
-  | RootCertificateMismatch
   | NoPeerPubKey
   | NoPeerCertificate
   deriving (Show)

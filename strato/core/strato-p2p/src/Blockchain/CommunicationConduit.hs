@@ -74,10 +74,6 @@ import UnliftIO.Concurrent hiding (yield)
 import UnliftIO.Exception
 import UnliftIO.STM
 
--- This is a placeholder until the root certs can be held in a proper database
-rootCerts' :: S.Set X509Certificate
-rootCerts' = S.fromList [rootCert]
-
 ethVersion :: Int
 ethVersion = 62
 {-# INLINE ethVersion #-}
@@ -187,47 +183,17 @@ handleMsgClientConduit myId peer = do
         =<< lift
           ( Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-
-              let s =
-                    if flags_useNodeCerts
-                      then
-                        NewStatus
-                          { protocolVersion = fromIntegral ethVersion,
-                            networkID = computeNetworkID,
-                            totalDifficulty = fromIntegral tdiff,
-                            latestHash = bHash,
-                            genesisHash = genHash,
-                            rootCerts = rootCerts'
-                          }
-                      else
-                        Status
-                          { protocolVersion = fromIntegral ethVersion,
-                            networkID = computeNetworkID,
-                            totalDifficulty = fromIntegral tdiff,
-                            latestHash = bHash,
-                            genesisHash = genHash
-                          }
+              let s = Status
+                      { protocolVersion = fromIntegral ethVersion,
+                        networkID = computeNetworkID,
+                        totalDifficulty = fromIntegral tdiff,
+                        latestHash = bHash,
+                        genesisHash = genHash
+                      }
               return $ Right s
           )
     other -> assertHandshake other
   awaitMsg >>= \case
-    -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-    Just NewStatus {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID', rootCerts = rcs} -> do
-      (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
-      when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-      when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-      when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-      -- we set to 0 cause we dont necessarily know the number yet
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
-      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
-      mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-      yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-      yield . Right $ GetChainDetails []
-      handleGetChainDetails peer S.empty
-      lift stampActionTimestamp
     Just Status {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
@@ -266,34 +232,6 @@ handleMsgServerConduit myPubkey peer = do
       yield $ Right helloMsg'
     other -> assertHandshake $ other
   awaitMsg >>= \case
-    -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-    Just NewStatus {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID', rootCerts = rcs} -> do
-      $logInfoS "serverHandshake/Status{}" "received status"
-      lift (Mod.get (Mod.Proxy @BestBlock)) >>= \(BestBlock bHash _ tdiff) -> do
-        (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
-        when (genHash /= peerGH) $ throwIO WrongGenesisBlock
-        when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-        when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
-        -- we set to 0 cause we dont necessarily know the number yet
-        lift $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-        yield $
-          Right
-            NewStatus
-              { protocolVersion = fromIntegral ethVersion,
-                networkID = computeNetworkID,
-                totalDifficulty = fromIntegral tdiff,
-                latestHash = bHash,
-                genesisHash = genHash,
-                rootCerts = rootCerts'
-              }
-        (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-        (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
-        let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
-        mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
-        yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-        yield . Right $ GetChainDetails []
-        handleGetChainDetails peer S.empty
-        lift stampActionTimestamp
     Just Status {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       $logInfoS "serverHandshake/Status{}" "received status"
       yield

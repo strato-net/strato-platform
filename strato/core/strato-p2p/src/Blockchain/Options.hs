@@ -27,8 +27,6 @@ defineFlag
   \ applicable for transactions received from peers, not\
   \ originating on this node."
 
--- TODO remove distinction between new status messages and old ones once entire protocol is complete
-defineFlag "useNodeCerts" (False :: Bool) "Use new node certificate checking protocol"
 
 defineEQFlag
   "participationMode"
