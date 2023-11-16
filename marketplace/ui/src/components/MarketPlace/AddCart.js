@@ -340,16 +340,18 @@ const Checkout = ({ user }) => {
   };
 
   return (
-    <div className="h-screen mx-14">
+    <>
       {isCreateOrderSubmitting
         ? <LoaderComponent />
         : <div>
           <BreadCrumbComponent />
-          {
-            mapData.length === 0
-              ? <NoProductComponent text={"item"} />
-              : mapData.map((e, index) => <CartComponent key={index} columns={columns} data={e.value} />)
-          }
+          <div className="h-screen mx-14">
+            {
+              mapData.length === 0
+                ? <NoProductComponent text={"item"} />
+                : mapData.map((e, index) => <CartComponent key={index} columns={columns} data={e.value} />)
+            }
+          </div>
         </div>
       }
       <ConfirmOrderModel
@@ -358,7 +360,7 @@ const Checkout = ({ user }) => {
         handleConfirm={handleOrderConfirm}
       />
       {message && openToastOrder("bottom")}
-    </div>
+    </>
   );
 };
 

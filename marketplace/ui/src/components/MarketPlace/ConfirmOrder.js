@@ -323,6 +323,11 @@ const ConfirmOrder = () => {
     }
   }, [inventoryDispatch, data]);
 
+  const handleBreadCrumb = (e, url) => {
+    e.preventDefault()
+    navigate(url)
+  }
+
   const activeButtonClass = "cursor-pointer justify-center flex items-center w-44 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white mr-4";
   const disabledButtonClass = "cursor-not-allowed justify-center flex items-center w-44 h-9  border border-[#999999] rounded bg-[#cccccc] text-[#666666] mr-4";
 
@@ -333,15 +338,13 @@ const ConfirmOrder = () => {
       ) : (
         <div className="pb-20">
           <Breadcrumb>
-            {/* eslint-disable-next-line no-script-url */}
-            <Breadcrumb.Item href="javascript:;">
-              <ClickableCell href={routes.Marketplace.url}>
+            <Breadcrumb.Item href="" onClick={(e) => { handleBreadCrumb(e, routes.Marketplace.url) }}>
+              <ClickableCell >
                 Home
               </ClickableCell>
             </Breadcrumb.Item>
-            {/* eslint-disable-next-line no-script-url */}
-            <Breadcrumb.Item href="javascript:;">
-              <ClickableCell href={routes.Checkout.url}>
+            <Breadcrumb.Item href="" onClick={(e) => { handleBreadCrumb(e, routes.Checkout.url) }}>
+              <ClickableCell >
                 Checkout
               </ClickableCell>
             </Breadcrumb.Item>
@@ -351,6 +354,7 @@ const ConfirmOrder = () => {
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
+
           <div className="mt-4">
             <DataTableComponent
               isLoading={false}
@@ -484,7 +488,8 @@ const ConfirmOrder = () => {
                       label="Address Line 1"
                       name="addressLine1"
                       className="w-72"
-                    ><>
+                    >
+                      <>
                         <TextArea
                           rows={3}
                           name="addressLine1"
@@ -633,7 +638,8 @@ const ConfirmOrder = () => {
                               label="Address Line 1"
                               name="addressLine1"
                               className="w-72"
-                            ><>
+                            >
+                              <>
                                 <TextArea
                                   rows={3}
                                   name="addressLine1"
