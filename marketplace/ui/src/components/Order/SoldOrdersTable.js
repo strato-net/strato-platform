@@ -11,6 +11,7 @@ import DataTableComponent from "../DataTableComponent";
 import { actions as orderActions } from "../../contexts/order/actions";
 // Dispatch and States
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { useAuthenticateState } from "../../contexts/authentication/index";
 // Utils, Constants,
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import { getStringDate } from "../../helpers/utils";
@@ -25,6 +26,7 @@ const SoldOrdersTable = ({ user }) => {
 
   const dispatch = useOrderDispatch();
   const { ordersSold, isordersSoldLoading } = useOrderState();
+  const { isCheckingAuthentication } = useAuthenticateState();
 
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
@@ -171,7 +173,7 @@ const SoldOrdersTable = ({ user }) => {
       <DataTableComponent
         columns={column}
         data={data}
-        isLoading={isordersSoldLoading}
+        isLoading={isordersSoldLoading || isCheckingAuthentication}
         pagination={false}
         // naviroute={routes.SoldOrderDetails.url}
         scrollX="100%"

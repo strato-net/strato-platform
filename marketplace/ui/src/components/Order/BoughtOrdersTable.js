@@ -14,6 +14,7 @@ import { getStringDate } from "../../helpers/utils";
 import { actions as orderActions } from "../../contexts/order/actions";
 // Dispatch and States
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { useAuthenticateState } from "../../contexts/authentication/index";
 // Utils, Constants.
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
@@ -21,7 +22,9 @@ import helper from "../../helpers/helper.json";
 const { orderTableFilter } = helper;
 
 const BoughtOrdersTable = ({ user }) => {
+  const navigate = useNavigate();
   const dispatch = useOrderDispatch();
+
   const debouncedSearchTerm = useDebounce("", 1000);
   const limit = 10;
   const [offset, setOffset] = useState(0);
@@ -29,6 +32,7 @@ const BoughtOrdersTable = ({ user }) => {
   const [page, setPage] = useState(1);
 
   const { orders, isordersLoading } = useOrderState();
+  const { isCheckingAuthentication } = useAuthenticateState();
 
   useEffect(() => {
     if (user?.organization) {
@@ -42,7 +46,7 @@ const BoughtOrdersTable = ({ user }) => {
     }
   }, [dispatch, limit, offset, debouncedSearchTerm, user?.organization]);
 
-  const navigate = useNavigate();
+  
   const [data, setdata] = useState([]);
   useEffect(() => {
 
@@ -172,7 +176,7 @@ const BoughtOrdersTable = ({ user }) => {
         columns={column}
         data={data}
         pagination={false}
-        isLoading={isordersLoading}
+        isLoading={isordersLoading || isCheckingAuthentication}
         // naviroute={routes.BoughtOrderDetails.url}
         scrollX="100%"
       />
