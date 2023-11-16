@@ -2,8 +2,11 @@ import { useState } from "react"
 import { useIdleTimer } from "react-idle-timer"
 import { actions } from "../contexts/authentication/actions";
 import { useAuthenticateDispatch, useAuthenticateState } from "../contexts/authentication";
+import { useNavigate } from "react-router-dom";
+import routes from "./routes";
 
 export const useIdleTimeout = ({ onIdle, idleTime }) => {
+    const navigate = useNavigate();
     const authDispatch = useAuthenticateDispatch();
     const { user } = useAuthenticateState();
     const idleTimeout = 60000 * idleTime;
@@ -11,7 +14,8 @@ export const useIdleTimeout = ({ onIdle, idleTime }) => {
     const handleIdle = () => {
         if (user) {
             setIdle(true);
-            actions.logout(authDispatch);
+            // actions.logout(authDispatch);
+            navigate(routes.Marketplace.url);
         }
     }
     const idleTimer = useIdleTimer({
