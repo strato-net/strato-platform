@@ -72,9 +72,10 @@ const ProcessingOrder = () => {
       if (response.status === RestStatus.OK) {
         if (JSON.parse(body.data.metadata.cart) !== {}) {
           if (body.data["payment_status"] === "paid") {
+            const customerEmail = body.data["customer_details"]["email"];
             const cart = JSON.parse(body.data.metadata.cart);
             let object = { paymentSessionId: sessionId, ...cart };
-            handleOrderConfirm(object);
+            handleOrderConfirm(object, customerEmail);
           }
         }
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
@@ -96,7 +97,7 @@ const ProcessingOrder = () => {
 
 
 
-  const handleOrderConfirm = async (cartData) => {
+  const handleOrderConfirm = async (cartData, customerEmail) => {
     let htmlContents = [];
     
     let customerFirstName = cartData.user.split(" ")[0];
@@ -124,53 +125,46 @@ const ProcessingOrder = () => {
     }
     
     // const allItemsAreNickelReserve = cartData.orderList.every((obj) => obj.subCategory === "Nickel Reserve");
-    const index = cartData.orderList.findIndex(obj => obj.subCategory === "Nickel Reserve");
+    // const index = cartData.orderList.findIndex(obj => obj.subCategory === "Nickel Reserve");
     
-    if (index !== -1) {
-      let nickel = {};
-      let orderItem = cartData.orderList[index];
-      nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
-      nickel.itemQty = orderItem.quantity;
-      nickel.itemName = orderItem.name;
-      htmlContents.push(generateHtmlContentNickel(customerFirstName, nickel ));
-      // if cartData orderlist has more than one item, use generateHtmlContent to populate htmlContents
-      if (cartData.orderList.length > 1) {
-        htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
-      }
-    } else {
-      htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
-    }
+    // if (index !== -1) {
+    //   let nickel = {};
+    //   let orderItem = cartData.orderList[index];
+    //   nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
+    //   nickel.itemQty = orderItem.quantity;
+    //   nickel.itemName = orderItem.name;
+    //   htmlContents.push(generateHtmlContentNickel(customerFirstName, nickel ));
+    //   // if cartData orderlist has more than one item, use generateHtmlContent to populate htmlContents
+    //   if (cartData.orderList.length > 1) {
+    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+    //   }
+    // } else {
+    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+    // }
+
+    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
 
     // Prepare order data to be sent to order controller
     const orderList = cartData.orderList.map(c => {
-      return {
-        inventoryId: c.inventoryId,
-        quantity: c.quantity,
-        subCategory: c.subCategory
-      }
+      return c.saleAddress;
     });
     
     const body = {
-      buyerOrganization: cartData.buyerOrganization,
-      orderList: orderList,
-      orderTotal: cartData.orderTotal,
-      paymentSessionId: cartData.paymentSessionId,
+      saleAddresses: orderList,
+      sellerCommonName: cartData.orderList[0].sellerCommonName,
+      totalPrice: cartData.orderTotal,
       shippingAddress: cartData.shippingAddress,
-      to: cartData.email,
+      paymentSessionId: cartData.paymentSessionId,
+      to: customerEmail,
       subject: "Your Order Confirmation",
       htmlContents: htmlContents,
-    };
+    }
 
-
-    let isDone = await orderActions.createOrder(orderDispatch, body);
+    let isDone = await orderActions.createSale(orderDispatch, body);
     if (isDone) {
-      let orderItemAddress = [];
-      cartData.orderList.forEach(c => {
-        orderItemAddress.push(c.inventoryId);
-      });
       let updatedCart = [];
       storedData.forEach(cart => {
-        if (!orderItemAddress.includes(cart.product.address)) {
+        if (!orderList.includes(cart.product.sale)) {
           updatedCart.push(cart);
         }
       });

@@ -389,10 +389,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, fulfillmentDate, ...restArgs } = args;
+  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, comments, ...restArgs } = args;
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.transferOwnership(rawAdmin, contract, options, fulfillmentDate);
+    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
+  }
+
+  contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, fulfillmentDate, comments, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.transferOwnership(rawAdmin, contract, options, fulfillmentDate, comments);
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
@@ -496,94 +502,96 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(error.response.status, error.response.statusText)
     }
   }
-  // //-----------------------------Order starts here -------------------------------
+  // //-----------------------------PAYMENT starts here -------------------------------
 
-  // //TODO implement payment contract creation inside dapp and use payment services there
-  // contract.paymentCheckout = async function (args, options = defaultOptions) {
-  //   try {
+  contract.paymentCheckout = async function (args, options = defaultOptions) {
+    try {
 
-  //     const { buyerOrganization, orderList, orderTotal: recievedOrderTotal } = args;
+      const { orderList, orderTotal: recievedOrderTotal } = args;
 
-  //     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //     // TODO
+      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
-  //     const inventoriesAddresses = orderList.map(order => order.inventoryId);
-  //     const inventoriesList = await managers.productManager.getInventories({ address: inventoriesAddresses }, newOptions);
+      const saleAddresses = orderList.map(o => o.saleAddress);
 
-  //     if (inventoriesList.length == 0 || inventoriesList.length != orderList.length) {
-  //       throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
-  //     }
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddresses }, options);
+      const assetAddresses = sales.map(sale => {
+        return sale.assetToBeSold;
+      })
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
 
-  //     const inventoryOrganization = inventoriesList[0].ownerOrganization;
-  //     for (const curr_inventory of inventoriesList) {
+      if (assets.length == 0 || assets.length != orderList.length) {
+        throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
+      }
 
-  //       if (curr_inventory.ownerOrganization == userOrganization) {
-  //         throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
-  //       }
+      const itemData = JSON.parse(assets[0].data);
 
-  //       /* User shouldn't be allowed buy products from multiple sellers  */
-  //       if (inventoryOrganization != curr_inventory.ownerOrganization) {
-  //         throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
-  //       }
-  //     }
-  //     // const chainOptions = { ...options, chainIds: [contract.chainId] };
-  //     const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
-  //       {
-  //         name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
-  //         accountDeauthorized: false
-  //       },
-  //       newOptions)
+      const inventoryOrganization = itemData.ownerOrganization;
+      const sellerName = assets[0].ownerCommonName;
+      for (const currInventory of assets) {
 
-  //     /*  check if an accountId already exists for the user org */
-  //     if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
-  //       throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
-  //     }
+        if (currInventory.ownerCommonName == userCert.commonName) {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
+        }
 
-  //     const productAddresses = inventoriesList.map(d => d.productId)
-  //     const productList = await managers.productManager.getProducts({ address: productAddresses }, newOptions);
+        /* User shouldn't be allowed buy products from multiple sellers  */
+        if (sellerName != currInventory.ownerCommonName) {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
+        }
+      }
+      // const chainOptions = { ...options, chainIds: [contract.chainId] };
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
+        {
+          name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
+          accountDeauthorized: false
+        },
+        newOptions)
+      
+      console.log("sellerStripeDetails", sellerStripeDetails);
 
-  //     const invoices = []; let calculatedOrderTotal = 0
+      /*  check if an accountId already exists for the user org */
+      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
+      }
 
-  //     orderList.forEach(orderLine => {
-  //       const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
-  //       const product = productList.find(item => item.address === inventoryItem.productId)
-  //       invoices.push({ productName: decodeURIComponent(product.name), unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
+      const invoices = []; let calculatedOrderTotal = 0
 
-  //       calculatedOrderTotal += (inventoryItem.pricePerUnit * orderLine.quantity)
-  //     })
+      orderList.forEach(item => {
+        const inventoryItem = assets.find(asset => asset.sale == item.saleAddress)
+        invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity })
 
-  //     if (calculatedOrderTotal != recievedOrderTotal) {
-  //       throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.")
-  //     }
-  //     let stripePaymentSession;
-  //     try {
+        calculatedOrderTotal += (inventoryItem.price * item.quantity)
+      })
 
-  //       stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
-  //     } catch (err) {
-  //       throw new rest.RestError(err.statusCode, err.message)
-  //     }
-  //     const paymentParameters = {
+      if (calculatedOrderTotal != recievedOrderTotal) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.")
+      }
+      let stripePaymentSession;
+      try {
+        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
+      } catch (err) {
+        throw new rest.RestError(err.statusCode, err.message)
+      }
+      const paymentParameters = {
+        paymentSessionId: stripePaymentSession.id,
+        paymentProvider: "stripe",
+        paymentStatus: stripePaymentSession.payment_status,
+        sessionStatus: stripePaymentSession.status,
+        amount: stripePaymentSession.amount_total.toString(),
+        expiresAt: stripePaymentSession.expires_at,
+        createdDate: stripePaymentSession.created,
+        sellerAccountId: sellerStripeDetails.accountId
+      }
+      const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
+      return stripePaymentSession
 
-  //       paymentSessionId: stripePaymentSession.id,
-  //       paymentProvider: "stripe",
-  //       paymentStatus: stripePaymentSession.payment_status,
-  //       sessionStatus: stripePaymentSession.status,
-  //       amount: stripePaymentSession.amount_total.toString(),
-  //       expiresAt: stripePaymentSession.expires_at,
-  //       createdDate: stripePaymentSession.created,
-  //       sellerAccountId: sellerStripeDetails.accountId
-  //     }
-  //     const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
-  //     return stripePaymentSession
-
-  //   } catch (error) {
-  //     console.log(error);
-  //     if (error.response) {
-  //       throw new rest.RestError(error.response.status, error.response.statusText);
-  //     }
-  //     throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
-  //   }
-  // };
+    } catch (error) {
+      console.log(error);
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
+    }
+  };
 
   contract.updatePayment = async function (args, options = defaultOptions, token) {
     try {

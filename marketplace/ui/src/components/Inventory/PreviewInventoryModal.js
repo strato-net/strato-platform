@@ -9,7 +9,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
   const [quantity, setQuantity] = useState(1);
 
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
 
   const subtract = () => {
@@ -107,7 +107,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               <div className="flex justify-center mt-16">
               <Button
                         className="h-11 bg-primary text-white w-9/12"
-                        disabled
+                        disabled={user?.commonName === inventory.ownerCommonName}
                         onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             window.location.href = loginUrl;
@@ -120,7 +120,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               
                 <Button
                         className="h-11 bg-primary text-white w-9/12 ml-4"
-                        disabled
+                        disabled={user?.commonName === inventory.ownerCommonName}
                         onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             window.location.href = loginUrl;

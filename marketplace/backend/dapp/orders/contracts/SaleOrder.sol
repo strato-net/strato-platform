@@ -12,7 +12,8 @@ contract SaleOrder is Order {
         address _purchasersAddress,
         uint _createdDate,
         uint _totalPrice,
-        address _shippingAddress
+        address _shippingAddress,
+        string _paymentSessionId
     ) external Order(
         _orderId, 
         _saleAddresses, 
@@ -21,7 +22,8 @@ contract SaleOrder is Order {
         _purchasersAddress, 
         _createdDate, 
         _totalPrice,
-        _shippingAddress
+        _shippingAddress,
+        _paymentSessionId
         ){
 
     }

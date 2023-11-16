@@ -185,6 +185,8 @@ abstract contract Order is RestStatus, OrderStatus {
     OrderStatus public status;
     address public shippingAddress;
     uint public fulfillmentDate;
+    string public paymentSessionId;
+    string public comments;
 
     constructor(
         uint _orderId,
@@ -194,7 +196,8 @@ abstract contract Order is RestStatus, OrderStatus {
         address _purchasersAddress,
         uint _createdDate,
         uint _totalPrice,
-        address _shippingAddress
+        address _shippingAddress,
+        string _paymentSessionId
     ) external{
         orderId = _orderId;
         saleAddresses = _saleAddresses;
@@ -205,15 +208,25 @@ abstract contract Order is RestStatus, OrderStatus {
         totalPrice = _totalPrice;
         status = OrderStatus.AWAITING_FULFILLMENT;
         shippingAddress = _shippingAddress;
+        paymentSessionId = _paymentSessionId;
+        comments = "";
+    }
+
+    function cancelOrder(string _comments) external returns (uint) {
+        require(tx.origin == purchasersAddress, "Only the purchaser can cancel the order");
+        status = OrderStatus.CANCELED;
+        comments = _comments;
+        return RestStatus.OK; 
     }
     
-    function transferOwnership(uint _fulfillmentDate) external returns (uint) {
+    function transferOwnership(uint _fulfillmentDate, string _comments) external returns (uint) {
         fulfillmentDate = _fulfillmentDate;
         for (uint i = 0; i < saleAddresses.length; i++) {
             Sale sale = Sale(saleAddresses[i]);
             // Perform the ownership transfer
             sale.transferOwnership(purchasersCommonName, purchasersAddress, orderId);
         }
+        comments = _comments;
         status = OrderStatus.CLOSED;
         return RestStatus.OK;
     }

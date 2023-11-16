@@ -25,7 +25,7 @@ const { Title, Text, Paragraph } = Typography;
 
 
 const CategoryProductCard = ({ product, category }) => {
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
 
@@ -82,6 +82,10 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const addItemToCart = () => {
+    if (product.ownerCommonName === user?.commonName) {
+      openToast("bottom", true, "Cannot buy your own item");
+      return false;
+    }
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
       if (cartList[i].product.address === product.address) {
@@ -94,6 +98,7 @@ const CategoryProductCard = ({ product, category }) => {
       items = [...cartList, { product, qty }];
       actions.addItemToCart(marketplaceDispatch, items);
       openToast("bottom", false, "Item added to cart");
+      return true;
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
@@ -103,13 +108,14 @@ const CategoryProductCard = ({ product, category }) => {
             actions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
             openToast("bottom", false, "Item updated in cart");
+            return true;
           } else {
             openToast(
               "bottom",
               true,
               "Cannot add more than available quantity"
             );
-            return;
+            return false;
           }
         }
       });
@@ -238,8 +244,9 @@ const CategoryProductCard = ({ product, category }) => {
                             productId: product.productId
                           },
                         });
-                        addItemToCart();
-                        navigate("/checkout");
+                        if (addItemToCart()) {
+                          navigate("/checkout");
+                        }
                       }
                     }}
                   >

@@ -212,7 +212,7 @@ const ProductDetails = ({ user, users }) => {
 
   const ownerSameAsUser = () => {
 
-    if (user && user.organization === inventoryDetails?.ownerOrganization) {
+    if (user?.commonName === inventoryDetails?.ownerCommonName) {
       return true;
     }
 

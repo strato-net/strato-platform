@@ -85,12 +85,12 @@ const SoldOrderDetails = ({ user, users }) => {
   useEffect(() => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.order.status)));
-      setcomment(orderDetails.sellerComments);
+      setcomment(orderDetails.order.comments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
-      if (orderDetails.fulfillmentDate === 0 || orderDetails.fulfillmentDate === null || orderDetails.fulfillmentDate === undefined) {
+      if (orderDetails.order.fulfillmentDate === 0 || orderDetails.order.fulfillmentDate === null || orderDetails.order.fulfillmentDate === undefined) {
         setSelectedDate(null);
       } else {
-        setSelectedDate(dayjs.unix(orderDetails.fulfillmentDate));
+        setSelectedDate(dayjs.unix(orderDetails.order.fulfillmentDate));
       }
 
       let items = [];
@@ -127,7 +127,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.paymentSessionId);
+      getPaymentStatus(data.order.paymentSessionId);
     }
   }
 
@@ -218,6 +218,7 @@ const SoldOrderDetails = ({ user, users }) => {
     body = {
       saleOrderAddress: details.order.address,
       fulfillmentDate: dayjs(selectedDate).unix(),
+      comments: comment,
     };
 
     isDone = await actions.executeSale(dispatch, body);
@@ -568,11 +569,11 @@ const SoldOrderDetails = ({ user, users }) => {
                     selectedDate
                   }
                   disabledDate={(current) => {
-                    const timestamp = Number(details.order.createdDate);
+                    const timestamp = Number(details.order.fulfillmentDate);
                     if (Number.isNaN(timestamp)) {
                       return "";
                     }
-                    const adjustedTime = details.order.createdDate < 1000000000000 ? details.order.createdDate * 1000 : details.order.createdDate;
+                    const adjustedTime = details.order.fulfillmentDate < 1000000000000 ? details.order.fulfillmentDate * 1000 : details.order.fulfillmentDate;
                     const specificDate = dayjs(adjustedTime);
                     const currentDate = dayjs();
                     const selectedDate = dayjs(current);
@@ -580,7 +581,7 @@ const SoldOrderDetails = ({ user, users }) => {
                     return selectedDate.isBefore(specificDate.startOf('day')) || selectedDate.isAfter(currentDate.endOf('day'));
                   }}
                   onChange={onDateChange}
-                  disabled={false}
+                  disabled={details.order.status === "3" || details.order.status === "4"}
                 />
               </div>
             </Row>
@@ -595,7 +596,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   placeholder="Enter Comments"
                   value={decodeURIComponent(comment)}
                   disabled={
-                    orderDetails.status === 3 || orderDetails.status === 4
+                    details.order.status === "3" || details.order.status === "4"
                   }
                   onChange={(event) => {
                     setcomment(encodeURIComponent(event.target.value));

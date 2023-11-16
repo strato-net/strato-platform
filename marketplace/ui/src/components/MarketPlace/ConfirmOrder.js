@@ -363,16 +363,16 @@ const ConfirmOrder = () => {
     confirmOrderList.forEach((item) => {
     // These additional fields need to be sent to form the request after stripe. 
       orderList.push({
-        inventoryId: item.key, 
-        quantity: item.qty,
+        quantity: 1,
         name: item.item.name,
-        unitPrice: item.unitPrice,
-        subCategory: item.subCategory ? item.subCategory : " ",
+        price: item.unitPrice,
+        saleAddress: item.saleAddress,
+        sellerCommonName: item.sellerCommonName,
       });
     });
 
     // These additional fields need to be sent to form the request after stripe. 
-    const body = {
+    let body = {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
@@ -392,37 +392,6 @@ const ConfirmOrder = () => {
       window.location.replace(data.url);
     }
   };
-
-  const handleTestConfirm = async () => {
-    let orderList = [];
-    let sellerCommonName = confirmOrderList[0].sellerCommonName;
-    confirmOrderList.forEach((item) => {
-      orderList.push(item.saleAddress);
-    });
-
-    const body = {
-      saleAddresses: orderList,
-      sellerCommonName: sellerCommonName,
-      totalPrice: total + tax + shipping,
-      shippingAddress: userAddresses[selectedAddress].address,
-    }
-
-    let isDone = await orderActions.createSale(orderDispatch, body);
-
-    if (isDone) {
-      let updatedCart = [];
-      cartList.forEach(cart => {
-        if (!orderList.includes(cart.product.sale)) {
-          updatedCart.push(cart);
-        }
-      });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
-      setTimeout(function () {
-        navigate(`/orders`, { state: { defaultKey: "Bought" } });
-      }, 2000);
-    }
-  };
-
 
   useEffect(() => {
     if (data.length !== 0) {
@@ -786,7 +755,6 @@ const ConfirmOrder = () => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
                     handlePaymentConfirm();
                   }
-                  handleTestConfirm();
                 }}
               >
                 Review and Submit

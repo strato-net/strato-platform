@@ -92,7 +92,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.paymentSessionId);
+      getPaymentStatus(data.order.paymentSessionId);
     }
   }
 
@@ -128,7 +128,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   useEffect(() => {
     if (orderDetails) {
       setStatus(getStatus(parseInt(orderDetails.order.status)));
-      setcomment(orderDetails.buyerComments);
+      setcomment(orderDetails.order.comments);
 
       let items = [];
       orderDetails.assets.forEach((prod) => {
@@ -371,7 +371,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                   rows={2}
                   placeholder="Enter Comments"
                   value={decodeURIComponent(comment)}
-                  disabled={status !== getStatus(1)}
+                  disabled={status !== getStatus(1) || details.order.paymentSessionId !== ""}
                   onChange={(event) => {
                     setcomment(event.target.value);
                   }}
@@ -381,7 +381,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 id="cancel-order-button"
                 type="primary"
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
-                disabled={status !== getStatus(1) || comment === "" || details.paymentSessionId !== ""}
+                disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
                 onClick={() => {
                   handleCancelOrder()
                   TagManager.dataLayer({

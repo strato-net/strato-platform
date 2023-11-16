@@ -173,10 +173,22 @@ class OrderController {
     try {
       const { dapp, body } = req
 
-      OrderController.validateCreateSaleOrderArgs(body)
+      const { to, subject, htmlContents, ...restBody } = body;
 
-      const result = await dapp.createSaleOrder(body)
+      OrderController.validateCreateSaleOrderArgs(restBody)
+
+      const result = await dapp.createSaleOrder(restBody)
       rest.response.status200(res, result)
+
+      // Only send email if order is created successfully
+      if (res.statusMessage === "OK") {
+        //for every item in htmlContents, send email
+        for (let i = 0; i < htmlContents.length; i++) {
+          await sendEmail(to, subject, htmlContents[i]);
+        }
+      }
+
+      console.log("*Buyer placed order*");
 
       return next()
     } catch (e) {
@@ -231,11 +243,11 @@ class OrderController {
     const paymentSchema = Joi.object({
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
-            inventoryId: Joi.string().required(),
             quantity: Joi.number().required(),
             name: Joi.string().required(),
-            subCategory: Joi.string().required(),
-            unitPrice: Joi.number().required(),
+            price: Joi.number().required(),
+            saleAddress: Joi.string().required(),
+            sellerCommonName: Joi.string().required(),
           })).required(),
       orderTotal: Joi.number().required(),
       shippingAddress: Joi.string().required(),
@@ -247,6 +259,7 @@ class OrderController {
     const validation = paymentSchema.validate(args);
 
     if (validation.error) {
+      console.log(validation.error.message);
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Payment Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
@@ -334,6 +347,7 @@ class OrderController {
       sellerCommonName: Joi.string().required(),
       totalPrice: Joi.number().required(),
       shippingAddress: Joi.string().required(),
+      paymentSessionId: Joi.string().required(),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);
@@ -350,6 +364,7 @@ class OrderController {
     const executeSaleSchema = Joi.object({
       saleOrderAddress: Joi.string().required(),
       fulfillmentDate: Joi.number().required(),
+      comments: Joi.string().required(),
     }).required();
 
     const validation = executeSaleSchema.validate(args);
