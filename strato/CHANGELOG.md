@@ -26,6 +26,7 @@ so that they could be properly moved to their respective version's subsection.
 - Contracts that inherit from abstract contracts at the grandparent+ level are indexed in Cirrus at all levels
 
 ### Removed
+- NewStatus message type from strato-p2p
 
 
 ## [10.0.0] - 10/31/2023

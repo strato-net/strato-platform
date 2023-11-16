@@ -909,7 +909,7 @@ addHistoryUnique (o, a, n) =
           <> wrapDoubleQuotes indexName
           <> "\n  ON "
           <> historyName
-          <> " (address, \"chainId\", block_hash, transaction_hash);",
+          <> " (address, block_hash, transaction_hash);",
         "ALTER TABLE "
           <> historyName
           <> " ADD PRIMARY KEY USING INDEX "

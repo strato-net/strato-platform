@@ -96,6 +96,11 @@ const CartComponent = ({ columns, data }) => {
                                     window.location.href = loginUrl;
                                 } else {
                                 actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                                window.LOQ.push(['ready', async LO => {
+                                    // Track an event
+                                    await LO.$internal.ready('events')
+                                    LO.events.track('Submit Order (from cart)')
+                                }])
                                 TagManager.dataLayer({
                                     dataLayer: {
                                       event: 'submit_order_from_cart',

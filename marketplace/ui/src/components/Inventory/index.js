@@ -8,6 +8,7 @@ import {
   Spin,
   Typography,
   Image,
+  Tooltip
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
@@ -74,6 +75,30 @@ const Inventory = ({ user }) => {
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.organization);
   }, [dispatch, user]);
+  
+  useEffect(() => {
+    const placement = 'bottom'; // Set placement to 'bottomCenter'
+  
+    if (stripeStatus !== null && stripeStatus !== undefined) {
+      const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
+      
+      const isOnboardedSuccess = ( chargesEnabled && detailsSubmitted && payoutsEnabled ) 
+      const isOnboardNotStarted = ( !chargesEnabled && !detailsSubmitted && !payoutsEnabled )
+  
+      if (!( isOnboardedSuccess || isOnboardNotStarted ) ) {
+        
+        setTimeout(() => {
+          api.error({
+            key: 1,
+            message: "Something went wrong with your Stripe account.",
+            description: "Please connect again.",
+            onClose: () => actions.resetMessage(dispatch),
+            placement,
+          });
+        }, 1000);
+      }
+    }
+  }, [stripeStatus]);  
 
   useEffect(() => {
     let len = inventories.length;
@@ -176,24 +201,36 @@ const Inventory = ({ user }) => {
                       onboardSeller()
                     }
                   }}
-                  disabled={stripeStatus.detailsSubmitted}
+                  disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
                 >
                   {"Connect Stripe"}
                 </Button>
-                <Button
-                  id="add-inventory-button"
-                  type="primary"
-                  className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      showModal()
-                    }
-                  }}
-                >
-                  Add Inventory
-                </Button>
+                <Tooltip
+                  title={
+                    stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
+                      ? ""
+                      : "Please connect to Stripe first"
+                  }
+                  placement="bottom"
+                  >
+                  <div>
+                    <Button
+                      id="add-inventory-button"
+                      type="primary"
+                      className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
+                      onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          window.location.href = loginUrl;
+                        } else {
+                          showModal()
+                        }
+                      }}
+                      disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+                    >
+                      Add Inventory
+                    </Button>
+                  </div>
+                </Tooltip>
               </div>
             </div>
           ) : (
@@ -218,7 +255,7 @@ const Inventory = ({ user }) => {
                     allowClear
                     onSearch={queryHandle}
                   />
-                  <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
+                  <Button type="primary" className="w-48 mr-3"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
@@ -226,20 +263,33 @@ const Inventory = ({ user }) => {
                         onboardSeller()
                       }
                     }}
+                    disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
                   >
                     {"Connect Stripe"}
                   </Button>
-                  <Button id="add-inventory-button" type="primary" className="w-48"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        showModal()
-                      }
-                    }}
+                  <Tooltip
+                    title={
+                      stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
+                        ? ""
+                        : "Please connect to Stripe first"
+                    }
+                    placement="bottom"
                   >
-                    Add Inventory
-                  </Button>
+                    <div>
+                      <Button id="add-inventory-button" type="primary" className="w-48"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            showModal()
+                          }
+                        }}
+                        disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+                      >
+                        Add Inventory
+                      </Button>
+                    </div>
+                  </Tooltip>
                 </div>
               </div>
               <>
