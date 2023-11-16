@@ -13,7 +13,7 @@ import {
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
 import "./header.css";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import {
   useMarketplaceState,
@@ -21,7 +21,7 @@ import {
 } from "../../contexts/marketplace";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
-import { useAuthenticateDispatch } from "../../contexts/authentication";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 
 const { Title } = Typography;
@@ -29,9 +29,13 @@ const { Header } = Layout;
 
 const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
+  const { isAuthenticated, isCheckingAuthentication } = useAuthenticateState();
   const { cartList } = useMarketplaceState();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -89,6 +93,20 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     });
     userActions.logout(userDispatch);
   };
+
+  useEffect(() => {
+    if (!isAuthenticated && !user && loginUrl) {
+      const unauthorizedRedirectUrls = [
+        '/orders', '/products', '/purchased', '/issued', '/inventories', '/checkout'
+      ];
+
+      const pathName = location.pathname;
+
+      if (unauthorizedRedirectUrls.some(url => pathName.includes(url))) {
+        navigate(routes.Marketplace.url);
+      }
+    }
+  }, [isCheckingAuthentication]);
 
   useEffect(() => {
     let pathName = window.location.pathname;
