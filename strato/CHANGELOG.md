@@ -20,6 +20,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 ### Fixed
 ### Removed
+- NewStatus message type from strato-p2p
 
 
 ## [10.0.0] - 10/31/2023
