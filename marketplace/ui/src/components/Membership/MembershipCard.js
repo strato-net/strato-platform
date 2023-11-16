@@ -1,30 +1,33 @@
 import React, { useEffect, useState } from "react";
-import { useFormik, getIn } from "formik";
-import { Card, Spin, Button, Row, Col, Typography, Image, Modal, Table, Collapse } from "antd";
-import { EditOutlined } from "@ant-design/icons";
-// import DeleteProductModal from "./DeleteProductModal";
-// import UpdateProductModal from "./UpdateProductModal";
-import helperJson from "../../helpers/helper.json"
-import "./membership.css";
-// import routes from "../../helpers/routes";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuthenticateState } from "../../contexts/authentication";
-import dayjs from 'dayjs';
-import ListNowModal from "./ListNowModal";
+import { Carousel } from 'react-responsive-carousel';
+import { useFormik, getIn } from "formik";
 import * as yup from "yup";
+import dayjs from 'dayjs';
+import { Card, Button, Row, Col, Typography, Image, Modal, Table, Collapse } from "antd";
+import { EditOutlined } from "@ant-design/icons";
+// Components
+import ListNowModal from "./ListNowModal";
+import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis"
+// import routes from "../../helpers/routes";
+// Actions
 import { actions as membershipActions } from "../../contexts/membership/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// Dispatch and States
 import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
-import { Carousel } from 'react-responsive-carousel';
-import { forwardArrowIcon, tagIcon } from "../../images/SVGComponents";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useAuthenticateState } from "../../contexts/authentication";
+// Images, Icons, css, configs, 
+import helperJson from "../../helpers/helper.json"
 import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
-import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { listNowConfig } from "../MarketPlace/listNowConfig";
-import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis"
-const { purchasedCardColumn, statusColor, statusText } = helperJson;
+import { forwardArrowIcon, tagIcon } from "../../images/SVGComponents";
+import 'react-responsive-carousel/lib/styles/carousel.min.css';
+import "./membership.css";
+import LoaderComponent from "../Loader/LoaderComponent";
 
+const { purchasedCardColumn, statusColor, statusText } = helperJson;
 const { Panel } = Collapse;
 const { Text, Paragraph, Title } = Typography;
 
@@ -52,8 +55,8 @@ const MembershipCard = ({
 }) => {
   const inventoryDispatch = useInventoryDispatch();
   const membershipDispatch = useMembershipDispatch();
-  const membershipState = useMembershipState()
-  const { type } = useParams()
+  const membershipState = useMembershipState();
+  const { type } = useParams();
   // const isIssued = type === "issued";
   // const isPurchased = type === "purchased";
   const {
@@ -94,7 +97,6 @@ const MembershipCard = ({
     });
   };
 
-
   const formik = useFormik({
     initialValues: initialValues,
     validationSchema: getSchema(visible),
@@ -106,7 +108,6 @@ const MembershipCard = ({
     },
     enableReinitialize: true,
   });
-
 
   const updateCol = (inv, texts) => (<Row
     style={{ justifyContent: 'space-between' }}>
@@ -254,7 +255,7 @@ const MembershipCard = ({
     }
   };
 
-  const inventoriesCol = (Inventories && Inventories.length == 0) ? "red" : "green";
+  const inventoriesCol = (Inventories && Inventories.length === 0) ? "red" : "green";
   const cardDetail = [
     { label: "Sub Category", value: subCategory, visible: true },
     { label: "Company Name", value: manufacturer, visible: true },
@@ -270,9 +271,7 @@ const MembershipCard = ({
   return (
     <>
       {state === null ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin />
-        </div>
+        <LoaderComponent />
       ) : (
         <Card className="w-full mt-6 border-grey card-shadow" id="product" key={membershipId}>
           <Col span={24} style={{ padding: "0px" }}>
@@ -283,7 +282,7 @@ const MembershipCard = ({
                     {membership?.productName ?? "--"}
                   </Text>
                 </Row>
-                <Row className="lh-20" type={status == 1 ? 'success' : 'danger'} level={4}>
+                <Row className="lh-20" type={status === 1 ? 'success' : 'danger'} level={4}>
                   <Col className="m-tp-5 w-2.5 h-2.5 rounded-md" style={{
                     borderRadius: '10%', backgroundColor: `${(status && statusColor[status]) ?? inventoriesCol} `,
                   }} > </Col>
@@ -329,7 +328,7 @@ const MembershipCard = ({
                     })}
                   </Carousel>}
 
-                {availableQuantity == 0 ? "" : <Button
+                {availableQuantity === 0 ? "" : <Button
                   block={true}
                   className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
                   onClick={() => {
@@ -349,8 +348,8 @@ const MembershipCard = ({
                       openListNowModal(configCase);
                     }
                   }}
-                  type={availableQuantity == 0 ? "default" : "primary"}
-                  disabled={availableQuantity == 0 ? true : false}
+                  type={availableQuantity === 0 ? "default" : "primary"}
+                  disabled={availableQuantity === 0 ? true : false}
                 >
                   <Row className="mx-auto w-full text-sm font-semibold">
                     <Col className="w-28 mx-auto flex justify-between item-center">
@@ -362,7 +361,6 @@ const MembershipCard = ({
                     </Col>
                   </Row>
                 </Button>}
-                {/* : null} */}
               </Col>
               <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17, offset: 1 }}
                 className={`border-grey shadow-lg leading-2 min-h-min rounded p-4 ${isMembershipNumber ? "h-52" : "h-40"}`}>

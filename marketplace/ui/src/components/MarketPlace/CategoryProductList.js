@@ -51,8 +51,8 @@ const CategoryProductList = ({ user }) => {
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [maxPrice, setMaxPrice] = useState(MAX_PRICE);
   const [minPrice, setMinPrice] = useState(0);
-  const [maxQty, setMaxQty] = useState(MAX_QUANTITY);
-  const [minQty, setMinQty] = useState(0);
+  const maxQty = MAX_QUANTITY;
+  const minQty = 0;
   const debouncedMaxQty = useDebounce(maxQty, 1000);
   const debouncedMinQty = useDebounce(minQty, 1000);
   const debouncedMaxPrice = useDebounce(maxPrice, 1000);
