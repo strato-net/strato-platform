@@ -49,6 +49,7 @@ import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Database.Persist.Postgresql as SQL
 import Database.Persist.TH
+import GHC.Bits (xor)
 import qualified LabeledError
 import Network.URI (URI (..), URIAuth (..))
 import qualified Network.URI as URI
@@ -220,11 +221,11 @@ instance Mod.Accessible UnbondedPeers IO where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime, PPeerEnableTime SQL.<. currentTime] []
 
-instance A.Selectable IPAsText ClosestPeers IO where
-  select _ (IPAsText requesterIP) = withGlobalSQLPool $ \sqldb ->
+instance A.Selectable Point ClosestPeers IO where
+  select _ point = withGlobalSQLPool $ \sqldb ->
     fmap (Just . ClosestPeers . map SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectList [PPeerIp SQL.!=. requesterIP, PPeerPubkey SQL.!=. Nothing] []
+        SQL.selectList [PPeerPubkey SQL.!=. Just point] []
 
 instance A.Replaceable PPeer UdpEnableTime IO where
   replace _ peer' (UdpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do
@@ -491,15 +492,14 @@ pointToNodeID PointO = error "called pointToNodeID with PointO, we can't handle 
 pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256ToBytes (fromInteger y)
 
 getPeersClosestTo ::
-  ( A.Selectable IPAsText ClosestPeers m
+  ( A.Selectable Point ClosestPeers m
   , Mod.Accessible ValidatorAddresses m
   ) =>
   NodeID ->
-  T.Text ->
-  Point -> -- what am I supposed to do with this?
+  Point ->
   m [PPeer]
-getPeersClosestTo targetNID requesterIP _ = do 
-    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) (IPAsText requesterIP)
+getPeersClosestTo targetNID requesterPubkey = do 
+    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) requesterPubkey
     ValidatorAddresses valAdds <- Mod.access (Mod.Proxy @ValidatorAddresses)
     let targetPt = nodeIDToPoint targetNID
         (vals, nonvals) = Set.partition (\p -> (fromPublicKey . pointToSecPubKey . fromJust $ pPeerPubkey p) `elem` valAdds) peers
@@ -507,12 +507,13 @@ getPeersClosestTo targetNID requesterIP _ = do
       Set.toList vals ++
       (take 20 . 
       sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) ((dist targetPt (pPeerPubkey peerB)))) $
-      Set.toList nonvals) --more efficient way?
+      Set.toList nonvals) -- how efficient is this?
       
   where 
     dist :: Point -> Maybe Point -> B.ByteString
-    dist (Point x1 y1) (Just (Point x2 y2)) = -- pythagorean theorem is overrated
-      word256ToBytes (fromInteger . abs $ x2 - x1) <> word256ToBytes (fromInteger . abs $ y2 - y1)
+    dist p1@(Point _ _) (Just p2@(Point _ _)) = -- xor of the points
+      B.packZipWith xor (pointToBytes p1) (pointToBytes p2)
+      -- word256ToBytes (fromInteger . abs $ x2 - x1) <> word256ToBytes (fromInteger . abs $ y2 - y1)
     dist _ _ = B.pack $ replicate 64 0xFF -- this case should never happen but just in case, make it the max distance possible
 
 updateLastMessage ::

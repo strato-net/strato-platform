@@ -166,7 +166,7 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
       Just (PeerBondingState b) | b > 1 -> do
         time <- liftIO $ round `fmap` getPOSIXTime
         let nextTime = time + 50
-        peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
+        peers <- getPeersClosestTo targetPubkey otherPubKey
         let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
         mPeer <- getPeerByIP' ip
         sendPacket (fromJust mPeer) $ Neighbors theNeighbors nextTime

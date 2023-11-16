@@ -84,7 +84,7 @@ instance Monad m => Accessible TCPPort (ReaderT ContextLite m) where
 instance MonadIO m => Accessible ValidatorAddresses (ReaderT ContextLite m) where
   access _ = RBDB.withRedisBlockDB $ ValidatorAddresses <$> RBDB.getValidatorAddresses
 
-instance MonadIO m => A.Selectable IPAsText ClosestPeers (ReaderT ContextLite m) where
+instance MonadIO m => A.Selectable Point ClosestPeers (ReaderT ContextLite m) where
   select p ip = liftIO $ A.select p ip
 
 instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m) where
@@ -211,7 +211,7 @@ type MonadDiscovery m =
     MonadLogger m,
     MonadUnliftIO m,
     Mod.Accessible ValidatorAddresses m,
-    A.Selectable IPAsText ClosestPeers m,
+    A.Selectable Point ClosestPeers m,
     A.Selectable String PPeer m,
     A.Replaceable PPeer PeerUdpDisable m,
     A.Replaceable PPeer T.Text m,

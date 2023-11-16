@@ -1003,12 +1003,12 @@ instance MonadIO m => Mod.Accessible ValidatorAddresses (MonadTest m) where
 instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible ValidatorAddresses (MonadP2PTest m) where
   access = lift . Mod.access
 
-instance MonadIO m => A.Selectable IPAsText ClosestPeers (MonadTest m) where
-  select _ (IPAsText t) = Just . ClosestPeers . filter f . M.elems <$> use stringPPeerMap
+instance MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
+  select _ point = Just . ClosestPeers . filter f . M.elems <$> use pointPPeerMap
     where
-      f p = pPeerIp p /= t && pPeerPubkey p /= Nothing
+      f p = pPeerPubkey p /= Just point
 
-instance A.Selectable IPAsText ClosestPeers m => A.Selectable IPAsText ClosestPeers (MonadP2PTest m) where
+instance A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
   select p = lift . A.select p
 
 instance
