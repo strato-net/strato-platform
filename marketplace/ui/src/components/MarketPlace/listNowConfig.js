@@ -194,7 +194,7 @@ export const listNowConfig = (caseType) => {
             type: "input",
             size: "large",
             disabled: true,
-            hidden: false,
+            hidden: true,
           },
           {
             key: "quantity",
