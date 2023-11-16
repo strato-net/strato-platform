@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import TagManager from "react-gtm-module";
 import {
   Layout,
@@ -15,10 +15,13 @@ import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined } from "@ant-d
 
 import "./header.css";
 import routes from "../../helpers/routes";
-import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
+// Actions
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
-import { useAuthenticateDispatch } from "../../contexts/authentication";
+// Dispatch and States
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
+// icons
 import { blockappLogo } from "../../images/SVGComponents";
 import { setCookie } from "../../helpers/cookie";
 
@@ -27,9 +30,13 @@ const { Header } = Layout;
 
 const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
+  const { isAuthenticated, isCheckingAuthentication } = useAuthenticateState();
   const { cartList } = useMarketplaceState();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
@@ -83,6 +90,20 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     });
     userActions.logout(userDispatch);
   };
+
+  useEffect(() => {
+    if (!isAuthenticated && !user && loginUrl) {
+      const unauthorizedRedirectUrls = [
+        '/order', '/products', '/purchased', '/issued'
+      ];
+
+      const pathName = location.pathname;
+
+      if (unauthorizedRedirectUrls.some(url => pathName.includes(url))) {
+        navigate(routes.Marketplace.url);
+      }
+    }
+  }, [isCheckingAuthentication]);
 
   useEffect(() => {
     let pathName = window.location.pathname;

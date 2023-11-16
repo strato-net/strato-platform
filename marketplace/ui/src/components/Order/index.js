@@ -1,6 +1,6 @@
 import React from "react";
 import { Input, Tabs } from "antd";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
@@ -14,7 +14,6 @@ const Order = ({ user }) => {
   const onChange = (key) => {
     navigate(`/orderList/${key}`)
   };
-  const { state } = useLocation();
 
   return (
     <>
@@ -22,7 +21,7 @@ const Order = ({ user }) => {
       <div>
         <Tabs
           className="mx-16 mt-2"
-          defaultActiveKey={state == null ? type : state.defaultKey}
+          defaultActiveKey={type}
           onChange={onChange}
           tabBarExtraContent={<Search placeholder="Search" className="w-80" />}
           items={[
