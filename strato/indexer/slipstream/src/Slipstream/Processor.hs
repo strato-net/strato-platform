@@ -37,7 +37,6 @@ import Blockchain.Data.AddressStateRef
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
-import Blockchain.Data.RLP
 import Blockchain.Data.TransactionResult
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Account
@@ -73,8 +72,6 @@ import Data.Text.Encoding
 import Data.Traversable (for)
 import Database.PostgreSQL.Typed (PGConnection)
 import qualified Handlers.AccountInfo as Account
-import Handlers.Storage
-import MaybeNamed
 import SelectAccessible ()
 import Slipstream.Data.Action
 import Slipstream.Events
@@ -87,7 +84,6 @@ import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.CodeCollection as CC (contractName)
 import SolidVM.Model.SolidString
-import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
 import Prelude hiding (lookup)
@@ -387,57 +383,13 @@ getMapNamesFromContract c =
 
 getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
 getAbstractParentsFromContract c cc =
-  let parents' = c ^. parents
-      parentContracts = getContractsForParents parents' (cc ^. contracts)
-   in filter ((== AbstractType) . _contractType) parentContracts
-
-resolveNameParts ::
-  ( MonadLogger m,
-    Selectable Account AddressState m,
-    Selectable Word256 ParentChainIds m,
-    Selectable StorageFilterParams [StorageAddress] m
-  ) =>
-  Text ->
-  Text ->
-  Contract ->
-  m (Text, Text, Text)
-resolveNameParts o a c = do
-  let tName = T.pack . _contractName
-  case c ^. importedFrom of
-    Nothing -> pure (o, a, tName c)
-    Just acct ->
-      select (Proxy @AddressState) acct >>= \case
-        Nothing -> do
-          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for account " ++ show acct
-          pure (o, a, tName c)
-        Just s ->
-          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> do
-              let qs =
-                    storageFilterParams
-                      { qsKey = Just $ HexStorage ".:creator",
-                        qsAddress = Just $ acct ^. accountAddress,
-                        qsChainId = Unnamed . ChainId <$> acct ^. accountChainId
-                      }
-              select (Proxy @[StorageAddress]) qs >>= \case
-                Just (sa : _) -> case value sa of
-                  HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe orgHex of
-                    Just (MS.BString orgBS) -> case decodeUtf8' orgBS of
-                      Right o' -> pure (o', T.pack appName, tName c)
-                      Left _ -> do
-                        $logWarnS "resolveNameParts" . T.pack $
-                          ":creator field is not valid UTF8 for account " ++ show acct ++ ": " ++ show orgBS
-                        pure (o, T.pack appName, tName c)
-                    _ -> do
-                      $logWarnS "resolveNameParts" . T.pack $
-                        "Could not RLP decode :creator field for account " ++ show acct ++ ": " ++ show orgHex
-                      pure (o, T.pack appName, tName c)
-                _ -> pure ("", T.pack appName, tName c)
-            _ -> do
-              $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for account " ++ show acct
-              pure (o, a, tName c)
+  -- recursively obtain parent + grandparent contracts
+  -- ex. B is A, C is B, then C should also be A
+  let go [] = []
+      go xs = xs ++ (go $ getContractsForParents (concatMap (^. parents) xs) ccc)
+      ccc = cc ^. contracts
+      parents' = c ^. parents
+   in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
 
 processTheMessages ::
   ( MonadLogger m,
@@ -469,10 +421,6 @@ processTheMessages env conn messages = do
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection
-
-  -- forM :: [a] -> (a -> m b) -> m [b]
-  -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
-  -- m [c]
 
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC g cp ccString
@@ -509,7 +457,8 @@ processTheMessages env conn messages = do
 
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                outputData conn $ createExpandAbstractTable g c nameParts
+                _ <- outputData conn $ createExpandAbstractTable g c nameParts cc
+                return []
               _ -> do
                 outputData conn $ createExpandIndexTable g c nameParts
 
@@ -537,9 +486,10 @@ processTheMessages env conn messages = do
         $logInfoS "processTheMessages" $ "Delegatecall made: " <> T.pack (format d)
         mStorageContract <- select (Proxy @Contract) s
         mCodeContract <- select (Proxy @Contract) c'
-        deferredForeignKeys <- case (,) <$> mStorageContract <*> mCodeContract of
+        mCodeCollection <- select (Proxy @CodeCollection) c' 
+        deferredForeignKeys <- case (,,) <$> mStorageContract <*> mCodeContract <*> mCodeCollection of
           Nothing -> pure []
-          Just (sc, cc) -> do
+          Just (sc, cc, _') -> do
             let c = cc {_contractName = _contractName sc}
                 mapNames = getMapNamesFromContract c
             nameParts <- resolveNameParts o a c
@@ -583,9 +533,10 @@ processTheMessages env conn messages = do
           let cName = T.unpack $ SE.contractName indexContract
           mCC <- lift $ select (Proxy @CodeCollection) (actionAccount row)
           case (,) <$> mCC <*> (Map.lookup cName . _contracts =<< mCC) of
-            Nothing -> pure . Right $ BatchedInserts indexContract [] hs []
+            Nothing -> do
+              $logInfoS "processTheMessages" . T.pack $ "ERROR: Contract not in Code Collection "
+              pure . Right $ BatchedInserts indexContract [] hs []
             Just (cc, c) -> do
-              stateDiff <- rowToMappings row
               let mapNames = getMapNamesFromContract c
                   abstracts = getAbstractParentsFromContract c cc
                   appName =
@@ -593,15 +544,17 @@ processTheMessages env conn messages = do
                       then SE.contractName indexContract
                       else SE.application indexContract
               --get columns for abstract table
+              $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
               abstractColumns <- fmap catMaybes . for abstracts $ \ab -> do
                 (o', a', n') <- lift $ resolveNameParts (SE.organization indexContract) appName ab
                 let tableName = AbstractTableName o' a' n'
                     tableNameText = tableNameToDoubleQuoteText tableName
+                $logInfoS "Row will be inserted into abstract table: " tableNameText
                 mCols <- getTableColumns g tableName
                 pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
-
               $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
               $logDebugLS "History inserts are: " $ show hs
+              stateDiff <- rowToMappings row
               pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
               pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
 
