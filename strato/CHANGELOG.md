@@ -18,6 +18,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Added
 - Debug log flags: API_DEBUG_LOG, SLIPSTREAM_DEBUG_LOG, VM_DEBUG_LOG, API_DEBUG_LOG, FULL_DEBUG_LOG
+- Improved Slipstream logging
 
 ### Changed
 
