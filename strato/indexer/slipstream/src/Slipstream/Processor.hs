@@ -383,9 +383,13 @@ getMapNamesFromContract c =
 
 getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
 getAbstractParentsFromContract c cc =
-  let parents' = c ^. parents
-      parentContracts = getContractsForParents parents' (cc ^. contracts)
-   in filter ((== AbstractType) . _contractType) parentContracts
+  -- recursively obtain parent + grandparent contracts
+  -- ex. B is A, C is B, then C should also be A
+  let go [] = []
+      go xs = xs ++ (go $ getContractsForParents (concatMap (^. parents) xs) ccc)
+      ccc = cc ^. contracts
+      parents' = c ^. parents
+   in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
 
 processTheMessages ::
   ( MonadLogger m,
@@ -417,10 +421,6 @@ processTheMessages env conn messages = do
       transactionResults = [tr | NewTransactionResult tr <- messages]
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection
-
-  -- forM :: [a] -> (a -> m b) -> m [b]
-  -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
-  -- m [c]
 
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC g cp ccString
@@ -537,7 +537,6 @@ processTheMessages env conn messages = do
               $logInfoS "processTheMessages" . T.pack $ "ERROR: Contract not in Code Collection "
               pure . Right $ BatchedInserts indexContract [] hs []
             Just (cc, c) -> do
-              stateDiff <- rowToMappings row
               let mapNames = getMapNamesFromContract c
                   abstracts = getAbstractParentsFromContract c cc
                   appName =
@@ -545,14 +544,17 @@ processTheMessages env conn messages = do
                       then SE.contractName indexContract
                       else SE.application indexContract
               --get columns for abstract table
+              $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
               abstractColumns <- fmap catMaybes . for abstracts $ \ab -> do
                 (o', a', n') <- lift $ resolveNameParts (SE.organization indexContract) appName ab
                 let tableName = AbstractTableName o' a' n'
                     tableNameText = tableNameToDoubleQuoteText tableName
+                $logInfoS "Row will be inserted into abstract table: " tableNameText
                 mCols <- getTableColumns g tableName
                 pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
               $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
               $logDebugLS "History inserts are: " $ show hs
+              stateDiff <- rowToMappings row
               pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
               pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
 

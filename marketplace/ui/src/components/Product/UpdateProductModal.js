@@ -133,7 +133,10 @@ const UpdateProductModal = ({
           },
         }
       }
-
+      window.LOQ.push(['ready', async LO => {
+        await LO.$internal.ready('events')
+        LO.events.track('Update Product')
+      }])
       TagManager.dataLayer({
         dataLayer: {
           event: 'update_product',
