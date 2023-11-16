@@ -16,14 +16,14 @@ import IdleModal from "./components/Header/IdleModal";
 const { Content } = Layout;
 
 const App = () => {
-
   const tagManagerArgs = {
-    gtmId: 'GTM-NHBZ2BX'
+    gtmId: "GTM-NHBZ2BX",
   };
 
   TagManager.initialize(tagManagerArgs);
 
   const { user, loginUrl, users, isAuthenticated } = useAuthenticateState();
+
   const userDispatch = useAuthenticateDispatch();
   const [isIdleModalOpen, setIsIdleModalOpen] = useState(false);
   const handleIdle = () => {
@@ -42,12 +42,23 @@ const App = () => {
     });
     actions.logout(userDispatch);
     setIsIdleModalOpen(false);
-  };
+
+  window.LOQ = window.LOQ || [];
+  window.LOQ.push([
+    "ready",
+    async (LO) => {
+      await LO.$internal.ready("visitor");
+      LO.visitor.identify({
+        email: user.preferred_username || null,
+        name: user.commonName || null,
+      });
+    },
+  ]);
 
   // Using this to delete our returnUrl cookie after login
   if (getCookie('returnUrl') && isAuthenticated) {
     window.location.href = getCookie('returnUrl');
-    delete_cookie('returnUrl');
+    delete_cookie("returnUrl");
   }
 
   // useEffect if path is empty then redirect to marketplace without using navigate
@@ -60,23 +71,27 @@ const App = () => {
 
   useEffect(() => {
     const referrer = document.referrer;
-    const specificReferralURL = 'https://mercatacarbon.com/';
+    const specificReferralURL = "https://mercatacarbon.com/";
 
     if (referrer === specificReferralURL) {
       TagManager.dataLayer({
         dataLayer: {
-          event: 'redirected_from_mercata_carbon',
+          event: "redirected_from_mercata_carbon",
         },
       });
     }
-  }, [])
-
+  }, []);
 
   return (
     <BrowserRouter basename="/marketplace">
       <Layout>
         <UsersProvider>
-          <HeaderComponent isOauth={isAuthenticated} user={user} users={users} loginUrl={loginUrl} />
+          <HeaderComponent
+            isOauth={isAuthenticated}
+            user={user}
+            users={users}
+            loginUrl={loginUrl}
+          />
         </UsersProvider>
         <Content>
           <AuthenticatedRoutes user={user} users={users} />

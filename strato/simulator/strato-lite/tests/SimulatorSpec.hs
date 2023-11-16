@@ -356,7 +356,7 @@ contract A {
       ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
       ifor_ ctxs1 $ \i ctx -> (i, ctx ^. apiChainInfoMap . at chainId) `shouldBe` (i, if i == 2 then Nothing else Just chainInfo')
 
-    xit "can sync a new node to a chain after running multiple transactions on that chain" $ do
+    it "can sync a new node to a chain after running multiple transactions on that chain" $ do
       -- TODO: somehow this test got reverted to a previous faulty state
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
       let validatorAddresses = fromPrivateKey <$> privKeys
@@ -566,7 +566,7 @@ contract A {
     --  ]
     --let connections' = connections ++ connections4
 
-    xit "can register and unregister a cert on the main chain" $ do
+    it "can register and unregister a cert on the main chain" $ do
       -- TODO: use registry at 0x509
       privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 2]
       let globalAdmin = privKeys !! 0
