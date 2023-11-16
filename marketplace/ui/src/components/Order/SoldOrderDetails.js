@@ -569,16 +569,7 @@ const SoldOrderDetails = ({ user, users }) => {
                     selectedDate
                   }
                   disabledDate={(current) => {
-                    const timestamp = Number(details.order.fulfillmentDate);
-                    if (Number.isNaN(timestamp)) {
-                      return "";
-                    }
-                    const adjustedTime = details.order.fulfillmentDate < 1000000000000 ? details.order.fulfillmentDate * 1000 : details.order.fulfillmentDate;
-                    const specificDate = dayjs(adjustedTime);
-                    const currentDate = dayjs();
-                    const selectedDate = dayjs(current);
-
-                    return selectedDate.isBefore(specificDate.startOf('day')) || selectedDate.isAfter(currentDate.endOf('day'));
+                    return current && current < dayjs().endOf('day');
                   }}
                   onChange={onDateChange}
                   disabled={details.order.status === "3" || details.order.status === "4"}
