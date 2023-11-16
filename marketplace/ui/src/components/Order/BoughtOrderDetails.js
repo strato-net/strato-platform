@@ -316,7 +316,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Bought" } }); }}>
+              <div onClick={() => { navigate(routes.Orders.boughtOrders); }}>
                 Orders (Bought)
               </div>
             </Breadcrumb.Item>

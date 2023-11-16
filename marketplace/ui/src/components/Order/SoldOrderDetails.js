@@ -215,7 +215,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const handleUpdateComment = async () => {
 
     let body = {};
-    let isDone=false;
+    let isDone = false;
     for (let i = 0; i < orderDetails.orderLines.length; i++) {
       setselectedProd(orderDetails.orderLines[i]);
 
@@ -235,7 +235,7 @@ const SoldOrderDetails = ({ user, users }) => {
         isDone = await actions.createOrderLineItem(dispatch, body);
       }
     }
-    
+
     body = {};
     if (selectedDate == null) {
       body = {
@@ -475,7 +475,7 @@ const SoldOrderDetails = ({ user, users }) => {
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }); }}>
+              <div onClick={() => { navigate(routes.Orders.soldOrders) }}>
                 Orders (Sold)
               </div>
             </Breadcrumb.Item>

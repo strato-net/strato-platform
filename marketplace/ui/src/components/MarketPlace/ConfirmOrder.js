@@ -5,7 +5,6 @@ import { useFormik } from "formik";
 import * as yup from "yup";
 import {
   Breadcrumb,
-  Typography,
   Row,
   Divider,
   Spin,
@@ -31,14 +30,13 @@ import { actions as orderActions } from "../../contexts/order/actions";
 // Utils, Css, 
 import "./index.css";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+// import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import helper from "../../helpers/helper.json"
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { columnsConfig } from "../Membership/components/ConfirmOrderConfig";
 
 const { confirmOrderInitialValue } = helper;
-const { Text } = Typography;
 const { TextArea } = Input;
 
 const ShippingDetailsSchema = () => {
@@ -289,7 +287,7 @@ const ConfirmOrder = () => {
       });
       marketplaceActions.addItemToCart(marketplaceDispatch, updatedCart);
       setTimeout(function () {
-        navigate(`/orders`, { state: { defaultKey: "Bought" } });
+        navigate(routes.Orders.boughtOrders);
       }, 2000);
     }
   };

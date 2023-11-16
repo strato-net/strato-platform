@@ -20,7 +20,7 @@ import LoaderComponent from "../Loader/LoaderComponent";
 
 const SoldOrderItemDetail = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
- 
+
   const [data, setdata] = useState([]);
   const { state } = useLocation();
 
@@ -40,7 +40,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
   });
 
   useEffect(() => {
-   
+
     if (orderLineDetails) {
       if (orderLineDetails.items) {
         let items = [];
@@ -61,7 +61,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
- 
+
   }, [routeMatch]);
 
   useEffect(() => {
@@ -135,7 +135,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
   const navigate = useNavigate();
 
   return details === null || isOrderLineDetailsLoading ? (
-    <LoaderComponent  />
+    <LoaderComponent />
   ) : (
     <div>
       <div className="flex justify-between items-center mx-14  mt-14">
@@ -146,7 +146,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
             </ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }); }}>
+            <div onClick={() => { navigate(routes.Orders.soldOrders) }}>
               Orders (Sold)
             </div>
           </Breadcrumb.Item>

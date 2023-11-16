@@ -109,7 +109,7 @@ const ProcessingOrder = () => {
         }
       });
       actions.addItemToCart(marketplaceDispatch, updatedCart);
-      navigate(routes.Orders.url, { state: { defaultKey: "Bought" } });
+      navigate(routes.Orders.boughtOrders);
     } else {
       setTimeout(function () {
         navigate(routes.Checkout.url)

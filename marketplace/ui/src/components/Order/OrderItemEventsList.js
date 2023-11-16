@@ -111,7 +111,7 @@ const OrderItemEventsList = () => {
         name: elem['eventTypename'],
         description: elem['eventTypeDescription'],
         date: epochToDate(elem['date']),
-        certifier:elem["certifierName"],
+        certifier: elem["certifierName"],
         certifiedDate: elem['certifiedDate'] ? epochToDate(elem['certifiedDate']) : '',
       }
     });
@@ -129,7 +129,7 @@ const OrderItemEventsList = () => {
             </ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <ClickableCell href={routes.Orders.url}>
+            <ClickableCell href={routes.Orders.soldOrders}>
               Orders
             </ClickableCell>
           </Breadcrumb.Item>
