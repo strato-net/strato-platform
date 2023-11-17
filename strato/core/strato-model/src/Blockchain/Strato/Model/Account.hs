@@ -39,7 +39,6 @@ import Data.Aeson.Types
 import Data.Binary
 import Data.Data
 import Data.Hashable
-import qualified Data.RLP as RLP2
 import Data.Swagger hiding (Format, format, get, put)
 import qualified Data.Swagger as Sw
 import qualified Data.Text as T
@@ -141,11 +140,6 @@ instance ToCapture (Capture "account" Account) where
 instance ToCapture (Capture "contractAccount" Account) where
   toCapture _ = DocCapture "contractAccount" "a STRATO account"
 
-instance RLP2.RLPEncodable Account where
-  rlpEncode (Account a Nothing) = RLP2.rlpEncode a
-  rlpEncode (Account a (Just cid)) = RLP2.Array [RLP2.rlpEncode a, RLP2.rlpEncode cid]
-  rlpDecode (RLP2.Array [a, cid]) = Account <$> (RLP2.rlpDecode a) <*> (Just <$> RLP2.rlpDecode cid)
-  rlpDecode a = flip Account Nothing <$> RLP2.rlpDecode a
 
 instance ToCapture (Capture "userAccount" Account) where
   toCapture _ = DocCapture "userAccount" "a STRATO account"

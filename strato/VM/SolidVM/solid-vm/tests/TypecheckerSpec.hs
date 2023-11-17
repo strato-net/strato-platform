@@ -2123,3 +2123,25 @@ contract qq {
 }
 |]
       trace (show anns) $ length anns `shouldBe` 0
+
+    it "can typecheck a parent contract being set to a child instance" $ do
+      anns <-
+        liftIO $
+          runTypechecker
+            [r|
+
+contract Base { }
+
+contract Child is Base { }
+
+contract qq {
+  constructor() {
+      Base b = Base(new Child());
+      Child c = new Child();
+      // Base d = c;
+      Base e = Base(c);
+      Child f = Child(b);
+  }
+}
+|]
+      anns `shouldBe` []

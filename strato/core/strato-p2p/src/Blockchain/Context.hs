@@ -76,10 +76,9 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Concurrent.Chan.Unagi        as CCCU
+import           Control.Concurrent.Chan.Unagi         as CCCU
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
--- import           Control.Arrow                         ( (***))
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader

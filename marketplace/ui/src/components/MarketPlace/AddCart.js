@@ -47,15 +47,12 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return item.product.taxes ?
-      (item.product.isTaxPercentage ?
-        (Math.ceil((item.product.pricePerUnit * item.qty * item.product.taxes) * 100) / 100).toFixed(2)
-        : (item.product.taxes / 100) * item.qty)
-      : 0;
+    let tax = item.product.taxDollarAmount === 0 ? Math.round(item.product.pricePerUnit * (item.product.taxPercentageAmount / 100)) : (item.product.taxDollarAmount)
+    return tax * item.qty   
   };
 
   const calculateShipping = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
+    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING);
   };
 
   let storedData
@@ -73,7 +70,7 @@ const Checkout = ({ user }) => {
 
   useEffect(() => {
     const map = new Map();
-    for (const obj of cartList) {
+    for (const obj of (cartList || [])) {
       const org = obj.product.ownerOrganization;
       if (!map.has(org)) {
         map.set(org, []);
@@ -85,11 +82,12 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
+        const imgUrl = item.product.productImageLocation?.length > 0 && item.product.productImageLocation[0]
         modifiedValue.push({
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: item.product.productImageLocation[0],
+            image: imgUrl,
             status: item.product.isActive ? "Active" : "Inactive",
           },
           sellerOrganization: item.product.ownerOrganization,
@@ -100,7 +98,7 @@ const Checkout = ({ user }) => {
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.pricePerUnit * item.qty,
+            item.product.isTaxPercentage ? ((item.product.pricePerUnit * item.qty) + calculateTax(item)) : ((item.product.pricePerUnit + item.product.taxes) * item.qty),
           action: item.product.address,
           qty: item.qty,
         });
@@ -109,20 +107,21 @@ const Checkout = ({ user }) => {
       // Return the new object
       return { key: key, value: modifiedValue };
     });
+
     setmapData(mapDataArray)
 
     let t = 0;
-    cartList.forEach((item) => {
+    cartList?.forEach((item) => {
       t += calculateTax(item);
     });
     setTax(t);
     let s = 0;
-    cartList.forEach((item) => {
+    cartList?.forEach((item) => {
       s += calculateShipping(item);
     });
     setShipping(s);
     let sum = 0;
-    cartList.forEach((item) => {
+    cartList?.forEach((item) => {
       sum += item.product.pricePerUnit * item.qty;
     });
     setTotal(sum);
@@ -215,7 +214,7 @@ const Checkout = ({ user }) => {
       render: (text) => {
         let qty = 0;
         let product;
-        cartList.forEach((element) => {
+        cartList?.forEach((element) => {
           if (element.product.address === text) {
             qty = element.qty;
             product = element.product;
@@ -229,7 +228,7 @@ const Checkout = ({ user }) => {
                   return;
                 }
                 let items = [...cartList];
-                cartList.forEach((element, index) => {
+                cartList?.forEach((element, index) => {
                   if (element.product.address === product.address) {
                     if (items[index].qty - 1 <= product.availableQuantity) {
                       items[index].qty -= 1;
@@ -252,7 +251,7 @@ const Checkout = ({ user }) => {
               min={1} value={qty} defaultValue={qty} controls={false}
               onChange={e => {
                 let items = [...cartList];
-                cartList.forEach((element, index) => {
+                cartList?.forEach((element, index) => {
                   if (element.product.address === product.address) {
                     if (e <= product?.availableQuantity) {
                       items[index].qty = e;
@@ -268,7 +267,7 @@ const Checkout = ({ user }) => {
             <div
               onClick={() => {
                 let items = [...cartList];
-                cartList.forEach((element, index) => {
+                cartList?.forEach((element, index) => {
                   if (element.product.address === product.address) {
                     if (items[index].qty + 1 <= product.availableQuantity) {
                       items[index].qty += 1;
@@ -309,7 +308,7 @@ const Checkout = ({ user }) => {
       title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-center">{Math.trunc(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">ACTION</Text>,
@@ -346,7 +345,7 @@ const Checkout = ({ user }) => {
   const handleOrderConfirm = async () => {
     handleCancel();
     let orderList = [];
-    cartList.forEach((item) => {
+    cartList?.forEach((item) => {
       orderList.push({ inventoryId: item.product.address, quantity: item.qty });
     });
     const body = {

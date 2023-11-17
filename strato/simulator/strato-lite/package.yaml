@@ -93,6 +93,7 @@ library:
   - strato-p2p
   - strato-sequencer
   - text
+  - thread-hierarchy
   - time
   - transformers
   - unliftio
