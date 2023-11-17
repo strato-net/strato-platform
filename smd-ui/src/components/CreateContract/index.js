@@ -12,7 +12,7 @@ import {
 } from './createContract.actions';
 import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
-import { Button, Dialog, Popover, PopoverInteractionKind, Position, AnchorButton } from '@blueprintjs/core';
+import { Button, Dialog, Popover, PopoverInteractionKind, Position, AnchorButton, Switch } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -25,10 +25,17 @@ import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
 import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
 import HexText from '../HexText';
+import { useEffect, useState } from 'react';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
 class CreateContract extends Component {
+  constructor(props) {
+    super();
+    this.state = {
+      useWallet: false,
+    };
+  }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.isToasts) {
@@ -57,6 +64,10 @@ class CreateContract extends Component {
       </div>
     );
   };
+
+  toggleWalletUsage = (e) => {
+    this.setState({ useWallet : !this.state.useWallet }, () => {})
+  }
 
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
@@ -174,7 +185,8 @@ class CreateContract extends Component {
       fileText: fileText,
       arguments: args,
       chainId: this.props.selectedChain ? this.props.selectedChain : undefined,
-      metadata: metadata
+      metadata: metadata,
+      useWallet: this.state.useWallet
     };
 
     mixpanelWrapper.track('create_contract_submit_click_successful');
@@ -350,6 +362,19 @@ class CreateContract extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   {this.renderAddress(isModeOauth)}
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Use Wallet
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <Switch
+                    checked={this.state.useWallet}
+                    onChange={this.toggleWalletUsage}
+                  />
                 </div>
               </div>
               {!isModeOauth && <div className="row">

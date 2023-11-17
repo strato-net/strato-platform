@@ -269,7 +269,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         }
         {roleIndex === undefined || roleIndex === 1 ? null : <Badge
           className="cursor-pointer"
-          count={cartList.length}
+          count={cartList?.length}
           onClick={() => {
             setCookie("returnUrl", `/marketplace/checkout`, 10);
             TagManager.dataLayer({

@@ -238,6 +238,10 @@ async function getTopSellingProducts(admin, args = {}, options) {
         ...restArgs
     }, options);
 
+    const productAddressList = products.map((item) => item.address);
+
+    let ownedProductFiles = await productFile.getAll(admin, { productId: productAddressList }, options);
+
     // We will make a map of products with memberships and products without memberships
     const productsWithMembershipsMap = new Map(
         products.filter(product => product.category === "Membership").map(product => [product.address, product])
@@ -295,9 +299,11 @@ async function getTopSellingProducts(admin, args = {}, options) {
     inventoryWithoutMembershipResults.forEach((inventoryBatch, batchIx) => {
         inventoryBatch.forEach(inventory => {
             const product = productsWithoutMembershipsMap.get(inventory.productId);
+            const productImageLocation = ownedProductFiles.filter((item) => item.productId === inventory.productId).map(item => item.fileLocation);
             productWithoutMembership.push({
                 ...product,
                 ...inventory,
+                productImageLocation
             });
         });
     });
@@ -332,6 +338,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
             // Get all the membership services for this membership
             const membershipServices = allMembershipServices?.filter(service => service.membershipId === membership.address);
 
+            const productImageLocation = ownedProductFiles.filter((item) => item.productId === inventory.productId).map(item => item.fileLocation);
             // Build the service data for each membership service
             const membershipData = {
                 services: membershipServices.map(service => {
@@ -353,6 +360,7 @@ async function getTopSellingProducts(admin, args = {}, options) {
             productWithMembership.push({
                 ...product,
                 ...inventory,
+                productImageLocation,
                 membershipId: membership.address,
                 totalSavings: totalSavings,
                 taxes: inventory.taxDollarAmount === 0 ? (

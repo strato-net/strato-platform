@@ -287,7 +287,7 @@ hoistCoreServer blocEnv = hoistServer (Proxy :: Proxy FullAPI) (convertErrors ru
         . runCirrusM
         . flip runReaderT blocEnv
         . runVaultM ("http://localhost:8013/strato/v2.3")
-        . runIdentitytM flags_identityServerUrl
+        . runIdentitytM getIdentityServerUrl
         $ f
 
 fullAPI :: Proxy FullAPI
@@ -298,11 +298,11 @@ main = do
   _ <- $initHFlags "Core API"
 
   -- check if id server connection is valid; only run if using https (unless using localhost)
-  identityUrl <- parseBaseUrl flags_identityServerUrl
+  identityUrl <- parseBaseUrl getIdentityServerUrl
   let allowedIPAddressRegex = "^172.17.((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){1}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
   let matches = matchRegex (mkRegex allowedIPAddressRegex) (baseUrlHost identityUrl)
   if baseUrlScheme identityUrl == Http && not (isJust matches || baseUrlHost identityUrl == "docker.for.mac.localhost")
-    then error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> flags_identityServerUrl
+    then error $ "Will not communicate with the identity server over http unless it is with localhost. Update the idServerUrl: " <> getIdentityServerUrl
     else putStrLn "Identity server url is valid to connect to"
 
   let theDoc =

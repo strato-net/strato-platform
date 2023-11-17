@@ -1,20 +1,22 @@
 {-# LANGUAGE BangPatterns              #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE KindSignatures            #-}
+{-# LANGUAGE MultiWayIf                #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE RankNTypes                #-}
 {-# LANGUAGE TemplateHaskell           #-}
+{-# LANGUAGE TypeFamilies              #-}
 
 module Blockchain.ExtMergeSources
   ( mergeSourcesByForce
   )
 where
 
+import           Control.Concurrent.Hierarchy
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
-import           Control.Monad.Logger
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Resource
 import           Data.Conduit                 as DC
@@ -76,22 +78,23 @@ chanSink :: MonadIO m
 chanSink ch writer = CL.mapM_ $ liftIO . atomically . writer ch
 {-# INLINE chanSink #-}
 
-mergeSourcesByForce :: (MonadLogger mi, MonadResource mi, MonadUnliftIO mi, MonadIO mo)
-                    => [ConduitM () a mi ()] -- sources to merge
-                    -> Int -- ^ bound of the intermediate channel
+mergeSourcesByForce :: (MonadResource mi, Monad mo, MonadUnliftIO mi)
+                    => [ConduitM () a mi ()]
+                    -> Int
+                    -> ThreadMap
                     -> mo (ConduitM () a mi ())
-mergeSourcesByForce sx bound = do
+mergeSourcesByForce sx bound tm =
   return $ do
     (chkey,c) <- allocate (liftSTM $ newTBMChan bound)
                           (liftSTM . closeTBMChan)
-    refcount  <- liftSTM . newTVar $ length sx
-    st        <- lift $ askUnliftIO
-    regs      <- forM sx $ \s -> do
-      register . killThread =<< do
-        (liftIO $ forkIOWithUnmask $ \unmask ->
-          (unmask $ unliftIO st $
-            runConduit $ s .| chanSink c writeTBMChan)
-          `finally` (liftSTM $ decRefcount refcount c))
+    refcount <- liftSTM . newTVar $ length sx
+    st <- lift $ askUnliftIO
+    regs <- forM sx $ \s -> do
+              register . killThread =<<
+                (liftIO $ newChild tm $ \_ ->
+                  (unliftIO st $
+                    runConduit $ s .| chanSink c writeTBMChan)
+                  `finally` (liftSTM $ decRefcount refcount c))
     chanSource c readTBMChan
     release chkey
     traverse_ release regs

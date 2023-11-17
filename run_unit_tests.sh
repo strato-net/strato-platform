@@ -51,6 +51,13 @@ stack test $1\
       source-tools \
       strato-lite
 
+if [ $1 = --coverage ]
+then
+      rm -rf hpc
+      mkdir hpc
+      cp -r $(stack path --local-hpc-root) hpc/
+fi
+
 stack bench vm-runner
 
 stack bench solid-vm

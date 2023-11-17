@@ -97,7 +97,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     description: "",
     price: "",
     quantity: "",
-    isTaxPercentage: true,
+    isTaxPercentage: false,
     taxDollarAmount: 0,
     taxPercentageAmount: 0,
     taxPercentage: 0,
@@ -187,18 +187,6 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
     const updatedServices = [...formik.values.services];
     updatedServices.splice(indexToRemove, 1);
     formik.setFieldValue("services", updatedServices);
-  };
-
-  const handlePriceDiscountClick = (index) => {
-    const updatedMemberDiscount = [...memberDiscount];
-    updatedMemberDiscount[index] = 1;
-    setMemberDiscount(updatedMemberDiscount);
-  };
-
-  const handlePercentDiscountClick = (index) => {
-    const updatedMemberDiscount = [...memberDiscount];
-    updatedMemberDiscount[index] = 2;
-    setMemberDiscount(updatedMemberDiscount);
   };
 
   const handleDocumentChange = (info) => {
@@ -365,8 +353,8 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                   // Status should always be published if we use List Now
                   status: INVENTORY_STATUS.PUBLISHED,
                   serialNumber: [],
-                  taxPercentageAmount: Math.floor(updatedValues.taxPercentageAmount * 100),
-                  taxDollarAmount: Math.floor(updatedValues.taxDollarAmount * 100),
+                  taxPercentageAmount: updatedValues.taxPercentageAmount,
+                  taxDollarAmount: updatedValues.taxDollarAmount,
                 };
 
                 const createInventory = await inventoryActions.createInventory(

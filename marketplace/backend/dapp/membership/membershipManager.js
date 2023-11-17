@@ -33,7 +33,7 @@ async function uploadContract(user, _constructorArgs, options) {
     const copyOfOptions = {
         ...options,
         history: contractName
-      }
+    }
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
@@ -206,7 +206,7 @@ async function uploadContract(user, _constructorArgs, options) {
 
 function marshalIn(_args) {
     const defaultArgs = {};
-   
+
     const args = {
         ...defaultArgs,
         ..._args,
@@ -263,6 +263,7 @@ function bind(user, _contract, options) {
     contract.createMembership = async (args) => createMembership(user, contract, args, options);
     contract.addMembershipOrderFlow = async (args) => addMembershipOrderFlow(user, contract, args, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
+    contract.createServiceUsage = async (args) => createServiceUsage(user, contract, args, options);
     contract.chainIds = options.chainIds;
 
     return contract;
@@ -335,6 +336,31 @@ async function addMembershipOrderFlow(user, contract, args, options) {
     return createMembershipStatus
 }
 
+async function createServiceUsage(user, contract, _args, options) {
+    const callArgs = {
+        contract,
+        method: "addServiceUsage",
+        args: util.usc({
+            ..._args,
+        }),
+    };
+    // const options = {
+    //     ...baseOptions,
+    //     history: [contractName],
+    // };
+
+    const [restStatus, serviceUsageAddress] = await rest.call(
+        user,
+        callArgs,
+        options
+    );
+
+    if (parseInt(restStatus, 10) !== RestStatus.OK)
+        throw new rest.RestError(restStatus, 0, { callArgs });
+
+    return [restStatus, serviceUsageAddress];
+}
+
 export default {
     uploadContract,
     contractName,
@@ -346,5 +372,6 @@ export default {
     addMembershipOrderFlow,
     marshalIn,
     marshalOut,
-    getHistory
+    getHistory,
+    createServiceUsage
 }

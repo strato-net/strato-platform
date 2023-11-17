@@ -139,7 +139,7 @@ export function generateTableColumns({
         {record.editable && !isEdit ? (
           <Select
             disabled={!record.provider && !record.bookedUserAddress}
-            placeholder={"Membership ID"}
+            placeholder={"Membership Number"}
             value={record.itemId}
             suffixIcon={<CaretDownOutlined />}
             style={{ width: 120 }}
@@ -365,7 +365,7 @@ export function generateTableColumns({
         ),
     },
     {
-      title: "Membership ID",
+      title: "Membership Number",
       dataIndex: "itemId",
       key: "itemId",
       render: (text, record, index) =>
