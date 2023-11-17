@@ -308,7 +308,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 timePeriodInMonths: updatedValues.duration,
                 additionalInfo: updatedValues.additionalInformation,
                 // If visible is true the List Now form is open and the membership is active
-                isActive: visible ? true : false,
+                isActive: true,
               },
               membershipServiceArgs: updatedValues.services.map((service) => ({
                 serviceId: service.serviceId,
