@@ -14,9 +14,9 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
 
     // Sale public sale;
     address[] public whitelistedSales;
-    SaleFactory salefactory;
 
-    constructor(string _name, string _description, string[] _images, uint _price, uint _createdDate, SaleState _state, PaymentType _payment) {
+
+    constructor(string _name, string _description, string[] _images, uint _price, uint _createdDate) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         owner  = c.userAddress();
