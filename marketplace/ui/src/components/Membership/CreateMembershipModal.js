@@ -43,6 +43,7 @@ import { useInventoryDispatch } from "../../contexts/inventory";
 import ListNowModal from "./ListNowModal";
 import { INVENTORY_STATUS } from "../../helpers/constants";
 import { checkPrimary, checkSuccess, uploadIcon2, uploadImageIcon } from "../../images/SVGComponents"
+import { listNowConfig } from "../MarketPlace/listNowConfig";
 const { Text, Title } = Typography;
 
 const { Dragger } = Upload;
@@ -840,7 +841,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 <Row className="mt-5">
                   <Col span={24}>
                     <Upload.Dragger
-                     {...props}
+                      {...props}
                       fileList={fileList}
                       // onChange={handleChange}
                       showUploadList={false}
@@ -878,13 +879,13 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
       </Modal>
       {visible && (
         <ListNowModal
+          config={listNowConfig("create")}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
           id="None"
-          listType="New"
           getIn={getIn}
           isCreateMembershipSubmitting={isCreateMembershipSubmitting}
         />

@@ -32,6 +32,7 @@ import DataTableComponent from "../DataTableComponent";
 import useDebounce from "../UseDebounce";
 import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { listNowConfig } from "./listNowConfig";
 import ListNowModal from "../Membership/ListNowModal";
 import * as yup from "yup";
 import { INVENTORY_STATUS } from "../../helpers/constants";
@@ -665,15 +666,15 @@ const MembershipDetails = ({ user, users }) => {
 
         </div>
         )}
-      {visible && (
+     {visible && (
         <ListNowModal
+          config={listNowConfig("resaleMembership")}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
-          listType="Sale"
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
