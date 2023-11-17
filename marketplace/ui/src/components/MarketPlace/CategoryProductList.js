@@ -39,7 +39,7 @@ const CategoryProductList = ({ user }) => {
   // States
   const { marketplaceList, isMarketplaceLoading, isMarketplaceInitialLoading } = useMarketplaceState();
   const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
-  const { hasChecked, isAuthenticated } = useAuthenticateState();
+  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { categorys, isCategorysLoading } = useCategoryState();
 
   const [productList, setProductList] = useState([])
@@ -151,7 +151,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    if (category !== "" && hasChecked && !isAuthenticated) {
+    if (category !== "" && hasChecked && !isAuthenticated && loginUrl) {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -163,7 +163,7 @@ const CategoryProductList = ({ user }) => {
         debouncedMinPrice,
         debouncedMaxPrice
       );
-    } else if (category !== "" && isAuthenticated) {
+    } else if (category !== "" && isAuthenticated && !loginUrl) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
