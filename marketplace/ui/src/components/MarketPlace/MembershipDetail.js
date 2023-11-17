@@ -1,59 +1,67 @@
 import React, { useState, useEffect } from "react";
+import { useMatch, useParams, useNavigate, useLocation } from "react-router-dom";
+import { Carousel } from "react-responsive-carousel";
+import TagManager from "react-gtm-module";
 import { useFormik, getIn } from "formik";
+import * as yup from "yup";
+import dayjs from "dayjs";
 import {
   Row,
   Image,
   Button,
   Typography,
   Tabs,
-  Spin,
   notification,
   Col,
   Card,
-  Table,
 } from "antd";
-import noPreview from "../../images/resources/noPreview.jpg";
-import { useMatch, useParams } from "react-router-dom";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { actions as membershipActions } from "../../contexts/membership/actions";
-import { actions as productActions } from "../../contexts/product/actions";
-import { Carousel } from "react-responsive-carousel";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import routes from "../../helpers/routes";
+
+//Components
+import InformationCard from "../Membership/components/InformationCard";
+import ServiceTabCard from "../Membership/components/ServiceTabCard";
+import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
+import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis";
+// import ToastComponent from "../ToastComponent/ToastComponent";
+import LoaderComponent from "../Loader/LoaderComponent";
+import ListNowModal from "../Membership/ListNowModal";
+//Actions
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
-import { useNavigate, useLocation } from "react-router-dom";
+import { actions as membershipActions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as productActions } from "../../contexts/product/actions";
+// Dispatch and States
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useProductDispatch, useProductState } from "../../contexts/product";
+import { useAuthenticateState } from "../../contexts/authentication";
+// Icons, images, config, routes, utils, constants, css.
+import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
+import noPreview from "../../images/resources/noPreview.jpg";
+import { INVENTORY_STATUS } from "../../helpers/constants";
+import { listNowConfig } from "./listNowConfig";
+import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
 import "./index.css";
-import { useAuthenticateState } from "../../contexts/authentication";
-import ListNowModal from "../Membership/ListNowModal";
-import * as yup from "yup";
-import { INVENTORY_STATUS } from "../../helpers/constants";
-import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
-import BreadCrumbComponent from "../BreadCrumb/BreadCrumbComponent";
-import TagManager from "react-gtm-module";
-import dayjs from "dayjs";
 
+
+const { Text, Paragraph, Title } = Typography;
 const StatusValue = {
   1: "Listed",
   2: "Not Listed",
 };
+const initialValues = {
+  name: "",
+  price: "",
+  quantity: 1,
+};
 
 const MembershipDetails = ({ user }) => {
   const { type } = useParams();
-
   const location = useLocation();
+  const navigate = useNavigate();
+  const { state, pathname } = useLocation();
+
   const queryParams = new URLSearchParams(location.search);
   const inventoryId = queryParams.get("inventoryId");
 
@@ -61,8 +69,6 @@ const MembershipDetails = ({ user }) => {
   const isPurchased = type === "purchased";
   const isMarket = type === "all";
   const isMarketPlace = !isIssued && !isPurchased;
-
-  const { state, pathname } = useLocation();
 
   let isCalledFromMembership = false;
 
@@ -72,13 +78,7 @@ const MembershipDetails = ({ user }) => {
     isCalledFromMembership = state.isCalledFromMembership;
   }
 
-  const initialValues = {
-    name: "",
-    price: "",
-    quantity: 1,
-  };
-
-  const [activeTab, setActiveTab] = useState("Details");
+  const [activeTab, setActiveTab] = useState("details");
   const [serviceList, setServiceList] = useState([]);
   const [savingsList, setSavingsList] = useState([]);
   const [totalSavings, setTotalSavings] = useState(0);
@@ -87,18 +87,24 @@ const MembershipDetails = ({ user }) => {
   const [membershipDetails, setMembershipDetails] = useState(undefined);
   const [allProductFiles, setAllProductFiles] = useState(undefined);
   const [visible, setVisible] = useState(false);
+  const [qty, setQty] = useState(1);
   const limit = 10,
     offset = 0;
   const debouncedSearchTerm = useDebounce("", 1000);
-  const {
-    membershipServices,
-    membership,
-    isInitialLoadMembershipDetail,
-    productFiles,
-  } = useMembershipState();
-  const serviceDispatch = useMembershipDispatch();
 
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  // Dispatch
+  const productDispatch = useProductDispatch();
+  const serviceDispatch = useMembershipDispatch();
+  const inventoryDispatch = useInventoryDispatch();
+  const membershipDispatch = useMembershipDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
+  // States
+  const { membershipServices, membership, isInitialLoadMembershipDetail, productFiles } = useMembershipState();
+  const { inventoryDetails, isCreateInventorySubmitting, isInitialLoadInventoryDetails } = useInventoryState();
+  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { productDetails, isInitialLoadProductDetails } = useProductState();
+  const { cartList } = useMarketplaceState();
+  // 
 
   useEffect(() => {
     if (Id !== undefined) {
@@ -176,21 +182,7 @@ const MembershipDetails = ({ user }) => {
     enableReinitialize: true,
   });
 
-  const { Text, Paragraph, Title } = Typography;
-  const [qty, setQty] = useState(1);
-  const inventoryDispatch = useInventoryDispatch();
-  const membershipDispatch = useMembershipDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const {
-    inventoryDetails,
-    isCreateInventorySubmitting,
-    isInitialLoadInventoryDetails,
-  } = useInventoryState();
-  const productDispatch = useProductDispatch();
-  const { productDetails, isInitialLoadProductDetails } = useProductState();
-  const marketplaceDispatch = useMarketplaceDispatch();
-  const { cartList } = useMarketplaceState();
-  const navigate = useNavigate();
 
   const routeMatch = useMatch({
     path: routes.MarketplaceProductDetail.url,
@@ -259,6 +251,14 @@ const MembershipDetails = ({ user }) => {
     isInitialLoadInventoryDetails,
   ]);
 
+  // const openToast = (placement, isError, msg) => {
+  //   return (<ToastComponent
+  //     message={msg}
+  //     success={!isError}
+  //     placement={placement}
+  //   />)
+  // };
+
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -326,59 +326,6 @@ const MembershipDetails = ({ user }) => {
     }
   };
 
-  const serviceColumn = [
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">Name</Text>
-      ),
-      dataIndex: "serviceName",
-      key: "name",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">
-          Description
-        </Text>
-      ),
-      dataIndex: "serviceDesc",
-      key: "serviceDesc",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">
-          Membership Price
-        </Text>
-      ),
-      dataIndex: "memberPrice",
-      key: "memberPrice",
-      render: (text) => (
-        <p className="text-left">${decodeURIComponent(text)}</p>
-      ),
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">
-          Non-Memberhsip Price
-        </Text>
-      ),
-      dataIndex: "nonMemberPrice",
-      key: "nonMemberPrice",
-      render: (text) => (
-        <p className="text-left">${decodeURIComponent(text)}</p>
-      ),
-    },
-    {
-      title: (
-        <Text className="text-primaryC font-semibold text-base">Uses</Text>
-      ),
-      dataIndex: "uses",
-      key: "uses",
-      render: (text) => <p className="text-left">{decodeURIComponent(text)}</p>,
-    },
-  ];
-
   const closeListNowModal = () => {
     setVisible(false);
   };
@@ -403,29 +350,6 @@ const MembershipDetails = ({ user }) => {
               taxDollarAmount: formik.values.taxDollarAmount,
             },
           };
-          // const inventoryBody = {
-          //   productAddress: membershipDetails.productId,
-          //   quantity: formik.values.quantity,
-          //   pricePerUnit: formik.values.price,
-          //   // Generate random code for now
-          //   batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-          //   // Status should always be published if we use List Now
-          //   status: formik.values.inventoryStatus,
-          //   serialNumber: [],
-          //   taxPercentageAmount: Math.floor(formik.values.taxPercentageAmount),
-          //   taxDollarAmount: Math.floor(formik.values.taxDollarAmount),
-          // };
-          // if (isIssued) {
-          //   const createInventory = await inventoryActions.createInventory(
-          //     inventoryDispatch,
-          //     inventoryBody
-          //   )
-
-          //   if (createInventory) {
-          //     formik.resetForm();
-          //   }
-          //   setVisible(false);
-          // } else {
           const resaleMembership = await membershipActions.resaleMembership(
             membershipDispatch,
             resalePayload
@@ -434,14 +358,9 @@ const MembershipDetails = ({ user }) => {
             formik.resetForm();
           }
           setVisible(false);
-          // }
         }
       }
     }
-  };
-
-  const handleTabChange = (label) => {
-    setActiveTab(label);
   };
 
   const detailTabSchema = [
@@ -450,135 +369,62 @@ const MembershipDetails = ({ user }) => {
       value: inventoryDetails?.ownerOrganization
         ? inventoryDetails?.ownerOrganization
         : productDetails?.ownerOrganization,
+      type: "Text"
     },
     {
       label: "Sub-Category",
       value: inventoryDetails?.subCategory
         ? inventoryDetails?.subCategory
         : productDetails?.subCategory,
+      type: "Text"
     },
     {
       label: `${isDuration ? "Time in Months" : "Expiry Date"}`,
       value: isDuration ? membershipDetails?.timePeriodInMonths : expiryDateVal,
+      type: "Text"
     },
-    // { label: "Additional Info", value: membershipDetails?.additionalInfo }
+    { label: "Additional Info", value: membershipDetails?.additionalInfo, type: "Paragraph" }
   ];
 
-  const DetailTabCard = () => {
-    return (
-      <>
-        <Text className="leading-6 text-lg block font-semibold pb-3">
-          {" "}
-          Information{" "}
-        </Text>
-        <Col
-          xl={{ span: 14 }}
-          className="border-grey shadow-lg leading-2 w-full rounded-md p-4 "
-          style={{ height: "auto", display: "inline-block" }}
-        >
-          {detailTabSchema.map((item, index) => {
-            return (
-              <Paragraph key={index}>
-                <Text disabled className="font-bold font-poppin">
-                  {item.label}
-                </Text>
-                <Text strong className="float-right">
-                  {item.value ?? "--"}
-                </Text>
-              </Paragraph>
-            );
-          })}
-          <Paragraph>
-            <Text disabled className="font-bold font-poppin">
-              Additional Info
-            </Text>
-            <Paragraph
-              ellipsis={{
-                rows: 2,
-                expandable: true,
-                symbol: <Text strong>more</Text>,
-              }}
-              className="float-right text-md font-regular h-auto"
-            >
-              {membershipDetails?.additionalInfo ?? "--"}
-            </Paragraph>
-          </Paragraph>
-          {/* {true && <Paragraph>
-          <Text disabled className="font-bold" >Membership ID</Text>
-          <Text strong className="float-right">membershipId</Text>
-        </Paragraph>} */}
-        </Col>
-      </>
-    );
-  };
+  const description = inventoryDetails?.description
+    ? inventoryDetails?.description
+    : productDetails?.description;
 
-  const ServiceTabCard = () => {
-    return (
-      <Row>
-        <Text className="leading-6 text-lg block font-semibold pb-3">
-          Services
-        </Text>
-        <Col span={24}>
-          <Table
-            className="inventory-table"
-            columns={serviceColumn}
-            dataSource={serviceList}
-            pagination={false}
-            scroll={{ y: 300 }}
-          />
-        </Col>
-        <Text className="leading-6 text-lg block font-semibold pb-3 mt-4">
-          Savings
-        </Text>
-        <hr style={{ color: "grey" }} />
-        <Col span={24} className="max-h-96 overflow-y-auto">
-          <Row>
-            {savingsList.map(({ serviceName, serviceCost }, index) => {
-              return (
-                <Col span={8} key={index}>
-                  <Card className="shadow-md m-2">
-                    <Row className="mt-2">
-                      <Col span={24}>
-                        <Text className="block text-base text-grey font-medium">
-                          Name
-                        </Text>
-                      </Col>
-                      <Col span={24}>
-                        <Text className="block text-lg ">{serviceName}</Text>
-                      </Col>
-                    </Row>
-                    <Row className="mt-2">
-                      <Col span={24}>
-                        <Text className="block text-base text-grey font-medium">
-                          Effective Cost Saving
-                        </Text>
-                      </Col>
-                      <Col span={24}>
-                        <Text
-                          className="block text-lg font-bold"
-                          style={{ color: "green" }}
-                        >
-                          $ {serviceCost ?? "--"}
-                        </Text>
-                      </Col>
-                    </Row>
-                  </Card>
-                </Col>
-              );
-            })}
-          </Row>
-        </Col>
-      </Row>
-    );
-  };
+  const membershipName = inventoryDetails?.name
+    ? inventoryDetails?.name
+    : productDetails?.name;
+
+  const TabItems = [
+    { key: "details", label: "", children: <InformationCard detailTabSchema={detailTabSchema} additionalInfo={membershipDetails?.additionalInfo} /> },
+    { key: "services", label: "", children: <ServiceTabCard serviceList={serviceList} savingsList={savingsList} /> }
+  ]
+
+  const isUnAuthenticated = hasChecked && !isAuthenticated && loginUrl !== undefined;
+
+  const handleListNowModal = () => {
+    let taxVal =
+      inventoryDetails.taxPercentageAmount === 0
+        ? inventoryDetails.taxDollarAmount
+        : inventoryDetails.taxPercentageAmount;
+    let isTaxPercentage =
+      inventoryDetails.taxPercentageAmount === 0 ? false : true
+
+    formik.setFieldValue("name", inventoryDetails?.name);
+    formik.setFieldValue("inventoryStatus", inventoryDetails?.status);
+    formik.setFieldValue("price", inventoryDetails?.pricePerUnit);
+    formik.setFieldValue("taxPercentage", taxVal);
+    formik.setFieldValue("isTaxPercentage", isTaxPercentage);
+    formik.setFieldValue("quantity", 1);
+    formik.setFieldValue("taxPercentageAmount", inventoryDetails.taxPercentageAmount);
+    formik.setFieldValue("taxDollarAmount", inventoryDetails.taxDollarAmount);
+    openListNowModal();
+  }
 
   return (
     <>
       {contextHolder}
       {isLoading ? (
-        <div className="h-screen flex justify-center mx-auto items-center">
-          <Spin spinning={isLoading} size="large" />
-        </div>
+        <LoaderComponent />
       ) : (
         <div>
           <BreadCrumbComponent
@@ -615,45 +461,31 @@ const MembershipDetails = ({ user }) => {
 
             <Col span={13} className="ml-3 px-2 h-96 w-px-455">
               <Card className="h-80 shadow-md">
-                <Text className="text-2xl leading-8 font-semibold font-poppin">
-                  {inventoryDetails?.name
-                    ? inventoryDetails?.name
-                    : productDetails?.name}
-                </Text>
-                {isDuration ? (
-                  <Row className="mb-1">
-                    {watchIcon()}
-                    <Text className="ml-2 font-medium text-dark-grey font-poppin text-sm">
-                      {membershipDetails?.timePeriodInMonths ?? ""} -month
-                      duration
-                    </Text>
-                  </Row>
-                ) : (
-                  <Row className="mb-1">
-                    {" "}
-                    <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm">
-                      {" "}
-                      Expiry Date:- &nbsp;
-                      {membershipDetails?.expiryDate
-                        ? expiryDateVal
-                        : "--"}{" "}
-                    </Text>{" "}
-                  </Row>
-                )}
+                <Paragraph className="text-2xl !mb-0 leading-8 font-semibold font-poppin" ellipsis={{ rows: 1, tooltip: membershipName }} >
+                  {membershipName}
+                </Paragraph>
+                <Row className="mb-1">
+                  {isDuration && watchIcon()}
+                  <Text className="ml-1 font-medium text-dark-grey font-poppin text-sm">
+                    {isDuration
+                      ? `${membershipDetails?.timePeriodInMonths ?? ""} -month duration`
+                      : `Expiry Date:- ${membershipDetails?.expiryDate ? expiryDateVal : "--"}`}
+                  </Text>
+                </Row>
                 <Row className="flex justify-between h-20 mt-8">
                   <Col
                     span={11}
                     className="border border-grayLight rounded-md p-2 h-full"
                   >
                     <Text className="block text-center text-grey text-base font-poppin font-normal">
-                      {isMarketPlace ? "Price" : "Status"}{" "}
+                      {isMarketPlace ? "Price" : "Status"}
                     </Text>
                     <Text className="block text-center text-xl font-bold mt-2">
                       {isMarketPlace
                         ? `$ ${inventoryDetails?.pricePerUnit}`
                         : (inventoryId
-                            ? StatusValue[inventoryDetails?.status]
-                            : "Not Listed") ?? "--"}{" "}
+                          ? StatusValue[inventoryDetails?.status]
+                          : "Not Listed") ?? "--"}
                     </Text>
                   </Col>
                   <Col
@@ -661,15 +493,13 @@ const MembershipDetails = ({ user }) => {
                     className="border border-grayLight rounded-md p-2 h-full"
                   >
                     <Text className="block text-center text-grey text-base font-poppin font-normal">
-                      {" "}
-                      Total Savings{" "}
+                      Total Savings
                     </Text>
                     <Text
                       className="block text-center text-xl font-bold mt-2 leading-6"
                       style={{ color: "green" }}
                     >
-                      {" "}
-                      $ {totalSavings}{" "}
+                      $ {totalSavings}
                     </Text>
                   </Col>
                 </Row>
@@ -680,39 +510,36 @@ const MembershipDetails = ({ user }) => {
                       style={{ borderBottom: "1px solid #d3d3d3" }}
                     ></Row>
                     <Col span={24} className="border-t-1 h-20 mt-8">
-                      {inventoryDetails?.availableQuantity != 0 ? (
+                      {inventoryDetails?.availableQuantity !== 0 ? (
                         <Row className="flex justify-between h-10 mt-5">
                           <Col span={4} className="rounded-md h-14">
-                            {" "}
                             <Button
                               className="h-full text-center p-6 add-sub-btn "
                               disabled={isIssued}
                               onClick={subtract}
                             >
                               {minusIcon()}
-                            </Button>{" "}
+                            </Button>
                           </Col>
                           <Col
                             span={16}
                             className="border border-grayLight rounded-md align-middle text-center h-14 py-2"
                           >
                             <Text className="font-poppin font-normal text-base text-grey">
-                              Quantity{" "}
-                            </Text>{" "}
-                            &nbsp;{" "}
+                              Quantity
+                            </Text>
+                            &nbsp;
                             <Text className="text-2xl font-bold leading-8 pt-2">
                               {qty}
                             </Text>
                           </Col>
                           <Col span={4} className="rounded-md h-14">
-                            {" "}
                             <Button
                               className="h-full text-center p-6 float-right add-sub-btn"
                               disabled={isIssued}
                               onClick={add}
                             >
-                              {" "}
-                              {plusIcon()}{" "}
+                              {plusIcon()}
                             </Button>
                           </Col>
                         </Row>
@@ -729,32 +556,25 @@ const MembershipDetails = ({ user }) => {
                     </Col>
                   </Row>
                 )}
-
-                {/* {isPurchased && <Row>
-                  <Row className="w-full absolute mr-5 left-0 mt-6" style={{ borderBottom: "1px solid #d3d3d3" }}></Row>
-                  <Col span={16} className="border border-grayLight rounded-md align-middle text-center mx-auto mt-12 h-14 py-2" >
-                    <Text className="font-poppin font-normal text-base text-grey">Quantity </Text> &nbsp; <Text className="text-2xl font-bold leading-8 pt-2">{inventoryDetails?.availableQuantity}</Text>
-                  </Col>
-                </Row>} */}
               </Card>
               <Row className="h-14 mt-4">
-                {inventoryDetails?.availableQuantity == 0 ? (
+                {inventoryDetails?.availableQuantity === 0 ? (
                   <Button
                     block={true}
                     type="primary"
                     size="large"
                     className="h-full !pt-4 h-px-56 bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
-                    // onClick={() => {
-                    //   TagManager.dataLayer({
-                    //     dataLayer: {
-                    //       event: 'contact_sales_from_category_card',
-                    //       product_name: product.name,
-                    //       category: product.category,
-                    //       productId: product.productId
-                    //     },
-                    //   });
-                    // }}
+                  // onClick={() => {
+                  //   TagManager.dataLayer({
+                  //     dataLayer: {
+                  //       event: 'contact_sales_from_category_card',
+                  //       product_name: product.name,
+                  //       category: product.category,
+                  //       productId: product.productId
+                  //     },
+                  //   });
+                  // }}
                   >
                     Contact to Buy
                   </Button>
@@ -762,59 +582,23 @@ const MembershipDetails = ({ user }) => {
                   <>
                     {!isIssued && (
                       <Button
-                        // type={ownerSameAsUser ? "default" : "primary"}
                         type="primary"
                         block={true}
                         size="large"
                         className=" h-full py-4 h-px-56"
                         onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
+                          if (isUnAuthenticated) {
                             window.location.href = loginUrl;
                           } else {
-                            let taxVal =
-                              inventoryDetails.taxPercentageAmount === 0
-                                ? inventoryDetails.taxDollarAmount
-                                : inventoryDetails.taxPercentageAmount;
-                            formik.setFieldValue(
-                              "name",
-                              inventoryDetails?.name
-                            );
-                            formik.setFieldValue(
-                              "inventoryStatus",
-                              inventoryDetails?.status
-                            );
-                            formik.setFieldValue(
-                              "price",
-                              inventoryDetails?.pricePerUnit
-                            );
-                            formik.setFieldValue("taxPercentage", taxVal);
-                            formik.setFieldValue("quantity", 1);
-                            formik.setFieldValue(
-                              "taxPercentageAmount",
-                              inventoryDetails.taxPercentageAmount
-                            );
-                            formik.setFieldValue(
-                              "taxDollarAmount",
-                              inventoryDetails.taxDollarAmount
-                            );
-                            openListNowModal();
+                            handleListNowModal()
+
                           }
                         }}
                         disabled={isIssued}
                       >
-                        {" "}
-                        <Text
-                          className={`text-lg font-poppin text-white 
-                    `}
-                        >
-                          {/* {isIssued ? "Add Inventory" : "Edit Listing"} */}
+                        <Text className={`text-lg font-poppin text-white`} >
                           List for Sale
                         </Text>
-                        {/* ${ownerSameAsUser ? "font-bold" : "text-white"} */}
                       </Button>
                     )}
                   </>
@@ -827,11 +611,7 @@ const MembershipDetails = ({ user }) => {
                         disabled={isIssued}
                         className="group border !h-14 border-primary hover:bg-primary"
                         onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
+                          if (isUnAuthenticated) {
                             window.location.href = loginUrl;
                           } else {
                             TagManager.dataLayer({
@@ -859,11 +639,7 @@ const MembershipDetails = ({ user }) => {
                         type="primary"
                         className="bg-primary !h-14 !hover:bg-primaryHover"
                         onClick={() => {
-                          if (
-                            hasChecked &&
-                            !isAuthenticated &&
-                            loginUrl !== undefined
-                          ) {
+                          if (isUnAuthenticated) {
                             window.location.href = loginUrl;
                           } else {
                             TagManager.dataLayer({
@@ -878,7 +654,6 @@ const MembershipDetails = ({ user }) => {
                             navigate("/checkout");
                           }
                         }}
-                        // disabled={ownerSameAsUser()}
                         id="buyNow"
                       >
                         Buy Now
@@ -893,68 +668,31 @@ const MembershipDetails = ({ user }) => {
           <Row className="max-w-4xl mx-auto mt-10">
             <Card className="w-full shadow-md">
               <Title level={3}> Description </Title>
-              <Paragraph
-                ellipsis={{
-                  rows: 2,
-                  expandable: true,
-                  symbol: <Text strong>Show more</Text>,
-                }}
-                className="text-primaryC text-[13px] mt-2"
-              >
-                {/* {decodeURIComponent(inventoryDetails?.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line ?? "--"}
-                    <br />
-                  </React.Fragment>
-                ))} */}
-                {inventoryDetails?.description
-                  ? inventoryDetails?.description
-                  : productDetails?.description}
-              </Paragraph>
+              <ParagraphEllipsis description={description} />
             </Card>
           </Row>
 
           <Row className="max-w-4xl mx-auto mt-10 mb-20">
             <Card className="w-full card-shadow-2">
               <Tabs
-                defaultActiveKey="1"
-                items={[
-                  {
-                    key: "Details",
-                    label: (
-                      <Text
-                        className="text-xl font-bold leading-6"
-                        style={{
-                          color:
-                            activeTab === "Details"
-                              ? "#181EAC"
-                              : "rgba(0, 0, 0, 0.4)",
-                        }}
-                      >
-                        Details
-                      </Text>
-                    ),
-                    children: DetailTabCard(),
-                  },
-                  {
-                    key: "Services",
-                    label: (
-                      <Text
-                        className="text-xl font-bold leading-6"
-                        style={{
-                          color:
-                            activeTab === "Services"
-                              ? "#181EAC"
-                              : "rgba(0, 0, 0, 0.4)",
-                        }}
-                      >
-                        Services
-                      </Text>
-                    ),
-                    children: ServiceTabCard(),
-                  },
-                ]}
-                onChange={handleTabChange}
+                defaultActiveKey="details"
+                items={TabItems.map((item, index) => {
+                  return {
+                    ...item, label: <Text
+                      className="text-xl font-bold leading-6 capitalize"
+                      style={{
+                        color:
+                          activeTab === item.key
+                            ? "#181EAC"
+                            : "rgba(0, 0, 0, 0.4)",
+                      }}
+                    >
+                      {item.key}
+                    </Text>
+                  }
+                })
+                }
+                onChange={(label) => { setActiveTab(label) }}
               />
             </Card>
           </Row>
@@ -962,14 +700,13 @@ const MembershipDetails = ({ user }) => {
       )}
       {visible && (
         <ListNowModal
+          config={listNowConfig("resaleMembership")}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
-          isEdit={true}
           getIn={getIn}
-          listType={isIssued ? "New" : "Sale"}
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
