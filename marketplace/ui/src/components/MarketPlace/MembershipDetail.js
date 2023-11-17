@@ -39,7 +39,6 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { minusIcon, plusIcon, watchIcon } from "../../images/SVGComponents";
 import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
-import { listNowConfig } from "./listNowConfig";
 import routes from "../../helpers/routes";
 import useDebounce from "../UseDebounce";
 import "./index.css";
@@ -325,39 +324,6 @@ const MembershipDetails = ({ user }) => {
       });
     }
   };
-
-  const serviceColumn = [
-    {
-      title: <Text className="text-primaryC font-semibold text-base">Name</Text>,
-      dataIndex: "serviceName",
-      key: "name",
-      render: (text) => <p>{decodeURIComponent(text)}</p>
-    },
-    {
-      title: <Text className="text-primaryC font-semibold text-base">Description</Text>,
-      dataIndex: "serviceDesc",
-      key: "serviceDesc",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
-    },
-    {
-      title: <Text className="text-primaryC font-semibold text-base">Membership Price</Text>,
-      dataIndex: "memberPrice",
-      key: "memberPrice",
-      render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
-    },
-    {
-      title: <Text className="text-primaryC font-semibold text-base">Non-Membership Price</Text>,
-      dataIndex: "nonMemberPrice",
-      key: "nonMemberPrice",
-      render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
-    },
-    {
-      title: <Text className="text-primaryC font-semibold text-base">Uses</Text>,
-      dataIndex: "uses",
-      key: "uses",
-      render: (text) => <p className="text-left">{decodeURIComponent(text)}</p>,
-    },
-  ];
 
   const closeListNowModal = () => {
     setVisible(false);
@@ -733,13 +699,13 @@ const MembershipDetails = ({ user }) => {
       )}
       {visible && (
         <ListNowModal
-          config={listNowConfig("resaleMembership")}
           open={visible}
           user={{ user }}
           handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
           getIn={getIn}
+          listType="Sale"
           id={Id}
           isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
