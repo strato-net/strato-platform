@@ -295,9 +295,10 @@ const ListNowIndex = ({
               // placeholder="Percentage"
               onWheel={(e) => e.target.blur()}
               min={0}
+              step={1}
               // addonAfter={selectAfter}
-              formatter={handleFormatter}
-              parser={handleParser}
+              // formatter={handleFormatter}
+              // parser={handleParser}
               value={taxPercentage}
               onChange={(value) => {
                 //   formik.setFieldValue("taxPercentage", value);
@@ -322,6 +323,7 @@ const ListNowIndex = ({
                 name="price"
                 controls={false}
                 type="number"
+                precision={0}
                 // placeholder="Price"
                 onWheel={(e) => e.target.blur()}
                 min={0}

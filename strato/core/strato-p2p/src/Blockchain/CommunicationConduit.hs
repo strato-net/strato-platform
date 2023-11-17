@@ -46,6 +46,9 @@ import Blockchain.Strato.Model.Util
 import Blockchain.TimerSource
 import Blockchain.Watchdog
 import Conduit
+import Control.Concurrent (ThreadId)
+import Control.Concurrent.Chan.Unagi
+import Control.Concurrent.Hierarchy
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Unlift
@@ -91,27 +94,28 @@ mkEthP2PEventSource ::
   ConduitM () P2pEvent m () ->
   String ->
   EthCryptState ->
+  ThreadMap ->
   m (ConduitM () Event m ())
-mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx = do
+mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx tm = do
   canarySource <- mkCanarySource
-  tid <- myThreadId
-  recvWatchdog <- mkWatchdog tid $ fromIntegral flags_connectionTimeout
-  merged <-
-    mergeSourcesByForce
-      ( [ peerSourceConduit
-            .| ethDecrypt inCtx
-            .| CL.iterM (recordTraffic Inbound)
-            .| bytesToMessages
-            .| CL.iterM (displayMessage Inbound peerStr)
-            .| CL.map MsgEvt
-            .| CL.iterM (const $ petWatchdog recvWatchdog),
-          seqEventSource
-            .| CL.map NewSeqEvent,
-          canarySource .| CL.map absurd,
-          timerSource
-        ]
-      )
-      4096 -- 🙏
+  eventsourcethreadid <- myThreadId
+  recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
+  merged <- mergeSourcesByForce
+              ( [ peerSourceConduit
+                    .| ethDecrypt inCtx
+                    .| CL.iterM (recordTraffic Inbound)
+                    .| bytesToMessages
+                    .| CL.iterM (displayMessage Inbound peerStr)
+                    .| CL.map MsgEvt
+                    .| CL.iterM (const $ petWatchdog recvWatchdog),
+                  seqEventSource
+                    .| CL.map NewSeqEvent,
+                  canarySource .| CL.map absurd,
+                  timerSource
+                ]
+              )
+              4096 -- 🙏
+              tm
   return $
     merged
       .| CL.iterM recordEvent
@@ -216,7 +220,9 @@ handleMsgClientConduit myId peer = do
       when (S.difference rcs rootCerts' /= S.empty) $ throwIO RootCertificateMismatch
       -- we set to 0 cause we dont necessarily know the number yet
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
@@ -228,7 +234,9 @@ handleMsgClientConduit myId peer = do
       when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
       -- we set to 0 cause we dont necessarily know the number yet
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
@@ -278,7 +286,9 @@ handleMsgServerConduit myPubkey peer = do
                 genesisHash = genHash,
                 rootCerts = rootCerts'
               }
-        (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+        (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+        (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+        let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
         mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
         yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
         yield . Right $ GetChainDetails []
@@ -302,7 +312,9 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      (BestBlockNumber lastBlockNumber) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
+      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []

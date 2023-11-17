@@ -49,7 +49,6 @@ library:
   - persistent-postgresql
   - quickcheck-instances
   - regex-compat
-  - relapse
   - resourcet
   - secp256k1-haskell # remove
   - servant-docs

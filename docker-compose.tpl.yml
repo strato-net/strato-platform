@@ -1,5 +1,5 @@
 #strato-version:<VERSION>
-#strato-getting-started-min-version:4.0
+#strato-getting-started-min-version:4.2.1
 version: "3"
 volumes:
   marketplacedata:
@@ -92,6 +92,8 @@ services:
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
     - ORG_NAME='BlockApps' # TODO: can be removed?
     - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    - ORG_ADMIN_NAME=${ORG_ADMIN_NAME}
+    - ORG_ADMIN_PASSWORD=${ORG_ADMIN_PASSWORD}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
     restart: unless-stopped

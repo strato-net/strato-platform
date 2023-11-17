@@ -38,6 +38,7 @@ import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Time (getCurrentTime)
 import GHC.Generics
 import qualified IdentityProvider.API as IDAPI
 import IdentityProvider.Email
@@ -88,7 +89,10 @@ getAccessTokenForRealm realm = do
 -- }
 
 getDefaultEmptyOrg :: String -> String -> String
-getDefaultEmptyOrg name uuid = "Mercata Account " ++ case elemIndex ' ' name of
+getDefaultEmptyOrg name uuid = "Mercata Account " ++ getDefaultEmptyOrgOld name uuid
+
+getDefaultEmptyOrgOld :: String -> String -> String
+getDefaultEmptyOrgOld name uuid = case elemIndex ' ' name of
   Nothing -> head name : take 8 uuid
   Just idx ->
     let lastNs = drop (idx + 1) name
@@ -98,28 +102,21 @@ getSubject ::
   ( MonadIO m,
     MonadLogger m
   ) =>
-  Text ->
-  Maybe Text ->
-  Text ->
+  String ->
   String ->
   PublicKey ->
   m Subject
-getSubject name mCo uuid _ pk
-  | not $ T.null name = do
-    let name' = T.unpack name
-    return
-      Subject
-        { subCommonName = name',
-          subOrg = case mCo of
-            Just co | not $ T.null co -> T.unpack co
-            _ -> getDefaultEmptyOrg (T.unpack name) (T.unpack uuid),
-          subUnit = Nothing,
-          subCountry = Nothing,
-          subPub = pk
-        }
-  | otherwise = do
-    $logErrorS "getSubject" "Improper query params! Param 'name' is not defined or is empty. Cannot create a cert with so little info"
-    throwIO $ IdentityError "Param 'name' cannot be empty"
+getSubject "" _ _ = do
+  $logErrorS "getSubject" "Improper query params! Param 'name' is not defined or is empty. Cannot create a cert with so little info"
+  throwIO $ IdentityError "Param 'name' cannot be empty"
+getSubject name org pk = pure
+  Subject
+    { subCommonName = name,
+      subOrg = org,
+      subUnit = Nothing,
+      subCountry = Nothing,
+      subPub = pk
+    }
 
 -- NOTE TO FUTURE DEVELOPERS: This commented-out code block is from a previous flow where we would call
 -- the GET /users endpoint on keycloak to get the user's information. We are trying to be less keycloak
@@ -188,19 +185,43 @@ putIdentity ::
   Maybe Text ->
   m Address
 putIdentity accessToken uuid idProv name mEmail mCo = do
+  time' <- liftIO getCurrentTime
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with name " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
   let realm = extractRealmName $ T.unpack idProv
+      name' = T.unpack name
+      uuid' = T.unpack uuid
+      orgNew = getDefaultEmptyOrg name' uuid'
+      orgOld = getDefaultEmptyOrgOld name' uuid'
+      (hasOrgName, org) = case mCo of
+        Just o | o /= "" -> (True, T.unpack o)
+        _ -> (False, orgNew)
+      csvLogMsg = T.intercalate ","
+           [ T.pack $ show time'
+           , T.pack realm
+           , uuid
+           , name
+           , T.pack org
+           ]
+  $logInfoS "putIdentity/csv" csvLogMsg
   getVaultKey accessToken >>= \case
     Just (AddressAndKey a k) -> do
       -- has vault key, confirm also has cert
-      hasCert <- certInCirrus accessToken realm a (T.unpack name) (T.unpack uuid) (T.unpack <$> mCo)
-      unless hasCert $ createAndRegisterCert name mEmail mCo uuid realm k
+      hasCert <- do
+        hasCert' <- certInCirrus accessToken realm a name' org
+        -- We don't want to check for a cert using the default
+        -- org name if the provided org name is different
+        if hasOrgName
+          then pure hasCert'
+          else if hasCert'
+            then pure hasCert'
+            else certInCirrus accessToken realm a name' orgOld
+      unless hasCert $ createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realm k
       return a
     Nothing -> do
       -- no vault key, so make key and register cert
       AddressAndKey a k <- postVaultKey accessToken
-      createAndRegisterCert name mEmail mCo uuid realm k
+      createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realm k
       return a
 
 -- This is just a dummy function
@@ -244,9 +265,8 @@ certInCirrus ::
   Address ->
   String ->
   String ->
-  Maybe String ->
   m Bool
-certInCirrus token realm a name uuid mCo = do
+certInCirrus token realm a name co = do
   rd <- access (Proxy @RealmData)
   case M.lookup realm rd of
     Nothing -> do
@@ -266,17 +286,14 @@ certInCirrus token realm a name uuid mCo = do
           $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
           throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
   where
-    cirrusSearchPath :: Address -> String -> String -> Maybe String -> String
-    cirrusSearchPath address commonName uuid' mOrg =
-      let orgParam = case mOrg of
-            Nothing -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
-            Just "" -> ",organization.eq." <> getDefaultEmptyOrg commonName uuid'
-            Just org -> ",organization.eq." <> org
+    cirrusSearchPath :: Address -> String -> String -> String
+    cirrusSearchPath address commonName org =
+      let orgParam = ",organization.eq." <> org
        in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> orgParam <> ")"
 
     callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
-      let cirrusEndpoint = cirrusSearchPath a name uuid mCo
+      let cirrusEndpoint = cirrusSearchPath a name co
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
@@ -294,15 +311,15 @@ createAndRegisterCert ::
     Accessible RealmData m,
     Accessible (Maybe SendgridAPIKey) m
   ) =>
-  Text ->
-  Maybe Text ->
-  Maybe Text ->
-  Text ->
+  String ->
+  Maybe String ->
+  String ->
+  String ->
   String ->
   PublicKey ->
   m ()
-createAndRegisterCert name mEmail mCo uuid realm k = do
-  sub <- getSubject name mCo uuid realm k
+createAndRegisterCert name mEmail org uuid realm k = do
+  sub <- getSubject name org k
   createNewCert sub >>= \case
     Just newCert -> do
       getAccessTokenForRealm realm >>= \case
@@ -313,10 +330,10 @@ createAndRegisterCert name mEmail mCo uuid realm k = do
           registerCert newCert realmToken realm
           mEmailK <- access (Proxy @(Maybe SendgridAPIKey))
           case (mEmail, mEmailK) of
-            (Just email, Just emailK) -> sendWelcomeEmail (T.unpack email) (T.unpack name) (T.unpack uuid) emailK
+            (Just email, Just emailK) -> sendWelcomeEmail email name uuid emailK
             (_, _) -> return ()
     Nothing -> do
-      $logErrorS "createAndRegisterCert" $ "Error occurred while trying to sign a cert for user " <> uuid
+      $logErrorS "createAndRegisterCert" . T.pack $ "Error occurred while trying to sign a cert for user " ++ uuid
       throwIO $ IdentityError "Unable to sign new cert for user"
 
 createNewCert ::
