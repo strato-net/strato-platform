@@ -1,46 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { Col, Row } from "antd";
+
+import { useMembershipState } from "../../contexts/membership";
 import MembershipCard from "./MembershipCard";
-import { Col, Row, Spin } from "antd";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../contexts/membership";
-import { actions } from "../../contexts/membership/actions";
-import { Image, Typography } from "antd";
-import { Images } from "../../images";
-import MembershipCardPurchased from "./MembershipCardPurchased";
+import helperJson from "../../../src/helpers/helper.json"
+import LoaderComponent from "../Loader/LoaderComponent";
+import NoProductComponent from "../NoProductFound/NoProductComponent";
+
+const { issuedCardConfig } = helperJson;
 
 const IssuedList = (
   user,
-  categorys,
-  subCategorys,
-  key,
   debouncedSearchTerm
 ) => {
-  const dispatch = useMembershipDispatch();
-  let {
-    memberships,
-    isMembershipsLoading,
-  } = useMembershipState();
+  const { memberships, isMembershipsLoading } = useMembershipState();
 
-  useEffect(() => {
-    actions.fetchMembership(dispatch);
-  }, []);
-
-  const { Title } = Typography;
   return (
     <>
       {isMembershipsLoading ? (
-        <div className="h-screen flex justify-center items-center mx-auto">
-          <Spin spinning={isMembershipsLoading} size="large" />
-        </div>
+        <LoaderComponent />
       ) : memberships?.length === 0 ? (
-        <div className="h-screen w-full lg:mt-52 text-center items-center mx-auto">
-          <Image src={Images.noProductSymbol} height={'120px'} preview={false} />
-          <Title level={3} className="mt-2">
-            No product found
-          </Title>
-        </div>
+        <NoProductComponent text={"product"} />
       ) : (
         <Row className="w-full my-4 flex flex-row" gutter={[12, 12]}>
           {memberships?.map((item, index) => {
@@ -62,20 +42,17 @@ const IssuedList = (
             transformedData["expiryDate"] = "";
             transformedData["status"] = item.status;
             return (
-              <Col span={12}>
-                <MembershipCardPurchased
+              <Col span={12} key={index}>
+                <MembershipCard
+                  cardConfig={issuedCardConfig}
                   user={user}
                   membership={transformedData}
-                  categorys={categorys}
-                  subCategorys={subCategorys}
                   debouncedSearchTerm={debouncedSearchTerm}
                   membershipId={item.address}
-                  isPurchasedList={false}
                 />
               </Col>
             );
           })}
-
         </Row>
       )}
     </>
