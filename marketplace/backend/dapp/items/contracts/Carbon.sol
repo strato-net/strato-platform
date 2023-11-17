@@ -1,18 +1,18 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/orders/contracts/SimpleSale.sol";
+import "/dapp/orders/contracts/Sales/CarbonSale.sol";
+import "/dapp/mercata-base-contracts/Templates/Assets/UTXO.sol";
 
 pragma es6;
 pragma strict;
 import <d816194227e1a7a780fff236a449604afeb36255>;
 
 /// @title A representation of Carbon assets
-contract Carbon is ItemStatus, RestStatus, Asset {
+contract Carbon is ItemStatus, RestStatus, UTXO {
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public serialNumber;
     ItemStatus public status;
-    string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
     string public projectType;
 
@@ -26,7 +26,6 @@ contract Carbon is ItemStatus, RestStatus, Asset {
     constructor(
         string _serialNumber,
         ItemStatus _status,
-        string _comment,
         uint _itemNumber,
         uint _createdDate,
         address _owner,
@@ -35,14 +34,11 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _price,
         string _projectType,
-        SaleState _saleState,
-        PaymentType _paymentType
-    ) public Asset(_name, _description, _images, _price, _createdDate){
+        PaymentType[] _paymentTypes
+    ) public UTXO(_name, _description, _images, _createdDate, _units, _serialNumber){
         owner = _owner;
 
-        serialNumber = _serialNumber;
         status = _status;
-        comment = _comment;
         itemNumber = _itemNumber;
         projectType = _projectType;
 
@@ -51,65 +47,22 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        createSale(_saleState, _paymentType, _price);
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            createSale(_paymentTypes[i], _price);
+        }
     }
 
-    function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
-        return Sale(new SimpleSale(address(this), _state, _payment));
-    }
-
-    function createSale(SaleState _state, PaymentType _payment, uint _price) public requireOwner("Create sale") returns (uint) {// can be overridden
-        require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        changePrice(_price);
-        sale = createBaseSale(_state, _payment);
+    function createSale(PaymentType _payment, uint _price) public requireOwner("Create sale") returns (uint) {// can be overridden
+        whitelistedSales.push(address(Sale(new CarbonSale(address(this), _payment, _price))));
         return RestStatus.OK;
     }
 
-    function update(
-        ItemStatus _status,
-        string _comment,
-        uint _scheme
+    function resell(
+        uint _price,
+        PaymentType[] _paymentTypes
     ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-
-        if (_scheme == 0) {
-            return RestStatus.OK;
-        }
-
-        if ((_scheme & (1 << 0)) == (1 << 0)) {
-            status = _status;
-        }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
-        }
-
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            createSale(_paymentTypes[i], _price);
+        }  
         return RestStatus.OK;
     }
-
-    // Get the userOrganization
-    function getUserOrganization(address caller) public returns (string) {
-        mapping(string => string) ownerCert = getUserCert(caller);
-        string userOrganization = ownerCert["organization"];
-        return userOrganization;
-    }
-
-    function generateOwnershipHistory(
-        string _seller,
-        string _newOwner,
-        uint _ownershipStartDate,
-        address _itemAddress
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-        emit OwnershipUpdate(
-            _seller,
-            _newOwner,
-            _ownershipStartDate,
-            _itemAddress
-        );
-        return RestStatus.OK;
-    }
-}

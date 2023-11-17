@@ -1,6 +1,5 @@
-import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/orders/contracts/SimpleSale.sol";
+import "/dapp/orders/contracts/Sales/ArtSale.sol";
 
 pragma es6;
 pragma strict;
@@ -12,7 +11,6 @@ contract Art is ItemStatus, RestStatus, Asset {
     string public ownerOrganizationalUnit;
     string public serialNumber;
     ItemStatus public status;
-    string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
     string public artist;
 
@@ -26,7 +24,6 @@ contract Art is ItemStatus, RestStatus, Asset {
     constructor(
         string _serialNumber,
         ItemStatus _status,
-        string _comment,
         uint _itemNumber,
         uint _createdDate,
         address _owner,
@@ -35,14 +32,12 @@ contract Art is ItemStatus, RestStatus, Asset {
         string _artist,
         string[] _images,
         uint _price,
-        SaleState _saleState,
-        PaymentType _paymentType
-    ) public Asset(_name, _description, _images, _price, _createdDate){
+        PaymentType[] _paymentTypes
+    ) public Asset(_name, _description, _images, _createdDate){
         owner = _owner;
 
         serialNumber = _serialNumber;
         status = _status;
-        comment = _comment;
         itemNumber = _itemNumber;
         artist = _artist;
 
@@ -51,48 +46,14 @@ contract Art is ItemStatus, RestStatus, Asset {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        createSale(_saleState, _paymentType, _price);
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            createSale(_paymentTypes[i], _price);
+        }
     }
 
-    function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
-        return Sale(new SimpleSale(address(this), _state, _payment));
-    }
-
-    function createSale(SaleState _state, PaymentType _payment, uint _price) public requireOwner("Create sale") returns (uint) {// can be overridden
-        require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        changePrice(_price);
-        sale = createBaseSale(_state, _payment);
+    function createSale(PaymentType _payment, uint _price) public requireOwner("Create sale") returns (uint) {// can be overridden
+        whitelistedSales.push(address(Sale(new ArtSale(address(this), _payment, _price))));
         return RestStatus.OK;
-    }
-
-    function update(
-        ItemStatus _status,
-        string _comment,
-        uint _scheme
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-
-        if (_scheme == 0) {
-            return RestStatus.OK;
-        }
-
-        if ((_scheme & (1 << 0)) == (1 << 0)) {
-            status = _status;
-        }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
-        }
-
-        return RestStatus.OK;
-    }
-
-    // Get the userOrganization
-    function getUserOrganization(address caller) public returns (string) {
-        mapping(string => string) ownerCert = getUserCert(caller);
-        string userOrganization = ownerCert["organization"];
-        return userOrganization;
     }
 
     function generateOwnershipHistory(
@@ -112,4 +73,14 @@ contract Art is ItemStatus, RestStatus, Asset {
         );
         return RestStatus.OK;
     }
-}
+
+    function resell(
+        uint _price,
+        PaymentType[] _paymentTypes
+    ) returns (uint) {
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            createSale(_paymentTypes[i], _price);
+        }  
+        return RestStatus.OK;
+    }
+
