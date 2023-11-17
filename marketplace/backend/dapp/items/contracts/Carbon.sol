@@ -34,7 +34,9 @@ contract Carbon is ItemStatus, RestStatus, UTXO {
         string[] _images,
         uint _price,
         string _projectType,
-        PaymentType[] _paymentTypes
+        PaymentType[] _paymentTypes,
+        uint _units,
+        bool createNewSale
     ) public UTXO(_name, _description, _images, _createdDate, _units, _serialNumber){
         owner = _owner;
 
@@ -47,8 +49,10 @@ contract Carbon is ItemStatus, RestStatus, UTXO {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        for (uint i = 0; i < _paymentTypes.length; i++) {
-            createSale(_paymentTypes[i], _price);
+        if (createNewSale) {
+            for (uint i = 0; i < _paymentTypes.length; i++) {
+                createSale(_paymentTypes[i], _price);
+            }
         }
     }
 
