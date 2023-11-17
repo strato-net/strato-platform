@@ -7,10 +7,9 @@ abstract contract UTXO is Asset {
         string _name,
         string _description,
         string[] _images,
-        uint _price,
         uint _createdDate,
         uint _units,
-        string _serialNo
+        uint _serialNo
     ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
         serialNo = _serialNo;
@@ -25,4 +24,4 @@ abstract contract UTXO is Asset {
         emit AssetSplit(address(newAsset), splitUnits);
 
         return address(newAsset);
-    }
+    }}

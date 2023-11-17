@@ -192,13 +192,13 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         payment=_payment;
     }
 
-    function transferOwnership(string _purchasersCommonName, address _purchasersAddress, uint _orderId) public requireSeller("Transfer Ownership of Asset") returns (uint) {
-        saleOrderID = _orderId;
-        purchasersCommonName = _purchasersCommonName;
-        assetToBeSold.transferOwnership(address(this), purchasersCommonName, _purchasersAddress);
-        state = SaleState.Closed;
-        return RestStatus.OK;
-    }
+    // function transferOwnership(string _purchasersCommonName, address _purchasersAddress, uint _orderId) public requireSeller("Transfer Ownership of Asset") returns (uint) {
+    //     saleOrderID = _orderId;
+    //     purchasersCommonName = _purchasersCommonName;
+    //     assetToBeSold.transferOwnership(address(this), purchasersCommonName, _purchasersAddress);
+    //     state = SaleState.Closed;
+    //     return RestStatus.OK;
+    // }
 }
 
 abstract contract Order is RestStatus, OrderStatus {
@@ -261,4 +261,6 @@ abstract contract Order is RestStatus, OrderStatus {
         status = OrderStatus.CLOSED;
         return RestStatus.OK;
     }
+
+
 }
