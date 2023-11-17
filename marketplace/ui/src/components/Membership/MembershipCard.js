@@ -1,109 +1,87 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Carousel } from 'react-responsive-carousel';
 import { useFormik, getIn } from "formik";
-import classNames from "classnames";
-import { Card, Popover, Spin, Button, Table, Typography, Row } from "antd";
-import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import ListForSaleModal from "./ListForSaleModal";
-// import DeleteProductModal from "./DeleteProductModal";
-// import UpdateProductModal from "./UpdateProductModal";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
-import routes from "../../helpers/routes";
-import { useNavigate } from "react-router-dom";
-import { useAuthenticateState } from "../../contexts/authentication";
-import ListNowModal from "../Membership/ListNowModal";
-import PublishNowModal from "../Membership/PublishNowModal";
 import * as yup from "yup";
+import dayjs from 'dayjs';
+import { Card, Button, Row, Col, Typography, Image, Modal, Table, Collapse } from "antd";
+import { EditOutlined } from "@ant-design/icons";
+// Components
+import ListNowModal from "./ListNowModal";
+import ParagraphEllipsis from "../Ellipsis/ParagraphEllipsis"
+// import routes from "../../helpers/routes";
+// Actions
+import { actions as membershipActions } from "../../contexts/membership/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// Dispatch and States
+import { useMembershipDispatch, useMembershipState } from "../../contexts/membership";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useAuthenticateState } from "../../contexts/authentication";
+// Images, Icons, css, configs, 
+import helperJson from "../../helpers/helper.json"
+import noPreview from "../../images/resources/noPreview.jpg";
 import { INVENTORY_STATUS } from "../../helpers/constants";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
-import { actions } from "../../contexts/inventory/actions";
-import TagManager from "react-gtm-module";
+import { listNowConfig } from "../MarketPlace/listNowConfig";
+import { forwardArrowIcon, tagIcon } from "../../images/SVGComponents";
+import 'react-responsive-carousel/lib/styles/carousel.min.css';
+import "./membership.css";
+import LoaderComponent from "../Loader/LoaderComponent";
 
-const { Title } = Typography;
+const { purchasedCardColumn, statusColor, statusText } = helperJson;
+const { Panel } = Collapse;
+const { Text, Paragraph, Title } = Typography;
+
+const initialValues = {
+  name: "",
+  price: "",
+  quantity: "",
+  // isTaxPercentage:false,
+};
 
 const MembershipCard = ({
   user,
   membership,
-  categorys,
-  debouncedSearchTerm,
-}) => {
-  const [state, setState] = useState(null);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
-  const naviroute = routes.MembershipDetail.url;
-  const [visible, setVisible] = useState(false);
-  const [viewable, setViewable] = useState(false);
-  console.log("membership", membership)
-
-
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { isCreateInventorySubmitting } = useInventoryState();
-  const dispatch = useInventoryDispatch();
-  const showModal = () => {
-    hide();
-    setOpen(true);
-  };
-
-  const handleCancel = () => {
-    setOpen(false);
-  };
-
-  const [openPop, setOpenPop] = useState(false);
-  const hide = () => {
-    setOpenPop(false);
-  };
-  const handleOpenChange = (newOpen) => {
-    setOpenPop(newOpen);
-  };
-
-  const showEditModal = () => {
-    hide();
-    setEditModalOpen(true);
-  };
-
-  const handleEditModalClose = () => {
-    setEditModalOpen(false);
-  };
-
-
-  useEffect(() => {
-    setState(membership);
-  }, [membership]);
-
-
-  const callDetailPage = (index, address) => {
-    if (state !== null && state !== undefined) {
-      navigate(`${naviroute.replace(":id", state.address)}`,
-        {
-          state: {
-            isCalledFromMembership: true,
-            inventoryId: (state.inventoryAddress !== undefined || state.inventoryAddress !== null)
-              ? state.inventoryAddress
-              : null
-          }
-        });
-    }
-
+  // debouncedSearchTerm,
+  membershipId,
+  cardConfig: {
+    isDuration,
+    issued,
+    qty,
+    isMembershipNumber,
+    isDescription,
+    configCase,
+    btnName
   }
+}) => {
+  const inventoryDispatch = useInventoryDispatch();
+  const membershipDispatch = useMembershipDispatch();
+  const membershipState = useMembershipState();
+  const { type } = useParams();
+  // const isIssued = type === "issued";
+  // const isPurchased = type === "purchased";
+  const {
+    subCategory,
+    manufacturer,
+    timePeriodInMonths,
+    savings,
+    // membershipId,
+    expiryDate,
+    availableQuantity,
+    // membershipAddress,
+    inventoryId,
+    Inventories,
+    itemNumber,
+    status,
+    description,
+    productImageLocation
+  } = membership;
 
-  const closeListNowModal = () => {
-    setVisible(false);
-  };
-
-  const openListNowModal = () => {
-    setVisible(true);
-  };
-
-  const openInventoryNowModal = () => {
-    setViewable(true);
-  };
-
-  const closeInventoryNowModal = () => {
-    setViewable(false);
-  };
+  const [isEdit, setIsEdit] = useState(false)
+  const [state, setState] = useState(null);
+  const [listModalConfig, setListModalConfig] = useState({})
+  const [carouselModel, setCarouselModel] = useState(false);
+  const navigate = useNavigate();
+  const [visible, setVisible] = useState(false);
 
   const getSchema = (isListNowModalOpen) => {
     return yup.object().shape({
@@ -114,15 +92,9 @@ const MembershipCard = ({
       }),
       quantity: yup.number().when("isListNowModalOpen", {
         is: () => isListNowModalOpen, // Use a function to evaluate the condition
-        then: yup.number().required("Quantity is required"),
+        then: yup.number(),
       }),
     });
-  };
-
-  const initialValues = {
-    name: "",
-    price: "",
-    quantity: ""
   };
 
   const formik = useFormik({
@@ -137,250 +109,329 @@ const MembershipCard = ({
     enableReinitialize: true,
   });
 
-
-  const previewCol = (indx, address) => (<Button type="text"
-    className="text-primary text-sm cursor-pointer"
-    onClick={callDetailPage.bind(this, indx, address)}
-  >
-    Preview
-  </Button>)
-
   const updateCol = (inv, texts) => (<Row
     style={{ justifyContent: 'space-between' }}>
     <p>{texts} </p>
-    <EditOutlined onClick={() => {
+  </Row>)
+
+  const callDetailPage = (index, address) => {
+    let route;
+    route = `/memberships/${type}/${membership.membershipAddress}?inventoryId=${membership.inventoryId}`
+    navigate(route);
+  }
+
+  const previewCol = (inv, address) => (<Button type="text"
+    className="text-primary text-sm cursor-pointer"
+    // onClick={callDetailPage.bind(this, indx, address)}
+    onClick={() => {
       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
         window.location.href = loginUrl;
       } else {
-        formik.setFieldValue("name", membership.product.name);
+        let tax = inv.taxPercentageAmount || inv.taxDollarAmount;
+        let isPercent = inv.taxDollarAmount === 0 ? true : false
+        formik.setFieldValue("name", membership.productName);
+        formik.setFieldValue("inventoryStatus", inv.status);
         formik.setFieldValue("tempInv", inv);
-        openListNowModal();
+        formik.setFieldValue("price", inv.pricePerUnit);
+        formik.setFieldValue("quantity", inv.availableQuantity);
+        formik.setFieldValue("taxPercentage", tax);
+        formik.setFieldValue("isTaxPercentage", isPercent);
+        formik.setFieldValue("taxPercentageAmount", inv.taxPercentageAmount);
+        formik.setFieldValue("taxDollarAmount", inv.taxDollarAmount);
+        setIsEdit(true)
+        openListNowModal("editInventory");
       }
-    }} />
-  </Row>)
+    }}
+  >
+    <EditOutlined
+    />
+  </Button>)
 
 
-  let data = membership.inventories.map((inventory, index) => {
+  let data = Inventories?.map((inventory, index) => {
     return {
       key: index,
       name: inventory.block_timestamp,
       age: inventory.availableQuantity,
       published: updateCol(inventory, inventory.status === 1 ? "Published" : "Unpublished"),
-      preview: previewCol(index, inventory.address),
+      edit: previewCol(inventory, inventory.address),
       address: "$ " + String(inventory.pricePerUnit)
     }
   });
 
-  const columns = [
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { isCreateInventorySubmitting, inventories, success } = useInventoryState();
 
-    {
-      title: 'Date',
-      dataIndex: 'name',
-      key: 'name',
-      width: '20%',
-      color: "red",
-      // ...getColumnSearchProps('name'),
-    },
-    {
-      title: 'Quantity',
-      dataIndex: 'age',
-      key: 'age',
-      width: '15%',
-      // ...getColumnSearchProps('age'),
-    },
-    {
-      title: 'Published/Unpublished',
-      dataIndex: 'published',
-      key: 'published',
-      width: '30%',
-      // ...getColumnSearchProps('age'),
-    },
-    {
-      title: 'Price',
-      dataIndex: 'address',
-      key: 'address',
-      width: '20%',
-      // ...getColumnSearchProps('address'),
-      sorter: (a, b) => a.address.length - b.address.length,
-      sortDirections: ['descend', 'ascend'],
-    },
-    {
-      title: '',
-      dataIndex: 'preview',
-      key: 'preview',
-      width: '7%',
-    }
-  ];
+  useEffect(() => {
+    setVisible(false);
+    setState(membership);
+    setIsEdit(false);
+  }, [success, membershipState.success])
 
+  const closeListNowModal = () => {
+    setVisible(false);
+    setIsEdit(false);
+  };
 
+  const openListNowModal = (configCase) => {
+    setVisible(true);
+    let config = listNowConfig(configCase);
+    setListModalConfig(config);
+  };
 
   const handleCreateFormSubmit = async (values) => {
     if (user) {
-      if (formik.values.price !== "" && formik.values.quantity !== "") {
-        const inventoryBody = {
-          productAddress: membership.productId,
-          quantity: formik.values.quantity,
-          pricePerUnit: formik.values.price,
-          // Generate random code for now
-          batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
-          // Status should always be published if we use List Now
-          status: INVENTORY_STATUS.PUBLISHED,
-          serialNumber: [],
-          taxPercentageAmount: formik.values.taxPercentageAmount,
-          taxDollarAmount: formik.values.taxDollarAmount,
-        };
-        const createInventory = await actions.createInventory(
-          dispatch,
-          inventoryBody
-        );
-
-        if (createInventory) {
-          // membership.product_with_inventory = 1;
-          formik.resetForm();
+      if (formik.values.price !== "" && inventories) {
+        if (issued) {
+          let taxPercentageAmountValue = formik.values.taxPercentageAmount ?? 0;
+          let taxDollarAmountValue = formik.values.taxDollarAmount ?? 0;
+          const inventoryBody = {
+            productAddress: membership.productId,
+            quantity: formik.values.quantity,
+            pricePerUnit: formik.values.price,
+            // Generate random code for now
+            batchId: `B-ID-${Math.floor(Math.random() * 1000000)}`,
+            // Status should always be published if we use List Now
+            status: INVENTORY_STATUS.PUBLISHED,
+            serialNumber: [],
+            taxPercentageAmount: Math.floor(taxPercentageAmountValue),
+            taxDollarAmount: Math.floor(taxDollarAmountValue),
+          };
+          if (isEdit) {
+            const updatePayload = {
+              productAddress: membership.productId,
+              inventory: formik.values.tempInv.address,
+              updates: {
+                pricePerUnit: formik.values.price,
+                status: parseInt(formik.values.inventoryStatus),
+                quantity: formik.values.tempInv.availableQuantity,
+                taxPercentageAmount: parseInt(formik.values.taxPercentageAmount),
+                taxDollarAmount: parseInt(formik.values.taxDollarAmount)
+              }
+            }
+            const updateInventory = await inventoryActions.updateInventory(
+              inventoryDispatch,
+              updatePayload
+            )
+            if (updateInventory) {
+              formik.resetForm();
+              // handleCancel("success");
+            }
+          } else {
+            const createInventory = await inventoryActions.createInventory(
+              inventoryDispatch,
+              inventoryBody
+            )
+            if (createInventory) {
+              formik.resetForm();
+              // handleCancel("success");
+            }
+          }
         }
-        setVisible(false);
+        else {
+          const resalePayload = {
+            itemAddress: membership.itemAddress,
+            productAddress: membership.productId,
+            inventory: membership.inventoryId,
+            updates: {
+              pricePerUnit: formik.values.price,
+              status: formik.values.inventoryStatus,
+              quantity: 1,
+              taxPercentageAmount: formik.values.taxPercentageAmount,
+              taxDollarAmount: formik.values.taxDollarAmount
+            }
+          }
+          const resaleMembership = await membershipActions.resaleMembership(
+            membershipDispatch, resalePayload
+          )
 
+          if (resaleMembership) {
+            // membership.product_with_inventory = 1;
+            formik.resetForm();
+          }
+          setVisible(false);
+        }
       }
     }
   };
 
+  const inventoriesCol = (Inventories && Inventories.length === 0) ? "red" : "green";
+  const cardDetail = [
+    { label: "Sub Category", value: subCategory, visible: true },
+    { label: "Company Name", value: manufacturer, visible: true },
+    {
+      label: isDuration ? "Duration" : "Expiry Date", value: isDuration
+        ? `${timePeriodInMonths ?? "--"} Month(s)`
+        : `${dayjs(expiryDate).format('MM-DD-YYYY') ?? "--"}`, visible: true
+    },
+    { label: "Savings", value: `$ ${savings ?? 0}`, visible: true },
+    { label: "Membership Number", value: membershipId, visible: isMembershipNumber },
+  ]
 
   return (
     <>
       {state === null ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin />
-        </div>
+        <LoaderComponent />
       ) : (
-        <Card className="w-full mt-6" id="product">
-          <div className="flex">
-            <div className="text-center py-1 rounded w-24 text-sm mt-2.5">
-              <img
-                className="w-52 object-cover"
-                alt=""
-                src={membership.productImageLocation}
-              />
-              {membership.inventories.some(inv => inv.status === 1) ?
-                (membership.inventories.every(inv => inv.status === 1) ?
-                  (<Button type="primary" shape="round" style={{ background: "green", marginTop: "10px" }}> For Sale </Button>)
-                  : (<Button type="primary" shape="round" style={{ background: "red", marginTop: "10px" }}> Retained </Button>))
-                : (<Button type="primary" shape="round" style={{ background: "blue", marginTop: "10px" }}> Not for Sale </Button>)}
-            </div>
-            <div className="ml-12 w-full">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center">
-                  <h3 className="font-semibold text-primaryB text-xl">
-                    {decodeURIComponent(membership.product.name)}
-                  </h3>
-                </div>
-                {/* <div className="flex items-center">
-                  {!membership.product_with_inventory ?
-                    <Button type="text"
-                      className="text-primary text-sm cursor-pointer"
-                      onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          window.location.href = loginUrl;
-                        } else {
-                          formik.setFieldValue("name", membership.product.name);
-                          openListNowModal();
-                        }
-                      }}
-                    >
-                      List for Sale
-                    </Button>
-                    : null}
-                </div> */}
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Sub Category</p>
-                <p text-secondryB text-sm>
+        <Card className="w-full mt-6 border-grey card-shadow" id="product" key={membershipId}>
+          <Col span={24} style={{ padding: "0px" }}>
+            <Row className="p-4 flex justify-between item-center rounded-md" style={{ backgroundColor: "#f2f2f9" }}>
+              <Col >
+                <Row>
+                  <Text level={4} className="font-poppin text-2xl lh-28">
+                    {membership?.productName ?? "--"}
+                  </Text>
+                </Row>
+                <Row className="lh-20" type={status === 1 ? 'success' : 'danger'} level={4}>
+                  <Col className="m-tp-5 w-2.5 h-2.5 rounded-md" style={{
+                    borderRadius: '10%', backgroundColor: `${(status && statusColor[status]) ?? inventoriesCol} `,
+                  }} > </Col>
+                  &nbsp; {statusText[status] ?? (Inventories?.length > 0 ? "For Sale" : "Not for Sale")}
+                </Row>
+              </Col>
+              <Col className="text-right flex" style={{ alignItems: "center" }}>
+                <Row type="text" onClick={() => { callDetailPage(null, inventoryId) }}>
+                  <Text className="primary-theme-text font-bold text-sm leading-4 flex font-poppin cursor-pointer"> Preview  </Text>
+                  <Text className="ml-2 m-tp-2"> {forwardArrowIcon()}</Text>
+                </Row>
+              </Col>
+              {isDescription &&
+                (<Col span={24} className="mt-2">
+                  <Text className="text-lg font-medium leading-6 font-poppin"> Description </Text>
+                  <ParagraphEllipsis description={description} className="text-dark-grey font-poppin" />
+                </Col>)}
+            </Row>
+            <Row className="mt-4">
+              <Col sm={12} lg={12} xl={8} xxl={6} className="border-grey shadow-lg h-52 rounded overflow-hidden">
+                {productImageLocation.length === 0 ?
+                  <Image
+                    className="object-covers"
+                    width={'100%'}
+                    height={'90%'}
+                    preview={false}
+                    fallback={noPreview}
+                    src={productImageLocation[0]}
+                  />
                   :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {membership.product.subCategory}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Company Name</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {membership.product.manufacturer}
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Duration</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {membership.timePeriodInMonths} Month(s)
-                </p>
-              </div>
-              <div className="flex mt-1.5 items-center">
-                <p className="text-primaryC text-sm w-40">Savings</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p
-                  style={{ color: "green" }}
-                  className="text-primaryB font-bold text-sm ml-3"
+                  <Carousel showArrows={true} showThumbs={false} className="h-full mem-card-carousel" >
+                    {productImageLocation && productImageLocation?.map((item) => {
+                      return <Image
+                        key={item}
+                        className="object-covers"
+                        width={'100%'}
+                        height={'100%'}
+                        preview={false}
+                        onClick={() => { setCarouselModel(true) }}
+                        src={item}
+                        fallback={noPreview}
+                      />
+                    })}
+                  </Carousel>}
+
+                {availableQuantity === 0 ? "" : <Button
+                  block={true}
+                  className="text-white text-sm cursor-pointer absolute bottom-0 rounded-none flex sm:h-10 pt-2"
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      let taxVal = membership.taxPercentageAmount === 0 ? membership.taxDollarAmount : membership.taxPercentageAmount;
+                      let isPercent = membership.taxDollarAmount === 0 ? true : false
+                      formik.setFieldValue("name", membership.productName);
+                      formik.setFieldValue("inventoryStatus", membership.status);
+                      formik.setFieldValue("isTaxPercentage", isPercent);
+                      formik.setFieldValue("price", membership?.price);
+                      formik.setFieldValue("quantity", qty);
+                      formik.setFieldValue("taxPercentage", taxVal);
+                      formik.setFieldValue("taxPercentageAmount", membership.taxPercentageAmount);
+                      formik.setFieldValue("taxDollarAmount", membership.taxDollarAmount);
+                      openListNowModal(configCase);
+                    }
+                  }}
+                  type={availableQuantity === 0 ? "default" : "primary"}
+                  disabled={availableQuantity === 0 ? true : false}
                 >
-                  $ {membership.savings}
-                </p>
-              </div>
-            </div>
-          </div>
-          <> </>
-          <div style={{ marginTop: "20px", borderRadius: '10px', border: '1px solid #333', padding: '10px' }}>
-            <Title level={5}>Inventories</Title>
-            <Table bordered pagination={false} columns={columns} dataSource={data} />
-          </div>
-          {/* {open && (
-            <DeleteProductModal
-              open={open}
-              handleCancel={handleCancel}
-              product={state}
-              debouncedSearchTerm={debouncedSearchTerm}
-            />
-          )}
-          {editModalOpen && (
-            <UpdateProductModal
-              open={editModalOpen}
-              handleCancel={handleEditModalClose}
-              productToUpdate={state}
-              categorys={categorys}
-              debouncedSearchTerm={debouncedSearchTerm}
-            />
-          )} */}
+                  <Row className="mx-auto w-full text-sm font-semibold">
+                    <Col className="w-28 mx-auto flex justify-between item-center">
+                      <Text>{tagIcon()}</Text>
+                      <Text className="text-white font-poppin">
+                        &nbsp;
+                        {btnName}
+                      </Text>
+                    </Col>
+                  </Row>
+                </Button>}
+              </Col>
+              <Col sm={12} lg={{ span: 12 }} xl={{ span: 14, offset: 1 }} xxl={{ span: 17, offset: 1 }}
+                className={`border-grey shadow-lg leading-2 min-h-min rounded p-4 ${isMembershipNumber ? "h-52" : "h-40"}`}>
+                {cardDetail.map(({ label, value, visible }, index) => {
+                  return (visible && <Paragraph key={index}>
+                    <Text className="font-normal text-grey leading-5 font-poppin" >{label}</Text>
+                    <Text className="float-right font-poppin leading-5">{value ?? "--"}</Text>
+                  </Paragraph>)
+                })}
+              </Col>
+            </Row>
+            {Inventories && Inventories?.length > 0 &&
+              <Row className="mt-4">
+                <Col span={24}>
+                  <Collapse size="large" expandIconPosition='end'>
+                    <Panel header={<Title className="leading-6 text-lg font-poppin font-medium" level={5}>Inventories</Title>} key="1" >
+                      <Table pagination={false}
+                        className="inventory-table"
+                        rowClassName={"bg-white"} rowKey="key" columns={purchasedCardColumn} dataSource={data} />
+                    </Panel>
+                  </Collapse>
+                </Col>
+              </Row>}
+          </Col>
         </Card>
-      )}
-      {viewable && (
-        <PublishNowModal
-          open={viewable}
-          user={user}
-          handleCancel={closeInventoryNowModal}
-          onClick={openInventoryNowModal}
-          formik={formik}
-          getIn={getIn}
-          isCreateMembershipSubmitting={isCreateInventorySubmitting}
-          inventory={formik.values.tempInv}
-        />
       )}
       {visible && (
         <ListNowModal
+          config={listModalConfig}
           open={visible}
-          handleCancel={closeListNowModal}
           user={user}
+          handleCancel={closeListNowModal}
           onClick={openListNowModal}
           formik={formik}
-          listType="New"
-          id="None"
+          id={itemNumber}
+          membershipStatus={membership.status}
           getIn={getIn}
-          inventory={formik.values.tempInv}
+          isCreateMembershipSubmitting={isCreateInventorySubmitting}
         />
       )}
+
+      <Modal
+        title={<Text className="h-44"> &nbsp;</Text>}
+        centered
+        open={carouselModel}
+        closeIcon={false}
+        footer={null}
+        onOk={() => setCarouselModel(false)}
+        onCancel={() => setCarouselModel(false)}
+        width={1100}
+        className="gallary-modal"
+      >
+        <Row>
+          <Col span={16} className="mx-auto ">
+            <Carousel showArrows={true} showThumbs={false}>
+              {productImageLocation && productImageLocation?.map((item) => {
+                return <Image
+                  key={item}
+                  className="object-covers"
+                  width={'100%'}
+                  preview={false}
+                  onClick={() => { setCarouselModel(true) }}
+                  src={item}
+                  fallback={noPreview}
+                />
+              })}
+            </Carousel>
+          </Col>
+        </Row>
+      </Modal>
+
     </>
   );
 };
