@@ -228,7 +228,8 @@ contract Mem_MembershipManager is
         string _providerComment,
         uint _providerLastUpdatedDate,
         uint _pricePaid,
-        address _bookedUserAddress
+        address _bookedUserAddress,
+        string _providerOrg
     ) returns (uint256, address) {
         ServiceUsage serviceUsage = new ServiceUsage(
             _itemId,
@@ -241,7 +242,8 @@ contract Mem_MembershipManager is
             _providerComment,
             _providerLastUpdatedDate,
             _pricePaid,
-            _bookedUserAddress
+            _bookedUserAddress,
+            _providerOrg
         );
 
         return (RestStatus.OK, address(serviceUsage));

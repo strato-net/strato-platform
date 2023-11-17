@@ -181,6 +181,7 @@ const ServiceTable = () => {
   const [tableData, setTableData] = useState([]);
   const [page, setPage] = useState(1);
   const [filterQuery, setFilterQuery] = useState({});
+  const [providerOrg, setProviderOrg] = useState("");
 
   useEffect(() => {
     setServiceList(serviceListData);
@@ -290,11 +291,13 @@ const ServiceTable = () => {
         updatedDataObj.itemId = record.itemId;
         updatedDataObj.serviceId = record.serviceId;
         if (serviceType == "booked") {
+          updatedDataObj["providerOrg"] = providerOrg;
           serviceUsageActions.createBookedServiceUsage(
             serviceUsageDispatch,
             updatedDataObj
           );
         } else {
+          updatedDataObj["providerOrg"] = organization;
           serviceUsageActions.createProvidedServiceUsage(
             serviceUsageDispatch,
             updatedDataObj
@@ -433,6 +436,7 @@ const ServiceTable = () => {
     membership,
     providerState,
     isServicesLoading,
+    setProviderOrg
   });
 
   const handlePaginationChange = (CPage) => {
