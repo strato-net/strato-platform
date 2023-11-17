@@ -15,14 +15,13 @@ contract CarbonSale is Sale{
         return RestStatus.OK;
     }
 
-    // Function to execute the UTXO sale
     function executeUTXOSale(string _purchasersCommonName, address _purchasersAddress) public requireSeller("Execute UTXO Sale") returns () {
         // Before executing the sale, ensure the asset is a UTXO asset
         Carbon carbonAsset = Carbon(address(assetToBeSold));
         require(units <= carbonAsset.units(), "Cannot sell more units than available");
 
         // Call splitAsset on the UTXO asset
-        newAssetAddress = carbonAsset.splitAsset(units, _purchasersCommonName);
+        address newAssetAddress = carbonAsset.splitAsset(units);
 
         // Transfer ownership of the new asset to the purchaser
         Asset(newAssetAddress).transferOwnership(address(this), _purchasersCommonName, _purchasersAddress);    
