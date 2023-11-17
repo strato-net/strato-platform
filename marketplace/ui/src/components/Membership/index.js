@@ -99,7 +99,7 @@ const Membership = (user) => {
 
   let msg = message || inventoryState.message;
 
-  const isPageLoading = stripeStatus === null || isLoadingStripeStatus;
+  const isPageLoading = isLoadingStripeStatus;
   const isMembershipFound = isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading;
   const listTabProps = { type, isPurchased, user, debouncedSearchTerm }
   return (

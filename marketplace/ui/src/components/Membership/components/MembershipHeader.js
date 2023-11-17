@@ -81,10 +81,10 @@ const MembershipHeader = ({ type, isMembershipFound, isPurchased, showModal }) =
             </Button>
             <Button
               id="add-product-button"
-              type={stripeStatus.detailsSubmitted ? "default" : "primary"}
+              type={stripeStatus?.detailsSubmitted ? "default" : "primary"}
               style={{ color: "white", fontWeight: "bold" }}
               className="py-3 px-6 mx-4 h-12 bg-500 !hover:bg-primaryHover font-semibold"
-              disabled={stripeStatus.detailsSubmitted}
+              disabled={stripeStatus?.detailsSubmitted}
               onClick={() => {
                 if (isRedirectLogin) {
                   window.location.href = loginUrl;
