@@ -1,10 +1,10 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/orders/contracts/orders/Sales/MaterialsSale.sol";
+import "/dapp/orders/orders/Sales/MaterialsSale.sol";
 
 pragma es6;
 pragma strict;
-import <1e23e3989728fa5fc5ca6d6d3cd01cdc889434f9>;
+import <d85f8ab0f5bb3add2046fd57ba9ba3ef3823d005>;
 
 /// @title A representation of Materials assets
 contract Materials is ItemStatus, RestStatus, Asset {
@@ -52,7 +52,7 @@ contract Materials is ItemStatus, RestStatus, Asset {
     }
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
-        whitelistedSales.push(address(Sale(new MaterialsSale(address(this), _state, _payment))));
+        whitelistedSales.push(address(new MaterialsSale(address(this), _state, _payment)));
         return RestStatus.OK;
     }
 

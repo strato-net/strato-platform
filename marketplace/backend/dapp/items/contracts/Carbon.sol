@@ -1,14 +1,16 @@
 import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/orders/contracts/SimpleSale.sol";
+import "/dapp/orders/contracts/CarbonSale.sol";
 import "/dapp/mercata-base-contracts/Templates/Assets/UTXO.sol";
 
 pragma es6;
 pragma strict;
-import <1e23e3989728fa5fc5ca6d6d3cd01cdc889434f9>;
+import <d85f8ab0f5bb3add2046fd57ba9ba3ef3823d005>;
 
 /// @title A representation of Carbon assets
-contract Carbon is ItemStatus, RestStatus, UTXO {
+contract Carbon is ItemStatus, RestStatus, Asset {
+    uint public units; // Number of units this asset represents
+    uint public serialNo;
     string public ownerOrganization;
     string public ownerOrganizationalUnit;
     string public serialNumber;
@@ -16,27 +18,27 @@ contract Carbon is ItemStatus, RestStatus, UTXO {
     uint public itemNumber;
     string public projectType;
 
-    event OwnershipUpdate(
-        string seller,
-        string newOwner,
-        uint ownershipStartDate,
-        address itemAddress
-    );
+    event AssetSplit(address newAsset, uint unitsMoved);
+    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
     constructor(
-        string _serialNumber,
-        ItemStatus _status,
-        uint _itemNumber,
-        uint _createdDate,
-        address _owner,
         string _name,
         string _description,
         string[] _images,
+        uint _createdDate,
+        uint _units,
+        uint _serialNumber,
+        ItemStatus _status,
+        uint _itemNumber,
         uint _price,
+        address _owner,
         string _projectType,
         SaleState _saleState,
-        PaymentType _paymentType
-    ) public UTXO(_name, _description, _images, _createdDate, _units, _serialNumber){
+        PaymentType _paymentType,
+        bool noSale
+    ) Asset(_name, _description, _images, _createdDate) {
+        units = _units;
+        serialNo = _serialNumber;
         owner = _owner;
 
         status = _status;
@@ -47,21 +49,28 @@ contract Carbon is ItemStatus, RestStatus, UTXO {
         ownerOrganization = ownerCert["organization"];
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
-
-        createSale(_saleState, _paymentType, _price);
+        if(noSale==false)
+            createSale(_saleState, _paymentType, _price, _units);
     }
 
-    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
-        whitelistedSales.push(address(Sale(new CarbonSale(address(this), _state, _payment))));
+    function splitAsset(uint splitUnits) public requireOwner("Split Asset") returns (address newAssetAddress) {
+        require(splitUnits < units, "Cannot split more units than available");
+        Carbon newAsset = new Carbon(name, description, images, createdDate, splitUnits, (serialNo+1), status, itemNumber, 0, owner, projectType, SaleState.NONE, PaymentType.NONE, true);
+        units -= splitUnits;
+
+        emit AssetSplit(address(newAsset), splitUnits);
+
+        return address(newAsset);
+    }
+
+    function createSale(SaleState _state, PaymentType _payment, uint _price, uint _units) public requireOwner("Create sale") returns (uint) {
+        whitelistedSales.push(address(new CarbonSale(address(this), _state, _payment, _price, _units)));
         return RestStatus.OK;
     }
 
-    function reSell(
-        uint _price,
-        SaleState _saleState,
-        PaymentType[] _paymentTypes
-    ){
+    function reSell(uint _price, SaleState _saleState, PaymentType[] _paymentTypes) public {
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            createSale(_saleState, _paymentTypes[i], price);
-         }  
+            createSale(_saleState, _paymentTypes[i], _price, units);
+        }  
     }
+}

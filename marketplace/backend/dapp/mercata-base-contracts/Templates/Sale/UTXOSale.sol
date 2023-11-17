@@ -27,7 +27,7 @@ abstract contract UTXOSale is Sale {
         newAssetAddress = utxoAsset.splitAsset(splitUnits, _purchasersCommonName);
 
         // Transfer ownership of the new asset to the purchaser
-        Asset(newAssetAddress).transferOwnership(_purchasersCommonName, _purchasersAddress);
+        Asset(newAssetAddress).transferOwnership(address(this), _purchasersCommonName, _purchasersAddress);    
 
         return newAssetAddress;
     }
