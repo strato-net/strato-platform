@@ -11,7 +11,6 @@ contract Art is ItemStatus, RestStatus, Asset {
     string public ownerOrganizationalUnit;
     string public serialNumber;
     ItemStatus public status;
-    string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
     string public artist;
 
@@ -25,7 +24,6 @@ contract Art is ItemStatus, RestStatus, Asset {
     constructor(
         string _serialNumber,
         ItemStatus _status,
-        string _comment,
         uint _itemNumber,
         uint _createdDate,
         address _owner,
@@ -35,13 +33,12 @@ contract Art is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _price,
         SaleState _saleState,
-        PaymentType _paymentType
-    ) public Asset(_name, _description, _images, _price, _createdDate){
+        PaymentType[] _paymentTypes
+    ) public Asset(_name, _description, _images, _createdDate){
         owner = _owner;
 
         serialNumber = _serialNumber;
         status = _status;
-        comment = _comment;
         itemNumber = _itemNumber;
         artist = _artist;
 
@@ -50,34 +47,13 @@ contract Art is ItemStatus, RestStatus, Asset {
         ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        createSale(_saleState, _paymentType);
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            createSale(_saleState, _paymentTypes[i], _price);
+         }
     }
 
     function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
         whitelistedSales.push(address(Sale(new ArtSale(address(this), _state, _payment))));
-        return RestStatus.OK;
-    }
-
-    function update(
-        ItemStatus _status,
-        string _comment,
-        uint _scheme
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-
-        if (_scheme == 0) {
-            return RestStatus.OK;
-        }
-
-        if ((_scheme & (1 << 0)) == (1 << 0)) {
-            status = _status;
-        }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
-        }
-
         return RestStatus.OK;
     }
 
@@ -105,5 +81,14 @@ contract Art is ItemStatus, RestStatus, Asset {
         );
         return RestStatus.OK;
     }
-}
+
+    function reSell(
+        uint _price,
+        SaleState _saleState,
+        PaymentType[] _paymentTypes
+    ){
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            createSale(_saleState, _paymentTypes[i], price);
+         }  
+    }
 

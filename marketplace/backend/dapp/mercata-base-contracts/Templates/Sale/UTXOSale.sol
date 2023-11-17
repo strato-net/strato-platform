@@ -6,8 +6,9 @@ abstract contract UTXOSale is Sale {
     constructor(
         address _assetToBeSold,
         SaleState _state,
-        PaymentType _payment
-    ) Sale(_assetToBeSold, _state, _payment) {
+        PaymentType _payment,
+        uint _price
+    ) Sale(_assetToBeSold, _price, _state, _payment) {
     }
 
 

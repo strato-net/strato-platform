@@ -12,7 +12,6 @@ contract Materials is ItemStatus, RestStatus, Asset {
     string public ownerOrganizationalUnit;
     string public serialNumber;
     ItemStatus public status;
-    string public comment; // to store remarks if the item is removed from the application.
     uint public itemNumber;
     string public source;
 
@@ -26,7 +25,6 @@ contract Materials is ItemStatus, RestStatus, Asset {
     constructor(
         string _serialNumber,
         ItemStatus _status,
-        string _comment,
         uint _itemNumber,
         uint _createdDate,
         address _owner,
@@ -37,12 +35,11 @@ contract Materials is ItemStatus, RestStatus, Asset {
         string _source,
         SaleState _saleState,
         PaymentType _paymentType
-    ) public Asset(_name, _description, _images, _price, _createdDate ){
+    ) public Asset(_name, _description, _images, _createdDate ){
         owner = _owner;
 
         serialNumber = _serialNumber;
         status = _status;
-        comment = _comment;
         itemNumber = _itemNumber;
         source = _source;
 
@@ -59,51 +56,12 @@ contract Materials is ItemStatus, RestStatus, Asset {
         return RestStatus.OK;
     }
 
-    function update(
-        ItemStatus _status,
-        string _comment,
-        uint _scheme
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-
-        if (_scheme == 0) {
-            return RestStatus.OK;
-        }
-
-        if ((_scheme & (1 << 0)) == (1 << 0)) {
-            status = _status;
-        }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
-        }
-
-        return RestStatus.OK;
+    function reSell(
+        uint _price,
+        SaleState _saleState,
+        PaymentType[] _paymentTypes
+    ){
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            createSale(_saleState, _paymentTypes[i], price);
+         }  
     }
-
-    // Get the userOrganization
-    function getUserOrganization(address caller) public returns (string) {
-        mapping(string => string) ownerCert = getUserCert(caller);
-        string userOrganization = ownerCert["organization"];
-        return userOrganization;
-    }
-
-    function generateOwnershipHistory(
-        string _seller,
-        string _newOwner,
-        uint _ownershipStartDate,
-        address _itemAddress
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-        emit OwnershipUpdate(
-            _seller,
-            _newOwner,
-            _ownershipStartDate,
-            _itemAddress
-        );
-        return RestStatus.OK;
-    }
-}

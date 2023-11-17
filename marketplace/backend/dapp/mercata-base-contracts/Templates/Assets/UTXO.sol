@@ -11,10 +11,9 @@ abstract contract UTXO is Asset {
         uint _createdDate,
         uint _units,
         string _serialNo
-    ) Asset(_name, _description, _images, _price, _createdDate) {
+    ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
         serialNo = _serialNo;
-        createSale(_state, _payment);
     }
 
     function splitAsset(uint splitUnits, string ownerCommonName) public requireOwner("Split Asset") returns (address newAssetAddress) {

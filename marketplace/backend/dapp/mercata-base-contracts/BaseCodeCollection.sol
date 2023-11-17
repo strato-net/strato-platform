@@ -51,20 +51,19 @@ contract RestStatus {
   uint constant GATEWAY_TIMEOUT = 504;
 }
 
-abstract contract Asset is RestStatus{
+abstract contract Asset is PaymentType, SaleState, RestStatus{
     address public owner;
     string public ownerCommonName;
     string public name;
     string public description;
     string[] public images;
-    uint public price;
     uint public createdDate;
 
     // Sale public sale;
     address[] public whitelistedSales;
-    SaleFactory salefactory;
 
-    constructor(string _name, string _description, string[] _images, uint _price, uint _createdDate) {
+
+    constructor(string _name, string _description, string[] _images, uint _createdDate) {
         CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
         Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
         owner  = c.userAddress();
@@ -72,7 +71,6 @@ abstract contract Asset is RestStatus{
         name = _name;
         description =_description;
         images =_images;
-        price = _price;
         createdDate = _createdDate;
     }
 
@@ -111,11 +109,10 @@ abstract contract Asset is RestStatus{
         for (uint i = 0; i < whitelistedSales.length; i++) {
             if (whitelistedSales[i] == saleContract) {
                 delete whitelistedSales[i];
-                // Shift elements left to fill the gap left by delete
+                // Shift    elements left to fill the gap left by delete
                 for (uint j = i; j < whitelistedSales.length - 1; j++) {
                     whitelistedSales[j] = whitelistedSales[j + 1];
                 }
-                // whitelistedSales.pop(); // Remove the last element
                 break;
             }
         }
@@ -126,13 +123,8 @@ abstract contract Asset is RestStatus{
     function disableAllSales() public requireOwner("disableAllSales") {
         for (uint i = 0; i < whitelistedSales.length; i++) {
             Sale(whitelistedSales[i]).changeSaleState(SaleState.Closed);
-            dewhitelistSale(whitelistedSales[i]);
+            whitelistedSales=[];
         }
-    }
-
-    function changePrice(uint _price) public requireOwner("Change Asset Price") returns (uint) {
-        price = _price;
-        return RestStatus.OK;
     }
     
     function transferOwnership(address saleContract, string _newOwnerCommonName, address _newOwner) public requireOwner("Ownership transfer") {
@@ -140,7 +132,7 @@ abstract contract Asset is RestStatus{
         ownerCommonName = _newOwnerCommonName;
         owner = _newOwner;
         disableAllSales();
-    }
+   }
 }
 
 abstract contract Sale is PaymentType, SaleState, RestStatus{ 
@@ -155,13 +147,14 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
 
     constructor(
         address _assetToBeSold,
+        uint _price,
         SaleState _state,
         PaymentType _payment
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         sellersCommonName = assetToBeSold.ownerCommonName();
         purchasersCommonName = sellersCommonName;
-        price = assetToBeSold.price();
+        price = _price;
         state = _state;
         payment = _payment;
         saleOrderID = 0;

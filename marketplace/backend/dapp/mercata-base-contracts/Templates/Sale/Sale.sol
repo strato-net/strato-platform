@@ -15,13 +15,14 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
 
     constructor(
         address _assetToBeSold,
+        uint _price,
         SaleState _state,
         PaymentType _payment
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         sellersCommonName = assetToBeSold.ownerCommonName();
         purchasersCommonName = sellersCommonName;
-        price = assetToBeSold.price();
+        price = _price;
         state = _state;
         payment = _payment;
         saleOrderID = 0;
