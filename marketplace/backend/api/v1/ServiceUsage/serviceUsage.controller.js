@@ -114,6 +114,7 @@ class ServiceUsageController {
       providerLastUpdatedDate: Joi.string().required(),
       pricePaid: Joi.string().required(),
       bookedUserAddress: Joi.string().required(),
+      providerOrg: Joi.string().required()
     });
 
     const validation = createServiceUsageSchema.validate(args);
