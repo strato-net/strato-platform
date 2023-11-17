@@ -346,7 +346,7 @@ const CategoryProductList = ({ user }) => {
           : (
             <div className="w-9/12 mb-12">
               <Text className="text-sm text-secondryB">
-                {marketplaceList.length} Products found
+                {productList.length} Products found
               </Text>
               {marketplaceList.length > 0
                 ? <div className="mt-4 mb-8 mr-10" id="product-list">
