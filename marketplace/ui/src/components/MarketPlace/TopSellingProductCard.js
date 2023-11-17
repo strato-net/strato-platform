@@ -160,8 +160,12 @@ const TopSellingProductCard = () => {
                           handleNavigate(topSellingProduct)
                         }}
                       />
-                      <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer"
-                        onClick={() => { handleNavigate(topSellingProduct) }}>
+                      <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer" onClick={() =>
+                        topSellingProduct.membershipId ?
+                          navigate(naviroute2.replace(":id", topSellingProduct.membershipId), { state: { isCalledFromMembership: true, inventoryId: topSellingProduct.address } })
+                          :
+                          navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                      }>
                         {topSellingProduct.name}
                       </Text>
                       <Text className="mt-3 text-xl !text-primaryC font-semibold">

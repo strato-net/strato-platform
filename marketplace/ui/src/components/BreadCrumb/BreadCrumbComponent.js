@@ -17,7 +17,11 @@ const BreadCrumbComponent = ({ name }) => {
       navigate('/category/Membership')
     } else if (item === "/memberships/serviceUsage") {
     } else {
-      navigate(item)
+      if (item) {
+        navigate(item)
+      } else {
+        navigate("/marketplace")
+      }
     }
   }
 
