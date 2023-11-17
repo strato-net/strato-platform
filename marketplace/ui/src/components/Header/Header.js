@@ -94,7 +94,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   useEffect(() => {
     if (!isAuthenticated && !user && loginUrl) {
       const unauthorizedRedirectUrls = [
-        '/order', '/products', '/purchased', '/issued', "checkout"
+        '/order', '/products', '/purchased', '/issued', "/checkout"
       ];
 
       const pathName = location.pathname;
