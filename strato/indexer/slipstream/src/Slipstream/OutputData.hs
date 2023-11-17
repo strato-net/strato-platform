@@ -6,89 +6,101 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MonoLocalBinds  #-}
 
-module Slipstream.OutputData
-  ( outputData,
-    outputData',
-    OutputM,
-    ProcessedMappingRow (..),
-    insertEventTables,
-    insertIndexTable,
-    insertForeignKeys,
-    insertMappingTable,
-    insertAbstractTable,
-    insertAbstractTableQuery,
-    createIndexTable,
-    createMappingTable,
-    createHistoryTable,
-    createAbstractTable,
-    insertHistoryTable,
-    createExpandEventTables,
-    createExpandIndexTable,
-    createForeignIndexesForJoins,
-    createExpandAbstractTable,
-    expandAbstractTable,
-    expandAbstractContractTable,
-    notifyPostgREST,
-    createExpandHistoryTable,
-    cirrusInfo,
-    historyTableName,
-  )
-where
+module Slipstream.OutputData (
+  outputData,
+  outputData',
+  OutputM,
+  ProcessedMappingRow(..),
+  insertEventTables,
+  insertIndexTable,
+  insertForeignKeys,
+  insertMappingTable,
+  insertMappingTableQuery,
+  insertAbstractTable,
+  insertAbstractTableQuery,
+  createIndexTable,
+  createMappingTable,
+  createHistoryTable,
+  createAbstractTable,
+  insertHistoryTable,
+  createExpandEventTables,
+  createExpandIndexTable,
+  createForeignIndexesForJoins,
+  createExpandAbstractTable,
+  expandAbstractTable,
+  expandAbstractContractTable,
+  notifyPostgREST,
+  createExpandHistoryTable,
+  cirrusInfo,
+  historyTableName,
+  tableColumns,
+  resolveNameParts
+  ) where
 
--- import qualified Data.Text.Encoding as TE
 
--- import qualified Data.ByteString.Lazy.Char8 as BSL
-
-import Bloc.Server.Utils (partitionWith)
-import BlockApps.Logging
-import BlockApps.Solidity.Value
-import qualified BlockApps.Solidity.Value as V
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
-import qualified Blockchain.Strato.Model.Event as Action
-import Blockchain.Strato.Model.Keccak256
-import Conduit
-import Control.Arrow ((***))
-import Control.Lens ((^.))
-import Control.Monad
-import qualified Data.Aeson as Aeson
-import Data.Bifunctor (first)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import Data.Function (on)
-import Data.List (groupBy, nubBy)
-import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, listToMaybe, mapMaybe)
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
-import Data.Time
-import Database.PostgreSQL.Typed
-import Database.PostgreSQL.Typed.Protocol
-import Database.PostgreSQL.Typed.Query
-import Slipstream.Data.Action
-import qualified Slipstream.Events as E
-import Slipstream.Globals
-import Slipstream.Metrics
-import Slipstream.Options
-import Slipstream.QueryFormatHelper
-import Slipstream.SolidityValue
-import SolidVM.Model.CodeCollection hiding (contractName, contracts)
-import SolidVM.Model.SolidString
-import qualified SolidVM.Model.Type as SVMType
-import Text.Printf
-import Text.RawString.QQ
-import UnliftIO.Exception (SomeException, catch, handle)
-import UnliftIO.IORef
+import           BlockApps.Solidity.Value as V
+import           Conduit
+import           Control.Arrow                   ((***))
+import           Control.Lens ((^.))
+import           Control.Monad
+import           Control.Monad.Change.Alter
+import qualified Data.Aeson                      as Aeson
+import qualified Data.ByteString.Base16         as Base16
+import qualified Data.ByteString.Char8           as BC
+import qualified Data.ByteString                 as B
+import qualified Data.ByteString.Lazy            as BL
+import qualified Data.Map.Strict                 as Map
+import           Data.Maybe                      (catMaybes, listToMaybe, mapMaybe)
+import           Data.Text                       (Text)
+import qualified Data.Text                       as T
+import           Data.Traversable                (for)
+import           Bloc.Server.Utils               (partitionWith)
+import           BlockApps.Logging
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
+import qualified Blockchain.Strato.Model.Event   as Action
+import           Blockchain.Strato.Model.Keccak256
+import           Data.Bifunctor                  (first)
+import           Data.Function                   (on)
+import           Data.List                       (groupBy, nubBy)
+import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
+import           Data.Time
+import           Database.PostgreSQL.Typed
+import           Database.PostgreSQL.Typed.Protocol
+import           Database.PostgreSQL.Typed.Query
+import           Slipstream.Data.Action
+import qualified Slipstream.Events               as E
+import           Slipstream.Globals
+import           Slipstream.Metrics
+import           Slipstream.Options
+import           Slipstream.QueryFormatHelper
+import           Slipstream.SolidityValue
+import           SolidVM.Model.CodeCollection    hiding (contractName, contracts)
+import           SolidVM.Model.SolidString
+import qualified SolidVM.Model.Type              as SVMType
+import           Text.Printf
+import           Text.RawString.QQ
+import           UnliftIO.Exception              (SomeException, catch, handle)
+import           UnliftIO.IORef
+-- import           Blockchain.Data.AddressStateDB (AddressState)
+import           Blockchain.Data.ChainInfo (ParentChainIds)
+import           Blockchain.Data.AddressStateDB
+import qualified Handlers.Storage as HS
+import           Blockchain.Strato.Model.ExtendedWord
+import qualified SolidVM.Model.Storable as MS
+import           MaybeNamed
+import           Blockchain.Strato.Model.ChainId
+import           Blockchain.Data.RLP
 
 newtype First b a = First {unFirst :: (a, b)}
 
 instance Functor (First b) where
   fmap f (First (a, b)) = First (f a, b)
+
 
 data ProcessedMappingRow = ProcessedMappingRow
   { address :: Address,
@@ -270,6 +282,54 @@ mappingTableName o a n m =
   let (o', a', n') = constructTableNameParameters o a n
    in MappingTableName o' a' n' m
 
+resolveNameParts ::
+  ( MonadLogger m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
+  Text ->
+  Text ->
+  Contract ->
+  m (Text, Text, Text)
+resolveNameParts o a c = do
+  let tName = T.pack . _contractName
+  case c ^. importedFrom of
+    Nothing -> pure (o, a, tName c)
+    Just acct ->
+      select (Proxy @AddressState) acct >>= \case
+        Nothing -> do
+          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
+            "Could not find address state for account " ++ show acct
+          pure (o, a, tName c)
+        Just s ->
+          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
+            Just (SolidVMCode appName _) -> do
+              let qs =
+                    HS.storageFilterParams
+                      { HS.qsKey = Just $ HS.HexStorage ".:creator",
+                        HS.qsAddress = Just $ acct ^. accountAddress,
+                        HS.qsChainId = Unnamed . ChainId <$> acct ^. accountChainId
+                      }
+              select (Proxy @[HS.StorageAddress]) qs >>= \case
+                Just (sa : _) -> case HS.value sa of
+                  HS.HexStorage orgHex -> case rlpDecode <$> rlpDeserializeMaybe orgHex of
+                    Just (MS.BString orgBS) -> case decodeUtf8' orgBS of
+                      Right o' -> pure (o', T.pack appName, tName c)
+                      Left _ -> do
+                        $logWarnS "resolveNameParts" . T.pack $
+                          ":creator field is not valid UTF8 for account " ++ show acct ++ ": " ++ show orgBS
+                        pure (o, T.pack appName, tName c)
+                    _ -> do
+                      $logWarnS "resolveNameParts" . T.pack $
+                        "Could not RLP decode :creator field for account " ++ show acct ++ ": " ++ show orgHex
+                      pure (o, T.pack appName, tName c)
+                _ -> pure ("", T.pack appName, tName c)
+            _ -> do
+              $logWarnS "resolveNameParts" . T.pack $
+                "Could not resolve code for account " ++ show acct
+              pure (o, a, tName c)
+
 createExpandIndexTable ::
   OutputM m =>
   IORef Globals ->
@@ -282,13 +342,18 @@ createExpandIndexTable g c nameParts = do
   return $ creationForeignKeys ++ expansionForeignKeys
 
 createExpandAbstractTable ::
-  OutputM m =>
+  ( OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
   IORef Globals ->
   Contract ->
   (Text, Text, Text) ->
+  CodeCollection ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandAbstractTable g c nameParts = do
-  creationForeignKeys <- createAbstractTable g c nameParts
+createExpandAbstractTable g c nameParts cc = do
+  creationForeignKeys <- createAbstractTable g c nameParts cc
   expansionForeignKeys <- expandAbstractTable g c nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
@@ -342,6 +407,24 @@ getDeferredForeignKeys tableName c o a =
         foreignTableName = indexTableName o a $ labelToText x
       }
 
+getDeferredForeignKeysAbstract ::   ( MonadLogger m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) => TableName -> Contract -> Text -> Text -> CodeCollection -> m[ForeignKeyInfo]
+getDeferredForeignKeysAbstract tableName c o a cc =
+  fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.Contract x}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
+      let contract = getContractsBySolidString x cc
+      case contract of
+        Just c' -> do
+          (o',a',n') <- resolveNameParts o a c'
+          pure $ Just $ ForeignKeyInfo
+                          { tableName = tableName,
+                            columnName = labelToText theName,
+                            foreignTableName = abstractTableName o' a' n'
+                          }
+        Nothing -> return Nothing
+
 getDeferredForeignKeysForMapping :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForMapping tableName o a =
   [ ForeignKeyInfo
@@ -358,7 +441,7 @@ getDeferredForeignKeysForMapping tableName o a =
   ]
 
 createIndexTable ::
-  OutputM m =>
+  OutputM m=>
   IORef Globals ->
   Contract ->
   (Text, Text, Text) ->
@@ -379,12 +462,17 @@ createIndexTable globalsIORef contract (o, a, n) = do
       return $ getDeferredForeignKeys tableName contract o a
 
 createAbstractTable ::
-  OutputM m =>
+  ( OutputM m,
+    Selectable Account AddressState m,
+    Selectable Word256 ParentChainIds m,
+    Selectable HS.StorageFilterParams [HS.StorageAddress] m
+  ) =>
   IORef Globals ->
   Contract ->
   (Text, Text, Text) ->
+  CodeCollection ->
   ConduitM () Text m [ForeignKeyInfo]
-createAbstractTable globalsIORef contract (o, a, n) = do
+createAbstractTable globalsIORef contract (o, a, n) cc = do
   let tableName = abstractTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
   if tableExists
@@ -393,7 +481,7 @@ createAbstractTable globalsIORef contract (o, a, n) = do
       let list = tableColumns $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       yield $ createAbstractTableQuery contract (o, a, n)
       setTableCreated globalsIORef tableName (list ++ ["\"data\" jsonb"])
-      return $ getDeferredForeignKeys tableName contract o a
+      lift $ getDeferredForeignKeysAbstract tableName contract o a cc
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::
@@ -648,7 +736,8 @@ insertIndexTable ::
   [E.ProcessedContract] ->
   ConduitM () Text m ()
 insertIndexTable [] = error "insertIndexTable: unhandled empty list"
-insertIndexTable contracts = yieldMany $ insertIndexTableQuery contracts
+insertIndexTable contracts = do
+  yieldMany $ insertIndexTableQuery contracts 
 
 insertMappingTable ::
   OutputM m =>
@@ -721,9 +810,8 @@ insertAbstractTable ::
   [(E.ProcessedContract, T.Text, TableColumns)] ->
   ConduitM () Text m ()
 insertAbstractTable [] = pure ()
-insertAbstractTable cs@((E.ProcessedContract {organization = org, application = app, contractName = cName}, _, _) : _) = do
-  let tableName = indexTableName org app cName
-  $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show tableName ++ " (and potentially others)"
+insertAbstractTable cs@((_, abTableName, _) : _) = do
+  $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName ++ " (and potentially others)" ++ show cs
   yieldMany $ insertAbstractTableQuery cs
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -852,7 +940,6 @@ insertIndexTableQuery cs =
                   ]
                 vals = flip map contracts $ \(row, rowList) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-
                 inserts = csv vals
              in (: []) $
                   T.concat
@@ -951,7 +1038,7 @@ insertAbstractTableQuery cs =
                 vals = flip map contracts $ \((row, contractColumns), _) ->
                   wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ [wrapSingleQuotes (tableNameToText contractTableName)] ++ [wrapSingleQuotes $ T.pack $ show $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] ++ (map snd $ Map.toList (Map.filterWithKey (\k _ -> k `elem` abColumns) contractColumns))
                 inserts = csv vals
-             in (: []) $
+            in (: []) $
                   T.concat
                     [ "INSERT INTO ",
                       abTableName,
@@ -966,8 +1053,9 @@ insertAbstractTableQuery cs =
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name|],
-                      if null list then "" else ",\n    ",
+    contract_name = excluded.contract_name,
+    data = excluded.data|],
+                      if null list then "" else "\n    ",
                       tableUpsert $ list',
                       ";"
                     ]
@@ -1185,7 +1273,6 @@ solidityValueToText (SolidityArray x) = escapeSingleQuotes . decodeUtf8 . BL.toS
 solidityValueToText (SolidityObject x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 valueToSQLTextFilterContract :: Value -> Maybe Text
-valueToSQLTextFilterContract (ValueContract _) = Just "NULL"
 valueToSQLTextFilterContract x = valueToSQLText x
 
 valueToSQLText :: Value -> Maybe Text

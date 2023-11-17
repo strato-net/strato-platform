@@ -6,12 +6,12 @@
 
 module Blockchain.Strato.Model.Nonce where
 
+import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
 import Control.DeepSeq (NFData)
 import Control.Lens.Operators
 import Data.Aeson hiding (Array, String)
 import Data.Proxy
-import Data.RLP
 import Data.Swagger
 import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
@@ -43,9 +43,9 @@ instance ToSchema Nonce where
 
 instance Arbitrary Nonce where arbitrary = Nonce . fromInteger <$> arbitrary
 
-instance RLPEncodable Nonce where
-  rlpEncode (Nonce n) = rlpEncode $ toInteger n
-  rlpDecode obj = Nonce . fromInteger <$> rlpDecode obj
+instance RLPSerializable Nonce where
+  rlpEncode (Nonce n) = rlpEncode n
+  rlpDecode obj = Nonce $ rlpDecode obj
 
 incrNonce :: Nonce -> Nonce
 incrNonce (Nonce n) = Nonce (n + 1)
