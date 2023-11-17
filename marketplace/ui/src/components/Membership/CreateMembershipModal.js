@@ -317,7 +317,7 @@ const CreateMembershipModal = ({ open, handleCancel, user }) => {
                 maxQuantity: service.numberOfUses,
                 createdDate: new Date().getTime(),
                 // If visible is true the List Now form is open and the membership is active
-                isActive: visible ? true : false,
+                isActive: true,
               })),
               //TODO: where do I put the imageKey from the uploaded File?
               productFileArgs: allFiles.map((file, index) => ({
