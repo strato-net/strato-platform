@@ -13,6 +13,7 @@ import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination, Button, Radio, Space} from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
+import RestStatus from "http-status-codes";
 
 
 const SoldOrdersTable = ({ user, selectedDate }) => {
@@ -29,16 +30,26 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
 
   useEffect(() => {
-    actions.fetchOrderSold(
-      dispatch,
-      limit,
-      offset,
-      debouncedSearchTerm,
-      user?.organization,
-      order,
-      selectedDate,
-      filter
-    );
+    
+    async function fetchData() {
+      console.log("Unauthorized1");
+      const response = await actions.fetchOrderSold(
+        dispatch,
+        limit,
+        offset,
+        debouncedSearchTerm,
+        user?.organization,
+        order,
+        selectedDate,
+        filter
+      );
+      console.log("Unauthorized12");
+      if (response === RestStatus.UNAUTHORIZED) {
+        console.log("Unauthorized123");
+        navigate(routes.Marketplace.url);
+      }
+    }
+    fetchData();
 
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
 

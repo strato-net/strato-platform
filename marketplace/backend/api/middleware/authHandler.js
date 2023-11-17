@@ -78,14 +78,16 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        return rest.response.status(RestStatus.UNAUTHORIZED, res, {
+        rest.response.status(RestStatus.UNAUTHORIZED, res, {
           loginUrl: getLoginUrl(req),
         })
+        return next(err)
       }
 
-      return rest.response.status(RestStatus.UNAUTHORIZED, res, {
+      rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })
+      return next(new Error('Authorization required'))
     }
   }
 
