@@ -394,7 +394,7 @@ const MembershipDetails = ({ user, users }) => {
     {
       title: (
         <Text className="text-primaryC font-semibold text-base">
-          Non-Memberhsip Price
+          Non-Membership Price
         </Text>
       ),
       dataIndex: "nonMemberPrice",
