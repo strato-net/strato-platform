@@ -95,6 +95,9 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   };
 
   useEffect(() => {
+    console.log("isAuthenticated", isAuthenticated)
+    console.log("user", user)
+    console.log("loginUrl", loginUrl)
     if (!isAuthenticated && !user && loginUrl) {
       const unauthorizedRedirectUrls = [
         '/orders', '/products', '/purchased', '/issued', '/inventories', '/checkout'
