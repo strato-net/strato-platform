@@ -313,7 +313,7 @@ const MembershipDetails = ({ user, users }) => {
       render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
     },
     {
-      title: <Text className="text-primaryC font-semibold text-base">Non-Memberhsip Price</Text>,
+      title: <Text className="text-primaryC font-semibold text-base">Non-Membership Price</Text>,
       dataIndex: "nonMemberPrice",
       key: "nonMemberPrice",
       render: (text) => <p className="text-left">${decodeURIComponent(text)}</p>,
