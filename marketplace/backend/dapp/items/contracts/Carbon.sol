@@ -53,7 +53,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
             createSale(_saleState, _paymentType, _price, _units);
     }
 
-    function splitAsset(uint splitUnits) public requireOwner("Split Asset") returns (address newAssetAddress) {
+    function splitAsset(uint splitUnits) public requireOwner("Split Asset") returns (address) {
         require(splitUnits < units, "Cannot split more units than available");
         Carbon newAsset = new Carbon(name, description, images, createdDate, splitUnits, (serialNo+1), status, itemNumber, 0, owner, projectType, SaleState.NONE, PaymentType.NONE, true);
         units -= splitUnits;
