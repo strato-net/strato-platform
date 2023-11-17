@@ -152,7 +152,7 @@ const TopSellingProductCard = () => {
                     <div className="flex flex-col items-center">
                       <Image
                         className="cursor-pointer"
-                        src={topSellingProduct.productImageLocation[0]}
+                        src={topSellingProduct.productImageLocation && topSellingProduct.productImageLocation[0]}
                         height={230}
                         width={230}
                         preview={false}
