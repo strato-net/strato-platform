@@ -38,9 +38,9 @@ const CategoryProductList = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
   // States
   const { marketplaceList, isMarketplaceLoading, isMarketplaceInitialLoading } = useMarketplaceState();
-  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
+  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
   const { hasChecked, isAuthenticated, loginUrl, isCheckingAuthentication } = useAuthenticateState();
-  const { categorys, isCategorysLoading } = useCategoryState();
+  const { categorys, iscategorysLoading } = useCategoryState();
 
   const [productList, setProductList] = useState([])
   const [category, setCategory] = useState("");
@@ -221,7 +221,7 @@ const CategoryProductList = ({ user }) => {
     return tempValues;
   }
 
-  const isLoading = isSubCategorysLoading || isMarketplaceLoading || isCategorysLoading || isMarketplaceInitialLoading || isCheckingAuthentication;
+  const isLoading = issubCategorysLoading || isMarketplaceLoading || iscategorysLoading || isMarketplaceInitialLoading || isCheckingAuthentication;
 
   return (
     <div>
