@@ -42,6 +42,7 @@ const App = () => {
     });
     actions.logout(userDispatch);
     setIsIdleModalOpen(false);
+  };
 
   window.LOQ = window.LOQ || [];
   window.LOQ.push([
