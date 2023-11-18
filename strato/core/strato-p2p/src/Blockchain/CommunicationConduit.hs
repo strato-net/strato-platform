@@ -48,7 +48,6 @@ import Blockchain.Watchdog
 import Conduit
 import Control.Concurrent (ThreadId)
 import Control.Concurrent.Chan.Unagi
-import Control.Concurrent.Hierarchy
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Unlift
@@ -69,6 +68,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import Data.Void
+import Ki.Unlifted hiding (await)
 import Text.Printf
 import UnliftIO.Concurrent hiding (yield)
 import UnliftIO.Exception
@@ -90,9 +90,9 @@ mkEthP2PEventSource ::
   ConduitM () P2pEvent m () ->
   String ->
   EthCryptState ->
-  ThreadMap ->
+  Scope ->
   m (ConduitM () Event m ())
-mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx tm = do
+mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx scp = do
   canarySource <- mkCanarySource
   eventsourcethreadid <- myThreadId
   recvWatchdog <- mkWatchdog eventsourcethreadid $ fromIntegral flags_connectionTimeout
@@ -111,7 +111,7 @@ mkEthP2PEventSource peerSourceConduit seqEventSource peerStr inCtx tm = do
                 ]
               )
               4096 -- 🙏
-              tm
+              scp
   return $
     merged
       .| CL.iterM recordEvent

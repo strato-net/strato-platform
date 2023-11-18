@@ -1,17 +1,17 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE PackageImports            #-}
+{-# LANGUAGE QuasiQuotes               #-}
+{-# LANGUAGE Rank2Types                #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE TemplateHaskell           #-}
+{-# LANGUAGE TupleSections             #-}
+{-# LANGUAGE TypeApplications          #-}
+{-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -77,7 +77,6 @@ import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
 import Control.Applicative (liftA2)
-import Control.Concurrent.Hierarchy
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
@@ -114,6 +113,7 @@ import Executable.EthereumVM
 import Executable.StratoP2P
 import Executable.StratoP2PClient
 import Executable.StratoP2PServer
+import Ki.Unlifted as KIU
 import Network.Socket
 import Test.Hspec
 import Text.Read (readMaybe)
@@ -1542,35 +1542,33 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  tm                  <- newThreadMap
-  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer =
-        Executable.StratoP2PServer.runEthServerConduit
-          (_p2pPeerPPeer client')
-          (sourceTQueue clientToServerTQueue)
-          (sinkTQueue serverToClientTQueue)
-          (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-          tm
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient =
-        runEthClientConduit
-          (_p2pPeerPPeer server')
-          (sourceTQueue serverToClientTQueue)
-          (sinkTQueue clientToServerTQueue)
-          (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-          tm
-  pure $
-    P2PConnection
-      serverToClientTQueue
-      clientToServerTQueue
-      server'
-      client'
-      (runReaderT rServer serverCtx)
-      (runReaderT rClient clientCtx)
-      serverExceptionTVar
-      clientExceptionTVar
+  scoped $ \scope -> do
+    conn <- fork scope (do let rServer = Executable.StratoP2PServer.runEthServerConduit
+                                           (_p2pPeerPPeer client')             
+                                           (sourceTQueue clientToServerTQueue) 
+                                           (sinkTQueue serverToClientTQueue)   
+                                           (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+                                           scope
+                           let rClient = runEthClientConduit         
+                                           (_p2pPeerPPeer server')   
+                                           (sourceTQueue serverToClientTQueue)
+                                           (sinkTQueue clientToServerTQueue)
+                                           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                                           scope
+                           pure $
+                             P2PConnection
+                               serverToClientTQueue
+                               clientToServerTQueue
+                               server'
+                               client'
+                               (runReaderT rServer serverCtx)
+                               (runReaderT rClient clientCtx)
+                               serverExceptionTVar
+                               clientExceptionTVar
+                       )
+    atomically $ KIU.await conn
 
 -- testPeer :: DataPeer.PPeer
 -- testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)

@@ -72,6 +72,7 @@ library:
   - hflags
   - hspec
   - hspec-expectations-lifted
+  - ki-unlifted
   - labeled-error
   - lens
   - merkle-patricia-db
@@ -93,7 +94,6 @@ library:
   - strato-p2p
   - strato-sequencer
   - text
-  - thread-hierarchy
   - time
   - transformers
   - unliftio

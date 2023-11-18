@@ -27,7 +27,6 @@ executables:
       - resourcet
       - strato-model
       - strato-p2p
-      - thread-hierarchy
       - unagi-chan
       - wai-middleware-prometheus
       - warp
@@ -70,6 +69,7 @@ library:
     # - json-rpc
     - json-rpc-server
     - json-rpc-client
+    - ki-unlifted
     - lens
     - lifted-async
     - lifted-base
@@ -132,6 +132,7 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - hourglass
+      - ki-unlifted
       - labeled-error
       - lens
       - merkle-patricia-db
@@ -152,7 +153,6 @@ tests:
       - strato-sequencer
       - strato-redis-blockdb
       - text
-      - thread-hierarchy
       - time
       - unliftio
       - vm-runner

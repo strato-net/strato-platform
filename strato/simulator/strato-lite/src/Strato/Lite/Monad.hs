@@ -77,7 +77,6 @@ import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext (ContextBestBlockInfo (..), GasCap (..), IsBlockstanbul (..), baggerState, lookupX509AddrFromCBHash, putContextBestBlockInfo, vmGasCap)
 import Conduit
 import Control.Applicative (liftA2)
-import Control.Concurrent.Hierarchy
 import Control.Concurrent.STM.TMChan
 import Control.Lens hiding (Context, view)
 import qualified Control.Lens as Lens
@@ -118,6 +117,7 @@ import Executable.EthereumVM
 import Executable.StratoP2P
 import Executable.StratoP2PClient 
 import Executable.StratoP2PServer (runEthServerConduit)
+import Ki.Unlifted as KIU
 import Network.Socket
 import Text.Read (readMaybe)
 import UnliftIO
@@ -1676,36 +1676,33 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer = do
-        tm <- liftIO newThreadMap
-        runEthServerConduit
-          (_p2pPeerPPeer client')
-          (sourceTQueue clientToServerTQueue)
-          (sinkTQueue serverToClientTQueue)
-          (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-          tm
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient = do
-        tm <- liftIO newThreadMap
-        runEthClientConduit
-          (_p2pPeerPPeer server')
-          (sourceTQueue serverToClientTQueue)
-          (sinkTQueue clientToServerTQueue)
-          (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-          tm
-  pure $
-    P2PConnection
-      serverToClientTQueue
-      clientToServerTQueue
-      server'
-      client'
-      (runReaderT rServer serverCtx)
-      (runReaderT rClient clientCtx)
-      serverExceptionTVar
-      clientExceptionTVar
+  scoped $ \scope -> do
+    conn <- fork scope (do let rServer = runEthServerConduit
+                                           (_p2pPeerPPeer client')             
+                                           (sourceTQueue clientToServerTQueue) 
+                                           (sinkTQueue serverToClientTQueue)   
+                                           (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+                                           scope
+                           let rClient = runEthClientConduit         
+                                           (_p2pPeerPPeer server')   
+                                           (sourceTQueue serverToClientTQueue)
+                                           (sinkTQueue clientToServerTQueue)
+                                           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                                           scope
+                           pure $
+                             P2PConnection
+                               serverToClientTQueue
+                               clientToServerTQueue
+                               server'
+                               client'
+                               (runReaderT rServer serverCtx)
+                               (runReaderT rClient clientCtx)
+                               serverExceptionTVar
+                               clientExceptionTVar
+                       )
+    atomically $ KIU.await conn
 
 createGermophobicConnection ::
   P2PPeer ->
@@ -1719,28 +1716,27 @@ createGermophobicConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  tm                  <- newThreadMap
-  let rServer :: MonadP2PTest TestContextM (Maybe SomeException)
-      rServer = pure Nothing -- server is germophobic; will not conduct handshake
-      rClient :: MonadP2PTest TestContextM (Maybe SomeException)
-      rClient =
-        runEthClientConduit
-          (_p2pPeerPPeer server')
-          (sourceTQueue serverToClientTQueue)
-          (sinkTQueue clientToServerTQueue)
-          (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-          ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-          tm
-  pure $
-    P2PConnection
-      serverToClientTQueue
-      clientToServerTQueue
-      server'
-      client'
-      (runReaderT rServer serverCtx)
-      (runReaderT rClient clientCtx)
-      serverExceptionTVar
-      clientExceptionTVar
+  scoped $ \scope -> do
+    conn <- fork scope (do let rServer = pure Nothing -- server is germophobic; will not conduct handshake
+                           let rClient = runEthClientConduit         
+                                           (_p2pPeerPPeer server')   
+                                           (sourceTQueue serverToClientTQueue)
+                                           (sinkTQueue clientToServerTQueue)
+                                           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                                           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                                           scope
+                           pure $
+                             P2PConnection
+                               serverToClientTQueue
+                               clientToServerTQueue
+                               server'
+                               client'
+                               (runReaderT rServer serverCtx)
+                               (runReaderT rClient clientCtx)
+                               serverExceptionTVar
+                               clientExceptionTVar
+                       )
+    atomically $ KIU.await conn 
 
 makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
 makeValidators = map (first fromPrivateKey)

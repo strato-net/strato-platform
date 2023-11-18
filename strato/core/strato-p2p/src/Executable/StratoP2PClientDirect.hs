@@ -22,7 +22,6 @@ import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Secp256k1 (getPub)
 import           Control.Concurrent
-import           Control.Concurrent.Hierarchy
 import           Control.Lens ((^.))
 import           Control.Monad.Change.Alter
 import           Control.Monad.IO.Unlift
@@ -32,6 +31,7 @@ import           Data.Conduit
 import qualified Data.Text as T
 import           Data.Traversable (for)
 import           Executable.StratoP2PClient (runEthClientConduit)
+import           Ki.Unlifted
 import qualified Text.Colors as C
 import           Text.Format
 import           UnliftIO
@@ -62,13 +62,10 @@ handleEvents ev sSource runner = do
       peers <- getPeersByParsedSets org
       $logDebugS "stratoP2PClientDirect/handleEvents" . T.pack $ show peers
       void . for peers $ \p -> do
-        void . liftIO . forkIO . runLoggingT . runner $ \_ -> do
-          tmm    <- liftIO newThreadMap
-          _      <- void $ liftIO $ newChild tmm $ \_ -> return ()
-          runPeer p tmm
-          liftIO $ killThreadHierarchy tmm
+        void . liftIO . forkIO . runLoggingT . runner $ \_ ->
+          runPeer p
       where
-        runPeer thePeer tm = do
+        runPeer thePeer = do
           case thePeer of
             Just peer -> do
               ender <- toIO . $logInfoS "stratoP2PClientDirect/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
@@ -107,21 +104,22 @@ handleEvents ev sSource runner = do
                       $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
                       $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
                       $logInfoS "stratoP2PClientDirect/handleEvents" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
-                      runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
-                        let pStr = pPeerString peer -- display string will show up as dns name
-                        attempt :: (Maybe SomeException) <-
-                          withCertifiedPeer peer . withActivePeer peer $
-                            runEthClientConduit
-                              peer {pPeerPubkey = Just otherPubKey}
-                              (c ^. peerSource)
-                              (c ^. peerSink)
-                              (c ^. seqSource)
-                              pStr
-                              tm
-                        case attempt of
-                          Nothing  -> $logInfoS "stratoP2PClientDirect/handleEvents" "New chain member connected successfully!"
-                          Just err -> do $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "New chain member connection was unsuccessful." ++ show (err)
-                                         throwIO err
+                      runClientConnection (IPAsText $ pPeerIp peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c ->
+                        scoped $ \scope -> do
+                          let pStr = pPeerString peer -- display string will show up as dns name
+                          attempt :: (Maybe SomeException) <-
+                            withCertifiedPeer peer . withActivePeer peer $
+                              runEthClientConduit
+                                peer {pPeerPubkey = Just otherPubKey}
+                                (c ^. peerSource)
+                                (c ^. peerSink)
+                                (c ^. seqSource)
+                                pStr
+                                scope
+                          case attempt of
+                            Nothing  -> $logInfoS "stratoP2PClientDirect/handleEvents" "New chain member connected successfully!"
+                            Just err -> do $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "New chain member connection was unsuccessful." ++ show (err)
+                                           throwIO err
                     else $logInfoS "stratoP2PClientDirect/handleEvents" "Peer is not a member of the chain."
             Nothing -> $logErrorS "stratoP2PClientDirect/handleEvents" . T.pack $ "Peer/Peers doesn't exist."
     _ -> $logDebugS "stratoP2PClientDirect/handleEvents" "Skipping non-relevant events."

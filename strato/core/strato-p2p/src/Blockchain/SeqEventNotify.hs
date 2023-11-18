@@ -8,13 +8,11 @@
 {-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 module Blockchain.SeqEventNotify (
---  seqEventNotificationSource,
   seqEventNotificationSourceChanFill,
   seqEventNotificationSourceChanPour
   ) where
 
 import           Conduit
---import           Control.Concurrent (myThreadId)
 import           Control.Concurrent.Chan.Unagi
 import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad
@@ -64,20 +62,3 @@ seqEventNotificationSourceChanPour p2peventchan dupaction = do
             $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ Offset " ++ show nextOffset
             _ <- yield event
             loop chan
-
-{-
-seqEventNotificationSource :: ( MonadIO m
-                              , MonadLogger m
-                              )
-                           => K.KafkaState -> ConduitM () P2pEvent m ()
-seqEventNotificationSource ks = evalStateC ks $ do
-    ofs' <- lift $ K.withKafkaRetry1s $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
-    loop ofs'
-    where loop nextOffset = do
-              events <- lift $ K.withKafkaRetry1s $ readSeqP2pEvents nextOffset
-              unless (null events) $ do -- stop bloating the logs
-                $logInfoS "seqEventNotify" . T.pack $ "reading at kafka seqevents @ " ++ show nextOffset
-                forM_ events $ \e -> do
-                    yield $ e
-              loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
--}
