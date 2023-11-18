@@ -143,6 +143,7 @@ tests:
       - ethereum-discovery
       - ethereum-rlp
       - hflags
+      - ki-unlifted
       - labeled-error
       - lens
       - merkle-patricia-db

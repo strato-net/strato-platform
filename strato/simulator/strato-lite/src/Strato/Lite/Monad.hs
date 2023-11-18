@@ -1666,8 +1666,9 @@ makeLenses ''P2PConnection
 createConnection ::
   P2PPeer ->
   P2PPeer ->
+  Scope ->
   IO P2PConnection
-createConnection server' client' = do
+createConnection server' client' scp = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1676,39 +1677,37 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  scoped $ \scope -> do
-    conn <- fork scope (do let rServer = runEthServerConduit
-                                           (_p2pPeerPPeer client')             
-                                           (sourceTQueue clientToServerTQueue) 
-                                           (sinkTQueue serverToClientTQueue)   
-                                           (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-                                           scope
-                           let rClient = runEthClientConduit         
-                                           (_p2pPeerPPeer server')   
-                                           (sourceTQueue serverToClientTQueue)
-                                           (sinkTQueue clientToServerTQueue)
-                                           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-                                           scope
-                           pure $
-                             P2PConnection
-                               serverToClientTQueue
-                               clientToServerTQueue
-                               server'
-                               client'
-                               (runReaderT rServer serverCtx)
-                               (runReaderT rClient clientCtx)
-                               serverExceptionTVar
-                               clientExceptionTVar
-                       )
-    atomically $ KIU.await conn
+  let rServer = runEthServerConduit
+                  (_p2pPeerPPeer client')             
+                  (sourceTQueue clientToServerTQueue) 
+                  (sinkTQueue serverToClientTQueue)   
+                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+                  scp
+  let rClient = runEthClientConduit         
+                  (_p2pPeerPPeer server')   
+                  (sourceTQueue serverToClientTQueue)
+                  (sinkTQueue clientToServerTQueue)
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                  scp
+  pure $
+    P2PConnection
+      serverToClientTQueue
+      clientToServerTQueue
+      server'
+      client'
+      (runReaderT rServer serverCtx)
+      (runReaderT rClient clientCtx)
+      serverExceptionTVar
+      clientExceptionTVar
 
 createGermophobicConnection ::
   P2PPeer ->
   P2PPeer ->
+  Scope ->
   IO P2PConnection
-createGermophobicConnection server' client' = do
+createGermophobicConnection server' client' scp = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   clientSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource client'
@@ -1716,27 +1715,24 @@ createGermophobicConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  scoped $ \scope -> do
-    conn <- fork scope (do let rServer = pure Nothing -- server is germophobic; will not conduct handshake
-                           let rClient = runEthClientConduit         
-                                           (_p2pPeerPPeer server')   
-                                           (sourceTQueue serverToClientTQueue)
-                                           (sinkTQueue clientToServerTQueue)
-                                           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-                                           scope
-                           pure $
-                             P2PConnection
-                               serverToClientTQueue
-                               clientToServerTQueue
-                               server'
-                               client'
-                               (runReaderT rServer serverCtx)
-                               (runReaderT rClient clientCtx)
-                               serverExceptionTVar
-                               clientExceptionTVar
-                       )
-    atomically $ KIU.await conn 
+  let rServer = pure Nothing -- server is germophobic; will not conduct handshake
+  let rClient = runEthClientConduit         
+                  (_p2pPeerPPeer server')   
+                  (sourceTQueue serverToClientTQueue)
+                  (sinkTQueue clientToServerTQueue)
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                  scp
+  pure $
+    P2PConnection
+      serverToClientTQueue
+      clientToServerTQueue
+      server'
+      client'
+      (runReaderT rServer serverCtx)
+      (runReaderT rClient clientCtx)
+      serverExceptionTVar
+      clientExceptionTVar
 
 makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
 makeValidators = map (first fromPrivateKey)
@@ -1872,11 +1868,13 @@ addConnection serverLabel clientLabel = do
       _ -> pure Nothing
   case mPeers of
     Nothing -> pure False
-    Just (server', client') -> liftIO $ do
-      connection <- createConnection server' client'
-      a <- async $ runConnection connection
-      atomically $ modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) ?~ a
-      pure True
+    Just (server', client') ->
+      liftIO $ do
+        connection <- scoped $ \scope ->
+                        createConnection server' client' scope
+        a <- async $ runConnection connection
+        atomically $ modifyTVar (mgr ^. threads) $ connectionThreads . at (serverLabel, clientLabel) ?~ a
+        pure True
 
 removeConnection :: Text -> Text -> ReaderT NetworkManager IO Bool
 removeConnection serverLabel clientLabel = do
@@ -1929,7 +1927,8 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
     clientPeer <- maybeToExceptT ("Couldn't find client " <> client') . MaybeT . pure $ M.lookup client' nodesMap
-    liftIO $ createConnection serverPeer clientPeer
+    liftIO $ scoped $ \scope  ->
+      createConnection serverPeer clientPeer scope
   for eConnections $ \connections' -> do
     let connectionsMap = M.fromList $ zip connectionsList connections'
         network' = Network nodesMap connectionsMap inet

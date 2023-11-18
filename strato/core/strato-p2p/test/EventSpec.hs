@@ -1532,8 +1532,9 @@ makeLenses ''P2PConnection
 createConnection ::
   P2PPeer ->
   P2PPeer ->
+  Scope ->
   IO P2PConnection
-createConnection server' client' = do
+createConnection server' client' scp = do
   serverToClientTQueue <- newTQueueIO
   clientToServerTQueue <- newTQueueIO
   serverSeqSource <- atomically . dupTMChan $ _p2pPeerSeqP2pSource server'
@@ -1542,33 +1543,30 @@ createConnection server' client' = do
   clientCtx <- newIORef $ def & unseqSink .~ _p2pPeerUnseqSource client'
   serverExceptionTVar <- newTVarIO Nothing
   clientExceptionTVar <- newTVarIO Nothing
-  scoped $ \scope -> do
-    conn <- fork scope (do let rServer = Executable.StratoP2PServer.runEthServerConduit
-                                           (_p2pPeerPPeer client')             
-                                           (sourceTQueue clientToServerTQueue) 
-                                           (sinkTQueue serverToClientTQueue)   
-                                           (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                           ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
-                                           scope
-                           let rClient = runEthClientConduit         
-                                           (_p2pPeerPPeer server')   
-                                           (sourceTQueue serverToClientTQueue)
-                                           (sinkTQueue clientToServerTQueue)
-                                           (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
-                                           ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
-                                           scope
-                           pure $
-                             P2PConnection
-                               serverToClientTQueue
-                               clientToServerTQueue
-                               server'
-                               client'
-                               (runReaderT rServer serverCtx)
-                               (runReaderT rClient clientCtx)
-                               serverExceptionTVar
-                               clientExceptionTVar
-                       )
-    atomically $ KIU.await conn
+  let rServer = Executable.StratoP2PServer.runEthServerConduit
+                  (_p2pPeerPPeer client')             
+                  (sourceTQueue clientToServerTQueue) 
+                  (sinkTQueue serverToClientTQueue)   
+                  (sourceTMChan serverSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName server' ++ ", Them: " ++ _p2pPeerName client')
+                  scp
+  let rClient = runEthClientConduit         
+                  (_p2pPeerPPeer server')
+                  (sourceTQueue serverToClientTQueue)
+                  (sinkTQueue clientToServerTQueue)
+                  (sourceTMChan clientSeqSource .| (awaitForever $ either (const $ pure ()) yield))
+                  ("Me: " ++ _p2pPeerName client' ++ ", Them: " ++ _p2pPeerName server')
+                  scp
+  pure $
+    P2PConnection
+      serverToClientTQueue
+      clientToServerTQueue
+      server'
+      client'
+      (runReaderT rServer serverCtx)
+      (runReaderT rClient clientCtx)
+      serverExceptionTVar
+      clientExceptionTVar
 
 -- testPeer :: DataPeer.PPeer
 -- testPeer = DataPeer.buildPeer (Nothing, "0.0.0.0", 1212)
