@@ -1,61 +1,55 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import TagManager from "react-gtm-module";
 import {
   Layout,
   Input,
   Menu,
-  Image,
   Space,
   Badge,
   Avatar,
   Dropdown,
   Typography,
-  Spin,
-  Modal,
 } from "antd";
-import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined, DollarOutlined } from "@ant-design/icons";
-import { Images } from "../../images";
+import { SearchOutlined, ShoppingCartOutlined, PlusCircleOutlined } from "@ant-design/icons";
+
 import "./header.css";
-import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
-import { useAuthenticateDispatch } from "../../contexts/authentication";
-import { useMembershipState, useMembershipDispatch } from "../../contexts/membership";
-import TagManager from "react-gtm-module";
+// Dispatch and States
+import { useMarketplaceState, useMarketplaceDispatch } from "../../contexts/marketplace";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
+// icons
 import { blockappLogo } from "../../images/SVGComponents";
-import { setCookie, getCookie } from "../../helpers/cookie";
-import ListNowIndex from "../../components/Membership/ListNowIndex";
-import { actions as membershipActions } from "../../contexts/membership/actions"
+import { setCookie } from "../../helpers/cookie";
 
 const { Title } = Typography;
 const { Header } = Layout;
 
 const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const navigate = useNavigate();
-  const { Text } = Typography;
+  const location = useLocation();
+
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useAuthenticateDispatch();
+  const { isAuthenticated, isCheckingAuthentication } = useAuthenticateState();
   const { cartList } = useMarketplaceState();
-  const { isMembershipsLoading, memberships } = useMembershipState();
-  const membershipDispatch = useMembershipDispatch();
+
   const storedData = useMemo(() => {
     return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
   }, []);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
-  const [visible, setVisible] = useState(false)
   const [selectedTab, setSelectedTab] = useState("0");
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
 
-  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
+  // const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
 
   const navItems = [
     {
@@ -80,7 +74,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
 
   const navUrls = [
     routes.Marketplace.url,
-    routes.Orders.url,
+    routes.Orders.soldOrders,
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
@@ -98,11 +92,25 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   };
 
   useEffect(() => {
+    if (!isAuthenticated && !user && loginUrl) {
+      const unauthorizedRedirectUrls = [
+        '/order', '/products', '/purchased', '/issued', "/checkout"
+      ];
+
+      const pathName = location.pathname;
+
+      if (unauthorizedRedirectUrls.some(url => pathName.includes(url))) {
+        navigate(routes.Marketplace.url);
+      }
+    }
+  }, [isCheckingAuthentication]);
+
+  useEffect(() => {
     let pathName = window.location.pathname;
     // if (pathName.includes("/marketplace")) {
     //   setSelectedTab("0");
     // } else 
-    if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
+    if (pathName.includes("/order")) {
       setSelectedTab("1");
     } else if (pathName.includes("/inventories")) {
       setSelectedTab("2");
@@ -168,12 +176,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     else setRoleIndex(1)
   }, [user]);
 
-  // const handleSellModal = () => {
-  //   membershipActions.fetchMembership(membershipDispatch);
-  //   setVisible(true);
-  // }
-
-
   return (
     <Header className="!bg-white flex shadow-lg">
       <Space>
@@ -181,7 +183,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
           className=" cursor-pointer"
           onClick={() => { navigate(routes.Marketplace.url) }}
         >
-          {/* <Image src={Images.logo} width={35} preview={false} /> */}
           {blockappLogo()}
         </div>
         {((roleIndex === undefined || roleIndex === 1) && !isOauth) ? null : <div className="ml-7 w-72">
@@ -200,53 +201,27 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         disabledOverflow={true}
         className="h-16 decoration-black m-auto"
         onClick={(item) => {
+          const events = [
+            'view_marketplace_page',
+            'view_orders_page',
+            'view_inventory_page',
+            'view_products_page',
+            'view_events_page',
+            'view_storage_page',
+          ];
+
           setCookie("returnUrl", `/marketplace${navUrls[item.key]}`, 10);
-          setSelectedTab(item.key)
-          if (item.key === "0") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_marketplace_page',
-              },
-            });
-          }
-          if (item.key === "1") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_orders_page',
-              },
-            });
-          }
-          if (item.key === "2") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_inventory_page',
-              },
-            });
-          }
-          if (item.key === "3") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_products_page',
-              },
-            });
-          }
-          if (item.key === "4") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_events_page',
-              },
-            });
-            navigate(navUrls[item.key], { state: { tab: "EventType" } })
-          }
-          else {
+          setSelectedTab(item.key);
+          TagManager.dataLayer({
+            dataLayer: {
+              event: events[item.key],
+            },
+          });
+
+          if (item.key === 4) {
+            navigate(navUrls[item.key], { state: { tab: "EventType" } });
+          } else {
             navigate(navUrls[item.key]);
-          }
-          if (item.key === "5") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_storage_page',
-              }
-            });
           }
         }}
         items={navItems[roleIndex]?.items}
@@ -309,20 +284,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             </Dropdown>
         }
       </Space>
-      {visible && (
-        <ListNowIndex
-          open={visible}
-          user={{ user: user }}
-          handleCancel={() => { setVisible(false) }}
-          onClick={() => { setVisible(true) }}
-          // formik={formik}
-          type="Sale"
-          isSellModal={true}
-        // id="None"
-        // getIn={getIn}
-        // isCreateMembershipSubmitting={isCreateInventorySubmitting}
-        />
-      )}
     </Header>
   );
 };
