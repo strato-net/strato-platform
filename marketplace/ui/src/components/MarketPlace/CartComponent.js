@@ -1,3 +1,6 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import TagManager from "react-gtm-module";
 import {
     Button,
     Row,
@@ -5,27 +8,21 @@ import {
     Col,
     Card
 } from "antd";
+
 import DataTableComponent from "../DataTableComponent";
-import "./index.css";
-import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { actions } from "../../contexts/marketplace/actions";
-import {
-    useMarketplaceDispatch,
-} from "../../contexts/marketplace";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
+import { useMarketplaceDispatch } from "../../contexts/marketplace";
+import "./index.css";
 
-
-const CartComponent = ({ columns, data }) => {
+const CartComponent = ({ columns, data, index }) => {
     const navigate = useNavigate();
-    let [tax, setTax] = useState(0);
-    const [shipping, setShipping] = useState(0);
-    const [total, setTotal] = useState(0);
     const marketplaceDispatch = useMarketplaceDispatch();
-
     let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
+    const [shipping, setShipping] = useState(0);
+    const [total, setTotal] = useState(0);
+    const [tax, setTax] = useState(0);
 
     useEffect(() => {
         let t = 0;
@@ -52,9 +49,8 @@ const CartComponent = ({ columns, data }) => {
     //     element.amount_ = !element.isTaxPercentage ? element.amount * (1 + parseFloat(element.tax) / 10000) : element.amount + parseFloat(element.tax)
     // });
 
-
     return (
-        <Card className="my-4">
+        <Card className="my-4" key={index}>
             <div>
                 <div>
                     <div className="mt-4">
@@ -106,7 +102,7 @@ const CartComponent = ({ columns, data }) => {
                                 if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                                     window.location.href = loginUrl;
                                 } else {
-                                    actions.addItemToConfirmOrder(marketplaceDispatch, data);
+                                    marketplaceActions.addItemToConfirmOrder(marketplaceDispatch, data);
                                     TagManager.dataLayer({
                                         dataLayer: {
                                             event: 'submit_order_from_cart',
@@ -125,6 +121,5 @@ const CartComponent = ({ columns, data }) => {
         </Card>
     );
 }
-
 
 export default CartComponent;
