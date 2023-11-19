@@ -5,21 +5,21 @@ import {
   Col,
   Breadcrumb,
   Typography,
-  Input,
-  Spin,
+  Input
 } from "antd";
-import { useMatch, useLocation,useNavigate } from "react-router-dom";
+import { useMatch, useLocation, useNavigate } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
 import { EyeOutlined, SearchOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import ClickableCell from "../ClickableCell";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 
 const BoughtOrderItemDetail = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
- 
+
   const [data, setdata] = useState([]);
   const { state } = useLocation();
 
@@ -39,7 +39,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
   });
 
   useEffect(() => {
-  
+
     if (orderLineDetails) {
       if (orderLineDetails.items) {
         let items = [];
@@ -50,7 +50,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
             key: item.address,
             itemId: item.address,
             serialNumber: item.itemSerialNumber ? item.itemSerialNumber : item.address,
-            event:item,
+            event: item,
           });
         });
         setdata(items);
@@ -60,12 +60,12 @@ const BoughtOrderItemDetail = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
-  
+
   }, [routeMatch]);
 
   useEffect(() => {
     if (Id !== undefined) {
-      actions.fetchOrderLineItemDetails(dispatch, Id);    
+      actions.fetchOrderLineItemDetails(dispatch, Id);
     }
   }, [Id, dispatch]);
 
@@ -122,9 +122,9 @@ const BoughtOrderItemDetail = ({ user, users }) => {
       dataIndex: "event",
       key: "event",
       render: (text) => (
-        <div className="flex items-center justify-start" onClick={()=>navigate(`${routes.OrderItemEventsList.url.replace(":itemId", text.itemId)}`,{state:{name:details.name,orderId:state.orderId,orderAddress:state.address,seller:false}})}>
+        <div className="flex items-center justify-start" onClick={() => navigate(`${routes.OrderItemEventsList.url.replace(":itemId", text.itemId)}`, { state: { name: details.name, orderId: state.orderId, orderAddress: state.address, seller: false } })}>
           <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
-          <p  
+          <p
             className="hover:text-primaryHover cursor-pointer"
           >
             View
@@ -135,9 +135,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
   ];
 
   return details === null || isOrderLineDetailsLoading ? (
-    <div className="h-screen flex justify-center items-center">
-      <Spin spinning={isOrderLineDetailsLoading} size="large" />
-    </div>
+    <LoaderComponent />
   ) : (
     <div>
       <div className="flex justify-between items-center mx-14  mt-14">
@@ -148,7 +146,7 @@ const BoughtOrderItemDetail = ({ user, users }) => {
             </ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <div onClick={()=>{  navigate(routes.Orders.url, { state: { defaultKey: "Bought" } });}}>
+            <div onClick={() => { navigate(routes.Orders.boughtOrders); }}>
               Orders (Bought)
             </div>
           </Breadcrumb.Item>

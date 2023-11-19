@@ -5,8 +5,7 @@ import {
   Col,
   Breadcrumb,
   Typography,
-  Input,
-  Spin,
+  Input
 } from "antd";
 import { useMatch, useLocation, useNavigate } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
@@ -15,11 +14,11 @@ import routes from "../../helpers/routes";
 import { EyeOutlined, SearchOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import ClickableCell from "../ClickableCell";
+import LoaderComponent from "../Loader/LoaderComponent";
 
 
 const SoldOrderItemDetail = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
- 
   const [data, setdata] = useState([]);
   const { state } = useLocation();
 
@@ -39,7 +38,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
   });
 
   useEffect(() => {
-   
+
     if (orderLineDetails) {
       if (orderLineDetails.items) {
         let items = [];
@@ -60,7 +59,6 @@ const SoldOrderItemDetail = ({ user, users }) => {
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
- 
   }, [routeMatch]);
 
   useEffect(() => {
@@ -134,9 +132,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
   const navigate = useNavigate();
 
   return details === null || isOrderLineDetailsLoading ? (
-    <div className="h-screen flex justify-center items-center">
-      <Spin spinning={isOrderLineDetailsLoading} size="large" />
-    </div>
+    <LoaderComponent />
   ) : (
     <div>
       <div className="flex justify-between items-center mx-14  mt-14">
@@ -147,7 +143,7 @@ const SoldOrderItemDetail = ({ user, users }) => {
             </ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <div onClick={() => { navigate(routes.Orders.url, { state: { defaultKey: "Sold" } }); }}>
+            <div onClick={() => { navigate(routes.Orders.soldOrders) }}>
               Orders (Sold)
             </div>
           </Breadcrumb.Item>
