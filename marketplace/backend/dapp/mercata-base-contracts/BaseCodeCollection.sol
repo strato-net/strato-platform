@@ -54,12 +54,12 @@ contract RestStatus {
 abstract contract Asset is PaymentType, SaleState, RestStatus{
     address public owner;
     string public ownerCommonName;
+    string public ownerOrganization;
     string public name;
     string public description;
     string[] public images;
     uint public createdDate;
 
-    // Sale public sale;
     address[] public whitelistedSales;
 
 
@@ -88,12 +88,12 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     }
 
     // Updated function to add a sale to the whitelist
-    function whitelistSale(address saleContract) public requireOwner("whitelistSale") {
-        require(!isSaleWhitelisted(saleContract), "Sale already whitelisted");
+    function whitelistSale(address saleContract) public requireOwner("whitelist a Sale") {
+        require(!isSaleWhitelisted(saleContract), "Sale is already whitelisted.");
         whitelistedSales.push(saleContract);
     }
 
-    function changePrice(uint _price) public requireOwner("Change Asset Price") returns (uint) {
+    function changePrice(uint _price) public requireOwner("change price") returns (uint) {
         price = _price;
         if (whitelistedSales.length > 0) {
             for (uint i = 0; i < whitelistedSales.length; i++) {
@@ -113,12 +113,12 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     }
 
     // Updated function to remove a sale from the whitelist
-    function dewhitelistSale(address saleContract) public requireOwner("dewhitelistSale") {
+    function dewhitelistSale(address saleContract) public requireOwner("dewhitelist a Sale") {
         require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
         for (uint i = 0; i < whitelistedSales.length; i++) {
             if (whitelistedSales[i] == saleContract) {
                 delete whitelistedSales[i];
-                // Shift    elements left to fill the gap left by delete
+                // Shift elements left to fill the gap left by delete
                 for (uint j = i; j < whitelistedSales.length - 1; j++) {
                     whitelistedSales[j] = whitelistedSales[j + 1];
                 }
@@ -127,9 +127,8 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
         }
     }
 
-
     // Updated function to disable all sales
-    function disableAllSales() public requireOwner("disableAllSales") {
+    function disableAllSales() public requireOwner("disable all Sales") {
         for (uint i = 0; i < whitelistedSales.length; i++) {
             Sale(whitelistedSales[i]).changeSaleState(SaleState.Closed);
         }
@@ -180,25 +179,17 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         require(commonName == sellersCommonName, err);
     }
 
-    function changePrice(uint _price) public requireSeller("Change Price"){
+    function changePrice(uint _price) public requireSeller("change price"){
         price=_price;
     }
 
-    function changeSaleState(SaleState _state) public requireSeller("Change Payment Type"){
+    function changeSaleState(SaleState _state) public requireSeller("change sale state"){
         state=_state;
     }
 
-    function changePaymentType(PaymentType _payment) public requireSeller("Change Payment Type"){
+    function changePaymentType(PaymentType _payment) public requireSeller("change payment type"){
         payment=_payment;
     }
-
-    // function transferOwnership(string _purchasersCommonName, address _purchasersAddress, uint _orderId) public requireSeller("Transfer Ownership of Asset") returns (uint) {
-    //     saleOrderID = _orderId;
-    //     purchasersCommonName = _purchasersCommonName;
-    //     assetToBeSold.transferOwnership(address(this), purchasersCommonName, _purchasersAddress);
-    //     state = SaleState.Closed;
-    //     return RestStatus.OK;
-    // }
 }
 
 abstract contract Order is RestStatus, OrderStatus {
@@ -261,6 +252,4 @@ abstract contract Order is RestStatus, OrderStatus {
         status = OrderStatus.CLOSED;
         return RestStatus.OK;
     }
-
-
 }
