@@ -204,7 +204,7 @@ const MembershipCard = ({
               updates: {
                 pricePerUnit: formik.values.price,
                 status: parseInt(formik.values.inventoryStatus),
-                quantity: formik.values.tempInv.availableQuantity,
+                quantity: formik.values.quantity,
                 taxPercentageAmount: parseInt(formik.values.taxPercentageAmount),
                 taxDollarAmount: parseInt(formik.values.taxDollarAmount)
               }
