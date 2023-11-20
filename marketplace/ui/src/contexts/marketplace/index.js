@@ -8,19 +8,20 @@ const MarketplaceProvider = ({ children }) => {
   const initialState = {
     marketplaceList: [],
     isMarketplaceLoading: false,
+    isMarketplaceInitialLoading: true,
     isTopSellingProductsLoading: false,
     topSellingProducts: [],
-    isAddingShippingAddress : false,
+    isAddingShippingAddress: false,
     shippingAddress: null,
     error: undefined,
     success: false,
     message: null,
     cartList: [],
     confirmOrderList: [],
-    userAddress:null,
-    isLoadingUserAddress:false,
-    userAddresses:[],
-    isLoadingUserAddresses:false,
+    userAddress: null,
+    isLoadingUserAddress: false,
+    userAddresses: [],
+    isLoadingUserAddresses: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);
