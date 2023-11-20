@@ -45,6 +45,7 @@ export function generateTableColumns({
   providerState,
   isServicesLoading,
   statusOptions,
+  setProviderOrg
 }) {
   const renderUserColumn = (
     text,
@@ -94,7 +95,8 @@ export function generateTableColumns({
     organization,
     setProviderState,
     handleInputChange,
-    getProviderOptions
+    getProviderOptions,
+    setProviderOrg
   ) => {
     return (
       <span>
@@ -117,6 +119,7 @@ export function generateTableColumns({
             onChange={(value, obj) => {
               setProviderState(obj.value.toString());
               handleInputChange(obj.label.toString(), "provider", index);
+              setProviderOrg(obj.label);
             }}
             options={getProviderOptions(membership?.purchasedMemberships)}
           />
@@ -361,7 +364,8 @@ export function generateTableColumns({
           organization,
           setProviderState,
           handleInputChange,
-          getProviderOptions
+          getProviderOptions,
+          setProviderOrg
         ),
     },
     {

@@ -44,6 +44,8 @@ library:
   - text
   - transformers
   - x509-certs
+  - unliftio-core
+  - monad-logger
 
 tests:
   blockapps-mpdbs-test:

@@ -183,6 +183,11 @@ instance RLPSerializable Integer where
   rlpDecode (RLPArray [x]) = -rlpDecode x
   rlpDecode (RLPArray _) = error "rlpDecode called for Integer for array of wrong size"
 
+instance RLPSerializable Word8 where
+  rlpEncode w = RLPScalar w 
+  rlpDecode (RLPScalar w) = w
+  rlpDecode x = error $ "rlpDecode for Word8 not defined for " ++ show x
+
 instance {-# OVERLAPPING #-} RLPSerializable String where
   rlpEncode = rlpEncode . T.pack
   rlpDecode = T.unpack . rlpDecode
