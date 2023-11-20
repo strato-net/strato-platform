@@ -19,6 +19,7 @@ contract SaleState{
         NONE,
         Created,
         Closed,
+        Canceled,
         MAX
     }
 }
@@ -241,7 +242,7 @@ abstract contract Order is RestStatus, OrderStatus {
         for (uint i = 0; i < saleAddresses.length; i++) {
             Sale sale = Sale(saleAddresses[i]);
             // Perform the ownership transfer
-            sale.transferOwnership(purchasersCommonName, purchasersAddress, orderId);
+            sale.transferOwnership(purchasersAddress, orderId);
         }
         comments = _comments;
         status = OrderStatus.CLOSED;
