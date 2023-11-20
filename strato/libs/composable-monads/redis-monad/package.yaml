@@ -6,7 +6,8 @@ dependencies:
 
 library:
   source-dirs: src
-  dependencies: 
+  dependencies:
+  - composable-monads-base
   - hedis
   - monad-alter
   - mtl

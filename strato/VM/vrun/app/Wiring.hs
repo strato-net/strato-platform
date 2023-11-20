@@ -63,6 +63,7 @@ import Control.Lens hiding (Context (..))
 import Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
@@ -258,6 +259,9 @@ instance (Keccak256 `A.Alters` BlockSummary) ContextM where
 
 instance MonadReader Context m => Mod.Accessible SQLDB m where
   access _ = view $ dbs . sqldb
+
+instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
+  accessEnv = view $ dbs . sqldb
 
 instance Mod.Accessible RBDB.RedisConnection ContextM where
   access _ = view $ dbs . redisPool

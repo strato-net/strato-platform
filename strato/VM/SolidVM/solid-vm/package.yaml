@@ -90,6 +90,7 @@ tests:
       - blockapps-mpdbs
       - bytestring
       - common-log
+      - composable-monads-base
       - containers
       - core-api2
       - crypto-api

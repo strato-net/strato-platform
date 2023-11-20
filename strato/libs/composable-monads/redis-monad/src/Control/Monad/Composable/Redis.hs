@@ -3,14 +3,14 @@
 
 module Control.Monad.Composable.Redis where
 
-import Control.Monad.Change.Modify
+import Control.Monad.Composable.Base
 import Control.Monad.Reader
 import Database.Redis (Redis)
 import qualified Database.Redis as Redis
 
 type RedisM = ReaderT RedisEnv
 
-type HasRedis m = Accessible RedisEnv m
+type HasRedis m = AccessibleEnv RedisEnv m
 
 data RedisEnv = RedisEnv
   { redisConnection :: Redis.Connection
@@ -33,5 +33,5 @@ runRedisM connectInfo f = flip runRedisMUsingEnv f =<< createRedisEnv connectInf
 execRedis :: (HasRedis m, MonadIO m) =>
              Redis a -> m a
 execRedis f = do
-  env <- access Proxy
+  env <- accessEnv
   liftIO $ Redis.runRedis (redisConnection env) f

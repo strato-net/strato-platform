@@ -51,6 +51,7 @@ library:
     - blockapps-mpdbs
     - bytestring
     - common-log
+    - composable-monads-base
     - conduit
     - cross-monitoring
     - data-default

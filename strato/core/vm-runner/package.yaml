@@ -99,6 +99,7 @@ tests:
       - blockapps-mpdbs
       - bytestring
       - common-log
+      - composable-monads-base
       - containers
       - data-default
       - debugger

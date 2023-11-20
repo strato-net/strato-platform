@@ -133,6 +133,7 @@ import           Blockchain.Stream.VMOutput            ( VMOutput(..)
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
 import           Blockchain.TCPClientWithTimeout
+import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
 import qualified Network.Kafka                         as K
@@ -486,6 +487,9 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) whe
 
 instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
   access _ = asks configSQLDB
+
+instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
+  accessEnv = asks configSQLDB
 
 instance MonadIO m => ((IPAsText, TCPPort) `A.Alters` ActivityState) (ReaderT Config m) where
   lookup _ _ = error "lookup ActivityState undefined for ContextM"

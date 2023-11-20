@@ -17,6 +17,7 @@ import Blockchain.Data.ChainInfoDB (putChainInfo)
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction (insertTX)
 import Blockchain.Data.ValidatorRef
+import Blockchain.DB.SQLDB
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Model.ChainId
@@ -30,27 +31,26 @@ import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Redis
-import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import qualified Data.Map.Strict as M
 import SelectAccessible ()
 
-instance HasSQL m => (Keccak256 `A.Alters` API OutputTx) m where
+instance HasSQLDB m => (Keccak256 `A.Alters` API OutputTx) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
   delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
   insert _ _ (API OutputTx {..}) = void $ insertTX Log otOrigin Nothing [otBaseTx]
 
-instance HasSQL m => (Word256 `A.Alters` API ChainInfo) m where
+instance HasSQLDB m => (Word256 `A.Alters` API ChainInfo) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Word256" "ChainInfo"
   delete _ _ = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
   insert _ cId (API cInfo) = void $ putChainInfo (ChainId cId) cInfo
 
-instance HasSQL m => (([ChainMemberParsedSet], [ChainMemberParsedSet]) `A.Alters` API (A.Proxy ValidatorRef)) m where
+instance HasSQLDB m => (([ChainMemberParsedSet], [ChainMemberParsedSet]) `A.Alters` API (A.Proxy ValidatorRef)) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Vals" "ValidatorRef"
   delete _ _ = liftIO . throwIO $ Delete "API" "Vals" "AddressStateRef"
   insert _ vals _ = void $ addRemoveValidator vals
 
-instance HasSQL m => (Keccak256 `A.Alters` API OutputBlock) m where
+instance HasSQLDB m => (Keccak256 `A.Alters` API OutputBlock) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
   insert _ _ (API ob) = void $ putBlocks [(outputBlockToBlockRetainPayloads ob, obTotalDifficulty ob)] False

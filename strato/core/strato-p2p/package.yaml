@@ -47,6 +47,7 @@ library:
     - blockapps-vault-wrapper-client
     - blockstanbul
     - bytestring
+    - composable-monads-base
     - concurrency
     - conduit
     - conduit-extra

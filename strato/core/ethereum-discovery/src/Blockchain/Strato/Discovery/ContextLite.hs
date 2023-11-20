@@ -38,6 +38,7 @@ import Control.Monad.Catch hiding (bracket)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify (Accessible (..))
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
 import Control.Monad.Reader
@@ -64,6 +65,9 @@ data ContextLite = ContextLite
 
 instance Monad m => Accessible SQLDB (ReaderT ContextLite m) where
   access _ = asks liteSQLDB
+
+instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT ContextLite m) where
+  accessEnv = asks liteSQLDB
 
 instance Monad m => Accessible Socket (ReaderT ContextLite m) where
   access _ = asks sock

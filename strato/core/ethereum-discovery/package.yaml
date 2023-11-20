@@ -30,6 +30,7 @@ library:
     - blockapps-vault-wrapper-client
     - bytestring
     - common-log
+    - composable-monads-base
     - cpu
     - crypto-pubkey-types
     - either

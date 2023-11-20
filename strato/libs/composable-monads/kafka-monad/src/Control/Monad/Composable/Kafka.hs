@@ -6,7 +6,7 @@
 
 module Control.Monad.Composable.Kafka where
 
-import Control.Monad.Change.Modify
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Unlift
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
@@ -17,7 +17,7 @@ import Network.Kafka.Protocol
 
 type KafkaM = ReaderT (IORef KafkaState)
 
-type HasKafka m = Accessible (IORef KafkaState) m
+type HasKafka m = AccessibleEnv (IORef KafkaState) m
 
 data KafkaEnv = KafkaEnv
   { kafkaStateIORef :: IORef KafkaState
@@ -51,7 +51,7 @@ execKafka ::
   StateT KafkaState (ExceptT KafkaClientError IO) a ->
   m a
 execKafka f = do
-  ksIORef <- access Proxy
+  ksIORef <- accessEnv
   ks <- liftIO $ readIORef ksIORef
   result <- liftIO $ runExceptT $ runStateT f ks
   case result of

@@ -1,4 +1,4 @@
-name:                kafka-monad
+name:                redis-monad
 version:             0.1.0.0
 
 dependencies:
@@ -8,9 +8,7 @@ library:
   source-dirs: src
   dependencies:
   - composable-monads-base
-  - milena
+  - hedis
   - mtl
-  - transformers
-  - unliftio-core
   
   

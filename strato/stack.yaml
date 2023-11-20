@@ -42,6 +42,7 @@ packages:
 
 - libs/clockwork
 - libs/common-log
+- libs/composable-monads/composable-monads-base
 - libs/composable-monads/kafka-monad
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
