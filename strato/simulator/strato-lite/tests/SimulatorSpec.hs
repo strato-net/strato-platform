@@ -155,32 +155,42 @@ spec = do
         ctxs <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1 :: Maybe Word256)
 
-    it "should update the round number after failing on a divided network first" $
+    it "should update the round number after failing on a divided network first" $ do
+      privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
+      let validatorsPrivKeys' = privKeys
+          primaryValidatorsPrivKeys = [head validatorsPrivKeys']
+          primaryValidatorAddresses = fromPrivateKey <$> primaryValidatorsPrivKeys
+          validatorInfos =
+            [ CommonName "BlockApps" "Engineering" "Admin" True,
+              CommonName "Microsoft" "Sales" "Person" True,
+              CommonName "Amazon" "Product" "Jeff Bezos" True
+            ]
+          primaryValidatorInfos = [head validatorInfos]
+          primaryValidators' = zip primaryValidatorAddresses primaryValidatorInfos
+          zippedValidators = makeValidators $ zip validatorsPrivKeys' validatorInfos
+      certs <- traverse (uncurry selfSignCert) $ zip privKeys validatorInfos
+      peers <-
+        traverse (\((p, c), (n, i)) -> createPeer' p c primaryValidators' certs n i) $
+          zip
+            (zip privKeys validatorInfos)
+            [ ("node1", "1.2.3.4"),
+              ("node2", "5.6.7.8"),
+              ("node3", "9.10.11.12")
+            ]
+      let validators' = peers
+          primaryValidators = [head validators']
+          secondaryValidators = tail validators'
+      let runForTwoSeconds = void . timeout 2000000
+          postTimeoutPrimary1 = do
+            threadDelay 1000000
+            for_ primaryValidators $ postEvent (TimerFire 0)
+          postTimeoutPrimary2 = do
+            threadDelay 1000000
+            for_ primaryValidators $ postEvent (TimerFire 1)
+          postTimeoutSecondary = do
+            threadDelay 1000000
+            for_ secondaryValidators $ postEvent (TimerFire 1000)
       scoped $ \scope -> do
-        privKeys <- traverse (const newPrivateKey) [(1 :: Integer) .. 3]
-        let validatorsPrivKeys' = privKeys
-            primaryValidatorsPrivKeys = [head validatorsPrivKeys']
-            primaryValidatorAddresses = fromPrivateKey <$> primaryValidatorsPrivKeys
-            validatorInfos =
-              [ CommonName "BlockApps" "Engineering" "Admin" True,
-                CommonName "Microsoft" "Sales" "Person" True,
-                CommonName "Amazon" "Product" "Jeff Bezos" True
-              ]
-            primaryValidatorInfos = [head validatorInfos]
-            primaryValidators' = zip primaryValidatorAddresses primaryValidatorInfos
-            zippedValidators = makeValidators $ zip validatorsPrivKeys' validatorInfos
-        certs <- traverse (uncurry selfSignCert) $ zip privKeys validatorInfos
-        peers <-
-          traverse (\((p, c), (n, i)) -> createPeer' p c primaryValidators' certs n i) $
-            zip
-              (zip privKeys validatorInfos)
-              [ ("node1", "1.2.3.4"),
-                ("node2", "5.6.7.8"),
-                ("node3", "9.10.11.12")
-              ]
-        let validators' = peers
-            primaryValidators = [head validators']
-            secondaryValidators = tail validators'
         connections' <- traverse
                           (\(a,b,c) -> createConnection a b c)
                           [ (peers !! 0, peers !! 1, scope),
@@ -201,25 +211,17 @@ spec = do
                 . (sequencerContext . blockstanbulContext . _Just . view . round .~ 1000)
                 . (sequencerContext . x509certInfoState %~ addValidatorsToCertMap zippedValidators)
             )
-        let runForTwoSeconds = void . timeout 2000000
-            postTimeoutPrimary1 = do
-              threadDelay 1000000
-              for_ primaryValidators $ postEvent (TimerFire 0)
-            postTimeoutPrimary2 = do
-              threadDelay 1000000
-              for_ primaryValidators $ postEvent (TimerFire 1)
-            postTimeoutSecondary = do
-              threadDelay 1000000
-              for_ secondaryValidators $ postEvent (TimerFire 1000)
         runForTwoSeconds $ concurrently_ (runNetworkOld peers connections') (concurrently_ postTimeoutPrimary1 postTimeoutSecondary)
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
+      scoped $ \scope -> do
         connections'' <- traverse
                            (\(a,b,c) -> createConnection a b c)
                            [ (peers !! 0, peers !! 1, scope),
                              (peers !! 0, peers !! 2, scope),
                              (peers !! 1, peers !! 2, scope)
                            ]
+
         atomically $
           modifyTVar'
             ((peers !! 0) ^. p2pTestContext)
