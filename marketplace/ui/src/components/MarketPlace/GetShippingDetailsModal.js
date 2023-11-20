@@ -115,16 +115,11 @@ const GetShippingDetailsModal = ({
       ...billingAddr
     };
 
-   
-
-
     let res = await actions.addShippingAddress(dispatch, body);
     if (res != null) {
       setShippingDetailsModalOpen(false)
       await actions.fetchUserAddresses(dispatch);
     }
-
-   
   };
 
 
@@ -155,119 +150,131 @@ const GetShippingDetailsModal = ({
       ]}
     >
       <Divider />
-      {  isAddingShippingAddress ? (
-          <div className="h-96 flex justify-center items-center">
-            <Spin size="large" spinning={isAddingShippingAddress}  />
-          </div>
-        ) : (<>
-      <Form layout="vertical" className="mt-5">
-        <div className="w-full">
-          <div className="flex justify-between mb-4">
-            <Form.Item label="Recipient Name" name="name" className="w-72">
-              <Input
-                label="name"
-                name="name"
-                placeholder="Enter Recipient Name"
-                value={formik.values.name}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.name && formik.errors.name && (
-                <span className="text-error text-xs">
-                  {formik.errors.name}
-                </span>
-              )}
-            </Form.Item>
-
-            <Form.Item label="Zipcode" name="zipcode" className="w-72">
-              <Input
-                label="zipcode"
-                name="zipcode"
-                placeholder="Enter Zipcode"
-                value={formik.values.zipcode}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.zipcode && formik.errors.zipcode && (
-                <span className="text-error text-xs">
-                  {formik.errors.zipcode}
-                </span>
-              )}
-            </Form.Item>
-          </div>
-
-          <div className="flex justify-between mb-4">
-            <Form.Item label="State" name="state" className="w-72">
-              <Input
-                label="state"
-                name="state"
-                placeholder="Enter State"
-                value={formik.values.state}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.state && formik.errors.state && (
-                <span className="text-error text-xs">
-                  {formik.errors.state}
-                </span>
-              )}
-            </Form.Item>
-
-            <Form.Item label="City" name="city" className="w-72">
-              <Input
-                label="city"
-                name="city"
-                placeholder="Enter City"
-                value={formik.values.city}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.city && formik.errors.city && (
-                <span className="text-error text-xs">
-                  {formik.errors.city}
-                </span>
-              )}
-            </Form.Item>
-          </div>
-
-          <div className="flex justify-between items-start mb-4">
-            <Form.Item
-              label="Address Line 1"
-              name="addressLine1"
-              className="w-72"
-            >
-              <TextArea
-                rows={3}
-                name="addressLine1"
-                placeholder="Enter Address Line 1"
-                value={formik.values.addressLine1}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.addressLine1 && formik.errors.addressLine1 && (
-                <span className="text-error text-xs">
-                  {formik.errors.addressLine1}
-                </span>
-              )}
-            </Form.Item>
-
-            <Form.Item
-              label="Address Line 2"
-              name="addressLine2"
-              className="w-72"
-            >
-              <TextArea
-                rows={3}
-                name="addressLine2"
-                placeholder="Enter Address Line 2"
-                value={formik.values.addressLine2}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.addressLine2 && formik.errors.addressLine2 && (
-                <span className="text-error text-xs">
-                  {formik.errors.addressLine2}
-                </span>
-              )}
-            </Form.Item>
-          </div>
+      {isAddingShippingAddress ? (
+        <div className="h-96 flex justify-center items-center">
+          <Spin size="large" spinning={isAddingShippingAddress} />
         </div>
-      </Form>
-      <Divider className="mb-0" />
+      ) : (<>
+        <Form layout="vertical" className="mt-5">
+          <div className="w-full">
+            <div className="flex justify-between mb-4">
+              <Form.Item label="Recipient Name" name="name" className="w-72">
+                <>
+                  <Input
+                    label="name"
+                    name="name"
+                    placeholder="Enter Recipient Name"
+                    value={formik.values.name}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.name && formik.errors.name && (
+                    <span className="text-error text-xs">
+                      {formik.errors.name}
+                    </span>
+                  )}
+                </>
+              </Form.Item>
+
+              <Form.Item label="Zipcode" name="zipcode" className="w-72">
+                <>
+                  <Input
+                    label="zipcode"
+                    name="zipcode"
+                    placeholder="Enter Zipcode"
+                    value={formik.values.zipcode}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.zipcode && formik.errors.zipcode && (
+                    <span className="text-error text-xs">
+                      {formik.errors.zipcode}
+                    </span>
+                  )}
+                </>
+              </Form.Item>
+            </div>
+
+            <div className="flex justify-between mb-4">
+              <Form.Item label="State" name="state" className="w-72">
+                <>
+                  <Input
+                    label="state"
+                    name="state"
+                    placeholder="Enter State"
+                    value={formik.values.state}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.state && formik.errors.state && (
+                    <span className="text-error text-xs">
+                      {formik.errors.state}
+                    </span>
+                  )}
+                </>
+              </Form.Item>
+
+              <Form.Item label="City" name="city" className="w-72">
+                <>
+                  <Input
+                    label="city"
+                    name="city"
+                    placeholder="Enter City"
+                    value={formik.values.city}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.city && formik.errors.city && (
+                    <span className="text-error text-xs">
+                      {formik.errors.city}
+                    </span>
+                  )}
+                </>
+              </Form.Item>
+            </div>
+
+            <div className="flex justify-between items-start mb-4">
+              <Form.Item
+                label="Address Line 1"
+                name="addressLine1"
+                className="w-72"
+              >
+                <>
+                  <TextArea
+                    rows={3}
+                    name="addressLine1"
+                    placeholder="Enter Address Line 1"
+                    value={formik.values.addressLine1}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.addressLine1 && formik.errors.addressLine1 && (
+                    <span className="text-error text-xs">
+                      {formik.errors.addressLine1}
+                    </span>
+                  )}
+                </>
+              </Form.Item>
+
+              <Form.Item
+                label="Address Line 2"
+                name="addressLine2"
+                className="w-72"
+              >
+                <>
+                  <TextArea
+                    rows={3}
+                    name="addressLine2"
+                    placeholder="Enter Address Line 2"
+                    value={formik.values.addressLine2}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.addressLine2 && formik.errors.addressLine2 && (
+                    <span className="text-error text-xs">
+                      {formik.errors.addressLine2}
+                    </span>
+                  )}
+                </>
+              </Form.Item>
+            </div>
+          </div>
+        </Form>
+        <Divider className="mb-0" />
       </>)}
     </Modal>
   );
