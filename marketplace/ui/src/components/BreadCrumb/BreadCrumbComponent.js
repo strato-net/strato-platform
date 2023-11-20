@@ -11,56 +11,69 @@ const BreadCrumbComponent = ({ name }) => {
 
   const isMarketplace = pathname.includes("all");
   const routesArray = pathname.split("/");
+  const routesLength = routesArray.length - 1;
 
-  const handleRedirect = (e, item) => {
-    e.preventDefault();
+  const handleRedirect = (index) => {
+    const redirectPath = routesArray.slice(0, index + 1).join("/");
     if (isMarketplace) {
+      if (!redirectPath) {
+        navigate("/marketplace");
+        return;
+      }
       navigate("/category/Membership");
-    } else if (item === "/memberships/serviceUsage") {
     } else {
-      navigate(item || "/marketplace");
+      navigate(redirectPath || "/marketplace");
     }
   };
 
+  const getBreadCrumbText = (item, index) => {
+    if (item === "" && index === 0) {
+      return "Home";
+    }
+    if (name && index === routesLength) {
+      return name;
+    }
+    return decodeURIComponent(item);
+  };
+
+  const BreadCrumbItem = ({ item, index }) => {
+    if (item === "all") {
+      return null;
+    }
+
+    return (
+      <Breadcrumb.Item
+        key={index}
+        href=""
+        onClick={(e) => {
+          e.preventDefault();
+          handleRedirect(index);
+        }}
+      >
+        <ClickableCell>
+          <Text
+            className={`${
+              routesLength !== index && "text-primary"
+            } capitalize text-md font-bold`}
+            underline
+          >
+            {getBreadCrumbText(item, index)}
+          </Text>
+        </ClickableCell>
+      </Breadcrumb.Item>
+    );
+  };
+
   return (
-    <>
-      <Row className="mx-16 h-20">
-        <Col span={24} className="mt-10">
-          <Breadcrumb>
-            {routesArray.map((item, index) => {
-              let len = routesArray.length - 1;
-              if (item === "all") {
-                return null;
-              }
-              return (
-                <Breadcrumb.Item
-                  key={index}
-                  href=""
-                  onClick={(e) =>
-                    handleRedirect(e, routesArray.slice(0, index + 1).join("/"))
-                  }
-                >
-                  <ClickableCell>
-                    <Text
-                      className={`${
-                        len === index ? "" : "text-primary"
-                      } capitalize text-md font-bold`}
-                      underline
-                    >
-                      {item === "" && index === 0
-                        ? "Home"
-                        : name && index === len
-                        ? name
-                        : decodeURIComponent(item)}
-                    </Text>
-                  </ClickableCell>
-                </Breadcrumb.Item>
-              );
-            })}
-          </Breadcrumb>
-        </Col>
-      </Row>
-    </>
+    <Row className="mx-16 h-20">
+      <Col span={24} className="mt-10">
+        <Breadcrumb>
+          {routesArray.map((item, index) => (
+            <BreadCrumbItem item={item} index={index} key={index} />
+          ))}
+        </Breadcrumb>
+      </Col>
+    </Row>
   );
 };
 
