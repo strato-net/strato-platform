@@ -64,10 +64,6 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
 
 
     constructor(string _name, string _description, string[] _images, uint _createdDate) {
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        owner  = c.userAddress();
-        ownerCommonName = c.commonName();
         name = _name;
         description =_description;
         images =_images;
@@ -75,14 +71,13 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     }
 
     modifier requireOwner(string action) {
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
+        mapping(string => string) user = getUserCert(tx.origin);
         string err = "Only "
                    + ownerCommonName
                    + " can perform "
                    + action
                    + ".";
-        string commonName = c.commonName();
+        string commonName = user["commonName"];
         require(commonName == ownerCommonName, err);
         _;
     }
@@ -135,10 +130,12 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
         whitelistedSales=[];
     }
     
-    function transferOwnership(address saleContract, string _newOwnerCommonName, address _newOwner) public requireOwner("Ownership transfer") {
+    function transferOwnership(address saleContract, address _newOwner) public requireOwner("ownership transfer") {
         require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
-        ownerCommonName = _newOwnerCommonName;
         owner = _newOwner;
+        mapping(string => string) ownerCert = getUserCert(owner);
+        ownerOrganization = ownerCert["organization"];
+        ownerCommonName = ownerCert["commonName"];
         disableAllSales();
    }
 }
@@ -167,14 +164,13 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
     }
 
     modifier requireSeller(string action) {
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
+        mapping(string => string) user = getUserCert(tx.origin);
         string err = "Only "
                    + sellersCommonName
                    + " can perform "
                    + action
                    + ".";
-        string commonName = c.commonName();
+        string commonName = user["commonName"];
         require(commonName == sellersCommonName, err);
     }
 
