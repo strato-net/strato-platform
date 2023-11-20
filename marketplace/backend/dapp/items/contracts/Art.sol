@@ -42,7 +42,7 @@ contract Art is ItemStatus, RestStatus, Asset {
         createSales(_paymentTypes, _price);
     }
 
-    function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {// can be overridden
+    function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new ArtSale(address(this), _paymentTypes[i], _price)));
         }

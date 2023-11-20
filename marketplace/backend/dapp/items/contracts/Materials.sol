@@ -1,4 +1,3 @@
-import "/dapp/dapp/contracts/Dapp.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/orders/contracts/Sales/MaterialsSale.sol";
 
@@ -8,11 +7,8 @@ import <d816194227e1a7a780fff236a449604afeb36255>;
 
 /// @title A representation of Materials assets
 contract Materials is ItemStatus, RestStatus, Asset {
-    string public ownerOrganization;
-    string public ownerOrganizationalUnit;
     string public serialNumber;
     ItemStatus public status;
-    uint public itemNumber;
     string public source;
 
     event OwnershipUpdate(
@@ -24,8 +20,6 @@ contract Materials is ItemStatus, RestStatus, Asset {
 
     constructor(
         string _serialNumber,
-        ItemStatus _status,
-        uint _itemNumber,
         uint _createdDate,
         address _owner,
         string _name,
@@ -33,36 +27,25 @@ contract Materials is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _price,
         string _source,
-        SaleState _saleState,
         PaymentType[] _paymentTypes
     ) public Asset(_name, _description, _images, _createdDate ){
         owner = _owner;
 
         serialNumber = _serialNumber;
-        status = _status;
-        itemNumber = _itemNumber;
+        status = ItemStatus.PUBLISHED;
         source = _source;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
-        ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        for (uint i = 0; i < _paymentTypes.length; i++) {
-            createSale(_paymentTypes[i], _price);
-        }
+        createdSales(_paymentTypes, _price);
     }
 
-    function createSale(PaymentType _payment, uint _price) public requireOwner("Create sale") returns (uint) {// can be overridden
-        whitelistedSales.push(address(Sale(new MaterialsSale(address(this), _payment, _price))));
+    function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            whitelistSale(address(new ArtSale(address(this), _paymentTypes[i], _price)));
+        }
         return RestStatus.OK;
     }
-
-    function resell(
-        uint _price,
-        PaymentType[] _paymentTypes
-    ){
-        for (uint i = 0; i < _paymentTypes.length; i++) {
-            createSale(_paymentTypes[i], price);
-         }  
-    }
+}
