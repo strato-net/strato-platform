@@ -214,6 +214,12 @@ spec = do
         runForTwoSeconds $ concurrently_ (runNetworkOld peers connections') (concurrently_ postTimeoutPrimary1 postTimeoutSecondary)
         ctxs1 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs1 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, if i == 0 then Just (1 :: Word256) else Just 1000)
+        connections'' <- traverse
+                           (\(a,b,c) -> createConnection a b c)
+                           [ (peers !! 0, peers !! 1, scope),
+                             (peers !! 0, peers !! 2, scope),
+                             (peers !! 1, peers !! 2, scope)
+                           ]
         atomically $
           modifyTVar'
             ((peers !! 0) ^. p2pTestContext)
@@ -221,7 +227,7 @@ spec = do
                 . (sequencerContext . x509certInfoState %~ addValidatorsToCertMap zippedValidators)
                 . (p2pValidators .~ Set.fromList validatorInfos)
             )
-        runForTwoSeconds $ concurrently_ (runNetworkOld peers connections') (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
+        runForTwoSeconds $ concurrently_ (runNetworkOld peers connections'') (concurrently_ postTimeoutPrimary2 postTimeoutSecondary)
         ctxs2 <- atomically $ traverse (readTVar . _p2pTestContext) peers
         ifor_ ctxs2 $ \i ctx -> (i, _round . _view <$> _blockstanbulContext (_sequencerContext ctx)) `shouldBe` (i, Just 1001 :: Maybe Word256)
 
