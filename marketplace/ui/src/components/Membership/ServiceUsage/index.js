@@ -1,4 +1,3 @@
-import "./index.css";
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -11,53 +10,26 @@ import {
   Typography,
   notification,
 } from "antd";
-import {
-  PlusOutlined,
-  CaretDownOutlined,
-  CloseOutlined,
-} from "@ant-design/icons";
+// Components
 import { generateTableColumns } from "./tableColumns";
-import {
-  useServiceUsageDispatch,
-  useServiceUsageState,
-} from "../../../contexts/serviceUsage";
-import {
-  useAuthenticateDispatch,
-  useAuthenticateState,
-} from "../../../contexts/authentication";
-import {
-  useMembershipDispatch,
-  useMembershipState,
-} from "../../../contexts/membership";
-import moment from "moment";
-import { useServiceDispatch, useServiceState } from "../../../contexts/service";
 import BreadCrumbComponent from "../../BreadCrumb/BreadCrumbComponent";
+// Dispatch and States
+import { useServiceUsageDispatch, useServiceUsageState } from "../../../contexts/serviceUsage";
+import { useAuthenticateDispatch, useAuthenticateState } from "../../../contexts/authentication";
+import { useMembershipDispatch, useMembershipState } from "../../../contexts/membership";
+import { useServiceDispatch, useServiceState } from "../../../contexts/service";
+// Actions
 import { actions as serviceUsageActions } from "../../../contexts/serviceUsage/actions";
 import { actions as servicesActions } from "../../../contexts/service/actions";
 import { actions as userAuthActions } from "../../../contexts/authentication/actions";
 import { actions as membershipActions } from "../../../contexts/membership/actions";
+// utils, css, 
+import { PlusOutlined, CaretDownOutlined, CloseOutlined } from "@ant-design/icons";
+import helper from "../../../helpers/helper.json"
+import "./index.css";
+const { statusOptionServiceUsage, UpdatePayloadKeys } = helper;
 
-const { TabPane } = Tabs;
-
-const limit = 10;
-const offset = 0;
-
-const statusOptions = [
-  { value: 1, label: "Requested" },
-  { value: 2, label: "Cancelled" },
-  { value: 3, label: "Completed" },
-];
-
-const UpdatePayloadKeys = [
-  "summary",
-  "serviceDate",
-  "providerComment",
-  "status",
-  "pricePaid",
-  "paymentStatus",
-  "providerLastUpdated",
-  "providerLastUpdatedDate",
-];
+const limit = 10, offset = 0;
 
 const getProviderOptions = (data) => {
   const uniqueManufacturers = new Set();
@@ -87,7 +59,7 @@ const getNewRowSchema = (serviceType, address) => {
     itemId: "", //provider
     serviceId: "", //service
     paymentStatus: 1,
-    bookedUserAddress: serviceType == 'booked' ? address : '',
+    bookedUserAddress: serviceType === 'booked' ? address : '',
 
     providerLastUpdated: address, //user-address
     providerLastUpdatedDate: new Date().getTime().toString(),
@@ -99,11 +71,12 @@ const ServiceTable = () => {
   let { serviceType } = useParams();
 
   const [api, contextHolder] = notification.useNotification();
+  // Dispatch
   const serviceUsageDispatch = useServiceUsageDispatch();
   const serviceDispatch = useServiceDispatch();
   const authUserDispatch = useAuthenticateDispatch();
   const membershipDispatch = useMembershipDispatch();
-
+  // states
   const userCert = useAuthenticateState();
   const servicesState = useServiceState();
   const membership = useMembershipState();
@@ -169,7 +142,7 @@ const ServiceTable = () => {
     return { value: userAddress, label: commonName };
   });
 
-  const UserListData = serviceType == 'booked' ? userListData : issuedUserList;
+  const UserListData = serviceType === 'booked' ? userListData : issuedUserList;
 
   const [membershipList, setMembershipList] = useState(defaultMembership);
   const [serviceList, setServiceList] = useState(serviceListData);
@@ -189,7 +162,7 @@ const ServiceTable = () => {
 
   useEffect(() => {
     setMembershipList(defaultMembership);
-    if (serviceType == 'provided') {
+    if (serviceType === 'provided') {
       setUserList(UserListData);
     }
   }, [membership]);
@@ -199,7 +172,7 @@ const ServiceTable = () => {
   }, [serviceUsageState]);
 
   useEffect(() => {
-    if (serviceType == 'booked') {
+    if (serviceType === 'booked') {
       setUserList(UserListData);
     }
   }, [userCert]);
@@ -244,8 +217,8 @@ const ServiceTable = () => {
     const data = tableData.map((item, index) => {
       if (index === key) {
         item.editable = bool;
-        let manufacturer = membership?.purchasedMemberships.find(mId => mId.itemAddress == record.itemId).manufacturer;
-        if (type == 'edit') {
+        // let manufacturer = membership?.purchasedMemberships.find(mId => mId.itemAddress === record.itemId).manufacturer;
+        if (type === 'edit') {
           // servicesActions.fetchService(serviceDispatch, 10, offset, manufacturer);
         }
 
@@ -276,7 +249,7 @@ const ServiceTable = () => {
 
     if (type === "update") {
       if (isEdit) {
-        if (serviceType == "booked") {
+        if (serviceType === "booked") {
           serviceUsageActions.UpdateBookedServiceUsage(
             serviceUsageDispatch,
             updatedPayload
@@ -290,7 +263,7 @@ const ServiceTable = () => {
       } else {
         updatedDataObj.itemId = record.itemId;
         updatedDataObj.serviceId = record.serviceId;
-        if (serviceType == "booked") {
+        if (serviceType === "booked") {
           updatedDataObj["providerOrg"] = providerOrg;
           serviceUsageActions.createBookedServiceUsage(
             serviceUsageDispatch,
@@ -419,7 +392,7 @@ const ServiceTable = () => {
   const columns = generateTableColumns({
     isEdit,
     isNewRow,
-    statusOptions,
+    statusOptionServiceUsage,
     serviceType,
     username,
     organization,
@@ -464,6 +437,8 @@ const ServiceTable = () => {
   };
 
   const activeTabCheck = serviceType === "booked" ? "Provider" : "User";
+  const tabsItem = [{ label: "Booked", key: "booked", children: "", disabled: IsLoading }
+    , { label: "Provided", key: "provided", children: "", disabled: IsLoading }]
 
   return (
     <>
@@ -471,9 +446,7 @@ const ServiceTable = () => {
       <BreadCrumbComponent />
       <Row className="mt-2">
         <Col span={22} className="m-auto">
-          <Tabs activeKey={serviceType} onChange={handleChangeServiceUsageType}>
-            <TabPane tab="Booked" key="booked" disabled={IsLoading} />
-            <TabPane tab="Provided" key="provided" disabled={IsLoading} />
+          <Tabs activeKey={serviceType} onChange={handleChangeServiceUsageType} items={tabsItem} disabled={IsLoading}>
           </Tabs>
         </Col>
         <Col
@@ -487,8 +460,8 @@ const ServiceTable = () => {
             disabled={
               validationError ||
               IsLoading ||
-              (tableData && tableData?.length != 0 && !tableData[0]?.address) ||
-              page != 1
+              (tableData && tableData?.length !== 0 && !tableData[0]?.address) ||
+              page !== 1
             }
           >
             Add Service Use
@@ -509,7 +482,7 @@ const ServiceTable = () => {
               value={filterQuery[activeTabCheck]}
               onChange={(value, obj) => {
                 handleFilter(
-                  serviceType == "booked" ? obj.label : value,
+                  serviceType === "booked" ? obj.label : value,
                   activeTabCheck
                 );
               }}
@@ -529,11 +502,11 @@ const ServiceTable = () => {
               onChange={(value) => {
                 handleFilter(value, "status");
               }}
-              options={statusOptions}
+              options={statusOptionServiceUsage}
             />
             <Button
               icon={<CloseOutlined />}
-              disabled={IsLoading || Object.keys(filterQuery).length == 0}
+              disabled={IsLoading || Object.keys(filterQuery).length === 0}
               onClick={clearFilter}
             />
           </span>

@@ -90,5 +90,128 @@
   "StatusValue": {
     "1": "Published",
     "2": "UnPublished"
-  }
+  },
+  "statusOptions": [
+    {
+      "value": 1,
+      "label": "Published"
+    },
+    {
+      "value": 2,
+      "label": "Unpublished"
+    }
+  ],
+  "discountTypeVal": {
+    "true": "taxPercentageAmount",
+    "false": "taxDollarAmount"
+  },
+  "issuedCardConfig": {
+    "isDuration": true,
+    "issued": true,
+    "qty": null,
+    "isMembershipNumber": false,
+    "isDescription": true,
+    "configCase": "AddInventory",
+    "btnName": "Add Inventory"
+  },
+  "purchasedCardConfig": {
+    "isDuration": false,
+    "issued": false,
+    "qty": 1,
+    "isMembershipNumber": true,
+    "isDescription": false,
+    "configCase": "resaleMembership",
+    "btnName": "Edit Listing"
+  },
+  "initialValues": {
+    "name": "",
+    "subCategory": "",
+    "duration": "",
+    "additionalInformation": "",
+    "images": [],
+    "description": "",
+    "price": "",
+    "quantity": "",
+    "isTaxPercentage": false,
+    "taxDollarAmount": 0,
+    "taxPercentageAmount": 0,
+    "taxPercentage": 0,
+    "services": [
+      {
+        "serviceId": "",
+        "serviceName": "",
+        "numberOfUses": "",
+        "memberPrice": null,
+        "percentDiscount": null
+      }
+    ],
+    "documents": []
+  },
+  "discountTypeBtn": [
+    {
+      "label": "$",
+      "value": "price"
+    },
+    {
+      "label": "%",
+      "value": "percent"
+    }
+  ],
+  "statusOptionServiceUsage": [
+    {
+      "value": 1,
+      "label": "Requested"
+    },
+    {
+      "value": 2,
+      "label": "Cancelled"
+    },
+    {
+      "value": 3,
+      "label": "Completed"
+    }
+  ],
+  "UpdatePayloadKeys": [
+    "summary",
+    "serviceDate",
+    "providerComment",
+    "status",
+    "pricePaid",
+    "paymentStatus",
+    "providerLastUpdated",
+    "providerLastUpdatedDate"
+  ],
+  "confirmOrderInitialValue": {
+    "sameAddress": true,
+    "state": "",
+    "name": "",
+    "zipcode": "",
+    "addressLine1": "",
+    "addressLine2": "",
+    "city": "",
+    "state_b": "",
+    "name_b": "",
+    "zipcode_b": "",
+    "addressLine1_b": "",
+    "addressLine2_b": "",
+    "city_b": ""
+  },
+  "orderTableFilter": [
+    {
+      "text": "Awaiting Fulfillment",
+      "value": "Awaiting Fulfillment"
+    },
+    {
+      "text": "Awaiting Shipment",
+      "value": "Awaiting Shipment"
+    },
+    {
+      "text": "Canceled",
+      "value": "Canceled"
+    },
+    {
+      "text": "Closed",
+      "value": "Closed"
+    }
+  ]
 }
