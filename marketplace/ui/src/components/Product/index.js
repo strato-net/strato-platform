@@ -1,39 +1,45 @@
 import React, { useState, useEffect } from "react";
-
 import {
   Breadcrumb,
   Input,
   Button,
   notification,
-  Spin,
   Image,
   Typography,
   Pagination,
 } from "antd";
+// Components
 import ProductCard from "./ProductCard";
 import CreateProductModal from "./CreateProductModal";
-import { actions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import useDebounce from "../UseDebounce";
-//categories
+import LoaderComponent from "../Loader/LoaderComponent";
+// Actions
+import { actions as productActions } from "../../contexts/product/actions";
 import { actions as categoryActions } from "../../contexts/category/actions";
+import useDebounce from "../UseDebounce";
+// Categories
+import { useProductDispatch, useProductState } from "../../contexts/product";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-//sub-categories
-import {
-  useSubCategoryState,
-} from "../../contexts/subCategory";
+import { useSubCategoryState } from "../../contexts/subCategory";
+import { useAuthenticateState } from "../../contexts/authentication";
+//images,utils, route
 import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
-import { useAuthenticateState } from "../../contexts/authentication";
 
 const { Search } = Input;
 const { Title, Text } = Typography;
 
 const Product = () => {
-  const [open, setOpen] = useState(false);
+  // dispatch
   const dispatch = useProductDispatch();
+  const categoryDispatch = useCategoryDispatch();
   const [api, contextHolder] = notification.useNotification();
+  // states
+  const { categorys, isCategorysLoading } = useCategoryState();
+  const { subCategorys, isSubCategorysLoading } = useSubCategoryState();
+  const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+
+  const [open, setOpen] = useState(false);
   const [queryValue, setQueryValue] = useState("");
   const limit = 10;
   const [offset, setOffset] = useState(0);
@@ -42,15 +48,6 @@ const Product = () => {
   const [total, setTotal] = useState(10);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
 
-  //Categories
-  const categoryDispatch = useCategoryDispatch();
-
-  //Sub-categories
-
-  const { categorys, iscategorysLoading } = useCategoryState();
-  const { subCategorys, issubCategorysLoading } = useSubCategoryState();
-
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -60,14 +57,14 @@ const Product = () => {
     if (success) {
       api.success({
         message: message,
-        onClose: actions.resetMessage(dispatch),
+        onClose: productActions.resetMessage(dispatch),
         placement,
         key: 1,
       });
     } else {
       api.error({
         message: message,
-        onClose: actions.resetMessage(dispatch),
+        onClose: productActions.resetMessage(dispatch),
         placement,
         key: 2,
       });
@@ -79,10 +76,10 @@ const Product = () => {
   useEffect(() => {
     if (isSearch) {
       setOffset(0);
-      actions.fetchProduct(dispatch, limit, 0, debouncedSearchTerm);
+      productActions.fetchProduct(dispatch, limit, 0, debouncedSearchTerm);
       setIsSearch(false)
     } else
-      actions.fetchProduct(dispatch, limit, offset, debouncedSearchTerm);
+      productActions.fetchProduct(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
@@ -112,13 +109,13 @@ const Product = () => {
     setPage(page);
   };
 
+  const isLoading = isProductsLoading || isCategorysLoading || isSubCategorysLoading;
+
   return (
     <>
       {contextHolder}
-      {isProductsLoading || iscategorysLoading || issubCategorysLoading ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin spinning={isProductsLoading} size="large" />
-        </div>
+      {isLoading ? (
+        <LoaderComponent />
       ) : (
         <div className="mx-16 mt-14 h-screen">
           {products.length === 0 && offset === 0 ? (
