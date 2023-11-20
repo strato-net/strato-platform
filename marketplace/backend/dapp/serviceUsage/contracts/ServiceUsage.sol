@@ -23,6 +23,7 @@ contract ServiceUsage is Status, PaymentStatus {
     uint public providerLastUpdatedDate;
     uint public pricePaid;
     address public bookedUserAddress;
+    string public providerOrg;
 
     /// @dev Events to add and remove members to this shard.
     event OrgAdded(string orgName);
@@ -44,7 +45,8 @@ contract ServiceUsage is Status, PaymentStatus {
         string _providerComment,
         uint _providerLastUpdatedDate,
         uint _pricePaid,
-        address _bookedUserAddress
+        address _bookedUserAddress,
+        string _providerOrg
     ) public {
         owner = tx.origin;
 
@@ -60,6 +62,7 @@ contract ServiceUsage is Status, PaymentStatus {
         providerLastUpdatedDate = _providerLastUpdatedDate;
         pricePaid = _pricePaid;
         bookedUserAddress = _bookedUserAddress;
+        providerOrg = _providerOrg;
 
         mapping(string => string) ownerCert = getUserCert(tx.origin);
         ownerOrganization = ownerCert["organization"];
@@ -78,40 +81,43 @@ contract ServiceUsage is Status, PaymentStatus {
         uint _pricePaid,
         uint _scheme
     ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
+        string txOrg = getUserOrganization(tx.origin);
+        if ((getUserOrganization(bookedUserAddress) == txOrg) || 
+            (providerOrg == txOrg)) {
+            if (_scheme == 0) {
+                return RestStatus.OK;
+            }
 
-        if (_scheme == 0) {
+            if ((_scheme & (1 << 0)) == (1 << 0)) {
+                serviceDate = _serviceDate;
+            }
+            if ((_scheme & (1 << 1)) == (1 << 1)) {
+                summary = _summary;
+            }
+            if ((_scheme & (1 << 2)) == (1 << 2)) {
+                changeStatus(_status);
+            }
+            if ((_scheme & (1 << 3)) == (1 << 3)) {
+                changePaymentStatus(_paymentStatus);
+            }
+            if ((_scheme & (1 << 4)) == (1 << 4)) {
+                providerLastUpdated = _providerLastUpdated;
+            }
+            if ((_scheme & (1 << 5)) == (1 << 5)) {
+                providerComment = _providerComment;
+            }
+            if ((_scheme & (1 << 6)) == (1 << 6)) {
+                providerLastUpdatedDate = _providerLastUpdatedDate;
+            }
+            if ((_scheme & (1 << 7)) == (1 << 7)) {
+                pricePaid = _pricePaid;
+            }
+
             return RestStatus.OK;
         }
-
-        if ((_scheme & (1 << 0)) == (1 << 0)) {
-            serviceDate = _serviceDate;
+        else {
+            return RestStatus.FORBIDDEN;
         }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            summary = _summary;
-        }
-        if ((_scheme & (1 << 2)) == (1 << 2)) {
-            changeStatus(_status);
-        }
-        if ((_scheme & (1 << 3)) == (1 << 3)) {
-            changePaymentStatus(_paymentStatus);
-        }
-        if ((_scheme & (1 << 4)) == (1 << 4)) {
-            providerLastUpdated = _providerLastUpdated;
-        }
-        if ((_scheme & (1 << 5)) == (1 << 5)) {
-            providerComment = _providerComment;
-        }
-        if ((_scheme & (1 << 6)) == (1 << 6)) {
-            providerLastUpdatedDate = _providerLastUpdatedDate;
-        }
-        if ((_scheme & (1 << 7)) == (1 << 7)) {
-            pricePaid = _pricePaid;
-        }
-
-        return RestStatus.OK;
     }
 
     function changeStatus(Status newType) public {
