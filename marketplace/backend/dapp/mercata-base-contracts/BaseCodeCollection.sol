@@ -186,7 +186,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
         payment=_payment;
     }
 
-    function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") returns (uint) {
+    function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") virtual returns (uint) {
         saleOrderID = _orderId;
         assetToBeSold.transferOwnership(address(this), _purchasersAddress);
         return RestStatus.OK;

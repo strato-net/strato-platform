@@ -40,16 +40,14 @@ class MaterialsController {
     const createMaterialsSchema = Joi.object({
       itemArgs: Joi.object({
         serialNumber: Joi.string().allow("").optional(),
-        status: Joi.number().integer().min(0).max(5).required(),
-        comment: Joi.string().allow("").optional(),
-        itemNumber: Joi.number().integer().min(0).required(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         source: Joi.string().required(),
         images: Joi.array().items(Joi.string().optional()).required(),
         price: Joi.number().positive().required(),
-        saleState: Joi.number().integer().min(0).max(3).required(),
-        paymentType: Joi.number().integer().min(0).max(3).required(),
+        paymentTypes: Joi.array().min(1).items(
+          Joi.number().integer().min(0).max(3).required(),
+        ).required(),
       }).required()
     });
 

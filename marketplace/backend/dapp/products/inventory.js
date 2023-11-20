@@ -193,7 +193,7 @@ async function getAll(admin, args = {}, options) {
         inventories = await searchAllWithQueryArgs(contractName, { address: assetAddresses }, options, admin);
     }
     else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'sale', value: '0000000000000000000000000000000000000000', predicate: 'neq' });
+        const searchArgs = setSearchQueryOptions(restArgs, { key: 'whitelistedSales', value: '[]', predicate: 'neq' });
         inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     }
 
