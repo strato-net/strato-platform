@@ -34,6 +34,9 @@ class StripeService {
                         quantity: quantity,
                     }
                 }),
+                metadata: {
+                    ...cartData
+                },
                 payment_intent_data: {
                     /* 3% of OrderTotal in Cents */
                     application_fee_amount: Math.round(3 * cartData.orderTotal),

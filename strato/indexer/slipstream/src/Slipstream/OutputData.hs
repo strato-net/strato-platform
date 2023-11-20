@@ -908,7 +908,7 @@ addHistoryUnique (o, a, n) =
           <> wrapDoubleQuotes indexName
           <> "\n  ON "
           <> historyName
-          <> " (address, \"chainId\", block_hash, transaction_hash);",
+          <> " (address, block_hash, transaction_hash);",
         "ALTER TABLE "
           <> historyName
           <> " ADD PRIMARY KEY USING INDEX "
@@ -1055,7 +1055,7 @@ insertAbstractTableQuery cs =
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
     data = excluded.data|],
-                      if null list then "" else ",\n    ",
+                      if null list then "" else "\n    ",
                       tableUpsert $ list',
                       ";"
                     ]

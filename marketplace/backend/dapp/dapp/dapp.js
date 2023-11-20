@@ -878,8 +878,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       let stripePaymentSession;
       try {
+        const { orderList, ...rest } = args;
 
-        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
+        // Convert orderList into an object with keys like 'orderList_0', 'orderList_1', ...
+        const orderListObject = orderList.reduce((acc, item, index) => {
+          acc[`orderList_${index}`] = JSON.stringify(item);
+          return acc;
+        }, {});
+
+        // Merge the orderListObject with the rest of the properties
+        const cartData = { ...rest, ...orderListObject };
+        Object.keys(cartData).forEach(key => {
+          cartData[key] = String(cartData[key]);
+        });
+
+        stripePaymentSession = await StripeService.initiatePayment(cartData, invoices, sellerStripeDetails.accountId);
       } catch (err) {
         throw new rest.RestError(err.statusCode, err.message)
       }
