@@ -7,11 +7,8 @@ import <d816194227e1a7a780fff236a449604afeb36255>;
 
 /// @title A representation of Art assets
 contract Art is ItemStatus, RestStatus, Asset {
-    string public ownerOrganization;
-    string public ownerOrganizationalUnit;
     string public serialNumber;
     ItemStatus public status;
-    uint public itemNumber;
     string public artist;
 
     event OwnershipUpdate(
@@ -23,8 +20,6 @@ contract Art is ItemStatus, RestStatus, Asset {
 
     constructor(
         string _serialNumber,
-        ItemStatus _status,
-        uint _itemNumber,
         uint _createdDate,
         address _owner,
         string _name,
@@ -37,50 +32,21 @@ contract Art is ItemStatus, RestStatus, Asset {
         owner = _owner;
 
         serialNumber = _serialNumber;
-        status = _status;
-        itemNumber = _itemNumber;
+        status = ItemStatus.PUBLISHED;
         artist = _artist;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
-        ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
+        createSales(_paymentTypes, _price);
+    }
+
+    function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {// can be overridden
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            createSale(_paymentTypes[i], _price);
+            whitelistSale(address(new ArtSale(address(this), _paymentTypes[i], _price)));
         }
-    }
-
-    function createSale(PaymentType _payment, uint _price) public requireOwner("Create sale") returns (uint) {// can be overridden
-        whitelistedSales.push(address(Sale(new ArtSale(address(this), _payment, _price))));
         return RestStatus.OK;
     }
-
-    function generateOwnershipHistory(
-        string _seller,
-        string _newOwner,
-        uint _ownershipStartDate,
-        address _itemAddress
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-        emit OwnershipUpdate(
-            _seller,
-            _newOwner,
-            _ownershipStartDate,
-            _itemAddress
-        );
-        return RestStatus.OK;
-    }
-
-    function resell(
-        uint _price,
-        PaymentType[] _paymentTypes
-    ) returns (uint) {
-        for (uint i = 0; i < _paymentTypes.length; i++) {
-            createSale(_paymentTypes[i], _price);
-        }  
-        return RestStatus.OK;
-    }
+}
 
