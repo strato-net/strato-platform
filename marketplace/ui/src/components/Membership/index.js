@@ -104,7 +104,7 @@ const Membership = (user) => {
   const listTabProps = { type, isPurchased, user, debouncedSearchTerm }
   return (
     <>
-      {isPageLoading
+      {isPageLoading || isMembershipFound
         ? <LoaderComponent />
         : <div className="min-h-full">
           <BreadCrumbComponent />
