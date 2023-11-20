@@ -39,7 +39,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       selectedDate,
       filter
     );
-    
+
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
 
   useEffect(() => {
