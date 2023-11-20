@@ -272,7 +272,7 @@ const SoldOrderDetails = ({ user, users }) => {
   
   const validatePayment = async (paymentSessionId) => {
     //if payment session exists and status = Payment Pending
-    // OR if payment session exists and comment is not set and status = Cancelled
+    // OR if payment session exists and comment is not set and status = Canceled
     if (((paymentSessionId !== "") && (getStatus(parseInt(orderDetails.status)) === getStatus(5))) || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === getStatus(4)))) {
       try {
         const intentResponse = await fetch(
@@ -288,7 +288,7 @@ const SoldOrderDetails = ({ user, users }) => {
         if(intentBody.data.last_payment_error.message) setcomment('Stripe:'+intentBody.data.last_payment_error.message);
 
         if (intentBody.data.status === 'requires_payment_method' && (getStatus(parseInt(orderDetails.status)) !== getStatus(4))) {
-          //If any payment failure exists, and STATUS != Cancelled 
+          //If any payment failure exists, and STATUS != ed 
           const newComment = 'Stripe:' + intentBody.data.last_payment_error.message;
   
           let body = {
@@ -299,7 +299,7 @@ const SoldOrderDetails = ({ user, users }) => {
             },
           };
           
-          //Update Seller Details and change the Order Status to 'Cancelled' from 'Payment Pending'
+          //Update Seller Details and change the Order Status to 'Canceled' from 'Payment Pending'
           const isDone = await actions.updateSellerDetails(dispatch, body);
           
           if (isDone) {

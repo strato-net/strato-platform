@@ -239,7 +239,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       textClass = "text-blue  bg-[#EBF7FF]";
     } else if (status === "Closed") {
       textClass = "text-success  bg-[#EAFFEE]";
-    } else if (status === "Cancelled") {
+    } else if (status === "Canceled") {
       textClass = "text-error  bg-[#FFF0F0]";
     } else if (status === "Payment Pending") {
       textClass = "text-orange bg-[#FFF6EC]";

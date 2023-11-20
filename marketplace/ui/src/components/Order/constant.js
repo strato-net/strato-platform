@@ -2,7 +2,7 @@ export const status = {
   1: "Awaiting Fulfillment",
   2: "Awaiting Shipment",
   3: "Closed",
-  4: "Cancelled",
+  4: "Canceled",
   5: "Payment Pending"
 };
 
