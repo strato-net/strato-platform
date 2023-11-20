@@ -5,6 +5,9 @@
 .pointer-hover:hover {
   cursor: pointer;
 }
+body {
+  background-color: white;
+}
 
 * {
   padding: 0;
@@ -163,6 +166,6 @@
   height: 390px;
 }
 
-.ant-image{
+.ant-image {
   height: 50%;
 }
