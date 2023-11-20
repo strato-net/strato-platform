@@ -8,7 +8,8 @@ contract Mercata{}
 contract PaymentType {
 enum PaymentType{
         NONE,
-        CASH,
+        VISA,
+        Mastercard,
         STRAT,
         MAX
     }
@@ -142,6 +143,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
 }
 
 abstract contract Sale is PaymentType, SaleState, RestStatus{ 
+    address public sellersAddress;
     string public sellersCommonName;
     Asset public assetToBeSold;
     uint public price;
@@ -157,6 +159,7 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         sellersCommonName = assetToBeSold.ownerCommonName();
+        sellersAddress = assetToBeSold.owner();
         price = _price;
         state = SaleState.Created;
         payment = _payment;

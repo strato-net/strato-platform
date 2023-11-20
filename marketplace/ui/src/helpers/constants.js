@@ -100,6 +100,7 @@ export const CATEGORIES = [
 ]
 
 export const PAYMENT_TYPE = [
-  { name: "Cash", value: 1 },
-  { name: "STRAT", value: 2 }
+  { name: "VISA", value: 1 },
+  { name: "Mastercard", value: 2 },
+  { name: "STRAT", value: 3},
 ]

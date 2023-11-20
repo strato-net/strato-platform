@@ -6,6 +6,7 @@ import {
   Modal,
   Input,
   Select,
+  Tag,
   Radio,
   Button,
   Spin,
@@ -24,6 +25,7 @@ import { usePapaParse } from "react-papaparse";
 import TagManager from "react-gtm-module";
 import { CATEGORIES, PAYMENT_TYPE } from "../../helpers/constants";
 import { PictureOutlined } from "@ant-design/icons";
+import { VISA, Mastercard } from "../../images/SVGComponents";
 
 
 const { Option } = Select;
@@ -46,7 +48,6 @@ const CreateInventoryModal = ({
 
   const initialValues = {
     serialNumber: "",
-    itemNumber: null,
     name: "",
     description: "",
     artist: "",
@@ -55,7 +56,7 @@ const CreateInventoryModal = ({
     brand: "",
     images: null,
     price: null,
-    paymentType: null,
+    paymentTypes: [],
     category: "Art"
   };
 
@@ -88,15 +89,12 @@ const CreateInventoryModal = ({
     const body = {
       itemArgs: {
         serialNumber: values.serialNumber,
-        status: 1,
-        comment: "",
-        itemNumber: values.itemNumber,
         name: values.name,
         description: values.description,
         images: (imageData ? [imageData.imageKey] : []),
         price: values.price,
         saleState: 1,
-        paymentType: values.paymentType
+        paymentTypes: values.paymentTypes
       },
     };
 
@@ -158,6 +156,26 @@ const CreateInventoryModal = ({
       placement,
       key: 1,
     });
+  };
+
+  const tagRender = (props) => {
+    const { label, value, closable, onClose } = props;
+    const onPreventMouseDown = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    return (
+      <Tag
+        icon={PAYMENT_TYPE[value] ? PAYMENT_TYPE[value] : undefined}
+        color={value}
+        onMouseDown={onPreventMouseDown}
+        closable={closable}
+        onClose={onClose}
+        style={{ marginRight: 3 }}
+      >
+        {label}
+      </Tag>
+    );
   };
 
   const categoricalProperties = () => {
@@ -332,6 +350,32 @@ const CreateInventoryModal = ({
               </div>
               {categoricalProperties()}
               <div className="flex justify-between mt-4 ">
+                <Form.Item label="Payment Types" name="paymentTypes" className="w-72">
+                  <Select
+                    id="paymentTypes"
+                    mode="multiple"
+                    tagRender={tagRender}
+                    placeholder="Select Payment Types"
+                    allowClear
+                    name="paymentTypes"
+                    value={formik.values.paymentTypes}
+                    onChange={(value) => {
+                      formik.setFieldValue("paymentTypes", value);
+                    }}
+                  >
+                    {PAYMENT_TYPE.map((e, index) => (
+                      <Option value={e.value} key={index}>
+                        {e.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  {getIn(formik.touched, "paymentTypes") &&
+                    getIn(formik.errors, "paymentTypes") && (
+                      <span className="text-error text-xs">
+                        {getIn(formik.errors, "paymentTypes")}
+                      </span>
+                    )}
+                </Form.Item>
                 <Form.Item
                   label="Price"
                   name="price"
@@ -348,30 +392,6 @@ const CreateInventoryModal = ({
                     formik.errors.price && (
                       <span className="text-error text-xs">
                         {formik.errors.price}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item label="Payment Type" name="paymentType" className="w-72">
-                  <Select
-                    id="paymentType"
-                    placeholder="Select Payment Type"
-                    allowClear
-                    name="paymentType"
-                    value={formik.values.paymentType}
-                    onChange={(value) => {
-                      formik.setFieldValue("paymentType", value);
-                    }}
-                  >
-                    {PAYMENT_TYPE.map((e, index) => (
-                      <Option value={e.value} key={index}>
-                        {e.name}
-                      </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "paymentType") &&
-                    getIn(formik.errors, "paymentType") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "paymentType")}
                       </span>
                     )}
                 </Form.Item>
@@ -393,7 +413,7 @@ const CreateInventoryModal = ({
 
               <div className="mt-4 flex justify-between">
                 <Form.Item label="Upload Images" name="images">
-                  <div className="w-48 h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
+                  <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
                     {selectedImage ? (
                       <div className="h-20">
                         <img
@@ -453,25 +473,6 @@ const CreateInventoryModal = ({
                       formik.errors.serialNumber && (
                         <span className="text-error text-xs">
                           {formik.errors.serialNumber}
-                        </span>
-                      )}
-                  </Form.Item>
-                  <Form.Item
-                    label="Item Number"
-                    name="itemNumber"
-                    className="w-72 mt-4"
-                  >
-                    <Input
-                      label="itemNumber"
-                      placeholder="Enter Item Number"
-                      name="itemNumber"
-                      value={formik.values.itemNumber}
-                      onChange={formik.handleChange}
-                    />
-                    {formik.touched.itemNumber &&
-                      formik.errors.itemNumber && (
-                        <span className="text-error text-xs">
-                          {formik.errors.itemNumber}
                         </span>
                       )}
                   </Form.Item>

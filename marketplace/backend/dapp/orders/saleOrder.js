@@ -224,7 +224,6 @@ async function cancelOrder(user, contract, options, comments = "") {
  * @param newOwner The common name of the new owner of the SimpleSale.
  */
 async function transferOwnership(user, contract, options, fulfillmentDate, comments) {
-
   const callArgs = {
     contract,
     method: "transferOwnership",

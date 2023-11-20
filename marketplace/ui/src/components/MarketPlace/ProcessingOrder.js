@@ -70,13 +70,21 @@ const ProcessingOrder = () => {
 
       const body = await response.json();
       if (response.status === RestStatus.OK) {
-        if (JSON.parse(body.data.metadata.cart) !== {}) {
-          if (body.data["payment_status"] === "paid") {
-            const customerEmail = body.data["customer_details"]["email"];
-            const cart = JSON.parse(body.data.metadata.cart);
-            let object = { paymentSessionId: sessionId, ...cart };
-            handleOrderConfirm(object, customerEmail);
+        try {
+          const cartObject = JSON.parse(body.data.metadata.cart);
+          if (Object.keys(cartObject).length !== 0) {
+            if (body.data["payment_status"] === "paid") {
+              const customerEmail = body.data["customer_details"]["email"];
+              const cart = JSON.parse(body.data.metadata.cart);
+              let object = { paymentSessionId: sessionId, ...cart };
+              handleOrderConfirm(object, customerEmail);
+            }
           }
+        } catch (error) {
+          seterror(error);
+          setTimeout(function () {
+            navigate(routes.Checkout.url)
+          }, 2000);
         }
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         seterror("Cannot find session ID");
@@ -151,7 +159,8 @@ const ProcessingOrder = () => {
     
     const body = {
       saleAddresses: orderList,
-      sellerCommonName: cartData.orderList[0].sellerCommonName,
+      sellersCommonName: cartData.orderList[0].sellersCommonName,
+      sellersAddress: cartData.orderList[0].sellersAddress,
       totalPrice: cartData.orderTotal,
       shippingAddress: cartData.shippingAddress,
       paymentSessionId: cartData.paymentSessionId,

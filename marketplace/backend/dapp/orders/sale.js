@@ -19,10 +19,7 @@ const contractName = constants.saleTableName;
  * @param args - Contract state 
  */
 function marshalIn(_args) {
-    const defaultArgs = {
-        pricePerUnit: 0,
-        status: 0
-    };
+    const defaultArgs = {};
 
     const args = {
         ...defaultArgs,
@@ -138,6 +135,25 @@ async function getAll(admin, args = {}, options) {
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
 }
 
+async function createSplitSale(user, args = {}, options, contract) {
+    const callArgs = {
+        contract,
+        method: "createSplitSale",
+        args: util.usc({ ...args }),
+      };
+      const splitStatus = await rest.call(user, callArgs, options);
+    
+      if (parseInt(splitStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+          splitStatus,
+          "Create Split Sale has failed",
+          { ...args }
+        );
+      }
+    
+      return transferStatus;
+}
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -152,6 +168,7 @@ export default {
     bindAddress,
     get,
     getAll,
+    createSplitSale,
     marshalIn,
     marshalOut,
     getHistory

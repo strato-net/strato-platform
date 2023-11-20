@@ -246,7 +246,9 @@ definitions:
         type: array
         items:
           type: string
-      sellerCommonName:
+      sellersCommonName:
+        type: string
+      sellersAddress:
         type: string
       totalPrice:
         type: number
