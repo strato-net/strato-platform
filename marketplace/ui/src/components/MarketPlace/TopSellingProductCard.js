@@ -33,7 +33,7 @@ const TopSellingProductCard = () => {
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
+    if (!isAuthenticated) {
       actions.fetchTopSellingProducts(marketplaceDispatch, offset);
     } else {
       actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
