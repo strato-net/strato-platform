@@ -80,7 +80,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
 
   const navUrls = [
     routes.Marketplace.url,
-    routes.Orders.url,
+    routes.Orders.soldOrders,
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
