@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useParams } from "react-router-dom";
 import { EyeOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
 import classNames from "classnames";
@@ -23,6 +23,8 @@ const { orderTableFilter } = helper;
 
 const BoughtOrdersTable = ({ user }) => {
   const navigate = useNavigate();
+  const { type } = useParams();
+
   const dispatch = useOrderDispatch();
 
   const debouncedSearchTerm = useDebounce("", 1000);
@@ -35,7 +37,7 @@ const BoughtOrdersTable = ({ user }) => {
   const { isCheckingAuthentication } = useAuthenticateState();
 
   useEffect(() => {
-    if (user?.organization) {
+    if (user?.organization && type === "bought") {
       orderActions.fetchOrder(
         dispatch,
         limit,
@@ -44,9 +46,8 @@ const BoughtOrdersTable = ({ user }) => {
         user?.organization
       )
     }
-  }, [dispatch, limit, offset, debouncedSearchTerm, user?.organization]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, user?.organization, type]);
 
-  
   const [data, setdata] = useState([]);
   useEffect(() => {
 

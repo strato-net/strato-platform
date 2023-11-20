@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useParams } from "react-router-dom";
 import { EyeOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
 import { Pagination } from "antd";
@@ -23,6 +23,7 @@ const { orderTableFilter } = helper;
 
 const SoldOrdersTable = ({ user }) => {
   const navigate = useNavigate();
+  const { type } = useParams();
 
   const dispatch = useOrderDispatch();
   const { ordersSold, isordersSoldLoading } = useOrderState();
@@ -36,7 +37,7 @@ const SoldOrdersTable = ({ user }) => {
   const [data, setdata] = useState([]);
 
   useEffect(() => {
-    if (user?.organization) {
+    if (user?.organization && type === "sold") {
       orderActions.fetchOrderSold(
         dispatch,
         limit,
@@ -45,7 +46,7 @@ const SoldOrdersTable = ({ user }) => {
         user?.organization
       )
     }
-  }, [dispatch, limit, offset, debouncedSearchTerm, user?.organization]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, user?.organization, type]);
 
   useEffect(() => {
     let items = [];
