@@ -297,7 +297,7 @@ const CategoryProductList = ({ user }) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {((selectedBrands.length > 0 || selectedSubCategories.length > 0 || debouncedMinPrice !== 0) ? productList : marketplaceList).map(({ productId, name }, index) => (
+                        {productList.map(({ productId, name }, index) => (
                           <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
                             {name}
                           </Checkbox>
@@ -346,7 +346,7 @@ const CategoryProductList = ({ user }) => {
           : (
             <div className="w-9/12 mb-12">
               <Text className="text-sm text-secondryB">
-                {marketplaceList.length} Products found
+                {productList.length} Products found
               </Text>
               {marketplaceList.length > 0
                 ? <div className="mt-4 mb-8 mr-10" id="product-list">
