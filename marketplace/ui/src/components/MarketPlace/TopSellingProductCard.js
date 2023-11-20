@@ -17,31 +17,20 @@ import {
 } from "../../contexts/marketplace";
 import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
+// import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
 const { Title, Text } = Typography;
 
-const TopSellingProductCard = () => {
+const TopSellingProductCard = ({topSellingProducts}) => {
   const [offset, setOffset] = useState(0);
 
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
+  const { isTopSellingProductsLoading, cartList } = useMarketplaceState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
-
-  useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
-      actions.fetchTopSellingProducts(marketplaceDispatch, offset);
-    } else {
-      actions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
-    }
-  }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
-
-  const naviroute = routes.MarketplaceProductDetail.url;
-  const naviroute2 = routes.MembershipDetail.url;
 
   const limit = 3;
 
@@ -142,7 +131,7 @@ const TopSellingProductCard = () => {
             </div>
           ) : (
             topSellingProducts
-              .map((topSellingProduct, index) => {
+              ?.map((topSellingProduct, index) => {
                 return (
                   <div
                     key={index}

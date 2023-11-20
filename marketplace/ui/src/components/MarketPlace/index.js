@@ -3,22 +3,34 @@ import CategoryCard from "./CategoryCard";
 import TopSellingProductCard from "./TopSellingProductCard";
 import { Images } from "../../images";
 import React, { useEffect } from "react";
-import { actions } from "../../contexts/category/actions";
+import { actions as categoryActions } from "../../contexts/category/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 const MarketPlace = () => {
   const limit = 10, offset = 0;
   const navigate = useNavigate();
   const dispatch = useCategoryDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
   const debouncedSearchTerm = useDebounce("", 1000);
-  const { iscategorysLoading } = useCategoryState();
+  const { isCategorysLoading } = useCategoryState();
+  const { topSellingProducts, isTopSellingProductsLoading } = useMarketplaceState();
+  let { isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
-    actions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
-  }, [dispatch, limit, offset, debouncedSearchTerm]);
+    categoryActions.fetchCategories(dispatch, limit, offset, debouncedSearchTerm);
+    if (!isAuthenticated) {
+      marketplaceActions.fetchTopSellingProducts(marketplaceDispatch, offset);
+    }
+    if (isAuthenticated) {
+      marketplaceActions.fetchTopSellingProductsLoggedIn(marketplaceDispatch, offset);
+    }
+  }, []);
 
   return (
     <>
@@ -40,14 +52,16 @@ const MarketPlace = () => {
           style={{ objectFit: "cover" }}
           preview={false} width="100%" />
       </div>
-      {iscategorysLoading ? (
+      {isCategorysLoading ? (
         <div className="h-96 flex justify-center items-center">
-          <Spin spinning={iscategorysLoading} size="large" />
+          <Spin spinning={isCategorysLoading} size="large" />
         </div>
       ) : (
         <div className="px-8 py-12">
           <CategoryCard />
-          <TopSellingProductCard />
+          {isTopSellingProductsLoading ? <div className="h-96 flex justify-center items-center">
+            <Spin spinning={isTopSellingProductsLoading} size="large" />
+          </div> : <TopSellingProductCard topSellingProducts={topSellingProducts} />}
         </div>
       )}
     </>
