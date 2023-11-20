@@ -1,9 +1,15 @@
 pragma es6;
 pragma strict;
-import <d85f8ab0f5bb3add2046fd57ba9ba3ef3823d005>;
+import <d816194227e1a7a780fff236a449604afeb36255>;
 
 /// @title A representation of asset sale contract
 contract ClothingSale is Sale{
     constructor(address _assetToBeSold, PaymentType _payment, _price) Sale(_assetToBeSold, _price, _payment){
+    }
+
+    function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") returns (uint) {
+        saleOrderID = _orderId;
+        assetToBeSold.transferOwnership(address(this), _purchasersAddress);
+        return RestStatus.OK;
     }
 }
