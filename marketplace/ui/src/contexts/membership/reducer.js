@@ -252,19 +252,22 @@ const reducer = (state, action) => {
     case actionDescriptors.sellerStripeStatus:
       return {
         ...state,
-        isLoadingStripeStatus: true
+        isLoadingStripeStatus: true,
+        isInitialLoadingStripeStatus: true,
       };
     case actionDescriptors.sellerStripeStatusSuccessful:
       return {
         ...state,
         stripeStatus: action.payload,
-        isLoadingStripeStatus: false
+        isLoadingStripeStatus: false,
+        isInitialLoadingStripeStatus: false,
       };
     case actionDescriptors.sellerStripeStatusFailed:
       return {
         ...state,
         error: action.error,
-        isLoadingStripeStatus: false
+        isLoadingStripeStatus: false,
+        isInitialLoadingStripeStatus: false,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

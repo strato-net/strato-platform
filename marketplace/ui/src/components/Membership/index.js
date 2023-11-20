@@ -18,7 +18,6 @@ import useDebounce from "../UseDebounce";
 import "./membership.css";
 import MembershipListTabComponent from "./components/MembershipListTabComponent";
 import MembershipHeader from "./components/MembershipHeader";
-import LoaderComponent from "../Loader/LoaderComponent";
 import ToastComponent from "../ToastComponent/ToastComponent";
 
 const limit = 10, offset = 0, queryValue = "";
@@ -52,9 +51,7 @@ const Membership = (user) => {
     isPurchasedMembershipLoading,
     purchasedMemberships,
     message,
-    success,
-    stripeStatus,
-    isLoadingStripeStatus,
+    success
   } = useMembershipState();
 
   // useEffect(() => {
@@ -99,27 +96,23 @@ const Membership = (user) => {
 
   let msg = message || inventoryState.message;
 
-  const isPageLoading = isLoadingStripeStatus;
   const isMembershipFound = isMembershipsLoading || isIssuedMembershipLoading || isPurchasedMembershipLoading;
   const listTabProps = { type, isPurchased, user, debouncedSearchTerm }
   return (
     <>
-      {isPageLoading || isMembershipFound
-        ? <LoaderComponent />
-        : <div className="min-h-full">
-          <BreadCrumbComponent />
-          <MembershipHeader
-            type={type}
-            isMembershipFound={isMembershipFound}
-            purchasedMemberships={purchasedMemberships}
-            memberships={memberships}
-            isPurchased={isPurchased}
-            showModal={() => { showModal() }}
-          />
-          <MembershipListTabComponent
-            props={listTabProps} />
-        </div>
-      }
+      <div className="min-h-full">
+        <BreadCrumbComponent />
+        <MembershipHeader
+          type={type}
+          isMembershipFound={isMembershipFound}
+          purchasedMemberships={purchasedMemberships}
+          memberships={memberships}
+          isPurchased={isPurchased}
+          showModal={() => { showModal() }}
+        />
+        <MembershipListTabComponent
+          props={listTabProps} />
+      </div>
       {open && (
         <CreateMembershipModal
           open={open}

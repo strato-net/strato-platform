@@ -20,6 +20,7 @@ const InventoriesProvider = ({ children }) => {
     isOnboardingSellerToStripe: false,
     onboardedSeller: null,
     stripeStatus: null,
+    isInitialLoadingStripeStatus: true,
     isLoadingStripeStatus: false,
   };
 
