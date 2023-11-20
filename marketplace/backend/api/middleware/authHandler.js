@@ -83,7 +83,11 @@ class AuthHandler {
         })
         return next(err)
       }
-
+      
+      res.clearCookie(req.app.oauth.getCookieNameAccessToken())
+      res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
+      res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
+      
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })

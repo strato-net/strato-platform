@@ -285,9 +285,12 @@ const actions = {
         return;
       }
       else if(response.status === RestStatus.UNAUTHORIZED) {
-        console.log("HERE1234")
-        dispatch({ type: actionDescriptors.fetchCategoryFailed, error: "Unauthorized while fetching category" });
-        return RestStatus.UNAUTHORIZED;
+        dispatch({ 
+          type: actionDescriptors.fetchOrderSoldFailed, 
+          error: "Unauthorized while fetching category" 
+        });
+        window.location.href = body.error.loginUrl;
+        return;
       }
       dispatch({
         type: actionDescriptors.fetchOrderSoldFailed,
