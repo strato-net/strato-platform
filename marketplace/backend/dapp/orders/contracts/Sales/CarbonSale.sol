@@ -14,7 +14,7 @@ contract CarbonSale is Sale{
         units = _units;
     }
 
-    function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") returns (uint) {
+    function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") override returns (uint) {
         saleOrderID = _orderId;
         executeUTXOSale(_purchasersAddress);
         state = SaleState.Closed;

@@ -90,13 +90,13 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     }
 
     function changePrice(uint _price) public requireOwner("change price") returns (uint) {
-        price = _price;
         if (whitelistedSales.length > 0) {
             for (uint i = 0; i < whitelistedSales.length; i++) {
                 Sale(whitelistedSales[i]).changePrice(_price);
             }
         }
         return RestStatus.OK;
+    }
 
     // Helper function to check if a sale is already whitelisted
     function isSaleWhitelisted(address saleContract) public returns (bool) {
@@ -157,7 +157,6 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         sellersCommonName = assetToBeSold.ownerCommonName();
-        purchasersCommonName = sellersCommonName;
         price = _price;
         state = SaleState.Created;
         payment = _payment;
@@ -185,6 +184,12 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
 
     function changePaymentType(PaymentType _payment) public requireSeller("change payment type"){
         payment=_payment;
+    }
+
+    function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") returns (uint) {
+        saleOrderID = _orderId;
+        assetToBeSold.transferOwnership(address(this), _purchasersAddress);
+        return RestStatus.OK;
     }
 }
 
