@@ -145,7 +145,6 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
 
 abstract contract Sale is PaymentType, SaleState, RestStatus{ 
     string public sellersCommonName;
-    string public purchasersCommonName;
     Asset public assetToBeSold;
     uint public price;
     uint public saleOrderID;
