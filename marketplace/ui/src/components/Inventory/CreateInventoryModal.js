@@ -52,6 +52,7 @@ const CreateInventoryModal = ({
     artist: "",
     source: "",
     projectType: "",
+    units: null,
     brand: "",
     images: null,
     price: null,
@@ -110,6 +111,7 @@ const CreateInventoryModal = ({
             itemArgs: {
               ...body.itemArgs,
               projectType: values.projectType,
+              units: values.units,
             }
           }
         case 'Clothing':
@@ -214,7 +216,8 @@ const CreateInventoryModal = ({
             </Form.Item>
           </div>)
       case 'Carbon':
-        return (<div className="flex justify-between mt-4 ">
+        return (
+          <div className="flex justify-between mt-4 ">
             <Form.Item
               label="Project Type"
               name="projectType"
@@ -231,6 +234,25 @@ const CreateInventoryModal = ({
                 formik.errors.projectType && (
                   <span className="text-error text-xs">
                     {formik.errors.projectType}
+                  </span>
+                )}
+            </Form.Item>
+            <Form.Item
+              label="Units"
+              name="units"
+              className="w-72"
+            >
+              <Input
+                label="units"
+                placeholder="Enter Units"
+                name="units"
+                value={formik.values.units}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.units &&
+                formik.errors.units && (
+                  <span className="text-error text-xs">
+                    {formik.errors.units}
                   </span>
                 )}
             </Form.Item>

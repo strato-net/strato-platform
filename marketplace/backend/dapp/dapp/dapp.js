@@ -290,6 +290,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
+      status: 1,
     };
     return carbonJs.uploadContract(rawAdmin, newArgs, options);
   };

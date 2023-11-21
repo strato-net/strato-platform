@@ -25,10 +25,16 @@ contract CarbonSale is Sale{
         // Before executing the sale, ensure the asset is a UTXO asset
         Carbon carbonAsset = Carbon(address(assetToBeSold));
 
-        // Call splitAsset on the UTXO asset
-        address newCarbonAsset = carbonAsset.splitAsset(address(this), units, _purchasersAddress);
+        // If the sale is for all the base units, call transferOwnership of the Asset. If else, split the asset.
+        if (units == carbonAsset.units()) {
+            assetToBeSold.transferOwnership(address(this), _purchasersAddress);
+        }
+        else {
+            // Call splitAsset on the UTXO asset
+            address newCarbonAsset = carbonAsset.splitAsset(address(this), units, _purchasersAddress);
 
-        // Point this sale to the new asset
-        assetToBeSold = Asset(newCarbonAsset);   
+            // Point this sale to the new asset
+            assetToBeSold = Asset(newCarbonAsset); 
+        }  
     }
 }

@@ -7,8 +7,7 @@ import <d816194227e1a7a780fff236a449604afeb36255>;
 /// @title A representation of Carbon assets
 contract Carbon is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
-    uint public serialNumber;
-    ItemStatus public status;
+    string public serialNumber;
     string public projectType;
 
     event AssetSplit(address newAsset, uint unitsMoved);
@@ -20,7 +19,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _createdDate,
         uint _units,
-        uint _serialNumber,
+        string _serialNumber,
         ItemStatus _status,
         uint _price,
         address _owner,
@@ -50,7 +49,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
                                      images, 
                                      createdDate, 
                                      splitUnits, 
-                                     serialNumber, 
+                                     serialNumber + "1", 
                                      ItemStatus.UNPUBLISHED,
                                      0, 
                                      newOwner, 
@@ -71,7 +70,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
-                whitelistSale(address(new CarbonSale(address(this), _paymentTypes[i], _price, _units)));
+            whitelistSale(address(new CarbonSale(address(this), _paymentTypes[i], _price, _units)));
         }
         return RestStatus.OK;
     }

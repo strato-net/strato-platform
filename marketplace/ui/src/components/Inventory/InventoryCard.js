@@ -78,45 +78,61 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const categoricalProperties = () => {
     switch (getCategory()) {
       case 'Art':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Artist</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.artist}
-        </p>
-      </div>)
+        return (
+          <div className="flex mt-1.5 items-center">
+            <p className="text-primaryC text-sm w-40">Artist</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {itemData.artist}
+            </p>
+          </div>)
       case 'Carbon':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Project Type</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.projectType}
-        </p>
-      </div>)
+        return (
+          <>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Project Type</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.projectType}
+              </p>
+            </div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Units</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.units}
+              </p>
+            </div>
+          </>
+          )
       case 'Clothing':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Brand</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.brand}
-        </p>
-      </div>)
+        return (
+          <div className="flex mt-1.5 items-center">
+            <p className="text-primaryC text-sm w-40">Brand</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {itemData.brand}
+            </p>
+          </div>)
       case 'Materials':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Source</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.source}
-        </p>
-      </div>)
+        return (
+          <div className="flex mt-1.5 items-center">
+            <p className="text-primaryC text-sm w-40">Source</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {itemData.source}
+            </p>
+          </div>)
       default:
         break;
     }
