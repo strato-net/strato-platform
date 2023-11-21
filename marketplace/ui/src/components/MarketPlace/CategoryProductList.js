@@ -316,44 +316,41 @@ const CategoryProductList = ({ user }) => {
   return (
     <div>
       <BreadCrumbComponent />
-      <div className="flex pt-4">
-        {/* Filter section */}
-        <div className="mr-6 pt-4">
-          <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
-            <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
-            <Divider className="m-0 mt-3" />
-            {PriceFilterComponent()}
-            <Divider className="m-0" />
+      {isLoading
+        ? <LoaderComponent />
+        : <div className="flex pt-4">
+          {/* Filter section */}
+          <div className="mr-6 pt-4">
+            <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
+              <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
+              <Divider className="m-0 mt-3" />
+              {PriceFilterComponent()}
+              <Divider className="m-0" />
 
-            {currentCategory && SubCategoryFilterComponent()}
-            {marketplaceList.length > 0 && ProductFilterComponent()}
-            {brands.length > 0 && marketplaceList.length > 0 && BrandFilterComponent()}
+              {currentCategory && SubCategoryFilterComponent()}
+              {marketplaceList.length > 0 && ProductFilterComponent()}
+              {brands.length > 0 && marketplaceList.length > 0 && BrandFilterComponent()}
 
-            <div className="pb-24"></div>
-          </div>
-        </div>
-
-        {isLoading
-          ? <LoaderComponent />
-          : (
-            <div className="w-9/12 mb-12">
-              <Text className="text-sm text-secondryB">
-                {productList.length} Products found
-              </Text>
-              {marketplaceList.length > 0
-                ? <div className="mt-4 mb-8 mr-10" id="product-list">
-                  {productList.map((product, index) =>
-                    <CategoryProductCard
-                      product={product}
-                      key={index}
-                    />
-                  )}
-                </div>
-                : <NoProductComponent text={"Product"} />
-              }
+              <div className="pb-24"></div>
             </div>
-          )}
-      </div>
+          </div>
+          <div className="w-9/12 mb-12">
+            <Text className="text-sm text-secondryB">
+              {productList.length} Products found
+            </Text>
+            {marketplaceList.length > 0
+              ? <div className="mt-4 mb-8 mr-10" id="product-list">
+                {productList.map((product, index) =>
+                  <CategoryProductCard
+                    product={product}
+                    key={index}
+                  />
+                )}
+              </div>
+              : <NoProductComponent text={"Product"} />
+            }
+          </div>
+        </div>}
     </div>
   );
 };
