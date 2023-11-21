@@ -144,6 +144,7 @@ const TopSellingProductCard = () => {
           ) : (
             topSellingProducts
               .map((topSellingProduct, index) => {
+                const itemData = JSON.parse(topSellingProduct.data);
                 return (
                   <div
                     key={index}
@@ -171,12 +172,7 @@ const TopSellingProductCard = () => {
                         ${topSellingProduct.price}
                       </Text>
                       <Text className="mt-1 text-sm !text-primaryB">
-                        {topSellingProduct.leastSellableUnit}{" "}
-                        {
-                          UNIT_OF_MEASUREMENTS[
-                          topSellingProduct.unitOfMeasurement
-                          ]
-                        }
+                        {itemData.units}{itemData.units && itemData.units > 1 ? " Tons" : " "}
                       </Text>
                       <div className="flex justify-evenly items-center mt-4 w-full px-3">
                         <Button

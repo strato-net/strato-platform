@@ -140,7 +140,7 @@ function bindAddress(user, address, options) {
 async function resellItem(user, contract, args, options) {
     const callArgs = {
       contract,
-      method: "createSale",
+      method: "createSales",
       args: util.usc({ ...args }),
     };
     const resellStatus = await rest.call(user, callArgs, options);

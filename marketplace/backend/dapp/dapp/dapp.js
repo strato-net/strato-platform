@@ -344,12 +344,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.resellItem = async function (args, options = defaultOptions) {
     const { itemContract, itemAddress, ...restArgs } = args;
-    const newArgs = {
-      ...restArgs,
-      state: 1,
-    }
     const contract = { name: itemContract, address: itemAddress };
-    return inventoryJs.resellItem(rawAdmin, contract, newArgs, options);
+    return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
   }
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
