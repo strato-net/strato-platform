@@ -37,7 +37,7 @@ const BreadCrumbComponent = ({ name }) => {
   };
 
   const BreadCrumbItem = ({ item, index }) => {
-    if (item === "all") {
+    if (item === "all" || (index === routesLength && item === "")) {
       return null;
     }
 
@@ -52,9 +52,8 @@ const BreadCrumbComponent = ({ name }) => {
       >
         <ClickableCell>
           <Text
-            className={`${
-              routesLength !== index && "text-primary"
-            } capitalize text-md font-bold`}
+            className={`${routesLength !== index && "text-primary"
+              } capitalize text-md font-bold`}
             underline
           >
             {getBreadCrumbText(item, index)}
