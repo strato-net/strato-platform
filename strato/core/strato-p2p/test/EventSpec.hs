@@ -959,7 +959,7 @@ instance (Monad m, Mod.Accessible ValidatorAddresses m) => Mod.Accessible Valida
 instance MonadIO m => A.Selectable Point ClosestPeers (MonadTest m) where
   select _ point = Just . ClosestPeers . filter f . M.elems <$> use pointPPeerMap
     where
-      f p = pPeerPubkey p /= Just point
+      f p = pPeerPubkey p /= Just point && pPeerPubkey p /= Nothing
 
 instance A.Selectable Point ClosestPeers m => A.Selectable Point ClosestPeers (MonadP2PTest m) where
   select p = lift . A.select p

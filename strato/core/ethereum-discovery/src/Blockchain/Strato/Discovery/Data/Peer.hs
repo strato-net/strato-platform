@@ -225,7 +225,7 @@ instance A.Selectable Point ClosestPeers IO where
   select _ point = withGlobalSQLPool $ \sqldb ->
     fmap (Just . ClosestPeers . map SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectList [PPeerPubkey SQL.!=. Just point] []
+        SQL.selectList [PPeerPubkey SQL.!=. Nothing, PPeerPubkey SQL.!=. Just point] []
 
 instance A.Replaceable PPeer UdpEnableTime IO where
   replace _ peer' (UdpEnableTime enableTime) = withGlobalSQLPool $ \sqldb -> do
