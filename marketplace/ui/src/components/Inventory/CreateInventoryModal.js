@@ -25,7 +25,6 @@ import { usePapaParse } from "react-papaparse";
 import TagManager from "react-gtm-module";
 import { CATEGORIES, PAYMENT_TYPE } from "../../helpers/constants";
 import { PictureOutlined } from "@ant-design/icons";
-import { VISA, Mastercard } from "../../images/SVGComponents";
 
 
 const { Option } = Select;
@@ -93,7 +92,6 @@ const CreateInventoryModal = ({
         description: values.description,
         images: (imageData ? [imageData.imageKey] : []),
         price: values.price,
-        saleState: 1,
         paymentTypes: values.paymentTypes
       },
     };
@@ -166,17 +164,30 @@ const CreateInventoryModal = ({
     };
     return (
       <Tag
-        icon={PAYMENT_TYPE[value] ? PAYMENT_TYPE[value] : undefined}
-        color={value}
         onMouseDown={onPreventMouseDown}
         closable={closable}
         onClose={onClose}
-        style={{ marginRight: 3 }}
+        className="flex items-center mr-1"
       >
-        {label}
+        {PAYMENT_TYPE[value].icon ? PAYMENT_TYPE[value].icon : <></>}
+        <p className="ml-1">{label}</p>
       </Tag>
     );
   };
+
+  const handleSelectAll = (value) => {
+    if (value.includes(0)) {
+      if (value.length === PAYMENT_TYPE.length) {
+        formik.setFieldValue("paymentTypes", []);
+        return []
+      }
+      formik.setFieldValue("paymentTypes", [1, 2, 3]);
+      return [1,2,3];
+    } else {
+      formik.setFieldValue("paymentTypes", value);
+      return value;
+    }
+  }
 
   const categoricalProperties = () => {
     switch (formik.values.category) {
@@ -350,7 +361,7 @@ const CreateInventoryModal = ({
               </div>
               {categoricalProperties()}
               <div className="flex justify-between mt-4 ">
-                <Form.Item label="Payment Types" name="paymentTypes" className="w-72">
+                <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
                   <Select
                     id="paymentTypes"
                     mode="multiple"
@@ -358,10 +369,10 @@ const CreateInventoryModal = ({
                     placeholder="Select Payment Types"
                     allowClear
                     name="paymentTypes"
+                    maxTagCount="responsive"
                     value={formik.values.paymentTypes}
-                    onChange={(value) => {
-                      formik.setFieldValue("paymentTypes", value);
-                    }}
+                    onChange={handleSelectAll}
+                    showSearch={false}
                   >
                     {PAYMENT_TYPE.map((e, index) => (
                       <Option value={e.value} key={index}>

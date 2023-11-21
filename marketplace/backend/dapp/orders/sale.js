@@ -107,14 +107,15 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-    const { address, ...restArgs } = args;
+    const { address, assetToBeSold, state, ...restArgs } = args;
     let sale;
 
     const searchArgs = setSearchQueryOptions(restArgs, {
         key: "address",
         value: address,
     });
-    sale = await searchOne(contractName, searchArgs, options, user);
+    
+    sale = await searchOne(contractName, { ...searchArgs, state: state ? state : 1 }, options, user);
 
     if (!sale) {
         return undefined;
@@ -127,10 +128,15 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { saleAddresses, ...restArgs } = args;
+    const { saleAddresses, assetAddresses, state, ...restArgs } = args;
     let sales;
 
-    sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses }, options, admin);
+    if (assetAddresses) {
+        sales = await searchAllWithQueryArgs(contractName, { assetToBeSold: assetAddresses, state: state ? state : 1 }, options, admin);
+    }
+    else {
+        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, state: state ? state : 1 }, options, admin);
+    }
 
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
 }

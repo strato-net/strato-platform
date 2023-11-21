@@ -221,10 +221,11 @@ export const RejectWhite = (props) => {
 };
 
 export const VISA = (props) => {
+  const { height, width } = props;
   return (
     <svg 
-      width="780" 
-      height="500" 
+      width={width} 
+      height={height}
       enable-background="new 0 0 780 500" 
       version="1.1" 
       viewBox="0 0 780 500" 
@@ -247,11 +248,12 @@ export const VISA = (props) => {
   )
 }
 
-export const MasterCard = (props) => {
+export const Mastercard = (props) => {
+  const { height, width } = props;
   return (
     <svg 
-      width="780" 
-      height="500" 
+      width={width} 
+      height={height}
       enable-background="new 0 0 780 500" 
       version="1.1" 
       viewBox="0 0 780 500" 

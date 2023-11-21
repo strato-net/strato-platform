@@ -1,4 +1,3 @@
-import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/orders/contracts/Sales/ArtSale.sol";
 
 pragma es6;
@@ -8,7 +7,6 @@ import <d816194227e1a7a780fff236a449604afeb36255>;
 /// @title A representation of Art assets
 contract Art is ItemStatus, RestStatus, Asset {
     string public serialNumber;
-    ItemStatus public status;
     string public artist;
 
     event OwnershipUpdate(

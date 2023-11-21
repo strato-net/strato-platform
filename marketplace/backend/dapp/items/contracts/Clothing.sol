@@ -1,4 +1,3 @@
-import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/orders/contracts/Sales/ClothingSale.sol";
 
 pragma es6;
@@ -42,7 +41,7 @@ contract Clothing is ItemStatus, RestStatus, Asset {
         createSales(_paymentTypes, _price);
     }
 
-    function createSales(PaymentType[] _payment, uint _price) public requireOwner("Create sale") returns (uint) {
+    function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("Create sale") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new ClothingSale(address(this), _paymentTypes[i], _price)));
         }

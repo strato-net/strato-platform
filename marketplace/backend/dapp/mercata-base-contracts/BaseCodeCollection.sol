@@ -5,6 +5,17 @@ pragma strict;
 
 contract Mercata{}
 
+contract ItemStatus{
+  enum ItemStatus{
+    NULL,
+    PUBLISHED,
+    UNPUBLISHED,
+    REMOVED,
+    SOLD,
+    MAX
+  }
+}
+
 contract PaymentType {
 enum PaymentType{
         NONE,
@@ -53,7 +64,7 @@ contract RestStatus {
   uint constant GATEWAY_TIMEOUT = 504;
 }
 
-abstract contract Asset is PaymentType, SaleState, RestStatus{
+abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus {
     address public owner;
     string public ownerCommonName;
     string public ownerOrganization;
@@ -61,6 +72,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     string public description;
     string[] public images;
     uint public createdDate;
+    ItemStatus public status;
 
     address[] public whitelistedSales;
 
@@ -136,6 +148,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
         ownerOrganization = ownerCert["organization"];
         ownerCommonName = ownerCert["commonName"];
         disableAllSales();
+        status = ItemStatus.UNPUBLISHED;
    }
 }
 

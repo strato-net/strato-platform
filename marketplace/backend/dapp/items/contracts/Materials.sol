@@ -1,4 +1,3 @@
-import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/orders/contracts/Sales/MaterialsSale.sol";
 
 pragma es6;
@@ -39,12 +38,12 @@ contract Materials is ItemStatus, RestStatus, Asset {
         ownerOrganization = ownerCert["organization"];
         ownerCommonName = ownerCert["commonName"];
 
-        createdSales(_paymentTypes, _price);
+        createSales(_paymentTypes, _price);
     }
 
     function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new ArtSale(address(this), _paymentTypes[i], _price)));
+            whitelistSale(address(new MaterialsSale(address(this), _paymentTypes[i], _price)));
         }
         return RestStatus.OK;
     }

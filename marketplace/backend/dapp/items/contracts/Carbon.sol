@@ -1,5 +1,3 @@
-import "/dapp/dapp/contracts/Dapp.sol";
-import "/dapp/items/contracts/ItemStatus.sol";
 import "/dapp/orders/contracts/Sales/CarbonSale.sol";
 
 pragma es6;

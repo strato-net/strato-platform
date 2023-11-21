@@ -4,6 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
+import saleJs from "../orders/sale";
 
 const contractName = constants.assetTableName;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
@@ -162,7 +163,7 @@ async function resellItem(user, contract, args, options) {
  */
 
 async function get(user, args, options) {
-    const { address, ...restArgs } = args;
+    const { address, state, ...restArgs } = args;
     let inventory;
 
     const searchArgs = setSearchQueryOptions(restArgs, {
@@ -175,6 +176,14 @@ async function get(user, args, options) {
         return undefined;
     }
 
+    const sale = await saleJs.get(user, { assetToBeSold: inventory.address }, options);
+
+    if (sale) {
+        inventory = {
+            ...inventory,
+            price: sale.price,
+        }
+    }
 
     return marshalOut({
         ...inventory,
@@ -182,22 +191,48 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { range, ownerCommonName, assetAddresses, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, ...restArgs } = args;
     let inventories;
+    let sales;
+    let finalInventory = [];
 
     if (ownerCommonName) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'ownerCommonName', value: ownerCommonName });
-        inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
+        inventories = await searchAllWithQueryArgs(contractName, 
+            {   
+                ...restArgs,
+                ownerCommonName: ownerCommonName, 
+                status: status ? status : [1,2],
+            }, options, admin);
     }
     else if (assetAddresses) {
-        inventories = await searchAllWithQueryArgs(contractName, { address: assetAddresses }, options, admin);
+        inventories = await searchAllWithQueryArgs(contractName, 
+            { 
+                ...restArgs,
+                address: assetAddresses, 
+                status: status ? status : [1, 2],
+            }, options, admin);
     }
     else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'whitelistedSales', value: '[]', predicate: 'neq' });
-        inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
+        inventories = await searchAllWithQueryArgs(contractName, 
+            { 
+                ...restArgs, 
+                status: status ? status : [1,2],
+            }, options, admin);
     }
 
-    return inventories ? inventories.map((inventory) => marshalOut(inventory)) : undefined;
+    if (inventories) {
+        const assetAddresses = inventories.map((inventory) => inventory.address);
+        sales = await saleJs.getAll(admin, { assetAddresses }, options);
+        inventories.forEach(inventory => {
+            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address);
+            finalInventory.push({
+                ...inventory,
+                price: itemSale.price,
+            })
+        });
+    }
+
+    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
 async function inventoryCount(admin, args = {}, options) {
