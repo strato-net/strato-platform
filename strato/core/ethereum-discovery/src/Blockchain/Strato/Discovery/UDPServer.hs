@@ -162,18 +162,25 @@ handleValidPacket addr (UDPPort otherUdpPort) packet otherPubKey = case packet o
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
   (FindNeighbors targetPubkey _) -> do
+    time <- liftIO $ round `fmap` getPOSIXTime
+    Just peer <- getPeerByIP' ip --should be a Just
+    let nextTime = time + 50
     A.select (A.Proxy @PeerBondingState) (IPAsText $ T.pack ip, UDPPort otherUdpPort) >>= \case 
       Just (PeerBondingState b) | b > 1 -> do
-        time <- liftIO $ round `fmap` getPOSIXTime
-        let nextTime = time + 50
         peers <- getPeersClosestTo targetPubkey otherPubKey
         let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
-        mPeer <- getPeerByIP' ip
-        sendPacket (fromJust mPeer) $ Neighbors theNeighbors nextTime
-        where
-          mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
-          mkNodeId = pointToNodeID . fromJust . pPeerPubkey
-      _ -> $logInfoS "handleValidPacket" "Recieved FindNeighbors request from a peer we are not bonded to; rejecting them"
+        sendPacket (peer) $ Neighbors theNeighbors nextTime
+      _ -> do
+        $logInfoS "handleValidPacket/FindNeighbors" "Recieved FindNeighbors request from a peer we are not bonded to; will attempt to bond first"
+        udpPort <- Mod.access (Mod.Proxy @UDPPort)
+        tcpPort <- Mod.access (Mod.Proxy @TCPPort)
+        mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
+        case getHostAddress <$> mServerAddr of 
+          Just (Right hostAddress) -> sendPacket (peer) $ Ping 4 (Endpoint hostAddress udpPort tcpPort) (mkEndpoint peer) nextTime
+          _ -> $logErrorS "handleValidPacket/FindNeighbors" "Attempted to bond to peer but failed"
+    where
+      mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
+      mkNodeId = pointToNodeID . fromJust . pPeerPubkey
   Neighbors neighbors _ -> do
     let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors)
     thePeer <- getPeerByIP' ip
