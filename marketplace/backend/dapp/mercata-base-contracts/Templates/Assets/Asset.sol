@@ -56,18 +56,15 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     }
 
     // Updated function to remove a sale from the whitelist
-    function dewhitelistSale(address saleContract) public requireOwner("dewhitelistSale") {
+    function dewhitelistSale(address saleContract) public requireOwner("dewhitelist a Sale") {
         require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
+        address[] newArray = [];
         for (uint i = 0; i < whitelistedSales.length; i++) {
-            if (whitelistedSales[i] == saleContract) {
-                delete whitelistedSales[i];
-                // Shift    elements left to fill the gap left by delete
-                for (uint j = i; j < whitelistedSales.length - 1; j++) {
-                    whitelistedSales[j] = whitelistedSales[j + 1];
-                }
-                break;
+            if (whitelistedSales[i] != saleContract) {
+                newArray.push(whitelistedSales[i]);
             }
         }
+        whitelistedSales = newArray;
     }
 
 

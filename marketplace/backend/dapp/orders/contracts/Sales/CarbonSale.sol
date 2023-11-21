@@ -26,9 +26,9 @@ contract CarbonSale is Sale{
         Carbon carbonAsset = Carbon(address(assetToBeSold));
 
         // Call splitAsset on the UTXO asset
-        address newCarbonAsset = carbonAsset.splitAsset(units, purchasersAddress);
+        address newCarbonAsset = carbonAsset.splitAsset(address(this), units, _purchasersAddress);
 
         // Point this sale to the new asset
-        assetToBeSold = newCarbonAsset;   
+        assetToBeSold = Asset(newCarbonAsset);   
     }
 }

@@ -9,7 +9,7 @@ import <d816194227e1a7a780fff236a449604afeb36255>;
 /// @title A representation of Carbon assets
 contract Carbon is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
-    string public serialNumber;
+    uint public serialNumber;
     ItemStatus public status;
     string public projectType;
 
@@ -34,7 +34,6 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         owner = _owner;
 
         status = _status;
-        itemNumber = _itemNumber;
         projectType = _projectType;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -61,8 +60,10 @@ contract Carbon is ItemStatus, RestStatus, Asset {
                                      []);
         units -= splitUnits;
 
+        dewhitelistSale(saleContract);
+
         for (uint i = 0; i < whitelistedSales.length; i++) {
-            whitelistedSales[i].changeUnitQuantity(splitUnits);
+            CarbonSale(whitelistedSales[i]).changeUnitQuantity(units);
         }
 
         emit AssetSplit(address(newAsset), splitUnits);
