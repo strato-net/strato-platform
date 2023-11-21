@@ -507,13 +507,12 @@ getPeersClosestTo targetNID requesterPubkey = do
       Set.toList vals ++
       (take 20 . 
       sortBy (\peerA peerB -> compare (dist targetPt (pPeerPubkey peerA)) ((dist targetPt (pPeerPubkey peerB)))) $
-      Set.toList nonvals) -- how efficient is this?
+      Set.toList nonvals)
       
   where 
     dist :: Point -> Maybe Point -> B.ByteString
     dist p1@(Point _ _) (Just p2@(Point _ _)) = -- xor of the points
       B.packZipWith xor (pointToBytes p1) (pointToBytes p2)
-      -- word256ToBytes (fromInteger . abs $ x2 - x1) <> word256ToBytes (fromInteger . abs $ y2 - y1)
     dist _ _ = B.pack $ replicate 64 0xFF -- this case should never happen but just in case, make it the max distance possible
 
 updateLastMessage ::
