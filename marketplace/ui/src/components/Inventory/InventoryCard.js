@@ -186,30 +186,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </p>
           </div>
           <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Item Number</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.itemNumber}
-            </p>
-          </div>
-          <div className="flex mt-1 items-center">
             <p className="text-primaryC text-sm w-40">Description</p>
             <p text-secondryB text-sm>
               :
             </p>
             <p className="text-secondryB text-sm ml-3">
               {inventory.description}
-            </p>
-          </div>
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Comment</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.comment ? itemData.comment : "No Comment Available"}
             </p>
           </div>
           <div className="flex mt-1 items-center">
@@ -221,7 +203,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               {itemData.serialNumber ? itemData.serialNumber : "No Serial Number Available"}
             </p>
           </div>
-          { inventory.sale === '0000000000000000000000000000000000000000' ?
+          { inventory.status === '2' ?
             (<div className="flex mt-2.5">
               <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">
                 <p>UNPUBLISHED</p>
