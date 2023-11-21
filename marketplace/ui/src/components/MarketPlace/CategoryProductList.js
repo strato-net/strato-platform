@@ -204,6 +204,113 @@ const CategoryProductList = ({ user }) => {
     return tempValues;
   }
 
+  const PriceFilterComponent = () => {
+    return <Collapse
+      bordered={false}
+      defaultActiveKey={1}
+      expandIconPosition="end"
+      ghost="true"
+      reverse={false}
+      className="pl-8 pr-7"
+    >
+      <Panel header={<Text strong>Price</Text>} key="1">
+        <Space>
+          <InputNumber min={0} prefix='$' placeholder="min" controls={false} onChange={(e) => {
+            e === null ? setMinPrice(0) : setMinPrice(e)
+          }} />
+          -
+          <InputNumber min={minPrice} prefix='$' placeholder="max" controls={false} onChange={(e) => {
+            e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+          }} />
+        </Space>
+      </Panel>
+    </Collapse>
+  }
+
+  const SubCategoryFilterComponent = () => {
+    return <>
+      <Collapse
+        bordered={false}
+        defaultActiveKey={1}
+        expandIconPosition="end"
+        ghost="true"
+        reverse={false}
+        className="pl-8 pr-7"
+      >
+        <Panel header={<Text strong>Sub-Category</Text>} key="1">
+          <Checkbox.Group
+            value={selectedSubCategories}
+          >
+            <div className="flex flex-col gap-3">
+              {subCategorys.map(({ name }, index) => (
+                <Checkbox value={name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                  {name}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
+        </Panel>
+      </Collapse>
+      <Divider className="m-0" />
+    </>
+  }
+
+  const ProductFilterComponent = () => {
+    return <>
+      <Collapse
+        bordered={false}
+        defaultActiveKey={1}
+        expandIconPosition="end"
+        ghost="true"
+        reverse={false}
+        className="pl-8 pr-7"
+      >
+        <Panel header={<Text strong>Product</Text>} key="1">
+          <Checkbox.Group
+            value={selectedProducts}
+          >
+            <div className="flex flex-col gap-3">
+              {productList.map(({ productId, name }, index) => (
+                <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
+                  {name}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
+        </Panel>
+      </Collapse>
+      <Divider className="m-0" />
+    </>
+  }
+
+  const BrandFilterComponent = () => {
+    return <>
+      <Collapse
+        bordered={false}
+        defaultActiveKey={1}
+        expandIconPosition="end"
+        ghost="true"
+        reverse={false}
+        className="pl-8 pr-7"
+      >
+        <Panel header={<Text strong>Brand</Text>} key="1">
+          <Checkbox.Group
+            value={selectedBrands}
+          >
+            <div className="flex flex-col gap-3">
+              {brands.map((brand, index) => (
+                <Checkbox value={brand} key={index} className="m-0" onChange={onChangeBrand}>
+                  {brand}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
+        </Panel>
+      </Collapse>
+      <Divider className="m-0" />
+    </>
+  }
+
   const isLoading = issubCategorysLoading || isMarketplaceLoading || iscategorysLoading || isMarketplaceInitialLoading || isCheckingAuthentication;
 
   return (
@@ -215,111 +322,13 @@ const CategoryProductList = ({ user }) => {
           <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
             <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
             <Divider className="m-0 mt-3" />
-            <Collapse
-              bordered={false}
-              defaultActiveKey={1}
-              expandIconPosition="end"
-              ghost="true"
-              reverse={false}
-              className="pl-8 pr-7"
-            >
-              <Panel header={<Text strong>Price</Text>} key="1">
-                <Space>
-                  <InputNumber min={0} prefix='$' placeholder="min" controls={false} onChange={(e) => {
-                    e === null ? setMinPrice(0) : setMinPrice(e)
-                  }} />
-                  -
-                  <InputNumber min={minPrice} prefix='$' placeholder="max" controls={false} onChange={(e) => {
-                    e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-                  }} />
-                </Space>
-              </Panel>
-            </Collapse>
+            {PriceFilterComponent()}
             <Divider className="m-0" />
 
-            {currentCategory && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
-                    <Checkbox.Group
-                      value={selectedSubCategories}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {subCategorys.map(({ name }, index) => (
-                          <Checkbox value={name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                            {name}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
+            {currentCategory && SubCategoryFilterComponent()}
+            {marketplaceList.length > 0 && ProductFilterComponent()}
+            {brands.length > 0 && marketplaceList.length > 0 && BrandFilterComponent()}
 
-            {marketplaceList.length > 0 && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Product</Text>} key="1">
-                    <Checkbox.Group
-                      value={selectedProducts}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {productList.map(({ productId, name }, index) => (
-                          <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
-                            {name}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
-
-            {brands.length > 0 && marketplaceList.length > 0 && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Brand</Text>} key="1">
-                    <Checkbox.Group
-                      value={selectedBrands}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {brands.map((brand, index) => (
-                          <Checkbox value={brand} key={index} className="m-0" onChange={onChangeBrand}>
-                            {brand}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
             <div className="pb-24"></div>
           </div>
         </div>
@@ -333,18 +342,12 @@ const CategoryProductList = ({ user }) => {
               </Text>
               {marketplaceList.length > 0
                 ? <div className="mt-4 mb-8 mr-10" id="product-list">
-                  {productList.map((product, index) => {
-                    const prodCategory = categorys.find(
-                      (c) => c.name === product.category
-                    );
-                    return (
-                      <CategoryProductCard
-                        product={product}
-                        key={index}
-                        category={prodCategory == null ? "" : prodCategory.name}
-                      />
-                    );
-                  })}
+                  {productList.map((product, index) =>
+                    <CategoryProductCard
+                      product={product}
+                      key={index}
+                    />
+                  )}
                 </div>
                 : <NoProductComponent text={"Product"} />
               }
