@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import TagManager from "react-gtm-module";
 import {
   Card,
   Image,
@@ -8,41 +10,38 @@ import {
   InputNumber,
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import routes from "../../helpers/routes";
-import { actions } from "../../contexts/marketplace/actions";
-import noPreview from "../../images/resources/noPreview.jpg";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
+// Actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+// Dispatch and states
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
+
+import noPreview from "../../images/resources/noPreview.jpg";
 import { setCookie } from "../../helpers/cookie";
 
 const { Title, Text, Paragraph } = Typography;
 
-const CategoryProductCard = ({ product, category }) => {
+const CategoryProductCard = ({ product }) => {
+  const { availableQuantity,
+    address,
+    name,
+    productImageLocation,
+    membershipId,
+    category,
+    productId,
+    pricePerUnit,
+    totalSavings, description } = product;
+    
+  const navigate = useNavigate();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
-  const { type } = useParams();
-
-  // const storedData = useMemo(() => {
-  //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  // }, []);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, cartList);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
   const [api, contextHolder] = notification.useNotification();
-
-  const navigate = useNavigate();
-  const naviroute = routes.MarketplaceProductDetail.url;
-  const naviroute2 = routes.MembershipDetail.url;
-
   const [qty, setQty] = useState(1);
 
   const subtract = () => {
@@ -53,7 +52,7 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const add = () => {
-    if (qty < product.availableQuantity) {
+    if (qty < availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -80,7 +79,7 @@ const CategoryProductCard = ({ product, category }) => {
   const addItemToCart = () => {
     let found = false;
     for (var i = 0; i < cartList?.length; i++) {
-      if (cartList[i].product.address === product.address) {
+      if (cartList[i].product.address === address) {
         found = true;
         break;
       }
@@ -88,15 +87,15 @@ const CategoryProductCard = ({ product, category }) => {
     let items = [];
     if (!found) {
       items = [...cartList, { product, qty }];
-      actions.addItemToCart(marketplaceDispatch, items);
+      marketplaceActions.addItemToCart(marketplaceDispatch, items);
       openToast("bottom", false, "Item added to cart");
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
-        if (element.product.address === product.address) {
-          if (items[index].qty + qty <= product.availableQuantity) {
+        if (element.product.address === address) {
+          if (items[index].qty + qty <= availableQuantity) {
             items[index].qty += qty;
-            actions.addItemToCart(marketplaceDispatch, items);
+            marketplaceActions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
             openToast("bottom", false, "Item updated in cart");
           } else {
@@ -112,17 +111,41 @@ const CategoryProductCard = ({ product, category }) => {
     }
   };
 
-  let route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
+  let route = `/memberships/all/${membershipId}?inventoryId=${address}`;
   const handleRedirect = () => {
     setCookie(
       "returnUrl",
       `/marketplace${route}`,
       10
     );
-
-    route = `/memberships/all/${product.membershipId}?inventoryId=${product.address}`;
     navigate(route);
   };
+
+  const handleButtonClick = (event, isNavigate) => {
+    if (
+      hasChecked &&
+      !isAuthenticated &&
+      loginUrl !== undefined
+    ) {
+      setCookie(
+        "returnUrl",
+        `/marketplace${route}`,
+        10
+      );
+      window.location.href = loginUrl;
+    } else {
+      TagManager.dataLayer({
+        dataLayer: {
+          event: event,
+          product_name: name,
+          category: category,
+          productId: productId,
+        },
+      });
+      addItemToCart();
+      isNavigate && navigate("/checkout");
+    }
+  }
 
   return (
     <div>
@@ -133,7 +156,7 @@ const CategoryProductCard = ({ product, category }) => {
         <div className="flex justify-start items-center">
           <div className="m-4">
             <Image
-              src={product.productImageLocation[0]}
+              src={productImageLocation[0]}
               width={200}
               height={180}
               preview={false}
@@ -153,7 +176,7 @@ const CategoryProductCard = ({ product, category }) => {
                   handleRedirect();
                 }}
               >
-                {product.name}&nbsp;
+                {name}&nbsp;
               </Text>
             </div>
             <Paragraph
@@ -161,16 +184,10 @@ const CategoryProductCard = ({ product, category }) => {
               className="text-primaryC text-xs mt-2"
               id="prod-desc"
             >
-              {/* {decodeURIComponent(product.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                <React.Fragment key={index}>
-                  {line}
-                  <br />
-                </React.Fragment>
-              ))} */}
-              {product.description}
+              {description}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
-              ${product.pricePerUnit}
+              ${pricePerUnit}
             </Title>
             <Title
               level={4}
@@ -178,9 +195,9 @@ const CategoryProductCard = ({ product, category }) => {
               id="prod-savings"
               style={{ color: "green" }}
             >
-              Total Savings: ${product.totalSavings}
+              Total Savings: ${totalSavings}
             </Title>
-            {product.availableQuantity !== 0 ? (
+            {availableQuantity !== 0 ? (
               <div>
                 <div className="flex items-center my-2" id="prod-quantity">
                   <Text className="text-primaryB text-base">Quantity</Text>
@@ -197,12 +214,12 @@ const CategoryProductCard = ({ product, category }) => {
                     <InputNumber
                       className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center"
                       min={1}
-                      max={product.availableQuantity}
+                      max={availableQuantity}
                       value={qty}
                       defaultValue={qty}
                       controls={false}
                       onChange={(e) => {
-                        if (e < product.availableQuantity) {
+                        if (e < availableQuantity) {
                           setQty(e);
                         } else {
                           openToast(
@@ -210,7 +227,7 @@ const CategoryProductCard = ({ product, category }) => {
                             true,
                             "Cannot add more than available quantity"
                           );
-                          setQty(product.availableQuantity);
+                          setQty(availableQuantity);
                         }
                       }}
                     />
@@ -225,28 +242,7 @@ const CategoryProductCard = ({ product, category }) => {
                 <Button
                   className="group w-40 h-9 border border-primary hover:bg-primary"
                   onClick={() => {
-                    if (
-                      hasChecked &&
-                      !isAuthenticated &&
-                      loginUrl !== undefined
-                    ) {
-                      setCookie(
-                        "returnUrl",
-                        `/marketplace${route}`,
-                        10
-                      );
-                      window.location.href = loginUrl;
-                    } else {
-                      TagManager.dataLayer({
-                        dataLayer: {
-                          event: "add_to_cart_from_marketplace",
-                          product_name: product.name,
-                          category: product.category,
-                          productId: product.productId,
-                        },
-                      });
-                      addItemToCart();
-                    }
+                    handleButtonClick("add_to_cart_from_marketplace", false)
                   }}
                 >
                   <div className="text-primary group-hover:text-white">
@@ -255,32 +251,10 @@ const CategoryProductCard = ({ product, category }) => {
                 </Button>
                 <Button
                   type="primary"
-                  id={`${product.name.replace(/ /g, "_")}-buy-now`}
+                  id={`${name.replace(/ /g, "_")}-buy-now`}
                   className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                   onClick={() => {
-                    if (
-                      hasChecked &&
-                      !isAuthenticated &&
-                      loginUrl !== undefined
-                    ) {
-                      setCookie(
-                        "returnUrl",
-                        `/marketplace${route}`,
-                        10
-                      );
-                      window.location.href = loginUrl;
-                    } else {
-                      TagManager.dataLayer({
-                        dataLayer: {
-                          event: "buy_now_from_marketplace",
-                          product_name: product.name,
-                          category: product.category,
-                          productId: product.productId,
-                        },
-                      });
-                      addItemToCart();
-                      navigate("/checkout");
-                    }
+                    handleButtonClick("buy_now_from_marketplace", true)
                   }}
                 >
                   Buy Now
@@ -297,9 +271,9 @@ const CategoryProductCard = ({ product, category }) => {
                     TagManager.dataLayer({
                       dataLayer: {
                         event: "contact_sales_from_category_card",
-                        product_name: product.name,
-                        category: product.category,
-                        productId: product.productId,
+                        product_name: name,
+                        category: category,
+                        productId: productId,
                       },
                     });
                   }}
