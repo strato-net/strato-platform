@@ -69,12 +69,6 @@ const CategoryProductList = ({ user }) => {
     strict: true,
   });
 
-  // const onChangeCategory = (checkedValues) => {
-  //   setSelectedCategories(checkedValues);
-  //   currentCategory = categorys.find((c) => c.name === checkedValues);
-  //   if (checkedValues.length) clearSelection();
-  // };
-
   useEffect(() => {
     let param = routeMatch?.params?.category;
     let newCategory = [];
@@ -178,13 +172,8 @@ const CategoryProductList = ({ user }) => {
     }
   }, [
     selectedCategories,
-    // selectedSubCategories,
-    // selectedProducts,
-    // selectedBrands,
     debouncedMinQty,
     debouncedMaxQty,
-    // debouncedMinPrice,
-    // debouncedMaxPrice,
     category,
     hasChecked,
     isAuthenticated,
@@ -201,12 +190,6 @@ const CategoryProductList = ({ user }) => {
     }
     setProductList(marketplaceList)
   }, [marketplaceList]);
-
-  // const clearSelection = () => {
-  //   setSelectedSubCategories([]);
-  //   setSelectedProducts([]);
-  //   setSelectedBrands([]);
-  // };
 
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
