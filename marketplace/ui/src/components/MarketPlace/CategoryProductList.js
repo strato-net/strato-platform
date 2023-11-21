@@ -39,7 +39,7 @@ const CategoryProductList = ({ user }) => {
   // States
   const { marketplaceList, isMarketplaceLoading, isMarketplaceInitialLoading } = useMarketplaceState();
   const { subCategorys, issubCategorysLoading } = useSubCategoryState();
-  const { hasChecked, isAuthenticated } = useAuthenticateState();
+  const { hasChecked, isAuthenticated, loginUrl, isCheckingAuthentication } = useAuthenticateState();
   const { categorys, iscategorysLoading } = useCategoryState();
 
   const [productList, setProductList] = useState([])
@@ -68,12 +68,6 @@ const CategoryProductList = ({ user }) => {
     path: routes.MarketplaceProductList.url,
     strict: true,
   });
-
-  // const onChangeCategory = (checkedValues) => {
-  //   setSelectedCategories(checkedValues);
-  //   currentCategory = categorys.find((c) => c.name === checkedValues);
-  //   if (checkedValues.length) clearSelection();
-  // };
 
   useEffect(() => {
     let param = routeMatch?.params?.category;
@@ -151,7 +145,7 @@ const CategoryProductList = ({ user }) => {
   };
 
   useEffect(() => {
-    if (category !== "" && hasChecked && !isAuthenticated) {
+    if (category !== "" && hasChecked && !isAuthenticated && loginUrl) {
       marketplaceActions.fetchMarketplace(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -163,7 +157,7 @@ const CategoryProductList = ({ user }) => {
         debouncedMinPrice,
         debouncedMaxPrice
       );
-    } else if (category !== "" && isAuthenticated) {
+    } else if (category !== "" && isAuthenticated && !loginUrl) {
       marketplaceActions.fetchMarketplaceLoggedIn(
         marketplaceDispatch,
         arrayToStr(selectedCategories),
@@ -178,13 +172,8 @@ const CategoryProductList = ({ user }) => {
     }
   }, [
     selectedCategories,
-    // selectedSubCategories,
-    // selectedProducts,
-    // selectedBrands,
     debouncedMinQty,
     debouncedMaxQty,
-    // debouncedMinPrice,
-    // debouncedMaxPrice,
     category,
     hasChecked,
     isAuthenticated,
@@ -202,12 +191,6 @@ const CategoryProductList = ({ user }) => {
     setProductList(marketplaceList)
   }, [marketplaceList]);
 
-  // const clearSelection = () => {
-  //   setSelectedSubCategories([]);
-  //   setSelectedProducts([]);
-  //   setSelectedBrands([]);
-  // };
-
   const checkValues = (e, arr) => {
     let tempValues = [...arr];
     const existingIndex = tempValues.indexOf(e.target.value);
@@ -221,153 +204,153 @@ const CategoryProductList = ({ user }) => {
     return tempValues;
   }
 
-  const isLoading = issubCategorysLoading || isMarketplaceLoading || iscategorysLoading || isMarketplaceInitialLoading;
+  const PriceFilterComponent = () => {
+    return <Collapse
+      bordered={false}
+      defaultActiveKey={1}
+      expandIconPosition="end"
+      ghost="true"
+      reverse={false}
+      className="pl-8 pr-7"
+    >
+      <Panel header={<Text strong>Price</Text>} key="1">
+        <Space>
+          <InputNumber min={0} prefix='$' placeholder="min" controls={false} onChange={(e) => {
+            e === null ? setMinPrice(0) : setMinPrice(e)
+          }} />
+          -
+          <InputNumber min={minPrice} prefix='$' placeholder="max" controls={false} onChange={(e) => {
+            e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
+          }} />
+        </Space>
+      </Panel>
+    </Collapse>
+  }
+
+  const SubCategoryFilterComponent = () => {
+    return <>
+      <Collapse
+        bordered={false}
+        defaultActiveKey={1}
+        expandIconPosition="end"
+        ghost="true"
+        reverse={false}
+        className="pl-8 pr-7"
+      >
+        <Panel header={<Text strong>Sub-Category</Text>} key="1">
+          <Checkbox.Group
+            value={selectedSubCategories}
+          >
+            <div className="flex flex-col gap-3">
+              {subCategorys.map(({ name }, index) => (
+                <Checkbox value={name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                  {name}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
+        </Panel>
+      </Collapse>
+      <Divider className="m-0" />
+    </>
+  }
+
+  const ProductFilterComponent = () => {
+    return <>
+      <Collapse
+        bordered={false}
+        defaultActiveKey={1}
+        expandIconPosition="end"
+        ghost="true"
+        reverse={false}
+        className="pl-8 pr-7"
+      >
+        <Panel header={<Text strong>Product</Text>} key="1">
+          <Checkbox.Group
+            value={selectedProducts}
+          >
+            <div className="flex flex-col gap-3">
+              {productList.map(({ productId, name }, index) => (
+                <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
+                  {name}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
+        </Panel>
+      </Collapse>
+      <Divider className="m-0" />
+    </>
+  }
+
+  const BrandFilterComponent = () => {
+    return <>
+      <Collapse
+        bordered={false}
+        defaultActiveKey={1}
+        expandIconPosition="end"
+        ghost="true"
+        reverse={false}
+        className="pl-8 pr-7"
+      >
+        <Panel header={<Text strong>Brand</Text>} key="1">
+          <Checkbox.Group
+            value={selectedBrands}
+          >
+            <div className="flex flex-col gap-3">
+              {brands.map((brand, index) => (
+                <Checkbox value={brand} key={index} className="m-0" onChange={onChangeBrand}>
+                  {brand}
+                </Checkbox>
+              ))}
+            </div>
+          </Checkbox.Group>
+        </Panel>
+      </Collapse>
+      <Divider className="m-0" />
+    </>
+  }
+
+  const isLoading = issubCategorysLoading || isMarketplaceLoading || iscategorysLoading || isMarketplaceInitialLoading || isCheckingAuthentication;
 
   return (
     <div>
       <BreadCrumbComponent />
-      <div className="flex pt-4">
-        {/* Filter section */}
-        <div className="mr-6 pt-4">
-          <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
-            <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
-            <Divider className="m-0 mt-3" />
-            <Collapse
-              bordered={false}
-              defaultActiveKey={1}
-              expandIconPosition="end"
-              ghost="true"
-              reverse={false}
-              className="pl-8 pr-7"
-            >
-              <Panel header={<Text strong>Price</Text>} key="1">
-                <Space>
-                  <InputNumber min={0} prefix='$' placeholder="min" controls={false} onChange={(e) => {
-                    e === null ? setMinPrice(0) : setMinPrice(e)
-                  }} />
-                  -
-                  <InputNumber min={minPrice} prefix='$' placeholder="max" controls={false} onChange={(e) => {
-                    e === null ? setMaxPrice(MAX_PRICE) : setMaxPrice(e)
-                  }} />
-                </Space>
-              </Panel>
-            </Collapse>
-            <Divider className="m-0" />
+      {isLoading
+        ? <LoaderComponent />
+        : <div className="flex pt-4">
+          {/* Filter section */}
+          <div className="mr-6 pt-4">
+            <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24">
+              <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
+              <Divider className="m-0 mt-3" />
+              {PriceFilterComponent()}
+              <Divider className="m-0" />
 
-            {currentCategory && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Sub-Category</Text>} key="1">
-                    <Checkbox.Group
-                      value={selectedSubCategories}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {subCategorys.map(({ name }, index) => (
-                          <Checkbox value={name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-                            {name}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
+              {currentCategory && SubCategoryFilterComponent()}
+              {marketplaceList.length > 0 && ProductFilterComponent()}
+              {brands.length > 0 && marketplaceList.length > 0 && BrandFilterComponent()}
 
-            {marketplaceList.length > 0 && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Product</Text>} key="1">
-                    <Checkbox.Group
-                      value={selectedProducts}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {productList.map(({ productId, name }, index) => (
-                          <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
-                            {name}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
-
-            {brands.length > 0 && marketplaceList.length > 0 && (
-              <>
-                <Collapse
-                  bordered={false}
-                  defaultActiveKey={1}
-                  expandIconPosition="end"
-                  ghost="true"
-                  reverse={false}
-                  className="pl-8 pr-7"
-                >
-                  <Panel header={<Text strong>Brand</Text>} key="1">
-                    <Checkbox.Group
-                      value={selectedBrands}
-                    >
-                      <div className="flex flex-col gap-3">
-                        {brands.map((brand, index) => (
-                          <Checkbox value={brand} key={index} className="m-0" onChange={onChangeBrand}>
-                            {brand}
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Checkbox.Group>
-                  </Panel>
-                </Collapse>
-                <Divider className="m-0" />
-              </>
-            )}
-            <div className="pb-24"></div>
-          </div>
-        </div>
-
-        {isLoading
-          ? <LoaderComponent />
-          : (
-            <div className="w-9/12 mb-12">
-              <Text className="text-sm text-secondryB">
-                {productList.length} Products found
-              </Text>
-              {marketplaceList.length > 0
-                ? <div className="mt-4 mb-8 mr-10" id="product-list">
-                  {productList.map((product, index) => {
-                    const prodCategory = categorys.find(
-                      (c) => c.name === product.category
-                    );
-                    return (
-                      <CategoryProductCard
-                        product={product}
-                        key={index}
-                        category={prodCategory == null ? "" : prodCategory.name}
-                      />
-                    );
-                  })}
-                </div>
-                : <NoProductComponent text={"Product"} />
-              }
+              <div className="pb-24"></div>
             </div>
-          )}
-      </div>
+          </div>
+          <div className="w-9/12 mb-12">
+            <Text className="text-sm text-secondryB">
+              {productList.length} Products found
+            </Text>
+            {marketplaceList.length > 0
+              ? <div className="mt-4 mb-8 mr-10" id="product-list">
+                {productList.map((product, index) =>
+                  <CategoryProductCard
+                    product={product}
+                    key={index}
+                  />
+                )}
+              </div>
+              : <NoProductComponent text={"Product"} />
+            }
+          </div>
+        </div>}
     </div>
   );
 };
