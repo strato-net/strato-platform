@@ -73,8 +73,6 @@ recordMessage' msgVect msg = do
         Ping -> "ping"
         Pong -> "pong"
         Status {} -> "status"
-        -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-        NewStatus {} -> "new_status"
         NewBlockHashes _ -> "new_block_hashes"
         Transactions _ -> "transactions"
         GetBlockHeaders {} -> "get_block_headers"

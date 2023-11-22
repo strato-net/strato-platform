@@ -9,20 +9,12 @@ Yellow='\033[0;33m'
 BYellow='\033[1;33m'
 NC='\033[0m'
 
-STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-"8013"}
-
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
-PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
-
-slipMinLogLevel=LevelInfo
-if [ "${SLIPSTREAM_DEBUG:-false}" == true ] ; then
-  slipMinLogLevel=LevelDebug
-fi
-
 PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
+
 echo 'Waiting for Postgres to be available...'
 until pg_isready ${PSQL_CONNECTION_PARAMS}
 do
@@ -48,33 +40,33 @@ if [ ! -f _container_initialized ]; then
   date '+%Y-%m-%d %H:%M:%S' > _container_initialized
 fi
 
-# <Find the continuation of the script after the following function declarations>
+if [ -n "${network}" ]; then
+  networkFlag="--network=${network}"
+fi
 
+# <Find the continuation of the script after the following function declarations>
 
 function newnode {
 
   # if alternative log in methods are provided then use them
   mkdir -p logs
 
-  VPACI=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}}
-  VPACS=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}}
-
   echo "trying to see if the alternative OAUTH parameters are available"
-
-  if [[ -z ${VPACI} || -z ${VPACS} ]]; then
+  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}} || -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}} ]]; then
     echo "Could not obtain OAUTH parameters for Vault Proxy"
     exit 2
   else
     echo "OAUTH parameters for Vault Proxy are available"
   fi
 
-  echo "Checking if the reserve seconds are provided"
-  [ -n "${OAUTH_RESERVE_SECONDS}" ] && vporsFlag="--OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}"
-
   runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} ${vporsFlag} --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013 --VAULT_PROXY_DEBUG=$VAULT_PROXY_DEBUG &>> logs/vault-proxy
+    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
+    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
+    --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS:-13} \
+    --VAULT_URL=${VAULT_URL} \
+    --VAULT_PROXY_PORT=8013 \
+    --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
 
   set +x
   echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
@@ -111,89 +103,56 @@ function newnode {
   echo "Starting Strato processes. All output is logged to $PWD/logs."
   runBackgroundProcess logserver --directory "${PWD}/logs" --uri_root=/logs/strato/ &>> logs/logserver
 
+  # DEBUG LOGGING FLAGS
+  apiDebugMode=LevelInfo
+  seqMinLogLevel=LevelInfo
+  slipMinLogLevel=LevelInfo
+  vmMinLogLevel=LevelInfo
 
+  if (( "${API_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
+    apiDebugMode=LevelDebug
+  fi
+  
+  if (( "${SEQUENCER_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
+    seqMinLogLevel=LevelDebug
+  fi
 
+  if (( "${SLIPSTREAM_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
+    slipMinLogLevel=LevelDebug
+  fi  
+  
+  if (( "${VM_DEBUG_LOG:-false}" || "${FULL_DEBUG_LOG:-false}" )); then 
+    vmMinLogLevel=LevelDebug
+  fi
 
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
-
-  actualTimeout="${connectionTimeout:-30}"
-  if [ -n "${blockstanbulRoundPeriodS}" ]; then
-    withCushion=$(( 2 * blockstanbulRoundPeriodS ))
-    actualTimeout=$(( actualTimeout > withCushion ? actualTimeout : withCushion ))
-  fi
-
-  if [[ -n "${blockstanbul}" || -n "${txGossipFanout}" ]]; then
-    txgFlag="--txGossipFanout=${txGossipFanout:-3}"
-  fi
-  if [ -n "${averageTxsPerBlock}" ]; then
-    atbFlag="--averageTxsPerBlock=${averageTxsPerBlock}"
-  fi
-  if [ -n "${participationMode}" ]; then
-    pmFlag="--participationMode=${participationMode}"
-  fi
-  if [ -n "${wireMessageCacheSize}" ]; then
-    cacheFlag="--wireMessageCacheSize=${wireMessageCacheSize}"
-  fi
-  if [ -n "${network}" ]; then
-    networkFlag="--network=${network}"
-  fi
-  if [ -n "${maxReturnedHeaders}" ]; then
-    maxHeadersFlag="--maxReturnedHeaders=${maxReturnedHeaders}"
-  fi
-
+  
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
-     --connectionTimeout=$actualTimeout \
-     --sqlPeers=true \
+     --averageTxsPerBlock=${averageTxsPerBlock:-40} \
+     --connectionTimeout=${connectionTimeout:-30} \
      --debugFail=${debugFail:-true}  \
-     --maxConn=$maxConn \
-     --networkID=$networkID \
-     ${maxHeadersFlag} \
-     ${txgFlag} \
-     ${atbFlag} \
-     ${pcamFlag} \
-     ${pmFlag} \
-     ${cacheFlag} \
-     ${networkFlag} \
-     &>> logs/strato-p2p
-
-  evmMinLogLevel=LevelInfo
-  if [ "${evmDebugMode}" = true ] ; then
-     evmMinLogLevel=LevelDebug
-  fi
-  seqMinLogLevel=LevelInfo
-  if [ "${seqDebugMode}" = true ] ; then
-     seqMinLogLevel=LevelDebug
-  fi
+     --maxConn=${maxConn:-1000} \
+     --maxReturnedHeaders=${maxReturnedHeaders:-500} \
+     --networkID=${networkID:--1} \
+     --sqlPeers=true \
+     --txGossipFanout=${txGossipFanount:-3} \
+     --wireMessageCacheSize=${wireMessageCacheSize:-2000} \
+     ${networkFlag} &>> logs/strato-p2p
 
   echo "Starting strato-sequencer"
-  if [ -n "${blockstanbul}" ]; then
-    tbFlag="--blockstanbul=${blockstanbul}"
-  fi
-  if [ -n "${blockstanbulBlockPeriodMs}" ]; then
-    bpFlag="--blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs}"
-  fi
-  if [ -n "${blockstanbulRoundPeriodS}" ]; then
-    rpFlag="--blockstanbul_round_period_s=${blockstanbulRoundPeriodS}"
-  fi
-  if [ -n "${seqMaxEventsPerIter}" ]; then
-    evsFlag="--seq_max_events_per_iter=${seqMaxEventsPerIter}"
-  fi
-  if [ -n "${seqMaxUsPerIter}" ]; then
-    usFlag="--seq_max_us_per_iter=${seqMaxUsPerIter}"
-  fi
-  if [ -n "${certInfo}" ]; then
-    ciFlag="--certInfo=${certInfo}"
-  fi
-
-  vbFlag="--validatorBehavior=${validatorBehavior}"
-
-
   runBackgroundProcess strato-sequencer \
-    "${bpFlag}" "${rpFlag}" "${tbFlag}" "${evsFlag}" "${usFlag}" \
-    "${vbFlag}" --minLogLevel=$seqMinLogLevel \
-    "${networkFlag}" "${ciFlag}"  --genesisBlockName=$genesis \
+    --blockstanbul=true \
+    --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
+    --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
+    --certInfo=${certInfo:-"{}"} \
+    --genesisBlockName=${genesis:-gettingStarted} \
+    --minLogLevel=$seqMinLogLevel \
+    --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
+    --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
+    --validatorBehavior=${validatorBehavior:-true} \
+    "${networkFlag}" \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
@@ -205,20 +164,8 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
-  if [ -n "${brokenRefundReenable}" ]; then
-    breFlag="--brokenRefundReenable=${brokenRefundReenable}"
-  fi
   if [ -n "${svmDev}" ]; then
     svdFlag="--svmDev=${svmDev}"
-  fi
-  if [ -n "${seqEventsBatchSize}" ]; then
-    sebFlag="--seqEventsBatchSize=${seqEventsBatchSize}"
-  fi
-  if [ -n "${seqEventsCostHeuristic}" ]; then
-      sechFlag="--seqEventsCostHeuristic=${seqEventsCostHeuristic}"
-  fi
-  if [ -n "${cacheTransactionResults}" ]; then
-      ctrFlag="--cacheTransactionResults=${cacheTransactionResults}"
   fi
   if [ -n "${accountNonceLimit}" ]; then
       aclFlag="--accountNonceLimit=${accountNonceLimit}"
@@ -246,33 +193,63 @@ function newnode {
   fi
 
   echo "Starting vm-runner"
-  runBackgroundProcess vm-runner --useSyncMode=$useSyncMode --maxTxsPerBlock=$maxTxsPerBlock \
-                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --svmTrace=$svmTrace --createTransactionResults=true \
-                         --debugEnabled=$vmDebug --wsDebug=$wsDebug \
-                         --debugPort=$debugPort --debugWSHost=$debugWSHost --debugWSPort=$debugWSPort \
-                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$evmMinLogLevel --evmCompatible=$evmCompatible \
-                         ${networkFlag} --networkID=$networkID --requireCerts=$requireCerts \
-                         "${tbFlag}" "${breFlag}" "${sebFlag}" "${sechFlag}" "${svdFlag}" "${ctrFlag}" "${aclFlag}" "${txsFlag}" "${gasFlag}" \
-                         --gasOn=$gasOn +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+  runBackgroundProcess vm-runner \
+    --blockstanbul=true \
+    --brokenRefundReenable=${brokenRefundReenable:-false} \
+    --cacheTransactionResults=${cacheTransactionResults:-true} \
+    --createTransactionResults=true \
+    --debug=${evmDebugMode:-false} \
+    --debugEnabled=${vmDebug:-false} \
+    --debugPort=${debugPort:-8051} \
+    --debugWSHost=${debugWSHost:-strato} \
+    --debugWSPort=${debugWSPort:-8052} \
+    --diffPublish=${diffPublish:-true} \
+    --gasOn=${gasOn:-true} \
+    --maxTxsPerBlock=${maxTxsPerBlock:-500} \
+    --minLogLevel=${vmMinLogLevel} \
+    --networkID=${networkID:--1} \
+    --seqEventsBatchSize=${seqEventsBatchSize:--1} \
+    --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \
+    --sqlDiff=${sqlDiff:-true} \
+    --svmDev=${svmDev:-false} \
+    --svmTrace=${svmTrace:-false} \
+    --requireCerts=${requireCerts:-true} \
+    --useSyncMode=${useSyncMode:-false} \
+    --wsDebug=${wsDebug:-false} \
+    ${networkFlag} \
+    "${aclFlag}" \
+    "${txsFlag}" \
+    "${gasFlag}" \
+    +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
-  echo "Starting strato-api"
   # Leave the +RTS -N1, it is important
-  runBackgroundProcess strato-api --minLogLevel=$evmMinLogLevel --gasOn=$gasOn --evmCompatible=$evmCompatible \
-    --networkID=$networkID "${networkFlag}" "${aclFlag}" "${txsFlag}" "${gasFlag}" "${idServer}" "${urFlag}" "${ucFlag}" \
-    "${ubFlag}" "${udFlag}" +RTS -N1 >> logs/strato-api 2>&1
+  echo "Starting strato-api"
+  runBackgroundProcess strato-api \
+    --gasOn=${gasOn:-true} \
+    --minLogLevel=$apiDebugMode \
+    --networkID=${networkID:--1} \
+    "${networkFlag}" \
+    "${aclFlag}" \
+    "${txsFlag}" \
+    "${gasFlag}" \
+    "${idServer}" \
+    "${urFlag}" \
+    "${ucFlag}" \
+    "${ubFlag}" \
+    "${udFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
-  if [ "${evmCompatible}" = true ]; then
-      echo "EVM Compatibility mode is on, so Slipstream EVM contract indexing is being turned on."
-      indexFlag=true
-  else
-      indexFlag=${indexEVM}
-  fi
+  SLIPSTREAM_CMD="slipstream \
+  --database=${postgres_slipstream_db} \
+  --kafkahost=${kafkaHost} \
+  --kafkaport=${kafkaPort} \
+  --minLogLevel=${slipMinLogLevel} \
+  --pghost=${postgres_host} \
+  --pgport=${postgres_port} \
+  --pguser=${postgres_user} \
+  --password=${postgres_password} \
+  --stratourl=http://localhost:3000/eth/v1.2"
 
-  SLIPSTREAM_CMD="slipstream --pghost=${postgres_host} --pgport=${postgres_port} \
-    --pguser=${postgres_user} --password=${postgres_password} --database=${postgres_slipstream_db} \
-    --stratourl=${STRATO_API_LOCAL_ROOT_PATH}  \
-    --kafkahost=${kafkaHost} --kafkaport=${kafkaPort} --minLogLevel=${slipMinLogLevel} --indexEVM=$indexFlag"
-
+  echo "Starting slipstream"
   if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
       $SLIPSTREAM_CMD &>> logs/slipstream &
   else
@@ -283,7 +260,7 @@ function newnode {
   runBackgroundProcess logRotation
 
   set +x
-  if [ "${PROCESS_MONITORING}" = true ] ; then
+  if [ ${PROCESS_MONITORING:-true} = true ] ; then
     echo -e "${Green}Monitoring the background processes. Making checks every ${MONITORING_TIMER} sec. If you don't see any error messages below - all processes are healthy...${NC}"
     while sleep ${MONITORING_TIMER}; do
       # check status for every monitored process
@@ -341,18 +318,25 @@ function cleanupDB {
 }
 
 function doInit {
-  blockTime=${blockTime:-13}
-  minBlockDifficulty=${minBlockDifficulty:-131072}
-  if [ -n "${network}" ]; then
-    networkFlag="--network=${network}"
-  fi
 
-  args="--pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
-        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-        --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-        --addBootnodes=$addBootnodes $stratoBootnode \
-        --blockTime=$blockTime --minPeers=$numMinPeers --minBlockDifficulty=$minBlockDifficulty \
-        --generateKey=$generateKey ${networkFlag}"
+  args="--addBootnodes=$addBootnodes \
+  --blockTime=${blockTime:-13} \
+  --genesisBlockName=${genesis:-gettingStarted} \
+  --generateKey=$generateKey \
+  --kafka=./kafka-topics.sh \
+  --kafkahost=$kafkaHost \
+  --lazyblocks=${lazyBlocks:-true} \
+  --minPeers=${numMinPeers:-100} \
+  --minBlockDifficulty=${minBlockDifficulty:-131072} \
+  --pguser=$pgUser \
+  --password=$pgPass \
+  --pghost=$pgHost \
+  --redisHost=$redisBDBHost \
+  --redisPort=$redisBDBPort \
+  --redisDBNumber=${redisBDBNumber:-0} \
+  --zkhost=$zkHost \
+  ${networkFlag} \
+  ${stratoBootnode}"
 
   if ${splitinit:-false} ; then
     #TODO(https://blockapps.atlassian.net/browse/STRATO-1421): Populate strato-init-events with from-restore from S3
@@ -415,61 +399,16 @@ function setEnv {
 }
 
 echo "Processed environment variables:"
-
+setEnv addBootnodes false
+setEnv bootnode ""
+setEnv genesisBlock ""
+setEnv kafkaHost ${kafkaHost}
 setEnv pgUser ${postgres_user}
 setEnv pgPass ${postgres_password}
 setEnv pgHost ${postgres_host}
-
-setEnv kafkaHost ${kafkaHost}
-setEnv zkHost ${zkHost}
-
 setEnv redisBDBHost ${redisHost}
 setEnv redisBDBPort ${redisPort}
-setEnv redisBDBNumber 0
-
-setEnv genesis gettingStarted
-setEnv miningAlgorithm Instant
-setEnv maxTxsPerBlock 500
-
-if [ -z $network ]
-then
-    setEnv networkID 6
-else
-    setEnv networkID -1
-fi
-setEnv requireCerts true
-setEnv genesisBlock ""
-setEnv bootnode ""
-
-setEnv mineBlocks true
-setEnv verifyBlocks false
-setEnv instantMining true
-setEnv lazyBlocks true
-setEnv addBootnodes false
-setEnv numMinPeers 100
-setEnv useSyncMode false
-setEnv minQuorumSize 1
-setEnv maxConn 1000
-
-
-setEnv sqlDiff ${sqlDiff:-true}
-setEnv svmTrace ${svmTrace:-false}
-setEnv diffPublish true
-
-setEnv evmCompatible ${EVM_COMPATIBLE:-false}
-setEnv indexEVM ${indexEVM:-false}
-
-setEnv evmDebugMode false
-setEnv evmTraceMode false
-
-setEnv vmDebug ${vmDebug:-false}
-setEnv wsDebug ${wsDebug:-false}
-setEnv debugPort ${debugPort:-8051}
-setEnv debugWSHost ${debugWSHost:-strato}
-setEnv debugWSPort ${debugWSPort:-8052}
-setEnv VAULT_PROXY_DEBUG ${VAULT_PROXY_DEBUG:-false}
-
-setEnv STRATO_API_LOCAL_ROOT_PATH http://localhost:3000/eth/v1.2
+setEnv zkHost ${zkHost}
 
 if [[ -z ${VAULT_URL} ]] ; then
   echo -e "Error: VAULT_URL is required"
@@ -497,7 +436,7 @@ mkdir -p /var/lib/strato
 cd /var/lib/strato
 
 if [[ -n $genesisBlock ]]
-then echo "$genesisBlock" > ${genesis}Genesis.json
+then echo "$genesisBlock" > ${genesis:-gettingStarted}Genesis.json
 fi
 
 until nc -z $zkHost 2181 >&/dev/null
@@ -515,6 +454,6 @@ until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
   sleep 1
 done
 
+# Main entry point
 global-db --pghost $pgHost || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
 newnode
-
