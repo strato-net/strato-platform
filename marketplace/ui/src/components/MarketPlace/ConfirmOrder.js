@@ -232,6 +232,11 @@ const ConfirmOrder = () => {
       ...billingAddr
     };
 
+    window.LOQ.push(['ready', async LO => {
+      // Track an event
+      await LO.$internal.ready('events')
+      LO.events.track('Add Shipping Address')
+    }])
     TagManager.dataLayer({
       dataLayer: {
         event: 'add_shipping_address',
@@ -321,6 +326,41 @@ const ConfirmOrder = () => {
 
   const navigate = useNavigate();
 
+  const handleOrderConfirm = async () => {
+    handleCancel();
+    let orderList = [];
+    let orderItemAddress = [];
+    confirmOrderList.forEach((item) => {
+      orderList.push({ inventoryId: item.key, quantity: item.qty });
+      orderItemAddress.push(item.key);
+    });
+    const body = {
+      buyerOrganization: userOrganization,
+      orderList,
+      orderTotal: total + tax + shipping,
+      shippingAddress: userAddresses[selectedAddress].address,
+    };
+    
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'pay_later_button',
+      },
+    });
+    let isDone = await orderActions.createOrder(orderDispatch, body);
+    if (isDone) {
+      let updatedCart = [];
+      cartList.forEach(cart => {
+        if (!orderItemAddress.includes(cart.product.address)) {
+          updatedCart.push(cart);
+        }
+      });
+      actions.addItemToCart(marketplaceDispatch, updatedCart);
+      setTimeout(function () {
+        navigate(`/orders`, { state: { defaultKey: "Bought" } });
+      }, 2000);
+    }
+  };
+
   const handlePaymentConfirm = async () => {
     let orderList = [];
     confirmOrderList.forEach((item) => {
@@ -330,6 +370,7 @@ const ConfirmOrder = () => {
         quantity: item.qty,
         name: item.item.name,
         unitPrice: item.unitPrice,
+        subCategory: item.subCategory ? item.subCategory : " ",
       });
     });
 
@@ -344,6 +385,11 @@ const ConfirmOrder = () => {
       user: user.commonName,
       email: user.preferred_username,
     };
+    window.LOQ.push(['ready', async LO => {
+      // Track an event
+      await LO.$internal.ready('events')
+      LO.events.track('Buy Now Button')
+    }])
     TagManager.dataLayer({
       dataLayer: {
         event: 'pay_now_button',

@@ -52,7 +52,7 @@ class OrderController {
     try {
       const { dapp, body } = req
       
-      const { to, subject, htmlContent } = body;
+      const { to, subject, htmlContents } = body;
 
       OrderController.validateCreateOrderArgs(body)
 
@@ -62,7 +62,10 @@ class OrderController {
 
       // Only send email if order is created successfully
       if (res.statusMessage === "OK") {
-        await sendEmail(to, subject, htmlContent);
+        //for every item in htmlContents, send email
+        for (let i = 0; i < htmlContents.length; i++) {
+          await sendEmail(to, subject, htmlContents[i]);
+        }
       }
 
       console.log("*Buyer placed order*");
@@ -170,14 +173,15 @@ class OrderController {
       buyerCommonName: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
         inventoryId: Joi.string().required(),
-        quantity: Joi.number().required()
+        quantity: Joi.number().required(),
+        subCategory: Joi.string().required(),
       })).required(),
       orderTotal: Joi.number().required(),
       paymentSessionId: Joi.string(),
       shippingAddress: Joi.string().required(),
       to: Joi.string().required(),
       subject: Joi.string().required(),
-      htmlContent: Joi.string().required(),
+      htmlContents: Joi.array().min(1).required(),
     }).required();
 
     const validation = createOrderSchema.validate(args);
@@ -197,6 +201,7 @@ class OrderController {
             inventoryId: Joi.string().required(),
             quantity: Joi.number().required(),
             name: Joi.string().required(),
+            subCategory: Joi.string().required(),
             unitPrice: Joi.number().required(),
           })).required(),
       orderTotal: Joi.number().required(),

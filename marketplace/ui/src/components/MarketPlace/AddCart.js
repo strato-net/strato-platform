@@ -97,6 +97,7 @@ const Checkout = ({ user }) => {
           },
           sellerCommonName: item.product.ownerCommonName,
           sellerOrganization: item.product.ownerOrganization.startsWith('Mercata Account') ? item.product.ownerCommonName : item.product.ownerOrganization,
+          subCategory: item.product.subCategory,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.pricePerUnit,
           quantity: item.product.address,
@@ -220,10 +221,12 @@ const Checkout = ({ user }) => {
       render: (text) => {
         let qty = 0;
         let product;
+        let availableQuantity;
         cartList.forEach((element) => {
           if (element.product.address === text) {
             qty = element.qty;
             product = element.product;
+            availableQuantity = element.product.availableQuantity;
           }
         });
         return (
@@ -250,8 +253,8 @@ const Checkout = ({ user }) => {
                   }
                 });
               }}
-              className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-              <MinusOutlined className="text-xs text-secondryD" />
+              className="h-[32px] w-[27px] pt-1 border text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+              <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
             </div>
             <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center"
                 min={1} value={qty} defaultValue={qty} controls={false}
@@ -289,8 +292,8 @@ const Checkout = ({ user }) => {
                   }
                 });
               }}
-              className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
-              <PlusOutlined className="text-xs text-secondryC" />
+              className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+              <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
             </div>
           </div>
         );
@@ -326,6 +329,12 @@ const Checkout = ({ user }) => {
             let items = [...cartList];
             items.splice(
               items.findIndex(function (i) {
+                window.LOQ = window.LOQ || []
+                window.LOQ.push(['ready', async LO => {
+                    // Track an event
+                    await LO.$internal.ready('events')
+                    LO.events.track('Delete Cart Item', { product: i.product.name, category: i.product.category })
+                }])
                 TagManager.dataLayer({
                   dataLayer: {
                     event: 'delete_item_from_cart',

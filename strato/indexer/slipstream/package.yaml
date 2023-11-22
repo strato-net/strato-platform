@@ -24,6 +24,12 @@ dependencies:
   - sql-monad
   - text
   - transformers
+  - data-default
+  - monad-alter
+  - core-api2
+  - blockapps-mpdbs
+  - blockapps-haskoin
+  - blockapps-data
 
 library:
   source-dirs: src/

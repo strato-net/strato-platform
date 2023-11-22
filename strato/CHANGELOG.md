@@ -17,9 +17,16 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unreleased]
 
 ### Added
+- Debug log flags: API_DEBUG_LOG, SLIPSTREAM_DEBUG_LOG, VM_DEBUG_LOG, API_DEBUG_LOG, FULL_DEBUG_LOG
+- Improved Slipstream logging
+
 ### Changed
+
 ### Fixed
+- Contracts that inherit from abstract contracts at the grandparent+ level are indexed in Cirrus at all levels
+
 ### Removed
+- NewStatus message type from strato-p2p
 
 
 ## [10.0.0] - 10/31/2023
@@ -49,6 +56,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Changed
 - `/compile` and `/transaction` endpoints use SolidVM compiler
 - POST `/transaction` calls redirected to the corresponding User contract
+- POST `/transaction` contract creation calls redirected to the corresponding User contract
 - optimized logic flow in p2p to prevent sync stalls
 ### Fixed
 - Error handle duplicate key violations in `code_ref` table
