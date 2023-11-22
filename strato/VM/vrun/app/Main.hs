@@ -22,6 +22,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.VMContext
 import Blockchain.VMOptions ()
+import Blockchain.Wiring ()
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import qualified Data.ByteString as B
@@ -31,7 +32,6 @@ import Data.Time.Clock.POSIX
 import Executable.EVMFlags ()
 import HFlags
 import Prometheus
-import Wiring ()
 
 main :: IO ()
 main = do

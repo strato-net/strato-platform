@@ -64,7 +64,7 @@ newtype MemCodeDB m a = MemCodeDB {unMemCodeDB :: StateT (M.Map Keccak256 DBCode
 instance MonadTrans MemCodeDB where
   lift = MemCodeDB . lift
 
-instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCodeDB m) where
+instance {-# OVERLAPPING #-} Monad m => (Keccak256 `A.Alters` DBCode) (MemCodeDB m) where
   lookup _ = MemCodeDB . gets . M.lookup
   insert _ k = MemCodeDB . modify' . M.insert k
   delete _ = MemCodeDB . modify' . M.delete

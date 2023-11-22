@@ -49,12 +49,12 @@ newtype MemAddressStateDB m a = MemAddressStateDB {unMemAddressStateDB :: StateT
 instance MonadTrans MemAddressStateDB where
   lift = MemAddressStateDB . lift
 
-instance Monad m => (Account `A.Alters` AddressState) (MemAddressStateDB m) where
+instance {-# OVERLAPPING #-} Monad m => (Account `A.Alters` AddressState) (MemAddressStateDB m) where
   lookup _ = MemAddressStateDB . gets . M.lookup
   insert _ k = MemAddressStateDB . modify' . M.insert k
   delete _ = MemAddressStateDB . modify' . M.delete
 
-instance Monad m => A.Selectable Account AddressState (MemAddressStateDB m) where
+instance {-# OVERLAPPING #-} Monad m => A.Selectable Account AddressState (MemAddressStateDB m) where
   select = A.lookup
 
 runMemAddressStateDB :: Monad m => MemAddressStateDB m a -> M.Map Account AddressState -> m a

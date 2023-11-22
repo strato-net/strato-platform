@@ -78,7 +78,7 @@ instance (Account `Alters` AddressState) m => (Account `Alters` AddressState) (M
   insert p k = lift . insert p k
   delete p = lift . delete p
 
-instance Selectable Account AddressState m => Selectable Account AddressState (MainChainT m) where
+instance {-# OVERLAPPING #-} Selectable Account AddressState m => Selectable Account AddressState (MainChainT m) where
   select p = lift . select p
 
 instance Monad m => Selectable Word256 ParentChainIds (MainChainT m) where

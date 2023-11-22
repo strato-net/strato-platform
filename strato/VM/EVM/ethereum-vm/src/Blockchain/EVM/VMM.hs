@@ -71,7 +71,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.VM.VMException
-import Blockchain.VMContext hiding (get, gets, put, modify)
+import Blockchain.VMContext
 import Control.Lens hiding (from, to)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A

@@ -20,6 +20,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMContext
 import Blockchain.VMOptions ()
+import Blockchain.Wiring ()
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
@@ -34,7 +35,6 @@ import qualified LabeledError
 import Test.Hspec
 import qualified Test.Hspec.Expectations.Lifted as L
 import Test.Hspec.Runner
-import Wiring ()
 import Prelude hiding (print)
 
 {-# NOINLINE exampleCode #-}

@@ -46,7 +46,7 @@ import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.VMOptions
-import Blockchain.Wiring ()
+import Blockchain.Wiring
 import Conduit hiding (Flush)
 import Control.Concurrent.STM (TQueue, atomically, readTQueue, writeTQueue)
 import Control.Lens hiding (Context)

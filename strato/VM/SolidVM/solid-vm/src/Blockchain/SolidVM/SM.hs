@@ -84,7 +84,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
-import Blockchain.VMContext hiding (modify, gets, get)
+import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative ((<|>))
 import Control.DeepSeq (force, ($!!))
