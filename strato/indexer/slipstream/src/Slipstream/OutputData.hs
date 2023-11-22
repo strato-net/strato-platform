@@ -84,9 +84,9 @@ import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
 import           Text.RawString.QQ
+import           Text.Tools                      
 import           UnliftIO.Exception              (SomeException, catch, handle)
 import           UnliftIO.IORef
--- import           Blockchain.Data.AddressStateDB (AddressState)
 import           Blockchain.Data.ChainInfo (ParentChainIds)
 import           Blockchain.Data.AddressStateDB
 import qualified Handlers.Storage as HS
@@ -448,11 +448,11 @@ createIndexTable ::
   ConduitM () Text m [ForeignKeyInfo]
 createIndexTable globalsIORef contract (o, a, n) = do
   let tableName = indexTableName o a n
-  contractAlreadyCreated <- isTableCreated globalsIORef tableName
+  tableExists <- isTableCreated globalsIORef tableName
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  $logInfoLS "createIndexTable/contractAlreadyCreated" (tableName, contractAlreadyCreated)
-  if contractAlreadyCreated
+  $logDebugLS "createIndexTable/tableExists" ("Table Name: " ++ show tableName ++ ", contract already created: " ++ show tableExists)
+  if tableExists 
     then return []
     else do
       incNumTables
@@ -494,7 +494,7 @@ createMappingTable globalsIORef (o, a, n) m = do
   let tableName = mappingTableName o a n m
   tableExists <- isTableCreated globalsIORef tableName
 
-  $logInfoLS "createMappingTable/mappingTableExists" (tableName, tableExists)
+  $logDebugLS "createMappingTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
   if tableExists
     then return []
     else do
@@ -514,7 +514,7 @@ createHistoryTable' globalsIORef contract (o, a, n) = do
   let tableName = historyTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
 
-  $logInfoLS "createHistoryTable/tableExists" (tableName, tableExists)
+  $logDebugLS "createHistoryTable'/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
 
   when (not tableExists) $ do
     incNumHistoryTables
@@ -533,7 +533,7 @@ createHistoryTable globalsIORef contract (o, a, n) = do
   let tableName = historyTableName o a n
   tableExists <- isTableCreated globalsIORef tableName
 
-  $logInfoLS "createHistoryTable/tableExists" (tableName, tableExists)
+  $logDebugLS "createHistoryTable'/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
 
   when (not tableExists) $ do
     incNumHistoryTables
@@ -746,7 +746,7 @@ insertMappingTable ::
 insertMappingTable [] = error "insertMappingTable: unhandled empty list"
 insertMappingTable maps = do
   let newMaps = nubBy ((==) `on` mapDataKey) maps
-  $logInfoS "insertMappingTable" $ T.pack $ show newMaps
+  multilineLog "insertMappingTable" $ boringBox $ map show newMaps
   let grouped = (groupBy ((==) `on` mapname) newMaps)
       results = concat $ map insertMappingTableQuery grouped
   yieldMany $ results
@@ -802,7 +802,7 @@ insertHistoryTable contracts@(E.ProcessedContract {organization = org, applicati
           (org)
           (app)
           (cName)
-  $logInfoS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
+  $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
 
 insertAbstractTable ::
@@ -811,7 +811,8 @@ insertAbstractTable ::
   ConduitM () Text m ()
 insertAbstractTable [] = pure ()
 insertAbstractTable cs@((_, abTableName, _) : _) = do
-  $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName ++ " (and potentially others)" ++ show cs
+  $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName
+  multilineLog "insertAbstractTable/processedContract" $ show cs
   yieldMany $ insertAbstractTableQuery cs
 
 createIndexTableQuery :: Contract -> (Text, Text, Text) -> Text
@@ -908,7 +909,7 @@ addHistoryUnique (o, a, n) =
           <> wrapDoubleQuotes indexName
           <> "\n  ON "
           <> historyName
-          <> " (address, \"chainId\", block_hash, transaction_hash);",
+          <> " (address, block_hash, transaction_hash);",
         "ALTER TABLE "
           <> historyName
           <> " ADD PRIMARY KEY USING INDEX "
@@ -1204,7 +1205,7 @@ insertEventTable globalsIORef agEv@AggregateEvent {eventEvent = ev} = do
 
   eventExists <- isTableCreated globalsIORef eventTable
   let q = insertEventTableQuery agEv
-  $logInfoS "insertEventTable" q
+  multilineDebugLog "insertEventTable/SQL" $ T.unpack q
   if eventExists
     then return (Just q)
     else return Nothing
