@@ -165,7 +165,6 @@ postChainInfo ::
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,
-    HasBlocEnv m,
     HasSQL m,
     HasVault m
   ) =>
@@ -175,22 +174,18 @@ postChainInfo ::
 postChainInfo mJwtToken chainInput = case mJwtToken of
   Nothing -> throwIO $ UserError $ Text.pack "Did not find X-USER-ACCESS-TOKEN in the header"
   Just jwtToken -> withLastBlockHash $ \bHash -> do
-    evmCompatibleOn <- fmap evmCompatible getBlocEnv
-    if evmCompatibleOn
-      then throwIO $ UserError $ Text.pack "Error: EVM Compatibility flag is On. This feature cannot be used."
-      else do
-        chainInfo' <- createChainInfo jwtToken bHash chainInput
-        chainId <- CORE.postChain chainInfo'
-        let isAsync = fromMaybe False $ chaininputAsync chainInput
-        unless isAsync $ do
-          info <- waitForChainInfo chainId
-          case info of
-            Nothing -> pure ()
-            Just info' -> do
-              let status = transactionResultStatus $ fst info'
-              when (status /= Just Success) . throwIO . UserError . Text.pack $
-                "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
-        pure chainId
+      chainInfo' <- createChainInfo jwtToken bHash chainInput
+      chainId <- CORE.postChain chainInfo'
+      let isAsync = fromMaybe False $ chaininputAsync chainInput
+      unless isAsync $ do
+        info <- waitForChainInfo chainId
+        case info of
+          Nothing -> pure ()
+          Just info' -> do
+            let status = transactionResultStatus $ fst info'
+            when (status /= Just Success) . throwIO . UserError . Text.pack $
+              "Chain creation for " <> format (unChainId chainId) <> " failed: " <> show status
+      pure chainId
 
 postChainInfos ::
   ( A.Selectable Account AddressState m,
