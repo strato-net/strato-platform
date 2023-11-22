@@ -96,7 +96,9 @@ const TopSellingProductCard = () => {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === product.address) {
-          if (items[index].qty + 1 <= product.availableQuantity) {
+          const itemData = JSON.parse(product.data);
+          const availableQuantity = itemData.units ? itemData.units : 1;
+          if (items[index].qty + 1 <= availableQuantity) {
             items[index].qty += 1;
             actions.addItemToCart(marketplaceDispatch, items);
 

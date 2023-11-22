@@ -89,28 +89,26 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
-        const itemData = JSON.parse(item.product.data);
         modifiedValue.push({
-          key: item.product.address,
+          key: item.product.address,  
           item: {
             name: item.product.name,
             image: item.product.images.length > 0 ? item.product.images[0] : image_placeholder,
             status: "Active",
           },
-          sellerOrganization: itemData.ownerOrganization,
-          sellerCommonName: item.product.ownerCommonName,
+          sellersOrganization: item.product.ownerOrganization,
+          sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          saleAddress: item.product.sale,
           unitPrice: item.product.price,
-          quantity: 1,
+          quantity: item.product.address,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.price +
+            item.product.price * item.qty +
             calculateShipping(item) +
             calculateTax(item),
           action: item.product.address,
-          qty: 1,
+          qty: item.qty,
         });
       });
 
@@ -193,7 +191,7 @@ const Checkout = ({ user }) => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
       ),
-      dataIndex: "sellerOrganization",
+      dataIndex: "sellersOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
       width: "12%"
@@ -202,7 +200,7 @@ const Checkout = ({ user }) => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
       ),
-      dataIndex: "sellerCommonName",
+      dataIndex: "sellersCommonName",
       align: "center",
       render: (text) => (
         <p className="text-center">{text}</p>
@@ -239,7 +237,9 @@ const Checkout = ({ user }) => {
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
                   if (element.product.address === product.address) {
-                    if (items[index].qty - 1 <= product.availableQuantity) {
+                    const itemData = JSON.parse(product.data);
+                    const availableQuantity = itemData.units ? itemData.units : 1;
+                    if (items[index].qty - 1 <= availableQuantity) {
                       items[index].qty -= 1;
                       actions.addItemToCart(marketplaceDispatch, items);
                     } else {
@@ -262,12 +262,14 @@ const Checkout = ({ user }) => {
                   let items = [...cartList];
                   cartList.forEach((element, index) => {
                     if (element.product.address === product.address) {
-                      if (e <= product?.availableQuantity) {
+                      const itemData = JSON.parse(product.data);
+                      const availableQuantity = itemData.units ? itemData.units : 1;
+                      if (e <= availableQuantity) {
                         items[index].qty = e;
                         actions.addItemToCart(marketplaceDispatch, items);
                       } else {
                         openToast("bottom", true, "Cannot add more than available quantity");
-                        items[index].qty = product?.availableQuantity;
+                        items[index].qty = availableQuantity;
                         actions.addItemToCart(marketplaceDispatch, items);
                       }
                     }
@@ -278,7 +280,9 @@ const Checkout = ({ user }) => {
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
                   if (element.product.address === product.address) {
-                    if (items[index].qty + 1 <= product.availableQuantity) {
+                    const itemData = JSON.parse(product.data);
+                    const availableQuantity = itemData.units ? itemData.units : 1;
+                    if (items[index].qty + 1 <= availableQuantity) {
                       items[index].qty += 1;
                       actions.addItemToCart(marketplaceDispatch, items);
                     } else {

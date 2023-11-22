@@ -76,7 +76,7 @@ const ProcessingOrder = () => {
             if (body.data["payment_status"] === "paid") {
               const customerEmail = body.data["customer_details"]["email"];
               const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, ...cart };
+              let object = { paymentSessionId: sessionId, paymentMethod: body.data.payment_method, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
           }
@@ -154,13 +154,12 @@ const ProcessingOrder = () => {
 
     // Prepare order data to be sent to order controller
     const orderList = cartData.orderList.map(c => {
-      return c.saleAddress;
+      return c.assetAddress;
     });
     
     const body = {
-      saleAddresses: orderList,
-      sellersCommonName: cartData.orderList[0].sellersCommonName,
-      sellersAddress: cartData.orderList[0].sellersAddress,
+      assetAddresses: orderList,
+      paymentMethod: cartData.paymentMethod,
       totalPrice: cartData.orderTotal,
       shippingAddress: cartData.shippingAddress,
       paymentSessionId: cartData.paymentSessionId,

@@ -154,7 +154,7 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={styles.label}>Order Number: <Text style={styles.value}>{invoice.order.orderId}</Text></Text>
             <Text style={styles.label}>Order Date: <Text style={styles.value}>{getStringDate(invoice.order.createdDate, US_DATE_FORMAT)}</Text></Text>
             <Text style={styles.label}>Buyer: <Text style={styles.value}>{invoice.order.purchasersCommonName}</Text></Text>
-            <Text style={styles.label}>Seller: <Text style={styles.value}>{invoice.order.sellerCommonName}</Text></Text>
+            <Text style={styles.label}>Seller: <Text style={styles.value}>{invoice.order.sellersCommonName}</Text></Text>
           </View>
           <View style={styles.topSection}>
             <View style={styles.addressSection}>

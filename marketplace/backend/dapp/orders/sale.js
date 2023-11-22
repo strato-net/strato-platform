@@ -3,7 +3,7 @@ import config from '/load.config';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
-import constants from '../../helpers/constants';
+import constants, { PAYMENT_TYPES } from '../../helpers/constants';
 
 const contractName = constants.saleTableName;
 
@@ -128,11 +128,15 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { saleAddresses, assetAddresses, state, ...restArgs } = args;
+    const { saleAddresses, assetAddresses, state, paymentMethod, ...restArgs } = args;
     let sales;
 
-    if (assetAddresses) {
-        sales = await searchAllWithQueryArgs(contractName, { assetToBeSold: assetAddresses, state: state ? state : 1 }, options, admin);
+    if (assetAddresses && paymentMethod) {
+        sales = await searchAllWithQueryArgs(contractName, { 
+            assetToBeSold: assetAddresses, 
+            state: state ? state : 1,
+            payment: PAYMENT_TYPES[paymentMethod]
+        }, options, admin);
     }
     else {
         sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, state: state ? state : 1 }, options, admin);

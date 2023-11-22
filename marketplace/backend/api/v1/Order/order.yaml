@@ -242,13 +242,11 @@ definitions:
   createSaleOrder:
     type: object
     properties:
-      saleAddresses:
+      assetAddresses:
         type: array
         items:
           type: string
-      sellersCommonName:
-        type: string
-      sellersAddress:
+      paymentMethod:
         type: string
       totalPrice:
         type: number

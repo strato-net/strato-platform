@@ -42,7 +42,8 @@ const CategoryProductCard = ({ product, category }) => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductDetail.url;
   const [qty, setQty] = useState(1);
-  const availableQuantity = product.availableQuantity;
+  const itemData = JSON.parse(product?.data);
+  const availableQuantity = itemData && itemData.units ? itemData.units : 1;
 
   const subtract = () => {
     if (qty !== 1) {
@@ -52,7 +53,7 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const add = () => {
-    if (qty < product.availableQuantity) {
+    if (qty < availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -103,7 +104,9 @@ const CategoryProductCard = ({ product, category }) => {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === product.address) {
-          if (items[index].qty + qty <= product.availableQuantity) {
+          const itemData = JSON.parse(product.data);
+          const availableQuantity = itemData.units ? itemData.units : 1;
+          if (items[index].qty + qty <= availableQuantity) {
             items[index].qty += qty;
             actions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
@@ -176,7 +179,7 @@ const CategoryProductCard = ({ product, category }) => {
             <Title level={4} className="!mt-0" id="prod-price">
               $ {product.price}
             </Title>
-            {product.availableQuantity !== 0 ?
+            {availableQuantity !== 0 ?
               (
                 <div>
                   <div className="flex items-center my-2" id="prod-quantity">
@@ -189,7 +192,7 @@ const CategoryProductCard = ({ product, category }) => {
                       </div>
                       <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
                         onChange={e => {
-                          if (e < product.availableQuantity) {
+                          if (e < availableQuantity) {
                             setQty(e)
                           } else {
                             openToast(
@@ -197,7 +200,7 @@ const CategoryProductCard = ({ product, category }) => {
                               true,
                               "Cannot add more than available quantity"
                             );
-                            setQty(product.availableQuantity)
+                            setQty(availableQuantity)
                           }
                         }} />
                       <div

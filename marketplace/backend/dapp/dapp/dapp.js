@@ -350,8 +350,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
+    const { assetAddresses, paymentMethod, ...restArgs } = args;
+    const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
+    const sellersAddress = sales[0].sellersAddress;
+    const sellersCommonName = sales[0].sellersCommonName;
+    const saleAddresses = sales.map(sale => {
+      return sale.address;
+    })
     const newArgs = {
-      ...args,
+      ...restArgs,
+      saleAddresses,
+      sellersCommonName,
+      sellersAddress,
       purchasersCommonName: userCert.commonName,
       purchasersAddress: rawAdmin.address,
       orderId: util.uid(),
@@ -508,21 +518,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
-      const saleAddresses = orderList.map(o => o.saleAddress);
-
-      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddresses }, options);
-      const assetAddresses = sales.map(sale => {
-        return sale.assetToBeSold;
-      })
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+      const assetAddresses = orderList.map(o => o.assetAddress);
+      
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses, status: 1 }, options);
 
       if (assets.length == 0 || assets.length != orderList.length) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
       }
 
-      const itemData = JSON.parse(assets[0].data);
-
-      const inventoryOrganization = itemData.ownerOrganization;
+      const inventoryOrganization = assets[0].ownerOrganization;
       const sellerName = assets[0].ownerCommonName;
       for (const currInventory of assets) {
 
@@ -542,8 +546,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           accountDeauthorized: false
         },
         newOptions)
-      
-      console.log("sellerStripeDetails", sellerStripeDetails);
 
       /*  check if an accountId already exists for the user org */
       if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
@@ -553,7 +555,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const invoices = []; let calculatedOrderTotal = 0
 
       orderList.forEach(item => {
-        const inventoryItem = assets.find(asset => asset.sale == item.saleAddress)
+        const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
         invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity })
 
         calculatedOrderTotal += (inventoryItem.price * item.quantity)
@@ -612,7 +614,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
       const { session_id } = args
       const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
-      return StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+      const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+      const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
+      const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
+      return { ...paymentSession, payment_method: paymentMethod.card.brand }
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }

@@ -270,7 +270,7 @@ const ConfirmOrder = () => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
       ),
-      dataIndex: "sellerOrganization",
+      dataIndex: "sellersOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
       width: "12%"
@@ -279,7 +279,7 @@ const ConfirmOrder = () => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
       ),
-      dataIndex: "sellerCommonName",
+      dataIndex: "sellersCommonName",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
       width: "12%"
@@ -363,11 +363,10 @@ const ConfirmOrder = () => {
     confirmOrderList.forEach((item) => {
     // These additional fields need to be sent to form the request after stripe. 
       orderList.push({
-        quantity: 1,
+        quantity: item.qty,
         name: item.item.name,
         price: item.unitPrice,
-        saleAddress: item.saleAddress,
-        sellerCommonName: item.sellerCommonName,
+        assetAddress: item.key,
       });
     });
 
@@ -395,7 +394,7 @@ const ConfirmOrder = () => {
 
   useEffect(() => {
     if (data.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellerOrganization"]);
+      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellersOrganization"]);
     }
   }, [inventoryDispatch, data]);
 
@@ -749,8 +748,7 @@ const ConfirmOrder = () => {
                 }}>
                 Pay Later
               </div> */}
-              {/* <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass} */}
-              <div id="pay-now-button" className={activeButtonClass}
+              <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
                 onClick={() => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
                     handlePaymentConfirm();

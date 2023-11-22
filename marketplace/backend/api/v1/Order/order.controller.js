@@ -246,8 +246,7 @@ class OrderController {
             quantity: Joi.number().required(),
             name: Joi.string().required(),
             price: Joi.number().required(),
-            saleAddress: Joi.string().required(),
-            sellerCommonName: Joi.string().required(),
+            assetAddress: Joi.string().required(),
           })).required(),
       orderTotal: Joi.number().required(),
       shippingAddress: Joi.string().required(),
@@ -343,9 +342,8 @@ class OrderController {
 
   static validateCreateSaleOrderArgs(args) {
     const createSaleOrderSchema = Joi.object({
-      saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
-      sellersCommonName: Joi.string().required(),
-      sellersAddress: Joi.string().required(),
+      assetAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
+      paymentMethod: Joi.string().required(),
       totalPrice: Joi.number().required(),
       shippingAddress: Joi.string().required(),
       paymentSessionId: Joi.string().required(),
