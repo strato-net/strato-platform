@@ -75,8 +75,8 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         return RestStatus.OK;
     }
 
-    function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint) {
-        whitelistSale(address(new CarbonSale(address(this), _paymentType, _price, _units)));
-        return RestStatus.OK;
+    function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
+        address newSale = address(new CarbonSale(address(this), _paymentType, _price, _units));
+        return (RestStatus.OK, string(newSale));
     }
 }

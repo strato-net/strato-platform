@@ -151,7 +151,7 @@ async function createSplitSale(user, args = {}, options, contract) {
         method: "createSplitSale",
         args: util.usc({ ...args }),
       };
-      const splitStatus = await rest.call(user, callArgs, options);
+      const [splitStatus, saleAddress] = await rest.call(user, callArgs, options);
     
       if (parseInt(splitStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(
@@ -161,7 +161,7 @@ async function createSplitSale(user, args = {}, options, contract) {
         );
       }
     
-      return transferStatus;
+      return saleAddress;
 }
 
 /**

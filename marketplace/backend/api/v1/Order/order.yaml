@@ -242,10 +242,17 @@ definitions:
   createSaleOrder:
     type: object
     properties:
-      assetAddresses:
+      orderList:
         type: array
         items:
-          type: string
+          type: object
+          properties:
+            quantity: 
+              type: number
+            assetAddress: 
+              type: string
+            category: 
+              type: string
       paymentMethod:
         type: string
       totalPrice:

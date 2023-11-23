@@ -35,6 +35,10 @@ const ProcessingOrder = () => {
     return JSON.parse(window.localStorage.getItem("cartList") ?? []);
   }, []);
 
+  const storedConfirmList = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
+  }, []);
+
   // useEffect(() => {
   //   actions.fetchCartItems(marketplaceDispatch, cartList);
   // }, [marketplaceDispatch, cartList]);
@@ -113,18 +117,18 @@ const ProcessingOrder = () => {
     // Construct Email with order details
     let concatenatedOrderString = "";
     let orderTotal = 0; 
-    for (let i = 0; i < cartData.orderList.length; i++) {
-      let orderItem = cartData.orderList[i];
-      let itemName = orderItem.name.replace(/%20/g, ' '); 
+    for (let i = 0; i < storedConfirmList.length; i++) {
+      let orderItem = storedConfirmList[i];
+      let itemName = orderItem.item.name.replace(/%20/g, ' '); 
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
-      let itemQty = orderItem.quantity;
+      let itemQty = orderItem.qty;
       let itemTotal = (itemPrice * itemQty).toFixed(2); 
   
       concatenatedOrderString += `${itemName}:\n`; 
       concatenatedOrderString += `$${itemTotal} <br>`; 
       concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each <br><br>`; 
       orderTotal += parseFloat(itemTotal); 
-      if (i === cartData.orderList.length - 1) {
+      if (i === storedConfirmList.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Sales Tax: $${parseFloat(cartData.tax).toFixed(2)} <br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
@@ -153,12 +157,14 @@ const ProcessingOrder = () => {
     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
 
     // Prepare order data to be sent to order controller
-    const orderList = cartData.orderList.map(c => {
-      return c.assetAddress;
+    let assetAddresses = [];
+    const orderList = storedConfirmList.map(o => {
+      assetAddresses.push(o.key);
+      return { assetAddress: o.key, quantity: o.qty, category: o.category };
     });
     
     const body = {
-      assetAddresses: orderList,
+      orderList: orderList,
       paymentMethod: cartData.paymentMethod,
       totalPrice: cartData.orderTotal,
       shippingAddress: cartData.shippingAddress,
@@ -172,7 +178,7 @@ const ProcessingOrder = () => {
     if (isDone) {
       let updatedCart = [];
       storedData.forEach(cart => {
-        if (!orderList.includes(cart.product.sale)) {
+        if (!assetAddresses.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });

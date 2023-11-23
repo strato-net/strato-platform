@@ -89,6 +89,7 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
+        const parts = item.product.contract_name.split('-');
         modifiedValue.push({
           key: item.product.address,  
           item: {
@@ -96,6 +97,7 @@ const Checkout = ({ user }) => {
             image: item.product.images.length > 0 ? item.product.images[0] : image_placeholder,
             status: "Active",
           },
+          category: parts[parts.length - 1],
           sellersOrganization: item.product.ownerOrganization,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,

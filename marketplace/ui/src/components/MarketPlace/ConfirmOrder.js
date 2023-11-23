@@ -364,8 +364,6 @@ const ConfirmOrder = () => {
     // These additional fields need to be sent to form the request after stripe. 
       orderList.push({
         quantity: item.qty,
-        name: item.item.name,
-        price: item.unitPrice,
         assetAddress: item.key,
       });
     });

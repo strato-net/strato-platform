@@ -203,13 +203,13 @@ const InvoiceComponent = ({ invoice }) => {
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.price}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>{asset.quantity ? asset.quantity : 1}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{asset.quantity}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.shippingCharges ? asset.shippingCharges : 0}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.tax ? asset.tax : 0}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.amount ? asset.amount : asset.price}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${asset.amount}</Text>
             </View>
           ))}
           {/* <View style={styles.tableRow} >

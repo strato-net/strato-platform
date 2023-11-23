@@ -52,7 +52,7 @@ const CreateInventoryModal = ({
     artist: "",
     source: "",
     projectType: "",
-    units: null,
+    units: 1,
     brand: "",
     images: null,
     price: null,

@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
+import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS, PAYMENT_TYPES } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
@@ -350,13 +350,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const { assetAddresses, paymentMethod, ...restArgs } = args;
+    const { orderList, paymentMethod, ...restArgs } = args;
+    const assetAddresses = orderList.map(asset => {
+      return asset.assetAddress;
+    })
     const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
     const sellersAddress = sales[0].sellersAddress;
     const sellersCommonName = sales[0].sellersCommonName;
-    const saleAddresses = sales.map(sale => {
-      return sale.address;
-    })
+    const saleAddresses = await Promise.all(sales.map(async (sale) => {
+      const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
+      const saleData = JSON.parse(sale.data);
+      if (saleData.units && orderForSale.quantity < saleData.units) {
+        const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
+        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, { 
+          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]), 
+          price: sale.price, 
+          units: orderForSale.quantity,
+        }, options, contract);
+        return splitSaleAddress;
+      }
+      else {
+        return sale.address;
+      }
+    }));
     const newArgs = {
       ...restArgs,
       saleAddresses,
@@ -384,7 +400,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const assetAddresses = sales.map(sale => {
         return sale.assetToBeSold;
       })
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+      let assets = [];
+      const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+      assetsWithoutQuantity.map(asset => {
+        const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
+        const quantity = saleForAsset.units ? saleForAsset.units : 1;
+        assets.push({
+          ...asset,
+          quantity: quantity,
+          amount: quantity * saleForAsset.price,
+        })
+      })
       const result = { userContactAddress, order, assets };
 
       return result;

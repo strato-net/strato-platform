@@ -139,9 +139,9 @@ const BoughtOrderDetails = ({ user, users }) => {
           productImage: prod.images.length > 0 ? prod.images[0] : image_placeholder,
           productName: prod,
           unitPrice: prod.price,
-          quantity: prod.quantity ? prod.quantity : 1,
+          quantity: prod.quantity,
           shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
-          amount: prod.amount ? prod.amount : prod.price,
+          amount: prod.amount,
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -344,7 +344,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="SELLER"
-                value={details.order.sellerCommonName}
+                value={details.order.sellersCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData title="TOTAL ($)" value={details.order.totalPrice} />

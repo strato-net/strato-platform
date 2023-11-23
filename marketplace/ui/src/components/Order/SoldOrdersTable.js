@@ -56,7 +56,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
         chainId: order.chainId,
         key: order.address,
         orderNumber: order,
-        buyerCommonName: order.purchasersCommonName,
+        buyersCommonName: order.purchasersCommonName,
         orderTotal: order.totalPrice,
         date: getStringDate(order.createdDate, US_DATE_FORMAT),
         status: getStatus(parseInt(order.status)),
@@ -87,8 +87,8 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     },
     {
       title: "buyer".toUpperCase(),
-      dataIndex: "buyerCommonName",
-      key: "buyerCommonName",
+      dataIndex: "buyersCommonName",
+      key: "buyersCommonName",
       render: (text) => <p>{text}</p>,
     },
     {
