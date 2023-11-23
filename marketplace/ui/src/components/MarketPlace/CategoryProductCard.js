@@ -10,19 +10,25 @@ import {
   InputNumber,
 } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
+
 // Actions
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+
 // Dispatch and states
-import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 
-import noPreview from "../../images/resources/noPreview.jpg";
 import { setCookie } from "../../helpers/cookie";
+import noPreview from "../../images/resources/noPreview.jpg";
 
 const { Title, Text, Paragraph } = Typography;
 
 const CategoryProductCard = ({ product }) => {
-  const { availableQuantity,
+  const {
+    availableQuantity,
     address,
     name,
     productImageLocation,
@@ -30,12 +36,16 @@ const CategoryProductCard = ({ product }) => {
     category,
     productId,
     pricePerUnit,
-    totalSavings, description } = product;
-    
+    totalSavings,
+    description,
+  } = product;
+
   const navigate = useNavigate();
+
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
+
+  const marketplaceDispatch = useMarketplaceDispatch();
 
   useEffect(() => {
     marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -61,19 +71,13 @@ const CategoryProductCard = ({ product }) => {
   };
 
   const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
+    const toastFunction = isError ? api.error : api.success;
+
+    toastFunction({
+      message: msg,
+      placement,
+      key: 1,
+    });
   };
 
   const addItemToCart = () => {
@@ -113,25 +117,13 @@ const CategoryProductCard = ({ product }) => {
 
   let route = `/memberships/all/${membershipId}?inventoryId=${address}`;
   const handleRedirect = () => {
-    setCookie(
-      "returnUrl",
-      `/marketplace${route}`,
-      10
-    );
+    setCookie("returnUrl", `/marketplace${route}`, 10);
     navigate(route);
   };
 
   const handleButtonClick = (event, isNavigate) => {
-    if (
-      hasChecked &&
-      !isAuthenticated &&
-      loginUrl !== undefined
-    ) {
-      setCookie(
-        "returnUrl",
-        `/marketplace${route}`,
-        10
-      );
+    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+      setCookie("returnUrl", `/marketplace${route}`, 10);
       window.location.href = loginUrl;
     } else {
       TagManager.dataLayer({
@@ -145,14 +137,12 @@ const CategoryProductCard = ({ product }) => {
       addItemToCart();
       isNavigate && navigate("/checkout");
     }
-  }
+  };
 
   return (
     <div>
       {contextHolder}
-      <Card
-        className="mb-6 cursor-pointer"
-      >
+      <Card className="mb-6 cursor-pointer">
         <div className="flex justify-start items-center">
           <div className="m-4">
             <Image
@@ -161,9 +151,7 @@ const CategoryProductCard = ({ product }) => {
               height={180}
               preview={false}
               fallback={noPreview}
-              onClick={() => {
-                handleRedirect();
-              }}
+              onClick={handleRedirect}
             />
           </div>
           <div>
@@ -172,9 +160,7 @@ const CategoryProductCard = ({ product }) => {
                 strong
                 className="text-xl text-primaryB hover:text-primary hover:underline"
                 id="prod-name"
-                onClick={() => {
-                  handleRedirect();
-                }}
+                onClick={handleRedirect}
               >
                 {name}&nbsp;
               </Text>
@@ -218,9 +204,9 @@ const CategoryProductCard = ({ product }) => {
                       value={qty}
                       defaultValue={qty}
                       controls={false}
-                      onChange={(e) => {
-                        if (e < availableQuantity) {
-                          setQty(e);
+                      onChange={(selectedQuantity) => {
+                        if (selectedQuantity < availableQuantity) {
+                          setQty(selectedQuantity);
                         } else {
                           openToast(
                             "bottom",
@@ -242,7 +228,7 @@ const CategoryProductCard = ({ product }) => {
                 <Button
                   className="group w-40 h-9 border border-primary hover:bg-primary"
                   onClick={() => {
-                    handleButtonClick("add_to_cart_from_marketplace", false)
+                    handleButtonClick("add_to_cart_from_marketplace", false);
                   }}
                 >
                   <div className="text-primary group-hover:text-white">
@@ -254,7 +240,7 @@ const CategoryProductCard = ({ product }) => {
                   id={`${name.replace(/ /g, "_")}-buy-now`}
                   className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                   onClick={() => {
-                    handleButtonClick("buy_now_from_marketplace", true)
+                    handleButtonClick("buy_now_from_marketplace", true);
                   }}
                 >
                   Buy Now
@@ -272,8 +258,8 @@ const CategoryProductCard = ({ product }) => {
                       dataLayer: {
                         event: "contact_sales_from_category_card",
                         product_name: name,
-                        category: category,
-                        productId: productId,
+                        category,
+                        productId,
                       },
                     });
                   }}
