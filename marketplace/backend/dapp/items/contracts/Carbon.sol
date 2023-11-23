@@ -57,8 +57,6 @@ contract Carbon is ItemStatus, RestStatus, Asset {
                                      []);
         units -= splitUnits;
 
-        dewhitelistSale(saleContract);
-
         for (uint i = 0; i < whitelistedSales.length; i++) {
             CarbonSale(whitelistedSales[i]).changeUnitQuantity(units);
         }
@@ -72,6 +70,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new CarbonSale(address(this), _paymentTypes[i], _price, _units)));
         }
+        status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
 

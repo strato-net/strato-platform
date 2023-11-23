@@ -396,7 +396,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: order.shippingAddress }, getOptions);
-      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses, state: [1,2] }, options);
       const assetAddresses = sales.map(sale => {
         return sale.assetToBeSold;
       })

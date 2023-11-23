@@ -74,7 +74,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus {
     uint public createdDate;
     ItemStatus public status;
 
-    address[] public whitelistedSales;
+    address[] public whitelistedSales = [];
 
 
     constructor(string _name, string _description, string[] _images, uint _createdDate) {

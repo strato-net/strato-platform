@@ -192,15 +192,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </div>
           </div>
           {categoricalProperties()}
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Price</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              $ {inventory.price}
-            </p>
-          </div>
+          { inventory.status === '2' ? <></> :
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Price</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                $ {inventory.price}
+              </p>
+            </div>
+          }
           <div className="flex mt-1 items-center">
             <p className="text-primaryC text-sm w-40">Description</p>
             <p text-secondryB text-sm>

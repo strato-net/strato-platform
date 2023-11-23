@@ -225,10 +225,14 @@ async function getAll(admin, args = {}, options) {
         sales = await saleJs.getAll(admin, { assetAddresses }, options);
         inventories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address);
-            finalInventory.push({
-                ...inventory,
-                price: itemSale.price,
-            })
+            if (itemSale) {
+                finalInventory.push({
+                    ...inventory,
+                    price: itemSale?.price,
+                })
+            } else {
+                finalInventory.push(inventory);
+            }
         });
     }
 

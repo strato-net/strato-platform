@@ -7,7 +7,6 @@ import <d816194227e1a7a780fff236a449604afeb36255>;
 /// @title A representation of Materials assets
 contract Materials is ItemStatus, RestStatus, Asset {
     string public serialNumber;
-    ItemStatus public status;
     string public source;
 
     event OwnershipUpdate(
@@ -31,7 +30,6 @@ contract Materials is ItemStatus, RestStatus, Asset {
         owner = _owner;
 
         serialNumber = _serialNumber;
-        status = ItemStatus.PUBLISHED;
         source = _source;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -45,6 +43,7 @@ contract Materials is ItemStatus, RestStatus, Asset {
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new MaterialsSale(address(this), _paymentTypes[i], _price)));
         }
+        status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
 }
