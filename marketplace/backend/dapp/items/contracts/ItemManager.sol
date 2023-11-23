@@ -12,6 +12,12 @@ contract Mem_ItemManager is ItemStatus, InventoryStatus {
     mapping(address => address) private itemProductIdMapping;
     mapping(address => address) private itemInventoryIdMapping;
 
+    struct ownershipResponseSchema {
+        address productId;
+        address inventoryId;
+    }
+
+
     struct ItemObject {
         uint itemNumber;
         string serialNumber;
@@ -175,27 +181,37 @@ contract Mem_ItemManager is ItemStatus, InventoryStatus {
         return (RestStatus.OK, "event has been certified");
     }
 
-    function transferOwnership(
-        address[] _itemsAddress,
-        address _newOwner,
-        address _dappAddress
-    ) public returns (uint, address, address) {
-        string itemAddresses = "";
-        // if(_itemsAddress.length <= 0){
-        //     return (RestStatus.BAD_REQUEST,address(0),address(0));
-        // }
-        // get Dapp contract from dapp chain
-        Dapp dapp = Dapp(address(_dappAddress));
-        Mem_ProductManager productManager = dapp.productManager();
+   function transferOwnership(
+    address[] _itemsAddress,
+    address _newOwner,
+    address _dappAddress,
+    uint _quantity
+) public returns (uint, ownershipResponseSchema[] memory) {
+    string memory itemAddresses = "";
+    ownershipResponseSchema[] memory ownershipResponseDataArray;
 
+    Dapp dapp = Dapp(address(_dappAddress));
+    Mem_ProductManager productManager = dapp.productManager();
+    for (uint i = 0; i < _quantity; i++) {
         (address productId, address inventoryId) = getProductAndInventory(
             productManager,
             _itemsAddress,
             _newOwner
         );
 
-        return (RestStatus.OK, productId, inventoryId);
+        ownershipResponseSchema memory ownershipResponseData;
+        ownershipResponseData.productId = productId;
+        ownershipResponseData.inventoryId = inventoryId;
+
+        // Concatenate item addresses (if needed)
+        // itemAddresses = string(abi.encodePacked(itemAddresses, ",", _itemsAddress[i]));
+
+        // Push the new object into the array
+        ownershipResponseDataArray.push(ownershipResponseData);
     }
+    return (RestStatus.OK, ownershipResponseDataArray);
+}
+
 
     function getProductAndInventory(
         Mem_ProductManager _productManager,

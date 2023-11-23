@@ -1303,6 +1303,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         let result = []
 
         for (let orderLineAddress of orderLinesAddresses) {
+
           const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
           console.log("dapp orderLineItems: ", orderLineItems)
           itemAddresses = orderLineItems.map(orderLineItem => orderLineItem.itemId);
@@ -1320,10 +1321,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const membershipAddresses = memberships.map(membership => membership.address);
 
           // Transfer ownership of the items to the buyer
-          const [status, productId, inventoryId] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress });
-          console.log("dapp productId: ", productId)
-          console.log("dapp inventoryId: ", inventoryId)
-
+          let quantity = parseInt(quantitiesToUpdate);
+          const [status, ownershipResponse] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress, quantity });
+          // console.log("dapp productId: ", productId)
+          // console.log("dapp inventoryId: ", inventoryId)
+          // ownershipResponse.forEach
           // Get all membershipServices using membershipId
           const membershipServices = await membershipServiceJs.getAll(rawAdmin, { membershipId: membershipAddresses }, createOptions)
           console.log("dapp membershipServices: ", membershipServices)
@@ -1362,18 +1364,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           });
 
 
-
-          console.log("comes here")
-          const memberResponse = await managers.membershipManager.addMembershipOrderFlow({
-            dappAddress: contract.address,
-            owner: newOwner,
-            productId: productId,
-            membershipArgs: membershipArgs,
-            membershipServiceArgs: membershipServiceArgs,
-            productFileArgs: productFileArgs
-          });
+          ownershipResponse.forEach(async (item) => {
+            let productId = item.productId;
+            let inventoryId = item.inventoryId;
+            const memberResponse = await managers.membershipManager.addMembershipOrderFlow({
+              dappAddress: contract.address,
+              owner: newOwner,
+              productId: productId,
+              membershipArgs: membershipArgs,
+              membershipServiceArgs: membershipServiceArgs,
+              productFileArgs: productFileArgs
+            });
           console.log("reach here: ", memberResponse)
-          result.push({ status, productId, inventoryId });
+            result.push({ status, productId, inventoryId });
+          })
+          console.log("comes here")
+
+          console.log("reach here: ", memberResponse)
         }
         return result;
       }
