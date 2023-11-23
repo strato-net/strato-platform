@@ -404,7 +404,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
       assetsWithoutQuantity.map(asset => {
         const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
-        const quantity = saleForAsset.units ? saleForAsset.units : 1;
+        const saleData = JSON.parse(saleForAsset.data);
+        const quantity = saleData.units ? saleData.units : 1;
         assets.push({
           ...asset,
           quantity: quantity,

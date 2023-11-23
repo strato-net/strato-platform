@@ -365,7 +365,7 @@ class OrderController {
     const executeSaleSchema = Joi.object({
       saleOrderAddress: Joi.string().required(),
       fulfillmentDate: Joi.number().required(),
-      comments: Joi.string().required(),
+      comments: Joi.string().allow(""),
     }).required();
 
     const validation = executeSaleSchema.validate(args);

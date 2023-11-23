@@ -143,12 +143,12 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus {
     
     function transferOwnership(address saleContract, address _newOwner) public requireOwner("ownership transfer") {
         require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
+        disableAllSales();
+        status = ItemStatus.UNPUBLISHED;
         owner = _newOwner;
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerCommonName = ownerCert["commonName"];
-        disableAllSales();
-        status = ItemStatus.UNPUBLISHED;
    }
 }
 
