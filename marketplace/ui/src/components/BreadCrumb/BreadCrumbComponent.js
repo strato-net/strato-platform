@@ -22,7 +22,7 @@ const BreadCrumbComponent = ({ name }) => {
   }
 
   return (
-    <Row className="mx-16 h-20">
+    <Row className="mx-12 h-20">
       <Col span={24} className="mt-10" >
         <Breadcrumb>
           {routesArray.map((item, index) => {

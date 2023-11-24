@@ -43,7 +43,7 @@ const App = () => {
 
   return (
     <BrowserRouter basename="/marketplace">
-      <Layout className="bg-white">
+      <Layout className="bg-white min-h-screen">
         <UsersProvider>
           <MembershipsProvider>
             <InventoriesProvider>
