@@ -408,6 +408,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const quantity = saleData.units ? saleData.units : 1;
         assets.push({
           ...asset,
+          price: saleForAsset.price,
           quantity: quantity,
           amount: quantity * saleForAsset.price,
         })

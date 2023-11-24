@@ -174,7 +174,7 @@ const TopSellingProductCard = () => {
                         ${topSellingProduct.price}
                       </Text>
                       <Text className="mt-1 text-sm !text-primaryB">
-                        {itemData.units}{itemData.units && itemData.units > 1 ? " Tons" : " "}
+                        {itemData.units}{itemData.units ? itemData.units > 1 ? " Tons" : " Ton" : <br/>}
                       </Text>
                       <div className="flex justify-evenly items-center mt-4 w-full px-3">
                         <Button

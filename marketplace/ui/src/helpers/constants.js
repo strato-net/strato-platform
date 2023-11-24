@@ -1,4 +1,4 @@
-import { VISA, Mastercard } from "../images/SVGComponents";
+import { AMEX, Discover, Mastercard, VISA } from "../images/SVGComponents";
 
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
@@ -103,7 +103,9 @@ export const CATEGORIES = [
 
 export const PAYMENT_TYPE = [
   { name: "---SELECT ALL---", value: 0},
-  { name: "VISA", value: 1, icon: <VISA width="20px" height="14px"/> },
-  { name: "Mastercard", value: 2, icon: <Mastercard width="20px" height="14px"/> },
-  { name: "STRAT", value: 3},
+  { name: "AMEX", value: 1, icon: <AMEX width="20px" height="14px"/> },
+  { name: "Discover", value: 2, icon: <Discover width="20px" height="14px"/> },
+  { name: "Mastercard", value: 3, icon: <Mastercard width="20px" height="14px"/> },
+  { name: "STRAT", value: 4 },
+  { name: "VISA", value: 5, icon: <VISA width="20px" height="14px"/> },
 ]

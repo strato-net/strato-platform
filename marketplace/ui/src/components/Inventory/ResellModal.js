@@ -62,8 +62,8 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
             setPaymentTypes([]);
             return []
           }
-          setPaymentTypes([1, 2, 3]);
-          return [1,2,3];
+          setPaymentTypes([1, 2, 3, 4, 5]);
+          return [1, 2, 3, 4, 5];
         } else {
           setPaymentTypes(value);
           return value;

@@ -663,7 +663,7 @@ const ProductDetails = ({ user, users }) => {
                 ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
-                $ {details.price}
+                {details.price ? <>$ {details.price}</> : "No Price Available"}
               </Title>
               {availableQuantity !== 0 ?
                 <Space>

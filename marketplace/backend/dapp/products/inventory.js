@@ -163,7 +163,7 @@ async function resellItem(user, contract, args, options) {
  */
 
 async function get(user, args, options) {
-    const { address, state, ...restArgs } = args;
+    const { address, ...restArgs } = args;
     let inventory;
 
     const searchArgs = setSearchQueryOptions(restArgs, {
@@ -176,7 +176,7 @@ async function get(user, args, options) {
         return undefined;
     }
 
-    const sale = await saleJs.get(user, { assetToBeSold: inventory.address }, options);
+    const sale = await saleJs.get(user, { assetToBeSold: inventory.address, state: 1 }, options);
 
     if (sale) {
         inventory = {

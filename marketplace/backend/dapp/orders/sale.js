@@ -109,13 +109,34 @@ function bindAddress(user, address, options) {
 async function get(user, args, options) {
     const { address, assetToBeSold, state, ...restArgs } = args;
     let sale;
+    let searchArgs;
 
-    const searchArgs = setSearchQueryOptions(restArgs, {
-        key: "address",
-        value: address,
-    });
-    
-    sale = await searchOne(contractName, { ...searchArgs, state: state ? state : 1 }, options, user);
+    if (assetToBeSold) {
+        searchArgs = setSearchQueryOptions(restArgs, 
+            [{
+                key: "assetToBeSold",
+                value: assetToBeSold,
+            },
+            {
+                key: "state",
+                value: 1
+            }
+            ]);
+    }
+    else {
+        searchArgs = setSearchQueryOptions(restArgs, 
+            [{
+                key: "address",
+                value: address,
+            },
+            {
+                key: "state",
+                value: 1
+            }
+            ]);
+    }
+
+    sale = await searchOne(contractName, searchArgs, options, user);
 
     if (!sale) {
         return undefined;

@@ -183,8 +183,8 @@ const CreateInventoryModal = ({
         formik.setFieldValue("paymentTypes", []);
         return []
       }
-      formik.setFieldValue("paymentTypes", [1, 2, 3]);
-      return [1,2,3];
+      formik.setFieldValue("paymentTypes", [1, 2, 3, 4, 5]);
+      return [1, 2, 3, 4, 5];
     } else {
       formik.setFieldValue("paymentTypes", value);
       return value;
