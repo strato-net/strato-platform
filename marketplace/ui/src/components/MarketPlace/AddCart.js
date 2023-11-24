@@ -48,7 +48,7 @@ const Checkout = ({ user }) => {
 
   const calculateTax = (item) => {
     let tax = item.product.taxDollarAmount === 0 ? Math.round(item.product.pricePerUnit * (item.product.taxPercentageAmount / 100)) : (item.product.taxDollarAmount)
-    return tax * item.qty   
+    return tax * item.qty
   };
 
   const calculateShipping = (item) => {
@@ -366,24 +366,26 @@ const Checkout = ({ user }) => {
   };
 
   return (
-    <div className="h-screen mx-14">
+    <div >
       {contextHolder}
       {isCreateOrderSubmitting ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
       ) : (
-        <div>
+        <>
           <BreadCrumbComponent />
-          {
-            mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
-              <Image src={Images.noProductSymbol} preview={false} />
-              <Title level={3} className="mt-2">
-                No item found
-              </Title>
-            </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
-          }
-        </div>
+          <div className="mx-14">
+            {
+              mapData.length === 0 ? <div className="h-screen justify-center flex flex-col items-center">
+                <Image src={Images.noProductSymbol} preview={false} />
+                <Title level={3} className="mt-2">
+                  No item found
+                </Title>
+              </div> : mapData.map(e => <CartComponent columns={columns} data={e.value} />)
+            }
+          </div>
+        </>
       )}
       <ConfirmOrderModel
         open={open}

@@ -22,7 +22,7 @@ const BreadCrumbComponent = ({ name }) => {
   }
 
   return (
-    <Row className="mx-12 h-20 sticky top-16 bg-white z-20 overflow-hidden">
+    <Row className="px-12 h-20 sticky top-16 bg-white z-20 overflow-hidden">
       <Col span={24} className="mt-10" >
         <Breadcrumb>
           {routesArray.map((item, index) => {
