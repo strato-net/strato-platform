@@ -175,7 +175,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
 
 
   return (
-    <Header className="!bg-white flex shadow-lg">
+    <Header className="!bg-white flex shadow-lg sticky top-0 z-40">
       <Space>
         <div
           className=" cursor-pointer"

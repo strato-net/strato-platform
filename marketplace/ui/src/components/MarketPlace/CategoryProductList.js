@@ -328,10 +328,10 @@ const CategoryProductList = ({ user }) => {
       <BreadCrumbComponent />
       <div className="flex pt-4">
         {/* Filter section */}
-        <div className="mr-6 pt-4 max-h-700 sticky top-42">
+        <div className="mr-6 pt-4 max-h-700 sticky top-40">
           <Text className="text-xl font-semibold  pl-12 pr-7">Filters</Text>
-          <div className="max-h-700 w-96">
-            <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24 overflow-y-scroll max-h-700">
+          <div className="h-full w-96">
+            <div className="bg-white shadow-[2px_-2px_4px_0_rgba(0,0,0,0.05)] my-6 pt-4 mb-24 overflow-y-scroll h-full">
               {PriceFilterComponent()}
               <Divider className="m-0" />
               {currentCategory && SubCategoryFilterComponent()}
