@@ -22,27 +22,25 @@ const BreadCrumbComponent = ({ name }) => {
   }
 
   return (
-    <>
-      <Row className="mx-16 h-20">
-        <Col span={24} className="mt-10" >
-          <Breadcrumb>
-            {routesArray.map((item, index) => {
-              let len = routesArray.length - 1;
-              if (item === "all") {
-                return null;
-              }
-              return <Breadcrumb.Item key={index} href="" onClick={(e) => handleRedirect(e, routesArray.slice(0, index + 1).join('/'))}>
-                <ClickableCell>
-                  <Text className={`${len == index ? "" : "text-primary"} capitalize text-md font-bold`} underline>
-                    {(item == "" && index == 0) ? "Home" : ((name && index == len) ? name : decodeURIComponent(item))}
-                  </Text>
-                </ClickableCell>
-              </Breadcrumb.Item>
-            })}
-          </Breadcrumb>
-        </Col>
-      </Row>
-    </>
+    <Row className="mx-16 h-20">
+      <Col span={24} className="mt-10" >
+        <Breadcrumb>
+          {routesArray.map((item, index) => {
+            let len = routesArray.length - 1;
+            if (item === "all") {
+              return null;
+            }
+            return <Breadcrumb.Item key={index} href="" onClick={(e) => handleRedirect(e, routesArray.slice(0, index + 1).join('/'))}>
+              <ClickableCell>
+                <Text className={`${len == index ? "" : "text-primary"} capitalize text-md font-bold`} underline>
+                  {(item == "" && index == 0) ? "Home" : ((name && index == len) ? name : decodeURIComponent(item))}
+                </Text>
+              </ClickableCell>
+            </Breadcrumb.Item>
+          })}
+        </Breadcrumb>
+      </Col>
+    </Row>
   )
 }
 
