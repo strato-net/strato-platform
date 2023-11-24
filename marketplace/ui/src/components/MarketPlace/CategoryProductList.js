@@ -278,7 +278,7 @@ const CategoryProductList = ({ user }) => {
             value={selectedProducts}
           >
             <div className="flex flex-col gap-3">
-              {(selectedProducts.length > 0 ? marketplaceList : productList).map(({ productId, name }, index) => (
+              {marketplaceList.map(({ productId, name }, index) => (
                 <Checkbox value={productId} key={index} className="m-0" onChange={onChangeProduct}>
                   {name}
                 </Checkbox>
