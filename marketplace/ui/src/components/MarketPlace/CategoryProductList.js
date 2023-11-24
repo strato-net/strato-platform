@@ -73,6 +73,7 @@ const CategoryProductList = ({ user }) => {
 
   useEffect(() => {
     let param = routeMatch?.params?.category;
+    param = param.charAt(0).toUpperCase() + param.slice(1)
     let newCategory = [];
     if (param !== ":category") newCategory.push(param);
     setCategory(param);

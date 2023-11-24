@@ -5,7 +5,7 @@ import ClickableCell from '../ClickableCell'
 const { Text } = Typography;
 
 const BreadCrumbComponent = ({ name }) => {
-  const { state, pathname } = useLocation();
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const isMarketplace = pathname.includes("all");
   // const isServiceUsage = pathname.includes("serviceUsage");
@@ -14,7 +14,7 @@ const BreadCrumbComponent = ({ name }) => {
   const handleRedirect = (e, item) => {
     e.preventDefault()
     if (isMarketplace) {
-      navigate('/category/Membership')
+      navigate('/category/membership')
     } else if (item === "/memberships/serviceUsage") {
     } else {
       navigate(item)
