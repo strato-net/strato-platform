@@ -13,6 +13,10 @@
   font-family: "Montserrat", sans-serif;
 }
 
+body{
+  background-color: white;
+}
+
 .ant-table
   .ant-table-container
   .ant-table-content
@@ -163,6 +167,13 @@
   height: 390px;
 }
 
-.ant-image{
+.max-h-700 {
+  max-height: 700px;
+}
+.top-42 {
+  top: 168px;
+}
+
+.ant-image {
   height: 50%;
 }
