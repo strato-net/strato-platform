@@ -11,7 +11,7 @@ import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
 import carbonJs from "/dapp/items/carbon";
-import materialsJs from "/dapp/items/materials";
+import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
 
 import saleJs from "/dapp/orders/sale";
@@ -221,12 +221,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName, };
     return inventoryJs.get(rawAdmin, { ...args }, getOptions);
   };
+
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate', status: [1,2] }, getOptions);
     return {inventories: inventories, inventoryCount: inventoryCount}
   };
+
+  contract.resellItem = async function (args, options = defaultOptions) {
+    const { itemContract, itemAddress, ...restArgs } = args;
+    const contract = { name: itemContract, address: itemAddress };
+    return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.updateItem = async function (args, options = defaultOptions) {
+    const { itemContract, itemAddress, ...restArgs} = args;
+    const contract = { name: itemContract, address: itemAddress };
+    return inventoryJs.updateItem(rawAdmin, contract, restArgs, options);
+  }
+
   // ------------------------------ INVENTORY ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
@@ -301,21 +315,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ CARBON ENDS--------------------------------
 
-  // ------------------------------ MATERIALS STARTS------------------------------
+  // ------------------------------ METALS STARTS------------------------------
 
-  contract.createMaterials = async function (args, options = defaultOptions) {
+  contract.createMetals = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
     };
-    return materialsJs.uploadContract(rawAdmin, newArgs, options);
+    return metalsJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getMaterials = async function (args = {}, options = optionsNoChainIds) {
+  contract.getMetals = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return materialsJs.getAll(rawAdmin, args, getOptions);
+    return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
   // ------------------------------ MATERIALS ENDS--------------------------------
@@ -340,12 +354,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ CLOTHING ENDS--------------------------------
 
   // ------------------------------ SALE TEST STARTS ------------------------------
-
-  contract.resellItem = async function (args, options = defaultOptions) {
-    const { itemContract, itemAddress, ...restArgs } = args;
-    const contract = { name: itemContract, address: itemAddress };
-    return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
-  }
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);

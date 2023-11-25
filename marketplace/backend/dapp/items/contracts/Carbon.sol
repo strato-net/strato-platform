@@ -42,6 +42,12 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         }
     }
 
+    function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
+        for (uint i = 0; i < whitelistedSales.length; i++) {
+            CarbonSale(whitelistedSales[i]).changeUnitQuantity(_units);
+        }
+    }
+
     function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
         require(splitUnits < units, "Cannot split more units than available");
         Carbon newAsset = new Carbon(name,
@@ -57,9 +63,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
                                      []);
         units -= splitUnits;
 
-        for (uint i = 0; i < whitelistedSales.length; i++) {
-            CarbonSale(whitelistedSales[i]).changeUnitQuantity(units);
-        }
+        changeUnitQuantity(units);
 
         emit AssetSplit(address(newAsset), splitUnits);
 
@@ -77,5 +81,36 @@ contract Carbon is ItemStatus, RestStatus, Asset {
     function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
         address newSale = address(new CarbonSale(address(this), _paymentType, _price, _units));
         return (RestStatus.OK, string(newSale));
+    }
+
+    function updateCarbon(
+        string _name, 
+        string _description, 
+        string[] _images, 
+        ItemStatus _status,
+        string _serialNumber,
+        string _projectType,
+        uint _price,
+        uint _units
+    ) public requireOwner("update asset") returns (uint) {
+        name = _name;
+        description = _description;
+        images = _images;
+        serialNumber = _serialNumber;
+        projectType = _projectType;
+        if (_status == ItemStatus.UNPUBLISHED) {
+            disableAllSales();
+            status = _status;
+            return RestStatus.OK;
+        }
+        uint price = Sale(whitelistedSales[0]).price()
+        if (_price != price) {
+            changePrice(_price);
+        }
+        if (_units != units) {
+            changeUnitQuantity(_units);
+            units = _units;
+        }
+        return RestStatus.OK;
     }
 }

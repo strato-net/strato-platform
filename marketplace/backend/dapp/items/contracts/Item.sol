@@ -175,7 +175,7 @@ contract Item_3 is ItemStatus {
         return RestStatus.OK;
     }
 
-    // Add the raw materials for the item
+    // Add the raw metals for the item
     function addRawMaterials(
         uint _uniqueProductCode,
         string[] _rawMaterialProductName,

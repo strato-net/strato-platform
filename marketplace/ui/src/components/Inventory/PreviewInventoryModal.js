@@ -80,7 +80,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
             </div>
           </div>
         );
-      case "Materials":
+      case "Metals":
         return (
           <div>
             <div className="flex items-center">

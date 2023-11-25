@@ -4,8 +4,8 @@ pragma es6;
 pragma strict;
 import <d816194227e1a7a780fff236a449604afeb36255>;
 
-/// @title A representation of Materials assets
-contract Materials is ItemStatus, RestStatus, Asset {
+/// @title A representation of Metals assets
+contract Metals is ItemStatus, RestStatus, Asset {
     string public serialNumber;
     string public source;
 
@@ -44,6 +44,32 @@ contract Materials is ItemStatus, RestStatus, Asset {
             whitelistSale(address(new MaterialsSale(address(this), _paymentTypes[i], _price)));
         }
         status = ItemStatus.PUBLISHED;
+        return RestStatus.OK;
+    }
+
+    function updateMetals(
+        string _name, 
+        string _description, 
+        string[] _images, 
+        ItemStatus _status,
+        string _serialNumber,
+        string _source,
+        uint _price
+    ) public requireOwner("update asset") returns (uint) {
+        name = _name;
+        description = _description;
+        images = _images;
+        serialNumber = _serialNumber;
+        source = _source;
+        if (_status == ItemStatus.UNPUBLISHED) {
+            disableAllSales();
+            status = _status;
+            return RestStatus.OK;
+        }
+        uint price = Sale(whitelistedSales[0]).price()
+        if (_price != price) {
+            changePrice(_price);
+        }
         return RestStatus.OK;
     }
 }

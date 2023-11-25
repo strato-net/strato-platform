@@ -78,7 +78,6 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus {
 
     address[] public whitelistedSales = [];
 
-
     constructor(string _name, string _description, string[] _images, uint _createdDate) {
         name = _name;
         description =_description;
@@ -195,10 +194,6 @@ abstract contract Sale is PaymentType, SaleState, RestStatus{
 
     function changeSaleState(SaleState _state) public requireSeller("change sale state"){
         state=_state;
-    }
-
-    function changePaymentType(PaymentType _payment) public requireSeller("change payment type"){
-        payment=_payment;
     }
 
     function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") virtual returns (uint) {

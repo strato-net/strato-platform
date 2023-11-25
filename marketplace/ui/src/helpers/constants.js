@@ -97,7 +97,7 @@ export const APPROVAL_STATUS = {
 export const CATEGORIES = [
   "Art",
   "Carbon",
-  "Materials",
+  "Metals",
   "Clothing"
 ]
 

@@ -46,4 +46,30 @@ contract Clothing is ItemStatus, RestStatus, Asset {
         status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
+
+    function updateClothing(
+        string _name, 
+        string _description, 
+        string[] _images, 
+        ItemStatus _status,
+        string _serialNumber,
+        string _brand,
+        uint _price
+    ) public requireOwner("update asset") returns (uint) {
+        name = _name;
+        description = _description;
+        images = _images;
+        serialNumber = _serialNumber;
+        brand = _brand;
+        if (_status == ItemStatus.UNPUBLISHED) {
+            disableAllSales();
+            status = _status;
+            return RestStatus.OK;
+        }
+        uint price = Sale(whitelistedSales[0]).price()
+        if (_price != price) {
+            changePrice(_price);
+        }
+        return RestStatus.OK;
+    }
 }

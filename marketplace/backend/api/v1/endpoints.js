@@ -77,8 +77,8 @@ export const Carbon = {
   create: '/'
 }
 
-export const Materials = {
-  prefix: '/materials',
+export const Metals = {
+  prefix: '/metals',
   getAll: '/',
   create: '/'
 }

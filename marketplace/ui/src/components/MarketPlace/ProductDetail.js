@@ -462,7 +462,7 @@ const ProductDetails = ({ user, users }) => {
               <Text className="text-[13px]">{itemData?.brand}</Text>
             </Space>
           </Space>)
-      case "Materials":
+      case "Metals":
         return (
           <Space direction="vertical">
             <Space>

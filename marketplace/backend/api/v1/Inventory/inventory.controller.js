@@ -162,12 +162,13 @@ class InventoryController {
 
   static validateUpdateInventoryArgs(args) {
     const updateInventorySchema = Joi.object({
-      productAddress: Joi.string().required(),
-      inventory: Joi.string(),
-      updates: Joi.object({
-        pricePerUnit: Joi.number().integer().greater(0).required(),
-        status: Joi.number().integer().min(1).max(2)
-      }).required()
+      itemContract: Joi.string().required(),
+      itemAddress: Joi.string().required(),
+      name: Joi.string().required(),
+      description: Joi.string().allow("").required(),
+      images: Joi.array().items(Joi.string().optional()).required(),
+      status: Joi.number().min(1).required(),
+      price: Joi.number().positive().min(1).required(),
     });
 
     const validation = updateInventorySchema.validate(args);

@@ -154,7 +154,7 @@ async function resellItem(user, contract, args, options) {
     }
   
     return resellStatus;
-  }
+}
 
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.

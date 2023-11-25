@@ -1,37 +1,37 @@
 paths:
-  /materials/:
+  /metals/:
     get:
       security:
         - bearerAuth: []
       tags:
-        - Materials
-      summary: Retrieve materials
+        - Metals
+      summary: Retrieve metals
       produces:
         - application/json
       responses:
         200:
-          description: Array of materials
+          description: Array of metals
     post:
       security:
         - bearerAuth: []
       tags:
-        - Materials
-      summary: Create a material
+        - Metals
+      summary: Create a metal
       produces:
         - application/json
       requestBody:
-        description: It enables user to create materials
+        description: It enables user to create metals
         required: true
         content:
           'application/json':
             schema:
-              $ref: '#/definitions/createMaterials'
+              $ref: '#/definitions/createMetals'
       responses:
         200:
-          description: Object of create materials
+          description: Object of create metals
 
 definitions:
-  createMaterials:
+  createMetals:
     type: object
     properties:
       machineArgs:

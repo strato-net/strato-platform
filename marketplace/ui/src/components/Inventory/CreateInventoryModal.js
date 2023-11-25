@@ -121,7 +121,7 @@ const CreateInventoryModal = ({
               brand: values.brand,
             }
           }
-        case 'Materials':
+        case 'Metals':
           return body = {
             itemArgs: {
               ...body.itemArgs,
@@ -279,7 +279,7 @@ const CreateInventoryModal = ({
                 )}
             </Form.Item>
           </div>)
-      case 'Materials':
+      case 'Metals':
         return (<div className="flex justify-between mt-4 ">
             <Form.Item
               label="Source"

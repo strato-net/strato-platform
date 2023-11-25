@@ -122,7 +122,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               {itemData.brand}
             </p>
           </div>)
-      case 'Materials':
+      case 'Metals':
         return (
           <div className="flex mt-1.5 items-center">
             <p className="text-primaryC text-sm w-40">Source</p>

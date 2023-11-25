@@ -1,23 +1,23 @@
 import express from "express";
-import MaterialsController from "./materials.controller";
-import { Materials } from "../endpoints";
+import MetalsController from "./metals.controller";
+import { Metals } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
 router.get(
-  Materials.getAll,
+  Metals.getAll,
   authHandler.authorizeRequest(true),
   loadDapp,
-  MaterialsController.getAll
+  MetalsController.getAll
 );
 
 router.post(
-  Materials.create,
+  Metals.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  MaterialsController.create
+  MetalsController.create
 );
 
 export default router;
