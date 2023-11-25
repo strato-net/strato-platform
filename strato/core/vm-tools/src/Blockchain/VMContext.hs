@@ -26,7 +26,6 @@ module Blockchain.VMContext
     hashDB,
     codeDB,
     blockSummaryDB,
-    kafkaState,
     redisPool,
     sqldb,
     stateTxMap,
@@ -122,8 +121,6 @@ import qualified Database.Redis as Redis
 import Debugger
 import Executable.EVMFlags
 import GHC.Generics
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Protocol as K
 import SolidVM.Model.Storable
 import SolidVM.Model.Value
 import System.Directory
@@ -158,7 +155,6 @@ data ContextDBs = ContextDBs
     _hashDB :: HashDB,
     _codeDB :: CodeDB,
     _blockSummaryDB :: BlockSummaryDB,
-    _kafkaState :: IORef K.KafkaState,
     _redisPool :: RBDB.RedisConnection,
     _sqldb :: SQLDB
   }
@@ -338,11 +334,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               Redis.connectPort = Redis.PortNumber 2023,
               Redis.connectDatabase = 0
             }
-      initialKafkaState <-
-        newIORef $
-          K.mkKafkaState
-            (K.KString "fake_client")
-            (K.Host (K.KString "localhost"), K.Port 1234132)
       cache <- liftIO $ TRC.new 64
 
       let cdbs =
@@ -351,7 +342,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                 _hashDB = HashDB hdb,
                 _codeDB = CodeDB cdb,
                 _blockSummaryDB = BlockSummaryDB blksumdb,
-                _kafkaState = initialKafkaState,
                 _redisPool = RBDB.RedisConnection rPool,
                 _sqldb = SQLDB conn
               }
@@ -411,7 +401,6 @@ initContext dSettings = do
   cdb <- DB.open (dbDir "h" ++ codeDBPath) ldbOptions
   blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
   rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-  kafkaStateRef <- newIORef $ mkConfiguredKafkaState "ethereum-vm"
   cache <- liftIO $ TRC.new 64
 
   let cdbs =
@@ -420,7 +409,6 @@ initContext dSettings = do
             _hashDB = HashDB hdb,
             _codeDB = CodeDB cdb,
             _blockSummaryDB = BlockSummaryDB blksumdb,
-            _kafkaState = kafkaStateRef,
             _redisPool = RBDB.RedisConnection rPool,
             _sqldb = conn
           }
