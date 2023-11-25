@@ -386,6 +386,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
   }
 
+  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, comments, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
+  }
+
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
     return saleOrderJs.getAll(rawAdmin, args, getOptions);

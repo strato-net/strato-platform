@@ -211,7 +211,7 @@ async function cancelOrder(user, contract, options, comments = "") {
   if (parseInt(cancelStatus, 10) !== RestStatus.OK) {
     throw new rest.RestError(
       cancelStatus,
-      "You cannot cancel an order you don't own",
+      "You cannot cancel an order you don't co-own",
       {}
     );
   }

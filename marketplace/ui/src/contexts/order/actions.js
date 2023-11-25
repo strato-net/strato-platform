@@ -34,6 +34,9 @@ const actionDescriptors = {
   createSale: "create_sale",
   createSaleSuccessful: "create_sale_successful",
   createSaleFailed: "create_sale_failed",
+  cancelSale: "cancel_sale",
+  cancelSaleSuccessful: "cancel_sale_successful",
+  cancelSaleFailed: "cancel_sale_failed",
   executeSale: "execute_sale",
   executeSaleSuccessful: "execute_sale_successful",
   executeSaleFailed: "execute_sale_failed",
@@ -425,6 +428,46 @@ const actions = {
         error: "Error while executing Sale",
       });
       actions.setMessage(dispatch, "Error while executing sale");
+    }
+  },
+
+  cancelSale: async (dispatch, payload) => {
+    dispatch ({ type: actionDescriptors.cancelSale });
+    
+    try {
+      const response = await fetch(`${apiUrl}/order/sale/cancel`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.cancelSaleSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Sale canceled successfully", true);
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.cancelSaleFailed,
+        error: "Error while canceling sale",
+      });
+      actions.setMessage(dispatch, "Error while canceling sale");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.cancelSaleFailed,
+        error: "Error while canceling Sale",
+      });
+      actions.setMessage(dispatch, "Error while canceling sale");
     }
   },
 

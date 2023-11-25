@@ -285,13 +285,10 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const handleCancelOrder = async () => {
     const body = {
-      address: Id,
-      updates: {
-        buyerComments: encodeURIComponent(comment),
-        status: 4,
-      },
+      saleOrderAddress: details.order.address,
+      comments: comment,
     };
-    let isDone = await actions.updateBuyerDetails(dispatch, body);
+    let isDone = await actions.cancelSale(dispatch, body);
     if (isDone) {
       setStatus("Canceled");
     }

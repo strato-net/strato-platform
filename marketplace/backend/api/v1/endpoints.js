@@ -103,6 +103,7 @@ export const Order = {
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
   createSaleOrder: '/sale',
+  cancelSaleOrder: '/sale/cancel',
   executeSale: '/closeSale',
 }
 

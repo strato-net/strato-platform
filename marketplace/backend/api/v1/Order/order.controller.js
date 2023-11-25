@@ -196,6 +196,21 @@ class OrderController {
     }
   }
 
+  static async cancelSaleOrder(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      OrderController.validateCancelSaleOrderArgs(body)
+
+      const result = await dapp.cancelSaleOrder(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async executeSale(req, res, next) {
     try {
       const { dapp, body } = req
@@ -356,6 +371,21 @@ class OrderController {
     if (validation.error) {
       console.log(validation.error);
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Sale Order Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateCancelSaleOrderArgs(args) {
+    const cancelSaleOrderSchema = Joi.object({
+      saleOrderAddress: Joi.string().required(),
+      comments: Joi.string().allow(""),
+    }).required();
+
+    const validation = cancelSaleOrderSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Cancel Sale Order Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
