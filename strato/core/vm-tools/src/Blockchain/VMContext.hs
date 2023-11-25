@@ -309,48 +309,7 @@ lookupX509AddrFromCBHash k = do
   case mAccount of
     Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
     _ -> pure Nothing
-{-
-instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
-  lookup _ = genericLookupHashDB $ getHashDB
-  insert _ = genericInsertHashDB $ getHashDB
-  delete _ = genericDeleteHashDB $ getHashDB
 
-instance HasMemRawStorageDB ContextM where
-  getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
-  putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
-  getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
-  putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
-
-instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
-
-instance (Keccak256 `A.Alters` BlockSummary) ContextM where
-  lookup _ = genericLookupBlockSummaryDB $ getBlockSummaryDB
-  insert _ = genericInsertBlockSummaryDB $ getBlockSummaryDB
-  delete _ = genericDeleteBlockSummaryDB $ getBlockSummaryDB
-
-instance MonadReader Context m => Mod.Accessible SQLDB m where
-  access _ = view $ dbs . sqldb
-
-instance Mod.Accessible RBDB.RedisConnection ContextM where
-  access _ = view $ dbs . redisPool
-
-instance Mod.Accessible (Maybe WorldBestBlock) ContextM where
-  access _ = do
-    mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
-    for mRBB $ \(RedisBestBlock sha num diff) ->
-      return . WorldBestBlock $ BestBlock sha num diff
-
-instance Mod.Modifiable GasCap ContextM where
-  get _ = contextGets (GasCap . _vmGasCap)
-
-  put _ (GasCap g) = do
-    contextModify (vmGasCap .~ g)
-    $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
--}
 runTestContextM ::
   ( MonadUnliftIO m,
     HasStateDB (ReaderT Context (ResourceT m))

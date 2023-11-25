@@ -123,6 +123,7 @@ tests:
       - solid-vm-parser
       - solid-vm-static-analysis
       - source-tools
+      - sql-monad
       - strato-conf
       - strato-genesis
       - strato-init

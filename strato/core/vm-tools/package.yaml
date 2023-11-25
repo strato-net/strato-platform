@@ -80,6 +80,7 @@ library:
     - resourcet
     - seqevents
     - solid-vm-model
+    - sql-monad
     - strato-redis-blockdb
     - text
     - time

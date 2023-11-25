@@ -1,7 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -53,6 +55,9 @@ import Control.Lens hiding (Context)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
+import Control.Monad.Composable.Kafka
+import Control.Monad.Composable.SQL
 import Control.Monad.Reader (ask, runReaderT)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
@@ -62,6 +67,7 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Proxy
+import Data.String
 import qualified Data.Text as T
 import Debugger
 import Executable.EthereumVM2
@@ -77,7 +83,8 @@ import UnliftIO (race_)
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
-  race_ (deployCommitsSqlDiffs ctx) . execContextM' ctx $ do
+  let k = kafkaConfig ethConf
+  race_ (deployCommitsSqlDiffs ctx) . runSQLM . runKafkaM "ethereum-vm" (fromString $ kafkaHost k, fromIntegral $ kafkaPort k) . execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
     (cpOffsetStart, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
     $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
@@ -164,7 +171,7 @@ logEventSummaries events = do
 
 -- KAFKA
 
-sendOutEvent :: VmOutEvent -> ContextM ()
+sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m ()
 sendOutEvent (OutAction act) = do
   let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
@@ -199,17 +206,17 @@ sendOutEvent (OutAction act) = do
       dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
       actionEvents = [NewAction act]
       vmes = ccEvents ++ dcEvents ++ actionEvents
-  contx <- ask
+  contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (VME vmes)
-sendOutEvent (OutIndexEvent e) = void . K.withKafkaRetry1s $ writeIndexEvents [e]
+sendOutEvent (OutIndexEvent e) = void . execKafka $ writeIndexEvents [e]
 sendOutEvent (OutToStateDiff cId cInfo bHash org app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo org app
 sendOutEvent (OutStateDiff diff) = do
-  contx <- ask
+  contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (SD diff)
-sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . K.withKafkaRetry1s $ writeIndexEvents [EventDBEntry e]
+sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void . execKafka $ writeIndexEvents [LogDBEntry l]
+sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void . execKafka $ writeIndexEvents [EventDBEntry e]
 sendOutEvent (OutTXR tr) = do
-  contx <- ask
+  contx <- accessEnv
   void . liftIO $ enqueue (_stateDiffQueue contx) (TXR tr)
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
@@ -221,12 +228,12 @@ sendOutEvent (OutASM asm) =
           | (theAccount, Mem.ASModification asMod) <- M.toList asm
         ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
-sendOutEvent (OutBlock o) = void . K.withKafkaRetry1s $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
+sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
-getFirstBlockFromSequencer :: ContextM OutputBlock
+getFirstBlockFromSequencer :: (MonadIO m, MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
 getFirstBlockFromSequencer = do
   (VmBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
   return block
@@ -234,19 +241,19 @@ getFirstBlockFromSequencer = do
 -- this one starts at 1, 0 is reserved for genesis block and is used to
 -- bootstrap a ton of this
 -- Also seeds the BlockSummaryDatabase
-initializeCheckpointAndBlockSummaryKafka :: ContextM ()
+initializeCheckpointAndBlockSummaryKafka :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m ()
 initializeCheckpointAndBlockSummaryKafka = do
   block <- getFirstBlockFromSequencer
   checkpoint <- initializeCheckpointAndBlockSummary block
   setCheckpoint 1 checkpoint
 
-getCheckpoint :: ContextM (KP.Offset, EVMCheckpoint)
+getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m) => m (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
   let topic = seqVmEventsTopicName
       topic' = show topic
       cg' = show consumerGroup
   $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-  K.withKafkaRetry1s (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+  execKafka (K.fetchSingleOffset consumerGroup topic 0) >>= \case
     Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummaryKafka >> getCheckpoint
     Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
     Right (ofs, md) -> do
@@ -254,36 +261,36 @@ getCheckpoint = do
       $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
       return (ofs, md')
 
-getCheckpointNoMetadata :: ContextM KP.Offset
+getCheckpointNoMetadata :: (MonadIO m, MonadLogger m, HasKafka m) => m KP.Offset
 getCheckpointNoMetadata = do
   let topic = seqVmEventsTopicName
       topic' = show topic
       cg' = show consumerGroup
   $logInfoS "getCheckpointNoMetadata" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-  K.withKafkaRetry1s (K.fetchSingleOffset consumerGroup topic 0) >>= \case
+  execKafka (K.fetchSingleOffset consumerGroup topic 0) >>= \case
     Left KP.UnknownTopicOrPartition -> setCheckpointNoMetadata 1 >> getCheckpointNoMetadata
     Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
     Right (ofs, _) -> do
       return ofs
 
-setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
+setCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
   $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
   let kMetadata = toKafkaMetadata checkpoint
-  ret <- K.withKafkaRetry1s $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
+  ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
-setCheckpointNoMetadata :: KP.Offset -> ContextM ()
+setCheckpointNoMetadata :: (MonadIO m, MonadLogger m, HasKafka m) => KP.Offset -> m ()
 setCheckpointNoMetadata ofs = do
   $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
   let emptyMetadata = KP.Metadata $ KP.KString BS.empty
-  ret <- K.withKafkaRetry1s $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
+  ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
   either (error . show) return ret
 
-getUnprocessedKafkaEvents :: KP.Offset -> ContextM [VmEvent]
+getUnprocessedKafkaEvents :: (MonadIO m, MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]
 getUnprocessedKafkaEvents offset = do
   $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-  ret <- K.withKafkaRetry1s (readSeqVmEvents offset)
+  ret <- execKafka (readSeqVmEvents offset)
   let countLimit =
         if flags_seqEventsBatchSize > 0
           then take flags_seqEventsBatchSize
@@ -310,9 +317,9 @@ getUnprocessedKafkaEvents offset = do
   return ret'
 
 -- This function lives on its own thread
-checkQueueAndCommitsSqlDiffsForever :: DL.DList VMEvent -> ContextM ()
+checkQueueAndCommitsSqlDiffsForever :: (MonadLogger m, HasSQL m, HasContext m) => DL.DList VMEvent -> m ()
 checkQueueAndCommitsSqlDiffsForever vmEvents = do
-  context' <- ask
+  context' <- accessEnv
   let que = _stateDiffQueue context'
   msg <- liftIO . atomically $ readTQueue que
   case msg of
@@ -326,7 +333,7 @@ checkQueueAndCommitsSqlDiffsForever vmEvents = do
       checkQueueAndCommitsSqlDiffsForever DL.empty
 
 deployCommitsSqlDiffs :: Context -> ResourceT (LoggingT IO) ()
-deployCommitsSqlDiffs = runReaderT (checkQueueAndCommitsSqlDiffsForever DL.empty)
+deployCommitsSqlDiffs context' = runSQLM $ runReaderT (checkQueueAndCommitsSqlDiffsForever DL.empty) context'
 
 -- Add an element to the end of the queue
 enqueue :: TQueue a -> a -> IO ()

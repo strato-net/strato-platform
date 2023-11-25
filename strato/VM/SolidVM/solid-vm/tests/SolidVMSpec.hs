@@ -1,52 +1,44 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -fno-warn-missing-fields #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 module SolidVMSpec where
 
 import BlockApps.Logging
--- for HFlags
--- for HFlags
 
 import BlockApps.X509.Certificate
 import BlockApps.X509.Keys as X509
--- import Executable.EthereumVM (writeBlockSummary)
-
 import Blockchain.Bagger (processNewBestBlock)
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
-import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs (BlockData (..))
 import Blockchain.Data.ExecResults
-import Blockchain.Data.GenesisBlock as GB
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Database.MerklePatricia as MP
+import Blockchain.DB.SQLDB
 import Blockchain.GenesisBlock
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SVM
-import Blockchain.SolidVM.CodeCollectionDB as CCDB
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address as MA
@@ -55,58 +47,39 @@ import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Keccak256 hiding (rlpHash)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions ()
 import Blockchain.Wiring ()
 import Control.Concurrent
 import Control.Concurrent.Async
-import Control.DeepSeq
 import Control.Exception
-import qualified Control.Exception as Blockchain.SolidVM
-import Control.Lens ((^.))
+import Control.Lens (view, (^.))
 import Control.Monad
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
-import qualified Control.Monad.State as State
+import Control.Monad.Trans.Reader
 import Crypto.Util (i2bs_unsized)
 import qualified Data.Aeson as Ae
-import Data.Binary (decode, encode)
-import Data.ByteString (putStr)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as Char8
-import qualified Data.ByteString.Short as SB
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char
-import Data.Coerce
-import Data.Either (fromRight)
-import Data.Foldable (for_)
-import qualified Data.JsonStream.Parser as JS
 import qualified Data.List as L
 import qualified Data.Map as M
-import Data.Map.Strict (Map)
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding
-import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
-import Debug.Trace
 import Executable.EVMFlags ()
-import GHC.TypeLits (ErrorMessage (Text))
-import HFlags
-import qualified Handlers.AccountInfo
 import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyErrorCall, anyException, describe, fit, hspec, it, pendingWith, shouldThrow, xdescribe, xit)
+import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -335,6 +308,9 @@ writeBlockSummary block =
       td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
    in putBSum sha (blockHeaderToBSum header td txCnt)
+
+instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
+  accessEnv = fmap (view $ dbs . sqldb) accessEnv
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do

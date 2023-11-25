@@ -12,7 +12,8 @@
 {-# OPTIONS -fno-warn-orphans      #-}
 
 module Blockchain.Wiring
-  ( contextGet,
+  ( HasContext,
+    contextGet,
     contextGets,
     contextModify',
     contextPut,
@@ -53,6 +54,7 @@ import Control.Lens hiding (Context (..))
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
+import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import qualified Data.ByteString as B
@@ -66,7 +68,6 @@ import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
 import qualified Database.LevelDB as DB
 import Debugger
-import qualified Network.Kafka as K
 import SolidVM.Model.Storable
 import Text.Read (readMaybe)
 import UnliftIO
@@ -157,7 +158,7 @@ instance HasContext m => Mod.Modifiable BaggerState m where
 instance HasContext m => Mod.Accessible TRC.Cache m where
   access _ = contextGets _txRunResultsCache
 
-instance ContextM `Mod.Yields` TransactionResult where
+instance HasSQL m => m `Mod.Yields` TransactionResult where
   yield = void . putTransactionResult
 
 vmBlockHashRootKey :: B.ByteString
@@ -192,10 +193,6 @@ instance HasContext m => Mod.Modifiable BestBlockRoot m where
   put _ (BestBlockRoot (MP.StateRoot sr)) = do
     db <- getStateDB
     DB.put db def vmBestBlockRootKey sr
-
-instance HasContext m => Mod.Modifiable K.KafkaState m where
-  get _ = readIORef =<< fmap (view $ dbs.kafkaState) accessEnv
-  put _ ks = fmap (view $ dbs.kafkaState) accessEnv >>= flip writeIORef ks
 
 instance HasContext m => Mod.Modifiable CurrentBlockHash m where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
@@ -294,11 +291,8 @@ instance HasContext m => (Keccak256 `A.Alters` BlockSummary) m where
 instance HasContext m => Mod.Accessible SQLDB m where
   access _ = fmap (view (dbs.sqldb)) accessEnv
 
-instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
-  accessEnv = view $ dbs . sqldb
-
-instance Mod.Accessible RBDB.RedisConnection ContextM where
-  access _ = view $ dbs . redisPool
+instance HasContext m => Mod.Accessible RBDB.RedisConnection m where
+  access _ = fmap (view $ dbs . redisPool) accessEnv
 
 instance (MonadIO m, Mod.Accessible RBDB.RedisConnection m) => Mod.Accessible (Maybe WorldBestBlock) m where
   access _ = do
@@ -306,7 +300,7 @@ instance (MonadIO m, Mod.Accessible RBDB.RedisConnection m) => Mod.Accessible (M
     for mRBB $ \(RedisBestBlock sha num diff) ->
       return . WorldBestBlock $ BestBlock sha num diff
 
-instance Mod.Modifiable GasCap ContextM where
+instance (MonadLogger m, HasContext m) => Mod.Modifiable GasCap m where
   get _ = contextGets (GasCap . _vmGasCap)
 
   put _ (GasCap g) = do

@@ -29,6 +29,7 @@ library:
   - blockapps-mpdbs
   - bytestring
   - common-log
+  - composable-monads-base
   - conduit
   - containers
   - cross-monitoring
@@ -39,6 +40,7 @@ library:
   - extra
   - format
   - lens
+  - kafka-monad
   - merkle-patricia-db
   - milena
   - milena-tools
@@ -47,6 +49,7 @@ library:
   - prometheus-client
   - seqevents
   - solid-vm
+  - sql-monad
   - stm
   - strato-conf
   - strato-genesis
