@@ -86,6 +86,7 @@ import qualified SolidVM.Model.CodeCollection as CC (contractName)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
+import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
 
 instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
@@ -383,9 +384,13 @@ getMapNamesFromContract c =
 
 getAbstractParentsFromContract :: Contract -> CodeCollection -> [Contract]
 getAbstractParentsFromContract c cc =
-  let parents' = c ^. parents
-      parentContracts = getContractsForParents parents' (cc ^. contracts)
-   in filter ((== AbstractType) . _contractType) parentContracts
+  -- recursively obtain parent + grandparent contracts
+  -- ex. B is A, C is B, then C should also be A
+  let go [] = []
+      go xs = xs ++ (go $ getContractsForParents (concatMap (^. parents) xs) ccc)
+      ccc = cc ^. contracts
+      parents' = c ^. parents
+   in filter ((== AbstractType) . _contractType) (go $ getContractsForParents parents' ccc)
 
 processTheMessages ::
   ( MonadLogger m,
@@ -418,15 +423,12 @@ processTheMessages env conn messages = do
       -- Use different functions based on flag value, this way it is only computed once, saving cpu cycles with if statements
       getCC = getCodeCollection
 
-  -- forM :: [a] -> (a -> m b) -> m [b]
-  -- forM :: [a] -> (a -> m (Either b c)) -> m [Either b c]
-  -- m [c]
-
   fkeys' <- forM creates $ \(ccString, cp, o, a, hl, _) -> do
     cc' <- getCC g cp ccString
     case cc' of
       Right cc -> do
-        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc ^. contracts)
+        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
+        multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         deferredForeignKeys <- fmap concat $
           forM (Map.toList $ cc ^. contracts) $ \(nameString, c) -> do
@@ -443,10 +445,11 @@ processTheMessages env conn messages = do
             let mapNames = getMapNamesFromContract c
 
             let historyTableNames = map (historyTableName o a') hl
-            $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
+            $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
             nameParts@(o'', a'', n'') <- resolveNameParts o a' c
-            $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n'' <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
+            $logInfoS "processTheMessages/Contract Added" $ "org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n''
+            multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
             --Create mapping tables
             deferredForeignKeysForMappings <- fmap concat $
@@ -509,14 +512,13 @@ processTheMessages env conn messages = do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
+      $logDebugS "processTheMessages" $ "Combined Action = " <> formatAction row
       $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
       case actionStorage row of
         Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
         Action.SolidVMDiff {} -> do
           let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-              -- (SolidVMCode name _) = actionCodeHash row
               name = case actionCodeHash row of
                 SolidVMCode name' _ -> name'
                 _ -> error "internal error: contract should be SolidVM for SolidVM"
@@ -537,7 +539,6 @@ processTheMessages env conn messages = do
               $logInfoS "processTheMessages" . T.pack $ "ERROR: Contract not in Code Collection "
               pure . Right $ BatchedInserts indexContract [] hs []
             Just (cc, c) -> do
-              stateDiff <- rowToMappings row
               let mapNames = getMapNamesFromContract c
                   abstracts = getAbstractParentsFromContract c cc
                   appName =
@@ -545,14 +546,17 @@ processTheMessages env conn messages = do
                       then SE.contractName indexContract
                       else SE.application indexContract
               --get columns for abstract table
+              $logDebugLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
               abstractColumns <- fmap catMaybes . for abstracts $ \ab -> do
                 (o', a', n') <- lift $ resolveNameParts (SE.organization indexContract) appName ab
                 let tableName = AbstractTableName o' a' n'
                     tableNameText = tableNameToDoubleQuoteText tableName
+                $logInfoS "Row will be inserted into abstract table: " tableNameText
                 mCols <- getTableColumns g tableName
                 pure $ (indexContract,tableNameText,) . map extractTextInsideQuotes <$> mCols
               $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (contractName indexContract)
               $logDebugLS "History inserts are: " $ show hs
+              stateDiff <- rowToMappings row
               pMappings <- processedContractToProcessedMappingRows stateDiff (mapNames) row abiid --get all mapping rows to insert
               pure . Right $ BatchedInserts indexContract abstractColumns hs pMappings
 

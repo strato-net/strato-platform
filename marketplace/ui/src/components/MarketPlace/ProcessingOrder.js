@@ -62,6 +62,24 @@ const ProcessingOrder = () => {
 
   }, [sessionId])
 
+  const restructureData = (cartData) =>{
+    // Convert the orderList items to an array of objects
+    const orderList = Object.keys(cartData)
+    .filter(key => key.startsWith('orderList'))
+    .map(key => JSON.parse(cartData[key]));
+    
+    //Prepare Cart Details
+    const cart = {
+      buyerOrganization: cartData.buyerOrganization,
+      orderList: orderList,
+      orderTotal: parseInt(cartData.orderTotal),
+      shippingAddress: cartData.shippingAddress,
+      tax: parseInt(cartData.tax),
+      user: cartData.user,
+      email: cartData.email
+    };
+    return cart;
+  }
 
   const getCartData = async () => {
     try {

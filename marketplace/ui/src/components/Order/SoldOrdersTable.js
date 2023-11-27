@@ -121,6 +121,10 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
       render: (text) => (
         <button
           onClick={() => {
+            window.LOQ.push(['ready', async LO => {
+              await LO.$internal.ready('events')
+              LO.events.track('Orders Sold: View Invoice')
+            }])
             TagManager.dataLayer({
               dataLayer: {
                 event: "view_invoice_in_orders_sold",

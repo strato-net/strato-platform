@@ -463,6 +463,10 @@ const SoldOrderDetails = ({ user, users }) => {
                 disabled={status === getStatus(3) || allSerialNumbersUploaded() === false }
                 onClick={() => {
                   handleUpdateComment()
+                  window.LOQ.push(['ready', async LO => {
+                    await LO.$internal.ready('events')
+                    LO.events.track('Order Details: Save Button')
+                  }])
                   TagManager.dataLayer({
                     dataLayer: {
                       event: 'orderDetails_sold_save_click',

@@ -107,6 +107,13 @@ const UpdateInventoryModal = ({
       },
     };
 
+    window.LOQ = window.LOQ || []
+    window.LOQ.push(['ready', async LO => {
+        // Track an event
+        await LO.$internal.ready('events')
+        LO.events.track('Update Inventory', {category: values.category.name, product: values.productName.name})
+    }])
+
     TagManager.dataLayer({
       dataLayer: {
         event: 'update_inventory',

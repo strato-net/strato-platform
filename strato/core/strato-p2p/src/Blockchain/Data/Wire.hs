@@ -14,7 +14,6 @@ module Blockchain.Data.Wire
   )
 where
 
-import BlockApps.X509
 import qualified Blockchain.Blockstanbul as PBFT
 import Blockchain.Data.Block (Block)
 import Blockchain.Data.BlockHeader
@@ -27,7 +26,6 @@ import Blockchain.Strato.Model.Keccak256
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import Data.List
-import qualified Data.Set as S
 import Data.Word
 import qualified Text.Colors as CL
 import Text.Format
@@ -179,16 +177,6 @@ data Message
         latestHash :: Keccak256,
         genesisHash :: Keccak256
       }
-  | -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-
-    NewStatus
-      { protocolVersion :: Int,
-        networkID :: Integer,
-        totalDifficulty :: Integer,
-        latestHash :: Keccak256,
-        genesisHash :: Keccak256,
-        rootCerts :: S.Set X509Certificate
-      }
   | NewBlockHashes [(Keccak256, Int)]
   | Transactions [Transaction]
   | GetBlockHeaders {block :: BlockHashOrNumber, maxHeaders :: Int, skip :: Int, direction :: Direction}
@@ -241,26 +229,6 @@ instance Format Message where
       ++ "\n"
       ++ "    genesisHash: "
       ++ format gh
-  -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-  format NewStatus {protocolVersion = ver, networkID = nID, totalDifficulty = d, latestHash = lh, genesisHash = gh, rootCerts = rcs} =
-    CL.blue "Status"
-      ++ "    protocolVersion: "
-      ++ show ver
-      ++ "\n"
-      ++ "    networkID: "
-      ++ show nID
-      ++ "\n"
-      ++ "    totalDifficulty: "
-      ++ show d
-      ++ "\n"
-      ++ "    latestHash: "
-      ++ format lh
-      ++ "\n"
-      ++ "    genesisHash: "
-      ++ format gh
-      ++ "\n"
-      ++ "    rootCerts: "
-      ++ show rcs
   format (NewBlockHashes items) = CL.blue "NewBlockHashes" ++ tab ("\n" ++ intercalate "\n    " ((\(hash', number') -> "(" ++ format hash' ++ ", " ++ show number' ++ ")") <$> items))
   format (Transactions transactions) =
     CL.blue "Transactions:\n    " ++ tab' (intercalate "\n    " (format <$> transactions))
@@ -311,15 +279,6 @@ obj2WireMessage 0x2 (RLPArray []) = Ping
 obj2WireMessage 0x2 (RLPArray [RLPArray []]) = Ping
 obj2WireMessage 0x3 (RLPArray []) = Pong
 -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh, rcs]) =
-  NewStatus
-    { protocolVersion = fromInteger $ rlpDecode ver,
-      networkID = fromInteger $ rlpDecode nID,
-      totalDifficulty = rlpDecode d,
-      latestHash = rlpDecode lh,
-      genesisHash = rlpDecode gh,
-      rootCerts = rlpDecode rcs
-    }
 obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh]) =
   Status
     { protocolVersion = fromInteger $ rlpDecode ver,
@@ -380,8 +339,6 @@ wireMessage2Obj Pong = (0x3, RLPArray [])
 wireMessage2Obj (Status ver nID d lh gh) =
   (0x10, RLPArray [rlpEncode $ toInteger ver, rlpEncode $ toInteger nID, rlpEncode d, rlpEncode lh, rlpEncode gh])
 -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-wireMessage2Obj (NewStatus ver nID d lh gh rcs) =
-  (0x10, RLPArray [rlpEncode $ toInteger ver, rlpEncode $ toInteger nID, rlpEncode d, rlpEncode lh, rlpEncode gh, rlpEncode rcs])
 wireMessage2Obj (NewBlockHashes items) =
   (0x11, RLPArray $ map (\(b, n) -> RLPArray [rlpEncode b, rlpEncode $ toInteger n]) items)
 wireMessage2Obj (GetBlockHeaders b max' skip' direction') =

@@ -185,6 +185,14 @@ const TopSellingProductCard = () => {
                               setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
+                              window.LOQ.push(['ready', async LO => {
+                                await LO.$internal.ready('events')
+                                LO.events.track('Buy Now (from Top Selling Product)', {
+                                  product: topSellingProduct.name,
+                                  category: topSellingProduct.category,
+                                  productId: topSellingProduct.productId
+                                })
+                              }])
                               TagManager.dataLayer({
                                 dataLayer: {
                                   event: 'buy_now_from_top_selling_product',
@@ -207,6 +215,14 @@ const TopSellingProductCard = () => {
                               setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
                               window.location.href = loginUrl;
                             } else {
+                              window.LOQ.push(['ready', async LO => {
+                                await LO.$internal.ready('events')
+                                LO.events.track('Add To Cart (from Top Selling Product)', {
+                                  product: topSellingProduct.name,
+                                  category: topSellingProduct.category,
+                                  productId: topSellingProduct.productId
+                                })
+                              }])
                               TagManager.dataLayer({
                                 dataLayer: {
                                   event: 'add_to_cart_from_top_selling_product',

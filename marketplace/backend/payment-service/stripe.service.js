@@ -27,7 +27,7 @@ class StripeService {
                     }
                 }),
                 metadata: {
-                    cart: JSON.stringify(cartData)
+                    ...cartData
                 },
                 payment_intent_data: {
                     /* 3% of OrderTotal in Cents */

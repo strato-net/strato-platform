@@ -72,6 +72,12 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   ];
 
   const logout = () => {
+    window.LOQ = window.LOQ || []
+    window.LOQ.push(['ready', async LO => {
+        // Track an event
+        await LO.$internal.ready('events')
+        LO.events.track('Logout')
+    }])
     TagManager.dataLayer({
       dataLayer: {
         event: 'logout',
@@ -172,6 +178,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         className="h-16 bg-primary text-tertiaryB m-auto"
         onClick={(item) => {
           setSelectedTab(item.key)
+          // These pages will be tracked automatically with lucky orange, no need to create an event here unluess we want to include additional metadata
           if (item.key === "0") {
             TagManager.dataLayer({
               dataLayer: {
