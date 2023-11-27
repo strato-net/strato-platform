@@ -118,8 +118,6 @@ function bind(user, _contract, options) {
   contract.get = async (args) =>
     get(user, args, options);
   contract.getState = async () => getState(user, contract, options);
-  contract.transferOwnership = async (newOwner) =>
-    transferOwnership(user, contract, options, newOwner);
   contract.getHistory = async (args, options = contractOptions) =>
     getHistory(user, chainId, args, options);
   contract.chainIds = options.chainIds;
@@ -202,16 +200,34 @@ async function getState(user, contract, options) {
   return marshalOut(state);
 }
 
+async function cancelOrder(user, contract, options, comments = "") {
+  const callArgs = {
+    contract,
+    method: "cancelOrder",
+    args: util.usc({ comments: comments }),
+  };
+  const cancelStatus = await rest.call(user, callArgs, options);
+
+  if (parseInt(cancelStatus, 10) !== RestStatus.OK) {
+    throw new rest.RestError(
+      cancelStatus,
+      "You cannot cancel an order you don't co-own",
+      {}
+    );
+  }
+
+  return cancelStatus;
+}
+
 /**
  * Transfer the ownership of a SimpleSale
  * @param newOwner The common name of the new owner of the SimpleSale.
  */
-async function transferOwnership(user, contract, options) {
-
+async function transferOwnership(user, contract, options, fulfillmentDate, comments) {
   const callArgs = {
     contract,
     method: "transferOwnership",
-    args: util.usc({}),
+    args: util.usc({ fulfillmentDate: fulfillmentDate, comments: comments }),
   };
   const transferStatus = await rest.call(user, callArgs, options);
 
@@ -236,6 +252,7 @@ export default {
   bindAddress,
   get,
   getAll,
+  cancelOrder,
   transferOwnership,
   marshalIn,
   marshalOut,

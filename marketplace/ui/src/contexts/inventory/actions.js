@@ -102,7 +102,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/search?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -240,15 +240,15 @@ const actions = {
           type: actionDescriptors.resellInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Resale inventory was successfully created", true);
+        actions.setMessage(dispatch, "Reselling Item was successful", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.resellInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while reselling Inventory" });
-        actions.setMessage(dispatch, "Error while reselling Inventory")
+        dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while reselling Item" });
+        actions.setMessage(dispatch, "Error while reselling Item")
         return false;
       }
 
@@ -261,9 +261,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.resellInventoryFailed,
-        error: "Error while reselling Inventory",
+        error: "Error while reselling Item",
       });
-      actions.setMessage(dispatch, "Error while reselling Inventory");
+      actions.setMessage(dispatch, "Error while reselling Item");
     }
   },
 

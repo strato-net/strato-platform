@@ -242,18 +242,38 @@ definitions:
   createSaleOrder:
     type: object
     properties:
-      saleAddresses:
+      orderList:
         type: array
         items:
-          type: string
-      sellerCommonName:
+          type: object
+          properties:
+            quantity: 
+              type: number
+            assetAddress: 
+              type: string
+            category: 
+              type: string
+      paymentMethod:
         type: string
       totalPrice:
         type: number
       shippingAddress:
         type: string
+      paymentSessionId:
+        type: string
+  cancelSaleOrder:
+    type: object
+    properties:
+      saleOrderAddress:
+        type: string
+      comments:
+        type: string
   executeSale:
     type: object
     properties:
       saleOrderAddress:
+        type: string
+      fulfillmentDate:
+        type: number
+      comments:
         type: string

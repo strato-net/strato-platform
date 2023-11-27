@@ -173,9 +173,36 @@ class OrderController {
     try {
       const { dapp, body } = req
 
-      OrderController.validateCreateSaleOrderArgs(body)
+      const { to, subject, htmlContents, ...restBody } = body;
 
-      const result = await dapp.createSaleOrder(body)
+      OrderController.validateCreateSaleOrderArgs(restBody)
+
+      const result = await dapp.createSaleOrder(restBody)
+      rest.response.status200(res, result)
+
+      // Only send email if order is created successfully
+      if (res.statusMessage === "OK") {
+        //for every item in htmlContents, send email
+        for (let i = 0; i < htmlContents.length; i++) {
+          await sendEmail(to, subject, htmlContents[i]);
+        }
+      }
+
+      console.log("*Buyer placed order*");
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async cancelSaleOrder(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      OrderController.validateCancelSaleOrderArgs(body)
+
+      const result = await dapp.cancelSaleOrder(body)
       rest.response.status200(res, result)
 
       return next()
@@ -231,11 +258,8 @@ class OrderController {
     const paymentSchema = Joi.object({
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
-            inventoryId: Joi.string().required(),
             quantity: Joi.number().required(),
-            name: Joi.string().required(),
-            subCategory: Joi.string().required(),
-            unitPrice: Joi.number().required(),
+            assetAddress: Joi.string().required(),
           })).required(),
       orderTotal: Joi.number().required(),
       shippingAddress: Joi.string().required(),
@@ -247,6 +271,7 @@ class OrderController {
     const validation = paymentSchema.validate(args);
 
     if (validation.error) {
+      console.log(validation.error.message);
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Payment Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
@@ -330,10 +355,15 @@ class OrderController {
 
   static validateCreateSaleOrderArgs(args) {
     const createSaleOrderSchema = Joi.object({
-      saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
-      sellerCommonName: Joi.string().required(),
+      orderList: Joi.array().min(1).items(Joi.object({
+        quantity: Joi.number().required(),
+        assetAddress: Joi.string().required(),
+        category: Joi.string().required(),
+      })).required(),
+      paymentMethod: Joi.string().required(),
       totalPrice: Joi.number().required(),
       shippingAddress: Joi.string().required(),
+      paymentSessionId: Joi.string().required(),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);
@@ -346,9 +376,26 @@ class OrderController {
     }
   }
 
+  static validateCancelSaleOrderArgs(args) {
+    const cancelSaleOrderSchema = Joi.object({
+      saleOrderAddress: Joi.string().required(),
+      comments: Joi.string().allow(""),
+    }).required();
+
+    const validation = cancelSaleOrderSchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Cancel Sale Order Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
   static validateExecuteSaleArgs(args) {
     const executeSaleSchema = Joi.object({
       saleOrderAddress: Joi.string().required(),
+      fulfillmentDate: Joi.number().required(),
+      comments: Joi.string().allow(""),
     }).required();
 
     const validation = executeSaleSchema.validate(args);

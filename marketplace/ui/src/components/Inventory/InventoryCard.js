@@ -78,45 +78,61 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const categoricalProperties = () => {
     switch (getCategory()) {
       case 'Art':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Artist</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.artist}
-        </p>
-      </div>)
+        return (
+          <div className="flex mt-1.5 items-center">
+            <p className="text-primaryC text-sm w-40">Artist</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {itemData.artist}
+            </p>
+          </div>)
       case 'Carbon':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Project Type</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.projectType}
-        </p>
-      </div>)
+        return (
+          <>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Project Type</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.projectType}
+              </p>
+            </div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Units</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.units}
+              </p>
+            </div>
+          </>
+          )
       case 'Clothing':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Brand</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.brand}
-        </p>
-      </div>)
-      case 'Materials':
-        return (<div className="flex mt-1.5 items-center">
-        <p className="text-primaryC text-sm w-40">Source</p>
-        <p text-secondryB text-sm>
-          :
-        </p>
-        <p className="text-secondryB text-sm ml-3">
-          {itemData.source}
-        </p>
-      </div>)
+        return (
+          <div className="flex mt-1.5 items-center">
+            <p className="text-primaryC text-sm w-40">Brand</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {itemData.brand}
+            </p>
+          </div>)
+      case 'Metals':
+        return (
+          <div className="flex mt-1.5 items-center">
+            <p className="text-primaryC text-sm w-40">Source</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {itemData.source}
+            </p>
+          </div>)
       default:
         break;
     }
@@ -176,24 +192,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </div>
           </div>
           {categoricalProperties()}
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Price</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              $ {inventory.price}
-            </p>
-          </div>
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Item Number</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.itemNumber}
-            </p>
-          </div>
+          { inventory.status === '2' ? <></> :
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Price</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                $ {inventory.price}
+              </p>
+            </div>
+          }
           <div className="flex mt-1 items-center">
             <p className="text-primaryC text-sm w-40">Description</p>
             <p text-secondryB text-sm>
@@ -201,15 +210,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </p>
             <p className="text-secondryB text-sm ml-3">
               {inventory.description}
-            </p>
-          </div>
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Comment</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.comment ? itemData.comment : "No Comment Available"}
             </p>
           </div>
           <div className="flex mt-1 items-center">
@@ -221,18 +221,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               {itemData.serialNumber ? itemData.serialNumber : "No Serial Number Available"}
             </p>
           </div>
-          <div className="flex mt-2.5">
-            <div
-              className={classNames(
-                itemData.status === "1"
-                  ? "text-primary bg-[#EBF7FF]"
-                  : "text-error bg-[#FFF0F0]",
-                "text-center py-1 rounded w-28 text-sm "
-              )}
-            >
-              <p>{INVENTORY_STATUS[itemData.status]}</p>
-            </div>
-          </div>
+          { inventory.status === '2' ?
+            (<div className="flex mt-2.5">
+              <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">
+                <p>UNPUBLISHED</p>
+              </div>
+            </div>)
+            :
+            (<div className="flex mt-2.5">
+              <div className="text-primary bg-[#EBF7FF] text-center py-1 rounded w-28 text-sm">
+                <p>PUBLISHED</p>
+              </div>
+            </div>)
+          }
         </div>
       </div>
       {open && (

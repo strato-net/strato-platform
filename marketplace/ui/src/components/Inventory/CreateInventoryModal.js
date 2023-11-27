@@ -6,6 +6,7 @@ import {
   Modal,
   Input,
   Select,
+  Tag,
   Radio,
   Button,
   Spin,
@@ -46,16 +47,16 @@ const CreateInventoryModal = ({
 
   const initialValues = {
     serialNumber: "",
-    itemNumber: null,
     name: "",
     description: "",
     artist: "",
     source: "",
     projectType: "",
+    units: 1,
     brand: "",
     images: null,
     price: null,
-    paymentType: null,
+    paymentTypes: [],
     category: "Art"
   };
 
@@ -88,15 +89,11 @@ const CreateInventoryModal = ({
     const body = {
       itemArgs: {
         serialNumber: values.serialNumber,
-        status: 1,
-        comment: "",
-        itemNumber: values.itemNumber,
         name: values.name,
         description: values.description,
         images: (imageData ? [imageData.imageKey] : []),
         price: values.price,
-        saleState: 1,
-        paymentType: values.paymentType
+        paymentTypes: values.paymentTypes
       },
     };
 
@@ -114,6 +111,7 @@ const CreateInventoryModal = ({
             itemArgs: {
               ...body.itemArgs,
               projectType: values.projectType,
+              units: values.units,
             }
           }
         case 'Clothing':
@@ -123,7 +121,7 @@ const CreateInventoryModal = ({
               brand: values.brand,
             }
           }
-        case 'Materials':
+        case 'Metals':
           return body = {
             itemArgs: {
               ...body.itemArgs,
@@ -160,6 +158,39 @@ const CreateInventoryModal = ({
     });
   };
 
+  const tagRender = (props) => {
+    const { label, value, closable, onClose } = props;
+    const onPreventMouseDown = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    return (
+      <Tag
+        onMouseDown={onPreventMouseDown}
+        closable={closable}
+        onClose={onClose}
+        className="flex items-center mr-1"
+      >
+        {PAYMENT_TYPE[value].icon ? PAYMENT_TYPE[value].icon : <></>}
+        <p className="ml-1">{label}</p>
+      </Tag>
+    );
+  };
+
+  const handleSelectAll = (value) => {
+    if (value.includes(0)) {
+      if (value.length === PAYMENT_TYPE.length) {
+        formik.setFieldValue("paymentTypes", []);
+        return []
+      }
+      formik.setFieldValue("paymentTypes", [1, 2, 3, 4, 5]);
+      return [1, 2, 3, 4, 5];
+    } else {
+      formik.setFieldValue("paymentTypes", value);
+      return value;
+    }
+  }
+
   const categoricalProperties = () => {
     switch (formik.values.category) {
       case 'Art':
@@ -185,7 +216,8 @@ const CreateInventoryModal = ({
             </Form.Item>
           </div>)
       case 'Carbon':
-        return (<div className="flex justify-between mt-4 ">
+        return (
+          <div className="flex justify-between mt-4 ">
             <Form.Item
               label="Project Type"
               name="projectType"
@@ -202,6 +234,25 @@ const CreateInventoryModal = ({
                 formik.errors.projectType && (
                   <span className="text-error text-xs">
                     {formik.errors.projectType}
+                  </span>
+                )}
+            </Form.Item>
+            <Form.Item
+              label="Units"
+              name="units"
+              className="w-72"
+            >
+              <Input
+                label="units"
+                placeholder="Enter Units"
+                name="units"
+                value={formik.values.units}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.units &&
+                formik.errors.units && (
+                  <span className="text-error text-xs">
+                    {formik.errors.units}
                   </span>
                 )}
             </Form.Item>
@@ -228,7 +279,7 @@ const CreateInventoryModal = ({
                 )}
             </Form.Item>
           </div>)
-      case 'Materials':
+      case 'Metals':
         return (<div className="flex justify-between mt-4 ">
             <Form.Item
               label="Source"
@@ -332,6 +383,32 @@ const CreateInventoryModal = ({
               </div>
               {categoricalProperties()}
               <div className="flex justify-between mt-4 ">
+                <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
+                  <Select
+                    id="paymentTypes"
+                    mode="multiple"
+                    tagRender={tagRender}
+                    placeholder="Select Payment Types"
+                    allowClear
+                    name="paymentTypes"
+                    maxTagCount="responsive"
+                    value={formik.values.paymentTypes}
+                    onChange={handleSelectAll}
+                    showSearch={false}
+                  >
+                    {PAYMENT_TYPE.map((e, index) => (
+                      <Option value={e.value} key={index}>
+                        {e.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  {getIn(formik.touched, "paymentTypes") &&
+                    getIn(formik.errors, "paymentTypes") && (
+                      <span className="text-error text-xs">
+                        {getIn(formik.errors, "paymentTypes")}
+                      </span>
+                    )}
+                </Form.Item>
                 <Form.Item
                   label="Price"
                   name="price"
@@ -348,30 +425,6 @@ const CreateInventoryModal = ({
                     formik.errors.price && (
                       <span className="text-error text-xs">
                         {formik.errors.price}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item label="Payment Type" name="paymentType" className="w-72">
-                  <Select
-                    id="paymentType"
-                    placeholder="Select Payment Type"
-                    allowClear
-                    name="paymentType"
-                    value={formik.values.paymentType}
-                    onChange={(value) => {
-                      formik.setFieldValue("paymentType", value);
-                    }}
-                  >
-                    {PAYMENT_TYPE.map((e, index) => (
-                      <Option value={e.value} key={index}>
-                        {e.name}
-                      </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "paymentType") &&
-                    getIn(formik.errors, "paymentType") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "paymentType")}
                       </span>
                     )}
                 </Form.Item>
@@ -393,7 +446,7 @@ const CreateInventoryModal = ({
 
               <div className="mt-4 flex justify-between">
                 <Form.Item label="Upload Images" name="images">
-                  <div className="w-48 h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
+                  <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
                     {selectedImage ? (
                       <div className="h-20">
                         <img
@@ -453,25 +506,6 @@ const CreateInventoryModal = ({
                       formik.errors.serialNumber && (
                         <span className="text-error text-xs">
                           {formik.errors.serialNumber}
-                        </span>
-                      )}
-                  </Form.Item>
-                  <Form.Item
-                    label="Item Number"
-                    name="itemNumber"
-                    className="w-72 mt-4"
-                  >
-                    <Input
-                      label="itemNumber"
-                      placeholder="Enter Item Number"
-                      name="itemNumber"
-                      value={formik.values.itemNumber}
-                      onChange={formik.handleChange}
-                    />
-                    {formik.touched.itemNumber &&
-                      formik.errors.itemNumber && (
-                        <span className="text-error text-xs">
-                          {formik.errors.itemNumber}
                         </span>
                       )}
                   </Form.Item>

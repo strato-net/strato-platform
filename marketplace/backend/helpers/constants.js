@@ -80,6 +80,14 @@ export const ITEM_STATUS = {
   "SOLD": 4
 }
 
+export const PAYMENT_TYPES = {
+  "amex": "1",
+  "discover": "2",
+  "mastercard": "3",
+  "strat": "4",
+  "visa": "5",
+}
+
 export const SERVICE_PROVIDERS = {}
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';

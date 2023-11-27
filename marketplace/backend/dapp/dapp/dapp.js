@@ -1,6 +1,6 @@
 import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
-import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS } from "/helpers/constants";
+import constants, { CHARGES, ITEM_STATUS, ORDER_STATUS, SERVICE_PROVIDERS, PAYMENT_TYPES } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
 
@@ -11,10 +11,11 @@ import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
 import carbonJs from "/dapp/items/carbon";
-import materialsJs from "/dapp/items/materials";
+import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
 
-import saleOrderJs from "dapp/orders/saleOrder";
+import saleJs from "/dapp/orders/sale";
+import saleOrderJs from "/dapp/orders/saleOrder";
 
 import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
@@ -220,12 +221,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName, };
     return inventoryJs.get(rawAdmin, { ...args }, getOptions);
   };
+
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate', status: [1,2] }, getOptions);
     return {inventories: inventories, inventoryCount: inventoryCount}
   };
+
+  contract.resellItem = async function (args, options = defaultOptions) {
+    const { itemContract, itemAddress, ...restArgs } = args;
+    const contract = { name: itemContract, address: itemAddress };
+    return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.updateItem = async function (args, options = defaultOptions) {
+    const { itemContract, itemAddress, ...restArgs} = args;
+    const contract = { name: itemContract, address: itemAddress };
+    return inventoryJs.updateItem(rawAdmin, contract, restArgs, options);
+  }
+
   // ------------------------------ INVENTORY ENDS--------------------------------
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
@@ -240,7 +255,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    // The issue with this is coming from the notEqualsValue. ServiceTokenUser gives BlockApps which returns nothing. Blockapps lowercase is needed to make the request work. 
     return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
   }
 
@@ -289,6 +303,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
+      status: 1,
     };
     return carbonJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -300,21 +315,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ CARBON ENDS--------------------------------
 
-  // ------------------------------ MATERIALS STARTS------------------------------
+  // ------------------------------ METALS STARTS------------------------------
 
-  contract.createMaterials = async function (args, options = defaultOptions) {
+  contract.createMetals = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
     };
-    return materialsJs.uploadContract(rawAdmin, newArgs, options);
+    return metalsJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getMaterials = async function (args = {}, options = optionsNoChainIds) {
+  contract.getMetals = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
-    return materialsJs.getAll(rawAdmin, args, getOptions);
+    return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
   // ------------------------------ MATERIALS ENDS--------------------------------
@@ -342,8 +357,34 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
+    const { orderList, paymentMethod, ...restArgs } = args;
+    const assetAddresses = orderList.map(asset => {
+      return asset.assetAddress;
+    })
+    const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
+    const sellersAddress = sales[0].sellersAddress;
+    const sellersCommonName = sales[0].sellersCommonName;
+    const saleAddresses = await Promise.all(sales.map(async (sale) => {
+      const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
+      const saleData = JSON.parse(sale.data);
+      if (saleData.units && orderForSale.quantity < saleData.units) {
+        const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
+        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, { 
+          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]), 
+          price: sale.price, 
+          units: orderForSale.quantity,
+        }, options, contract);
+        return splitSaleAddress;
+      }
+      else {
+        return sale.address;
+      }
+    }));
     const newArgs = {
-      ...args,
+      ...restArgs,
+      saleAddresses,
+      sellersCommonName,
+      sellersAddress,
       purchasersCommonName: userCert.commonName,
       purchasersAddress: rawAdmin.address,
       orderId: util.uid(),
@@ -352,9 +393,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.uploadContract(rawAdmin, newArgs, options);
   }
 
+  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, comments, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
+  }
+
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
-    
     return saleOrderJs.getAll(rawAdmin, args, getOptions);
   }
 
@@ -363,7 +409,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const order = await saleOrderJs.get(rawAdmin, args, options);
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: order.shippingAddress }, getOptions);
-      const assets = await inventoryJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses, state: [1,2] }, options);
+      const assetAddresses = sales.map(sale => {
+        return sale.assetToBeSold;
+      })
+      let assets = [];
+      const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+      assetsWithoutQuantity.map(asset => {
+        const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
+        const saleData = JSON.parse(saleForAsset.data);
+        const quantity = saleData.units ? saleData.units : 1;
+        assets.push({
+          ...asset,
+          price: saleForAsset.price,
+          quantity: quantity,
+          amount: quantity * saleForAsset.price,
+        })
+      })
       const result = { userContactAddress, order, assets };
 
       return result;
@@ -375,10 +437,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, ...restArgs } = args;
+  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, comments, ...restArgs } = args;
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.transferOwnership(rawAdmin, contract, options);
+    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
+  }
+
+  contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
+    const { saleOrderAddress, fulfillmentDate, comments, ...restArgs } = args;
+    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
+    return saleOrderJs.transferOwnership(rawAdmin, contract, options, fulfillmentDate, comments);
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
@@ -482,94 +550,88 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(error.response.status, error.response.statusText)
     }
   }
-  // //-----------------------------Order starts here -------------------------------
+  // //-----------------------------PAYMENT starts here -------------------------------
 
-  // //TODO implement payment contract creation inside dapp and use payment services there
-  // contract.paymentCheckout = async function (args, options = defaultOptions) {
-  //   try {
+  contract.paymentCheckout = async function (args, options = defaultOptions) {
+    try {
 
-  //     const { buyerOrganization, orderList, orderTotal: recievedOrderTotal } = args;
+      const { orderList, orderTotal: recievedOrderTotal } = args;
 
-  //     const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-  //     // TODO
+      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
 
-  //     const inventoriesAddresses = orderList.map(order => order.inventoryId);
-  //     const inventoriesList = await managers.productManager.getInventories({ address: inventoriesAddresses }, newOptions);
+      const assetAddresses = orderList.map(o => o.assetAddress);
+      
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses, status: 1 }, options);
 
-  //     if (inventoriesList.length == 0 || inventoriesList.length != orderList.length) {
-  //       throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
-  //     }
+      if (assets.length == 0 || assets.length != orderList.length) {
+        throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
+      }
 
-  //     const inventoryOrganization = inventoriesList[0].ownerOrganization;
-  //     for (const curr_inventory of inventoriesList) {
+      const inventoryOrganization = assets[0].ownerOrganization;
+      const sellerName = assets[0].ownerCommonName;
+      for (const currInventory of assets) {
 
-  //       if (curr_inventory.ownerOrganization == userOrganization) {
-  //         throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
-  //       }
+        if (currInventory.ownerCommonName == userCert.commonName) {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
+        }
 
-  //       /* User shouldn't be allowed buy products from multiple sellers  */
-  //       if (inventoryOrganization != curr_inventory.ownerOrganization) {
-  //         throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
-  //       }
-  //     }
-  //     // const chainOptions = { ...options, chainIds: [contract.chainId] };
-  //     const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
-  //       {
-  //         name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
-  //         accountDeauthorized: false
-  //       },
-  //       newOptions)
+        /* User shouldn't be allowed buy products from multiple sellers  */
+        if (sellerName != currInventory.ownerCommonName) {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
+        }
+      }
+      // const chainOptions = { ...options, chainIds: [contract.chainId] };
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
+        {
+          name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
+          accountDeauthorized: false
+        },
+        newOptions)
 
-  //     /*  check if an accountId already exists for the user org */
-  //     if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
-  //       throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
-  //     }
+      /*  check if an accountId already exists for the user org */
+      if (Object.keys(sellerStripeDetails).length == 0 || !sellerStripeDetails.chargesEnabled || !sellerStripeDetails.detailsSubmitted || !sellerStripeDetails.payoutsEnabled) {
+        throw new rest.RestError(RestStatus.CONFLICT, "Seller hasn't activated this payment method")
+      }
 
-  //     const productAddresses = inventoriesList.map(d => d.productId)
-  //     const productList = await managers.productManager.getProducts({ address: productAddresses }, newOptions);
+      const invoices = []; let calculatedOrderTotal = 0
 
-  //     const invoices = []; let calculatedOrderTotal = 0
+      orderList.forEach(item => {
+        const inventoryItem = assets.find(asset => asset.address == item.assetAddress);
+        invoices.push({ productName: decodeURIComponent(inventoryItem.name), unitPrice: inventoryItem.price, quantity: item.quantity })
 
-  //     orderList.forEach(orderLine => {
-  //       const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
-  //       const product = productList.find(item => item.address === inventoryItem.productId)
-  //       invoices.push({ productName: decodeURIComponent(product.name), unitPrice: inventoryItem.pricePerUnit, quantity: orderLine.quantity })
+        calculatedOrderTotal += (inventoryItem.price * item.quantity)
+      })
 
-  //       calculatedOrderTotal += (inventoryItem.pricePerUnit * orderLine.quantity)
-  //     })
+      if (calculatedOrderTotal != recievedOrderTotal) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.")
+      }
+      let stripePaymentSession;
+      try {
+        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
+      } catch (err) {
+        throw new rest.RestError(err.statusCode, err.message)
+      }
+      const paymentParameters = {
+        paymentSessionId: stripePaymentSession.id,
+        paymentProvider: "stripe",
+        paymentStatus: stripePaymentSession.payment_status,
+        sessionStatus: stripePaymentSession.status,
+        amount: stripePaymentSession.amount_total.toString(),
+        expiresAt: stripePaymentSession.expires_at,
+        createdDate: stripePaymentSession.created,
+        sellerAccountId: sellerStripeDetails.accountId
+      }
+      const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
+      return stripePaymentSession
 
-  //     if (calculatedOrderTotal != recievedOrderTotal) {
-  //       throw new rest.RestError(RestStatus.BAD_REQUEST, "Incorrect order value.")
-  //     }
-  //     let stripePaymentSession;
-  //     try {
-
-  //       stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
-  //     } catch (err) {
-  //       throw new rest.RestError(err.statusCode, err.message)
-  //     }
-  //     const paymentParameters = {
-
-  //       paymentSessionId: stripePaymentSession.id,
-  //       paymentProvider: "stripe",
-  //       paymentStatus: stripePaymentSession.payment_status,
-  //       sessionStatus: stripePaymentSession.status,
-  //       amount: stripePaymentSession.amount_total.toString(),
-  //       expiresAt: stripePaymentSession.expires_at,
-  //       createdDate: stripePaymentSession.created,
-  //       sellerAccountId: sellerStripeDetails.accountId
-  //     }
-  //     const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
-  //     return stripePaymentSession
-
-  //   } catch (error) {
-  //     console.log(error);
-  //     if (error.response) {
-  //       throw new rest.RestError(error.response.status, error.response.statusText);
-  //     }
-  //     throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating  the Order");
-  //   }
-  // };
+    } catch (error) {
+      console.log(error);
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
+    }
+  };
 
   contract.updatePayment = async function (args, options = defaultOptions, token) {
     try {
@@ -593,7 +655,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
       const { session_id } = args
       const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
-      return StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+      const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+      const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
+      const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
+      return { ...paymentSession, payment_method: paymentMethod.card.brand }
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }

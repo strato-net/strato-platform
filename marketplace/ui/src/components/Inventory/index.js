@@ -158,7 +158,7 @@ const Inventory = ({ user }) => {
         </div>
       ) : (
         <div className="mx-16 mt-14">
-          {inventories.length === 0 && offset === 0 ? (
+          {!isSearch && inventories.length === 0 && offset === 0 ? (
             <div className="h-screen justify-center flex flex-col items-center">
               <Image src={Images.noProductSymbol} preview={false} />
               <Title level={3} className="mt-2">

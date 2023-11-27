@@ -78,6 +78,13 @@ router.post(
 )
 
 router.post(
+  Order.cancelSaleOrder,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.cancelSaleOrder,
+)
+
+router.post(
   Order.executeSale,
   authHandler.authorizeRequest(),
   loadDapp,

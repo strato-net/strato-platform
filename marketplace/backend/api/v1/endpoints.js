@@ -43,7 +43,6 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
-  search: '/search',
   get: '/:address',
   getAll: '/',
   create: '/',
@@ -78,8 +77,8 @@ export const Carbon = {
   create: '/'
 }
 
-export const Materials = {
-  prefix: '/materials',
+export const Metals = {
+  prefix: '/metals',
   getAll: '/',
   create: '/'
 }
@@ -104,6 +103,7 @@ export const Order = {
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
   createSaleOrder: '/sale',
+  cancelSaleOrder: '/sale/cancel',
   executeSale: '/closeSale',
 }
 

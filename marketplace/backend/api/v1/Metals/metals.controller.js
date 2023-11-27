@@ -5,13 +5,13 @@ import config from '../../../load.config'
 
 const options = { config, cacheNonce: true }
 
-class MaterialsController {
+class MetalsController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
 
-      const materials = await dapp.getMaterials({ ...query })
-      rest.response.status200(res, materials)
+      const metals = await dapp.getMetals({ ...query })
+      rest.response.status200(res, metals)
 
       return next()
     } catch (e) {
@@ -23,9 +23,9 @@ class MaterialsController {
     try {
       const { dapp, body } = req
 
-      MaterialsController.validateCreateMaterialsArgs(body)
+      MetalsController.validateCreateMetalsArgs(body)
 
-      const result = await dapp.createMaterials(body)
+      const result = await dapp.createMetals(body)
       rest.response.status200(res, result)
 
       return next()
@@ -36,32 +36,30 @@ class MaterialsController {
 
   // ----------------------- ARG VALIDATION ------------------------
 
-  static validateCreateMaterialsArgs(args) {
-    const createMaterialsSchema = Joi.object({
+  static validateCreateMetalsArgs(args) {
+    const createMetalsSchema = Joi.object({
       itemArgs: Joi.object({
         serialNumber: Joi.string().allow("").optional(),
-        status: Joi.number().integer().min(0).max(5).required(),
-        comment: Joi.string().allow("").optional(),
-        itemNumber: Joi.number().integer().min(0).required(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         source: Joi.string().required(),
         images: Joi.array().items(Joi.string().optional()).required(),
         price: Joi.number().positive().required(),
-        saleState: Joi.number().integer().min(0).max(3).required(),
-        paymentType: Joi.number().integer().min(0).max(3).required(),
+        paymentTypes: Joi.array().min(1).items(
+          Joi.number().integer().min(0).max(3).required(),
+        ).required(),
       }).required()
     });
 
-    const validation = createMaterialsSchema.validate(args);
+    const validation = createMetalsSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Materials Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Metals Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
   }
 }
 
-export default MaterialsController;
+export default MetalsController;

@@ -30,7 +30,7 @@ const TopSellingProductCard = () => {
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
@@ -74,6 +74,10 @@ const TopSellingProductCard = () => {
   };
 
   const addItemToCart = (product) => {
+    if (product.ownerCommonName === user?.commonName) {
+      openToast("bottom", true, "Cannot buy your own item")
+      return false;
+    }
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
       if (cartList[i].product.address === product.address) {
@@ -87,22 +91,26 @@ const TopSellingProductCard = () => {
       actions.addItemToCart(marketplaceDispatch, items);
 
       openToast("bottom", false, "Item added to cart");
+      return true;
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === product.address) {
-          if (items[index].qty + 1 <= product.availableQuantity) {
+          const itemData = JSON.parse(product.data);
+          const availableQuantity = itemData.units ? itemData.units : 1;
+          if (items[index].qty + 1 <= availableQuantity) {
             items[index].qty += 1;
             actions.addItemToCart(marketplaceDispatch, items);
 
             openToast("bottom", false, "Item updated in cart");
+            return true;
           } else {
             openToast(
               "bottom",
               true,
               "Cannot add more than available quantity"
             );
-            return;
+            return false;
           }
         }
       });
@@ -138,6 +146,7 @@ const TopSellingProductCard = () => {
           ) : (
             topSellingProducts
               .map((topSellingProduct, index) => {
+                const itemData = JSON.parse(topSellingProduct.data);
                 return (
                   <div
                     key={index}
@@ -165,12 +174,7 @@ const TopSellingProductCard = () => {
                         ${topSellingProduct.price}
                       </Text>
                       <Text className="mt-1 text-sm !text-primaryB">
-                        {topSellingProduct.leastSellableUnit}{" "}
-                        {
-                          UNIT_OF_MEASUREMENTS[
-                          topSellingProduct.unitOfMeasurement
-                          ]
-                        }
+                        {itemData.units}{itemData.units ? itemData.units > 1 ? " Tons" : " Ton" : <br/>}
                       </Text>
                       <div className="flex justify-evenly items-center mt-4 w-full px-3">
                         <Button
@@ -189,8 +193,9 @@ const TopSellingProductCard = () => {
                                   productId: topSellingProduct.productId
                                 },
                               });
-                              addItemToCart(topSellingProduct);
-                              navigate("/checkout");
+                              if (addItemToCart(topSellingProduct)) { 
+                                navigate("/checkout") 
+                              }
                             }
                           }}
                         >

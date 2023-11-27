@@ -1,114 +1,105 @@
-import "/dapp/dapp/contracts/Dapp.sol";
-import "/dapp/items/contracts/ItemStatus.sol";
-import "/dapp/orders/contracts/SimpleSale.sol";
+import "/dapp/orders/contracts/Sales/CarbonSale.sol";
 
 pragma es6;
 pragma strict;
-import <1e23e3989728fa5fc5ca6d6d3cd01cdc889434f9>;
+import <d816194227e1a7a780fff236a449604afeb36255>;
 
 /// @title A representation of Carbon assets
 contract Carbon is ItemStatus, RestStatus, Asset {
-    string public ownerOrganization;
-    string public ownerOrganizationalUnit;
+    uint public units; // Number of units this asset represents
     string public serialNumber;
-    ItemStatus public status;
-    string public comment; // to store remarks if the item is removed from the application.
-    uint public itemNumber;
     string public projectType;
 
-    event OwnershipUpdate(
-        string seller,
-        string newOwner,
-        uint ownershipStartDate,
-        address itemAddress
-    );
+    event AssetSplit(address newAsset, uint unitsMoved);
+    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
     constructor(
-        string _serialNumber,
-        ItemStatus _status,
-        string _comment,
-        uint _itemNumber,
-        uint _createdDate,
-        address _owner,
         string _name,
         string _description,
         string[] _images,
+        uint _createdDate,
+        uint _units,
+        string _serialNumber,
+        ItemStatus _status,
         uint _price,
+        address _owner,
         string _projectType,
-        SaleState _saleState,
-        PaymentType _paymentType
-    ) public Asset(_name, _description, _images, _price, _createdDate){
+        PaymentType[] _paymentTypes
+    ) Asset(_name, _description, _images, _createdDate) {
+        units = _units;
+        serialNumber = _serialNumber;
         owner = _owner;
 
-        serialNumber = _serialNumber;
         status = _status;
-        comment = _comment;
-        itemNumber = _itemNumber;
         projectType = _projectType;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
-        ownerOrganizationalUnit = ownerCert["organizationalUnit"];
         ownerCommonName = ownerCert["commonName"];
 
-        createSale(_saleState, _paymentType);
+        if(_paymentTypes.length > 0) {
+            createSales(_paymentTypes, _price, _units);
+        }
     }
 
-    function createBaseSale(SaleState _state, PaymentType _payment) internal returns (Sale) {
-        return Sale(new SimpleSale(address(this), _state, _payment));
+    function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
+        for (uint i = 0; i < whitelistedSales.length; i++) {
+            CarbonSale(whitelistedSales[i]).changeSaleQuantity(_units);
+        }
     }
 
-    function createSale(SaleState _state, PaymentType _payment) public requireOwner("Create sale") returns (uint) {// can be overridden
-        require(address(sale) == address(0), "An open bill of sale already exists for this asset");
-        sale = createBaseSale(_state, _payment);
+    function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
+        require(splitUnits < units, "Cannot split more units than available");
+        Carbon newAsset = new Carbon(name,
+                                     description, 
+                                     images, 
+                                     createdDate, 
+                                     splitUnits, 
+                                     serialNumber + "1", 
+                                     ItemStatus.UNPUBLISHED,
+                                     0, 
+                                     newOwner, 
+                                     projectType, 
+                                     []);
+        units -= splitUnits;
+
+        changeUnitQuantity(units);
+
+        emit AssetSplit(address(newAsset), splitUnits);
+
+        return address(newAsset);
+    }
+
+    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            whitelistSale(address(new CarbonSale(address(this), _paymentTypes[i], _price, _units)));
+        }
+        status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
 
-    function update(
+    function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
+        address newSale = address(new CarbonSale(address(this), _paymentType, _price, _units));
+        return (RestStatus.OK, string(newSale));
+    }
+
+    function updateCarbon(
+        string _name, 
+        string _description, 
+        string[] _images, 
         ItemStatus _status,
-        string _comment,
-        uint _scheme
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
+        string _serialNumber,
+        string _projectType,
+        uint _price,
+        uint _units
+    ) public requireOwner("update carbon") returns (uint) {
+        serialNumber = _serialNumber;
+        projectType = _projectType;
+        updateAsset(_name, _description, _images, _status, _price);
+        if (_units != units) {
+            changeUnitQuantity(_units);
+            units = _units;
         }
-
-        if (_scheme == 0) {
-            return RestStatus.OK;
-        }
-
-        if ((_scheme & (1 << 0)) == (1 << 0)) {
-            status = _status;
-        }
-        if ((_scheme & (1 << 1)) == (1 << 1)) {
-            comment = _comment;
-        }
-
-        return RestStatus.OK;
-    }
-
-    // Get the userOrganization
-    function getUserOrganization(address caller) public returns (string) {
-        mapping(string => string) ownerCert = getUserCert(caller);
-        string userOrganization = ownerCert["organization"];
-        return userOrganization;
-    }
-
-    function generateOwnershipHistory(
-        string _seller,
-        string _newOwner,
-        uint _ownershipStartDate,
-        address _itemAddress
-    ) returns (uint) {
-        if (ownerOrganization != getUserOrganization(tx.origin)) {
-            return RestStatus.FORBIDDEN;
-        }
-        emit OwnershipUpdate(
-            _seller,
-            _newOwner,
-            _ownershipStartDate,
-            _itemAddress
-        );
         return RestStatus.OK;
     }
 }

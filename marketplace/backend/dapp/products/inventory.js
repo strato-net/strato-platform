@@ -4,6 +4,7 @@ import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
+import saleJs from "../orders/sale";
 
 const contractName = constants.assetTableName;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
@@ -136,6 +137,25 @@ function bindAddress(user, address, options) {
     return bind(user, contract, options);
 }
 
+async function resellItem(user, contract, args, options) {
+    const callArgs = {
+      contract,
+      method: "createSales",
+      args: util.usc({ ...args }),
+    };
+    const resellStatus = await rest.call(user, callArgs, options);
+  
+    if (parseInt(resellStatus, 10) !== RestStatus.OK) {
+      throw new rest.RestError(
+        resellStatus,
+        "You cannot resell the item because it's already published",
+        { callArgs }
+      );
+    }
+  
+    return resellStatus;
+}
+
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
  * @param args Lookup with an address or uniqueInventoryID.
@@ -156,6 +176,14 @@ async function get(user, args, options) {
         return undefined;
     }
 
+    const sale = await saleJs.get(user, { assetToBeSold: inventory.address, state: 1 }, options);
+
+    if (sale) {
+        inventory = {
+            ...inventory,
+            price: sale.price,
+        }
+    }
 
     return marshalOut({
         ...inventory,
@@ -163,22 +191,52 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const { range, ownerCommonName, saleAddresses, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, ...restArgs } = args;
     let inventories;
+    let sales;
+    let finalInventory = [];
 
     if (ownerCommonName) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'ownerCommonName', value: ownerCommonName });
-        inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
+        inventories = await searchAllWithQueryArgs(contractName, 
+            {   
+                ...restArgs,
+                ownerCommonName: ownerCommonName, 
+                status: status ? status : [1,2],
+            }, options, admin);
     }
-    else if (saleAddresses) {
-        inventories = await searchAllWithQueryArgs(contractName, { sale: saleAddresses }, options, admin);
+    else if (assetAddresses) {
+        inventories = await searchAllWithQueryArgs(contractName, 
+            { 
+                ...restArgs,
+                address: assetAddresses, 
+                status: status ? status : [1, 2],
+            }, options, admin);
     }
     else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'sale', value: '0000000000000000000000000000000000000000', predicate: 'neq' });
-        inventories = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
+        inventories = await searchAllWithQueryArgs(contractName, 
+            { 
+                ...restArgs, 
+                status: status ? status : [1,2],
+            }, options, admin);
     }
 
-    return inventories ? inventories.map((inventory) => marshalOut(inventory)) : undefined;
+    if (inventories) {
+        const assetAddresses = inventories.map((inventory) => inventory.address);
+        sales = await saleJs.getAll(admin, { assetAddresses }, options);
+        inventories.forEach(inventory => {
+            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address);
+            if (itemSale) {
+                finalInventory.push({
+                    ...inventory,
+                    price: itemSale?.price,
+                })
+            } else {
+                finalInventory.push(inventory);
+            }
+        });
+    }
+
+    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
 async function inventoryCount(admin, args = {}, options) {
@@ -220,6 +278,7 @@ export default {
     contractName,
     contractFilename,
     bindAddress,
+    resellItem,
     get,
     getAll,
     inventoryCount,

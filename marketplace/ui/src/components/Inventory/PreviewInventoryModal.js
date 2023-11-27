@@ -9,7 +9,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
   const [quantity, setQuantity] = useState(1);
 
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
 
   const subtract = () => {
@@ -47,15 +47,26 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
         );
       case "Carbon":
         return (
-          <div>
-            <div className="flex items-center">
-              <p className="text-primaryC text-sm w-44">Project Type</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">{itemData.projectType}</p>
+          <>
+            <div>
+              <div className="flex items-center">
+                <p className="text-primaryC text-sm w-44">Project Type</p>
+                <p text-secondryB text-sm>
+                  :
+                </p>
+                <p className="text-secondryB text-sm ml-3">{itemData.projectType}</p>
+              </div>
             </div>
-          </div>
+            <div>
+              <div className="flex items-center">
+                <p className="text-primaryC text-sm w-44">Units</p>
+                <p text-secondryB text-sm>
+                  :
+                </p>
+                <p className="text-secondryB text-sm ml-3">{itemData.units}</p>
+              </div>
+            </div>
+          </>
         );
       case "Clothing":
         return (
@@ -69,7 +80,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
             </div>
           </div>
         );
-      case "Materials":
+      case "Metals":
         return (
           <div>
             <div className="flex items-center">
@@ -107,7 +118,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               <div className="flex justify-center mt-16">
               <Button
                         className="h-11 bg-primary text-white w-9/12"
-                        disabled
+                        disabled={user?.commonName === inventory.ownerCommonName}
                         onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             window.location.href = loginUrl;
@@ -120,7 +131,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               
                 <Button
                         className="h-11 bg-primary text-white w-9/12 ml-4"
-                        disabled
+                        disabled={user?.commonName === inventory.ownerCommonName}
                         onClick={() => {
                           if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                             window.location.href = loginUrl;

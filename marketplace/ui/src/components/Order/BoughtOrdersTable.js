@@ -34,6 +34,9 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       limit,
       offset,
       user?.commonName,
+      selectedDate,
+      filter,
+      order
     );
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
   
@@ -53,7 +56,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         chainId: order.chainId,
         key: order.address,
         orderNumber: order,
-        sellerCommonName: order.sellerCommonName,
+        sellersCommonName: order.sellersCommonName,
         orderTotal: order.totalPrice,
         date: getStringDate(order.createdDate, US_DATE_FORMAT),
         status: getStatus(parseInt(order.status)),
@@ -84,8 +87,8 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     },
     {
       title: "seller".toUpperCase(),
-      dataIndex: "sellerCommonName",
-      key: "sellerCommonName",
+      dataIndex: "sellersCommonName",
+      key: "sellersCommonName",
       render: (text) => <p>{text}</p>,
     },
     {
@@ -99,8 +102,8 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       key: "date",
       render: (text) => <p>{text}</p>,
       title: (
-        <div className="mt-2" style={{ display: "flex", justifyContent: "space-between" }}>
-          <div className="align-middle">{"Date (mm/dd/yyyy)".toUpperCase()}</div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div className="mt-1.5">{"Date (mm/dd/yyyy)".toUpperCase()}</div>
           <div>
             {order === "createdDate.desc" ? (
               <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />

@@ -270,7 +270,7 @@ const ConfirmOrder = () => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
       ),
-      dataIndex: "sellerOrganization",
+      dataIndex: "sellersOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
       width: "12%"
@@ -279,7 +279,7 @@ const ConfirmOrder = () => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
       ),
-      dataIndex: "sellerCommonName",
+      dataIndex: "sellersCommonName",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
       width: "12%"
@@ -363,16 +363,13 @@ const ConfirmOrder = () => {
     confirmOrderList.forEach((item) => {
     // These additional fields need to be sent to form the request after stripe. 
       orderList.push({
-        inventoryId: item.key, 
         quantity: item.qty,
-        name: item.item.name,
-        unitPrice: item.unitPrice,
-        subCategory: item.subCategory ? item.subCategory : " ",
+        assetAddress: item.key,
       });
     });
 
     // These additional fields need to be sent to form the request after stripe. 
-    const body = {
+    let body = {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
@@ -393,40 +390,9 @@ const ConfirmOrder = () => {
     }
   };
 
-  const handleTestConfirm = async () => {
-    let orderList = [];
-    let sellerCommonName = confirmOrderList[0].sellerCommonName;
-    confirmOrderList.forEach((item) => {
-      orderList.push(item.saleAddress);
-    });
-
-    const body = {
-      saleAddresses: orderList,
-      sellerCommonName: sellerCommonName,
-      totalPrice: total + tax + shipping,
-      shippingAddress: userAddresses[selectedAddress].address,
-    }
-
-    let isDone = await orderActions.createSale(orderDispatch, body);
-
-    if (isDone) {
-      let updatedCart = [];
-      cartList.forEach(cart => {
-        if (!orderList.includes(cart.product.sale)) {
-          updatedCart.push(cart);
-        }
-      });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
-      setTimeout(function () {
-        navigate(`/orders`, { state: { defaultKey: "Bought" } });
-      }, 2000);
-    }
-  };
-
-
   useEffect(() => {
     if (data.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellerOrganization"]);
+      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellersOrganization"]);
     }
   }, [inventoryDispatch, data]);
 
@@ -780,13 +746,11 @@ const ConfirmOrder = () => {
                 }}>
                 Pay Later
               </div> */}
-              {/* <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass} */}
-              <div id="pay-now-button" className={activeButtonClass}
+              <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
                 onClick={() => {
                   if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
                     handlePaymentConfirm();
                   }
-                  handleTestConfirm();
                 }}
               >
                 Review and Submit

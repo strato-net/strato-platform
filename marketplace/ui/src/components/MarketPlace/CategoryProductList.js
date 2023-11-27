@@ -52,6 +52,7 @@ const CategoryProductList = ({ user }) => {
   const debouncedMaxPrice = useDebounce(maxPrice, 1000);
   const debouncedMinPrice = useDebounce(minPrice, 1000);
   const [subCategories, setSubCategories] = useState([]);
+  const [uniqueProductNames, setUniqueProductNames] = useState([]);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -168,6 +169,12 @@ const CategoryProductList = ({ user }) => {
             (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
           );
       setBrands(uniqueBrands);
+
+      const uniqueNames = marketplaceList.map((p) => p.name)
+                            .filter(
+                              (name, index, arr) => arr.indexOf(name) == index
+                            );
+      setUniqueProductNames(uniqueNames);
     }
   }, [marketplaceList]);
 
@@ -295,7 +302,7 @@ const CategoryProductList = ({ user }) => {
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}
-            {currentCategory && (
+            {/* {currentCategory && (
               <>
                 <Collapse
                   bordered={false}
@@ -317,7 +324,7 @@ const CategoryProductList = ({ user }) => {
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )}
+            )} */}
 
             {/* Panel - Product */}
             {marketplaceList.length > 0 && (
@@ -336,9 +343,9 @@ const CategoryProductList = ({ user }) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {marketplaceList.map((product, index) => (
-                          <Checkbox value={product.productId} key={index} className="m-0" onChange={onChangeProduct}>
-                            {decodeURIComponent(product.name)}
+                        {uniqueProductNames.map((product, index) => (
+                          <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
+                            {decodeURIComponent(product)}
                           </Checkbox>
                         ))}
                       </div>
@@ -350,7 +357,7 @@ const CategoryProductList = ({ user }) => {
             )}
 
             {/* Panel - Manufacturer/Brand */}
-            {brands.length > 0 && marketplaceList.length > 0 && (
+            {/* {brands.length > 0 && marketplaceList.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -376,7 +383,7 @@ const CategoryProductList = ({ user }) => {
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )}
+            )} */}
             <div className="pb-24"></div>
           </div>
         </div>

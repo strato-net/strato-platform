@@ -34,6 +34,9 @@ const actionDescriptors = {
   createSale: "create_sale",
   createSaleSuccessful: "create_sale_successful",
   createSaleFailed: "create_sale_failed",
+  cancelSale: "cancel_sale",
+  cancelSaleSuccessful: "cancel_sale_successful",
+  cancelSaleFailed: "cancel_sale_failed",
   executeSale: "execute_sale",
   executeSaleSuccessful: "execute_sale_successful",
   executeSaleFailed: "execute_sale_failed",
@@ -232,12 +235,21 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, commonName) => {
+  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
     dispatch({ type: actionDescriptors.fetchOrder });
+
+    let query = "";
+    if (selectedDate) {
+      let end = selectedDate + 86400;
+      query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
+    }
+    if (filter) {
+      query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
+    }
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}&purchasersCommonName=${commonName}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&order=${order}&purchasersCommonName=${commonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -258,12 +270,21 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, commonName) => {
+  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
     dispatch({ type: actionDescriptors.fetchOrderSold });
+
+    let query = "";
+    if (selectedDate) {
+      let end = selectedDate + 86400;
+      query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
+    }
+    if (filter) {
+      query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
+    }
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&sellerCommonName=${commonName}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellersCommonName=${commonName}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -407,6 +428,46 @@ const actions = {
         error: "Error while executing Sale",
       });
       actions.setMessage(dispatch, "Error while executing sale");
+    }
+  },
+
+  cancelSale: async (dispatch, payload) => {
+    dispatch ({ type: actionDescriptors.cancelSale });
+    
+    try {
+      const response = await fetch(`${apiUrl}/order/sale/cancel`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.cancelSaleSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Sale canceled successfully", true);
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.cancelSaleFailed,
+        error: "Error while canceling sale",
+      });
+      actions.setMessage(dispatch, "Error while canceling sale");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.cancelSaleFailed,
+        error: "Error while canceling Sale",
+      });
+      actions.setMessage(dispatch, "Error while canceling sale");
     }
   },
 

@@ -6,12 +6,12 @@ import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
 
-const contractName = "Materials";
-const contractFilename = `${util.cwd}/dapp/items/contracts/Materials.sol`;
+const contractName = "Metals";
+const contractFilename = `${util.cwd}/dapp/items/contracts/Metals.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
 /** 
- * Uploads a new Materials item 
+ * Uploads a new Metals item 
  * @param user User token (typically an admin)
  * @param _constructorArgs Arguments of Item's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
@@ -119,7 +119,7 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing Materials contract to a new user token. Useful for having multiple users test
+ * Bind an existing Metals contract to a new user token. Useful for having multiple users test
  * the same contract.
  * @example <caption>Create an admin and user bound to the same new item contract.</caption>
  * const adminBoundContract = createArt(adminToken, args, options);
@@ -163,7 +163,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Materials']` }, options, admin);
+    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Metals']` }, options, admin);
     return inventories.map((inventory) => marshalOut(inventory));
   }
   
@@ -202,6 +202,25 @@ async function transferOwnership(user, contract, options, newOwner) {
     return transferStatus
 }
 
+async function updateMetals(user, contract, args, options) {
+    const callArgs = {
+      contract,
+      method: "updateMetals",
+      args: util.usc({ ...args }),
+    };
+    const updateStatus = await rest.call(user, callArgs, options);
+  
+    if (parseInt(updateStatus, 10) !== RestStatus.OK) {
+      throw new rest.RestError(
+        updateStatus,
+        "You cannot update an item you don't own",
+        { callArgs }
+      );
+    }
+  
+    return updateStatus;
+}
+
 async function getAllOwnershipEvents(admin, args = {}, options) {
     const itemOwnershipEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.OWNERSHIP_UPDATE}`, args, options, admin)
     return itemOwnershipEvents.map((item) => marshalOut(item))
@@ -216,6 +235,7 @@ export default {
     getAll,
     getAllOwnershipEvents,
     transferOwnership,
+    updateMetals,
     marshalIn,
     marshalOut,
     getHistory

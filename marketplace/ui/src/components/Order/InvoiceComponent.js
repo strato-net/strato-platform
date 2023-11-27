@@ -154,7 +154,7 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={styles.label}>Order Number: <Text style={styles.value}>{invoice.order.orderId}</Text></Text>
             <Text style={styles.label}>Order Date: <Text style={styles.value}>{getStringDate(invoice.order.createdDate, US_DATE_FORMAT)}</Text></Text>
             <Text style={styles.label}>Buyer: <Text style={styles.value}>{invoice.order.purchasersCommonName}</Text></Text>
-            <Text style={styles.label}>Seller: <Text style={styles.value}>{invoice.order.sellerCommonName}</Text></Text>
+            <Text style={styles.label}>Seller: <Text style={styles.value}>{invoice.order.sellersCommonName}</Text></Text>
           </View>
           <View style={styles.topSection}>
             <View style={styles.addressSection}>
@@ -203,13 +203,13 @@ const InvoiceComponent = ({ invoice }) => {
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.price}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>{asset.quantity ? asset.quantity : 1}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{asset.quantity}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.shippingCharges ? asset.shippingCharges : 0}</Text>
               {/* <View style={styles.separator} /> */}
               <Text style={[styles.value, styles.tableRowColumn]}>${asset.tax ? asset.tax : 0}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.amount ? asset.amount : asset.price}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${asset.amount}</Text>
             </View>
           ))}
           {/* <View style={styles.tableRow} >

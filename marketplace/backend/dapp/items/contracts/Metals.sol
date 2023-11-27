@@ -1,13 +1,13 @@
-import "/dapp/orders/contracts/Sales/ArtSale.sol";
+import "/dapp/orders/contracts/Sales/MaterialsSale.sol";
 
 pragma es6;
 pragma strict;
 import <d816194227e1a7a780fff236a449604afeb36255>;
 
-/// @title A representation of Art assets
-contract Art is ItemStatus, RestStatus, Asset {
+/// @title A representation of Metals assets
+contract Metals is ItemStatus, RestStatus, Asset {
     string public serialNumber;
-    string public artist;
+    string public source;
 
     event OwnershipUpdate(
         string seller,
@@ -22,15 +22,15 @@ contract Art is ItemStatus, RestStatus, Asset {
         address _owner,
         string _name,
         string _description,
-        string _artist,
         string[] _images,
         uint _price,
+        string _source,
         PaymentType[] _paymentTypes
-    ) public Asset(_name, _description, _images, _createdDate){
+    ) public Asset(_name, _description, _images, _createdDate ){
         owner = _owner;
 
         serialNumber = _serialNumber;
-        artist = _artist;
+        source = _source;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -41,25 +41,24 @@ contract Art is ItemStatus, RestStatus, Asset {
 
     function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new ArtSale(address(this), _paymentTypes[i], _price)));
+            whitelistSale(address(new MaterialsSale(address(this), _paymentTypes[i], _price)));
         }
         status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
 
-    function updateArt(
+    function updateMetals(
         string _name, 
         string _description, 
         string[] _images, 
         ItemStatus _status,
         string _serialNumber,
-        string _artist,
+        string _source,
         uint _price
-    ) public requireOwner("update art") returns (uint) {
+    ) public requireOwner("update metals") returns (uint) {
         serialNumber = _serialNumber;
-        artist = _artist;
+        source = _source;
         updateAsset(_name, _description, _images, _status, _price);
         return RestStatus.OK;
     }
 }
-
