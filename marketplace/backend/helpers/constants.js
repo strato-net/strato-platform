@@ -22,7 +22,10 @@ export default {
   s3ParamName: "s3",
   tempUploadDir: "./temp",
   buyerOrgName: "rejolut",
-  sellerOrgName: "blockapps"
+  sellerOrgName: "blockapps",
+  assetTableName: "BlockApps-Mercata-Asset",
+  saleTableName: "BlockApps-Mercata-Sale",
+  orderTableName: "BlockApps-Mercata-Order",
 };
 
 export const STRIPE_ENV = {
@@ -75,6 +78,14 @@ export const ITEM_STATUS = {
   "UNPUBLISHED": 2,
   "REMOVED": 3,
   "SOLD": 4
+}
+
+export const PAYMENT_TYPES = {
+  "amex": "1",
+  "discover": "2",
+  "mastercard": "3",
+  "strat": "4",
+  "visa": "5",
 }
 
 export const SERVICE_PROVIDERS = {}

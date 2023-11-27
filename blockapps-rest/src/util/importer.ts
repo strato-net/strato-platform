@@ -79,7 +79,7 @@ function readFileLinesToArray(initialFileArray, fullname, relativePath = undefin
   isImported(fullname);
   const { fileArray, buffer } = array.reduce((obj, line) => {
     const { fileArray, buffer } = obj;
-    if (line.startsWith('import')) {
+    if (line.startsWith('import') && !line.includes("<")) {
       const newBuffer = buffer + '//' + line + '\n';
       const newFileArray = importFileToArray(fileArray, fullname, relativePath, line);
       return { fileArray: newFileArray, buffer: newBuffer }

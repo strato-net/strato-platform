@@ -1,0 +1,57 @@
+paths:
+  /metals/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Metals
+      summary: Retrieve metals
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of metals
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Metals
+      summary: Create a metal
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create metals
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createMetals'
+      responses:
+        200:
+          description: Object of create metals
+
+definitions:
+  createMetals:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          serialNumber:
+            type: string
+          name:
+            type: string
+          description:
+            type: string
+          source:
+            type: string
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          paymentTypes:
+            type: array
+            items:
+              type: number

@@ -32,6 +32,7 @@ import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
 import TagManager from "react-gtm-module";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -83,30 +84,29 @@ const SoldOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (orderDetails) {
-      setStatus(getStatus(parseInt(orderDetails.status)));
-      setcomment(orderDetails.sellerComments);
+      setStatus(getStatus(parseInt(orderDetails.order.status)));
+      setcomment(orderDetails.order.comments);
       // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
-      if (orderDetails.fullfilmentDate === 0 || orderDetails.fullfilmentDate === null || orderDetails.fullfilmentDate === undefined) {
+      if (orderDetails.order.fulfillmentDate === 0 || orderDetails.order.fulfillmentDate === null || orderDetails.order.fulfillmentDate === undefined) {
         setSelectedDate(null);
       } else {
-        setSelectedDate(dayjs.unix(orderDetails.fullfilmentDate));
+        setSelectedDate(dayjs.unix(orderDetails.order.fulfillmentDate));
       }
 
       let items = [];
-      orderDetails.orderLines.forEach((prod) => {
+      orderDetails.assets.forEach((prod) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.imageUrl,
-          productName: prod.productName,
-          manufacturer: prod.manufacturer,
-          unitPrice: prod.pricePerUnit,
+          productImage: prod.images.length > 0 ? prod.images[0] : image_placeholder,
+          productName: prod,
+          unitPrice: prod.price,
           quantity: prod.quantity,
-          shippingCharges: prod.shippingCharges,
+          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
           amount: prod.amount,
           serialNumber: prod,
-          tax: prod.tax,
+          tax: prod.tax ? prod.tax : 0,
         });
       });
       setdata(items);
@@ -127,7 +127,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.paymentSessionId);
+      getPaymentStatus(data.order.paymentSessionId);
     }
   }
 
@@ -201,13 +201,13 @@ const SoldOrderDetails = ({ user, users }) => {
     if (orderDetails === null) {
       return serialsUploaded;
     }
-    for (const orderLine of orderDetails.orderLines) {
-      if (orderLine.containsSerialNumber === true) {
-        if (orderLine.isSerialUploaded === false) {
-          serialsUploaded = false;
-        }
-      }
-    }
+    // for (const orderLine of orderDetails.orderLines) {
+    //   if (orderLine.containsSerialNumber === true) {
+    //     if (orderLine.isSerialUploaded === false) {
+    //       serialsUploaded = false;
+    //     }
+    //   }
+    // }
     return serialsUploaded;
   };
 
@@ -215,50 +215,13 @@ const SoldOrderDetails = ({ user, users }) => {
     let body = {};
     let isDone=false;
 
-    for (let i = 0; i < orderDetails.orderLines.length; i++) {
-      setselectedProd(orderDetails.orderLines[i]);
+    body = {
+      saleOrderAddress: details.order.address,
+      fulfillmentDate: dayjs(selectedDate).unix(),
+      comments: comment,
+    };
 
-      // Here we are skipping the createOrderLineItem if the serial number is already uploaded. 
-      // If the serial number is uploaded an orderLineItem is already created.
-      if (details.orderLines[i].containsSerialNumber === true) {
-        continue;
-      } else {
-        body = {
-          orderId: details.orderId,
-          orderAddress: details.address,
-          orderLineId: details.orderLines[i].address,
-          serialNumber: [],
-          quantity: details.orderLines[i].quantity,
-        };
-
-        isDone= await actions.createOrderLineItem(dispatch, body);
-      }
-    }
-    
-      
-    body = {};
-    if (selectedDate == null) {
-      body = {
-        address: Id,
-
-        updates: {
-          sellerComments: comment,
-          status: parseInt(getStatusByValue(status)),
-
-        },
-      };
-    } else {
-      body = {
-        address: Id,
-
-        updates: {
-          sellerComments: comment,
-          status: 3,
-          fullfilmentDate: dayjs(selectedDate).unix(),
-        },
-      };
-    }
-    isDone = await actions.updateSellerDetails(dispatch, body);
+    isDone = await actions.executeSale(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
       await actions.fetchOrderDetails(dispatch, Id);
@@ -279,7 +242,7 @@ const SoldOrderDetails = ({ user, users }) => {
         updates: {
           status: parseInt(getStatusByValue(selectedStatus)),
           sellerComments: comment,
-          // fullfilmentDate: dayjs(selectedDate).unix(),
+          // fulfillmentDate: dayjs(selectedDate).unix(),
         },
       };
     } else {
@@ -323,13 +286,21 @@ const SoldOrderDetails = ({ user, users }) => {
       title: "",
       dataIndex: "productImage",
       key: "productImage",
-      render: (text) => <Image width={75} height={60} src={text} />,
+      render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
     },
     {
       title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
       dataIndex: "productName",
       key: "productName",
-      render: (text) => <p className="text-primary text-[17px]">{decodeURIComponent(text)}</p>,
+      render: (text) => (
+        <p
+          // href={routes.BoughtOrderDetails.url}
+          className="text-primary text-[17px] cursor-pointer"
+          onClick={() => {navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+        >
+          {decodeURIComponent(text.name)}
+        </p>
+      ),
     },
     {
       title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
@@ -377,13 +348,6 @@ const SoldOrderDetails = ({ user, users }) => {
           );
         }
       }
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">MANUFACTURER</Text>,
-      dataIndex: "manufacturer",
-      key: "manufacturer",
-      align: "center",
-      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -474,7 +438,7 @@ const SoldOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-primary">
-              {details.orderId}
+              {details.order.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -515,23 +479,23 @@ const SoldOrderDetails = ({ user, users }) => {
               </Button>
             </div>
             <Row className="my-6 justify-between">
-              <OrderData title="NUMBER" value={`#${details.orderId}`} />
+              <OrderData title="NUMBER" value={`#${details.order.orderId}`} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="BUYER"
-                value={details.buyerOrganization}
+                value={details.order.purchasersCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="SELLER"
-                value={details.sellerOrganization}
+                value={details.order.sellersCommonName}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData title="TOTAL ($)" value={details.orderTotal} />
+              <OrderData title="TOTAL ($)" value={details.order.totalPrice} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="DATE"
-                value={getStringDate(details.orderDate, US_DATE_FORMAT)}
+                value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
 
@@ -609,19 +573,10 @@ const SoldOrderDetails = ({ user, users }) => {
                     selectedDate
                   }
                   disabledDate={(current) => {
-                    const timestamp = Number(details.orderDate);
-                    if (Number.isNaN(timestamp)) {
-                      return "";
-                    }
-                    const adjustedTime = details.orderDate < 1000000000000 ? details.orderDate * 1000 : details.orderDate;
-                    const specificDate = dayjs(adjustedTime);
-                    const currentDate = dayjs();
-                    const selectedDate = dayjs(current);
-
-                    return selectedDate.isBefore(specificDate.startOf('day')) || selectedDate.isAfter(currentDate.endOf('day'));
+                    return current && current < dayjs().endOf('day');
                   }}
                   onChange={onDateChange}
-                  disabled={false}
+                  disabled={details.order.status === "3" || details.order.status === "4"}
                 />
               </div>
             </Row>
@@ -636,7 +591,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   placeholder="Enter Comments"
                   value={decodeURIComponent(comment)}
                   disabled={
-                    orderDetails.status === 3 || orderDetails.status === 4
+                    details.order.status === "3" || details.order.status === "4"
                   }
                   onChange={(event) => {
                     setcomment(encodeURIComponent(event.target.value));
