@@ -44,7 +44,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
 
     function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
         for (uint i = 0; i < whitelistedSales.length; i++) {
-            CarbonSale(whitelistedSales[i]).changeUnitQuantity(_units);
+            CarbonSale(whitelistedSales[i]).changeSaleQuantity(_units);
         }
     }
 
@@ -92,21 +92,10 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         string _projectType,
         uint _price,
         uint _units
-    ) public requireOwner("update asset") returns (uint) {
-        name = _name;
-        description = _description;
-        images = _images;
+    ) public requireOwner("update carbon") returns (uint) {
         serialNumber = _serialNumber;
         projectType = _projectType;
-        if (_status == ItemStatus.UNPUBLISHED) {
-            disableAllSales();
-            status = _status;
-            return RestStatus.OK;
-        }
-        uint price = Sale(whitelistedSales[0]).price()
-        if (_price != price) {
-            changePrice(_price);
-        }
+        updateAsset(_name, _description, _images, _status, _price);
         if (_units != units) {
             changeUnitQuantity(_units);
             units = _units;

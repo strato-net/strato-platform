@@ -55,21 +55,10 @@ contract Metals is ItemStatus, RestStatus, Asset {
         string _serialNumber,
         string _source,
         uint _price
-    ) public requireOwner("update asset") returns (uint) {
-        name = _name;
-        description = _description;
-        images = _images;
+    ) public requireOwner("update metals") returns (uint) {
         serialNumber = _serialNumber;
         source = _source;
-        if (_status == ItemStatus.UNPUBLISHED) {
-            disableAllSales();
-            status = _status;
-            return RestStatus.OK;
-        }
-        uint price = Sale(whitelistedSales[0]).price()
-        if (_price != price) {
-            changePrice(_price);
-        }
+        updateAsset(_name, _description, _images, _status, _price);
         return RestStatus.OK;
     }
 }

@@ -151,6 +151,27 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus {
         ownerOrganization = ownerCert["organization"];
         ownerCommonName = ownerCert["commonName"];
    }
+
+   function updateAsset(
+        string _name, 
+        string _description, 
+        string[] _images, 
+        ItemStatus _status,
+        uint _price
+    ) public requireOwner("update asset") returns (uint) {
+        name = _name;
+        description = _description;
+        images = _images;
+        if (_status == ItemStatus.UNPUBLISHED) {
+            disableAllSales();
+            status = _status;
+            return RestStatus.OK;
+        }
+        uint price = Sale(whitelistedSales[0]).price()
+        if (_price != price) {
+            changePrice(_price);
+        }
+    }
 }
 
 abstract contract Sale is PaymentType, SaleState, RestStatus{ 

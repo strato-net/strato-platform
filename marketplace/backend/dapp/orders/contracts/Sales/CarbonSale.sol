@@ -10,7 +10,7 @@ contract CarbonSale is Sale{
         units=_units;
     }
 
-    function changeUnitQuantity(uint _units) public requireSeller("change unit quantity") {
+    function changeSaleQuantity(uint _units) public requireSeller("change unit quantity") {
         units = _units;
     }
 
