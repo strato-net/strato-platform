@@ -7,6 +7,10 @@ docker-compose.push.yml
 docker-compose.push.ecr.yml
 /docker-compose.yml
 docker-compose.ecr.yml
+docker-compose.highway.push.yml
+docker-compose.highway.push.ecr.yml
+docker-compose.highway.yml
+docker-compose.highway.ecr.yml
 docker-compose.vault.push.yml
 docker-compose.vault.push.ecr.yml
 docker-compose.vault.yml

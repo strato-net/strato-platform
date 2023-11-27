@@ -62,6 +62,7 @@ export const Item = {
   update: '/update',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
+  transfers: '/transfers',
   getRawMaterials: '/rawmaterials'
 }
 

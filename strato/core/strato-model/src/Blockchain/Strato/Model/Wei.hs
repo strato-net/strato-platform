@@ -6,12 +6,12 @@
 
 module Blockchain.Strato.Model.Wei where
 
+import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
 import Control.DeepSeq (NFData)
 import Control.Lens.Operators
 import Data.Aeson hiding (Array, String)
 import Data.Proxy
-import Data.RLP
 import Data.Swagger
 import GHC.Generics
 import Test.QuickCheck hiding ((.&.))
@@ -46,6 +46,6 @@ instance ToJSON Wei where
 instance FromJSON Wei where
   parseJSON = fmap (Wei . fromInteger) . parseJSON
 
-instance RLPEncodable Wei where
-  rlpEncode (Wei n) = rlpEncode $ toInteger n
-  rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
+instance RLPSerializable Wei where
+  rlpEncode (Wei n) = rlpEncode n
+  rlpDecode obj = Wei $ rlpDecode obj

@@ -19,7 +19,7 @@ import BlockApps.Logging
 import BlockApps.SolidVMStorageDecoder
 import BlockApps.Solidity.Parse.Parser (parseXabi)
 import BlockApps.Solidity.Value
-import BlockApps.Solidity.Xabi hiding (Func, Public)
+import BlockApps.Solidity.Xabi hiding (Func, Public, External)
 import BlockApps.Solidity.Xabi.Type (indexedTypeType)
 import BlockApps.Solidity.XabiContract
 import BlockApps.SolidityVarReader
@@ -186,7 +186,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
   let contractFuncs Contract {..} = catMaybes . map (traverse getFunction) $ Map.toList _functions
       convertType = (either (const Nothing) Just . xabiTypeToType . indexedTypeType) <=< indexedTypeToEvmIndexedType
       getFunction Func {..} =
-        if isNothing _funcVisibility || _funcVisibility == Just Public
+        if isNothing _funcVisibility || _funcVisibility == Just Public || _funcVisibility == Just External
           then
             let args = catMaybes $ sequence . (maybe "" Text.pack *** convertType) <$> _funcArgs
                 ret = catMaybes $ sequence . (fmap Text.pack *** convertType) <$> _funcVals
@@ -206,6 +206,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
           ++ (decodeSolidVMValues $ map (key &&& value) storage')
     (StorageAddress {kind = SolidVM} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
+    ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')
     _ ->
       error $ "EVM contract state indexing no longer supported"
   $logDebugS "getContractsState/storage" $

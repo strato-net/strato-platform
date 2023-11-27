@@ -334,4 +334,5 @@ abstract contract FractionalizedFungible is Fungible {
         super.burn(tokenAmount);
     }
 
+<<<<<<< HEAD
 }

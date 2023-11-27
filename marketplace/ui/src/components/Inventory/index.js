@@ -8,6 +8,7 @@ import {
   Spin,
   Typography,
   Image,
+  Tooltip
 } from "antd";
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
@@ -21,9 +22,9 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import { Images } from "../../images";
-//events
-import { actions as eventActions } from "../../contexts/event/actions";
-import { useEventDispatch, useEventState } from "../../contexts/event";
+//items
+import { actions as itemActions } from "../../contexts/item/actions";
+import { useItemDispatch, useItemState} from "../../contexts/item";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
@@ -51,15 +52,15 @@ const Inventory = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
 
   const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus } =
+  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } =
     useInventoryState();
 
-  //events
-  const eventsDispatch = useEventDispatch();
+  //items
+  const itemDispatch = useItemDispatch();
   const {
-    message: eventMsg,
-    success: eventSuccess
-  } = useEventState();
+    message: itemMsg,
+    success: itemSuccess
+  } = useItemState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -74,6 +75,30 @@ const Inventory = ({ user }) => {
   useEffect(() => {
     actions.sellerStripeStatus(dispatch, user?.organization);
   }, [dispatch, user]);
+  
+  useEffect(() => {
+    const placement = 'bottom'; // Set placement to 'bottomCenter'
+  
+    if (stripeStatus !== null && stripeStatus !== undefined) {
+      const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
+      
+      const isOnboardedSuccess = ( chargesEnabled && detailsSubmitted && payoutsEnabled ) 
+      const isOnboardNotStarted = ( !chargesEnabled && !detailsSubmitted && !payoutsEnabled )
+  
+      if (!( isOnboardedSuccess || isOnboardNotStarted ) ) {
+        
+        setTimeout(() => {
+          api.error({
+            key: 1,
+            message: "Something went wrong with your Stripe account.",
+            description: "Please connect again.",
+            onClose: () => actions.resetMessage(dispatch),
+            placement,
+          });
+        }, 1000);
+      }
+    }
+  }, [stripeStatus]);  
 
   useEffect(() => {
     let len = inventories.length;
@@ -125,18 +150,18 @@ const Inventory = ({ user }) => {
     setPage(page);
   };
 
-  const eventToast = (placement) => {
-    if (eventSuccess) {
+  const itemToast = (placement) => {
+    if (itemSuccess) {
       api.success({
-        message: eventMsg,
-        onClose: eventActions.resetMessage(eventsDispatch),
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 3,
       });
     } else {
       api.error({
-        message: eventMsg,
-        onClose: eventActions.resetMessage(eventsDispatch),
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
         placement,
         key: 4,
       });
@@ -176,24 +201,36 @@ const Inventory = ({ user }) => {
                       onboardSeller()
                     }
                   }}
-                  disabled={stripeStatus.detailsSubmitted}
+                  disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
                 >
                   {"Connect Stripe"}
                 </Button>
-                <Button
-                  id="add-inventory-button"
-                  type="primary"
-                  className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      showModal()
-                    }
-                  }}
-                >
-                  Add Inventory
-                </Button>
+                <Tooltip
+                  title={
+                    stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
+                      ? ""
+                      : "Please connect to Stripe first"
+                  }
+                  placement="bottom"
+                  >
+                  <div>
+                    <Button
+                      id="add-inventory-button"
+                      type="primary"
+                      className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
+                      onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                          window.location.href = loginUrl;
+                        } else {
+                          showModal()
+                        }
+                      }}
+                      disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+                    >
+                      Add Inventory
+                    </Button>
+                  </div>
+                </Tooltip>
               </div>
             </div>
           ) : (
@@ -218,7 +255,7 @@ const Inventory = ({ user }) => {
                     allowClear
                     onSearch={queryHandle}
                   />
-                  <Button type="primary" className="w-48 mr-3" disabled={stripeStatus.detailsSubmitted}
+                  <Button type="primary" className="w-48 mr-3"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         window.location.href = loginUrl;
@@ -226,20 +263,33 @@ const Inventory = ({ user }) => {
                         onboardSeller()
                       }
                     }}
+                    disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
                   >
                     {"Connect Stripe"}
                   </Button>
-                  <Button id="add-inventory-button" type="primary" className="w-48"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        window.location.href = loginUrl;
-                      } else {
-                        showModal()
-                      }
-                    }}
+                  <Tooltip
+                    title={
+                      stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
+                        ? ""
+                        : "Please connect to Stripe first"
+                    }
+                    placement="bottom"
                   >
-                    Add Inventory
-                  </Button>
+                    <div>
+                      <Button id="add-inventory-button" type="primary" className="w-48"
+                        onClick={() => {
+                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            window.location.href = loginUrl;
+                          } else {
+                            showModal()
+                          }
+                        }}
+                        disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
+                      >
+                        Add Inventory
+                      </Button>
+                    </div>
+                  </Tooltip>
                 </div>
               </div>
               <>
@@ -266,7 +316,8 @@ const Inventory = ({ user }) => {
                 <Pagination
                   current={page}
                   onChange={onPageChange}
-                  total={total}
+                  total={inventoriesTotal}
+                  showSizeChanger={false}
                   className="flex justify-center my-5 "
                 />
                 <div className="pb-12"></div>
@@ -286,7 +337,7 @@ const Inventory = ({ user }) => {
         />
       )}
       {message && openToast("bottom")}
-      {eventMsg && eventToast("bottom")}
+      {itemMsg && itemToast("bottom")}
     </>
   );
 };
