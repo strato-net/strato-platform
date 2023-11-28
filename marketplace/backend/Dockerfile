@@ -9,12 +9,8 @@ HEALTHCHECK --interval=3s --timeout=2s --start-period=300s \
 
 COPY . /usr/src/backend/
 
-WORKDIR /usr/src/backend/blockapps-rest
-
-RUN yarn install && yarn build
-
 WORKDIR /usr/src/backend
 
-RUN yarn install
+RUN yarn build-barest && yarn install
 
 CMD [ "sh", "/usr/src/backend/docker-run.sh" ]
