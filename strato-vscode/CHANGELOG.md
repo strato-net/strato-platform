@@ -6,6 +6,17 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [v0.3.0] - TODO
+
+### Changed
+
+- General UI/UX improvements
+
+### Removed
+
+- Removed the `Project Management` view and functions
+- Removed private chain interaction
+
 ## [v0.2.0] - 2023-26-05
 
 ### Added
