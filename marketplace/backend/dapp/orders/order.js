@@ -9,6 +9,7 @@ import {
   setSearchQueryOptionsPrime
 } from "/helpers/utils";
 import dayjs from "dayjs";
+import constants from "../../helpers/constants";
 
 const contractName = "Order";
 const contractFilename = `${util.cwd}/dapp/orders/contracts/Order.sol`;

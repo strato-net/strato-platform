@@ -169,6 +169,38 @@ const reducer = (state, action) => {
         error: action.error,
         issellerDetailsUpdating: false,
       };
+    case actionDescriptors.executeSale:
+      return {
+        ...state,
+        isCreateOrderSubmitting: true,
+      }
+    case actionDescriptors.executeSaleSuccessful:
+      return {
+        ...state,
+        isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.executeSaleFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.createSale:
+      return {
+        ...state,
+        isCreateOrderSubmitting: true,
+      }
+    case actionDescriptors.createSaleSuccessful:
+      return {
+        ...state,
+        isCreateOrderSubmitting: false,
+      }
+    case actionDescriptors.createSaleFailed:
+      return {
+        ...state,
+        error: action.error,
+        isCreateOrderSubmitting: false,
+      }
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

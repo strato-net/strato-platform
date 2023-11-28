@@ -25,6 +25,7 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import CartComponent from "./CartComponent";
 import TagManager from "react-gtm-module";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const { Title, Text } = Typography;
 
@@ -46,11 +47,11 @@ const Checkout = ({ user }) => {
   };
 
   const calculateTax = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.TAX) / 100;
+    return (item.product.price * CHARGES.TAX) / 100;
   };
 
   const calculateShipping = (item) => {
-    return (item.product.pricePerUnit * item.qty * CHARGES.SHIPPING) / 100;
+    return (item.product.price * CHARGES.SHIPPING) / 100;
   };
 
   const storedData = useMemo(() => {
@@ -88,22 +89,24 @@ const Checkout = ({ user }) => {
       const [key, value] = entry;
       let modifiedValue = [];
       value.forEach(item => {
+        const parts = item.product.contract_name.split('-');
         modifiedValue.push({
-          key: item.product.address,
+          key: item.product.address,  
           item: {
             name: item.product.name,
-            image: item.product.imageUrl,
-            status: item.product.isActive ? "Active" : "Inactive",
+            image: item.product.images.length > 0 ? item.product.images[0] : image_placeholder,
+            status: "Active",
           },
-          subCategory: item.product.subCategory,
-          sellerOrganization: item.product.ownerOrganization,
+          category: parts[parts.length - 1],
+          sellersOrganization: item.product.ownerOrganization,
+          sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: item.product.pricePerUnit,
+          unitPrice: item.product.price,
           quantity: item.product.address,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
-            item.product.pricePerUnit * item.qty +
+            item.product.price * item.qty +
             calculateShipping(item) +
             calculateTax(item),
           action: item.product.address,
@@ -128,7 +131,7 @@ const Checkout = ({ user }) => {
     setShipping(s);
     let sum = 0;
     cartList.forEach((item) => {
-      sum += item.product.pricePerUnit * item.qty;
+      sum += item.product.price;
     });
     setTotal(sum);
   }, [marketplaceDispatch, cartList]);
@@ -173,7 +176,7 @@ const Checkout = ({ user }) => {
       dataIndex: "item",
       render: (text) => {
         return (
-          <img className="w-16 h-16 object-cover" alt="" src={text.image} />
+          <img className="w-16 h-16 object-contain" alt="" src={text.image} />
         );
       },
     },
@@ -190,19 +193,19 @@ const Checkout = ({ user }) => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
       ),
-      dataIndex: "sellerOrganization",
+      dataIndex: "sellersOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
       width: "12%"
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">UNIT OF MEASUREMENT</Text>
+        <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
       ),
-      dataIndex: "unitOfMeasure",
+      dataIndex: "sellersCommonName",
       align: "center",
       render: (text) => (
-        <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>
+        <p className="text-center">{text}</p>
       ),
       width: "12%"
     },
@@ -218,14 +221,12 @@ const Checkout = ({ user }) => {
       align: "center",
       width: "160px",
       render: (text) => {
-        let qty = 0;
+        let qty = 1;
         let product;
-        let availableQuantity;
         cartList.forEach((element) => {
           if (element.product.address === text) {
             qty = element.qty;
             product = element.product;
-            availableQuantity = element.product.availableQuantity;
           }
         });
         return (
@@ -238,7 +239,9 @@ const Checkout = ({ user }) => {
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
                   if (element.product.address === product.address) {
-                    if (items[index].qty - 1 <= product.availableQuantity) {
+                    const itemData = JSON.parse(product.data);
+                    const availableQuantity = itemData.units ? itemData.units : 1;
+                    if (items[index].qty - 1 <= availableQuantity) {
                       items[index].qty -= 1;
                       actions.addItemToCart(marketplaceDispatch, items);
                     } else {
@@ -252,8 +255,8 @@ const Checkout = ({ user }) => {
                   }
                 });
               }}
-              className="h-[32px] w-[27px] pt-1 border text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
-              <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
+              className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+              <MinusOutlined className="text-xs text-secondryD" />
             </div>
             <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center"
                 min={1} value={qty} defaultValue={qty} controls={false}
@@ -261,12 +264,14 @@ const Checkout = ({ user }) => {
                   let items = [...cartList];
                   cartList.forEach((element, index) => {
                     if (element.product.address === product.address) {
-                      if (e <= product?.availableQuantity) {
+                      const itemData = JSON.parse(product.data);
+                      const availableQuantity = itemData.units ? itemData.units : 1;
+                      if (e <= availableQuantity) {
                         items[index].qty = e;
                         actions.addItemToCart(marketplaceDispatch, items);
                       } else {
                         openToast("bottom", true, "Cannot add more than available quantity");
-                        items[index].qty = product?.availableQuantity;
+                        items[index].qty = availableQuantity;
                         actions.addItemToCart(marketplaceDispatch, items);
                       }
                     }
@@ -277,7 +282,9 @@ const Checkout = ({ user }) => {
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
                   if (element.product.address === product.address) {
-                    if (items[index].qty + 1 <= product.availableQuantity) {
+                    const itemData = JSON.parse(product.data);
+                    const availableQuantity = itemData.units ? itemData.units : 1;
+                    if (items[index].qty + 1 <= availableQuantity) {
                       items[index].qty += 1;
                       actions.addItemToCart(marketplaceDispatch, items);
                     } else {
@@ -291,8 +298,8 @@ const Checkout = ({ user }) => {
                   }
                 });
               }}
-              className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
-              <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
+              className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer">
+              <PlusOutlined className="text-xs text-secondryC" />
             </div>
           </div>
         );
