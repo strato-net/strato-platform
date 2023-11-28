@@ -5,7 +5,6 @@ import "/dapp/dapp/contracts/Dapp.sol";
 import "./OrderLineItem.sol";
 import "./Order.sol";
 import "./OrderStatus.sol";
-import "/dapp/items/contracts/Item.sol";
 import "/dapp/items/contracts/ItemStatus.sol";
 
 /// @title A representation of OrderLine assets
@@ -83,7 +82,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.NOT_FOUND,string(address(0)),string(address(0)));
         }
 
-        Item_3 item = Item_3(address(_items[i]));
+        Art item = Art(address(_items[i]));
 
         // check published status of items
         if(item.status() != ItemStatus.PUBLISHED){
@@ -95,7 +94,7 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
           return (RestStatus.FORBIDDEN,string(address(0)),string(address(0)));
         } 
 
-        OrderLineItem orderLineItem=new OrderLineItem(_orderLineId, string(address(_items[i])), item.serialNumber(), _createdDate);
+        OrderLineItem orderLineItem=new OrderLineItem(_orderLineId, string(address(_items[i])), item.serialNumber(), _createdDate, address(item.sale()));
         orderLineItems += string(address(orderLineItem)) + ",";
         items += string(address(item)) + ",";
         itemsAddresses.push(address(item));
@@ -108,7 +107,6 @@ contract OrderLine_2 is ItemStatus,OrderStatus{
         return (RestStatus.BAD_REQUEST,string(address(0)),string(address(0)));
       }
       isSerialUploaded=true;
-      order.updateOrderStatus(OrderStatus.AWAITING_SHIPMENT);
       return (RestStatus.OK,orderLineItems,items);
     }
 

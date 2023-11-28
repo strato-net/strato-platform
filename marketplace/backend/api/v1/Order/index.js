@@ -70,5 +70,26 @@ router.get(
   OrderController.getAllUserAddress
 )
 
+router.post(
+  Order.createSaleOrder,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.createSaleOrder,
+)
+
+router.post(
+  Order.cancelSaleOrder,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.cancelSaleOrder,
+)
+
+router.post(
+  Order.executeSale,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.executeSale
+)
+
 
 export default router;

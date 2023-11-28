@@ -183,7 +183,7 @@ const Inventory = ({ user }) => {
         </div>
       ) : (
         <div className="mx-16 mt-14">
-          {inventories.length === 0 && offset === 0 ? (
+          {!isSearch && inventories.length === 0 && offset === 0 ? (
             <div className="h-screen justify-center flex flex-col items-center">
               <Image src={Images.noProductSymbol} preview={false} />
               <Title level={3} className="mt-2">
@@ -205,32 +205,20 @@ const Inventory = ({ user }) => {
                 >
                   {"Connect Stripe"}
                 </Button>
-                <Tooltip
-                  title={
-                    stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
-                      ? ""
-                      : "Please connect to Stripe first"
-                  }
-                  placement="bottom"
-                  >
-                  <div>
-                    <Button
-                      id="add-inventory-button"
-                      type="primary"
-                      className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
-                      onClick={() => {
-                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                          window.location.href = loginUrl;
-                        } else {
-                          showModal()
-                        }
-                      }}
-                      disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
-                    >
-                      Add Inventory
-                    </Button>
-                  </div>
-                </Tooltip>
+                <Button
+                  id="add-inventory-button"
+                  type="primary"
+                  className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6 ml-3"
+                  onClick={() => {
+                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      window.location.href = loginUrl;
+                    } else {
+                      showModal()
+                    }
+                  }}
+                >
+                  Add Item
+                </Button>
               </div>
             </div>
           ) : (
@@ -275,21 +263,6 @@ const Inventory = ({ user }) => {
                     }
                     placement="bottom"
                   >
-                    <div>
-                      <Button id="add-inventory-button" type="primary" className="w-48"
-                        onClick={() => {
-                          if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                            window.location.href = loginUrl;
-                          } else {
-                            showModal()
-                          }
-                        }}
-                        disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
-                      >
-                        Add Inventory
-                      </Button>
-                    </div>
-                  </Tooltip>
                 </div>
               </div>
               <>

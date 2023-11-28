@@ -3,8 +3,10 @@ import config from '/load.config';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
 import dayjs from 'dayjs';
+import constants from '../../helpers/constants';
+import saleJs from "../orders/sale";
 
-const contractName = 'Inventory';
+const contractName = constants.assetTableName;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 
 /** 
@@ -109,7 +111,7 @@ function marshalOut(_args) {
 function bind(user, _contract, options) {
     const contract = { ..._contract };
 
-    contract.get = async (args = { address: contract.address }) => get(user, args, options);
+    contract.get = async (args) => get(user, args, options);
     contract.getState = async () => getState(user, contract, options);
     contract.getHistory = async (args, options = contractOptions) => getHistory(user, chainId, args, options);
     contract.chainIds = options.chainIds;
@@ -135,6 +137,25 @@ function bindAddress(user, address, options) {
     return bind(user, contract, options);
 }
 
+async function resellItem(user, contract, args, options) {
+    const callArgs = {
+      contract,
+      method: "createSales",
+      args: util.usc({ ...args }),
+    };
+    const resellStatus = await rest.call(user, callArgs, options);
+  
+    if (parseInt(resellStatus, 10) !== RestStatus.OK) {
+      throw new rest.RestError(
+        resellStatus,
+        "You cannot resell the item because it's already published",
+        { callArgs }
+      );
+    }
+  
+    return resellStatus;
+}
+
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
  * @param args Lookup with an address or uniqueInventoryID.
@@ -142,20 +163,27 @@ function bindAddress(user, address, options) {
  */
 
 async function get(user, args, options) {
-    const { uniqueInventoryID, address, ...restArgs } = args;
+    const { address, ...restArgs } = args;
     let inventory;
 
-    if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
-        inventory = await searchOne(contractName, searchArgs, options, user);
-    } else {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'uniqueInventoryID', value: uniqueInventoryID });
-        inventory = await searchOne(contractName, searchArgs, options, user);
-    }
+    const searchArgs = setSearchQueryOptions(restArgs, {
+        key: "address",
+        value: address,
+    });
+    inventory = await searchOne(contractName, searchArgs, options, user);
+
     if (!inventory) {
         return undefined;
     }
 
+    const sale = await saleJs.get(user, { assetToBeSold: inventory.address, state: 1 }, options);
+
+    if (sale) {
+        inventory = {
+            ...inventory,
+            price: sale.price,
+        }
+    }
 
     return marshalOut({
         ...inventory,
@@ -163,8 +191,52 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventories = await searchAllWithQueryArgs(contractName, args, options, admin)
-    return inventories.map((inventory) => marshalOut(inventory))
+    const { range, ownerCommonName, assetAddresses, status, ...restArgs } = args;
+    let inventories;
+    let sales;
+    let finalInventory = [];
+
+    if (ownerCommonName) {
+        inventories = await searchAllWithQueryArgs(contractName, 
+            {   
+                ...restArgs,
+                ownerCommonName: ownerCommonName, 
+                status: status ? status : [1,2],
+            }, options, admin);
+    }
+    else if (assetAddresses) {
+        inventories = await searchAllWithQueryArgs(contractName, 
+            { 
+                ...restArgs,
+                address: assetAddresses, 
+                status: status ? status : [1, 2],
+            }, options, admin);
+    }
+    else {
+        inventories = await searchAllWithQueryArgs(contractName, 
+            { 
+                ...restArgs, 
+                status: status ? status : [1,2],
+            }, options, admin);
+    }
+
+    if (inventories) {
+        const assetAddresses = inventories.map((inventory) => inventory.address);
+        sales = await saleJs.getAll(admin, { assetAddresses }, options);
+        inventories.forEach(inventory => {
+            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address);
+            if (itemSale) {
+                finalInventory.push({
+                    ...inventory,
+                    price: itemSale?.price,
+                })
+            } else {
+                finalInventory.push(inventory);
+            }
+        });
+    }
+
+    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
 async function inventoryCount(admin, args = {}, options) {
@@ -206,6 +278,7 @@ export default {
     contractName,
     contractFilename,
     bindAddress,
+    resellItem,
     get,
     getAll,
     inventoryCount,
