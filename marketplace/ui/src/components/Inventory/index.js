@@ -262,7 +262,7 @@ const Inventory = ({ user }) => {
                         : "Please connect to Stripe first"
                     }
                     placement="bottom"
-                  >
+                  />
                 </div>
               </div>
               <>
