@@ -104,7 +104,12 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
       const prefix = connected ? (connected.isHealthy ? '✅ ' : '⚠️ ') : '❌ ';
       const prefixedLabel = `${prefix}${dep.label ? dep.label : dep.url}`;
       return new Node(
-        { ...dep, label: prefixedLabel, tooltip: dep.url, description: dep.label ? dep.url : undefined },
+        { 
+          ...dep, 
+          label: prefixedLabel, 
+          tooltip: dep.url, 
+          description: dep.label ? dep.url : undefined 
+        },
         connected ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
         undefined,
         'node'

@@ -33,7 +33,7 @@ export class CirrusProvider implements vscode.TreeDataProvider<CirrusItem> {
   }
 
   /**
-   * Given the path to package.json, read all its deployments and devDeployments.
+   * Given the path to a designated config.yaml, read all its deployments information
    */
   private async queryCirrus(): Promise<CirrusItem[]> {
     const [name, queryString] = this._queryString.split('?')

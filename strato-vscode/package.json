@@ -4,7 +4,7 @@
 	"displayName": "STRATO",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"icon": "resources/rebrand-logo.png",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"repository": "https://github.com/blockapps/strato-platform/strato-vscode-images",
 	"engines": {
 		"vscode": "^1.53.0"
@@ -15,14 +15,6 @@
 	"activationEvents": [
 		"onDebugDynamicConfigurations:strato",
 		"onLanguage:solidity",
-		"onCommand:strato-vscode.importProject",
-		"onCommand:strato-vscode.buildProject",
-		"onCommand:strato-vscode.deployProject",
-		"onCommand:strato-vscode.runServer",
-		"onCommand:strato-vscode.testServer",
-		"onCommand:strato-vscode.runUI",
-		"onCommand:strato-vscode.testUI",
-		"onView:project-management",
 		"onView:contracts",
 		"onView:nodes",
 		"onView:cirrus",
@@ -42,39 +34,9 @@
 					"type": "boolean",
 					"default": true
 				},
-				"strato-vscode.deployProjectCommand": {
-					"type": "string",
-					"default": "CONFIG=mercata yarn deploy",
-					"description": "Script that deploys the project contracts to a STRATO node"
-				},
-				"strato-vscode.runServerCommand": {
-					"type": "string",
-					"default": "yarn install; yarn start",
-					"description": "Script that runs the project backend server"
-				},
-				"strato-vscode.runUICommand": {
-					"type": "string",
-					"default": "yarn install; yarn develop",
-					"description": "Script that runs the project frontend server"
-				},
-				"strato-vscode.testServerCommand": {
-					"type": "string",
-					"default": "yarn install; yarn test",
-					"description": "Script that runs the backend test suite"
-				},
-				"strato-vscode.testUICommand": {
-					"type": "string",
-					"default": "yarn install; yarn test",
-					"description": "Script that runs the frontend test suite"
-				},
 				"strato-vscode.configPath": {
 					"type": "string",
-					"default": "backend/config",
-					"description": "The default directory for the configuration file(s) location"
-				},
-				"strato-vscode.configFile": {
-					"type": "string",
-					"default": "mercata.config.yaml",
+					"default": "",
 					"description": "The default configuration file containing STRATO node(s) information"
 				}
 			}
@@ -85,34 +47,6 @@
 			}
 		},
 		"commands": [
-			{
-				"command": "strato-vscode.createProject",
-				"title": "Create STRATO Project"
-			},
-			{
-				"command": "strato-vscode.buildProject",
-				"title": "Build STRATO Project"
-			},
-			{
-				"command": "strato-vscode.deployProject",
-				"title": "Deploy STRATO Project"
-			},
-			{
-				"command": "strato-vscode.runServer",
-				"title": "Run STRATO Project Server"
-			},
-			{
-				"command": "strato-vscode.testServer",
-				"title": "Test STRATO Project Server"
-			},
-			{
-				"command": "strato-vscode.runUI",
-				"title": "Run STRATO Project UI"
-			},
-			{
-				"command": "strato-vscode.testUI",
-				"title": "Test STRATO Project UI"
-			},
 			{
 				"command": "contracts.refreshEntry",
 				"title": "Refresh",
@@ -129,17 +63,22 @@
 				"icon": "$(play)"
 			},
 			{
+				"command": "contracts.searchContract",
+				"title": "Search",
+				"icon": "$(search)"
+			},
+			{
 				"command": "cirrus.queryCirrus",
 				"title": "Search",
 				"icon": "$(search)"
 			},
 			{
-				"command": "nodes.refreshEntry",
-				"title": "Refresh",
-				"icon": "$(refresh)"
+				"command": "nodes.addConfig",
+				"title": "Add",
+				"icon": "$(add)"
 			},
 			{
-				"command": "project-management.settings",
+				"command": "nodes.settings",
 				"title": "Open Settings",
 				"icon": "$(settings-gear)"
 			},
@@ -234,25 +173,30 @@
 					"group": "navigation"
 				},
 				{
+					"command": "contracts.searchContract",
+					"when": "view == contracts",
+					"group": "navigation"
+				},
+				{
 					"command": "cirrus.queryCirrus",
 					"when": "view == cirrus",
 					"group": "navigation"
 				},
 				{
-					"command": "nodes.refreshEntry",
+					"command": "nodes.addConfig",
 					"when": "view == nodes",
 					"group": "navigation"
 				},
 				{
-					"command": "project-management.settings",
-					"when": "view == project-management",
+					"command": "nodes.settings",
+					"when": "view == nodes",
 					"group": "navigation"
 				}
 			],
 			"view/item/context": [
 				{
 					"command": "contracts.uploadContract",
-					"when": "view == contracts && viewItem == chainId",
+					"when": "view == contracts",
 					"group": "inline"
 				},
 				{
@@ -283,10 +227,6 @@
 		},
 		"views": {
 			"strato-project": [
-				{
-					"id": "project-management",
-					"name": "Project Management"
-				},
 				{
 					"id": "nodes",
 					"name": "Nodes"
