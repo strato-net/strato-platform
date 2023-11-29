@@ -65,6 +65,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order created successfully", true);
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createOrderFailed, 
+          error: "Unauthorized while creating Order" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -105,6 +111,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Payment created successfully", true);
         return body.data;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createPaymentFailed, 
+          error: "Unauthorized while creating Order" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -145,6 +157,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Item created successfully", true);
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createOrderLineItemFailed, 
+          error: "Unauthorized while creating Item" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -179,6 +197,12 @@ const actions = {
         });
 
         return body.data;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchOrderDetailsFailed, 
+          error: "Unauthorized while fetching Order" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -211,6 +235,12 @@ const actions = {
         });
 
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchOrderLineItemDetailsFailed, 
+          error: "Unauthorized while fetching Item" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -251,6 +281,12 @@ const actions = {
           payload: body.data,
         });
         return;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchOrderFailed, 
+          error: "Unauthorized while fetching order" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({ type: actionDescriptors.fetchOrderFailed, error: body.error });
     } catch (err) {
@@ -283,6 +319,13 @@ const actions = {
           payload: body.data,
         });
         return;
+      }
+      else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchOrderSoldFailed, 
+          error: "Unauthorized while fetching order sold" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchOrderSoldFailed,
@@ -319,6 +362,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order has been updated", true);
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateBuyerDetailsFailed, 
+          error: "Unauthorized while updating Order" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -359,6 +408,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Order has been updated", true);
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateSellerDetailsFailed, 
+          error: "Unauthorized while updating Order" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

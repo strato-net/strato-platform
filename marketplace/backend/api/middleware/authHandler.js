@@ -59,7 +59,7 @@ class AuthHandler {
               res,
               'Access token is not a valid JWT',
             )
-            return next()
+            return next(err)
           }
           try {
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
@@ -79,13 +79,17 @@ class AuthHandler {
         }
       } catch (err) {
         rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
-        return next()
+        return next(err)
       }
-
+      
+      res.clearCookie(req.app.oauth.getCookieNameAccessToken())
+      res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
+      res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
+      
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })
-      return next()
+      return next(new Error('Authorization required'))
     }
   }
 
