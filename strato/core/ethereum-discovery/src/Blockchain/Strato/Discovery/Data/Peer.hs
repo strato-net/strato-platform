@@ -400,6 +400,9 @@ getUnbondedPeers = unUnbondedPeers <$> Mod.access (Mod.Proxy @UnbondedPeers)
 thisPeer :: PPeer -> [SQL.Filter PPeer]
 thisPeer peer = [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
 
+thisOr100Years :: Int -> Int
+thisOr100Years = min (100 * 365 * 24 * 60 * 60) -- there is no need to be disabling peers for > 100 years y'all
+
 disableUDPPeerForSeconds ::
   (MonadUnliftIO m, A.Replaceable PPeer UdpEnableTime m) =>
   PPeer ->
@@ -410,7 +413,8 @@ disableUDPPeerForSeconds peer seconds = try $ do
   if (currentTime < pPeerUdpEnableTime peer)
     then return ()
     else
-      let enableTime = UdpEnableTime $ fromIntegral seconds `addUTCTime` currentTime
+      let seconds' = thisOr100Years seconds
+          enableTime = UdpEnableTime $ fromIntegral seconds' `addUTCTime` currentTime
        in A.replace (A.Proxy @UdpEnableTime) peer enableTime
 
 resetPeers :: IO ()
@@ -454,7 +458,9 @@ lengthenPeerDisable' peer' = try $ do
   currentTime <- liftIO getCurrentTime
   let disable =
         if (currentTime < pPeerDisableExpiration peer')
-          then ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral (pPeerNextUdpDisableWindowSeconds peer') `addUTCTime` currentTime) 2
+          then 
+            let seconds = thisOr100Years $ pPeerNextUdpDisableWindowSeconds peer'
+            in ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral seconds `addUTCTime` currentTime) 2
           else SetPeerUdpDisableTime (UdpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
   A.replace (A.Proxy @PeerUdpDisable) peer' disable
 
