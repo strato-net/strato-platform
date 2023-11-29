@@ -78,7 +78,7 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
+        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error")
         return next(err)
       }
       
