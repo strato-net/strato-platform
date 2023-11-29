@@ -991,3 +991,4 @@ spec = do
   --   transaction_sender = excluded.transaction_sender,
   --   contract_name = excluded.contract_name,
   --   data = excluded.data;|]
+

@@ -52,7 +52,6 @@ const CategoryProductList = ({ user }) => {
   const debouncedMaxPrice = useDebounce(maxPrice, 1000);
   const debouncedMinPrice = useDebounce(minPrice, 1000);
   const [subCategories, setSubCategories] = useState([]);
-  const [uniqueProductNames, setUniqueProductNames] = useState([]);
   //=========================Categories===============================//
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -169,12 +168,6 @@ const CategoryProductList = ({ user }) => {
             (manufacturer, index, arr) => arr.indexOf(manufacturer) == index
           );
       setBrands(uniqueBrands);
-
-      const uniqueNames = marketplaceList.map((p) => p.name)
-                            .filter(
-                              (name, index, arr) => arr.indexOf(name) == index
-                            );
-      setUniqueProductNames(uniqueNames);
     }
   }, [marketplaceList]);
 
@@ -302,7 +295,7 @@ const CategoryProductList = ({ user }) => {
             <Divider className="m-0" />
 
             {/* Panel - SubCategory */}
-            {/* {currentCategory && (
+            {currentCategory && (
               <>
                 <Collapse
                   bordered={false}
@@ -318,13 +311,18 @@ const CategoryProductList = ({ user }) => {
                       value={selectedSubCategories}
                     >
                       <div className="flex flex-col gap-3">
+                        {subCategories.map((subcategory, index) => (
+                          <Checkbox value={subcategory.name} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
+                            {subcategory.name}
+                          </Checkbox>
+                        ))}
                       </div>
                     </Checkbox.Group>
                   </Panel>
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )} */}
+            )}
 
             {/* Panel - Product */}
             {marketplaceList.length > 0 && (
@@ -343,9 +341,9 @@ const CategoryProductList = ({ user }) => {
                       value={selectedProducts}
                     >
                       <div className="flex flex-col gap-3">
-                        {uniqueProductNames.map((product, index) => (
-                          <Checkbox value={product} key={index} className="m-0" onChange={onChangeProduct}>
-                            {decodeURIComponent(product)}
+                        {marketplaceList.map((product, index) => (
+                          <Checkbox value={product.productId} key={index} className="m-0" onChange={onChangeProduct}>
+                            {decodeURIComponent(product.name)}
                           </Checkbox>
                         ))}
                       </div>
@@ -357,7 +355,7 @@ const CategoryProductList = ({ user }) => {
             )}
 
             {/* Panel - Manufacturer/Brand */}
-            {/* {brands.length > 0 && marketplaceList.length > 0 && (
+            {brands.length > 0 && marketplaceList.length > 0 && (
               <>
                 <Collapse
                   bordered={false}
@@ -383,7 +381,7 @@ const CategoryProductList = ({ user }) => {
                 </Collapse>
                 <Divider className="m-0" />
               </>
-            )} */}
+            )}
             <div className="pb-24"></div>
           </div>
         </div>

@@ -152,39 +152,6 @@ const reducer = (state, action) => {
         error: action.error,
         isLoadingStripeStatus: false
       };
-    case actionDescriptors.uploadImage:
-      return {
-        ...state,
-        isUploadImageSubmitting: true,
-      };
-    case actionDescriptors.uploadImageSuccessful:
-      return {
-        ...state,
-        uploadedImg: action.payload,
-        isUploadImageSubmitting: false,
-      };
-    case actionDescriptors.uploadImageFailed:
-      return {
-        ...state,
-        error: action.error,
-        isUploadImageSubmitting: false,
-      };
-    case actionDescriptors.createItem:
-      return {
-        ...state,
-        isCreateInventorySubmitting: true,
-      }
-    case actionDescriptors.createItemSuccessful:
-      return {
-        ...state,
-        isCreateInventorySubmitting: false,
-      }
-    case actionDescriptors.createItemFailed:
-      return {
-        ...state,
-        error: action.error,
-        isCreateInventorySubmitting: false,
-      }
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

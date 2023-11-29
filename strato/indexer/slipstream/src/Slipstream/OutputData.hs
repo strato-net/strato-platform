@@ -1251,7 +1251,7 @@ solidityTypeToSQLType (SVMType.UserDefined _ _) = Just "text"
 solidityTypeToSQLType (SVMType.Fixed _ _) = Just "fixed"
 solidityTypeToSQLType (SVMType.Address _) = Just "text"
 solidityTypeToSQLType (SVMType.Account _) = Just "text"
-solidityTypeToSQLType (SVMType.Array _ _) = Just "jsonb"
+solidityTypeToSQLType (SVMType.Array _ _) = Nothing -- Just "jsonb"
 solidityTypeToSQLType (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
 solidityTypeToSQLType (SVMType.UnknownLabel _ _) = Just "text"
 --solidityTypeToSQLType (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
@@ -1271,7 +1271,7 @@ solidityValueToText (SolidityBool x) = tshow x
 solidityValueToText (SolidityNum x) = tshow x
 solidityValueToText (SolidityBytes x) = escapeQuotes $ tshow x
 solidityValueToText (SolidityArray x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
-solidityValueToText x@(SolidityObject _) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
+solidityValueToText (SolidityObject x) = escapeSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode x
 
 valueToSQLTextFilterContract :: Value -> Maybe Text
 valueToSQLTextFilterContract x = valueToSQLText x
@@ -1292,8 +1292,8 @@ valueToSQLText (ValueEnum _ _ index) = Just $ wrapSingleQuotes $ escapeQuotes $ 
 valueToSQLText (ValueContract acct) = Just $ wrapSingleQuotes $ escapeQuotes $ T.pack $ show acct
 valueToSQLText (ValueFunction _ _ _) = Nothing
 valueToSQLText (ValueMapping _) = Nothing
-valueToSQLText arr@(ValueArrayFixed _ _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ arr
-valueToSQLText arr@(ValueArrayDynamic _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ arr
-valueToSQLText struct@(ValueStruct _) = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ struct
+valueToSQLText (ValueArrayFixed _ _) = Nothing
+valueToSQLText (ValueArrayDynamic _) = Nothing
+--valueToSQLText (ValueStruct namedItems) = Nothing
 
 valueToSQLText x = Just . wrapSingleQuotes . solidityValueToText . valueToSolidityValue $ x

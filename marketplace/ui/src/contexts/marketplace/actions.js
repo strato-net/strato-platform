@@ -224,9 +224,9 @@ const actions = {
       ? `&manufacturer[]=${manufacturers}`
       : "";
 
-    const productIdQuery = products ? `&name[]=${products}` : "";
-    const qtyQuery = `range[]=units,${minQty},${maxQty}`;
-    const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    const productIdQuery = products ? `&productId[]=${products}` : "";
+    const qtyQuery = `range[]=quantity,${minQty},${maxQty}`;
+    const priceQuery = `&range[]=pricePerUnit,${minPrice},${maxPrice}`;
 
     try {
       const response = await fetch(

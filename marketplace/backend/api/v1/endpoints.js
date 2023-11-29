@@ -43,6 +43,7 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
+  search: '/search',
   get: '/:address',
   getAll: '/',
   create: '/',
@@ -65,31 +66,6 @@ export const Item = {
   getRawMaterials: '/rawmaterials'
 }
 
-export const Art = {
-  prefix: '/art',
-  getAll: '/',
-  create: '/'
-}
-
-export const Carbon = {
-  prefix: '/carbon',
-  getAll: '/',
-  create: '/'
-}
-
-export const Metals = {
-  prefix: '/metals',
-  getAll: '/',
-  create: '/'
-}
-
-export const Clothing = {
-  prefix: '/clothing',
-  getAll: '/',
-  create: '/'
-}
-
-
 export const Order = {
   prefix: '/order',
   get: '/:address',
@@ -102,9 +78,6 @@ export const Order = {
   paymentSession: '/payment/session/:session_id',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user',
-  createSaleOrder: '/sale',
-  cancelSaleOrder: '/sale/cancel',
-  executeSale: '/closeSale',
 }
 
 export const OrderLine = {

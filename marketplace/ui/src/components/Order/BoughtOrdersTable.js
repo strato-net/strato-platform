@@ -33,10 +33,11 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       dispatch,
       limit,
       offset,
-      user?.commonName,
+      debouncedSearchTerm,
+      user?.organization,
+      order,
       selectedDate,
-      filter,
-      order
+      filter
     );
   }, [dispatch, limit, offset, debouncedSearchTerm, user, order, selectedDate, filter]);
   
@@ -56,9 +57,9 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         chainId: order.chainId,
         key: order.address,
         orderNumber: order,
-        sellersCommonName: order.sellersCommonName,
-        orderTotal: order.totalPrice,
-        date: getStringDate(order.createdDate, US_DATE_FORMAT),
+        sellerOrganization: order.sellerOrganization,
+        orderTotal: order.orderTotal,
+        date: getStringDate(order.orderDate, US_DATE_FORMAT),
         status: getStatus(parseInt(order.status)),
         invoice: order,
       });
@@ -87,8 +88,8 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     },
     {
       title: "seller".toUpperCase(),
-      dataIndex: "sellersCommonName",
-      key: "sellersCommonName",
+      dataIndex: "sellerOrganization",
+      key: "sellerOrganization",
       render: (text) => <p>{text}</p>,
     },
     {
@@ -101,18 +102,9 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       dataIndex: "date",
       key: "date",
       render: (text) => <p>{text}</p>,
-      title: (
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div className="mt-1.5">{"Date (mm/dd/yyyy)".toUpperCase()}</div>
-          <div>
-            {order === "createdDate.desc" ? (
-              <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
-            ) : (
-              <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.desc")} />
-            )}
-          </div>
-        </div>
-      ),
+      title: "DATE",
+      sorter: true,
+      sortDirections: ["ascend", "descend", "ascend" ]
     },
     {
       title: "invoice".toUpperCase(),
@@ -226,6 +218,15 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     setPage(page);
   };
 
+  const onChange = (pagination, filters, sorter) => {
+    console.log(sorter);
+    if (order === "createdDate.desc") {
+      setOrder("createdDate.asc")
+    } else {
+      setOrder("createdDate.desc")
+    }
+  };
+
   return (
     <div>
       <DataTableComponent
@@ -234,6 +235,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         pagination={false}
         isLoading={isordersLoading}
         scrollX="100%"
+        onChange={onChange}
       />
       <Pagination
         current={page}

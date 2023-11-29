@@ -12,12 +12,7 @@ const AddressComponent = ({ userAddress }) => {
             </Row>
             <Row className="flex flex-wrap">
                 <b className="w-28">Address</b>
-                <p className="w-52">
-                    { userAddress.shippingAddressLine2 ?
-                        decodeURIComponent(userAddress.shippingAddressLine1)+", "+decodeURIComponent(userAddress.shippingAddressLine2) 
-                        : decodeURIComponent(userAddress.shippingAddressLine1)
-                    }
-                </p>
+                <p className="w-52" >{decodeURIComponent(userAddress.shippingAddressLine1) + ", " + decodeURIComponent(userAddress.shippingAddressLine2)}</p>
             </Row>
             <Row>
                 <b className="w-28">City</b>

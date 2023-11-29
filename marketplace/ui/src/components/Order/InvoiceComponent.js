@@ -128,16 +128,17 @@ const InvoiceComponent = ({ invoice }) => {
 
 
   useEffect(() => {
+   
     let tax = 0;
     let shipping = 0;
-    // invoice.orderLines.forEach(item => {
-    //   tax += item.tax;
-    //   shipping += item.shippingCharges;
-    // });
+    invoice.orderLines.forEach(item => {
+      tax += item.tax;
+      shipping += item.shippingCharges;
+    });
    
     settotalTax(tax);
     settotalShipping(shipping);
-    setSubtotal(invoice.order.totalPrice-tax-shipping);
+    setSubtotal(invoice.orderTotal-tax-shipping);
   }, [invoice])
 
 
@@ -151,10 +152,10 @@ const InvoiceComponent = ({ invoice }) => {
         <View style={styles.section}>
           <Text style={styles.title}>Invoice</Text>
           <View>
-            <Text style={styles.label}>Order Number: <Text style={styles.value}>{invoice.order.orderId}</Text></Text>
-            <Text style={styles.label}>Order Date: <Text style={styles.value}>{getStringDate(invoice.order.createdDate, US_DATE_FORMAT)}</Text></Text>
-            <Text style={styles.label}>Buyer: <Text style={styles.value}>{invoice.order.purchasersCommonName}</Text></Text>
-            <Text style={styles.label}>Seller: <Text style={styles.value}>{invoice.order.sellersCommonName}</Text></Text>
+            <Text style={styles.label}>Order Number: <Text style={styles.value}>{invoice.orderId}</Text></Text>
+            <Text style={styles.label}>Order Date: <Text style={styles.value}>{getStringDate(invoice.orderDate, US_DATE_FORMAT)}</Text></Text>
+            <Text style={styles.label}>Buyer: <Text style={styles.value}>{invoice.buyerOrganization}</Text></Text>
+            <Text style={styles.label}>Seller: <Text style={styles.value}>{invoice.sellerOrganization}</Text></Text>
           </View>
           <View style={styles.topSection}>
             <View style={styles.addressSection}>
@@ -165,12 +166,7 @@ const InvoiceComponent = ({ invoice }) => {
               </View>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>Address: </Text>
-                <Text style={styles.bottomLabelValue}>
-                  { invoice.userContactAddress.shippingAddressLine2 ?
-                    decodeURIComponent(invoice.userContactAddress.shippingAddressLine1)+", "+decodeURIComponent(invoice.userContactAddress.shippingAddressLine2) 
-                    : decodeURIComponent(invoice.userContactAddress.shippingAddressLine1)
-                  }
-                </Text>
+                <Text style={styles.bottomLabelValue}>{decodeURIComponent(invoice.userContactAddress.shippingAddressLine1)+", "+decodeURIComponent(invoice.userContactAddress.shippingAddressLine2) }</Text>
               </View>
               <View style={styles.addressTextSection}>
                 <Text style={styles.bottomLabelAddress}>City: </Text>
@@ -191,25 +187,28 @@ const InvoiceComponent = ({ invoice }) => {
           {/* <Text style={styles.title}>Items</Text> */}
           <View style={styles.tableHeader}>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Product Name</Text>
+            <Text style={[styles.label, styles.tableHeaderColumn]}>Manufacturer</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Unit Price($)</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Quantity</Text>
-            <Text style={[styles.label, styles.tableHeaderColumn]}>Shipping($)</Text>
+            <Text style={[styles.label, styles.tableHeaderColumn]}>Shipping Charges($)</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Tax($)</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount($)</Text>
           </View>
-          {invoice.assets.map(asset => (
-            <View style={styles.tableRow} key={asset.address}>
-              <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
+          {invoice.orderLines.map(item => (
+            <View style={styles.tableRow} key={item.id}>
+              <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(item.productName)}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.price}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(item.manufacturer)}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>{asset.quantity}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${item.pricePerUnit}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.shippingCharges ? asset.shippingCharges : 0}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{item.quantity}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.tax ? asset.tax : 0}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${item.shippingCharges}</Text>
               {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.amount}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>${item.tax}</Text>
+              {/* <View style={styles.separator} /> */}
+              <Text style={[styles.value, styles.tableRowColumn]}>${item.amount}</Text>
             </View>
           ))}
           {/* <View style={styles.tableRow} >
@@ -238,7 +237,7 @@ const InvoiceComponent = ({ invoice }) => {
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Total</Text>
-              <Text style={styles.bottomLabel}>${invoice.order.totalPrice}</Text>
+              <Text style={styles.bottomLabel}>${invoice.orderTotal}</Text>
             </View>
           </View>
         </View>

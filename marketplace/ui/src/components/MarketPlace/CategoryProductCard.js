@@ -19,13 +19,13 @@ import {
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
-import image_placeholder from "../../images/resources/image_placeholder.png";
+
 
 const { Title, Text, Paragraph } = Typography;
 
 
 const CategoryProductCard = ({ product, category }) => {
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
 
@@ -42,8 +42,7 @@ const CategoryProductCard = ({ product, category }) => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductDetail.url;
   const [qty, setQty] = useState(1);
-  const itemData = JSON.parse(product?.data);
-  const availableQuantity = itemData && itemData.units ? itemData.units : 1;
+  const availableQuantity = product.availableQuantity;
 
   const subtract = () => {
     if (qty !== 1) {
@@ -53,17 +52,12 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const add = () => {
-    if (qty < availableQuantity) {
+    if (qty < product.availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
       openToast("bottom", true, "Cannot add more than available quantity");
     }
-  };
-
-  const getCategory = () => {
-    const parts = product.contract_name.split('-');
-    return parts[parts.length - 1];
   };
 
   const openToast = (placement, isError, msg) => {
@@ -83,10 +77,6 @@ const CategoryProductCard = ({ product, category }) => {
   };
 
   const addItemToCart = () => {
-    if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, "Cannot buy your own item");
-      return false;
-    }
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
       if (cartList[i].product.address === product.address) {
@@ -99,26 +89,22 @@ const CategoryProductCard = ({ product, category }) => {
       items = [...cartList, { product, qty }];
       actions.addItemToCart(marketplaceDispatch, items);
       openToast("bottom", false, "Item added to cart");
-      return true;
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === product.address) {
-          const itemData = JSON.parse(product.data);
-          const availableQuantity = itemData.units ? itemData.units : 1;
-          if (items[index].qty + qty <= availableQuantity) {
+          if (items[index].qty + qty <= product.availableQuantity) {
             items[index].qty += qty;
             actions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
             openToast("bottom", false, "Item updated in cart");
-            return true;
           } else {
             openToast(
               "bottom",
               true,
               "Cannot add more than available quantity"
             );
-            return false;
+            return;
           }
         }
       });
@@ -137,7 +123,7 @@ const CategoryProductCard = ({ product, category }) => {
         <div className="flex justify-start items-center">
           <div className="m-4">
             <Image
-              src={product.images && product.images.length > 0 ? product.images[0] : image_placeholder}
+              src={product.imageUrl}
               width={200}
               height={180}
               style={{ objectFit: "contain" }}
@@ -159,10 +145,12 @@ const CategoryProductCard = ({ product, category }) => {
               >
                 {decodeURIComponent(product.name)}&nbsp;
               </Text>
-              <Text className="text-secondryB text-sm" id="prod-category">({getCategory()})</Text>
+              <Text className="text-secondryB text-sm" id="prod-category">({category})</Text>
             </div>
             <Text className="text-secondryB text-sm" id="prod-category">
-              Sold By: {product.ownerCommonName}
+              Sold By: {product.ownerOrganization.startsWith('Mercata Account')
+                ? product.ownerCommonName
+                : product.ownerOrganization}
             </Text>
             <Paragraph
               ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
@@ -177,9 +165,9 @@ const CategoryProductCard = ({ product, category }) => {
               ))}
             </Paragraph>
             <Title level={4} className="!mt-0" id="prod-price">
-              $ {product.price}
+              $ {product.pricePerUnit}
             </Title>
-            {availableQuantity !== 0 ?
+            {product.availableQuantity !== 0 ?
               (
                 <div>
                   <div className="flex items-center my-2" id="prod-quantity">
@@ -192,7 +180,7 @@ const CategoryProductCard = ({ product, category }) => {
                       </div>
                       <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={product.availableQuantity} value={qty} defaultValue={qty} controls={false}
                         onChange={e => {
-                          if (e < availableQuantity) {
+                          if (e < product.availableQuantity) {
                             setQty(e)
                           } else {
                             openToast(
@@ -200,7 +188,7 @@ const CategoryProductCard = ({ product, category }) => {
                               true,
                               "Cannot add more than available quantity"
                             );
-                            setQty(availableQuantity)
+                            setQty(product.availableQuantity)
                           }
                         }} />
                       <div
@@ -241,7 +229,7 @@ const CategoryProductCard = ({ product, category }) => {
                   </Button>
                   <Button
                     type="primary"
-                    id={`${product.name}-buy-now`}
+                    id={`${product.name.replace(/ /g, "_")}-buy-now`}
                     className="w-40 h-9 m-3 bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -265,9 +253,8 @@ const CategoryProductCard = ({ product, category }) => {
                             productId: product.productId
                           },
                         });
-                        if (addItemToCart()) {
-                          navigate("/checkout");
-                        }
+                        addItemToCart();
+                        navigate("/checkout");
                       }
                     }}
                   >

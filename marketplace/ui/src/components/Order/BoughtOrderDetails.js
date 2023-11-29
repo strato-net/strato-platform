@@ -27,7 +27,6 @@ import ClickableCell from "../ClickableCell";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 import RestStatus from "http-status-codes";
 import TagManager from "react-gtm-module";
-import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const BoughtOrderDetails = ({ user, users }) => {
   const [comment, setcomment] = useState("");
@@ -92,7 +91,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const getData = async () => {
     const data = await actions.fetchOrderDetails(dispatch, Id);
     if (data != null) {
-      getPaymentStatus(data.order.paymentSessionId);
+      getPaymentStatus(data.paymentSessionId);
     }
   }
 
@@ -127,23 +126,24 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (orderDetails) {
-      setStatus(getStatus(parseInt(orderDetails.order.status)));
-      setcomment(orderDetails.order.comments);
+      setStatus(getStatus(parseInt(orderDetails.status)));
+      setcomment(orderDetails.buyerComments);
 
       let items = [];
-      orderDetails.assets.forEach((prod) => {
+      orderDetails.orderLines.forEach((prod) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.images.length > 0 ? prod.images[0] : image_placeholder,
-          productName: prod,
-          unitPrice: prod.price,
+          productImage: prod.imageUrl,
+          productName: prod.productName,
+          manufacturer: prod.manufacturer,
+          unitPrice: prod.pricePerUnit,
           quantity: prod.quantity,
-          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
+          shippingCharges: prod.shippingCharges,
           amount: prod.amount,
           serialNumber: prod,
-          tax: prod.tax ? prod.tax : 0,
+          tax: prod.tax,
         });
       });
       setdata(items);
@@ -200,7 +200,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       title: "",
       dataIndex: "productImage",
       key: "productImage",
-      render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
+      render: (text) => <Image width={75} height={60} src={text} />,
     },
     {
       title: <Text className="text-primaryC text-[13px]">PRODUCT NAME</Text>,
@@ -209,10 +209,9 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => (
         <p
           // href={routes.BoughtOrderDetails.url}
-          className="text-primary text-[17px] cursor-pointer"
-          onClick={() => {navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+          className="text-primary text-[17px]"
         >
-          {decodeURIComponent(text.name)}
+          {decodeURIComponent(text)}
         </p>
       ),
     },
@@ -239,6 +238,13 @@ const BoughtOrderDetails = ({ user, users }) => {
           </p>
         </div>
       ),
+    },
+    {
+      title: <Text className="text-primaryC text-[13px]">MANUFACTURER</Text>,
+      dataIndex: "manufacturer",
+      key: "manufacturer",
+      align: "center",
+      render: (text) => <p>{decodeURIComponent(text)}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
@@ -285,10 +291,13 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const handleCancelOrder = async () => {
     const body = {
-      saleOrderAddress: details.order.address,
-      comments: comment,
+      address: Id,
+      updates: {
+        buyerComments: encodeURIComponent(comment),
+        status: 4,
+      },
     };
-    let isDone = await actions.cancelSale(dispatch, body);
+    let isDone = await actions.updateBuyerDetails(dispatch, body);
     if (isDone) {
       setStatus("Canceled");
     }
@@ -318,7 +327,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-primary">
-              {details.order.orderId}
+              {details.orderId}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -332,23 +341,23 @@ const BoughtOrderDetails = ({ user, users }) => {
               }
             </div>
             <Row className="my-6 justify-between">
-              <OrderData title="NUMBER" value={`#${details.order.orderId}`} />
+              <OrderData title="NUMBER" value={`#${details.orderId}`} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="BUYER"
-                value={details.order.purchasersCommonName}
+                value={details.buyerOrganization}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="SELLER"
-                value={details.order.sellersCommonName}
+                value={details.sellerOrganization}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
-              <OrderData title="TOTAL ($)" value={details.order.totalPrice} />
+              <OrderData title="TOTAL ($)" value={details.orderTotal} />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <OrderData
                 title="DATE"
-                value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
+                value={getStringDate(details.orderDate, US_DATE_FORMAT)}
               />
               <Divider type="vertical" className="h-14 bg-secondryD" />
               <Col>
@@ -368,7 +377,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                   rows={2}
                   placeholder="Enter Comments"
                   value={decodeURIComponent(comment)}
-                  disabled={status !== getStatus(1) || details.order.paymentSessionId !== ""}
+                  disabled={status !== getStatus(1)}
                   onChange={(event) => {
                     setcomment(event.target.value);
                   }}
@@ -378,7 +387,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 id="cancel-order-button"
                 type="primary"
                 className="w-48 h-9 ml-6 mt-3 bg-primary !hover:bg-primaryHover"
-                disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
+                disabled={status !== getStatus(1) || comment === "" || details.paymentSessionId !== ""}
                 onClick={() => {
                   handleCancelOrder()
                   window.LOQ.push(['ready', async LO => {

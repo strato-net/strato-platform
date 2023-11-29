@@ -31,15 +31,6 @@ const actionDescriptors = {
   updateSellerDetailsFailed: "update_seller_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
-  createSale: "create_sale",
-  createSaleSuccessful: "create_sale_successful",
-  createSaleFailed: "create_sale_failed",
-  cancelSale: "cancel_sale",
-  cancelSaleSuccessful: "cancel_sale_successful",
-  cancelSaleFailed: "cancel_sale_failed",
-  executeSale: "execute_sale",
-  executeSaleSuccessful: "execute_sale_successful",
-  executeSaleFailed: "execute_sale_failed",
 };
 
 const actions = {
@@ -265,21 +256,18 @@ const actions = {
     }
   },
 
-  fetchOrder: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
+  fetchOrder: async (dispatch, limit, offset, queryValue, organization, order, selectedDate, filter) => {
+    let query = queryValue ? `&orderId=${queryValue}` : "";
+    let end = selectedDate + 86400;
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : "query";
+    
+    query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
+    
     dispatch({ type: actionDescriptors.fetchOrder });
-
-    let query = "";
-    if (selectedDate) {
-      let end = selectedDate + 86400;
-      query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
-    }
-    if (filter) {
-      query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
-    }
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?limit=${limit}&offset=${offset}&order=${order}&purchasersCommonName=${commonName}${query}`,
+        `${apiUrl}/order?limit=${limit}&offset=${offset}&${query}&order=${order}&buyerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -306,21 +294,18 @@ const actions = {
     }
   },
 
-  fetchOrderSold: async (dispatch, limit, offset, commonName, selectedDate, filter, order) => {
-    dispatch({ type: actionDescriptors.fetchOrderSold });
+  fetchOrderSold: async (dispatch, limit, offset, queryValue, organization, order, selectedDate, filter) => {
+    let query = queryValue ? `&orderId=${queryValue}` : "";
+    let end = selectedDate + 86400;
+    query = selectedDate ? query.concat(`&range[]=orderDate,${selectedDate},${end}`) : query;
 
-    let query = "";
-    if (selectedDate) {
-      let end = selectedDate + 86400;
-      query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
-    }
-    if (filter) {
-      query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
-    }
+    query = filter !== 0  ? query.concat(`&status=${filter}`) : query;
+
+    dispatch({ type: actionDescriptors.fetchOrderSold });
 
     try {
       const response = await fetch(
-        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellersCommonName=${commonName}${query}`,
+        `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&${query}&sellerOrganization=${organization}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -444,127 +429,7 @@ const actions = {
       });
       actions.setMessage(dispatch, "Error while updating Order");
     }
-  },
-
-  executeSale: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.executeSale });
-    
-    try {
-      const response = await fetch(`${apiUrl}/order/closeSale`, {
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.executeSaleSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Sale executed successfully", true);
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.executeSaleFailed,
-        error: "Error while executing sale",
-      });
-      actions.setMessage(dispatch, "Error while executing sale");
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.executeSaleFailed,
-        error: "Error while executing Sale",
-      });
-      actions.setMessage(dispatch, "Error while executing sale");
-    }
-  },
-
-  cancelSale: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.cancelSale });
-    
-    try {
-      const response = await fetch(`${apiUrl}/order/sale/cancel`, {
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.cancelSaleSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Sale canceled successfully", true);
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.cancelSaleFailed,
-        error: "Error while canceling sale",
-      });
-      actions.setMessage(dispatch, "Error while canceling sale");
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.cancelSaleFailed,
-        error: "Error while canceling Sale",
-      });
-      actions.setMessage(dispatch, "Error while canceling sale");
-    }
-  },
-
-  createSale: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.createSale });
-    
-    try {
-      const response = await fetch(`${apiUrl}/order/sale`, {
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.createSaleSuccessful,
-          payload: body.data,
-        });
-        actions.setMessage(dispatch, "Sale created successfully", true);
-        return body.data;
-      }
-
-      dispatch({
-        type: actionDescriptors.createSaleFailed,
-        error: "Error while executing sale",
-      });
-      actions.setMessage(dispatch, "Error while creating sale");
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.createSaleFailed,
-        error: "Error while creating Sale",
-      });
-      actions.setMessage(dispatch, "Error while creating sale");
-    }
-  },
+  }
 };
 
 export { actionDescriptors, actions };

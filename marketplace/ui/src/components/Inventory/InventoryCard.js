@@ -5,7 +5,7 @@ import {
   MoreOutlined,
   EditOutlined,
   EyeOutlined,
-  PlusOutlined,
+  SwapOutlined,
   PieChartOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
@@ -15,7 +15,7 @@ import { UNIT_OF_MEASUREMENTS, INVENTORY_STATUS } from "../../helpers/constants"
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ResellModal from "./ResellModal";
 import routes from "../../helpers/routes";
-import image_placeholder from "../../images/resources/image_placeholder.png";
+import TransferModal from "./TransferModal";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -23,15 +23,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-
-  const itemData = JSON.parse(inventory.data);
-
-  const showModalEdit = () => {
-    hide();
-    setOpenEdit(true);
-  };
 
   const handleCancel = () => {
     setOpen(false);
@@ -66,91 +60,32 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
     setResellModalOpen(false);
   };
 
+  const showTransferModal = () => {
+    hide();
+    setTransferModalOpen(true);
+  };
+
+  const handleTransferModalClose = () => {
+    setTransferModalOpen(false);
+  };
+
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", inventory.address)}`, { state: { isCalledFromInventory: true } });
   }
 
-  const getCategory = () => {
-    const parts = inventory.contract_name.split('-');
-    return parts[parts.length - 1];
-  };
-
-  const categoricalProperties = () => {
-    switch (getCategory()) {
-      case 'Art':
-        return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Artist</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.artist}
-            </p>
-          </div>)
-      case 'Carbon':
-        return (
-          <>
-            <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Project Type</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {itemData.projectType}
-              </p>
-            </div>
-            <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Units</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {itemData.units}
-              </p>
-            </div>
-          </>
-          )
-      case 'Clothing':
-        return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Brand</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.brand}
-            </p>
-          </div>)
-      case 'Metals':
-        return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Source</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.source}
-            </p>
-          </div>)
-      default:
-        break;
-    }
-  };
-
   return (
     <Card className="w-full mt-6">
       <div className="flex" id={id}>
-        <img className="w-52 object-contain" alt="" src={inventory.images && inventory.images.length > 0 ? inventory.images[0] : image_placeholder} />
+        <img className="w-52 object-cover" alt="" src={inventory.imageUrl} />
         <div className="ml-12 w-full">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <h3 className="font-semibold text-primaryB text-xl">
                 {decodeURIComponent(inventory.name)}
               </h3>
-              {
+              {category &&
                 <p className="font-medium text-secondryB text-base ml-2">
-                  ({getCategory()})
+                  ({category.name})
                 </p>
               }
             </div>
@@ -183,6 +118,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                       <PieChartOutlined />
                       <p className="ml-3">Resell</p>
                     </div>
+                    <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showTransferModal}
+                    >
+                      <SwapOutlined />
+                      <p className="ml-3">Transfer</p>
+                    </div>
                   </div>
                 }
                 trigger="click"
@@ -191,49 +133,97 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               </Popover>
             </div>
           </div>
-          {categoricalProperties()}
-          { inventory.status === '2' ? <></> :
-            <div className="flex mt-1 items-center">
-              <p className="text-primaryC text-sm w-40">Price</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                $ {inventory.price}
-              </p>
+          <div className="flex mt-1.5 items-center">
+            <p className="text-primaryC text-sm w-40">Manufacturer</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {decodeURIComponent(inventory.manufacturer)}
+            </p>
+          </div>
+          <div className="flex mt-1 items-center">
+            <p className="text-primaryC text-sm w-40">Price Per Unit</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              $ {inventory.pricePerUnit}
+            </p>
+          </div>
+          <div className="flex mt-1 items-center">
+            <p className="text-primaryC text-sm w-40">Least Sellable Unit</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">
+              {inventory.leastSellableUnit} (
+              {UNIT_OF_MEASUREMENTS[inventory.unitOfMeasurement]})
+            </p>
+          </div>
+          <div className="flex mt-1 items-center">
+            <p className="text-primaryC text-sm w-40">Batch ID</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">{inventory.batchId}</p>
+          </div>
+          <div className="flex mt-1 items-center">
+            <p className="text-primaryC text-sm w-40">Type</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-secondryB text-sm ml-3">{inventory.inventoryType}</p>
+          </div>
+          <div className="flex mt-1 items-center">
+            <p className="text-primaryC text-sm w-40">Remaining Quantity</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <p className="text-error text-sm ml-3">
+              {inventory.availableQuantity}
+            </p>
+          </div>
+          <div className="flex mt-1 items-center">
+            <p className="text-primaryC text-sm w-40">Serial Numbers</p>
+            <p text-secondryB text-sm>
+              :
+            </p>
+            <div
+              className="flex items-center cursor-pointer ml-3"
+              onClick={() => {
+                navigate(
+                  `${routes.Items.url}?inventoryId=${inventory.address}`,
+                  { state: { productName: inventory.name } }
+                );
+              }}
+            >
+              <EyeOutlined />
+              <p className="text-secondryB text-sm ml-2">View</p>
             </div>
-          }
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Description</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {inventory.description}
-            </p>
           </div>
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Serial Number</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.serialNumber ? itemData.serialNumber : "No Serial Number Available"}
-            </p>
+          <div className="flex mt-2.5">
+            <div
+              className={classNames(
+                inventory.status === 1
+                  ? "text-primary bg-[#EBF7FF]"
+                  : "text-error bg-[#FFF0F0]",
+                "text-center py-1 rounded w-28 text-sm "
+              )}
+            >
+              <p>{INVENTORY_STATUS[inventory.status]}</p>
+            </div>
+            <div
+              className={classNames(
+                inventory.isActive
+                  ? "text-success bg-[#EAFFEE]"
+                  : "text-orange bg-[#FFF6EC]",
+                "text-center py-1 rounded w-24 text-sm ml-4"
+              )}
+            >
+              <p>{inventory.isActive ? "Active" : "Inactive"}</p>
+            </div>
           </div>
-          { inventory.status === '2' ?
-            (<div className="flex mt-2.5">
-              <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">
-                <p>UNPUBLISHED</p>
-              </div>
-            </div>)
-            :
-            (<div className="flex mt-2.5">
-              <div className="text-primary bg-[#EBF7FF] text-center py-1 rounded w-28 text-sm">
-                <p>PUBLISHED</p>
-              </div>
-            </div>)
-          }
         </div>
       </div>
       {open && (
@@ -262,6 +252,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
         <ResellModal
           open={resellModalOpen}
           handleCancel={handleResellModalClose}
+          inventory={inventory}
+        />
+      )}
+      {transferModalOpen && (
+        <TransferModal
+          open={transferModalOpen}
+          handleCancel={handleTransferModalClose}
           inventory={inventory}
         />
       )}

@@ -17,7 +17,7 @@ const CategoryCard = () => {
   const categoryImages = [
     Images.art,
     Images.carbon,
-    Images.metals,
+    Images.materials,
     Images.clothing,
     Images.collectibles,
   ];

@@ -21,7 +21,6 @@ import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
-import image_placeholder from "../../images/resources/image_placeholder.png";
 
 const { Title, Text } = Typography;
 
@@ -30,7 +29,7 @@ const TopSellingProductCard = () => {
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
@@ -74,10 +73,6 @@ const TopSellingProductCard = () => {
   };
 
   const addItemToCart = (product) => {
-    if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, "Cannot buy your own item")
-      return false;
-    }
     let found = false;
     for (var i = 0; i < cartList.length; i++) {
       if (cartList[i].product.address === product.address) {
@@ -91,26 +86,22 @@ const TopSellingProductCard = () => {
       actions.addItemToCart(marketplaceDispatch, items);
 
       openToast("bottom", false, "Item added to cart");
-      return true;
     } else {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === product.address) {
-          const itemData = JSON.parse(product.data);
-          const availableQuantity = itemData.units ? itemData.units : 1;
-          if (items[index].qty + 1 <= availableQuantity) {
+          if (items[index].qty + 1 <= product.availableQuantity) {
             items[index].qty += 1;
             actions.addItemToCart(marketplaceDispatch, items);
 
             openToast("bottom", false, "Item updated in cart");
-            return true;
           } else {
             openToast(
               "bottom",
               true,
               "Cannot add more than available quantity"
             );
-            return false;
+            return;
           }
         }
       });
@@ -146,7 +137,6 @@ const TopSellingProductCard = () => {
           ) : (
             topSellingProducts
               .map((topSellingProduct, index) => {
-                const itemData = JSON.parse(topSellingProduct.data);
                 return (
                   <div
                     key={index}
@@ -156,7 +146,7 @@ const TopSellingProductCard = () => {
                     <div className="flex flex-col items-center">
                       <Image
                         className="cursor-pointer"
-                        src={topSellingProduct.images && topSellingProduct.images.length > 0 ? topSellingProduct.images[0] : image_placeholder}
+                        src={topSellingProduct.imageUrl}
                         height={230}
                         width={230}
                         style={{ objectFit: "contain" }}
@@ -171,10 +161,15 @@ const TopSellingProductCard = () => {
                         {decodeURIComponent(topSellingProduct.name)}
                       </Text>
                       <Text className="mt-3 text-xl !text-primaryC font-semibold">
-                        ${topSellingProduct.price}
+                        ${topSellingProduct.pricePerUnit}
                       </Text>
                       <Text className="mt-1 text-sm !text-primaryB">
-                        {itemData.units}{itemData.units ? itemData.units > 1 ? " Tons" : " Ton" : <br/>}
+                        {topSellingProduct.leastSellableUnit}{" "}
+                        {
+                          UNIT_OF_MEASUREMENTS[
+                          topSellingProduct.unitOfMeasurement
+                          ]
+                        }
                       </Text>
                       <div className="flex justify-evenly items-center mt-4 w-full px-3">
                         <Button
@@ -201,9 +196,8 @@ const TopSellingProductCard = () => {
                                   productId: topSellingProduct.productId
                                 },
                               });
-                              if (addItemToCart(topSellingProduct)) { 
-                                navigate("/checkout") 
-                              }
+                              addItemToCart(topSellingProduct);
+                              navigate("/checkout");
                             }
                           }}
                         >

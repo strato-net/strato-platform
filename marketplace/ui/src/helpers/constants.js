@@ -1,4 +1,4 @@
-import { AMEX, Discover, Mastercard, VISA } from "../images/SVGComponents";
+import { env } from "../env";
 
 export const apiUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/api/v1"
@@ -7,6 +7,14 @@ export const apiUrl = process.env.REACT_APP_URL
 export const cirrusUrl = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL + "/cirrus/search"
   : "/cirrus/search"
+
+export const assetTableName = env.REACT_APP_ASSET_TABLE_NAME
+  ? env.REACT_APP_ASSET_TABLE_NAME
+  : "Asset"
+
+export const saleTableName = env.REACT_APP_SALE_TABLE_NAME
+  ? env.REACT_APP_SALE_TABLE_NAME
+  : "Sale"
 
 export const HTTP_METHODS = {
   GET: "GET",
@@ -37,8 +45,8 @@ export const MAX_PRICE = 100000000;
 export const INVENTORY_STATUS = {
   PUBLISHED: 1,
   UNPUBLISHED: 2,
-  "1": "Published",
-  "2": "Unpublished",
+  1: "Published",
+  2: "Unpublished",
 };
 
 export const unitOfMeasures = [
@@ -93,19 +101,3 @@ export const APPROVAL_STATUS = {
   "Accept": 1,
   "Reject": 2,
 };
-
-export const CATEGORIES = [
-  "Art",
-  "Carbon",
-  "Metals",
-  "Clothing"
-]
-
-export const PAYMENT_TYPE = [
-  { name: "---SELECT ALL---", value: 0},
-  { name: "AMEX", value: 1, icon: <AMEX width="20px" height="14px"/> },
-  { name: "Discover", value: 2, icon: <Discover width="20px" height="14px"/> },
-  { name: "Mastercard", value: 3, icon: <Mastercard width="20px" height="14px"/> },
-  { name: "STRAT", value: 4 },
-  { name: "VISA", value: 5, icon: <VISA width="20px" height="14px"/> },
-]

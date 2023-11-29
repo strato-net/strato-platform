@@ -71,16 +71,24 @@ const UpdateInventoryModal = ({
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
 
-  const getCategory = () => {
-    const parts = inventoryToUpdate.inventory.contract_name.split('-');
-    return parts[parts.length - 1];
-  };
-
   useEffect(() => {
     if (inventoryToUpdate) {
+      let subCategory; 
+      categorys.map(
+        (category) => category.subCategories.map(
+          (subCategoryRecord) => {
+            if (subCategoryRecord.name === inventoryToUpdate.inventory.subCategory) {
+              subCategory = subCategoryRecord;
+            } 
+          }
+        )
+      );
       let nextState = {
         category: {
-          name: getCategory(),
+          name: inventoryToUpdate.category.name,
+        },
+        subCategory: {
+          name: subCategory.name ?? "",
         },
         productName: {
           name: decodeURIComponent(inventoryToUpdate.inventory.name),
@@ -183,6 +191,38 @@ const UpdateInventoryModal = ({
                   getIn(formik.errors, "category.name") && (
                     <span className="text-error text-xs">
                       {getIn(formik.errors, "category.name")}
+                    </span>
+                  )}
+              </Form.Item>
+              <Form.Item
+                label="Sub Category"
+                name="subCategory"
+                className="w-72"
+              >
+                <Select
+                  placeholder="Select Sub Category"
+                  allowClear
+                  showSearch
+                  id="subCategory"
+                  name="subCategory.name"
+                  disabled={true}
+                  value={formik.values.subCategory.name}
+                  onChange={(value) => {
+                    formik.setFieldValue("subCategory.name", value);
+                  }}
+                >
+                  {categorys.map((category) =>
+                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
+                      <Option value={e.name} key={index}>
+                        {e.name}
+                      </Option>
+                    )) : null
+                  )}
+                </Select>
+                {getIn(formik.touched, "subCategory.name") &&
+                  getIn(formik.errors, "subCategory.name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "subCategory.name")}
                     </span>
                   )}
               </Form.Item>

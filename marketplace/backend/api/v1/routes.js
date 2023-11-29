@@ -8,10 +8,6 @@ import subCategory from './SubCategory'
 import product from './Product'
 import inventory from './Inventory'
 import item from './Item'
-import art from './Art'
-import carbon from './Carbon'
-import metals from './Metals'
-import clothing from './Clothing'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
 import eventType from './EventType'
@@ -31,10 +27,6 @@ import {
   Product,
   Inventory,
   Item,
-  Art,
-  Carbon,
-  Metals,
-  Clothing,
   Order,
   OrderLineItem,
   EventType,
@@ -55,10 +47,6 @@ router.use(SubCategory.prefix, subCategory)
 router.use(Product.prefix, product)
 router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)
-router.use(Art.prefix, art)
-router.use(Carbon.prefix, carbon)
-router.use(Clothing.prefix, clothing)
-router.use(Metals.prefix, metals)
 router.use(Order.prefix, order)
 router.use(OrderLineItem.prefix, orderLineItem)
 router.use(EventType.prefix, eventType)

@@ -35,10 +35,6 @@ const ProcessingOrder = () => {
     return JSON.parse(window.localStorage.getItem("cartList") ?? []);
   }, []);
 
-  const storedConfirmList = useMemo(() => {
-    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
-  }, []);
-
   // useEffect(() => {
   //   actions.fetchCartItems(marketplaceDispatch, cartList);
   // }, [marketplaceDispatch, cartList]);
@@ -92,22 +88,11 @@ const ProcessingOrder = () => {
 
       const body = await response.json();
       if (response.status === RestStatus.OK) {
-        try {
-          const cartObject = JSON.parse(body.data.metadata.cart);
-          if (Object.keys(cartObject).length !== 0) {
-            if (body.data["payment_status"] === "paid") {
-              const customerEmail = body.data["customer_details"]["email"];
-              const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, paymentMethod: body.data.payment_method, ...cart };
-              handleOrderConfirm(object, customerEmail);
-            }
+        const cart = restructureData(body.data.metadata);
+          if (body.data["payment_status"] === "paid") {
+            let object = { paymentSessionId: sessionId, ...cart };
+            handleOrderConfirm(object);
           }
-        } catch (error) {
-          seterror(error);
-          setTimeout(function () {
-            navigate(routes.Checkout.url)
-          }, 2000);
-        }
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         seterror("Cannot find session ID");
         setTimeout(function () {
@@ -127,7 +112,7 @@ const ProcessingOrder = () => {
 
 
 
-  const handleOrderConfirm = async (cartData, customerEmail) => {
+  const handleOrderConfirm = async (cartData) => {
     let htmlContents = [];
     
     let customerFirstName = cartData.user.split(" ")[0];
@@ -135,18 +120,18 @@ const ProcessingOrder = () => {
     // Construct Email with order details
     let concatenatedOrderString = "";
     let orderTotal = 0; 
-    for (let i = 0; i < storedConfirmList.length; i++) {
-      let orderItem = storedConfirmList[i];
-      let itemName = orderItem.item.name.replace(/%20/g, ' '); 
+    for (let i = 0; i < cartData.orderList.length; i++) {
+      let orderItem = cartData.orderList[i];
+      let itemName = orderItem.name.replace(/%20/g, ' '); 
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
-      let itemQty = orderItem.qty;
+      let itemQty = orderItem.quantity;
       let itemTotal = (itemPrice * itemQty).toFixed(2); 
   
       concatenatedOrderString += `${itemName}:\n`; 
       concatenatedOrderString += `$${itemTotal} <br>`; 
       concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each <br><br>`; 
       orderTotal += parseFloat(itemTotal); 
-      if (i === storedConfirmList.length - 1) {
+      if (i === cartData.orderList.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Sales Tax: $${parseFloat(cartData.tax).toFixed(2)} <br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
@@ -155,48 +140,53 @@ const ProcessingOrder = () => {
     }
     
     // const allItemsAreNickelReserve = cartData.orderList.every((obj) => obj.subCategory === "Nickel Reserve");
-    // const index = cartData.orderList.findIndex(obj => obj.subCategory === "Nickel Reserve");
+    const index = cartData.orderList.findIndex(obj => obj.subCategory === "Nickel Reserve");
     
-    // if (index !== -1) {
-    //   let nickel = {};
-    //   let orderItem = cartData.orderList[index];
-    //   nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
-    //   nickel.itemQty = orderItem.quantity;
-    //   nickel.itemName = orderItem.name;
-    //   htmlContents.push(generateHtmlContentNickel(customerFirstName, nickel ));
-    //   // if cartData orderlist has more than one item, use generateHtmlContent to populate htmlContents
-    //   if (cartData.orderList.length > 1) {
-    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
-    //   }
-    // } else {
-    //     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
-    // }
-
-    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+    if (index !== -1) {
+      let nickel = {};
+      let orderItem = cartData.orderList[index];
+      nickel.orderTotal = orderItem.unitPrice * orderItem.quantity;
+      nickel.itemQty = orderItem.quantity;
+      nickel.itemName = orderItem.name;
+      htmlContents.push(generateHtmlContentNickel(customerFirstName, nickel ));
+      // if cartData orderlist has more than one item, use generateHtmlContent to populate htmlContents
+      if (cartData.orderList.length > 1) {
+        htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+      }
+    } else {
+      htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+    }
 
     // Prepare order data to be sent to order controller
-    let assetAddresses = [];
-    const orderList = storedConfirmList.map(o => {
-      assetAddresses.push(o.key);
-      return { assetAddress: o.key, quantity: o.qty, category: o.category };
+    const orderList = cartData.orderList.map(c => {
+      return {
+        inventoryId: c.inventoryId,
+        quantity: c.quantity,
+        subCategory: c.subCategory
+      }
     });
     
     const body = {
+      buyerOrganization: cartData.buyerOrganization,
       orderList: orderList,
-      paymentMethod: cartData.paymentMethod,
-      totalPrice: cartData.orderTotal,
-      shippingAddress: cartData.shippingAddress,
+      orderTotal: cartData.orderTotal,
       paymentSessionId: cartData.paymentSessionId,
-      to: customerEmail,
+      shippingAddress: cartData.shippingAddress,
+      to: cartData.email,
       subject: "Your Order Confirmation",
       htmlContents: htmlContents,
-    }
+    };
 
-    let isDone = await orderActions.createSale(orderDispatch, body);
+
+    let isDone = await orderActions.createOrder(orderDispatch, body);
     if (isDone) {
+      let orderItemAddress = [];
+      cartData.orderList.forEach(c => {
+        orderItemAddress.push(c.inventoryId);
+      });
       let updatedCart = [];
       storedData.forEach(cart => {
-        if (!assetAddresses.includes(cart.product.address)) {
+        if (!orderItemAddress.includes(cart.product.address)) {
           updatedCart.push(cart);
         }
       });

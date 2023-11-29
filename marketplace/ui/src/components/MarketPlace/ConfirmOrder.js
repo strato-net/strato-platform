@@ -257,7 +257,7 @@ const ConfirmOrder = () => {
       dataIndex: "item",
       render: (text) => {
         return (
-          <img className="w-16 h-16 object-contain" alt="" src={text.image} />
+          <img className="w-16 h-16 object-cover" alt="" src={text.image} />
         );
       },
     },
@@ -275,18 +275,18 @@ const ConfirmOrder = () => {
       title: (
         <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
       ),
-      dataIndex: "sellersOrganization",
+      dataIndex: "sellerOrganization",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
       width: "12%"
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
+        <Text className="text-primaryC text-[13px]">UNIT OF MEASUREMENT</Text>
       ),
-      dataIndex: "sellersCommonName",
+      dataIndex: "unitOfMeasure",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-center">{UNIT_OF_MEASUREMENTS[text]}</p>,
       width: "12%"
     },
     {
@@ -368,13 +368,16 @@ const ConfirmOrder = () => {
     confirmOrderList.forEach((item) => {
     // These additional fields need to be sent to form the request after stripe. 
       orderList.push({
+        inventoryId: item.key, 
         quantity: item.qty,
-        assetAddress: item.key,
+        name: item.item.name,
+        unitPrice: item.unitPrice,
+        subCategory: item.subCategory ? item.subCategory : " ",
       });
     });
 
     // These additional fields need to be sent to form the request after stripe. 
-    let body = {
+    const body = {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
@@ -400,9 +403,10 @@ const ConfirmOrder = () => {
     }
   };
 
+
   useEffect(() => {
     if (data.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellersOrganization"]);
+      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellerOrganization"]);
     }
   }, [inventoryDispatch, data]);
 

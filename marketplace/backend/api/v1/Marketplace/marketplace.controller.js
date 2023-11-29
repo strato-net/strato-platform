@@ -20,11 +20,11 @@ class MarketplaceController {
 
       const productsWithImageUrl = inventories
         .map(product => (
-          product.images && product.images.length > 0 ?
+          product.imageKey ?
           {
           ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
-          }
+          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
+        }
         : product
         ))
       rest.response.status200(res, productsWithImageUrl)
@@ -47,10 +47,10 @@ class MarketplaceController {
 
       const productsWithImageUrl = inventories
         .map(product => (
-          product.images && product.images.length > 0 ?
+          product.imageKey ? 
           {
           ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
+          imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName))
           }
           : product
         ))
@@ -67,11 +67,11 @@ class MarketplaceController {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProducts({ ...query })
       const productsWithImageUrl = inventories.map(product => (
-        product.images && product.images.length > 0 ?
+        product.imageKey ?
         {
-          ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
-        }
+        ...product,
+        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+        )}
         :
         product
       ))
@@ -88,11 +88,11 @@ class MarketplaceController {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
       const productsWithImageUrl = inventories.map(product => (
-        product.images && product.images.length > 0 ?
+        product.imageKey ?
         {
-          ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
-        } : product
+        ...product,
+        imageUrl: getSignedUrlFromS3(product.imageKey, req.app.get(constants.s3ParamName)
+        )} : product
       ))
       rest.response.status200(res, productsWithImageUrl)
 

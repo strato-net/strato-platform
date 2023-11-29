@@ -18,4 +18,4 @@ fi
 
 echo 'Starting ui server...'
 
-serve --single -l 3003 build
+npx react-inject-env set && serve --single -l 3003 build
