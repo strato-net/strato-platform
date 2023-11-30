@@ -108,6 +108,7 @@ tests:
     dependencies:
       - QuickCheck
       - base16-bytestring
+      - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
       - blockapps-privacy
@@ -121,6 +122,7 @@ tests:
       - ethereum-encryption
       - ethereum-discovery
       - ethereum-rlp
+      - extra
       - hflags
       - hspec
       - hspec-expectations-lifted
@@ -150,3 +152,4 @@ tests:
       - unliftio
       - vm-runner
       - vm-tools
+      - x509-certs

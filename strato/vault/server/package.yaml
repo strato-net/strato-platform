@@ -134,6 +134,7 @@ tests:
       - blockapps-vault-wrapper-server
       - bytestring
       - clockwork
+      - cryptonite
       - hspec
       - labeled-error
       - secp256k1-haskell
