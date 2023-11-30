@@ -16,7 +16,7 @@ function getImportsTree(fullname) {
   let parentPath = splitPath(fullname);
   for (let i = 0; i < array.length; i++) {
     let line = array[i];
-    if (line.startsWith('import')) {
+    if (line.startsWith('import') && !line.includes("<")) {
       let importName = getImportName(line);
       let importFullname = parentPath + nodepath.sep + importName;
       if (isImported(importFullname)) continue;

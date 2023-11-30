@@ -119,7 +119,7 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
-  console.log(contract)
+  console.debug(contract)
   let userOrganization
 
   if (!serviceUser) {
