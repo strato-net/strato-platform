@@ -9,11 +9,10 @@ HEALTHCHECK --interval=3s --timeout=2s --start-period=300s \
 
 COPY . /usr/src/backend/
 
-WORKDIR /usr/src/backend/blockapps-rest
-
-RUN yarn install && yarn build
-
 WORKDIR /usr/src/backend
+
+# Temporary solution until the 8.3.1 is released - pegging to 8.1.0 for now
+RUN sed -i '/file:..\/..\/blockapps-rest/c\"blockapps-rest": "8.1.0",' package.json
 
 RUN yarn install
 
