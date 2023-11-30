@@ -11,9 +11,7 @@ import constants from '/helpers/constants'
 import dappJs from '/dapp/dapp/dapp'
 import certificateJs from '/dapp/certificates/certificate'
 
-const oauth = oauthUtil.init(config.nodes[0].oauth)
 const options = { config }
-const loadEnv = dotenv.config()
 class AuthenticationController {
   static async callback(req, res, next) {
     const { code } = req.query
@@ -30,7 +28,7 @@ class AuthenticationController {
     let adminUserPassword = process.env.GLOBAL_ADMIN_PASSWORD
 
     try {
-      const tokensResponse = await oauth.getAccessTokenByAuthCode(code)
+      const tokensResponse = await req.app.oauth.getAccessTokenByAuthCode(code)
       accessToken = tokensResponse.token[
         config.nodes[0].oauth.tokenField
           ? config.nodes[0].oauth.tokenField
@@ -83,15 +81,15 @@ class AuthenticationController {
       return next()
     }
 
-    res.cookie(oauth.getCookieNameAccessToken(), accessToken, {
+    res.cookie(req.app.oauth.getCookieNameAccessToken(), accessToken, {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
     })
-    res.cookie(oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
+    res.cookie(req.app.oauth.getCookieNameAccessTokenExpiry(), accessTokenExpiration, {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
     })
-    res.cookie(oauth.getCookieNameRefreshToken(), refreshToken, {
+    res.cookie(req.app.oauth.getCookieNameRefreshToken(), refreshToken, {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
     })
@@ -152,11 +150,11 @@ class AuthenticationController {
     if (config.dockerized) {
       oauthSignOutUrl = '/auth/logout'
     } else {
-      oauthSignOutUrl = oauth.getLogOutUrl()
+      oauthSignOutUrl = req.app.oauth.getLogOutUrl()
     }
-    res.clearCookie(oauth.getCookieNameAccessToken())
-    res.clearCookie(oauth.getCookieNameAccessTokenExpiry())
-    res.clearCookie(oauth.getCookieNameRefreshToken())
+    res.clearCookie(req.app.oauth.getCookieNameAccessToken())
+    res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
+    res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
 
     rest.response.status200(res, { logoutUrl: oauthSignOutUrl })
   }

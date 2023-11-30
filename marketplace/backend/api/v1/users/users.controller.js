@@ -18,7 +18,7 @@ class UsersController {
         // user = await dapp.getCertificate({ userAddress })
         if (user === null || user === undefined) console.log('user not found in after multiple attempts');
       }
-      console.log('me USER ', user);
+      console.debug('me USER ', user);
       if (!user || Object.keys(user).length == 0) {
         rest.response.status400(res, { username }) 
       }
