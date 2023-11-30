@@ -17,23 +17,9 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - blockapps-vault-proxy-api
-- bytestring
-- common-log
 - concurrent-extra
-- lens
-- postgresql-simple
 - text
-- hflags
-- http-conduit
-- HTTP
-- monad-logger
-- regex-compat
 - servant-client
-- servant-client-core
-- servant-subscriber
-- http-reverse-proxy
-- http-types
-- req
 
 ghc-options: -Wall -Werror -threaded
 
@@ -41,37 +27,16 @@ library:
   source-dirs: src
   dependencies:
     - base64
-    - bytestring
     - cache
     - clock
-    - containers
-    - cryptonite
     - exceptions
     - http-client
-    - jwt
-    - lens
     - modern-uri
-    - monad-alter
-    - mtl
-    - product-profunctors
-    - profunctors
     - req
-    - saltine
     - servant
-    - servant-auth
-    - servant-auth-server
     - servant-client
-    - scientific
-    - servant-swagger
-    - strato-model
     - stm
-    - swagger2
-    - transformers
-    - unliftio
-    - resource-pool
-    - servant-server
     - text
-    - yesod-core
 
 
 executables:
@@ -82,17 +47,16 @@ executables:
     dependencies:
       - blockapps-vault-proxy-server
       - blockapps-init
+      - bytestring
       - cache
-      - clock
       - hflags
       - http-client
-      - resource-pool
-      - servant-options
-      - servant-server
+      - http-conduit
+      - http-reverse-proxy
+      - http-types
+      - regex-compat
+      - servant-client-core
       - wai
-      - wai-cors
-      - wai-extra
-      - wai-middleware-prometheus
       - warp
     ghc-options: -threaded
       
@@ -105,10 +69,8 @@ tests:
       - async
       - blockapps-data
       - blockapps-vault-proxy-server
-      - bytestring
       - cache
       - clockwork
-      - cryptonite
       - hspec
       - labeled-error
       - mtl

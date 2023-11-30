@@ -90,7 +90,6 @@ executables:
       - blockapps-vault-wrapper-server
       - base64-bytestring
       - bytestring
-      - cryptonite
       - hflags
       - opaleye
       - saltine
@@ -110,8 +109,6 @@ executables:
       - saltine
       - strato-model
       - text
-      - resource-pool
-      - http-client
 
   migrate-salt:
     source-dirs: app
@@ -126,10 +123,6 @@ executables:
       - saltine
       - strato-model
       - text
-      - cache
-      - resource-pool
-      - http-client
-      - clock
       
 
 tests:
@@ -141,7 +134,6 @@ tests:
       - blockapps-vault-wrapper-server
       - bytestring
       - clockwork
-      - cryptonite
       - hspec
       - labeled-error
       - secp256k1-haskell

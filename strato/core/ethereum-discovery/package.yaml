@@ -50,7 +50,6 @@ library:
     - persistent-postgresql
     - prometheus-client
     - random
-    - resourcet
     - servant-client
     - split
     - strato-conf

@@ -9,7 +9,6 @@ library:
   dependencies:
   - composable-monads-base
   - hedis
-  - monad-alter
   - mtl
   
   

@@ -11,7 +11,6 @@ dependencies:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-init
-  - blockstanbul
   - containers
   - exceptions
   - hflags
@@ -19,7 +18,6 @@ dependencies:
   - strato-conf
   - strato-model
   - strato-statediff
-  - vector
 
 library:
   source-dirs: src/
@@ -86,7 +84,6 @@ library:
     - time
     - transformers
     - unliftio
-    - unordered-containers
     - x509-certs
 
 

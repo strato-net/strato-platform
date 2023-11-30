@@ -41,7 +41,6 @@ library:
   - lens
   - merkle-patricia-db
   - milena
-  - milena-tools
   - monad-alter
   - monad-logger
   - mtl
