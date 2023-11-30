@@ -1,15 +1,16 @@
-import "/dapp/orders/contracts/Sales/<embershipSale.sol";
+import "/dapp/orders/contracts/Sales/MembershipSale.sol";
 
 pragma es6;
 pragma strict;
 import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 
-/// @title A representation of <embership assets
+/// @title A representation of Membership assets
 contract Membership is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
     string public serialNumber;
     string public projectType;
-    uint _expirationPeriodInMonths;
+    uint expirationPeriodInMonths;
+    uint expirationDate;
     event AssetSplit(address newAsset, uint unitsMoved);
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
@@ -25,7 +26,8 @@ contract Membership is ItemStatus, RestStatus, Asset {
         address _owner,
         string _projectType,
         PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths
+        uint _expirationPeriodInMonths,
+        uint uid
     ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
         serialNumber = _serialNumber;
@@ -37,21 +39,24 @@ contract Membership is ItemStatus, RestStatus, Asset {
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerCommonName = ownerCert["commonName"];
-
+        expirationPeriodInMonths =_expirationPeriodInMonths;
+        expirationDate = _expirationPeriodInMonths * 2592000;
         if(_paymentTypes.length > 0) {
             createSales(_paymentTypes, _price, _units);
         }
     }
 
     function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
+        require(block.timestamp < expirationDate, "Membership is expired");
         for (uint i = 0; i < whitelistedSales.length; i++) {
-            <embershipSale(whitelistedSales[i]).changeSaleQuantity(_units);
+            MembershipSale(whitelistedSales[i]).changeSaleQuantity(_units);
         }
     }
 
     function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
+        require(block.timestamp < expirationDate, "Membership is expired");
         require(splitUnits < units, "Cannot split more units than available");
-        <embership newAsset = new <embership(name,
+        Membership newAsset = new Membership(name,
                                      description, 
                                      images, 
                                      createdDate, 
@@ -72,19 +77,21 @@ contract Membership is ItemStatus, RestStatus, Asset {
     }
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
+        require(block.timestamp < expirationDate, "Membership is expired");
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new <embershipSale(address(this), _paymentTypes[i], _price, _units)));
+            whitelistSale(address(new MembershipSale(address(this), _paymentTypes[i], _price, _units)));
         }
         status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
 
     function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
-        address newSale = address(new <embershipSale(address(this), _paymentType, _price, _units));
+        require(block.timestamp < expirationDate, "Membership is expired");
+        address newSale = address(new MembershipSale(address(this), _paymentType, _price, _units));
         return (RestStatus.OK, string(newSale));
     }
 
-    function update<embership(
+    function updateMembership(
         string _name, 
         string _description, 
         string[] _images, 
@@ -102,6 +109,14 @@ contract Membership is ItemStatus, RestStatus, Asset {
             units = _units;
         }
         return RestStatus.OK;
+    }
+
+    function transferOwnership(address saleContract, string _newOwnerCommonName, address _newOwner) overrides public requireOwner("Ownership transfer") {
+        require(block.timestamp < expirationDate, "Membership is expired");
+        require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
+        ownerCommonName = _newOwnerCommonName;
+        owner = _newOwner;
+        disableAllSales();
     }
 }
 

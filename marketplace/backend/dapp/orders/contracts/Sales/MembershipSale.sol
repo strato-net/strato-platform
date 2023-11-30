@@ -21,20 +21,20 @@ contract MembershipSale is Sale{
         return RestStatus.OK;
     }
 
-    function executeUTXOSale(address _purchasersAddress) public requireSeller("execute UTXO sale") {
-        // Before executing the sale, ensure the asset is a UTXO asset
-        Membership membershipAsset = Membership(address(assetToBeSold));
+    function executeUTXOSale(address _purchasersAddress, uint[] ) public requireSeller("execute UTXO sale") {
 
-        // If the sale is for all the base units, call transferOwnership of the Asset. If else, split the asset.
-        if (units == membershipAsset.units()) {
-            assetToBeSold.transferOwnership(address(this), _purchasersAddress);
-        }
-        else {
-            // Call splitAsset on the UTXO asset
-            address newMembershipAsset = membershipAsset.splitAsset(address(this), units, _purchasersAddress);
+            // Iterate over the units and create a new Membership instance for each unit
+            for (uint i = 0; i < units; i++) {//loop 10 times
+                // Call splitAsset on the UTXO asset for each unit
+                address newMembershipAssetAddress = membershipAsset.splitAsset(address(this), 1, _purchasersAddress);
 
-            // Point this sale to the new asset
-            assetToBeSold = Asset(newMembershipAsset); 
-        }  
+                // Create a new instance of Membership with a quantity of 1
+                Membership newMembershipAsset = new Membership(newMembershipAssetAddress);
+                newMembershipAsset.setQuantity(1);
+
+            }
+
+            // Update the original asset's units
+            membershipAsset.setUnits(membershipAsset.units() - units); 
     }
 }
