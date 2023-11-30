@@ -11,9 +11,6 @@ COPY . /usr/src/backend/
 
 WORKDIR /usr/src/backend
 
-# Temporary solution until the 8.3.1 is released - pegging to 8.1.0 for now
-RUN sed -i '/file:..\/..\/blockapps-rest/c\"blockapps-rest": "8.1.0",' package.json
-
 RUN yarn install
 
 CMD [ "sh", "/usr/src/backend/docker-run.sh" ]
