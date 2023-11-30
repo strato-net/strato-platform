@@ -21,20 +21,17 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - blockapps-vault-wrapper-api
-- common-log
 - postgresql-simple
 
 library:
   source-dirs: src
   dependencies:
-    - aeson
     - bytestring
     - cache
-    - clock
+    - common-log
     - cryptonite
     - http-client
     - lens
-    - monad-control
     - mtl
     - opaleye
     - product-profunctors
@@ -46,10 +43,8 @@ library:
     - transformers
     - unliftio
     - resource-pool
-    - secp256k1-haskell == 0.2.0
     - servant-server
     - text
-    - yaml
 
 
 executables:
@@ -62,6 +57,7 @@ executables:
       - blockapps-init
       - cache
       - clock
+      - common-log
       - hflags
       - http-client
       - resource-pool

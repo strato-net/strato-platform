@@ -40,7 +40,6 @@ ghc-options: -Wall -Werror -threaded
 library:
   source-dirs: src
   dependencies:
-    - aeson
     - base64
     - bytestring
     - cache
@@ -53,7 +52,6 @@ library:
     - lens
     - modern-uri
     - monad-alter
-    - monad-control
     - mtl
     - product-profunctors
     - profunctors
@@ -71,7 +69,6 @@ library:
     - transformers
     - unliftio
     - resource-pool
-    - secp256k1-haskell == 0.2.0
     - servant-server
     - text
     - yesod-core
@@ -115,6 +112,5 @@ tests:
       - hspec
       - labeled-error
       - mtl
-      - secp256k1-haskell
       - stm
       - strato-model

@@ -27,7 +27,6 @@ library:
   - cryptonite
   - deepseq
   - ethereum-rlp
-  - ethereum-encryption
   - hourglass
   - lens
   - memory
@@ -35,7 +34,6 @@ library:
   - pem
   - text
   - format
-  - transformers
   - secp256k1-haskell
   - servant-docs
   - strato-model

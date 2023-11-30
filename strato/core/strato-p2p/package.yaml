@@ -6,13 +6,11 @@ synopsis: a microservice that handles peer to peer connections for strato
 
 dependencies:
   - base
-  - blockapps-data
   - common-log
-  - extra
   - vm-tools
-  - x509-certs
 
 ghc-options: -Wall -threaded
+
 
 executables:
   strato-p2p:
@@ -24,10 +22,8 @@ executables:
       - hflags
       - lifted-async
       - ordered-containers
-      - resourcet
       - strato-model
       - strato-p2p
-      - thread-hierarchy
       - unagi-chan
       - wai-middleware-prometheus
       - warp
@@ -38,24 +34,22 @@ library:
   dependencies:
     - SafeSemaphore
     - aeson
-    - async
     - alarmclock
     - ansi-wl-pprint
     - base16-bytestring
+    - blockapps-data
     - blockapps-datadefs
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
     - bytestring
     - composable-monads-base
-    - concurrency
     - conduit
     - conduit-extra
     - containers
     - cross-monitoring
     - crypto-pubkey-types
     - data-default
-    - deepseq
     - dlist
     - dns
     - either
@@ -77,7 +71,6 @@ library:
     - milena
     - milena-tools
     - monad-alter
-    - monad-control
     - monad-logger
     - monadIO
     - mtl
@@ -92,7 +85,6 @@ library:
     - servant-client
     - servant-server
     - split
-    - stm
     - stm-conduit
     - strato-conf
     - strato-model
@@ -158,4 +150,3 @@ tests:
       - unliftio
       - vm-runner
       - vm-tools
-      - x509-certs 
