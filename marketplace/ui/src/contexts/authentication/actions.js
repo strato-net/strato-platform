@@ -55,6 +55,12 @@ const actions = {
           payload: body.data,
         });
         return;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchUsersFailed, 
+          error: "Unauthorized while fetching users" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({ type: actionDescriptors.fetchUsersFailed, payload: undefined });
     } catch (err) {
@@ -68,11 +74,17 @@ const actions = {
           method: HTTP_METHODS.GET,
           credentials: "same-origin",
       });
+      const body = await response.json();
       if (response.status === RestStatus.OK) {
-        const body = await response.json();
         window.location.href = body.data.logoutUrl;
         dispatch({ type: actionDescriptors.logoutSuccessful, payload: body.data.logoutUrl });
         return;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.logoutFailed, 
+          error: "Unauthorized while logging out" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({ type: actionDescriptors.logoutFailed, payload: undefined });
     } catch (err) {
