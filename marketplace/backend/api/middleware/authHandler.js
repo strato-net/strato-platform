@@ -44,7 +44,7 @@ class AuthHandler {
         }
         let isServiceUser = false
         if (!token && allowAnonAccess === true) {
-          token = await oauthHelper.getServiceToken()
+          token = await oauthHelper.getServiceToken(req)
           isServiceUser = true
         }
 
@@ -93,10 +93,10 @@ class AuthHandler {
     }
   }
 
-  static initOauth() {
+  static async initOauth() {
     let oauth
     try {
-      oauth = oauthUtil.init(config.nodes[0].oauth)
+      oauth = await oauthUtil.init(config.nodes[0].oauth)
     } catch (err) {
       console.log('Error initializing oauth handlers')
       process.exit(1)

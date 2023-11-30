@@ -31,9 +31,9 @@ const actionDescriptors = {
   updateSellerDetailsFailed: "update_seller_details_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
-  createSale: "create_sale",
-  createSaleSuccessful: "create_sale_successful",
-  createSaleFailed: "create_sale_failed",
+  createSaleOrder: "create_sale",
+  createSaleOrderSuccessful: "create_sale_successful",
+  createSaleOrderFailed: "create_sale_failed",
   cancelSale: "cancel_sale",
   cancelSaleSuccessful: "cancel_sale_successful",
   cancelSaleFailed: "cancel_sale_failed",
@@ -526,8 +526,8 @@ const actions = {
     }
   },
 
-  createSale: async (dispatch, payload) => {
-    dispatch ({ type: actionDescriptors.createSale });
+  createSaleOrder: async (dispatch, payload) => {
+    dispatch ({ type: actionDescriptors.createSaleOrder });
     
     try {
       const response = await fetch(`${apiUrl}/order/sale`, {
@@ -544,7 +544,7 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.createSaleSuccessful,
+          type: actionDescriptors.createSaleOrderSuccessful,
           payload: body.data,
         });
         actions.setMessage(dispatch, "Sale created successfully", true);
@@ -552,14 +552,14 @@ const actions = {
       }
 
       dispatch({
-        type: actionDescriptors.createSaleFailed,
+        type: actionDescriptors.createSaleOrderFailed,
         error: "Error while executing sale",
       });
       actions.setMessage(dispatch, "Error while creating sale");
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.createSaleFailed,
+        type: actionDescriptors.createSaleOrderFailed,
         error: "Error while creating Sale",
       });
       actions.setMessage(dispatch, "Error while creating sale");

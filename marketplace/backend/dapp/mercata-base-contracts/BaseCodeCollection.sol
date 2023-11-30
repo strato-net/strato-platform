@@ -167,10 +167,11 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus {
             status = _status;
             return RestStatus.OK;
         }
-        uint price = Sale(whitelistedSales[0]).price()
+        uint price = Sale(whitelistedSales[0]).price();
         if (_price != price) {
             changePrice(_price);
         }
+        return RestStatus.OK;
     }
 }
 
