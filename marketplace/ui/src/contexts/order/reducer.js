@@ -185,17 +185,17 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       }
-    case actionDescriptors.createSale:
+    case actionDescriptors.createSaleOrder:
       return {
         ...state,
         isCreateOrderSubmitting: true,
       }
-    case actionDescriptors.createSaleSuccessful:
+    case actionDescriptors.createSaleOrderSuccessful:
       return {
         ...state,
         isCreateOrderSubmitting: false,
       }
-    case actionDescriptors.createSaleFailed:
+    case actionDescriptors.createSaleOrderFailed:
       return {
         ...state,
         error: action.error,
