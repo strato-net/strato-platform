@@ -185,7 +185,7 @@ class InventoryController {
       itemContract: Joi.string().required(),
       itemAddress: Joi.string().required(),
       paymentTypes: Joi.array().min(1).items(
-        Joi.number().integer().min(0).max(3).required(),
+        Joi.number().integer().min(0).max(5).required(),
       ).required(),
       price: Joi.number().integer().greater(0).required(),
       units: Joi.number().integer().greater(0).optional(),
