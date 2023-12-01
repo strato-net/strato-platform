@@ -184,12 +184,9 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-  let arg = { ...args }
-  // arg['limit'] = ''
-  // arg['offset'] = 0
+  let { limit, offset, ...arg1 } = args;
   const serviceUsages = await searchAllWithQueryArgs(contractName, args, options, admin)
-  const serviceCount = await searchAllWithQueryArgs(contractName, arg, options, admin)
-
+  const serviceCount = await searchAllWithQueryArgs(contractName, arg1, options, admin)
   return { serviceUsage: serviceUsages.map((serviceUsage) => marshalOut(serviceUsage)), total: serviceCount.length }
 
 
