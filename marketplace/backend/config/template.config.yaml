@@ -13,7 +13,6 @@ nodes:
   - id: 0
     label: <node_label_value>
     url: <node_url_value>
-    port: 30303
     oauth:
       appTokenCookieName: <oauth_appTokenCookieName_value>
       appTokenCookieMaxAge: 7776000000
