@@ -235,6 +235,8 @@ const ServiceTable = () => {
   const handleChangeServiceUsageType = (key) => {
     setFilterQuery({});
     setPage(1);
+    setTableData([]);
+    setIsNewRow(false);
     navigate(`/memberships/serviceUsage/${key}`);
   };
 
@@ -485,7 +487,7 @@ const ServiceTable = () => {
             icon={<PlusOutlined />}
             onClick={handleAddRow}
             disabled={
-              validationError ||
+              // validationError ||
               IsLoading ||
               (tableData && tableData?.length != 0 && !tableData[0]?.address) ||
               page != 1

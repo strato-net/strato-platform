@@ -21,10 +21,6 @@ import dayjs from "dayjs";
 
 dayjs.locale('es');
 
-const disabledDate = (current) => {
-  return current && dayjs(current).isBefore(dayjs().startOf('day'));
-};
-
 export function generateTableColumns({
   isEdit,
   isNewRow,
@@ -223,7 +219,6 @@ export function generateTableColumns({
       <span>
         {record.editable ? (
           <DatePicker
-            disabledDate={disabledDate}
             defaultValue={text ? dayjs(text) : ''}
             disabled={isEdit && serviceType == 'booked'}
             onChange={(serviceDate, dateString) =>
