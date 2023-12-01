@@ -106,7 +106,6 @@ tests:
     ghc-options: -Wall -Werror -dynamic
     main: Main.hs
     dependencies:
-      - QuickCheck
       - base16-bytestring
       - blockapps-data
       - blockapps-datadefs
@@ -125,9 +124,6 @@ tests:
       - extra
       - hflags
       - hspec
-      - hspec-expectations-lifted
-      - hourglass
-      - labeled-error
       - lens
       - merkle-patricia-db
       - monad-alter
@@ -136,8 +132,6 @@ tests:
       - nibblestring
       - ordered-containers
       - Ranged-sets
-      - raw-strings-qq
-      - secp256k1-haskell
       - seqevents
       - stm-chans
       - stm-conduit

@@ -2,9 +2,6 @@ name: solid-vm
 
 dependencies:
   - base
-  - blockapps-haskoin
-  - x509-certs
-  - monad-logger
 
 library:
   source-dirs: src/
@@ -18,9 +15,9 @@ library:
   dependencies:
   - aeson
   - base16-bytestring
-  - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockapps-haskoin
   - blockapps-mpdbs
   - bytestring
   - common-log
@@ -36,7 +33,6 @@ library:
   - labeled-error
   - lens
   - lrucache
-  - memory
   - merkle-patricia-db
   - monad-alter
   - nibblestring
@@ -54,6 +50,7 @@ library:
   - utf8-string
   - vector
   - vm-tools
+  - x509-certs
 
 
 
@@ -70,7 +67,6 @@ executables:
       - solid-vm-parser
       - solid-vm-static-analysis
       - text
-      - deepseq
 
 tests:
   solid-vm-spec:
@@ -80,63 +76,39 @@ tests:
     dependencies:
       - QuickCheck
       - aeson
-      - ansi-wl-pprint
       - async
-      - base16-bytestring
-      - binary
       - blockapps-data
       - blockapps-datadefs
-      - blockapps-init
       - blockapps-mpdbs
       - bytestring
       - common-log
       - composable-monads-base
       - containers
-      - core-api2
       - crypto-api
-      - data-default
-      - debugger
-      - deepseq
-      - directory
       - ethereum-rlp
-      - exceptions
-      - extra
-      - hedis
       - hflags
       - hspec
       - hspec-expectations-lifted
-      - json-stream
       - labeled-error
       - lens
-      - leveldb-haskell
       - merkle-patricia-db
-      - milena
       - monad-alter
-      - mtl
-      - nibblestring
-      - persistent-sqlite
       - raw-strings-qq
-      - resourcet
       - seqevents
       - solid-vm
       - solid-vm-model
       - solid-vm-parser
       - solid-vm-static-analysis
       - source-tools
-      - sql-monad
-      - strato-conf
       - strato-genesis
       - strato-init
       - strato-model
-      - strato-redis-blockdb
-      - strato-statediff
-      - test-framework
       - text
       - time
       - transformers
-      - unliftio
       - utf8-string
       - vm-tools
+      - x509-certs
 
 benchmarks:
     codebench:

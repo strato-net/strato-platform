@@ -20,16 +20,14 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
-- blockapps-highway-wrapper-api
-- bytestring
-- common-log
-- unliftio-core
 
 library:
   source-dirs: src
   dependencies:
     - aws
+    - blockapps-highway-wrapper-api
     - bytestring
+    - common-log
     - conduit
     - http-client
     - http-conduit
@@ -43,6 +41,7 @@ library:
     - unliftio
     - servant-server
     - text
+    - unliftio-core
 
 executables:
   blockapps-highway-wrapper-server:
@@ -50,14 +49,18 @@ executables:
     main: Main.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-highway-wrapper-api
       - blockapps-highway-wrapper-server
       - blockapps-init
+      - bytestring
+      - common-log
       - hflags
       - http-client
       - raw-strings-qq
       - servant-multipart-client
       - servant-server
       - text
+      - unliftio-core
       - wai-cors
       - wai-middleware-prometheus
       - warp
@@ -67,12 +70,3 @@ tests:
   highway-wrapper-spec:
     source-dirs: test/
     main: Spec.hs
-    dependencies:
-      - blockapps-data
-      - bytestring
-      - clockwork
-      - cryptonite
-      - hspec
-      - labeled-error
-      - secp256k1-haskell
-      - strato-model

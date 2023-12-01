@@ -18,8 +18,6 @@ dependencies:
 - base
 - blockapps-vault-proxy-api
 - concurrent-extra
-- text
-- servant-client
 
 ghc-options: -Wall -Werror -threaded
 
@@ -55,7 +53,9 @@ executables:
       - http-reverse-proxy
       - http-types
       - regex-compat
+      - servant-client
       - servant-client-core
+      - text
       - wai
       - warp
     ghc-options: -threaded
@@ -67,12 +67,8 @@ tests:
     ghc-options: -dynamic
     dependencies:
       - async
-      - blockapps-data
       - blockapps-vault-proxy-server
       - cache
-      - clockwork
       - hspec
-      - labeled-error
       - mtl
       - stm
-      - strato-model

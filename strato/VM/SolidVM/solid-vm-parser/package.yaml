@@ -2,7 +2,6 @@ name: solid-vm-parser
 
 dependencies:
   - base
-  - containers
 
 library:
   source-dirs: src/
@@ -41,6 +40,7 @@ executables:
     other-modules: []
     main: Parse.hs
     dependencies:
+      - containers
       - parsec
       - solid-vm-parser
     ghc-options: -Wall -O2 -threaded -rtsopts

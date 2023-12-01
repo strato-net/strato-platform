@@ -8,16 +8,7 @@ category:      Data Structures
 
 dependencies:
   - base
-  - blockapps-data
-  - blockapps-datadefs
-  - blockapps-init
-  - containers
-  - exceptions
   - hflags
-  - milena-tools
-  - strato-conf
-  - strato-model
-  - strato-statediff
 
 library:
   source-dirs: src/
@@ -46,11 +37,15 @@ library:
     - aeson
     - ansi-wl-pprint
     - binary
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-init
     - blockapps-mpdbs
     - bytestring
     - common-log
     - composable-monads-base
     - conduit
+    - containers
     - cross-monitoring
     - data-default
     - debugger
@@ -68,6 +63,7 @@ library:
     - lrucache
     - merkle-patricia-db
     - milena
+    - milena-tools
     - monad-alter
     - mtl
     - nibblestring
@@ -79,7 +75,10 @@ library:
     - seqevents
     - solid-vm-model
     - sql-monad
+    - strato-conf
+    - strato-model
     - strato-redis-blockdb
+    - strato-statediff
     - text
     - time
     - transformers
@@ -94,9 +93,5 @@ tests:
     main: Spec.hs
     ghc-options: -Wall -O2 -dynamic
     dependencies:
-      - bytestring
-      - common-log
-      - labeled-error
       - hspec
-      - hspec-expectations-lifted
       - vm-tools

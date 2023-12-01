@@ -79,7 +79,6 @@ tests:
     dependencies:
       - aeson
       - aeson-diff
-      - base16-bytestring
       - binary
       - blockapps-data
       - blockapps-datadefs
@@ -93,7 +92,6 @@ tests:
       - secp256k1-haskell
       - strato-model
       - text
-      - unordered-containers
       - vector
       - QuickCheck
     ghc-options: -Wall -Werror -threaded -rtsopts -with-rtsopts=-N -dynamic

@@ -40,28 +40,9 @@ tests:
     source-dirs: test/
     ghc-options: -dynamic
     dependencies:
-      - QuickCheck
-      - aeson
-      - base16-bytestring
-      - blockapps-data
-      - blockapps-datadefs
-      - blockstanbul
-      - bytestring
       - common-log
-      - containers
-      - cryptonite
-      - ethereum-rlp
       - hflags
       - hspec
-      - hspec-expectations-lifted
-      - labeled-error
-      - lens
-      - monad-alter
-      - mtl
-      - strato-model
-      - time
-      - transformers
-      - x509-certs
 
 
 benchmarks:

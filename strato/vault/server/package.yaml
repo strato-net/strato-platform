@@ -20,12 +20,11 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
-- blockapps-vault-wrapper-api
-- postgresql-simple
 
 library:
   source-dirs: src
   dependencies:
+    - blockapps-vault-wrapper-api
     - bytestring
     - cache
     - common-log
@@ -34,6 +33,7 @@ library:
     - lens
     - mtl
     - opaleye
+    - postgresql-simple
     - product-profunctors
     - profunctors
     - saltine
@@ -53,6 +53,7 @@ executables:
     main: Main.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - blockapps-init
       - cache
@@ -60,6 +61,7 @@ executables:
       - common-log
       - hflags
       - http-client
+      - postgresql-simple
       - resource-pool
       - servant-options
       - servant-server
@@ -74,12 +76,14 @@ executables:
     main: MigrateKeys.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - bytestring
       - csv
       - hflags
       - lens
       - opaleye
+      - postgresql-simple
       - text
 
   migrate-nodekey:
@@ -87,11 +91,13 @@ executables:
     main: MigrateNodeKey.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - base64-bytestring
       - bytestring
       - hflags
       - opaleye
+      - postgresql-simple
       - saltine
       - strato-model
       - text
@@ -101,11 +107,13 @@ executables:
     main: MigrateMercata.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - bytestring
       - hflags
       - lens
       - opaleye
+      - postgresql-simple
       - saltine
       - strato-model
       - text
@@ -115,11 +123,13 @@ executables:
     main: MigrateSalt.hs
     other-modules: [Options]
     dependencies:
+      - blockapps-vault-wrapper-api
       - blockapps-vault-wrapper-server
       - bytestring
       - hflags
       - lens
       - opaleye
+      - postgresql-simple
       - saltine
       - strato-model
       - text
@@ -131,7 +141,6 @@ tests:
     main: Spec.hs
     dependencies:
       - blockapps-data
-      - blockapps-vault-wrapper-server
       - bytestring
       - clockwork
       - cryptonite

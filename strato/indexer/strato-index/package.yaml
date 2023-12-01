@@ -8,7 +8,6 @@ ghc-options: -threaded -rtsopts -with-rtsopts=-N
 
 dependencies:
   - base
-  - milena-tools
 
 library:
   source-dirs: src/
@@ -20,23 +19,19 @@ library:
   - common-log
   - conduit
   - containers
-  - deepseq
   - extra
   - format
-  - hedis
   - kafka-monad
   - milena
+  - milena-tools
   - monad-alter
   - redis-monad
-  - resourcet
   - seqevents
   - sql-monad
-  - stm
   - strato-conf
   - strato-model
   - strato-redis-blockdb
   - text
-  - transformers
   - x509-certs
 
 executables:
@@ -78,7 +73,6 @@ executables:
       - monad-alter
       - redis-monad
       - seqevents
-      - sql-monad
       - strato-conf
       - strato-index
       - strato-model
@@ -115,7 +109,6 @@ tests:
     main: Spec.hs
     ghc-options: -dynamic
     dependencies:
-    - blockapps-data
     - blockapps-datadefs
     - bytestring
     - hspec
@@ -123,5 +116,4 @@ tests:
     - x509-certs
     - strato-model
     - text
-    - containers
 

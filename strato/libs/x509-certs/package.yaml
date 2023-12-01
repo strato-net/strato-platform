@@ -10,7 +10,6 @@ description:
 
 dependencies:
   - base >= 4 && < 5
-  - monad-alter
 
 
 library:
@@ -49,12 +48,11 @@ tests:
     source-dirs: test/
     ghc-options: -Wall -Werror -O2 -dynamic
     dependencies:
-      - x509-certs
       - aeson
-      - bytestring
       - cryptonite
       - ethereum-rlp
+      - hourglass
       - hspec
       - strato-model
       - transformers
-      - hourglass
+      - x509-certs

@@ -16,7 +16,6 @@ library:
   source-dirs:     src
   dependencies:
     - alarmclock
-    - base16-bytestring
     - binary
     - blockapps-data
     - blockapps-datadefs
@@ -70,8 +69,6 @@ executables:
       - base64
       - blockapps-data
       - blockapps-init
-      - blockapps-vault-wrapper-api
-      - blockapps-vault-wrapper-client
       - blockstanbul
       - bytestring
       - common-log
@@ -88,7 +85,6 @@ executables:
       - strato-conf
       - strato-genesis
       - strato-model
-      - strato-networks
       - strato-sequencer
       - text
       - wai-middleware-prometheus
@@ -145,7 +141,6 @@ tests:
       - strato-sequencer
       - text
       - time
-      - unliftio
       - wai-extra
       - wai-middleware-prometheus
       - warp
