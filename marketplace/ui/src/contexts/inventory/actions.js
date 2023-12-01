@@ -27,7 +27,13 @@ const actionDescriptors = {
   onboardSellerToStripeFailed: "onboard_seller_to_stripe_failed",
   sellerStripeStatus: "seller_stripe_status",
   sellerStripeStatusSuccessful: "seller_stripe_status_successful",
-  sellerStripeStatusFailed: "seller_stripe_status_failed"
+  sellerStripeStatusFailed: "seller_stripe_status_failed",
+  uploadImage: "upload_image",
+  uploadImageSuccessful: "upload_image_successful",
+  uploadImageFailed: "upload_image_failed",
+  createItem: "create_item",
+  createItemSuccessful: "create_item_successful",
+  createItemFailed: "create_item_failed",
 };
 
 const actions = {
@@ -70,6 +76,12 @@ const actions = {
         dispatch({ type: actionDescriptors.createInventoryFailed, error: "Error while creating Inventory" });
         actions.setMessage(dispatch, "Error while creating Inventory")
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createInventoryFailed, 
+          error: "Unauthorized while creating Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -96,7 +108,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/search?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/inventory?limit=${limit}&offset=${offset}${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -114,6 +126,12 @@ const actions = {
           type: actionDescriptors.fetchInventorySearchFailed,
           error: "Error while fetching Inventory",
         });
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchInventorySearchFailed, 
+          error: "Unauthorized while fetching Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchInventorySearchFailed,
@@ -153,6 +171,12 @@ const actions = {
           type: actionDescriptors.fetchInventoryFailed,
           error: "Error while fetching Inventory",
         });
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchInventoryFailed, 
+          error: "Unauthorized while fetching Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchInventoryFailed,
@@ -196,6 +220,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while updating Inventory");
         return false;;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateInventoryFailed, 
+          error: "Unauthorized while updating Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -234,16 +264,22 @@ const actions = {
           type: actionDescriptors.resellInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Resale inventory was successfully created", true);
+        actions.setMessage(dispatch, "Reselling Item was successful", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.resellInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while reselling Inventory" });
-        actions.setMessage(dispatch, "Error while reselling Inventory")
+        dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while reselling Item" });
+        actions.setMessage(dispatch, "Error while reselling Item")
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.resellInventoryFailed, 
+          error: "Unauthorized while reselling Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -255,9 +291,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.resellInventoryFailed,
-        error: "Error while reselling Inventory",
+        error: "Error while reselling Item",
       });
-      actions.setMessage(dispatch, "Error while reselling Inventory");
+      actions.setMessage(dispatch, "Error while reselling Item");
     }
   },
 
@@ -278,6 +314,12 @@ const actions = {
         });
 
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchInventoryDetailFailed, 
+          error: "Unauthorized while fetching Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -312,11 +354,17 @@ const actions = {
         return body.data;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
-          type: actionDescriptors.fetchInventoryFailed,
+          type: actionDescriptors.onboardSellerToStripeFailed,
           error: "Error while trying to onboard to Stripe",
         });
         actions.setMessage(dispatch, "Error while trying to onboard to Stripe");
         return null;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.onboardSellerToStripeFailed, 
+          error: "Unauthorized while trying to onboard to Stripe" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -349,6 +397,12 @@ const actions = {
           payload: body.data,
         });
         return body.data;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.sellerStripeStatusFailed, 
+          error: "Unauthorized while trying to get Stripe status" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -363,6 +417,96 @@ const actions = {
       });
     }
   },
+
+  uploadImage: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.uploadImage });
+
+    try {
+      const response = await fetch(`${apiUrl}/Image`, {
+        method: HTTP_METHODS.POST,
+        body: payload,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.CREATED) {
+        dispatch({
+          type: actionDescriptors.uploadImageSuccessful,
+          payload: body.data,
+        });
+        // actions.setMessage(dispatch, "Image uploaded successfully", true);
+        return body.data;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.uploadImageFailed,
+          error: "Image upload failed",
+        });
+        actions.setMessage(dispatch, "Error while uploading Image");
+        return false;
+      }
+
+      dispatch({
+        type: actionDescriptors.uploadImageFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.uploadImageFailed,
+        error: "Image upload failed",
+      });
+      actions.setMessage(dispatch, "Error while uploading Image");
+    }
+  },
+
+  createItem: async (dispatch, payload, category) => {
+    dispatch({ type: actionDescriptors.createItem });
+
+    try {
+      const response = await fetch(`${apiUrl}/${category}`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.createItemSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Item created successfully", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.createItemFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.createItemFailed, error: "Error while creating Item" });
+        actions.setMessage(dispatch, "Error while creating Item")
+        return false;
+      }
+
+      dispatch({
+        type: actionDescriptors.createItemFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.createItemFailed,
+        error: "Error while creating Item",
+      });
+      actions.setMessage(dispatch, "Error while creating Item");
+    }
+  }
 
 };
 

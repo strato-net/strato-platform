@@ -1,0 +1,57 @@
+paths:
+  /clothing/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Clothing
+      summary: Retrieve clothing
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of clothings
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Clothing
+      summary: Create a clothing
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create clothing
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createClothing'
+      responses:
+        200:
+          description: Object of create clothing
+
+definitions:
+  createClothing:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          serialNumber:
+            type: string
+          name:
+            type: string
+          description:
+            type: string
+          brand:
+            type: string
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          paymentTypes:
+            type: array
+            items:
+              type: number

@@ -2,81 +2,19 @@
     "categories": [
         {
             "name": "Art",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Art"
-                }
-            ]
+            "imageKey": ""
         },
         {
             "name": "Carbon",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Carbon Credit"
-                },
-                {
-                    "name": "Membership DAO"
-                }
-            ]
+            "imageKey": ""
         },
         {
-            "name": "Materials",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Nickel Reserve"
-                },
-                {
-                    "name": "Nickel"
-                },
-                {
-                    "name": "Silver"
-                }
-            ]
+            "name": "Metals",
+            "imageKey": ""
         },
         {
             "name": "Clothing",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Sneakers"
-                },
-                {
-                    "name": "Shirts"
-                },
-                {
-                    "name": "Pants"
-                },
-                {
-                    "name": "Jackets"
-                },
-                {
-                    "name": "Accessories"
-                }
-            ]
-        },
-        {
-            "name": "Collectibles",
-            "imageKey": "",
-            "subCategories": [
-                {
-                    "name": "Trading Cards"
-                },
-                {
-                    "name": "Toys"
-                },
-                {
-                    "name": "Video Games"
-                },
-                {
-                    "name": "Vinyls"
-                },
-                {
-                    "name": "Other"
-                }
-            ]
+            "imageKey": ""
         }
     ]
 }

@@ -14,9 +14,8 @@ marketplaceUiUrlPrefix: "/marketplace"
 
 nodes:
   - id: 0
-    label: mercata-testnet-node1
-    url: https://node1.mercata-testnet2.blockapps.net
-    port: 30303
+    label: localhost
+    url: https://node2.mercata-testnet2.blockapps.net
     oauth:
       appTokenCookieName: asset_framework_session
       appTokenCookieMaxAge: 7776000000
@@ -28,6 +27,6 @@ nodes:
       serviceOAuthFlow: 
       redirectUri: http://localhost/api/v1/authentication/callback
       logoutRedirectUri: http://localhost
-      tokenField: 
+      tokenField: access_token
       tokenUsernameProperty: 
       tokenUsernamePropertyServiceFlow: 

@@ -44,7 +44,7 @@ class AuthHandler {
         }
         let isServiceUser = false
         if (!token && allowAnonAccess === true) {
-          token = await oauthHelper.getServiceToken()
+          token = await oauthHelper.getServiceToken(req)
           isServiceUser = true
         }
 
@@ -59,7 +59,7 @@ class AuthHandler {
               res,
               'Access token is not a valid JWT',
             )
-            return next()
+            return next(err)
           }
           try {
             address = await rest.createOrGetKey({ username: decodedToken.preferred_username, token }, { config })
@@ -78,21 +78,25 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
-        return next()
+        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error")
+        return next(err)
       }
-
+      
+      res.clearCookie(req.app.oauth.getCookieNameAccessToken())
+      res.clearCookie(req.app.oauth.getCookieNameAccessTokenExpiry())
+      res.clearCookie(req.app.oauth.getCookieNameRefreshToken())
+      
       rest.response.status(RestStatus.UNAUTHORIZED, res, {
         loginUrl: getLoginUrl(req),
       })
-      return next()
+      return next(new Error('Authorization required'))
     }
   }
 
-  static initOauth() {
+  static async initOauth() {
     let oauth
     try {
-      oauth = oauthUtil.init(config.nodes[0].oauth)
+      oauth = await oauthUtil.init(config.nodes[0].oauth)
     } catch (err) {
       console.log('Error initializing oauth handlers')
       process.exit(1)
@@ -133,7 +137,7 @@ class AuthHandler {
           return next()
         }
       } catch (err) {
-        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR)
+        rest.response.status(RestStatus.INTERNAL_SERVER_ERROR, res, "Internal Server Error")
         return next()
       }
 

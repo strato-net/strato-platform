@@ -27,7 +27,7 @@ class StripeService {
                     }
                 }),
                 metadata: {
-                    ...cartData
+                    cart: JSON.stringify(cartData)
                 },
                 payment_intent_data: {
                     /* 3% of OrderTotal in Cents */
@@ -54,6 +54,28 @@ class StripeService {
     static getPaymentSession(session_id, CONNECTED_ACCOUNT_ID) {
         try {
             return stripe.checkout.sessions.retrieve(session_id, {
+                stripeAccount: CONNECTED_ACCOUNT_ID
+            });
+        } catch (error) {
+            console.error(`Stripe error: ${e}`)
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+        }
+    }
+
+    static getPaymentIntent(paymentIntentId, CONNECTED_ACCOUNT_ID) {
+        try {
+            return stripe.paymentIntents.retrieve(paymentIntentId, {
+                stripeAccount: CONNECTED_ACCOUNT_ID
+            });
+        } catch (error) {
+            console.error(`Stripe error: ${e}`)
+            throw new rest.RestError(RestStatus.BAD_REQUEST, `Stripe error: ${e.message}`)
+        }
+    }
+
+    static getPaymentMethod(paymentMethodId, CONNECTED_ACCOUNT_ID) {
+        try {
+            return stripe.paymentMethods.retrieve(paymentMethodId, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             });
         } catch (error) {

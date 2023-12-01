@@ -113,6 +113,44 @@ paths:
       responses:         
         200:
           description: indicates success of transfer ownership
+  /order/sale:
+    post:
+      security:              
+        - bearerAuth: []      
+      tags:               
+        - Order        
+      summary: Creates a Sale Order
+      produces:
+      - application/json
+      requestBody:         
+        description: It creates a sale order
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/createSaleOrder' 
+      responses:         
+        200:
+          description: indicates success of create sale order
+  /order/closeSale:
+    post:
+      security:              
+        - bearerAuth: []      
+      tags:               
+        - Order        
+      summary: Call transferOwnership on Sale Order
+      produces:
+      - application/json
+      requestBody:         
+        description: It enable user to transfer ownership
+        required: true
+        content:
+          'application/json':
+            schema:       
+              $ref: '#/definitions/executeSale' 
+      responses:         
+        200:
+          description: indicates success of transfer ownership
 definitions:        
   fetchOrder:
     address:
@@ -200,4 +238,42 @@ definitions:
       chainId:
         type: string
       newOwner:
+        type: string
+  createSaleOrder:
+    type: object
+    properties:
+      orderList:
+        type: array
+        items:
+          type: object
+          properties:
+            quantity: 
+              type: number
+            assetAddress: 
+              type: string
+            category: 
+              type: string
+      paymentMethod:
+        type: string
+      totalPrice:
+        type: number
+      shippingAddress:
+        type: string
+      paymentSessionId:
+        type: string
+  cancelSaleOrder:
+    type: object
+    properties:
+      saleOrderAddress:
+        type: string
+      comments:
+        type: string
+  executeSale:
+    type: object
+    properties:
+      saleOrderAddress:
+        type: string
+      fulfillmentDate:
+        type: number
+      comments:
         type: string
