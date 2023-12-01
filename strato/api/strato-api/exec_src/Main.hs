@@ -326,7 +326,6 @@ main = do
   let env =
         BlocEnv
           { gasOn = flags_gasOn,
-            evmCompatible = flags_evmCompatible,
             txSizeLimit = flags_txSizeLimit,
             accountNonceLimit = flags_accountNonceLimit,
             gasLimit = flags_gasLimit,
