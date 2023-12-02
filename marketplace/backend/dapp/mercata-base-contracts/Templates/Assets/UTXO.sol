@@ -1,7 +1,11 @@
+import "Asset.sol";
+
 abstract contract UTXO is Asset {
     uint public units; // Number of units this asset represents
     uint public serialNo;
     event AssetSplit(address newAsset, uint unitsMoved);
+
+    mapping (address => uint) lockedUnits;
 
     constructor(
         string _name,
@@ -15,13 +19,35 @@ abstract contract UTXO is Asset {
         serialNo = _serialNo;
     }
 
-    function splitAsset(uint splitUnits) public requireOwner("Split Asset") returns (address newAssetAddress) {
-        require(splitUnits < units, "Cannot split more units than available");
+    function splitAsset(address orderAddress, address purchasersAddress) public requireWhitelisted("Split Asset") returns (address) {
+        uint splitUnits = takeLockedUnits(orderAddress);
         // Create a new UTXO with a portion of the units
-        UTXO newAsset = new UTXO(name, description, images, price, createdDate, splitUnits, (serialNo+1));
-        units -= splitUnits; // Reduce the units in the current contract
+        UTXO newAsset = new UTXO(name, description, images, createdDate, splitUnits, (serialNo+1));
+
+        Asset(newAsset).whitelistSale(msg.sender);
+        Asset(newAsset).transferOwnership(purchasersAddress);
 
         emit AssetSplit(address(newAsset), splitUnits);
 
         return address(newAsset);
-    }}
+    }
+
+    function lockUnits(address orderAddress, uint unitsToLock) public requireWhitelisted("lock asset units") {
+        require(unitsToLock >= units, "Not enough units to lock");
+        require(lockedUnits[orderAddress] == 0, "Order has already locked units in this asset.");
+        units -= unitsToLock;
+        lockedUnits[orderAddress] = unitsToLock;
+    }
+
+    function takeLockedUnits(address orderAddress) internal returns (uint) {
+        uint unitsToUnlock = lockedUnits[orderAddress];
+        require(unitsToUnlock > 0, "There are no units to unlock for address " + string(orderAddress));
+        lockedUnits[orderAddress] = 0;
+        return unitsToUnlock;
+    }
+
+    function unlockUnits(address orderAddress) public requireWhitelisted("unlock asset units") {
+        uint unitsToReturn = takeLockedUnits(orderAddress);
+        units += unitsToReturn;
+    }
+}

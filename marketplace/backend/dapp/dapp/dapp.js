@@ -25,8 +25,8 @@ import paymentProviderJs from '/dapp/payments/paymentProvider';
 
 const allAssetNames = [];
 
-const contractName = "Dapp";
-const contractFileName = `dapp/dapp/contracts/Dapp.sol`;
+const contractName = "Mercata";
+const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
 const balance = 100000000000000000000;
 let userCert = null;

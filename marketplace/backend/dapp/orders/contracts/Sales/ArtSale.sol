@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+import <904f9336947055bfab86992930f3bc4a6637035f>;
 
 /// @title A representation of art sale contract
 contract ArtSale is Sale{
