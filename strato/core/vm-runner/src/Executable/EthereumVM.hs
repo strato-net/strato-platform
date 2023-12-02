@@ -233,7 +233,7 @@ sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ block
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
-getFirstBlockFromSequencer :: (MonadIO m, MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
+getFirstBlockFromSequencer :: (MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
 getFirstBlockFromSequencer = do
   (VmBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
   return block
@@ -261,7 +261,7 @@ getCheckpoint = do
       $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
       return (ofs, md')
 
-getCheckpointNoMetadata :: (MonadIO m, MonadLogger m, HasKafka m) => m KP.Offset
+getCheckpointNoMetadata :: (MonadLogger m, HasKafka m) => m KP.Offset
 getCheckpointNoMetadata = do
   let topic = seqVmEventsTopicName
       topic' = show topic
@@ -273,21 +273,21 @@ getCheckpointNoMetadata = do
     Right (ofs, _) -> do
       return ofs
 
-setCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
+setCheckpoint :: (MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
   $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
   let kMetadata = toKafkaMetadata checkpoint
   ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
-setCheckpointNoMetadata :: (MonadIO m, MonadLogger m, HasKafka m) => KP.Offset -> m ()
+setCheckpointNoMetadata :: (MonadLogger m, HasKafka m) => KP.Offset -> m ()
 setCheckpointNoMetadata ofs = do
   $logInfoS "setCheckpointNoMetadata" . T.pack $ "Setting checkpoint to " ++ show ofs
   let emptyMetadata = KP.Metadata $ KP.KString BS.empty
   ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs emptyMetadata
   either (error . show) return ret
 
-getUnprocessedKafkaEvents :: (MonadIO m, MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]
+getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]
 getUnprocessedKafkaEvents offset = do
   $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
   ret <- execKafka (readSeqVmEvents offset)

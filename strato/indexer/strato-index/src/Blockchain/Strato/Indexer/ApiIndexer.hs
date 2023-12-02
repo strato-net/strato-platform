@@ -29,15 +29,13 @@ import Control.Arrow ((&&&))
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
-import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Network.Kafka
 import Network.Kafka.Protocol
 
-apiIndexerMainLoop :: ( MonadIO m,
-                        MonadLogger m,
+apiIndexerMainLoop :: ( MonadLogger m,
                         HasKafka m,
                         (Keccak256 `A.Alters` API OutputTx) m,
                         (Word256 `A.Alters` API ChainInfo) m,
@@ -85,7 +83,7 @@ indexAPI idxEvents = do
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")
 
-getKafkaCheckpoint :: (MonadIO m, HasKafka m) =>
+getKafkaCheckpoint :: HasKafka m =>
                       m Offset
 getKafkaCheckpoint =
   execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
@@ -93,7 +91,7 @@ getKafkaCheckpoint =
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right r -> pure $ fst r
 
-setKafkaCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) =>
+setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       Offset -> m ()
 setKafkaCheckpoint ofs = do
   $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
@@ -108,7 +106,7 @@ indexerMetadata = Metadata $ KString S8.empty
 setKafkaCheckpoint' :: Kafka k => Offset -> k (Either KafkaError ())
 setKafkaCheckpoint' = commitSingleOffset (snd kafkaClientIds) targetTopicName 0 `flip` indexerMetadata
 
-getUnprocessedIndexEvents :: (MonadIO m, HasKafka m) =>
+getUnprocessedIndexEvents :: HasKafka m =>
                              m (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
   ofs <- getKafkaCheckpoint

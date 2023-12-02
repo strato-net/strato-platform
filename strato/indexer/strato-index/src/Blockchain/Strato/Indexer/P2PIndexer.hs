@@ -22,7 +22,6 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&))
 import Control.Monad
-import Control.Monad.IO.Class
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
@@ -34,8 +33,7 @@ import Network.Kafka.Protocol
 import Text.Format
 
 p2pIndexerMainLoop ::
-  ( MonadIO m,
-    MonadLogger m,
+  ( MonadLogger m,
     HasKafka m,
     (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) m,
     (Keccak256 `A.Alters` P2P OutputBlock) m,
@@ -87,7 +85,7 @@ indexP2P idxEvents = do
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-p2p-indexer", lookupConsumerGroup "strato-p2p-indexer")
 
-getKafkaCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) =>
+getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       m Offset
 getKafkaCheckpoint =
   execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
@@ -95,7 +93,7 @@ getKafkaCheckpoint =
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
 
-setKafkaCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) =>
+setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       Offset -> m ()
 setKafkaCheckpoint ofs = do
   $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
@@ -103,7 +101,7 @@ setKafkaCheckpoint ofs = do
     Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
     Right () -> return ()
 
-getUnprocessedIndexEvents :: (MonadIO m, MonadLogger m, HasKafka m) =>
+getUnprocessedIndexEvents :: (MonadLogger m, HasKafka m) =>
                              m (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
   ofs <- getKafkaCheckpoint

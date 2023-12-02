@@ -17,7 +17,7 @@ import Network.Kafka.Protocol
 
 type KafkaM = ReaderT (IORef KafkaState)
 
-type HasKafka m = AccessibleEnv (IORef KafkaState) m
+type HasKafka m = (MonadIO m, AccessibleEnv (IORef KafkaState) m)
 
 data KafkaEnv = KafkaEnv
   { kafkaStateIORef :: IORef KafkaState
@@ -43,11 +43,11 @@ runKafkaMUsingEnv :: KafkaEnv -> KafkaM m a -> m a
 runKafkaMUsingEnv env f =
   runReaderT f $ kafkaStateIORef env
 
-runKafkaM :: MonadUnliftIO m => KafkaString -> KafkaAddress -> KafkaM m a -> m a
+runKafkaM :: MonadIO m => KafkaString -> KafkaAddress -> KafkaM m a -> m a
 runKafkaM x y f = flip runKafkaMUsingEnv f =<< createKafkaEnv x y
 
 execKafka ::
-  (HasKafka m, MonadIO m) =>
+  HasKafka m =>
   StateT KafkaState (ExceptT KafkaClientError IO) a ->
   m a
 execKafka f = do

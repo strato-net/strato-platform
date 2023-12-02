@@ -69,7 +69,7 @@ doRemoveOrgName chainId cm = do
   removeMember chainId cm
   void . execRedis $ RBDB.removeChainMember chainId cm
 
-doRegisterCertificate :: (MonadIO m, MonadLogger m, HasKafka m, HasRedis m) =>
+doRegisterCertificate :: (MonadLogger m, HasKafka m, HasRedis m) =>
                          Address -> X509CertInfoState -> m ()
 doRegisterCertificate userAddress x509CertInfoState = do
   logF
@@ -81,7 +81,7 @@ doRegisterCertificate userAddress x509CertInfoState = do
   void . execRedis $ RBDB.registerCertificate userAddress x509CertInfoState
   void . execKafka $ writeUnseqEvents [IENewCertRegistered userAddress x509CertInfoState]
 
-doRevokeCertificate :: (MonadIO m, MonadLogger m, HasKafka m, HasRedis m) =>
+doRevokeCertificate :: (MonadLogger m, HasKafka m, HasRedis m) =>
                        Address -> m ()
 doRevokeCertificate userAddress = do
   logF
@@ -220,7 +220,7 @@ txrResultHandler = \case
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer")
 
-getKafkaCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) =>
+getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       m Offset
 getKafkaCheckpoint =
   execKafka (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
@@ -228,7 +228,7 @@ getKafkaCheckpoint =
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
 
-setKafkaCheckpoint :: (MonadIO m, MonadLogger m, HasKafka m) =>
+setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
                       Offset -> m ()
 setKafkaCheckpoint ofs = do
   $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
@@ -236,7 +236,7 @@ setKafkaCheckpoint ofs = do
     Left err -> error $ "Unexpected response when setting checkpoint to " ++ show ofs ++ ": " ++ show err
     Right () -> return ()
 
-getUnprocessedIndexEvents :: (MonadIO m, MonadLogger m, HasKafka m) =>
+getUnprocessedIndexEvents :: (MonadLogger m, HasKafka m) =>
                              m (Offset, [IndexEvent])
 getUnprocessedIndexEvents = do
   ofs <- getKafkaCheckpoint
