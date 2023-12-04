@@ -10,6 +10,7 @@ contract Membership is ItemStatus, RestStatus, Asset {
     string public serialNumber;
     uint expirationPeriodInMonths;
     uint expirationDate;
+    bool spent;
     event AssetSplit(address newAsset, uint unitsMoved);
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
@@ -39,12 +40,14 @@ contract Membership is ItemStatus, RestStatus, Asset {
         ownerCommonName = ownerCert["commonName"];
         expirationPeriodInMonths =_expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
+        spent=false;
         if(_paymentTypes.length > 0) {
             createSales(_paymentTypes, _price, _units);
         }
     }
 
     function splitAsset(address saleContract, uint[] splitUnitsArray, address newOwner) public requireOwner("split asset") returns (address[] memory) {
+        require(spent == false, "Membership is invalid");
         uint totalSplitUnits = 0;
         for (uint i = 0; i < splitUnitsArray.length; i++) {
             totalSplitUnits += splitUnitsArray[i];
@@ -88,13 +91,14 @@ contract Membership is ItemStatus, RestStatus, Asset {
                 projectType,
                 new string[](0)
             );
-
+        spent=true;
         newAssets.push(address(newAsset));
         emit AssetSplit(address(newAsset), splitUnitsArray[i]);
 
         return newAssets;
     }
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
+        require(spent == false, "Membership is invalid");
         require(block.timestamp < expirationDate, "Membership is expired");
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new MembershipSale(address(this), _paymentTypes[i], _price, _units)));
@@ -104,6 +108,7 @@ contract Membership is ItemStatus, RestStatus, Asset {
     }
 
     function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
+        require(spent == false, "Membership is invalid");
         require(block.timestamp < expirationDate, "Membership is expired");
         address newSale = address(new MembershipSale(address(this), _paymentType, _price, _units));
         return (RestStatus.OK, string(newSale));
@@ -118,6 +123,7 @@ contract Membership is ItemStatus, RestStatus, Asset {
         uint _price,
         uint _units
     ) public requireOwner("update membership") returns (uint) {
+        require(spent == false, "Membership is invalid");
         serialNumber = _serialNumber;
         updateAsset(_name, _description, _images, _status, _price);
         if (_units != units) {
