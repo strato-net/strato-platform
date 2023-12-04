@@ -2,7 +2,35 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Sequencer.Metrics where
+module Blockchain.Sequencer.Metrics (
+  blockHashRegistrySize,
+  chainHashRegistrySize,
+  chainIdRegistrySize,
+  emittedBlockRegistrySize,
+  eventsplitMetrics,
+  gregorCheckpointsSent,
+  gregorLoop,
+  gregorP2PRead,
+  gregorP2PWrite,
+  gregorSeqTiming,
+  gregorUnseqRead,
+  gregorUnseqTiming,
+  gregorUnseqWrite,
+  gregorVMRead,
+  gregorVMWrite,
+  seqBlocksEcrfail,
+  seqBlocksEnqueued,
+  seqLdbBatchSize,
+  seqLdbBatchWrites,
+  seqLoopEvents,
+  seqLoopTiming,
+  seqSplitEventsTiming,
+  seqTxsUnwitnessed,
+  seqTxsWitnessed,
+  timeAction,
+  txHashRegistrySize,
+  x509CertInfoStateRegistrySize
+  ) where
 
 import BlockApps.Init ()
 import Control.Monad.IO.Class
@@ -28,10 +56,10 @@ seqBlocksEcrfail = unsafeRegister $ counter (Info "seq_blocks_ecrfail" "Sequence
 
 seqBlocksEnqueued :: Counter
 seqBlocksEnqueued = unsafeRegister $ counter (Info "seq_blocks_enqueued" "Sequencer counter for blocks enqueued")
-
+{-
 seqBlocksReleased :: Counter
 seqBlocksReleased = unsafeRegister $ counter (Info "seq_blocks_released" "Sequencer counter for blocks released")
-
+-}
 seqLoopTiming :: Summary
 seqLoopTiming =
   unsafeRegister $
@@ -50,24 +78,24 @@ seqSplitEventsTiming =
     summary
       (Info "seq_split_events_timing" "Amount of time spent in split events")
       defaultQuantiles
-
+{-
 gregorKafkaCheckpointWrites :: Counter
 gregorKafkaCheckpointWrites =
   unsafeRegister . counter $
     Info "gregor_kafka_checkpoint_writes" "Sequencer counter for kafka checkpoint writes"
-
+-}
 eventsplitMetrics :: Vector Text Counter
 eventsplitMetrics =
   unsafeRegister
     . vector "seq_event_type"
     . counter
     $ Info "seq_event_splitted" "Counts for splitted events in sequencer"
-
+{-
 gregorKafkaCheckpointReads :: Counter
 gregorKafkaCheckpointReads =
   unsafeRegister . counter $
     Info "gregor_kafka_checkpoint_reads" "Sequencer counter for kafka checkpoint reads"
-
+-}
 gregorLoop :: Vector Text Counter
 gregorLoop =
   unsafeRegister . vector "channel" . counter $
@@ -116,12 +144,12 @@ gregorUnseqWrite :: Counter
 gregorUnseqWrite =
   unsafeRegister . counter $
     Info "gregor_unseq_chan_write" "Gregor counter for TMChan unsequenced writes"
-
+{-
 gregorUnseqOffset :: Gauge
 gregorUnseqOffset =
   unsafeRegister . gauge $
     Info "gregor_unseq_kafka_offset" "Gauges number of unseq events read"
-
+-}
 gregorCheckpointsSent :: Counter
 gregorCheckpointsSent =
   unsafeRegister . counter $
@@ -174,7 +202,7 @@ x509CertInfoStateRegistrySize =
     . vector "X509CertInfoStateRegistrySize_registry"
     . gauge
     $ Info "X509CertInfoStateRegistrySize_registry" "Size count for private chain X509CertInfoStateRegistrySize"
-
+{-
 {-# NOINLINE getChainsDbSize #-}
 getChainsDbSize :: Vector Text Gauge
 getChainsDbSize =
@@ -182,7 +210,8 @@ getChainsDbSize =
     . vector "get_chains_db"
     . gauge
     $ Info "get_chains_db" "Size count for private chain get chains db"
-
+-}
+{-
 {-# NOINLINE getTransactionsDbSize #-}
 getTransactionsDbSize :: Vector Text Gauge
 getTransactionsDbSize =
@@ -190,7 +219,7 @@ getTransactionsDbSize =
     . vector "get_transactions_db"
     . gauge
     $ Info "get_transactions_db" "Size count for private chain get transactions db"
-
+-}
 timeAction :: (Observer metric, MonadMonitor m, MonadIO m) => metric -> m a -> m a
 timeAction metric act = do
   start <- liftIO $ getTime Monotonic

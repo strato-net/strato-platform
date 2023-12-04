@@ -27,6 +27,7 @@ library:
     - bytestring
     - clock
     - common-log
+    - composable-monads-base
     - conduit
     - data-default
     - directory
@@ -34,6 +35,7 @@ library:
     - extra
     - format
     - http-client
+    - kafka-monad
     - labeled-error
     - lens
     - leveldb-haskell
@@ -49,6 +51,7 @@ library:
     - servant-client
     - text
     - time
+    - transformers
     - classy-prelude
     - containers
     - milena-tools
