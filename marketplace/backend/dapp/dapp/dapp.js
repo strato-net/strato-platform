@@ -108,19 +108,9 @@ async function uploadContract(token, options) {
   return await bind(token, contract, options);
 }
 
-async function getManagersAndCirrusInfo(admin, contract, options) {
-  const state = await rest.getState(admin, contract, options);
-  const paymentManager = await paymentManagerJs.bindAddress(admin, state.paymentManager, options);
-
-  const cirrusOrg = state.bootUserOrganization !== "" ? state.bootUserOrganization : undefined;
-
-  return { cirrusOrg, paymentManager };
-}
-
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
   console.debug(contract)
-  let userOrganization
 
   if (!serviceUser) {
 
@@ -130,14 +120,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //99% chance they do, but if this this their first login
     //the node might not have a certificate in time
     if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
-      contract.userOrganization = userCertificate.organization
-      userOrganization = userCertificate.organization
       userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
-      console.log('dapp - userCertificate.organization', userCertificate.organization)
+      console.log('dapp - userCertificate', userCertificate)
     }
   }
 
-  const managers = await getManagersAndCirrusInfo(rawAdmin, contract, _defaultOptions)
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
   const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], };
   // for querying data not on the dapp shard
@@ -146,13 +133,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     chainIds: [],
   };
 
-  const dappAddress = contract.address;
-  const admin = { dappAddress, ...rawAdmin };
-
-  contract.managers = managers;
-  contract.chainId = defaultOptions.chainIds
-    ? defaultOptions.chainIds[0]
-    : undefined;
+  const admin = { ...rawAdmin };
 
   // --------------------------- DAPP MANAGEMENT --------------------------------
   // governance - single add
@@ -407,7 +388,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
       const userContactAddress = await userAddressJs.get(rawAdmin, { address: order.shippingAddress }, getOptions);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses, state: [1,2] }, options);
       const assetAddresses = sales.map(sale => {
@@ -455,10 +436,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   /* ------------------------ Stripe account connect starts here ------------------------ */
   contract.stripeOnboarding = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
       let userStripeAccount, generatedAccountLink;
       // get user paymentProvider details from cirrus
-      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: userOrganization, accountDeauthorized: false }, getOptions)
+      const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false }, getOptions)
 
       /*  check if an accountId already exists for the user org */
       if (Object.keys(sellerStripeDetails).length > 0 && sellerStripeDetails.accountLinked) {
@@ -473,7 +454,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           accountId: userStripeAccount.id, status: "", createdDate: dayjs().unix(),
         }
         userStripeAccount = userStripeAccount.id
-        await managers.paymentManager.createPaymentProvider(accountDetails)
+        // await managers.paymentManager.createPaymentProvider(accountDetails)
       } else {
         userStripeAccount = sellerStripeDetails.accountId
       }
@@ -487,7 +468,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStripeOnboardingStatus = async function (args, options = defaultOptions) {
     try {
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
 
       // get user paymentProvider details from cirrus
       const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false, ...args }, getOptions);
@@ -512,7 +493,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
       if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-        await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, options)
+        // await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, options)
       }
 
       return connectedStripeAccountStatus
@@ -528,7 +509,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // get user paymentProvider details from cirrus
       const { accountId, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime } = args
 
-      const getOptions = { ...options, org: managers.cirrusOrg, app: contractName };
+      const getOptions = { ...options, app: contractName };
       const chainOptions = { ...options, chainIds: [contract.chainId] };
 
       const paymentProvider = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountId }, getOptions);
@@ -543,7 +524,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return true;
       }
 
-      await managers.paymentManager.updatePaymentProvider({ paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
+      // await managers.paymentManager.updatePaymentProvider({ paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
 
     } catch (error) {
       console.error(error);
@@ -557,7 +538,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
 
-      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
+      const newOptions = { ...options, app: contractName }
 
       const assetAddresses = orderList.map(o => o.assetAddress);
       
@@ -622,7 +603,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         createdDate: stripePaymentSession.created,
         sellerAccountId: sellerStripeDetails.accountId
       }
-      const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
+      // const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
       return stripePaymentSession
 
     } catch (error) {
@@ -637,7 +618,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.updatePayment = async function (args, options = defaultOptions, token) {
     try {
       const chainOptions = { ...options, chainIds: [contract.chainId] };
-      return managers.paymentManager.updatePayment(args, chainOptions)
+      // return managers.paymentManager.updatePayment(args, chainOptions)
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating payment status", { message: "Error while updating payment status" })
     }
@@ -645,7 +626,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getPayment = async function (args, options = defaultOptions) {
     try {
-      return managers.paymentManager.get(args, { ...options, org: managers.cirrusOrg, app: contractName });
+      return undefined // managers.paymentManager.get(args, { ...options, org: managers.cirrusOrg, app: contractName });
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment", { message: "Error while fetching payment" })
     }
@@ -653,13 +634,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getPaymentSession = async function (args, options = defaultOptions) {
     try {
-      const newOptions = { ...options, org: managers.cirrusOrg, app: contractName }
+      const newOptions = { ...options, app: contractName }
       const { session_id } = args
-      const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
-      const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
-      const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
-      const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
-      return { ...paymentSession, payment_method: paymentMethod.card.brand }
+      // const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
+      // const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+      // const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
+      // const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
+      return {} // { ...paymentSession, payment_method: paymentMethod.card.brand }
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }
@@ -668,7 +649,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.createUserAddress = async function (args, options = defaultOptions) {
     try {
       const createdDate = Math.floor(Date.now() / 1000);
-      return managers.paymentManager.createUserAddress({ ...args, createdDate: createdDate, });
+      return {} // managers.paymentManager.createUserAddress({ ...args, createdDate: createdDate, });
     } catch (err) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -678,8 +659,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, org: managers.cirrusOrg, app: contractName }
-    return userAddressJs.getAll(rawAdmin, { ownerOrganization: userOrganization, ...args }, getOptions);
+    const getOptions = { ...options, app: contractName }
+    return userAddressJs.getAll(rawAdmin, { ...args }, getOptions);
   };
 
   return contract;

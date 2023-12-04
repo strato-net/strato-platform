@@ -2,7 +2,7 @@ import "/dapp/orders/contracts/Sales/ArtSale.sol";
 
 pragma es6;
 pragma strict;
-import <904f9336947055bfab86992930f3bc4a6637035f>;
+import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
 
 /// @title A representation of Art assets
 contract Art is ItemStatus, RestStatus, Asset {

@@ -63,7 +63,6 @@ services:
     - nginx
     environment:
     - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
-    - MP_DAPP_ADDRESS=${MP_DAPP_ADDRESS:-038b2c5c70dc23ff707bdd92648666863a388a0d}
     - MP_API_DEBUG=${MP_API_DEBUG:-false}
     - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
     - ORG_DEPLOY_FILE_NAME=${DEPLOY_FILE_NAME:-org.deploy.yaml}
