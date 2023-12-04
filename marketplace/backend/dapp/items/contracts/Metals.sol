@@ -1,8 +1,8 @@
-import "/dapp/orders/contracts/Sales/MaterialsSale.sol";
+import "/dapp/orders/contracts/Sales/MetalsSale.sol";
 
 pragma es6;
 pragma strict;
-import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
+import <afa8348e8e0305b2ac801b0ea20790bd7b638554>;
 
 /// @title A representation of Metals assets
 contract Metals is ItemStatus, RestStatus, Asset {
@@ -27,21 +27,15 @@ contract Metals is ItemStatus, RestStatus, Asset {
         string _source,
         PaymentType[] _paymentTypes
     ) public Asset(_name, _description, _images, _createdDate ){
-        owner = _owner;
-
         serialNumber = _serialNumber;
         source = _source;
-
-        mapping(string => string) ownerCert = getUserCert(owner);
-        ownerOrganization = ownerCert["organization"];
-        ownerCommonName = ownerCert["commonName"];
 
         createSales(_paymentTypes, _price);
     }
 
     function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sales") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new MaterialsSale(address(this), _paymentTypes[i], _price)));
+            whitelistSale(address(new MetalsSale(address(this), _paymentTypes[i], _price)));
         }
         status = ItemStatus.PUBLISHED;
         return RestStatus.OK;

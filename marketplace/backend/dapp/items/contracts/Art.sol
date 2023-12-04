@@ -2,7 +2,7 @@ import "/dapp/orders/contracts/Sales/ArtSale.sol";
 
 pragma es6;
 pragma strict;
-import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
+import <afa8348e8e0305b2ac801b0ea20790bd7b638554>;
 
 /// @title A representation of Art assets
 contract Art is ItemStatus, RestStatus, Asset {
@@ -27,15 +27,8 @@ contract Art is ItemStatus, RestStatus, Asset {
         uint _price,
         PaymentType[] _paymentTypes
     ) public Asset(_name, _description, _images, _createdDate){
-        owner = _owner;
-
         serialNumber = _serialNumber;
         artist = _artist;
-
-        mapping(string => string) ownerCert = getUserCert(owner);
-        ownerOrganization = ownerCert["organization"];
-        ownerCommonName = ownerCert["commonName"];
-
         createSales(_paymentTypes, _price);
     }
 

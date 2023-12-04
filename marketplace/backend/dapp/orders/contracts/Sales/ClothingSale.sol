@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
+import <afa8348e8e0305b2ac801b0ea20790bd7b638554>;
 
 /// @title A representation of clothing sale contract
 contract ClothingSale is Sale{

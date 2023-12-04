@@ -35,6 +35,9 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus, Utils
     }
 
     modifier requireOwner(string action) {
+        string err = "Only the owner of the asset can "
+                   + action
+                   + ".";
         require(msg.sender == owner, err);
         _;
     }

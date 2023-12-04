@@ -2,7 +2,7 @@ import "Asset.sol";
 
 abstract contract UTXO is Asset {
     uint public units; // Number of units this asset represents
-    uint public serialNo;
+    uint public serialNumber;
     event AssetSplit(address newAsset, uint unitsMoved);
 
     mapping (address => uint) lockedUnits;
@@ -13,16 +13,20 @@ abstract contract UTXO is Asset {
         string[] _images,
         uint _createdDate,
         uint _units,
-        uint _serialNo
+        uint _serialNumber
     ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
-        serialNo = _serialNo;
+        serialNumber = _serialNumber;
+    }
+
+    function mint(uint splitUnits) internal virtual returns (UTXO) {
+        return new UTXO(name, description, images, createdDate, splitUnits, (serialNumber+1));
     }
 
     function splitAsset(address orderAddress, address purchasersAddress) public requireWhitelisted("Split Asset") returns (address) {
         uint splitUnits = takeLockedUnits(orderAddress);
         // Create a new UTXO with a portion of the units
-        UTXO newAsset = new UTXO(name, description, images, createdDate, splitUnits, (serialNo+1));
+        UTXO newAsset = mint(splitUnits);
 
         Asset(newAsset).whitelistSale(msg.sender);
         Asset(newAsset).transferOwnership(purchasersAddress);

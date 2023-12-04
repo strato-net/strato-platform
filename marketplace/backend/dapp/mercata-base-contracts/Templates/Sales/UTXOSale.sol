@@ -2,7 +2,6 @@ import "../Sales/Sale.sol";
 import "../Assets/Asset.sol";
 
 abstract contract UTXOSale is Sale {
-    uint units;
     UTXO createdUTXO;
 
     constructor(
