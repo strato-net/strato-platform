@@ -35,6 +35,7 @@ contract Membership is ItemStatus, RestStatus, Asset {
 
         status = _status;
         projectType = _projectType;
+
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerCommonName = ownerCert["commonName"];
@@ -45,36 +46,56 @@ contract Membership is ItemStatus, RestStatus, Asset {
         }
     }
 
-    function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
-        require(block.timestamp < expirationDate, "Membership is expired");
-        for (uint i = 0; i < whitelistedSales.length; i++) {
-            MembershipSale(whitelistedSales[i]).changeSaleQuantity(_units);
+    function splitAsset(address saleContract, uint[] splitUnitsArray, address newOwner) public requireOwner("split asset") returns (address[] memory) {
+        uint totalSplitUnits = 0;
+        for (uint i = 0; i < splitUnitsArray.length; i++) {
+            totalSplitUnits += splitUnitsArray[i];
         }
+        require(totalSplitUnits = units, "Cannot split more/less units than available");
+
+        address[] newAssets;
+
+        //for example:
+        //splitUnitsArray for Membership will be [1,1,1,1,1] if someone buys 5 memberships
+        //splitUnitsArray for Carbon will be [5] if someone buys 5 memberships
+        for (uint i = 0; i < splitUnitsArray.length; i++) {
+            Membership newAsset = new Membership(
+                name,
+                description,
+                images,
+                createdDate,
+                splitUnitsArray[i],
+                serialNumber + i+1,
+                ItemStatus.UNPUBLISHED,
+                0,
+                newOwner,
+                projectType,
+                new string[](0)
+            );
+
+            newAssets.push(address(newAsset));
+            emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+        }
+
+        Membership newAsset = new Membership(
+                name,
+                description,
+                images,
+                createdDate,
+                (units-totalSplitUnits),
+                serialNumber + 1,
+                ItemStatus.UNPUBLISHED,
+                0,
+                newOwner,
+                projectType,
+                new string[](0)
+            );
+
+        newAssets.push(address(newAsset));
+        emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+
+        return newAssets;
     }
-
-    function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
-        require(block.timestamp < expirationDate, "Membership is expired");
-        require(splitUnits < units, "Cannot split more units than available");
-        Membership newAsset = new Membership(name,
-                                     description, 
-                                     images, 
-                                     createdDate, 
-                                     splitUnits, 
-                                     serialNumber + "1", 
-                                     ItemStatus.UNPUBLISHED,
-                                     0, 
-                                     newOwner, 
-                                     projectType, 
-                                     []);
-        units -= splitUnits;
-
-        changeUnitQuantity(units);
-
-        emit AssetSplit(address(newAsset), splitUnits);
-
-        return address(newAsset);
-    }
-
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
         require(block.timestamp < expirationDate, "Membership is expired");
         for (uint i = 0; i < _paymentTypes.length; i++) {
@@ -109,13 +130,4 @@ contract Membership is ItemStatus, RestStatus, Asset {
         }
         return RestStatus.OK;
     }
-
-    function transferOwnership(address saleContract, string _newOwnerCommonName, address _newOwner) overrides public requireOwner("Ownership transfer") {
-        require(block.timestamp < expirationDate, "Membership is expired");
-        require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
-        ownerCommonName = _newOwnerCommonName;
-        owner = _newOwner;
-        disableAllSales();
-    }
 }
-
