@@ -416,7 +416,7 @@ const CreateInventoryModal = ({
                     )}
                 </Form.Item>
                 <Form.Item
-                  label="Price"
+                  label={formik.values.category === 'Carbon' ? 'Price per unit' : 'Price'}
                   name="price"
                   className="w-72"
                 >

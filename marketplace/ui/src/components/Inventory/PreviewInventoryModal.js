@@ -113,7 +113,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               <img
                 className="w-60 object-cover"
                 alt=""
-                src={inventory.images.length > 0 ? inventory.images[0] : image_placeholder}
+                src={inventory.images && inventory.images.length > 0 ? inventory.images[0] : image_placeholder}
               />
               <div className="flex justify-center mt-16">
               <Button
