@@ -83,7 +83,7 @@ const UpdateInventoryModal = ({
           name: decodeURIComponent(inventoryToUpdate.inventory.name),
           address: inventoryToUpdate.inventory.productId,
         },
-        availableQuantity: data ? data.units : null,
+        availableQuantity: data?.units ?? null,
         price: inventoryToUpdate.inventory.price,
         batchId: inventoryToUpdate.inventory.batchId,
         serialNumber: null,

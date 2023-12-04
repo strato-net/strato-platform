@@ -48,17 +48,10 @@ contract Metals is ItemStatus, RestStatus, Asset {
     }
 
     function update(
-        string _name, 
-        string _description, 
-        string[] _images, 
         ItemStatus _status,
-        string _serialNumber,
-        string _source,
         uint _price
     ) public requireOwner("update metals") returns (uint) {
-        serialNumber = _serialNumber;
-        source = _source;
-        updateAsset(_name, _description, _images, _status, _price);
+        updateAsset(name, description, images, _status, _price);
         return RestStatus.OK;
     }
 }

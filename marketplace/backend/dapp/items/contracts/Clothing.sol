@@ -48,17 +48,10 @@ contract Clothing is ItemStatus, RestStatus, Asset {
     }
 
     function update(
-        string _name, 
-        string _description, 
-        string[] _images, 
         ItemStatus _status,
-        string _serialNumber,
-        string _brand,
         uint _price
     ) public requireOwner("update clothing") returns (uint) {
-        serialNumber = _serialNumber;
-        brand = _brand;
-        updateAsset(_name, _description, _images, _status, _price);
+        updateAsset(name, description, images, _status, _price);
         return RestStatus.OK;
     }
 }
