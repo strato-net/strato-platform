@@ -8,7 +8,6 @@ import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 contract Membership is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
     string public serialNumber;
-    string public projectType;
     uint expirationPeriodInMonths;
     uint expirationDate;
     event AssetSplit(address newAsset, uint unitsMoved);
@@ -24,7 +23,6 @@ contract Membership is ItemStatus, RestStatus, Asset {
         ItemStatus _status,
         uint _price,
         address _owner,
-        string _projectType,
         PaymentType[] _paymentTypes,
         uint _expirationPeriodInMonths,
         uint uid
@@ -117,12 +115,10 @@ contract Membership is ItemStatus, RestStatus, Asset {
         string[] _images, 
         ItemStatus _status,
         string _serialNumber,
-        string _projectType,
         uint _price,
         uint _units
     ) public requireOwner("update membership") returns (uint) {
         serialNumber = _serialNumber;
-        projectType = _projectType;
         updateAsset(_name, _description, _images, _status, _price);
         if (_units != units) {
             changeUnitQuantity(_units);

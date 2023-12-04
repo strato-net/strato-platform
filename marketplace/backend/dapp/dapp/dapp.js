@@ -437,12 +437,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.cancelSaleOrder = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
-  }
-
   contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
     const { saleOrderAddress, fulfillmentDate, comments, ...restArgs } = args;
     const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
