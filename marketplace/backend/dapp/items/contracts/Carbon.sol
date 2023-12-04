@@ -85,7 +85,7 @@ contract Carbon is ItemStatus, RestStatus, Asset {
 
     function update(
         ItemStatus _status,
-        uint _price,
+        uint _price
     ) public requireOwner("update carbon") returns (uint) {
         updateAsset(name, description, images, _status, _price);
         return RestStatus.OK;

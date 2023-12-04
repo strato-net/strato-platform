@@ -48,7 +48,7 @@ const UpdateInventoryModal = ({
       address: "",
     },
     availableQuantity: null,
-    pricePerUnit: "",
+    price: "",
     batchId: "",
     serialNumber: null,
     status: true,
@@ -84,7 +84,7 @@ const UpdateInventoryModal = ({
           address: inventoryToUpdate.inventory.productId,
         },
         availableQuantity: data ? data.units : null,
-        pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
+        price: inventoryToUpdate.inventory.price,
         batchId: inventoryToUpdate.inventory.batchId,
         serialNumber: null,
         status: inventoryToUpdate.inventory.status === 1 ? true : false,
@@ -99,7 +99,7 @@ const UpdateInventoryModal = ({
       itemContract: values.category.name,
       itemAddress: inventoryToUpdate.inventory.address,
       updates: {
-        pricePerUnit: values.pricePerUnit,
+        price: values.price,
         status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
       },
     };
@@ -247,19 +247,19 @@ const UpdateInventoryModal = ({
             <div className="flex justify-between mt-4 ">
               <Form.Item
                 label="Price Per Unit"
-                name="pricePerUnit "
+                name="price "
                 className="w-72"
               >
                 <Input
-                  label="pricePerUnit"
+                  label="price"
                   placeholder="Enter Price"
-                  name="pricePerUnit"
-                  value={formik.values.pricePerUnit}
+                  name="price"
+                  value={formik.values.price}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.pricePerUnit && formik.errors.pricePerUnit && (
+                {formik.touched.price && formik.errors.price && (
                   <span className="text-error text-xs">
-                    {formik.errors.pricePerUnit}
+                    {formik.errors.price}
                   </span>
                 )}
               </Form.Item>

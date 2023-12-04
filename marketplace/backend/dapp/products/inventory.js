@@ -160,7 +160,7 @@ async function updateInventory(user, contract, args, options) {
     const callArgs = {
       contract,
       method: "update",
-      args: util.usc({ ...args }),
+      args: util.usc({ ...args.updates }),
     };
     console.log("callArgs", callArgs)
     const resellStatus = await rest.call(user, callArgs, options);

@@ -9,7 +9,7 @@ const getSchema = () => {
       name: yup.string().required("Product Name is required").nullable(),
     }),
     availableQuantity: yup.number().required("Quantity is required").nullable(),
-    pricePerUnit: yup.number().required("Price per unit is required"),
+    price: yup.number().required("Price per unit is required"),
     batchId: yup.string(),
     status: yup.boolean().required("Status is required"),
   });
