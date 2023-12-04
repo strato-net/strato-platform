@@ -194,27 +194,35 @@ contract Mem_Order is OrderStatus {
       status = _status;
     }
 
-    function getInventoriesAndAvailableQuantity(OrderStatus _status,string _comments,address[] _orderLines,bool _isBuyer) public returns(uint,string,string){
-
-      changeStatus(_status);
-      if(_isBuyer){
+   function getInventoriesAndAvailableQuantity(OrderStatus _status, string _comments, address[] _orderLines, bool _isBuyer) public returns(uint, string, string) {
+    changeStatus(_status);
+    if (_isBuyer) {
         buyerComments = _comments;
-      }else{
+    } else {
         sellerComments = _comments;
-      }
-      string inventories = "";
-      string orderLineQuantities = "";
-      for(uint i=0;i<orderLines.length;i++){
+    }
+    string inventories = "";
+    string orderLineQuantities = "";
+    
+    for (uint i = 0; i < orderLines.length; i++) {
         Mem_OrderLine_2 orderLine = Mem_OrderLine_2(address(orderLines[i]));
         Mem_Inventory_2 inventory = Mem_Inventory_2(address(orderLine.inventoryId()));
-        inventories += string(address(orderLine.inventoryId())) + ",";
-        orderLineQuantities += string(orderLine.quantity()) + ",";
-      }
-      return (RestStatus.OK,inventories,orderLineQuantities);
-  
-    }
+        
+        if (i > 0) {
+            orderLineQuantities += ",";
+        }
+        
+        orderLineQuantities += string(orderLine.quantity());
 
-   
+        if (i > 0) {
+            inventories += ",";
+        }
+        
+        inventories += string(address(orderLine.inventoryId()));
+    }
+    
+    return (RestStatus.OK, inventories, orderLineQuantities);
+}
     // ------------------- ASSET SHARD MEMBERSHIP FUNCTIONS ---------------
 
     // Add an organization to the chain

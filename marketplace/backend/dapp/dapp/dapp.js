@@ -839,7 +839,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       orderList.forEach(orderLine => {
         const inventoryItem = inventoriesList.find(inven => inven.address == orderLine.inventoryId)
         const product = productList.find(item => item.address === inventoryItem.productId)
-        
+
         let price = inventoryItem.pricePerUnit
         let tax = inventoryItem.taxDollarAmount === 0 ? Math.round(price * (inventoryItem.taxPercentageAmount / 100)) : (inventoryItem.taxDollarAmount)
         let finalPrice = inventoryItem.pricePerUnit + tax;
@@ -968,24 +968,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }, {});
 
       const inventoriesData = Object.values(groupedData);
-     
       const total = inventoriesData.reduce((acc, obj) => {
         const result = obj.data.reduce((total, curr) => {
-            let tax = curr.taxDollarAmount === 0 ? Math.round(curr.pricePerUnit * (curr.taxPercentageAmount / 100)) : curr.taxDollarAmount;
-            let finalPrice = curr.pricePerUnit + tax;
-    
-            return total + (finalPrice * curr.quantity);  // corrected this line
+          let tax = curr.taxDollarAmount === 0 ? Math.round(curr.pricePerUnit * (curr.taxPercentageAmount / 100)) : curr.taxDollarAmount;
+          let finalPrice = curr.pricePerUnit + tax;
+          return total + (finalPrice * curr.quantity);  // corrected this line
         }, 0);
         return acc + result;
       }, 0);
-    
+
       if (total != recievedOrderTotal) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Order Total is not matching");
       }
 
       let orders = [];
       for (const inventory of inventoriesData) {
-       
+
         const orderArgs = {
 
           orderId: util.uid(),
@@ -1064,7 +1062,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const getOptions = { ...options, org: managers.cirrusOrg, app: contractName, };
       // const ownedProducts = Get Products where ownerOrg === userOrg and Manufacturer !== userOrg and Category == 'Membership'
-      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', limit: 80, ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
+      let ownedProducts = await managers.productManager.getProducts({ category: 'Membership', limit: 80, sort: '-createdDate',ownerOrganization: userOrganization, notEqualsField: 'manufacturer', notEqualsValue: userOrganization }, getOptions);
       // ownedProducts = ownedProducts.filter(m => userOrganization !== m.manufacturer && m.ownerOrganization === userOrganization)
 
       const arrayOfAddresses = ownedProducts.map(obj => obj.address);
@@ -1301,7 +1299,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         let itemAddresses
         let newOwner = orderLines[0].owner
         let result = []
-
         for (let orderLineAddress of orderLinesAddresses) {
 
           const orderLineItems = await managers.orderManager.getOrderLineItems({ orderLineId: orderLineAddress }, createOptions)
@@ -1321,10 +1318,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const membershipAddresses = memberships.map(membership => membership.address);
 
           // Transfer ownership of the items to the buyer
-          let quantity = parseInt(quantitiesToUpdate);
-          const [status, ownershipResponse] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress, quantity });
-          // console.log("dapp productId: ", productId)
-          // console.log("dapp inventoryId: ", inventoryId)
+          // let quantity = parseInt(quantitiesToUpdate);
+          let quantity = orderLines.find((item) => item.address === orderLineAddress).quantity;
+          let [status, productIds, inventoryIds] = await managers.itemManager.transferOwnership({ itemsAddress: itemAddresses, newOwner, dappAddress, quantity });
+          productIds = productIds?.split(",");
+          inventoryIds = inventoryIds?.split(",");
+          console.log("productIds", productIds);
+          // console.log("inventoryIds", inventoryIds);
+          // console.log("dapp productId: ", productIds)
+          // console.log("dapp inventoryId: ", inventoryIds)
           // ownershipResponse.forEach
           // Get all membershipServices using membershipId
           const membershipServices = await membershipServiceJs.getAll(rawAdmin, { membershipId: membershipAddresses }, createOptions)
@@ -1363,25 +1365,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             };
           });
 
-
-          ownershipResponse.forEach(async (item) => {
-            let productId = item.productId;
-            let inventoryId = item.inventoryId;
+          for (let item of productIds) {
+            console.log("item", item);
             const memberResponse = await managers.membershipManager.addMembershipOrderFlow({
               dappAddress: contract.address,
               owner: newOwner,
-              productId: productId,
-              membershipArgs: membershipArgs,
-              membershipServiceArgs: membershipServiceArgs,
-              productFileArgs: productFileArgs
+              productId: item,
+              membershipArgs,
+              membershipServiceArgs,
+              productFileArgs
             });
-          console.log("reach here: ", memberResponse)
-            result.push({ status, productId, inventoryId });
-          })
+            console.log("reach here: ", memberResponse)
+            result.push({ status, productId: item, inventoryId: inventoryIds });
+          }
           console.log("comes here")
-
-          console.log("reach here: ", memberResponse)
         }
+        console.log("result", result);
         return result;
       }
 

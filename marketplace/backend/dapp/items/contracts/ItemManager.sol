@@ -17,7 +17,6 @@ contract Mem_ItemManager is ItemStatus, InventoryStatus {
         address inventoryId;
     }
 
-
     struct ItemObject {
         uint itemNumber;
         string serialNumber;
@@ -181,94 +180,96 @@ contract Mem_ItemManager is ItemStatus, InventoryStatus {
         return (RestStatus.OK, "event has been certified");
     }
 
-   function transferOwnership(
-    address[] _itemsAddress,
-    address _newOwner,
-    address _dappAddress,
-    uint _quantity
-) public returns (uint, ownershipResponseSchema[] memory) {
-    string memory itemAddresses = "";
-    ownershipResponseSchema[] memory ownershipResponseDataArray;
-
-    Dapp dapp = Dapp(address(_dappAddress));
-    Mem_ProductManager productManager = dapp.productManager();
-    for (uint i = 0; i < _quantity; i++) {
-        (address productId, address inventoryId) = getProductAndInventory(
+    function transferOwnership(
+        address[] _itemsAddress,
+        address _newOwner,
+        address _dappAddress,
+        uint _quantity
+    ) public returns (uint, string memory, string memory) {
+        Dapp dapp = Dapp(address(_dappAddress));
+        Mem_ProductManager productManager = dapp.productManager();
+        (string productId, string inventoryId) = getProductAndInventory(
             productManager,
             _itemsAddress,
             _newOwner
         );
 
-        ownershipResponseSchema memory ownershipResponseData;
-        ownershipResponseData.productId = productId;
-        ownershipResponseData.inventoryId = inventoryId;
-
-        // Concatenate item addresses (if needed)
-        // itemAddresses = string(abi.encodePacked(itemAddresses, ",", _itemsAddress[i]));
-
-        // Push the new object into the array
-        ownershipResponseDataArray.push(ownershipResponseData);
+        return (RestStatus.OK, productId, inventoryId);
     }
-    return (RestStatus.OK, ownershipResponseDataArray);
-}
-
 
     function getProductAndInventory(
         Mem_ProductManager _productManager,
         address[] _itemAddress,
         address _newOwner
-    ) public returns (address, address) {
-        Mem_Item_3 item = Mem_Item_3(_itemAddress[0]);
-        Mem_Product_3 product;
-        Mem_Inventory_2 inventory;
-
-        Mem_Product_3 oldProduct = Mem_Product_3(item.productId());
-        address productAddress = _productManager.checkForProduct(
-            address(oldProduct),
-            oldProduct.uniqueProductCode(),
-            _newOwner
-        );
-
-        product = (productAddress == address(0))
-            ? new Mem_Product_3(
-                oldProduct.name(),
-                oldProduct.description(),
-                oldProduct.manufacturer(),
-                oldProduct.unitOfMeasurement(),
-                oldProduct.userUniqueProductCode(),
-                oldProduct.uniqueProductCode(),
-                oldProduct.leastSellableUnit(),
-                oldProduct.imageKey(),
-                oldProduct.isActive(),
-                oldProduct.category(),
-                oldProduct.subCategory(),
-                block.timestamp,
-                _newOwner
-            )
-            : Mem_Product_3(productAddress);
-
-        Mem_Inventory_2 oldInventory = Mem_Inventory_2(item.inventoryId());
-
-        (uint status, address inventory) = product.addInventory(
-            _itemAddress.length,
-            oldInventory.pricePerUnit(),
-            oldInventory.batchId(),
-            InventoryStatus.UNPUBLISHED,
-            block.timestamp,
-            _newOwner,
-            oldInventory.taxPercentageAmount(),
-            oldInventory.taxDollarAmount()
-        );
-
+    ) public returns (string memory, string memory) {
+        string memory productIds = "";
+        string memory inventoryIds = "";
         for (uint i = 0; i < _itemAddress.length; i++) {
+            Mem_Item_3 item = Mem_Item_3(_itemAddress[i]);
+            Mem_Product_3 product;
+            Mem_Inventory_2 inventory;
+
+            Mem_Product_3 oldProduct = Mem_Product_3(item.productId());
+            address productAddress = _productManager.checkForProduct(
+                address(oldProduct),
+                oldProduct.uniqueProductCode(),
+                _newOwner
+            );
+
+            product = (productAddress == address(0))
+                ? new Mem_Product_3(
+                    oldProduct.name(),
+                    oldProduct.description(),
+                    oldProduct.manufacturer(),
+                    oldProduct.unitOfMeasurement(),
+                    oldProduct.userUniqueProductCode(),
+                    oldProduct.uniqueProductCode(),
+                    oldProduct.leastSellableUnit(),
+                    oldProduct.imageKey(),
+                    oldProduct.isActive(),
+                    oldProduct.category(),
+                    oldProduct.subCategory(),
+                    block.timestamp,
+                    _newOwner
+                )
+                : Mem_Product_3(productAddress);
+
+            Mem_Inventory_2 oldInventory = Mem_Inventory_2(item.inventoryId());
+
+            (uint status, address inventory) = product.addInventory(
+                1,
+                oldInventory.pricePerUnit(),
+                oldInventory.batchId(),
+                InventoryStatus.UNPUBLISHED,
+                block.timestamp,
+                _newOwner,
+                oldInventory.taxPercentageAmount(),
+                oldInventory.taxDollarAmount()
+            );
+
             Mem_Item_3 _item = Mem_Item_3(_itemAddress[i]);
             _item.transferOwnership(
                 _newOwner,
                 address(product),
                 address(inventory)
             );
+
+             if (i > 0) {
+                productIds =
+                    string(productIds) +
+                    "," +
+                    string(address(product));
+                inventoryIds =
+                    string(inventoryIds) +
+                    "," +
+                    string(address(inventory));
+            } else {
+                productIds = string(address(product));
+                inventoryIds = string(address(inventory));
+            }
+
         }
 
-        return (address(product), address(inventory));
+        return (productIds, inventoryIds);
     }
 }
