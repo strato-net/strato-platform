@@ -47,7 +47,7 @@ contract Art is ItemStatus, RestStatus, Asset {
         return RestStatus.OK;
     }
 
-    function updateArt(
+    function update(
         string _name, 
         string _description, 
         string[] _images, 

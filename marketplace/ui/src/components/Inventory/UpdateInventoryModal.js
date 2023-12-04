@@ -43,10 +43,6 @@ const UpdateInventoryModal = ({
       name: null,
       address: null,
     },
-    subCategory: {
-      name: null,
-      address: "",
-    },
     productName: {
       name: null,
       address: "",
@@ -78,6 +74,7 @@ const UpdateInventoryModal = ({
 
   useEffect(() => {
     if (inventoryToUpdate) {
+      const data = inventoryToUpdate.inventory.data ? JSON.parse(inventoryToUpdate.inventory.data) : {};
       let nextState = {
         category: {
           name: getCategory(),
@@ -86,7 +83,7 @@ const UpdateInventoryModal = ({
           name: decodeURIComponent(inventoryToUpdate.inventory.name),
           address: inventoryToUpdate.inventory.productId,
         },
-        availableQuantity: inventoryToUpdate.inventory.availableQuantity,
+        availableQuantity: data ? data.units : null,
         pricePerUnit: inventoryToUpdate.inventory.pricePerUnit,
         batchId: inventoryToUpdate.inventory.batchId,
         serialNumber: null,
@@ -99,8 +96,8 @@ const UpdateInventoryModal = ({
 
   const handleUpdateFormSubmit = async (values) => {
     const body = {
-      productAddress: values.productName.address,
-      inventory: inventoryToUpdate.inventory.address,
+      itemContract: values.category.name,
+      itemAddress: inventoryToUpdate.inventory.address,
       updates: {
         pricePerUnit: values.pricePerUnit,
         status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],

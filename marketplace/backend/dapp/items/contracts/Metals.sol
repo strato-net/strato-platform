@@ -47,7 +47,7 @@ contract Metals is ItemStatus, RestStatus, Asset {
         return RestStatus.OK;
     }
 
-    function updateMetals(
+    function update(
         string _name, 
         string _description, 
         string[] _images, 

@@ -156,6 +156,26 @@ async function resellItem(user, contract, args, options) {
     return resellStatus;
 }
 
+async function updateInventory(user, contract, args, options) {
+    const callArgs = {
+      contract,
+      method: "update",
+      args: util.usc({ ...args }),
+    };
+    console.log("callArgs", callArgs)
+    const resellStatus = await rest.call(user, callArgs, options);
+  
+    if (parseInt(resellStatus, 10) !== RestStatus.OK) {
+      throw new rest.RestError(
+        resellStatus,
+        "You cannot resell the item because it's already published",
+        { callArgs }
+      );
+    }
+  
+    return resellStatus;
+}
+
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
  * @param args Lookup with an address or uniqueInventoryID.
@@ -279,6 +299,7 @@ export default {
     contractFilename,
     bindAddress,
     resellItem,
+    updateInventory,
     get,
     getAll,
     inventoryCount,
