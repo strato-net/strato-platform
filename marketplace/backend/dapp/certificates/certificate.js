@@ -10,7 +10,7 @@ async function getCertificate(admin, args = {}, options = defaultOptions) {
         return { key, value }
     })
     
-    const searchArgs = setSearchQueryOptions({}, parsedArgs)
+    const searchArgs = setSearchQueryOptions({},[...parsedArgs,{key:"order",value:"block_timestamp.asc"}])
     const user = await searchOne(constants.certificateContractName, searchArgs, options, admin)
     
     if (!user) {
