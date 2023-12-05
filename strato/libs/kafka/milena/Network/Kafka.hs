@@ -11,10 +11,11 @@ import Control.Exception (Exception, IOException)
 import Control.Exception.Lifted (catch)
 import Control.Lens
 import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.State.Class (MonadState)
+--import Control.Monad.IO.Class (MonadIO, liftIO)
+--import Control.Monad.State.Class (MonadState)
+import Control.Monad.State.Strict as CMSS
 import Control.Monad.Trans.Control 
-import Control.Monad.Trans.State
+--import Control.Monad.Trans.State
 import Data.ByteString.Char8 (ByteString)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
@@ -199,8 +200,8 @@ addKafkaAddress = over stateAddresses . NE.nub .: NE.cons
     (.:) = (.) . (.)
 
 -- | Run the underlying Kafka monad.
-runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
-runKafka s k = runExceptT $ evalStateT k s
+runKafka :: KafkaState -> CMSS.StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
+runKafka s k = runExceptT $ CMSS.evalStateT k s
 
 -- | Catch 'IOException's and wrap them in 'KafkaIOException's.
 tryKafka :: Kafka m => m a -> m a

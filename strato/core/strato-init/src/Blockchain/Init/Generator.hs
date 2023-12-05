@@ -12,7 +12,8 @@ import Control.Lens.Combinators (use)
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Except
-import Control.Monad.Trans.State
+import Control.Monad.State.Strict as CMSS
+--import Control.Monad.Trans.State
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString.Char8 as C8
 import Data.FileEmbed
@@ -26,7 +27,7 @@ import System.Exit
 import UnliftIO.Directory
 import UnliftIO.IO
 
-type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
+type GenM = CMSS.StateT KafkaState (ExceptT KafkaClientError IO)
 
 runGenM :: KafkaAddress -> GenM a -> IO a
 runGenM kaddr mv = do
@@ -106,7 +107,7 @@ sendAccountInfo accountInfoFileName = do
             unless (T.null chk) $ do
               addEvent $ GenesisAccounts chk
               sendChunks h
-      s <- get
+      s <- CMSS.get
       liftIO . withFile accountInfoFileName ReadMode $ \h -> do
         hSetBuffering h (BlockBuffering (Just (1024 * 1024)))
         mErr <- runKafka s $ sendChunks h

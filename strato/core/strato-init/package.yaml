@@ -48,6 +48,7 @@ library:
   - milena
   - milena-tools
   - monad-alter
+  - mtl
   - nibblestring
   - persistent-postgresql
   - resourcet

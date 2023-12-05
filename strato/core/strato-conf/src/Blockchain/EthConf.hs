@@ -9,7 +9,8 @@ where
 
 import Blockchain.EthConf.Model
 import Control.Monad.Except (ExceptT (..))
-import Control.Monad.Trans.State
+import Control.Monad.State.Strict as CMSS
+--import Control.Monad.Trans.State
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
 import Data.String
@@ -37,7 +38,7 @@ connStr = postgreSQLConnectionString . sqlConfig $ ethConf
 cirrusConnStr :: B.ByteString
 cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
 
-runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
+runKafkaConfigured :: KafkaClientId -> CMSS.StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
 
 mkConfiguredKafkaState :: KafkaClientId -> KafkaState
