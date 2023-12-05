@@ -37,7 +37,7 @@ abstract contract UTXO is Asset {
     }
 
     function lockUnits(address orderAddress, uint unitsToLock) public requireWhitelisted("lock asset units") {
-        require(unitsToLock >= units, "Not enough units to lock");
+        require(unitsToLock <= units, "Not enough units to lock");
         require(lockedUnits[orderAddress] == 0, "Order has already locked units in this asset.");
         units -= unitsToLock;
         lockedUnits[orderAddress] = unitsToLock;

@@ -2,7 +2,7 @@ import "/dapp/orders/contracts/Sales/MetalsSale.sol";
 
 pragma es6;
 pragma strict;
-import <afa8348e8e0305b2ac801b0ea20790bd7b638554>;
+import <e206b22155d4958e9133fedb39dad88f0402df2d>;
 
 /// @title A representation of Metals assets
 contract Metals is ItemStatus, RestStatus, Asset {
