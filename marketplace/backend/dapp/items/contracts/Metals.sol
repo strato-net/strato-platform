@@ -54,7 +54,6 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
 
         sellableUnitOfMeasurement = _sellableUnitOfMeasurement;
         leastSellableUnits = _leastSellableUnits;
-        unitsPerQuantity = _unitsPerQuantity;
         // serialNumber = _serialNumber;
         source = _source;
 
@@ -76,8 +75,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
     }
 
     function updateMetals( //should you be able to update quantity?...
-        Unit _unit,
-        uint _unitsPerQuantity,
+        UnitOfMeasurement _sellableUnitOfMeasurement,
         string _name, 
         string _description, 
         string[] _images, 
@@ -87,8 +85,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
         uint _price
     ) public requireOwner("update metals") returns (uint) {
         // serialNumber = _serialNumber;
-        unit = _unit;
-        unitsPerQuantity = _unitsPerQuantity;
+        sellableUnitOfMeasurement = _sellableUnitOfMeasurement;
         source = _source;
         updateAsset(_name, _description, _images, _status, _price);
         return RestStatus.OK;
