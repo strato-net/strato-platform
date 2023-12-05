@@ -53,7 +53,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
         owner = _owner;
 
         sellableUnitOfMeasurement = _sellableUnitOfMeasurement;
-        leastSellableUnits = _leastSellableUnits
+        leastSellableUnits = _leastSellableUnits;
         unitsPerQuantity = _unitsPerQuantity;
         // serialNumber = _serialNumber;
         source = _source;
