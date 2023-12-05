@@ -39,7 +39,7 @@ class MetalsController {
   static validateCreateMetalsArgs(args) {
     const createMetalsSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
+        serialNumber: Joi.string().allow("").optional(), // delete?
         name: Joi.string().required(),
         description: Joi.string().required(),
         source: Joi.string().required(),
@@ -48,6 +48,10 @@ class MetalsController {
         paymentTypes: Joi.array().min(1).items(
           Joi.number().integer().min(0).max(5).required(),
         ).required(),
+        units: Joi.integer().min(1).required(),
+        unitOfMeasurement: Joi.integer().min(0).max(5).required(),
+        leastSellableUnits: Joi.integer().min(1).required(),
+        purity: Joi.string().required()
       }).required()
     });
 

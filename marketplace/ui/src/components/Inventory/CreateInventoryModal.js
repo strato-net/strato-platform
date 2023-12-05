@@ -51,6 +51,9 @@ const CreateInventoryModal = ({
     description: "",
     artist: "",
     source: "",
+    leastSellableUnits: 1,
+    unitOfMeasurement: 0,
+    purity: "",
     projectType: "",
     units: 1,
     brand: "",
@@ -125,7 +128,11 @@ const CreateInventoryModal = ({
           return body = {
             itemArgs: {
               ...body.itemArgs,
+              units: values.units,
+              unitOfMeasurement: values.unitOfMeasurement,
+              leastSellableUnits: values.leastSellableUnits,
               source: values.source,
+              purity: values.purity
             }
           }
         default:
@@ -306,7 +313,64 @@ const CreateInventoryModal = ({
                   </span>
                 )}
             </Form.Item>
-          </div>)
+            <Form.Item
+              label="Purity"
+              name="purity"
+              className="w-72"
+            >
+              <Input
+                label="purity"
+                placeholder="Enter Purity"
+                name="purity"
+                value={formik.values.purity}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.purity &&
+                formik.errors.purity && (
+                  <span className="text-error text-xs">
+                    {formik.errors.purity}
+                  </span>
+                )}
+            </Form.Item>
+            <Form.Item
+              label="Least Sellable Units"
+              name="leastSellableUnits"
+              className="w-72"
+            >
+              <Input
+                label="leastSellableUnits"
+                placeholder="Enter Least Sellable Units"
+                name="leastSellableUnits"
+                value={formik.values.leastSellableUnits}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.leastSellableUnits &&
+                formik.errors.leastSellableUnits && (
+                  <span className="text-error text-xs">
+                    {formik.errors.leastSellableUnits}
+                  </span>
+                )}
+            </Form.Item>
+            <Form.Item
+              label="Quantity"
+              name="units"
+              className="w-72"
+            >
+              <Input
+                label="units"
+                placeholder="Enter Quantity"
+                name="units"
+                value={formik.values.units}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.units &&
+                formik.errors.units && (
+                  <span className="text-error text-xs">
+                    {formik.errors.units}
+                  </span>
+                )}
+            </Form.Item>
+            </div>)
       default:
         break;
     }
