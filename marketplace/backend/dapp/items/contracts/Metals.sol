@@ -41,20 +41,22 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
         UnitOfMeasurement _sellableUnitOfMeasurement,
         uint _leastSellableUnits,
         string _source,
+        string _purity,
         address _owner,
         string _name,
         string _description,
         string[] _images,
         uint _createdDate,
-        uint _quantity,
+        uint _units,
         uint _price,
+        string _serialNumber, // unused
         PaymentType[] _paymentTypes
-    ) public UTXOAsset(_name, _description, _images, _createdDate, _quantity){
+    ) public UTXOAsset(_name, _description, _images, _createdDate, _units){
         owner = _owner;
 
         sellableUnitOfMeasurement = _sellableUnitOfMeasurement;
         leastSellableUnits = _leastSellableUnits;
-        // serialNumber = _serialNumber;
+        purity = _purity;
         source = _source;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -62,7 +64,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
         ownerCommonName = ownerCert["commonName"];
 
         if(_paymentTypes.length > 0) {
-            createSales(_paymentTypes, _price, _quantity);
+            createSales(_paymentTypes, _price, _units);
         }
     }
 
