@@ -55,7 +55,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     const fetchDataBought = async () => {
       const updatedDataBought = await Promise.all(
         orders.map(async (order) => {
-          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatus(5)) {
+          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
             try {
               setIsLoading(true);
               await validatePayment(order);          
@@ -96,7 +96,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     if (response.status === RestStatus.OK) {
       if (
         body.data["payment_status"] === "paid" &&
-        getStatus(parseInt(order.status)) === getStatus(5)
+        getStatus(parseInt(order.status)) === "Payment Pending"
       ) {
         // Update order status
         const isDone = await actions.updateOrderStatus(dispatch, {
