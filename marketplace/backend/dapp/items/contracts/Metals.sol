@@ -4,20 +4,31 @@ pragma es6;
 pragma strict;
 import <4244a06baf12f75617016f4785897ab80e4daf3c>;
 
-enum Unit {
+enum UnitOfMeasurement {
+    TON,
     POUND,
     OUNCE,
-    TON,
+    TONNE,
     KG,
     G   
 }
 
 /// @title A representation of Metals assets
 contract Metals is ItemStatus, RestStatus, UTXOAsset {
-    Unit public unit;
-    uint public unitsPerQuantity;
-    // string public serialNumber; // still needed?
-    string public source;
+    // description would have the acutal product details of units and stuff
+    // least sellable unit = #
+    // unit of measurement
+    // user should set correct quantity (# of least sellable units)
+
+    // can fractionalize product; what is smallest unit can be sold in?
+    // least sellable unit
+    // units sellable = (sellableNumUnits, sellableUnitType) ex: 5 KG
+    // quantity describes sellable units not product units
+    UnitOfMeasurement public sellableUnitOfMeasurement;
+    uint public leastSellableUnits;
+    string public source; //call manufacturer instead?
+    string purity;
+    //string country;
     
     event OwnershipUpdate(
         string seller,
@@ -27,22 +38,22 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
     );
 
     constructor(
-        uint _quantity,
-        Unit _unit,
-        uint _unitsPerQuantity,
-        // string _serialNumber,
-        uint _createdDate,
+        UnitOfMeasurement _sellableUnitOfMeasurement,
+        uint _leastSellableUnits,
+        string _source,
         address _owner,
         string _name,
         string _description,
         string[] _images,
+        uint _createdDate,
+        uint _quantity,
         uint _price,
-        string _source,
         PaymentType[] _paymentTypes
     ) public UTXOAsset(_name, _description, _images, _createdDate, _quantity){
         owner = _owner;
 
-        unit = _unit;
+        sellableUnitOfMeasurement = _sellableUnitOfMeasurement;
+        leastSellableUnits = _leastSellableUnits
         unitsPerQuantity = _unitsPerQuantity;
         // serialNumber = _serialNumber;
         source = _source;
