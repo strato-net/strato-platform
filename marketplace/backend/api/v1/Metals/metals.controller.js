@@ -48,9 +48,9 @@ class MetalsController {
         paymentTypes: Joi.array().min(1).items(
           Joi.number().integer().min(0).max(5).required(),
         ).required(),
-        units: Joi.integer().min(1).required(),
-        unitOfMeasurement: Joi.integer().min(0).max(5).required(),
-        leastSellableUnits: Joi.integer().min(1).required(),
+        units: Joi.number().integer().min(1).required(),
+        unitOfMeasurement: Joi.number().integer().min(0).max(5).required(),
+        leastSellableUnits: Joi.number().integer().min(1).required(),
         purity: Joi.string().required()
       }).required()
     });
