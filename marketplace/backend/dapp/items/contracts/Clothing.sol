@@ -7,7 +7,10 @@ import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 /// @title A representation of Clothing assets
 contract Clothing is ItemStatus, RestStatus, Asset {
     string public serialNumber;
-    string public brand;
+    string public clothingType; // Dropdown selection on UI (Shirt, Pants, Jacket, Shoes, Accessories)
+    string public size; // This will be selected in the UI, a size options appear after selecting the colthing type
+    string public skuNumber; // This could be nice to track more closely. If the SKU is already known it could speed up item creation for user by auto populating things on the form for example.
+    string public condition; // This is a dropdown of conditions on the UI (New, Used)
 
     event OwnershipUpdate(
         string seller,
@@ -24,13 +27,19 @@ contract Clothing is ItemStatus, RestStatus, Asset {
         string _description,
         string[] _images,
         uint _price,
-        string _brand,
+        string _clothingType,
+        string _size,
+        string _skuNumber,
+        string _condition,
         PaymentType[] _paymentTypes
     ) public Asset(_name, _description, _images, _createdDate){
-        owner = _owner;
 
+        owner = _owner;
         serialNumber = _serialNumber;
-        brand = _brand;
+        clothingType = _clothingType;
+        size = _size;
+        skuNumber = _skuNumber;
+        condition = _condition;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -53,11 +62,11 @@ contract Clothing is ItemStatus, RestStatus, Asset {
         string[] _images, 
         ItemStatus _status,
         string _serialNumber,
-        string _brand,
+        string _clothingType,
         uint _price
     ) public requireOwner("update clothing") returns (uint) {
         serialNumber = _serialNumber;
-        brand = _brand;
+        clothingType = _clothingType;
         updateAsset(_name, _description, _images, _status, _price);
         return RestStatus.OK;
     }
