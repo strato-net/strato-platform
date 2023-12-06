@@ -162,7 +162,7 @@ async function updateInventory(user, contract, args, options) {
       method: "update",
       args: util.usc({ ...args.updates }),
     };
-    console.log("callArgs", callArgs)
+    
     const resellStatus = await rest.call(user, callArgs, options);
   
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {

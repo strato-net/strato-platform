@@ -87,7 +87,7 @@ const UpdateInventoryModal = ({
         price: inventoryToUpdate.inventory.price,
         batchId: inventoryToUpdate.inventory.batchId,
         serialNumber: null,
-        status: inventoryToUpdate.inventory.status === 1 ? true : false,
+        status: inventoryToUpdate.inventory.status === "1" ? true : false,
       };
     
       setFormState(nextState);
@@ -289,7 +289,7 @@ const UpdateInventoryModal = ({
               // value={formik.values.serialNumber}
               placeholder="Enter serial numbers as comma separated values 1232WE13W43,1232WE13W434,1232WE13W45"
             /> */}
-            <Form.Item label="Status" name="status" className="mt-4">
+            {/* <Form.Item label="Status" name="status" className="mt-4">
               <Radio.Group
                 value={formik.values.status}
                 onChange={formik.handleChange}
@@ -304,7 +304,7 @@ const UpdateInventoryModal = ({
                   {formik.errors.status}
                 </span>
               )}
-            </Form.Item>
+            </Form.Item> */}
           </div>
         </Form>
       )}
