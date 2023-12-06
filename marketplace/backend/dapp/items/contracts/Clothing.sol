@@ -2,7 +2,7 @@ import "/dapp/orders/contracts/Sales/ClothingSale.sol";
 
 pragma es6;
 pragma strict;
-import <e206b22155d4958e9133fedb39dad88f0402df2d>;
+import <0e5223240c46b3022a73c5e589536d3781e5b93f>;
 
 /// @title A representation of Clothing assets
 contract Clothing is ItemStatus, RestStatus, Asset {
