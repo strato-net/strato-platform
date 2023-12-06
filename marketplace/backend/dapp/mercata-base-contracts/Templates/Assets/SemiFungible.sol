@@ -38,7 +38,7 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
         }
     }
 
-    function splitAsset(address saleContract, uint[] splitUnitsArray, address newOwner) public requireOwner("split asset") returns (address[] memory) {
+    function splitAsset(address orderAddress, uint[] splitUnitsArray, address newOwner) public requireOwner("split asset") returns (address[] memory) {
         uint totalSplitUnits = 0;
         for (uint i = 0; i < splitUnitsArray.length; i++) {
             totalSplitUnits += splitUnitsArray[i];

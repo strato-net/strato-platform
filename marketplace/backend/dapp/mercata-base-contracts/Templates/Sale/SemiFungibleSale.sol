@@ -21,7 +21,7 @@ contract SemiFungibleSale is Sale{
     function executeUTXOSale(address _purchasersAddress) public requireSeller("execute UTXO sale") {
         // Before executing the sale, ensure the asset is a UTXO asset
         SemiFungible semiFungibleAsset = SemiFungible(address(assetToBeSold));
-        address newSemiFungibleAssets[] = semiFungibleAsset.splitAsset(address(this), units, _purchasersAddress);
+        address newSemiFungibleAssets[] = semiFungibleAsset.splitAsset(msg.sender, units, _purchasersAddress);
         }  
     }
 
