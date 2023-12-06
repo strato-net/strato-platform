@@ -69,7 +69,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
         }
     }
 
-    function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") overrides returns (address) {
+    function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") override returns (address) {
         require(splitUnits < quantity, "Cannot split more units than available");
         Metals newMetals = new Metals(unitOfMeasurement,
             leastSellableUnits,
@@ -80,13 +80,13 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
             description,
             images,
             createdDate,
-            slitUnits,
+            splitUnits,
             0,
             "",
             []);
         quantity -= splitUnits;
         for(int i = 0; i < whitelistedSales.length; i++){
-            whitelistedSales[i].changeSaleQuantity(quantity)
+            UTXOSale(whitelistedSales[i]).changeSaleQuantity(quantity);
         }
         emit AssetSplit(address(newMetals), splitUnits);
         return address(newMetals);
