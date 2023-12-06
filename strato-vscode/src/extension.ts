@@ -205,6 +205,13 @@ export async function activate(context: vscode.ExtensionContext) {
 		vscode.commands.executeCommand('workbench.action.openSettings', 'strato-vscode');
 	});
 
+	
+	// Open the STRATO settings page
+	vscode.commands.registerCommand('nodes.settings', async () => {
+		// Open the user settings file
+		vscode.commands.executeCommand('workbench.action.openSettings', 'strato-vscode');
+	});
+
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
 	// Register clipboard copier
