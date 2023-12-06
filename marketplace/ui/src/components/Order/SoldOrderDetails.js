@@ -24,7 +24,7 @@ import { getStringDate } from "../../helpers/utils";
 import { useNavigate } from "react-router-dom";
 import UploadSerialNumberModal from "./UploadSerialNumber";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByValue } from "./constant";
+import { getStatus, getStatusByValue, getStatusByName } from "./constant";
 import dayjs from "dayjs";
 import ConfirmStatusModal from "./ConfirmStatusModal";
 import { US_DATE_FORMAT } from "../../helpers/constants";
@@ -273,7 +273,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const validatePayment = async (paymentSessionId) => {
     //if payment session exists and status = Payment Pending
     // OR if payment session exists and comment is not set and status = Canceled
-    if (((paymentSessionId !== "") && (getStatus(parseInt(orderDetails.status)) === "Payment Pending")) || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === "Canceled"))) {
+    if (((paymentSessionId !== "") && (getStatus(parseInt(orderDetails.status)) === getStatusByName("Payment Pending"))) || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === getStatusByName("Canceled")))) {
       try {
         const intentResponse = await fetch(
           `${apiUrl}/order/payment/intent/sessions/${paymentSessionId}`,
@@ -290,7 +290,7 @@ const SoldOrderDetails = ({ user, users }) => {
             setcomment('Stripe:'+intentBody.data.last_payment_error.message);
           }
 
-        if (intentBody.data.status === 'requires_payment_method' && (getStatus(parseInt(orderDetails.status)) !== "Canceled")) {
+        if (intentBody.data.status === 'requires_payment_method' && (getStatus(parseInt(orderDetails.status)) !== getStatusByName("Canceled"))) {
           //If any payment failure exists, and STATUS != Canceled 
           const newComment = 'Stripe:' + intentBody.data.last_payment_error.message;
   
@@ -306,7 +306,7 @@ const SoldOrderDetails = ({ user, users }) => {
           const isDone = await actions.updateSellerDetails(dispatch, body);
           
           if (isDone) {
-            setStatus("Canceled");
+            setStatus(getStatusByName("Canceled"));
             await actions.fetchOrderDetails(dispatch, Id);
             setcomment(newComment);
           }

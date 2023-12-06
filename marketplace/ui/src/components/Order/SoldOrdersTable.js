@@ -3,7 +3,7 @@ import classNames from "classnames";
 import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled} from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus } from "./constant";
+import { getStatus, getStatusByName } from "./constant";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate, Link } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
@@ -59,7 +59,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     const fetchData = async () => {
       const updatedData = await Promise.all(
         ordersSold.map(async (order) => {
-          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === "Payment Pending") {
+          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
             try {
               setIsLoading(true);
               await validatePayment(order);
@@ -101,7 +101,7 @@ const SoldOrdersTable = ({ user, selectedDate }) => {
     if (response.status === RestStatus.OK) {
       if (
         body.data["payment_status"] === "paid" &&
-        getStatus(parseInt(order.status)) === "Payment Pending"
+        getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")
       ) {
         // Update payment status
         let isDone = await actions.updateOrderStatus(dispatch, {

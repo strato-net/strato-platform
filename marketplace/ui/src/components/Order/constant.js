@@ -6,6 +6,18 @@ export const status = {
   5: "Payment Pending"
 };
 
+export const statusByName = {
+  "Awaiting Fulfillment": "Awaiting Fulfillment",
+  "Awaiting Shipment": "Awaiting Shipment",
+  "Closed": "Closed",
+  "Canceled": "Canceled",
+  "Payment Pending": "Payment Pending"
+};
+
+export const getStatusByName = (name) => {
+  return statusByName[`${name}`];
+};
+
 export const getStatus = (num) => {
   return status[`${num}`];
 };

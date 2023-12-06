@@ -20,7 +20,7 @@ import classNames from "classnames";
 import { EyeOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
-import { getStatus } from "./constant";
+import { getStatus, getStatusByName } from "./constant";
 import { useNavigate } from "react-router-dom";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
@@ -99,7 +99,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const validatePayment = async(paymentSessionId) => {
     //if payment session exists and status = Payment Pending
     // OR if payment session exists and comment is not set and status = Canceled
-    if((paymentSessionId !== "" && getStatus(parseInt(orderDetails.status)) === "Payment Pending") || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === "Canceled"))) {
+    if((paymentSessionId !== "" && getStatus(parseInt(orderDetails.status)) === getStatusByName("Payment Pending")) || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === getStatusByName("Canceled")))) {
       try{
         const intentResponse = await fetch(
           `${apiUrl}/order/payment/intent/sessions/${paymentSessionId}`,
@@ -116,7 +116,7 @@ const BoughtOrderDetails = ({ user, users }) => {
             setcomment('Stripe:'+intentBody.data.last_payment_error.message);
           }
         //If any payment failure exists, and STATUS != Canceled 
-        if(intentBody.data.status==='requires_payment_method' && getStatus(parseInt(orderDetails.status)) !== "Canceled")
+        if(intentBody.data.status==='requires_payment_method' && getStatus(parseInt(orderDetails.status)) !== getStatusByName("Canceled"))
           { 
           setcomment('Stripe:'+intentBody.data.last_payment_error.message);
 
@@ -130,7 +130,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           //Update Buyer Details and change the Order Status to 'Canceled' from 'Payment Pending'
           let isDone = await actions.updateBuyerDetails(dispatch, body);
           if (isDone) {
-            setStatus("Canceled");
+            setStatus(getStatusByName("Canceled"));
             await actions.fetchOrderDetails(dispatch, Id);
             }
         }
