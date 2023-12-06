@@ -42,7 +42,10 @@ class ClothingController {
         serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
-        brand: Joi.string().required(),
+        clothingType: Joi.string().required(),
+        size: Joi.string().required(),
+        skuNumber: Joi.string().required(),
+        condition: Joi.string().required(),
         images: Joi.array().items(Joi.string().optional()).required(),
         price: Joi.number().positive().required(),
         paymentTypes: Joi.array().min(1).items(
