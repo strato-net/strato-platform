@@ -24,7 +24,7 @@ import { getStringDate } from "../../helpers/utils";
 import { useNavigate } from "react-router-dom";
 import UploadSerialNumberModal from "./UploadSerialNumber";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByValue } from "./constant";
+import { getStatus, getStatusByValue, getStatusByName } from "./constant";
 import dayjs from "dayjs";
 import ConfirmStatusModal from "./ConfirmStatusModal";
 import { US_DATE_FORMAT } from "../../helpers/constants";
@@ -43,6 +43,7 @@ const SoldOrderDetails = ({ user, users }) => {
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [paid, setPaid] = useState(false);
   const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false)
+  const [achStatus,setAchStatus] = useState(false);
   const [comment, setcomment] = useState("");
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
@@ -148,6 +149,10 @@ const SoldOrderDetails = ({ user, users }) => {
 
           if (body.data["payment_status"] === "paid") {
             setPaid(true);
+          }
+          if (body.data["payment_method_options"].hasOwnProperty("us_bank_account")) {
+            setAchStatus(true);
+            await validatePayment(paymentSessionId);
           }
 
         }
@@ -264,6 +269,52 @@ const SoldOrderDetails = ({ user, users }) => {
       await actions.fetchOrderDetails(dispatch, Id);
     }
   };
+  
+  const validatePayment = async (paymentSessionId) => {
+    //if payment session exists and status = Payment Pending
+    // OR if payment session exists and comment is not set and status = Canceled
+    if (((paymentSessionId !== "") && (getStatus(parseInt(orderDetails.status)) === getStatusByName("Payment Pending"))) || (comment==="" && paymentSessionId!=="" && (getStatus(parseInt(orderDetails.status)) === getStatusByName("Canceled")))) {
+      try {
+        const intentResponse = await fetch(
+          `${apiUrl}/order/payment/intent/sessions/${paymentSessionId}`,
+          {
+            method: HTTP_METHODS.GET,
+          }
+        );
+  
+        const intentBody = await intentResponse.json();
+        
+        //Set the Comment with Status Message
+        if(intentBody.data.last_payment_error.message) 
+          {
+            setcomment('Stripe:'+intentBody.data.last_payment_error.message);
+          }
+
+        if (intentBody.data.status === 'requires_payment_method' && (getStatus(parseInt(orderDetails.status)) !== getStatusByName("Canceled"))) {
+          //If any payment failure exists, and STATUS != Canceled 
+          const newComment = 'Stripe:' + intentBody.data.last_payment_error.message;
+  
+          let body = {
+            address: Id,
+            updates: {
+              status: 4,
+              sellerComments: encodeURIComponent('Stripe:' + intentBody.data.last_payment_error.message),
+            },
+          };
+          
+          //Update Seller Details and change the Order Status to 'Canceled' from 'Payment Pending'
+          const isDone = await actions.updateSellerDetails(dispatch, body);
+          
+          if (isDone) {
+            setStatus(getStatusByName("Canceled"));
+            await actions.fetchOrderDetails(dispatch, Id);
+            setcomment(newComment);
+          }
+        }
+      } catch (err) {}
+    }
+  }
+  
 
   const handleChange = async () => {
     handleCancel();
@@ -294,7 +345,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
     const isDone = await actions.updateSellerDetails(dispatch, body);
     if (isDone) {
-      setStatus(selectedStatus);
+      setStatus(getStatus(selectedStatus));
       await actions.fetchOrderDetails(dispatch, Id);
     }
   };
@@ -481,14 +532,48 @@ const SoldOrderDetails = ({ user, users }) => {
           <Card className="mx-14 mb-14">
             <div className="flex justify-between">
               <div className="flex flex-col">
+              <div className="flex">
+              <Text className="font-semibold text-primaryB">Order Details</Text>
+              {
+              status === getStatus(4) ? (
                 <div className="flex">
-                  <Text className="font-semibold text-primaryB">Order Details</Text>
-                  {
-                    !paid ? <div /> : <div className={classNames("text-success  bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                  <div className={classNames("text-error bg-[#FFF0F0]", "ml-4 w-30 text-center text-xs p-1 rounded")}>
+                    <p>Payment Failed</p>
+                  </div>
+                  <div className={classNames("text-primaryB bg-[#EAFFEE]", "ml-2 w-20 text-center text-xs p-1 rounded")}>
+                    <p><b>ACH</b></p>
+                  </div>
+                </div>
+              ) : (
+                !paid ? (
+                  achStatus && (
+                    <div className="flex">
+                      <div className={classNames("text-warning bg-[#FFC300]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                        <p>Processing</p>
+                      </div>
+                      <div className={classNames("text-primaryB bg-[#EAFFEE]", "ml-2 w-20 text-center text-xs p-1 rounded")}>
+                        <p><b>ACH</b></p>
+                      </div>
+                    </div>
+                  )
+                ) : (achStatus ? (
+                  <div className="flex">
+                    <div className={classNames("text-success bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
                       <p>Paid</p>
                     </div>
-                  }
-                </div>
+                    <div className={classNames("text-primaryB bg-[#EAFFEE]", "ml-2 w-20 text-center text-xs p-1 rounded")}>
+                      <p><b>ACH</b></p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={classNames("text-success bg-[#EAFFEE]", "ml-4 w-20 text-center text-xs p-1 rounded")}>
+                    <p>Paid</p>
+                  </div>
+                ))
+              )
+            }
+            </div>
+
                 <Text className="text-primaryB">Please upload serial number(s) (if any) and/or enter the fulfillment date to close the order</Text>
               </div>
               <Button
@@ -496,7 +581,7 @@ const SoldOrderDetails = ({ user, users }) => {
                 type="primary"
                 // Disable the button here if the serial numbers aren't uploaded. We don't want the user closing the order without providing the serial numbers.
                 loading={issellerDetailsUpdating || isCreateOrderLineItem}
-                disabled={status === getStatus(3) || allSerialNumbersUploaded() === false }
+                disabled={status === getStatus(3) || status === getStatus(5) || allSerialNumbersUploaded() === false }
                 onClick={() => {
                   handleUpdateComment()
                   window.LOQ.push(['ready', async LO => {

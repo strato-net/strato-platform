@@ -3,7 +3,7 @@ import classNames from "classnames";
 import { EyeOutlined, DownOutlined, UpOutlined, FilterFilled } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus } from "./constant";
+import { getStatus, getStatusByName } from "./constant";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate, Link } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
@@ -13,6 +13,8 @@ import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination, Button, Radio, Space} from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
+import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import RestStatus from "http-status-codes";
 
 
 const BoughtOrdersTable = ({ user, selectedDate }) => {
@@ -25,6 +27,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   const [filter, setFilter] = useState(0)
   const [selectedValue, setSelectedValue] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
 
   const { orders, isordersLoading, orderBoughtTotal} = useOrderState();
 
@@ -49,23 +52,60 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   const navigate = useNavigate();
   const [data, setdata] = useState([]);
   useEffect(() => {
-
-    let items = [];
-    orders.forEach((order) => {
-      items.push({
-        address: order.address,
-        chainId: order.chainId,
-        key: order.address,
-        orderNumber: order,
-        sellerOrganization: order.sellerOrganization,
-        orderTotal: order.orderTotal,
-        date: getStringDate(order.orderDate, US_DATE_FORMAT),
-        status: getStatus(parseInt(order.status)),
-        invoice: order,
-      });
-    });
-    setdata(items);
+    const fetchDataBought = async () => {
+      const updatedDataBought = await Promise.all(
+        orders.map(async (order) => {
+          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
+            try {
+              setIsLoading(true);
+              await validatePayment(order);          
+            } catch (err) {
+              console.error(err);
+            }
+          }
+          return {
+            address: order.address,
+            chainId: order.chainId,
+            key: order.address,
+            orderNumber: order,
+            sellerOrganization: order.sellerOrganization,
+            orderTotal: order.orderTotal,
+            date: getStringDate(order.orderDate, US_DATE_FORMAT),
+            status: getStatus(parseInt(order.status)),
+            invoice: order,
+          };
+        })
+      );
+      setIsLoading(false);
+      setdata(updatedDataBought);
+    };
+  
+    fetchDataBought();
   }, [orders]);
+
+  const validatePayment = async (order) =>{
+    const response = await fetch(
+      `${apiUrl}/order/payment/session/${order.paymentSessionId}`,
+      {
+        method: HTTP_METHODS.GET,
+      }
+    );
+
+    const body = await response.json();
+    
+    if (response.status === RestStatus.OK) {
+      if (
+        body.data["payment_status"] === "paid" &&
+        getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")
+      ) {
+        // Update order status
+        const isDone = await actions.updateOrderStatus(dispatch, {
+          orderAddress: order.address,
+          status: 1,
+        });
+      }
+    }
+  }
 
   const column = [
     {
@@ -155,6 +195,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
               <Radio value={2}>Awaiting Shipment</Radio>
               <Radio value={3}>Closed</Radio>
               <Radio value={4}>Canceled</Radio>
+              <Radio value={5}>Payment Pending</Radio>
             </Space>
           </Radio.Group>
           <div className="mt-2" style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -204,6 +245,8 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       textClass = "text-success  bg-[#EAFFEE]";
     } else if (status === "Canceled") {
       textClass = "text-error  bg-[#FFF0F0]";
+    } else if (status === "Payment Pending") {
+      textClass = "text-orange bg-[#FFF6EC]";
     }
 
     return (
@@ -233,7 +276,7 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
         columns={column}
         data={data}
         pagination={false}
-        isLoading={isordersLoading}
+        isLoading={isordersLoading || isLoading}
         scrollX="100%"
         onChange={onChange}
       />

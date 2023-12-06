@@ -95,6 +95,14 @@ export const STATUS = {
   "Rejected": 3
 };
 
+export const ORDER_STATUS = {
+  "AWAITING_FULFILLMENT": 1,
+  "AWAITING_SHIPMENT": 2,
+  "CLOSED": 3,
+  "CANCELED": 4,
+  "PAYMENT_PENDING": 5
+}
+
 export const APPROVAL_STATUS = {
   1: "Accept",
   2: "Reject",
