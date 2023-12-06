@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import classNames from "classnames";
-import { Card, Popover, Button, Spin } from "antd";
+import { Card, Popover, Button } from "antd";
 import {
   MoreOutlined,
   EditOutlined,
@@ -16,11 +16,6 @@ import UpdateInventoryModal from "./UpdateInventoryModal";
 import ResellModal from "./ResellModal";
 import routes from "../../helpers/routes";
 import image_placeholder from "../../images/resources/image_placeholder.png";
-import { actions } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const [openPop, setOpenPop] = useState(false);
@@ -32,34 +27,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   const naviroute = routes.InventoryDetail.url;
 
   const itemData = JSON.parse(inventory.data);
-  
-  // Dispatch
-  const dispatch = useInventoryDispatch();
-  
-  // State
-  const { isinventoryUpdating } = useInventoryState();
-  
-  
-  // Actions
-  const unpublishInventory = async (inventory) => {
-    try {
-      const body = {
-        itemContract: inventory.contract_name.split('-')[1],
-        itemAddress: inventory.address,
-        updates: {
-          price: inventory.price,
-          status: INVENTORY_STATUS.UNPUBLISHED,
-        },
-      };
-      console.log("body", body);
-      const res = await actions.updateInventory(dispatch, body);
-      if (res) {
-        actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
 
   const showModalEdit = () => {
     hide();
@@ -211,33 +178,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                 onOpenChange={handleOpenChange}
                 title={
                   <div className="font-medium">
-                    {inventory.status === "2" ? (
-                      <div
-                        className="flex items-center mt-2 cursor-pointer"
-                        onClick={showResellModal}
-                      >
-                        <PieChartOutlined />
-                        <p className="ml-3">Resell</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div
-                          className="flex items-center mt-2 cursor-pointer"
-                          onClick={showEditModal}
-                        >
-                          <EditOutlined />
-                          <p className="ml-3">Edit</p>
-                        </div>
-                        <div
-                          className={`flex items-center mt-2 cursor-pointer ${isinventoryUpdating ? 'disabled' : ''}`}
-                          onClick={() => unpublishInventory(inventory)}
-                          style={{ opacity: isinventoryUpdating ? 0.5 : 1 }}
-                        >
-                          {isinventoryUpdating ? <Spin /> : <PieChartOutlined />}
-                          <p className="ml-3">Unpublish</p>
-                        </div>
-                      </>
-                    )}
+                    <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showEditModal}
+                    >
+                      <EditOutlined />
+                      <p className="ml-3">Edit</p>
+                    </div>
                   </div>
                 }
                 trigger="click"
