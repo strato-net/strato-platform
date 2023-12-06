@@ -35,7 +35,7 @@ const UpdateInventoryModal = ({
     useProductState();
   
 
-  const { isinventoryUpdating } =
+  const { isinventoryUpdating, isReselling } =
     useInventoryState();
 
   const initialValues = {
@@ -195,7 +195,7 @@ const UpdateInventoryModal = ({
             onClick={formik.handleSubmit}
             disabled={isinventoryUpdating}
           >
-            {isinventoryUpdating ? <Spin /> : "Update Inventory"}
+            {isinventoryUpdating || isReselling ? <Spin /> : "Update Inventory"}
           </Button>
         </div>,
       ]}
