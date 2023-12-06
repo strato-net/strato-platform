@@ -1,8 +1,7 @@
 abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
     uint public serialNumber;
-    uint expirationPeriodInMonths;
-    uint expirationDate;
+
     mapping (address => uint) lockedUnits;
     event AssetSplit(address newAsset, uint unitsMoved);
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
@@ -16,8 +15,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         uint _serialNumber,
         ItemStatus _status,
         uint _price,
-        PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths
+        PaymentType[] _paymentTypes
     ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
         serialNumber = _serialNumber;
@@ -27,8 +25,6 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
         ownerCommonName = ownerCert["commonName"];
-        expirationPeriodInMonths =_expirationPeriodInMonths;
-        expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
         if(_paymentTypes.length > 0) {
             createSales(_paymentTypes, _price, _units);
         }
@@ -55,8 +51,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
                 serialNumber + i+1,
                 ItemStatus.UNPUBLISHED,
                 0,
-                [],
-                expirationPeriodInMonths
+                []
             );
             Asset(sf).transferOwnership(msg.sender, newOwner);
 
@@ -72,8 +67,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
                 serialNumber + 1,
                 ItemStatus.UNPUBLISHED,
                 0,
-                [],
-                expirationPeriodInMonths
+                []
             );
 
         newAssets.push(address(sf));
@@ -88,8 +82,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         uint _serialNumber,
         ItemStatus _status,
         uint _price,
-        PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths) internal virtual public returns(SemiFungible){
+        PaymentType[] _paymentTypes) internal virtual public returns(SemiFungible){
             SemiFungible newAsset = new SemiFungible(
                 _name,
                 _description,
@@ -99,15 +92,14 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
                 _serialNumber,
                 _status,
                 _price,
-                _paymentTypes,
-                _expirationPeriodInMonths
+                _paymentTypes
                     );
             emit AssetSplit(address(newAsset), 1);
             return newAsset;
     }
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
-        require(block.timestamp < expirationDate, "SemiFungible is expired");
+        // require(block.timestamp < expirationDate, "SemiFungible is expired");
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new SemiFungibleSale(address(this), _paymentTypes[i], _price, _units)));
         }
@@ -116,7 +108,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     }
 
     function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
-        require(block.timestamp < expirationDate, "SemiFungible is expired");
+        // require(block.timestamp < expirationDate, "SemiFungible is expired");
         address newSale = address(new SemiFungibleSale(address(this), _paymentType, _price, _units));
         return (RestStatus.OK, string(newSale));
     }

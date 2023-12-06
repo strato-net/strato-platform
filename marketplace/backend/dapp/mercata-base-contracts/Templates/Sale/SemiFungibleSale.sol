@@ -13,12 +13,12 @@ abstract contract SemiFungibleSale is Sale{
 
     function transferOwnership(address _purchasersAddress, uint _orderId) public requireSeller("transfer ownership of Asset") override returns (uint) {
         saleOrderID = _orderId;
-        executeUTXOSale(_purchasersAddress);
+        executeSemiFungibleSale(_purchasersAddress);
         state = SaleState.Closed;
         return RestStatus.OK;
     }
 
-    function executeUTXOSale(address _purchasersAddress) public requireSeller("execute UTXO sale") {
+    function executeSemiFungibleSale(address _purchasersAddress) public requireSeller("execute UTXO sale") {
         // Before executing the sale, ensure the asset is a UTXO asset
         SemiFungible semiFungibleAsset = SemiFungible(address(assetToBeSold));
         newSemiFungibleAssets = semiFungibleAsset.splitAsset(msg.sender, units, _purchasersAddress);

@@ -6,6 +6,8 @@ import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 
 /// @title A representation of Membership assets
 contract Membership is ItemStatus, PaymentType, SemiFungible {
+    uint _expirationPeriodInMonths;
+    uint expirationDate;
     constructor(
         string _name,
         string _description,
@@ -17,9 +19,10 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         uint _price,
         address _owner,
         PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths,
-        uint uid
+        
     ) SemiFungible(_name, _description, _images, _createdDate, _units, _serialNumber, _status, _price, _owner, _paymentTypes, _expirationPeriodInMonths, uid) {
+        expirationPeriodInMonths =_expirationPeriodInMonths;
+        expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
     }
 
     function mint(string _name,
