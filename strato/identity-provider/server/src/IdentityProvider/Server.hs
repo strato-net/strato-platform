@@ -215,14 +215,14 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
     Just (AddressAndKey a k) -> do
       -- has vault key, confirm also has cert
       hasCert <- do
-        hasCert' <- certInCirrus accessToken realm a name' org
+        hasCert' <- certInCirrus accessToken realm a org
         -- We don't want to check for a cert using the default
         -- org name if the provided org name is different
         if hasOrgName
           then pure hasCert'
           else if hasCert'
             then pure hasCert'
-            else certInCirrus accessToken realm a name' orgOld
+            else certInCirrus accessToken realm a orgOld
       unless hasCert $ createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realm k
       return a
     Nothing -> do
@@ -272,9 +272,8 @@ certInCirrus ::
   String ->
   Address ->
   String ->
-  String ->
   m Bool
-certInCirrus token realm a name co = do
+certInCirrus token realm a co = do
   rd <- access (Proxy @RealmData)
   case M.lookup realm rd of
     Nothing -> do
@@ -294,14 +293,14 @@ certInCirrus token realm a name co = do
           $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
           throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
   where
-    cirrusSearchPath :: Address -> String -> String -> String
-    cirrusSearchPath address commonName org =
+    cirrusSearchPath :: Address -> String -> String
+    cirrusSearchPath address org =
       let orgParam = ",organization.eq." <> org
-       in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> orgParam <> ")"
+       in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> orgParam <> ")"
 
     callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
-      let cirrusEndpoint = cirrusSearchPath a name co
+      let cirrusEndpoint = cirrusSearchPath a co
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
