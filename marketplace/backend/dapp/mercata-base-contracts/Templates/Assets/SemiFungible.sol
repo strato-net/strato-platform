@@ -1,4 +1,4 @@
-contract SemiFungible is ItemStatus, RestStatus, Asset {
+abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
     string public serialNumber;
     uint expirationPeriodInMonths;
@@ -16,14 +16,12 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
         string _serialNumber,
         ItemStatus _status,
         uint _price,
-        address _owner,
         PaymentType[] _paymentTypes,
         uint _expirationPeriodInMonths,
         uint uid
     ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
         serialNumber = _serialNumber;
-        owner = _owner;
 
         status = _status;
         projectType = _projectType;
@@ -38,22 +36,19 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
         }
     }
 
-    function splitAsset(address orderAddress, uint[] splitUnitsArray, address newOwner) public requireOwner("split asset") returns (address[] memory) {
-        uint totalSplitUnits = 0;
-        for (uint i = 0; i < splitUnitsArray.length; i++) {
-            totalSplitUnits += splitUnitsArray[i];
-        }
-        require(totalSplitUnits <= units, "Cannot split more units than available");
+    function splitAsset(address orderAddress, uint _units, address newOwner) public requireOwner("split asset") returns (address[] memory) {
+        uint splitUnits = takeLockedUnits(orderAddress);
+        require(_units <= units, "Cannot split more units than available");
         // Ensure there are enough unlocked units available for the split
-        require(totalSplitUnits <= lockedUnits[msg.sender], "Not enough unlocked units to split");
+        // require(_units <= lockedUnits[orderAddress], "Not enough unlocked units to split");
 
         address[] newAssets;
 
         //for example:
         //splitUnitsArray for SemiFungible will be [1,1,1,1,1] if someone buys 5 semiFungibles
         //splitUnitsArray for Carbon will be [5] if someone buys 5 semiFungibles
-        for (uint i = 0; i < splitUnitsArray.length; i++) {
-            mint(
+        for (uint i = 0; i < splitUnits; i++) {
+            SemiFungible sf = mint(
                 name,
                 description,
                 images,
@@ -62,13 +57,12 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
                 serialNumber + i+1,
                 ItemStatus.UNPUBLISHED,
                 0,
-                newOwner,
                 projectType,
                 new string[](0)
             );
+            Asset(sf).transferOwnership(newOwner);
 
             newAssets.push(address(newAsset));
-            emit AssetSplit(address(newAsset), splitUnitsArray[i]);
         }
 
         mint(
@@ -86,8 +80,6 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
             );
 
         newAssets.push(address(newAsset));
-        emit AssetSplit(address(newAsset), splitUnitsArray[i]);
-
         return newAssets;
     }
 
@@ -102,7 +94,7 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
         address _owner,
         PaymentType[] _paymentTypes,
         uint _expirationPeriodInMonths,
-        uint uid) internal virtual public{
+        uint uid) internal virtual public returns(SemiFungible){
             SemiFungible newAsset = new SemiFungible(
                 _name,
                 _description,
@@ -116,9 +108,8 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
                 _paymentTypes,
                 _expirationPeriodInMonths
                     );
-
-            newAssets.push(address(newAsset));
             emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+            return newAsset;
     }
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {

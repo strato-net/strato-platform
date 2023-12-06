@@ -1,6 +1,6 @@
 /// @title A representation of asset sale contract
-contract SemiFungibleSale is Sale{
-    uint[] public units;
+abstract contract SemiFungibleSale is Sale{
+    uint public units;
     address[] public newSemiFungibleAssets;
 
     constructor(address _assetToBeSold, PaymentType _payment, uint _price, uint _units) Sale(_assetToBeSold, _price, _payment){
