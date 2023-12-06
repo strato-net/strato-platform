@@ -74,10 +74,11 @@ export async function getApplicationUser(mNodeId?: number, tokens?: any): Promis
           data: `grant_type=refresh_token&refresh_token=${tokens.refresh_token}`
         };
         const res = await axios(req)
-        return { token: res.data.access_token }
+        return { token: res.data.access_token, refresh_token: res.data.refresh_token }
       }
 
       vscode.window.showWarningMessage('User access tokens have expired. Please login again.')
+      return undefined
     }
 
     const req = {
@@ -90,7 +91,7 @@ export async function getApplicationUser(mNodeId?: number, tokens?: any): Promis
       data: 'grant_type=client_credentials'
     };
     const res = await axios(req)
-    return { token: res.data.access_token }
+    return { token: res.data.access_token, refresh_token: '' }
   } catch(e) {
     vscode.window.showErrorMessage(`Error: ${e}`)
     return undefined

@@ -256,6 +256,11 @@
 				"view": "nodes",
 				"contents": "To start using the STRATO IDE, import a valid BlockApps REST configuration file.\n[Import Configuration File](command:nodes.addConfig)\nTo learn more about how to configure the STRATO IDE, visit the [the docs](https://docs.blockapps.net/blockapps-rest/).",
 				"when": "!config.strato-vscode.configPath"
+			},
+			{
+				"view": "cirrus",
+				"contents": "[Search for contracts](command:cirrus.queryCirrus)",
+				"when": "config.strato-vscode.configPath"
 			}
 		]
 	},

@@ -58,11 +58,10 @@ export async function activate(context: vscode.ExtensionContext) {
 				let srcMap = {}
 				const folders = vscode.workspace.workspaceFolders || [];
 				if (folders.length > 0) {
-					const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
 					const currentFolder = folders[0]
 					const folder = currentFolder.uri.path;
 					// eslint-disable-next-line import/no-mutable-exports
-					const dirPath = `${folder}/${serverPath}`
+					const dirPath = folder + '/'
 					srcMap = await importer.combine(doc.uri.path, true, dirPath);
 					srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
 					src = Object.values(srcMap).reduce((str, fileContents) => `${str}\n${fileContents}`, '');
@@ -91,7 +90,7 @@ export async function activate(context: vscode.ExtensionContext) {
 						}
 					}
 					const uploadArgs = {
-						source: srcMap,
+						source: await importer.combine(doc.uri.path),
 						args,
 						name: contractName,
 						chainid: chainId,
@@ -206,12 +205,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	});
 
 	
-	// Open the STRATO settings page
-	vscode.commands.registerCommand('nodes.settings', async () => {
-		// Open the user settings file
-		vscode.commands.executeCommand('workbench.action.openSettings', 'strato-vscode');
-	});
-
 	vscode.window.registerTreeDataProvider('nodes', nodesProvider)
 
 	// Register clipboard copier
@@ -223,11 +216,11 @@ export async function activate(context: vscode.ExtensionContext) {
 	})
 
 	// Activate debug mode and diagnostics
-	activateStratoDebug(context);
-	const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
-	context.subscriptions.push(solidityDiagnostics);
+	// activateStratoDebug(context);
+	// const solidityDiagnostics = vscode.languages.createDiagnosticCollection("solidity");
+	// context.subscriptions.push(solidityDiagnostics);
 
-	await subscribeToDocumentChanges(context, solidityDiagnostics);
+	// await subscribeToDocumentChanges(context, solidityDiagnostics);
 }
 
 async function sleep(ms: number) {
