@@ -299,9 +299,35 @@ const UpdateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
+              <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
+                  <Select
+                    id="paymentTypes"
+                    mode="multiple"
+                    tagRender={tagRender}
+                    placeholder="Select Payment Types"
+                    allowClear
+                    name="paymentTypes"
+                    maxTagCount="responsive"
+                    value={formik.values.paymentTypes}
+                    onChange={handleSelectAll}
+                    showSearch={false}
+                    disabled={inventoryToUpdate.inventory.status === "1"  || !formik.values.status}
+                  >
+                    {PAYMENT_TYPE.map((e, index) => (
+                      <Option value={e.value} key={index}>
+                        {e.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  {getIn(formik.touched, "paymentTypes") &&
+                    getIn(formik.errors, "paymentTypes") && (
+                      <span className="text-error text-xs">
+                        {getIn(formik.errors, "paymentTypes")}
+                      </span>
+                    )}
+                </Form.Item>
             </div>
             <div className="flex justify-between mt-4 ">
-              { inventoryToUpdate.inventory.status === "2" && !formik.values.status ? <></> :
                 <Form.Item
                   label="Price Per Unit"
                   name="price "
@@ -313,6 +339,7 @@ const UpdateInventoryModal = ({
                     name="price"
                     value={formik.values.price}
                     onChange={formik.handleChange}
+                    disabled={ !formik.values.status }
                   />
                   {formik.touched.price && formik.errors.price && (
                     <span className="text-error text-xs">
@@ -320,7 +347,7 @@ const UpdateInventoryModal = ({
                     </span>
                   )}
                 </Form.Item>
-              }
+
               <Form.Item label="Status" name="status" className="w-72">
                 <Radio.Group
                   value={formik.values.status}
@@ -364,36 +391,6 @@ const UpdateInventoryModal = ({
                 // value={formik.values.serialNumber}
                 placeholder="Enter serial numbers as comma separated values 1232WE13W43,1232WE13W434,1232WE13W45"
               /> */}
-              {/* If the status is 2 then show another formItem to specify Payment Types */}
-              { inventoryToUpdate.inventory.status === "2"  && formik.values.status ?
-                <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
-                  <Select
-                    id="paymentTypes"
-                    mode="multiple"
-                    tagRender={tagRender}
-                    placeholder="Select Payment Types"
-                    allowClear
-                    name="paymentTypes"
-                    maxTagCount="responsive"
-                    value={formik.values.paymentTypes}
-                    onChange={handleSelectAll}
-                    showSearch={false}
-                  >
-                    {PAYMENT_TYPE.map((e, index) => (
-                      <Option value={e.value} key={index}>
-                        {e.name}
-                      </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "paymentTypes") &&
-                    getIn(formik.errors, "paymentTypes") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "paymentTypes")}
-                      </span>
-                    )}
-                </Form.Item>  
-                : <></>
-              }
             </div>
           </div>
         </Form>
