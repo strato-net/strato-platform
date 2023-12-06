@@ -24,7 +24,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
     // least sellable unit
     // units sellable = (sellableNumUnits, sellableUnitType) ex: 5 KG
     // quantity describes sellable units not product units
-    UnitOfMeasurement public sellableUnitOfMeasurement;
+    UnitOfMeasurement public unitOfMeasurement;
     uint public leastSellableUnits;
     string public source; //call manufacturer instead?
     string purity;
@@ -38,7 +38,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
     );
 
     constructor(
-        UnitOfMeasurement _sellableUnitOfMeasurement,
+        UnitOfMeasurement _unitOfMeasurement,
         uint _leastSellableUnits,
         string _source,
         string _purity,
@@ -54,7 +54,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
     ) public UTXOAsset(_name, _description, _images, _createdDate, _units){
         owner = _owner;
 
-        sellableUnitOfMeasurement = _sellableUnitOfMeasurement;
+        unitOfMeasurement = _unitOfMeasurement;
         leastSellableUnits = _leastSellableUnits;
         purity = _purity;
         source = _source;
@@ -77,7 +77,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
     }
 
     function updateMetals( //should you be able to update quantity?...
-        UnitOfMeasurement _sellableUnitOfMeasurement,
+        UnitOfMeasurement _unitOfMeasurement,
         string _name, 
         string _description, 
         string[] _images, 
@@ -87,7 +87,7 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
         uint _price
     ) public requireOwner("update metals") returns (uint) {
         // serialNumber = _serialNumber;
-        sellableUnitOfMeasurement = _sellableUnitOfMeasurement;
+        unitOfMeasurement = _unitOfMeasurement;
         source = _source;
         updateAsset(_name, _description, _images, _status, _price);
         return RestStatus.OK;
