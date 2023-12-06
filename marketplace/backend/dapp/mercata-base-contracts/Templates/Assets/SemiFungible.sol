@@ -74,29 +74,6 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         return newAssets;
     }
 
-    function mint(string _name,
-        string _description,
-        string[] _images,
-        uint _createdDate,
-        uint _units,
-        uint _serialNumber,
-        ItemStatus _status,
-        uint _price,
-        PaymentType[] _paymentTypes) internal virtual public returns(SemiFungible){
-            SemiFungible newAsset = new SemiFungible(
-                _name,
-                _description,
-                _images,
-                _createdDate,
-                _units,
-                _serialNumber,
-                _status,
-                _price,
-                _paymentTypes
-                    );
-            emit AssetSplit(address(newAsset), 1);
-            return newAsset;
-    }
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
         // require(block.timestamp < expirationDate, "SemiFungible is expired");
