@@ -1,7 +1,7 @@
 {
 	"name": "strato-vscode",
 	"publisher": "BlockApps",
-	"displayName": "STRATO",
+	"displayName": "STRATO IDE",
 	"description": "VSCode Integration for BlockApps STRATO",
 	"icon": "resources/rebrand-logo.png",
 	"version": "0.3.0",
@@ -28,7 +28,7 @@
 			}
 		],
 		"configuration": {
-			"title": "STRATO",
+			"title": "STRATO IDE",
 			"properties": {
 				"strato-vscode.autoFuzz": {
 					"type": "boolean",
@@ -74,8 +74,8 @@
 			},
 			{
 				"command": "nodes.addConfig",
-				"title": "Add",
-				"icon": "$(add)"
+				"title": "Select Configuration File",
+				"icon": "$(new-file)"
 			},
 			{
 				"command": "nodes.settings",
@@ -93,6 +93,11 @@
 				"command": "extension.copyToClipboard",
 				"title": "Copy to Clipboard",
 				"icon": "$(clippy)"
+			},
+			{
+				"command": "extension.oauthLogin",
+				"title": "Login",
+				"icon": "$(log-in)"
 			}
 		],
 		"debuggers": [
@@ -184,19 +189,24 @@
 				},
 				{
 					"command": "nodes.addConfig",
-					"when": "view == nodes",
-					"group": "navigation"
+					"when": "view == nodes && config.strato-vscode.configPath",
+					"group": "navigation@0"
 				},
 				{
 					"command": "nodes.settings",
 					"when": "view == nodes",
+					"group": "navigation@1"
+				},
+				{
+					"command": "extension.oauthLogin",
+					"when": "view == contracts",
 					"group": "navigation"
 				}
 			],
 			"view/item/context": [
 				{
 					"command": "contracts.uploadContract",
-					"when": "view == contracts",
+					"when": "view == contracts && viewItem == node",
 					"group": "inline"
 				},
 				{
@@ -220,7 +230,7 @@
 			"activitybar": [
 				{
 					"id": "strato-project",
-					"title": "STRATO Project Manager",
+					"title": "STRATO IDE",
 					"icon": "resources/rebrand-logo.png"
 				}
 			]
@@ -240,7 +250,14 @@
 					"name": "Contracts"
 				}
 			]
-		}
+		},
+		"viewsWelcome": [
+			{
+				"view": "nodes",
+				"contents": "To start using the STRATO IDE, import a valid BlockApps REST configuration file.\n[Import Configuration File](command:nodes.addConfig)\nTo learn more about how to configure the STRATO IDE, visit the [the docs](https://docs.blockapps.net/blockapps-rest/).",
+				"when": "!config.strato-vscode.configPath"
+			}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "yarn run compile",

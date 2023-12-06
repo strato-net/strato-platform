@@ -27,7 +27,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
       let currentConvertedChild = this.toChild(i, currentChild);
       childrenArray.push(currentConvertedChild);
     }
-    console.debug(`NodesProvider/getNodesFromParent/childrenArray: ${childrenArray}`)
+    // console.debug(`NodesProvider/getNodesFromParent/childrenArray: ${childrenArray}`)
     return childrenArray;
   }
   getMenu(element?: any) {
@@ -40,7 +40,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
       }
     }
 
-    console.debug(`NodesProvider/getMenu/menus: ${menus}`)
+    // console.debug(`NodesProvider/getMenu/menus: ${menus}`)
     return menus;
 
   }
@@ -80,7 +80,7 @@ export class NodesProvider implements vscode.TreeDataProvider<Node> {
   async getNodesInternal(): Promise<any[]> {
     const config = getConfig() || {}
     const nodes = config.nodes || []
-    console.debug(`NodesProvider/getNodesInternal/nodes: ${nodes}`)
+    // console.debug(`NodesProvider/getNodesInternal/nodes: ${nodes}`)
     const filledNodes = await Promise.all(nodes.map(async (element) => {
       try {
         const node = await this.getNodeVersion(element);

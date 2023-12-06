@@ -8,6 +8,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [v0.3.0] - TODO
 
+### Added
+
+- Ability to log in to a STRATO Mercata account and access a node from the user identity
+
 ### Changed
 
 - General UI/UX improvements

@@ -9,25 +9,46 @@ import { NodesProvider } from './nodes';
 import { activateStratoDebug } from './activateStratoDebug';
 import { subscribeToDocumentChanges } from './diagnostics';
 import { rest, importer } from 'blockapps-rest';
-import { getApplicationUser } from './auth';
+import { getApplicationUser, applicationUserLogin } from './auth';
 import getConfig from './load.config';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
-
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "strato-vscode" is now active!');
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
+	vscode.commands.registerCommand('extension.oauthLogin', async () => {
+		const config = getConfig() || {}
+		const nodes = config.nodes || []
+		if (nodes.length === 0) {
+			vscode.window.showWarningMessage('Please add STRATO node information to your config file.')
+			return undefined 
+		}
+		
+		// Take a user and password through input boxes
+		const user = await vscode.window.showInputBox({
+			prompt: `Enter your STRATO Mercata username`
+		});
+		if (!user) return;
+		const password = await vscode.window.showInputBox({
+			prompt: `Enter your password`,
+			password: true
+		});
+		if (!password) return;
+
+		applicationUserLogin(context, user, password)
+    });
 
 	// Uploads a contract to the targetted node
 	vscode.commands.registerCommand('contracts.uploadContract', async (element) => {
 		const { nodeId, item } = element;
 		const { chainId } = item;
-		const user = await getApplicationUser(nodeId);
+		const tokens = await getAccessTokenSecrets(context);
+		const user = await getApplicationUser(nodeId, tokens);
 		const config = getConfig() || {};
 		const nodeOptions = { config, node: nodeId };
 		if (vscode.window.activeTextEditor) {
@@ -76,7 +97,7 @@ export async function activate(context: vscode.ExtensionContext) {
 						chainid: chainId,
 					}
 					const res = await rest.createContract(user, uploadArgs, nodeOptions);
-					vscode.window.showInformationMessage(`Contract ${contractName} created at address: ${res}`);
+					vscode.window.showInformationMessage(`Contract ${contractName} created at address: ${res.address}`);
 				} catch (e) {
 					vscode.window.showErrorMessage(`${e}`);
 				}
@@ -93,7 +114,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	vscode.commands.registerCommand('contracts.callFunction', async (element) => {
 		const { nodeId, item } = element;
 		const { chainId, contractName, contractAddress, variableName } = item;
-		const user = await getApplicationUser(nodeId);
+		const tokens = await getAccessTokenSecrets(context);
+		const user = await getApplicationUser(nodeId, tokens);
 		const config = getConfig() || {}
 		const nodeOptions = { config, node: nodeId };
 		const val = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
@@ -157,7 +179,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Register the nodes provider
 	const nodesProvider = new NodesProvider();
 	vscode.commands.registerCommand('nodes.addConfig', async () => {
-		let fp = vscode.workspace.getConfiguration().get('strato-vscode.configPath') || '';
+		let fp = vscode.workspace.getConfiguration().get('strato-vscode.configPath', '');
 		const options: vscode.OpenDialogOptions = {
 			title: 'Import configuration',
 			openLabel: 'Import configuration',
@@ -169,7 +191,11 @@ export async function activate(context: vscode.ExtensionContext) {
 		console.debug(`refreshEntry/userSelect: ${userSelect}`)
 
 		fp = userSelect && userSelect[0] ? userSelect[0].fsPath : ''
-		await vscode.workspace.getConfiguration().update('strato-vscode.configPath', fp)
+		if (!fp.endsWith('.yaml') && !fp.endsWith('.yml')) { 
+			vscode.window.showErrorMessage('Please select a valid YAML file.')
+			return
+		}
+		await vscode.workspace.getConfiguration().update('strato-vscode.configPath', fp, true)
 		nodesProvider.refresh()
 	})
 	
@@ -240,4 +266,10 @@ function runCommand(cmd: string) {
 export function copyToClipboard(t: string) {
 	vscode.env.clipboard.writeText(t)
 		.then(() => { vscode.window.showInformationMessage('Copied to clipboard') })
+}
+
+// Get a valid access token
+async function getAccessTokenSecrets(context: vscode.ExtensionContext) {
+	const secrets = await context.secrets.get('access_token_data')
+	return JSON.parse(secrets || '{}')
 }
