@@ -390,8 +390,6 @@ registerCert cert token realm commonName = do
                   functionpayloadChainid = Nothing,
                   functionpayloadMetadata = Nothing
                 }
-          -- The following is to be used when the UserRegistry is in the genesis block.
-
           txPayload' =
             BlocFunction
               FunctionPayload
