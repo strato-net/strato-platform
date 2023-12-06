@@ -3,6 +3,7 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
     string public serialNumber;
     uint expirationPeriodInMonths;
     uint expirationDate;
+    mapping (address => uint) lockedUnits;
     event AssetSplit(address newAsset, uint unitsMoved);
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
@@ -42,7 +43,9 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
         for (uint i = 0; i < splitUnitsArray.length; i++) {
             totalSplitUnits += splitUnitsArray[i];
         }
-        require(totalSplitUnits = units, "Cannot split more/less units than available");
+        require(totalSplitUnits <= units, "Cannot split more units than available");
+        // Ensure there are enough unlocked units available for the split
+        require(totalSplitUnits <= lockedUnits[msg.sender], "Not enough unlocked units to split");
 
         address[] newAssets;
 
@@ -99,7 +102,7 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
         address _owner,
         PaymentType[] _paymentTypes,
         uint _expirationPeriodInMonths,
-        uint uid) internal virtual public returns(){
+        uint uid) internal virtual public{
             SemiFungible newAsset = new SemiFungible(
                 _name,
                 _description,
@@ -149,5 +152,25 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
             units = _units;
         }
         return RestStatus.OK;
+    }
+
+
+    function lockUnits(address orderAddress, uint unitsToLock) public requireWhitelisted("lock asset units") {
+    require(unitsToLock <= units, "Not enough units to lock");
+    require(lockedUnits[orderAddress] == 0, "Order has already locked units in this asset.");
+    units -= unitsToLock;
+    lockedUnits[orderAddress] = unitsToLock;
+    }
+
+    function unlockUnits(address orderAddress) public requireWhitelisted("unlock asset units") {
+        uint unitsToReturn = takeLockedUnits(orderAddress);
+        units += unitsToReturn;
+    }
+
+    function takeLockedUnits(address orderAddress) internal returns (uint) {
+        uint unitsToUnlock = lockedUnits[orderAddress];
+        require(unitsToUnlock > 0, "There are no units to unlock for address");
+        lockedUnits[orderAddress] = 0;
+        return unitsToUnlock;
     }
 }
