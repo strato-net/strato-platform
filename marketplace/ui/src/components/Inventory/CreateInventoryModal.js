@@ -59,7 +59,7 @@ const CreateInventoryModal = ({
     images: null,
     price: null,
     paymentTypes: [],
-    category: "Clothing",
+    category: "Art",
     size: null,
     skuNumber: "",
     condition: null
