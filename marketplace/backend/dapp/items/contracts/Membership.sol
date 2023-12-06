@@ -21,4 +21,34 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         uint uid
     ) SemiFungible(_name, _description, _images, _createdDate, _units, _serialNumber, _status, _price, _owner, _paymentTypes, _expirationPeriodInMonths, uid) {
     }
+
+    function mint(string _name,
+        string _description,
+        string[] _images,
+        uint _createdDate,
+        uint _units,
+        string _serialNumber,
+        ItemStatus _status,
+        uint _price,
+        address _owner,
+        PaymentType[] _paymentTypes,
+        uint _expirationPeriodInMonths,
+        uint uid) internal overrides public returns(){
+        Membership newAsset = new Membership(
+                _name,
+                _description,
+                _images,
+                _createdDate,
+                _units,
+                _serialNumber,
+                _status,
+                _price,
+                _owner,
+                _paymentTypes,
+                _expirationPeriodInMonths
+                    );
+
+            newAssets.push(address(newAsset));
+            emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+    }
 }

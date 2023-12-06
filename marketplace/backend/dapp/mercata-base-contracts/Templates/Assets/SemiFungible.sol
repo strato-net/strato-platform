@@ -50,7 +50,7 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
         //splitUnitsArray for SemiFungible will be [1,1,1,1,1] if someone buys 5 semiFungibles
         //splitUnitsArray for Carbon will be [5] if someone buys 5 semiFungibles
         for (uint i = 0; i < splitUnitsArray.length; i++) {
-            SemiFungible newAsset = new SemiFungible(
+            mint(
                 name,
                 description,
                 images,
@@ -68,7 +68,7 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
             emit AssetSplit(address(newAsset), splitUnitsArray[i]);
         }
 
-        SemiFungible newAsset = new SemiFungible(
+        mint(
                 name,
                 description,
                 images,
@@ -87,6 +87,37 @@ contract SemiFungible is ItemStatus, RestStatus, Asset {
 
         return newAssets;
     }
+
+    function mint(string _name,
+        string _description,
+        string[] _images,
+        uint _createdDate,
+        uint _units,
+        string _serialNumber,
+        ItemStatus _status,
+        uint _price,
+        address _owner,
+        PaymentType[] _paymentTypes,
+        uint _expirationPeriodInMonths,
+        uint uid) internal virtual public returns(){
+            SemiFungible newAsset = new SemiFungible(
+                _name,
+                _description,
+                _images,
+                _createdDate,
+                _units,
+                _serialNumber,
+                _status,
+                _price,
+                _owner,
+                _paymentTypes,
+                _expirationPeriodInMonths
+                    );
+
+            newAssets.push(address(newAsset));
+            emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+    }
+
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
         require(block.timestamp < expirationDate, "SemiFungible is expired");
         for (uint i = 0; i < _paymentTypes.length; i++) {
