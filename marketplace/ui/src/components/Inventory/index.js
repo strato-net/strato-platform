@@ -189,7 +189,6 @@ const Inventory = ({ user }) => {
               <Title level={3} className="mt-2">
                 No inventory found
               </Title>
-              <Text className="text-sm">Start adding your inventory</Text>
               <div className="flex items-center">
                 <Button
                   type="primary"

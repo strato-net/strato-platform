@@ -164,7 +164,7 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
         Import _ i -> pure . Just $ def & ufuImports .~ [i]
         _ -> pure Nothing
   ufuMap <- except . fmap M.fromList . traverse (\(n, s) -> (n,) <$> getNamedSUnits n s) $ M.toList initCodeMap
-  theCC <- withExceptT IEx $ resolveImports (codeCollectionFromHashNoCache typeCheck) ufuMap
+  theCC <- withExceptT IEx $ resolveImports (codeCollectionFromHashNoCache False typeCheck) ufuMap
   pure $ force theCC
 
 --- Don't typecheck in Slipstream!!!
@@ -176,12 +176,21 @@ compileSource ::
   Map T.Text T.Text ->
   m (Either CompilationError CodeCollection)
 compileSource typeCheck mTT = do
+  eCC <- compileSource' typeCheck mTT
+  pure $ first SVMEx . applyInheritanceFunctions =<< eCC
+
+compileSource' ::
+  ( HasCodeDB m,
+    A.Selectable Account AddressState m
+  ) =>
+  Bool ->
+  Map T.Text T.Text ->
+  m (Either CompilationError CodeCollection)
+compileSource' typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritanceNoFunctions
   eCC <- compileSourceNoInheritance typeCheck mTT
   pure $ case applyInheritanceE =<< eCC of
-    Right cc ->
-      first SVMEx . applyInheritanceFunctions . O.detector
-        =<< if typeCheck
+    Right cc -> O.detector <$> if typeCheck
           then typeCheckDetector cc
           else Right cc
     Left x -> Left x
@@ -260,7 +269,7 @@ codeCollectionFromHash typeCheck hsh = do
       return cc
     (_, Nothing) -> do
       recordCacheEvent CacheMiss
-      cc <- codeCollectionFromHashNoCache typeCheck hsh
+      cc <- codeCollectionFromHashNoCache True typeCheck hsh
       liftIO $ modifyIORef' unsafeCodeCahcheLRUIORef (LRU.insert hsh cc)
       return cc
 
@@ -269,16 +278,17 @@ codeCollectionFromHashNoCache ::
     A.Selectable Account AddressState m
   ) =>
   Bool ->
+  Bool ->
   Keccak256 ->
   m CodeCollection
-codeCollectionFromHashNoCache typeCheck hsh =
+codeCollectionFromHashNoCache mergeFuncs typeCheck hsh =
   getCode hsh >>= \case
     Nothing -> internalError "unknown code hash" hsh
     Just (_, initCode) -> do
       let initMap = case Aeson.decode $ BL.fromStrict initCode of
             Just l -> M.fromList l
             Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-      ecc <- compileSource typeCheck initMap
+      ecc <- (if mergeFuncs then compileSource else compileSource') typeCheck initMap
       case ecc of
         Right a -> pure a
         Left (PEx p) -> parseError "codeCollectionFromHash" p
