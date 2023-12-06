@@ -28,7 +28,6 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
     uint public leastSellableUnits;
     string public source; //call manufacturer instead?
     string purity;
-    //string country;
     
     event OwnershipUpdate(
         string seller,
@@ -65,7 +64,32 @@ contract Metals is ItemStatus, RestStatus, UTXOAsset {
 
         if(_paymentTypes.length > 0) {
             createSales(_paymentTypes, _price, _units);
+        } else {
+            status = ItemStatus.UNPUBLISHED;
         }
+    }
+
+    function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") overrides returns (address) {
+        require(splitUnits < quantity, "Cannot split more units than available");
+        Metals newMetals = new Metals(unitOfMeasurement,
+            leastSellableUnits,
+            source,
+            purity,
+            owner,
+            name,
+            description,
+            images,
+            createdDate,
+            slitUnits,
+            0,
+            "",
+            []);
+        quantity -= splitUnits;
+        for(int i = 0; i < whitelistedSales.length; i++){
+            whitelistedSales[i].changeSaleQuantity(quantity)
+        }
+        emit AssetSplit(address(newMetals), splitUnits);
+        return address(newMetals);
     }
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _quantity) public requireOwner("create sales") returns (uint) {
