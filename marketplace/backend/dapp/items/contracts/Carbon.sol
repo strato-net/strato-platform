@@ -7,8 +7,6 @@ import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 /// @title A representation of Carbon assets
 contract Carbon is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
-    string public serialNumber;
-    string public projectType;
 
     event AssetSplit(address newAsset, uint unitsMoved);
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
@@ -19,19 +17,15 @@ contract Carbon is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _createdDate,
         uint _units,
-        string _serialNumber,
         ItemStatus _status,
         uint _price,
         address _owner,
-        string _projectType,
         PaymentType[] _paymentTypes
     ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
-        serialNumber = _serialNumber;
         owner = _owner;
 
         status = _status;
-        projectType = _projectType;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -54,12 +48,10 @@ contract Carbon is ItemStatus, RestStatus, Asset {
                                      description, 
                                      images, 
                                      createdDate, 
-                                     splitUnits, 
-                                     serialNumber + "1", 
+                                     splitUnits,
                                      ItemStatus.UNPUBLISHED,
                                      0, 
-                                     newOwner, 
-                                     projectType, 
+                                     newOwner,
                                      []);
         units -= splitUnits;
 
