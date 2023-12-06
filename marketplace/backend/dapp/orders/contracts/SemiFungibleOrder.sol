@@ -4,14 +4,17 @@ pragma strict;
 import <509>;
 import "../Enums/RestStatus.sol";
 import "Order.sol";
-import "../Sales/UTXOSale.sol";
+import "../Sales/SemiFungibleSale.sol";
 
-abstract contract SemiFungibleOrder is RestStatus, OrderStatus, Order {
+contract SemiFungibleOrder is RestStatus, OrderStatus, Order {
     uint[] units;
 
     constructor(
         uint _orderId,
         address[] _saleAddresses, 
+        string _sellersCommonName, 
+        address _sellersAddress,
+        string _purchasersCommonName, 
         address _purchasersAddress,
         uint _createdDate,
         uint _totalPrice,
@@ -21,6 +24,9 @@ abstract contract SemiFungibleOrder is RestStatus, OrderStatus, Order {
     ) Order (
         _orderId,
         _saleAddresses, 
+        _sellersCommonName,
+        _sellersAddress,
+        _purchasersCommonName,
         _purchasersAddress,
         _createdDate,
         _totalPrice,

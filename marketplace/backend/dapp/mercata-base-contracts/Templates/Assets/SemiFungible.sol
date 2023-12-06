@@ -1,6 +1,6 @@
 abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
-    string public serialNumber;
+    uint public serialNumber;
     uint expirationPeriodInMonths;
     uint expirationDate;
     mapping (address => uint) lockedUnits;
@@ -13,18 +13,16 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _createdDate,
         uint _units,
-        string _serialNumber,
+        uint _serialNumber,
         ItemStatus _status,
         uint _price,
         PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths,
-        uint uid
+        uint _expirationPeriodInMonths
     ) Asset(_name, _description, _images, _createdDate) {
         units = _units;
         serialNumber = _serialNumber;
 
         status = _status;
-        projectType = _projectType;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];
@@ -53,33 +51,32 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
                 description,
                 images,
                 createdDate,
-                splitUnitsArray[i],
+                1,
                 serialNumber + i+1,
                 ItemStatus.UNPUBLISHED,
                 0,
-                projectType,
-                new string[](0)
+                [],
+                expirationPeriodInMonths
             );
-            Asset(sf).transferOwnership(newOwner);
+            Asset(sf).transferOwnership(msg.sender, newOwner);
 
-            newAssets.push(address(newAsset));
+            newAssets.push(address(sf));
         }
 
-        mint(
+        SemiFungible sf = mint(
                 name,
                 description,
                 images,
                 createdDate,
-                (units-totalSplitUnits),
+                (units-splitUnits),
                 serialNumber + 1,
                 ItemStatus.UNPUBLISHED,
                 0,
-                newOwner,
-                projectType,
-                new string[](0)
+                [],
+                expirationPeriodInMonths
             );
 
-        newAssets.push(address(newAsset));
+        newAssets.push(address(sf));
         return newAssets;
     }
 
@@ -88,13 +85,11 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _createdDate,
         uint _units,
-        string _serialNumber,
+        uint _serialNumber,
         ItemStatus _status,
         uint _price,
-        address _owner,
         PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths,
-        uint uid) internal virtual public returns(SemiFungible){
+        uint _expirationPeriodInMonths) internal virtual public returns(SemiFungible){
             SemiFungible newAsset = new SemiFungible(
                 _name,
                 _description,
@@ -104,11 +99,10 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
                 _serialNumber,
                 _status,
                 _price,
-                _owner,
                 _paymentTypes,
                 _expirationPeriodInMonths
                     );
-            emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+            emit AssetSplit(address(newAsset), 1);
             return newAsset;
     }
 
@@ -132,14 +126,13 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         string _description, 
         string[] _images, 
         ItemStatus _status,
-        string _serialNumber,
+        uint _serialNumber,
         uint _price,
         uint _units
     ) public requireOwner("update semiFungible") returns (uint) {
         serialNumber = _serialNumber;
         updateAsset(_name, _description, _images, _status, _price);
         if (_units != units) {
-            changeUnitQuantity(_units);
             units = _units;
         }
         return RestStatus.OK;
@@ -147,10 +140,10 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
 
 
     function lockUnits(address orderAddress, uint unitsToLock) public requireWhitelisted("lock asset units") {
-    require(unitsToLock <= units, "Not enough units to lock");
-    require(lockedUnits[orderAddress] == 0, "Order has already locked units in this asset.");
-    units -= unitsToLock;
-    lockedUnits[orderAddress] = unitsToLock;
+        require(unitsToLock <= units, "Not enough units to lock");
+        require(lockedUnits[orderAddress] == 0, "Order has already locked units in this asset.");
+        units -= unitsToLock;
+        lockedUnits[orderAddress] = unitsToLock;
     }
 
     function unlockUnits(address orderAddress) public requireWhitelisted("unlock asset units") {
