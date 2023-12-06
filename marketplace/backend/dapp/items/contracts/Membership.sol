@@ -37,6 +37,7 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         PaymentType[] _paymentTypes,
         uint _expirationPeriodInMonths,
         uint uid) internal overrides public returns(){
+        require(block.timestamp < expirationDate, "Membership is expired");
         Membership newAsset = new Membership(
                 _name,
                 _description,
