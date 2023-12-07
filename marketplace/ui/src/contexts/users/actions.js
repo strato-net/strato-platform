@@ -24,6 +24,12 @@ const actions = {
           payload: body.data,
         });
         return;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchUsersFailed, 
+          error: "Unauthorized while fetching users" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({ type: actionDescriptors.fetchUsersFailed, payload: 'users request failed' });
     } catch (err) {

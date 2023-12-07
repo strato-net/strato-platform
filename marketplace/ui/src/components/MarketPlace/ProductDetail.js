@@ -79,11 +79,12 @@ const ProductDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if (user) {
-      if (Id !== undefined) {
-        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
-      }
-    }
+    // TODO: Uncomment this when we have events working
+    // if (user) {
+    //   if (Id !== undefined) {
+    //     eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+    //   }
+    // }
   }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
 
 
@@ -141,9 +142,10 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      if (user) {
-        itemsActions.fetchSerialNumbers(itemDispatch, Id);
-      }
+      // TODO: Uncomment this when we have serial numbers working
+      // if (user) {
+      //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
+      // }
     }
   }, [Id, dispatch, itemDispatch, user]);
 
@@ -546,7 +548,7 @@ const ProductDetails = ({ user, users }) => {
           <div className="flex mx-16">
             <div className="w-1/2">
               <div className="h-96 flex items-center justify-center border border-grayLight">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images.length > 0 ? details.images[0] : image_placeholder} />
+                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
               </div>
               {availableQuantity !== 0 ?
                 <Row className="justify-center my-7">

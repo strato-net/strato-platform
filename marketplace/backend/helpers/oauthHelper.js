@@ -88,8 +88,8 @@ const getCredentialsFromTokenEnv = (envVariable) => {
   return getCredentialsFromToken(token)
 }
 
-const getServiceToken = async () => {
-  const oauth = await oauthUtil.init(config.nodes[0].oauth)
+const getServiceToken = async (req = null) => {
+  const oauth = req ? req.app.oauth : await oauthUtil.init(config.nodes[0].oauth)
   let token = CACHED_DATA.serviceToken
   const expiresAt = CACHED_DATA.serviceTokenExpiresAt
   if (
@@ -113,8 +113,8 @@ const getServiceToken = async () => {
   return token
 }
 
-const getUserToken = async (username, password) => {
-  const oauth = await oauthUtil.init(config.nodes[0].oauth)
+const getUserToken = async (username, password, req = null) => {
+  const oauth = req ? req.app.oauth : await oauthUtil.init(config.nodes[0].oauth)
   const userTokenData = CACHED_DATA[`${username}`]
   
   if (

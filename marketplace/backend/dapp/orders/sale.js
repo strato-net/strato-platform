@@ -159,6 +159,12 @@ async function getAll(admin, args = {}, options) {
             payment: PAYMENT_TYPES[paymentMethod]
         }, options, admin);
     }
+    else if (assetAddresses) {
+        sales = await searchAllWithQueryArgs(contractName, { 
+            assetToBeSold: assetAddresses, 
+            state: state ? state : 1,
+        }, options, admin);
+    }
     else {
         sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, state: state ? state : 1 }, options, admin);
     }

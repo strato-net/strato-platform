@@ -119,8 +119,9 @@ async function getManagersAndCirrusInfo(admin, contract, options) {
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
-  console.log(contract)
+  console.debug(contract)
   let userOrganization
+  let userCommonName
 
   if (!serviceUser) {
 
@@ -132,6 +133,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
+      userCommonName = userCertificate.commonName
       userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
       console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
@@ -250,7 +252,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
+    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
@@ -260,7 +262,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions)
   }
 
   // ------------------------------ ART STARTS ------------------------------
@@ -607,21 +609,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       let stripePaymentSession;
       try {
-        const { orderList, ...rest } = args;
 
-        // Convert orderList into an object with keys like 'orderList_0', 'orderList_1', ...
-        const orderListObject = orderList.reduce((acc, item, index) => {
-          acc[`orderList_${index}`] = JSON.stringify(item);
-          return acc;
-        }, {});
-
-        // Merge the orderListObject with the rest of the properties
-        const cartData = { ...rest, ...orderListObject };
-        Object.keys(cartData).forEach(key => {
-          cartData[key] = String(cartData[key]);
-        });
-
-        stripePaymentSession = await StripeService.initiatePayment(cartData, invoices, sellerStripeDetails.accountId);
+        stripePaymentSession = await StripeService.initiatePayment(args, invoices, sellerStripeDetails.accountId);
       } catch (err) {
         throw new rest.RestError(err.statusCode, err.message)
       }
