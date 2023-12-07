@@ -14,8 +14,6 @@ module Blockchain.SeqEventNotify (
 
 import           BroadcastChan
 import           Conduit
---import           Control.Concurrent (myThreadId)
---import           Control.Concurrent.Chan.Unagi
 import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad
 import           Control.Monad.Except
@@ -62,8 +60,7 @@ seqEventNotificationSourceChanPour p2peventchanin = do
   where loop chan = do
             newevent <- liftIO $ readBChan chan
             case newevent of
-              Nothing                 -> do $logInfoS "seqEventNotifyChanPour" . T.pack $ "nothing to pour from kafka middleman."
-                                            loop chan
+              Nothing                 -> loop chan
               Just (event,nextOffset) -> do $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ Offset " ++ show nextOffset
                                             _ <- yield event
                                             loop chan

@@ -20,6 +20,7 @@ executables:
     main: StratoP2PMain.hs
     dependencies:
       - blockapps-init
+      - broadcast-chan
       - ethereum-discovery
       - hflags
       - lifted-async
@@ -28,7 +29,7 @@ executables:
       - strato-model
       - strato-p2p
       - thread-hierarchy
-      - unagi-chan
+      - unliftio 
       - wai-middleware-prometheus
       - warp
       
@@ -102,7 +103,6 @@ library:
     - thread-hierarchy
     - time
     - transformers
-      #- unagi-chan
     - unliftio-core
     - unliftio 
     - warp

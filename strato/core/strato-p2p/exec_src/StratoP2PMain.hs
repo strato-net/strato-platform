@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
---import           Control.Concurrent.Chan.Unagi
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
 import           Blockchain.VMOptions       ()
