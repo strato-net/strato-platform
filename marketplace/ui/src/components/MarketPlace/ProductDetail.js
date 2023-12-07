@@ -547,7 +547,7 @@ const ProductDetails = ({ user, users }) => {
 
           <div className="flex mx-16">
             <div className="w-1/2">
-              <div className="h-96 flex items-center justify-center border border-grayLight">
+              <div className="h-[212px] lg:h-[417px] flex items-center justify-center border border-grayLight">
                 <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
               </div>
               {availableQuantity !== 0 ?
