@@ -345,6 +345,7 @@ const CreateInventoryModal = ({
                 onBlur={formik.handleBlur}
               >
                 <Option value="new">New</Option>
+                <Option value="conditional">Conditional</Option>
                 <Option value="used">Used</Option>
               </Select>
               {formik.touched.condition && formik.errors.condition && (
