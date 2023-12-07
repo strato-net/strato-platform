@@ -205,7 +205,6 @@ withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
   { contextKafkaState        :: K.KafkaState
-  --, contextKafkaMiddleman  :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
   , contextKafkaMiddlemanIn  :: BroadcastChan In (P2pEvent,Int64)
   , blockHeaders             :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
