@@ -103,7 +103,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
             // emit AssetSplit(address(newAsset), splitUnitsArray[i]);
     }
 
-    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public ("create sale") returns (uint) {
+    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public returns (uint) {
         // require(block.timestamp < expirationDate, "SemiFungible is expired");
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new SemiFungibleSale(address(this), _paymentTypes[i], _price, _units)));
