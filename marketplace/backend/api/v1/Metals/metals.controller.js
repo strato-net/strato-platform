@@ -49,7 +49,7 @@ class MetalsController {
           Joi.number().integer().min(0).max(5).required(),
         ).required(),
         units: Joi.number().integer().min(1).required(),
-        unitOfMeasurement: Joi.number().integer().min(0).max(5).required(),
+        unitOfMeasurement: Joi.number().integer().min(0).max(6).required(),
         leastSellableUnits: Joi.number().integer().min(1).required(),
         purity: Joi.string().required()
       }).required()

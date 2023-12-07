@@ -52,7 +52,7 @@ const CreateInventoryModal = ({
     artist: "",
     source: "",
     leastSellableUnits: 1,
-    unitOfMeasurement: 0,
+    unitOfMeasurement: 1,
     purity: "",
     projectType: "",
     units: 1,

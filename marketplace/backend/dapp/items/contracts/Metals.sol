@@ -6,6 +6,7 @@ import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 
 contract UnitOfMeasurement {
 enum UnitOfMeasurement {
+    NULL,
     TON,
     POUND,
     OUNCE,
