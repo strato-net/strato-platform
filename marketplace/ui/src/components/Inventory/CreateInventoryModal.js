@@ -131,6 +131,7 @@ const CreateInventoryModal = ({
               size: values.size,
               condition: values.condition,
               brand: values.brand,
+              units: values.units
             },
           });
         case "Metals":
@@ -381,6 +382,20 @@ const CreateInventoryModal = ({
               {formik.touched.skuNumber && formik.errors.skuNumber && (
                 <span className="text-error text-xs">
                   {formik.errors.skuNumber}
+                </span>
+              )}
+            </Form.Item>
+            <Form.Item label="Units" name="units">
+              <Input
+                id="units"
+                name="units"
+                value={formik.values.units}
+                placeholder="Enter Units"
+                onChange={formik.handleChange}
+              />
+              {formik.touched.units && formik.errors.units && (
+                <span className="text-error text-xs">
+                  {formik.errors.units}
                 </span>
               )}
             </Form.Item>

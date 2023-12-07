@@ -342,6 +342,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
+      status: 1
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
