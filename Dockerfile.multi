@@ -68,6 +68,7 @@ WORKDIR /var/lib/strato
 ENTRYPOINT ["/strato/doit.sh"]
 
 FROM base as highway-wrapper
+COPY usr/local/bin/blockapps-highway-wrapper-server /usr/local/bin/
 COPY ./highway-wrapper /highway-wrapper
 EXPOSE 8080
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
