@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -294,7 +295,11 @@ data CertificateInCirrus = CertificateInCirrus
   }
   deriving (Show, Generic)
 
-instance FromJSON CertificateInCirrus
+instance FromJSON CertificateInCirrus where
+  parseJSON = withObject "CertificateInCirrus" $ \v -> do
+      commonName <- v .: "commonName"
+      isValid <- v .: "isValid"
+      return CertificateInCirrus { certCommonName = commonName, isValid = isValid }
 
 instance ToJSON CertificateInCirrus
 
@@ -304,7 +309,10 @@ data WalletInCirrus = WalletInCirrus
   }
   deriving (Show, Generic)
 
-instance FromJSON WalletInCirrus
+instance FromJSON WalletInCirrus where
+  parseJSON = withObject "WalletInCirrus" $ \v -> do
+      commonName <- v .: "commonName"
+      return WalletInCirrus { walletCommonName = commonName }
 
 instance ToJSON WalletInCirrus
 
@@ -366,7 +374,7 @@ walletInCirrus token realm commonName = do
       throwIO $ IdentityError "Identity server does not support this realm. Error should have been thrown sooner"
     Just (RealmDetails _ _ _ nurl1 nurl2) -> do
       response1 <- callCirrus nurl1 userTableName
-      mWallet :: Maybe [CertificateInCirrus] <-
+      mWallet :: Maybe [WalletInCirrus] <-
         if statusCode (responseStatus response1) == 200
           then return . decode $ responseBody response1
           else callCirrus nurl2 userTableName >>= return . decode . responseBody
