@@ -5,35 +5,35 @@ import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Enums/SaleState.sol";
+import "../Orders/Order.sol";
+import "../Payments/PaymentProvider.sol";
 import "../Utils/Utils.sol";
 
-abstract contract Sale is PaymentType, SaleState, RestStatus, Utils { 
-    address public sellersAddress;
-    string public sellersCommonName;
-    string public purchasersCommonName;
+abstract contract Sale is SaleState, Utils { 
     Asset public assetToBeSold;
     uint public price;
-    uint public saleOrderID;
+    uint public quantity;
     SaleState public state;
-    PaymentType public payment;
-
+    address[] public paymentProviders;
+    mapping (address => uint) paymentProvidersMap;
+    mapping (address => uint) lockedQuantity;
 
     constructor(
         address _assetToBeSold,
         uint _price,
-        PaymentType _payment
+        uint _quantity,
+        address[] _paymentProviders
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
-        sellersAddress = assetToBeSold.owner();
-        sellersCommonName = assetToBeSold.ownerCommonName();
-        purchasersCommonName = "";
         price = _price;
+        quantity = _quantity;
         state = SaleState.Created;
-        payment = _payment;
-        saleOrderID = 0;
+        addPaymentProviders(_paymentProviders);
+        assetToBeSold.attachSale();
     }
 
     modifier requireSeller(string action) {
+        string sellersCommonName = assetToBeSold.ownerCommonName();
         string err = "Only "
                    + sellersCommonName
                    + " can perform "
@@ -47,21 +47,81 @@ abstract contract Sale is PaymentType, SaleState, RestStatus, Utils {
         price=_price;
     }
 
-    function changeSaleState(SaleState _state) public requireSeller("Change Payment Type"){
-        state=_state;
+    function addPaymentProviders(address[] _paymentProviders) public requireSeller("add payment providers") {
+        for (uint i = 0; i < _paymentProviders.length; i++) {
+            address p = _paymentProviders[i];
+            paymentProviders.push(p);
+            paymentProvidersMap[p] = paymentProviders.length;
+        }
     }
 
-    function changePaymentType(PaymentType _payment) public requireSeller("Change Payment Type"){
-        payment=_payment;
+    function removePaymentProviders(address[] _paymentProviders) public requireSeller("remove payment providers") {
+        for (uint i = 0; i < _paymentProviders.length; i++) {
+            address p = _paymentProviders[i];
+            uint x = paymentProvidersMap[p];
+            if (x > 0) {
+                paymentProviders[x-1] = address(0);
+                paymentProvidersMap[p] = 0;
+            }
+        }
     }
 
-    // The logic in Asset's transferOwnership function should be immutable, but inherited Sales may alter
-    // the functionality of transferOwnership
-    function transferOwnership(address _purchasersAddress, uint _orderId) public virtual returns (uint) {
-        saleOrderID = _orderId;
-        purchasersCommonName = getCommonName(_purchasersAddress);
-        assetToBeSold.transferOwnership(_purchasersAddress);
+    function clearPaymentProviders() public requireSeller("clear payment providers") {
+        for (uint i = 0; i < paymentProviders.length; i++) {
+            paymentProvidersMap[paymentProviders[i]] = 0;
+            paymentProviders[i] = address(0);
+        }
+        paymentProviders = [];
+    }
+
+    function isPaymentProvider(address _paymentProvider) public returns (bool) {
+        return paymentProvidersMap[_paymentProvider] != 0;
+    }
+
+    function completeSale(
+        address _orderAddress,
+        uint _fulfillmentDate,
+        string _comments
+    ) public requireSeller("complete sale") returns (uint) {
+        Order order = Order(_orderAddress);
+        address purchaser = order.purchasersAddress();
+        uint orderQuantity = takeLockedQuantity(_orderAddress);
+        assetToBeSold.transferOwnership(purchaser, orderQuantity);
+        order.saleCompleted(_fulfillmentDate, _comments);
+        return RestStatus.OK;
+    }
+
+    function closeSale() public requireSeller("close sale") returns (uint) {
+        try {
+            assetToBeSold.closeSale();
+        } catch {
+
+        }
         state = SaleState.Closed;
+        return RestStatus.OK;
+    }
+
+    function lockQuantity(uint quantityToLock) public {
+        require(quantityToLock <= quantity, "Not enough quantity to lock");
+        require(lockedQuantity[msg.sender] == 0, "Order has already locked quantity in this asset.");
+        quantity -= quantityToLock;
+        lockedQuantity[msg.sender] = quantityToLock;
+    }
+
+    function takeLockedQuantity(address orderAddress) internal returns (uint) {
+        uint quantityToUnlock = lockedQuantity[orderAddress];
+        require(quantityToUnlock > 0, "There are no quantity to unlock for address " + string(orderAddress));
+        lockedQuantity[orderAddress] = 0;
+        return quantityToUnlock;
+    }
+
+    function unlockQuantity() public fromSale("unlock asset quantity") {
+        uint quantityToReturn = takeLockedQuantity(msg.sender);
+        quantity += quantityToReturn;
+    }
+
+    function cancelOrder() public requireSeller("cancel order") returns (uint) {
+        unlockQuantity();
         return RestStatus.OK;
     }
 }

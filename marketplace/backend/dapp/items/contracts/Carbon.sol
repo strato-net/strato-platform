@@ -2,10 +2,10 @@ import "/dapp/orders/contracts/Sales/CarbonSale.sol";
 
 pragma es6;
 pragma strict;
-import <0e5223240c46b3022a73c5e589536d3781e5b93f>;
+import <bbcd8ec0bf0cdf0c17b4123429893df42692052a>;
 
 /// @title A representation of Carbon assets
-contract Carbon is ItemStatus, RestStatus, UTXO {
+contract Carbon is UTXO {
     uint serialNumber;
     string public projectType;
 
@@ -15,74 +15,46 @@ contract Carbon is ItemStatus, RestStatus, UTXO {
         string _name,
         string _description,
         string[] _images,
+        string[] _files,
         uint _createdDate,
-        uint _units,
+        uint _quantity,
         uint _serialNumber,
-        ItemStatus _status,
-        uint _price,
-        string _projectType,
-        PaymentType[] _paymentTypes
+        string _projectType
     ) UTXO (
         _name,
         _description,
+        "Carbon",
+        "Carbon Offset",
         _images,
+        _files,
         _createdDate,
-        _units
+        _quantity
     ) {
-        status = _status;
         serialNumber = _serialNumber;
         projectType = _projectType;
-
-        if(_paymentTypes.length > 0) {
-            createSales(_paymentTypes, _price);
-        }
     }
 
-    // function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
-    //     for (uint i = 0; i < whitelistedSales.length; i++) {
-    //         CarbonSale(whitelistedSales[i]).changeSaleQuantity(_units);
-    //     }
-    // }
-
-    function mint(uint splitUnits) internal override returns (UTXO) {
+    function mint(uint splitQuantity) internal override returns (UTXO) {
         Carbon c = new Carbon(name,
                               description, 
                               images, 
+                              files, 
                               createdDate, 
-                              splitUnits, 
+                              splitQuantity, 
                               serialNumber + 1, 
-                              ItemStatus.UNPUBLISHED,
-                              0, 
-                              projectType, 
-                              []);
+                              projectType);
         return UTXO(c);
     }
 
-    function createSales(PaymentType[] _paymentTypes, uint _price) public requireOwner("create sale") returns (uint) {
-        for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new CarbonSale(address(this), _paymentTypes[i], _price)));
-        }
-        status = ItemStatus.PUBLISHED;
-        return RestStatus.OK;
-    }
-
-    function createSplitSale(PaymentType _paymentType, uint _price) public returns (uint, string) {
-        address newSale = address(new CarbonSale(address(this), _paymentType, _price));
-        return (RestStatus.OK, string(newSale));
-    }
-
     function updateCarbon(
-        string _name, 
-        string _description, 
         string[] _images, 
-        ItemStatus _status,
+        string[] _files, 
         uint _serialNumber,
-        string _projectType,
-        uint _price
+        string _projectType
     ) public requireOwner("update carbon") returns (uint) {
         serialNumber = _serialNumber;
         projectType = _projectType;
-        updateAsset(_name, _description, _images, _status, _price);
+        updateAsset(_images, _files);
         return RestStatus.OK;
     }
 }

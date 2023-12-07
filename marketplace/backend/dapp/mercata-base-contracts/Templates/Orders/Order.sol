@@ -6,47 +6,80 @@ import "../Enums/OrderStatus.sol";
 import "../Enums/RestStatus.sol";
 import "../Sales/Sale.sol";
 
-abstract contract Order is RestStatus, OrderStatus, Utils {
+contract Order is OrderStatus, Utils {
     uint public orderId;
     address[] public saleAddresses;
-    string public purchasersCommonName;
+    mapping (address => uint) saleMap;
+    uint[] public quantities;
+    bool[] public completedSales;
+    uint outstandingSales;
     address public purchasersAddress;
+    string public purchasersCommonName;
     uint public createdDate;
     uint public totalPrice;
     OrderStatus public status;
-    address public shippingAddress;
-    uint public fulfillmentDate;
+    string public shippingAddress;
     string public paymentSessionId;
-    string public comments;
+
+    event SaleCompleted(uint fulfillmentDate, string comments);
 
     constructor(
         uint _orderId,
         address[] _saleAddresses, 
-        address _purchasersAddress,
+        uint[] _quantities,
         uint _createdDate,
-        uint _totalPrice,
-        address _shippingAddress,
-        string _paymentSessionId
+        string _shippingAddress
     ) external{
+        require(_saleAddresses.length == _quantities.length, "Number of sales doesn't match number of quantities.");
         orderId = _orderId;
-        saleAddresses = _saleAddresses;
-        purchasersAddress = _purchasersAddress;
-        purchasersCommonName = getCommonName(_purchasersAddress);
+        purchasersAddress = msg.sender;
+        purchasersCommonName = getCommonName(msg.sender);
         createdDate = _createdDate;
-        totalPrice = _totalPrice;
+        totalPrice = 0;
+        for (uint i = 0; i < _saleAddresses.length; i++) {
+            address a = _saleAddresses[i];
+            Sale s = Sale(a);
+            uint q = _quantities[i];
+            s.lockQuantity(q);
+            totalPrice += s.price() * q;
+            saleAddresses.push(a);
+            saleMap[a] = saleAddresses.length;
+            completedSales.push(false);
+            quantities.push(q);
+            outstandingSales++;
+        }
         status = OrderStatus.AWAITING_FULFILLMENT;
         shippingAddress = _shippingAddress;
     }
-    
-    function transferOwnership(uint _fulfillmentDate, string _comments) external returns (uint) {
-        for (uint i = 0; i < saleAddresses.length; i++) {
-            Sale sale = Sale(saleAddresses[i]);
-            // Perform the ownership transfer
-            sale.transferOwnership(purchasersAddress, orderId);
+
+    function saleCompleted(uint _fulfillmentDate, string _comments) external returns (uint) {
+        require(status != OrderStatus.CLOSED, "Order already closed.");
+        uint index = saleMap[msg.sender];
+        if (index > 0 && !completedSales[index - 1]) {
+            completedSales[index - 1] = true;
+            outstandingSales--;
+            emit SaleCompleted(_fulfillmentDate, _comments);
         }
-        fulfillmentDate = _fulfillmentDate;
-        comments = _comments;
+        if (outstandingSales == 0) {
+            status = OrderStatus.CLOSED;
+        }
+        return RestStatus.OK;
+    }
+
+    function unlockSales() internal {
+        for (uint i = 0; i < saleAddresses.length; i++) {
+            Sale s = Sale(saleAddresses[i]);
+            try {
+                s.unlockQuantity();
+            } catch {
+
+            }
+        }
+    }
+    
+    function completeOrder() external returns (uint) {
         status = OrderStatus.CLOSED;
+        unlockSales();
         return RestStatus.OK;
     }
 
@@ -55,6 +88,7 @@ abstract contract Order is RestStatus, OrderStatus, Utils {
     function cancelOrder() external {
         require(tx.origin == purchasersAddress, "Only the purchaser can cancel the order");
         onCancel();
+        unlockSales();
         status = OrderStatus.CANCELED;
     }
 }

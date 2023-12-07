@@ -11,9 +11,8 @@ import "Templates/Enums/PaymentType.sol";
 import "Templates/Enums/RestStatus.sol";
 import "Templates/Enums/SaleState.sol";
 import "Templates/Orders/Order.sol";
-import "Templates/Orders/UTXOOrder.sol";
+import "Templates/Payments/PaymentProvider.sol";
 import "Templates/Sales/Sale.sol";
-import "Templates/Sales/UTXOSale.sol";
 import "Templates/Utils/Utils.sol";
 
 contract Mercata{}
