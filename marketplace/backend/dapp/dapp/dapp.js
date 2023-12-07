@@ -121,6 +121,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
   console.debug(contract)
   let userOrganization
+  let userCommonName
 
   if (!serviceUser) {
 
@@ -132,6 +133,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
+      userCommonName = userCertificate.commonName
       userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
       console.log('dapp - userCertificate.organization', userCertificate.organization)
     }
@@ -250,7 +252,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions);
+    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
@@ -260,7 +262,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerOrganization', notEqualsValue: userOrganization }, getOptions)
+    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions)
   }
 
   // ------------------------------ ART STARTS ------------------------------
