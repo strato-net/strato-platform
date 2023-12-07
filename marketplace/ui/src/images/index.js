@@ -23,4 +23,12 @@ export const Images = {
   'orderImg2': require('./resources/orderImages/orderImg2.png'),
   'orderImg3': require('./resources/orderImages/orderImg3.png'),
   'role-request': require('./resources/request-role.png'),
+  'newLogo': require('./resources/newLogo.png'),
+  'carousel_first': require('./resources/carousel_first_image.png'),
+  'carousel_second': require('./resources/carousel_second_image.png'),
+  'carousel_third': require('./resources/carousel_third_image.png'),
+  'Carbon-category': require("./resources/categories/Carbon_category.png") ,  
+  'Art-category': require("./resources/categories/Art_category.png") , 
+  'Clothing-category': require("./resources/categories/Clothing_category.png") ,
+  'Material-category': require("./resources/categories/Material_category.png") ,
 };
