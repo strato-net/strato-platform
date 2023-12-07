@@ -8,7 +8,7 @@ async function sendEmail(to, subject, htmlContent) {
 
   const msg = {
     to: to,
-    from: { email: "no_reply@blockapps.net", name: "Blockapps.net" },
+    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
     subject: subject,
     html: htmlContent,
     // attachments: [

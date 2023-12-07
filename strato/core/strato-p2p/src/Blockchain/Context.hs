@@ -711,7 +711,6 @@ initConfig wireMessagesRef maxHeaders = do
 
 initContext :: IO Context
 initContext = do
-  --initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
   initContextKafkaMiddlemanIn  <- newBroadcastChan :: IO (BroadcastChan In (P2pEvent,Int64))
   return Context { actionTimestamp = emptyActionTimestamp
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
