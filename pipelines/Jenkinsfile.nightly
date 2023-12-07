@@ -33,7 +33,6 @@ pipeline {
         dir ('strato-worktree') {
           sh 'rm -rf .docker-work'
           sh 'REPO=private make all'
-          sh 'rm -rf .docker-work'
           dir ('blockapps-rest') {
             sh 'yarn install --pure-lockfile'
             sh 'yarn build'
@@ -424,6 +423,7 @@ module.exports = {
 
   post {
     always {
+      sh 'rm -rf .docker-work'
       dir ('strato-getting-started') {
         sh 'rm -rf strato_logs*'
         sh './fetchlogs --as-dir'

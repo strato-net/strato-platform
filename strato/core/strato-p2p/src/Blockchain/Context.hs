@@ -76,7 +76,7 @@ module Blockchain.Context
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Concurrent.Chan.Unagi         as CCCU
+import           Control.Concurrent.Chan.Unagi.Bounded as CCCUB
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
@@ -709,7 +709,7 @@ initConfig wireMessagesRef maxHeaders = do
 
 initContext :: IO Context
 initContext = do
-  initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  initContextKafkaMiddleman <- CCCUB.newChan 1000 :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
   return Context { actionTimestamp = emptyActionTimestamp
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
                  , contextKafkaMiddleman = initContextKafkaMiddleman
