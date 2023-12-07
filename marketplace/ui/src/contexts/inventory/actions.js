@@ -76,6 +76,12 @@ const actions = {
         dispatch({ type: actionDescriptors.createInventoryFailed, error: "Error while creating Inventory" });
         actions.setMessage(dispatch, "Error while creating Inventory")
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.createInventoryFailed, 
+          error: "Unauthorized while creating Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -120,6 +126,12 @@ const actions = {
           type: actionDescriptors.fetchInventorySearchFailed,
           error: "Error while fetching Inventory",
         });
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchInventorySearchFailed, 
+          error: "Unauthorized while fetching Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchInventorySearchFailed,
@@ -159,6 +171,12 @@ const actions = {
           type: actionDescriptors.fetchInventoryFailed,
           error: "Error while fetching Inventory",
         });
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchInventoryFailed, 
+          error: "Unauthorized while fetching Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchInventoryFailed,
@@ -202,6 +220,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while updating Inventory");
         return false;;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateInventoryFailed, 
+          error: "Unauthorized while updating Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -250,6 +274,12 @@ const actions = {
         dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while reselling Item" });
         actions.setMessage(dispatch, "Error while reselling Item")
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.resellInventoryFailed, 
+          error: "Unauthorized while reselling Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -284,6 +314,12 @@ const actions = {
         });
 
         return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchInventoryDetailFailed, 
+          error: "Unauthorized while fetching Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -318,11 +354,17 @@ const actions = {
         return body.data;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
-          type: actionDescriptors.fetchInventoryFailed,
+          type: actionDescriptors.onboardSellerToStripeFailed,
           error: "Error while trying to onboard to Stripe",
         });
         actions.setMessage(dispatch, "Error while trying to onboard to Stripe");
         return null;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.onboardSellerToStripeFailed, 
+          error: "Unauthorized while trying to onboard to Stripe" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -355,6 +397,12 @@ const actions = {
           payload: body.data,
         });
         return body.data;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.sellerStripeStatusFailed, 
+          error: "Unauthorized while trying to get Stripe status" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({

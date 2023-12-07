@@ -1,7 +1,6 @@
 {
   "scripts": {
     "mocha-babel": "node_modules/.bin/mocha --require @babel/register --inline-diffs --exit",
-    "token-getter": "babel-node node_modules/blockapps-rest/dist/util/oauth.client.js --flow authorization-code --config config/${CONFIG:-localhost}.config.yaml",
     "start": "babel-node index",
     "start:prod": "NODE_ENV=production babel-node index",
     "deploy": "cp config/${CONFIG:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && yarn mocha-babel dapp/dapp/dapp.deploy.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
@@ -45,7 +44,7 @@
     "@sendgrid/mail": "^7.7.0",
     "aws-sdk": "^2.1284.0",
     "babel-plugin-module-resolver": "^4.1.0",
-    "blockapps-rest": "file:/usr/src/backend/blockapps-rest",
+    "blockapps-rest": "8.3.1",
     "body-parser": "^1.20.1",
     "chai": "^4.3.7",
     "chai-http": "^4.3.0",

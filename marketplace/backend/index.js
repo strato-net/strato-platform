@@ -36,57 +36,66 @@ assert.isDefined(
   process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY,
   "Missing external storage params"
 );
-const app = express();
 
-const { baseUrl, deployParamName } = constants;
-
-// Load deploy file
-const deploy = fsUtil.getYaml(`${config.configDirPath}/${config.deployFilename}`);
-if (!deploy) {
-  throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
-}
-
-app.set(deployParamName, deploy);
-
-// Setup middleware
-app.use(helmet());
-app.use(cors());
-app.use(bodyParser.json());
-app.use(cookieParser())
-
-// Setup logging
-app.use(
-  expressWinston.logger({
-    transports: [new winston.transports.Console()],
-    meta: true,
-    expressFormat: true
-  })
-);
-
-app.oauth = authHandler.initOauth()
-
-app.set(constants.s3ParamName, {
-  bucket: {
-    Bucket: process.env.EXT_STORAGE_S3_BUCKET
-  },
-  accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
-  secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
-});
-// Setup routes
-app.use(`${baseUrl}`, routes);
-
-app.use(ErrorHandlers.clientErrorHandler);
-app.use(ErrorHandlers.commonErrorHandler);
-
-// Start the server
-const port = process.env.PORT || 3030;
-const server = app.listen(port, () => console.log(`Listening on ${port}`));
-websocket(server);
-
-app.use(
-  "/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpecs)
-);
+let server
+(async () => {
+  const app = express();
+  
+  const { baseUrl, deployParamName } = constants;
+  
+  // Load deploy file
+  const deploy = fsUtil.getYaml(`${config.configDirPath}/${config.deployFilename}`);
+  if (!deploy) {
+    throw new Error(`Deploy file '${config.configDirPath}/${config.deployFilename}' not found`);
+  }
+  
+  app.set(deployParamName, deploy);
+  
+  // Setup middleware
+  app.use(helmet());
+  app.use(cors());
+  app.use(bodyParser.json());
+  app.use(cookieParser())
+  
+  // Setup logging
+  app.use(
+    expressWinston.logger({
+      transports: [new winston.transports.Console()],
+      meta: true,
+      expressFormat: true
+    })
+  );
+  
+  try {
+    app.oauth = await authHandler.initOauth()
+  } catch (e) {
+    console.error('Error initializing the oauthHandler', e)
+    throw e
+  }
+  
+  app.set(constants.s3ParamName, {
+    bucket: {
+      Bucket: process.env.EXT_STORAGE_S3_BUCKET
+    },
+    accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
+  });
+  // Setup routes
+  app.use(`${baseUrl}`, routes);
+  
+  app.use(ErrorHandlers.clientErrorHandler);
+  app.use(ErrorHandlers.commonErrorHandler);
+  
+  // Start the server
+  const port = process.env.PORT || 3030;
+  server = app.listen(port, () => console.log(`Listening on ${port}`));
+  websocket(server);
+  
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpecs)
+  );
+})();
 
 export default server;

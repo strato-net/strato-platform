@@ -22,8 +22,12 @@ class InventoryController {
         chainOptions = { ...options }
       }
 
+      let result;
       const inventory = await dapp.getInventory(args, chainOptions)
-      const result = { ...inventory, images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))}
+      inventory.images && inventory.images.length > 0 ?
+        result = { ...inventory, images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))}
+        :
+        result = inventory
       rest.response.status200(res, result)
 
       return next()
@@ -185,7 +189,7 @@ class InventoryController {
       itemContract: Joi.string().required(),
       itemAddress: Joi.string().required(),
       paymentTypes: Joi.array().min(1).items(
-        Joi.number().integer().min(0).max(3).required(),
+        Joi.number().integer().min(0).max(5).required(),
       ).required(),
       price: Joi.number().integer().greater(0).required(),
       units: Joi.number().integer().greater(0).optional(),
