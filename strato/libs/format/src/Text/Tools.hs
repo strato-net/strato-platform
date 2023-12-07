@@ -6,6 +6,7 @@ module Text.Tools
     formatBool,
     grayBox,
     multilineLog,
+    multilineDebugLog,
     setTitle,
     shorten,
     tab,
@@ -52,8 +53,19 @@ multilineLog ::
 multilineLog source theLines = do
   forM_ (lines theLines) $ \theLine ->
     $logInfoS source $ T.pack theLine
+  
+multilineDebugLog ::
+  MonadLogger m =>
+  T.Text ->
+  String ->
+  m ()
+multilineDebugLog source theLines = do
+  forM_ (lines theLines) $ \theLine ->
+    $logDebugS source $ T.pack theLine
+
 
 boringBox :: [String] -> String
+boringBox [] = ""
 boringBox strings =
   unlines $
     [C.magenta (replicate width '=')]

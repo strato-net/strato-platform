@@ -1,40 +1,36 @@
-# tCommerce
+# STRATO Mercata Marketplace
 
 ## Setup and Execution
 
 ### Dependencies
 
-The following tools should already be installed
+The following tools should be preinstalled to run Marketplace:
 
-1. Docker 4.1.0+
+1. Docker Engine v24+
 2. Docker Compose V2
-3. NodeJS 14.19.1+ (for development mode only)
-4. yarn or npm (for development mode only)
+3. NodeJS 14.21.3 (for development mode only)
+4. yarn (for development mode only)
 
-### Run tCommerce application locally (for development)
+*NOTE* the required NodeJS version. The app may not work properly on the newer or older Node versions. Refer to Dockerfile first line to check what is tested for Production deployment.
+
+
+### Run Marketplace application locally (for development)
 
 #### Start nginx
 
 Nginx acts as a proxy for the frontend and the backend. It is required so that both the frontend and the backend have the same root URL (required for authentication).
 
+For Docker Engine v.24+ (year 2023):
 ```
-cd tCommerce/nginx-docker
+cd nginx-docker
+HOST_IP=host.docker.internal docker-compose up -d --build
 ```
-
-If you are running on Linux, execute the following command:
-```
-HOST_IP=172.17.0.1 docker compose up -d
-```
-
-If you are running on Mac, execute the following command:
-```
-HOST_IP=docker.for.mac.localhost docker compose up -d
-```
+(for older Docker versions on Linux: `HOST_IP=172.17.0.1 docker compose up -d --build`; on Mac: `HOST_IP=docker.for.mac.localhost docker compose up -d --build`)
 
 #### Deploy the Dapp and Start The Backend
 
 ```
-cd tCommerce/backend
+cd backend
 ```
 
 1. Create a `.env` file with the below credentials: (In local development, Please make sure the value of `GLOBAL_ADMIN_NAME` `<globalAdminUserName>` is set to the login that you will be using to login to the app) 
@@ -46,65 +42,70 @@ EXT_STORAGE_S3_ACCESS_KEY_ID=<s3Key>
 EXT_STORAGE_S3_SECRET_ACCESS_KEY=<s3AccessKey>
 EXT_STORAGE_S3_BUCKET=<s3Bucket>
 
-# accounts for testing user roles
-TRADINGENTITY_NAME=<tradingEntityUsername>
-TRADINGENTITY_PASSWORD=<tradingEntityPassword>
+SENDGRID_API_KEY=<sendgridApiKey>
+
+STRIPE_PUBLISHABLE_KEY=<stripePublishableKey>
+STRIPE_SECRET_KEY=<stripeSecretKey>
+
+### VARS USED IN BACKEND TESTS ONLY: ###
+#  accounts for testing user roles:
 CERTIFIER_NAME=<certifierUserName>
 CERTIFIER_PASSWORD=<certifierPassword>
-
-# accounts for testing buyer and sellers access although the user role is TRADING ENTITY
+# accounts for testing buyer and sellers access although the user role is TRADING ENTITY:
 TEST_BUYER_ORG=<buyerUsername>
 TEST_BUYER_PASSWORD=<buyerPassword>
 TEST_SELLER_ORG=<sellerUsername>
 TEST_SELLER_PASSWORD=<sellerPassword>
-
-# blockapps stripe account
-STRIPE_PUBLISHABLE_KEY=<stripePublishableKey>
-STRIPE_SECRET_KEY=<stripeSecretKey>
 ```
-2. Install dependencies: 
+
+2. Update `config/localhost.config.yaml`
+
+In `config/localhost.config.yaml` file change the `url` value (under `nodes[0]`) to be a full url to a STRATO node (e.g. https://example.com, or https://example.com:8080 if STRATO is running on custom port)
+
+3. Install dependencies: 
 ```
 yarn install
 ```
 
-3. Deploy contracts:
+4. Deploy Dapp contracts to blockchain:
 ```
-CONFIG=mercata yarn deploy
-# CONFIG var can be skipped if using `mercata` config - it is the default config name used (config/mercata.config.yaml)
-# If you have a custom config file `config/<myConfig>.config.yaml`, set `CONFIG=myConfig`
+yarn deploy
 ```
 
-Start the backend server:
+Start the backend webserver:
 ```
 yarn start
 ```
-
-*NOTE: `yarn start` will start the server and use the terminal window to dump log information. To stop the server, hit `CTRL+C`*.
-
 
 #### Launch UI
 
 In a new terminal window, run the following commands:
 
 ```
-cd tCommerce/ui
+cd ui
 yarn install
 yarn develop
 ```
 
 This should open a browser window and display a basic React webpage.
 
-*NOTE: Please make sure that `nginx` is up WITH CORRECT HOST_IP (see above).*
+*NOTE: Please make sure that you run `nginx-docker` with proper HOST_IP (see nginx part above).*
 
-*NOTE: Your IP address may change if you change the WIFI or in other reasons. In that case restart nginx container with actual HOST_IP.*
+#### Stopping the App
+Once you are node with Martketplace development, also stop the Nginx-docker container:
 
-*NOTE: `yarn develop` will start the UI and use the terminal window to dump log information. To stop the UI, hit `CTRL+C`*.
+To stop the app, hit `CTRL+C` on the server and UI windows. To stop the nginx server, run
+```
+cd nginx-docker
+docker compose down
+```
 
-## Cypress Test
+
+## Cypress Tests
 There are two options: 
 1. Using explorer
 ```
-cd marketplace/ui
+cd ui
 yarn run cypress open 
 ```
 *NOTE: Select E2E testing in the dialog*
@@ -113,15 +114,15 @@ yarn run cypress open
 ```
 yarn test:e2e
 ```
-#### Stopping the App
-
-To stop the app, hit `CTRL+C` on the server and UI windows. To stop the nginx server, run
-```
-docker stop nginx-docker_nginx_1
-```
 
 
-### Run tCommerce app in Docker (the production way)
+
+
+###############################################
+
+### OBSOLETE: Run marketplace app in Docker (the production way)
+
+*Important:* The Marketplace is deployed as part of the STRATO Platform for production use. The information below is kept here for future reference but is not expected to work as is.
 
 #### 1. Build docker images
 ```

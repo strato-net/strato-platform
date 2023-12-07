@@ -22,9 +22,12 @@ class InventoryController {
         chainOptions = { ...options }
       }
 
+      let result;
       const inventory = await dapp.getInventory(args, chainOptions)
-      const inventoryImageUrl = getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName))
-      const result = { ...inventory, imageUrl: inventoryImageUrl }
+      inventory.images && inventory.images.length > 0 ?
+        result = { ...inventory, images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))}
+        :
+        result = inventory
       rest.response.status200(res, result)
 
       return next()
@@ -39,33 +42,10 @@ class InventoryController {
 
       const inventories = await dapp.getInventories({ ...query })
       const inventoriesWithImageUrl = inventories?.inventories.map(inventory => (
-        inventory.imageKey ?
+        inventory.images && inventory.images.length > 0 ?
         {
           ...inventory,
-          imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
-          )
-        }
-        :
-        inventory
-      ))
-      rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
-
-      return next()
-    } catch (e) {
-      return next(e)
-    }
-  }
-  
-  static async search(req, res, next) {
-    try {
-      const { dapp, query } = req
-
-      const inventories = await dapp.getInventoriesSearch({ ...query })
-      const inventoriesWithImageUrl = inventories?.inventories.map(inventory => (
-        inventory.imageKey ?
-        {
-          ...inventory,
-          imageUrl: getSignedUrlFromS3(inventory.imageKey, req.app.get(constants.s3ParamName)
+          images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName)))
           )
         }
         :
@@ -114,9 +94,9 @@ class InventoryController {
     try {
       const { dapp, body } = req
 
-      InventoryController.validateResellInventoryArgs(body)
+      InventoryController.validateResellItemArgs(body)
 
-      const result = await dapp.resellInventory(body)
+      const result = await dapp.resellItem(body)
       rest.response.status200(res, result)
 
       return next()
@@ -186,11 +166,11 @@ class InventoryController {
 
   static validateUpdateInventoryArgs(args) {
     const updateInventorySchema = Joi.object({
-      productAddress: Joi.string().required(),
-      inventory: Joi.string(),
+      itemContract: Joi.string().required(),
+      itemAddress: Joi.string().required(),
       updates: Joi.object({
-        pricePerUnit: Joi.number().integer().greater(0).required(),
-        status: Joi.number().integer().min(1).max(2)
+        status: Joi.number().min(1).required(),
+        price: Joi.number().positive().min(1).required()
       }).required()
     });
 
@@ -203,19 +183,22 @@ class InventoryController {
     }
   }
 
-  static validateResellInventoryArgs(args) {
-    const resellInventorySchema = Joi.object({
-      inventoryId: Joi.string().required(),
-      quantity: Joi.number().integer().min(1).required(),
+  static validateResellItemArgs(args) {
+    const resellItemSchema = Joi.object({
+      itemContract: Joi.string().required(),
+      itemAddress: Joi.string().required(),
+      paymentTypes: Joi.array().min(1).items(
+        Joi.number().integer().min(0).max(5).required(),
+      ).required(),
       price: Joi.number().integer().greater(0).required(),
-      itemsAddress: Joi.array().required()
+      units: Joi.number().integer().greater(0).optional(),
     });
 
-    const validation = resellInventorySchema.validate(args);
+    const validation = resellItemSchema.validate(args);
 
     if (validation.error) {
       console.log('validation error: ', validation.error)
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Resell Inventory Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

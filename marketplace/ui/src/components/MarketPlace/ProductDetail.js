@@ -49,6 +49,7 @@ import "./index.css";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import image_placeholder from "../../images/resources/image_placeholder.png";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -78,11 +79,12 @@ const ProductDetails = ({ user, users }) => {
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
   useEffect(() => {
-    if (user) {
-      if (Id !== undefined) {
-        eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
-      }
-    }
+    // TODO: Uncomment this when we have events working
+    // if (user) {
+    //   if (Id !== undefined) {
+    //     eventActions.fetchEventOfInventory(eventDispatch, limit, offset, debouncedSearchTerm, Id);
+    //   }
+    // }
   }, [limit, offset, debouncedSearchTerm, eventDispatch, Id, user])
 
 
@@ -97,6 +99,8 @@ const ProductDetails = ({ user, users }) => {
   const [isTransformationSelected, setIsTransformationSelected] =
     useState(false);
   const { Text, Paragraph, Title } = Typography;
+  const [ itemData, setItemData ] = useState({});
+  const [ availableQuantity, setAvailableQuantity ] = useState (1);
   const [qty, setQty] = useState(1);
   const dispatch = useInventoryDispatch();
   const itemDispatch = useItemDispatch();
@@ -138,9 +142,10 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       actions.fetchInventoryDetail(dispatch, Id);
-      if (user) {
-        itemsActions.fetchSerialNumbers(itemDispatch, Id);
-      }
+      // TODO: Uncomment this when we have serial numbers working
+      // if (user) {
+      //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
+      // }
     }
   }, [Id, dispatch, itemDispatch, user]);
 
@@ -149,7 +154,6 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
-  const availableQuantity = details?.availableQuantity;
 
   useEffect(() => {
     if (categorys.length && details) {
@@ -157,6 +161,11 @@ const ProductDetails = ({ user, users }) => {
         (c) => c.name === details.category
       );
       setCategoryName(prodCategory?.name);
+      const detailsData = JSON.parse(details.data);
+      setItemData(detailsData);
+      if (detailsData.units) {
+        setAvailableQuantity(detailsData.units);
+      }
     }
   }, [categorys, details]);
 
@@ -168,7 +177,7 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const add = () => {
-    if (qty < details.availableQuantity) {
+    if (qty < availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -211,7 +220,7 @@ const ProductDetails = ({ user, users }) => {
 
   const ownerSameAsUser = () => {
 
-    if (user && user.organization === inventoryDetails?.ownerOrganization) {
+    if (user?.commonName === inventoryDetails?.ownerCommonName) {
       return true;
     }
 
@@ -237,7 +246,7 @@ const ProductDetails = ({ user, users }) => {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === details.address) {
-          if (items[index].qty + qty <= details.availableQuantity) {
+          if (items[index].qty + qty <= availableQuantity) {
             items[index].qty += qty;
             marketPlaceActions.addItemToCart(marketplaceDispatch, items);
             setQty(1);
@@ -414,41 +423,59 @@ const ProductDetails = ({ user, users }) => {
     return <Text className="text-primaryC text-[13px] whitespace-pre">{text}</Text>;
   };
 
+  const getCategory = (data) => {
+    const parts = data.contract_name.split('-');
+    return parts[parts.length - 1];
+  };
+
   const DescriptionComponent = () => {
-    return (
-      <Space direction="vertical">
-        <Space>
-          <DescTitle text="Product Id" />
-          <DescTitle text="                      :" />
-          <Text className="text-[13px]">{details.uniqueProductCode}</Text>
-        </Space>
+    const categoryName = getCategory(details);
 
-        <Space>
-          <DescTitle text="Unique Product Code" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">{details.userUniqueProductCode ? details.userUniqueProductCode : " "}</Text>
-        </Space>
-        <Space>
-          <DescTitle text="Manufacturer" />
-          <DescTitle text="                :" />
-          <Text className="text-[13px]">{decodeURIComponent(details.manufacturer)}</Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Unit of Measurement" />
-          <DescTitle text=" :" />
-          <Text className="text-[13px]">
-            {UNIT_OF_MEASUREMENTS[details.unitOfMeasurement]}
-          </Text>
-        </Space>
-
-        <Space>
-          <DescTitle text="Least Sellable Unit" />
-          <DescTitle text="       :" />
-          <Text className="text-[13px]">{details.leastSellableUnit}</Text>
-        </Space>
-      </Space>
-    );
+    switch (categoryName) {
+      case "Art":
+        return (
+          <Space direction="vertical">
+            <Space>
+              <DescTitle text="Artist" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{itemData?.artist}</Text>
+            </Space>
+          </Space>)
+      case "Carbon":
+        return (
+          <Space direction="vertical">
+            <Space>
+              <DescTitle text="Project Type" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{itemData?.projectType}</Text>
+            </Space>
+            <Space>
+              <DescTitle text="Units" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{availableQuantity}</Text>
+            </Space>
+          </Space>)
+      case "Clothing":
+        return (
+          <Space direction="vertical">
+            <Space>
+              <DescTitle text="Brand" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{itemData?.brand}</Text>
+            </Space>
+          </Space>)
+      case "Metals":
+        return (
+          <Space direction="vertical">
+            <Space>
+              <DescTitle text="Source" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{itemData?.source}</Text>
+            </Space>
+          </Space>)
+      default:
+        break;
+    }
   };
 
   const EventDetailsComponent = ({ title, value, id }) => {
@@ -521,9 +548,9 @@ const ProductDetails = ({ user, users }) => {
           <div className="flex mx-16">
             <div className="w-1/2">
               <div className="h-96 flex items-center justify-center border border-grayLight">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.imageUrl} />
+                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
               </div>
-              {details.availableQuantity !== 0 ?
+              {availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
                   {ownerSameAsUser() ? <Button
                     className="group w-1/3 h-9 border border-primary"
@@ -658,7 +685,7 @@ const ProductDetails = ({ user, users }) => {
                   {decodeURIComponent(details.name)}&nbsp;
                 </Text>
                 <Text className="font-medium text-sm text-secondryB ">
-                  ({categoryName})
+                  ({getCategory(details)})
                 </Text>
               </Row>
               <Paragraph
@@ -673,9 +700,9 @@ const ProductDetails = ({ user, users }) => {
                 ))}
               </Paragraph>
               <Title level={4} className="!mt-0">
-                $ {details.pricePerUnit}
+                {details.price ? <>$ {details.price}</> : "No Price Available"}
               </Title>
-              {details.availableQuantity !== 0 ?
+              {availableQuantity !== 0 ?
                 <Space>
                   <Text className="text-primaryB text-base">Quantity</Text>
                   <div className="flex items-center my-2 ml-5" id="quantity">
@@ -684,9 +711,9 @@ const ProductDetails = ({ user, users }) => {
                       className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
                       <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
                     </div>
-                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={details.availableQuantity} value={qty} defaultValue={qty} controls={false}
+                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={availableQuantity} value={qty} defaultValue={qty} controls={false}
                       onChange={e => {
-                        if (e < details.availableQuantity) {
+                        if (e < availableQuantity) {
                           setQty(e)
                         } else {
                           openToast(
@@ -694,7 +721,7 @@ const ProductDetails = ({ user, users }) => {
                             true,
                             "Cannot add more than available quantity"
                           );
-                          setQty(details.availableQuantity)
+                          setQty(availableQuantity)
                         }
                       }} />
                     <div

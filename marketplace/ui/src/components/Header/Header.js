@@ -7,8 +7,7 @@ import {
   Space,
   Badge,
   Avatar,
-  Dropdown,
-  Typography,
+  Dropdown
 } from "antd";
 import { SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Images } from "../../images";
@@ -24,7 +23,6 @@ import { actions as userActions } from "../../contexts/authentication/actions";
 import { useAuthenticateDispatch } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 
-const { Title } = Typography;
 const { Header } = Layout;
 
 const HeaderComponent = ({ isOauth, user, loginUrl }) => {
@@ -44,8 +42,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
   const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
 
-  const showStorage = user && user.organization && user.organization === "BlockApps" ? true : false
-
   const navItems = [
     {
       role: 0,
@@ -53,9 +49,8 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
         { label: <div id="Marketplace">Marketplace</div>, key: '0' },
         { label: <div id="Orders">Orders</div>, key: '1' },
         { label: <div id="Inventory">Inventory</div>, key: '2' },
-        { label: <div id="Products">Products</div>, key: '3' },
+        // { label: <div id="Products">Products</div>, key: '3' },
         // { label: <div id="Events">Events</div>, key: '4' }, // hiding events from marketplace
-        // showStorage && { label: <div id="Storage">Storage</div>, key: '5' }, //hiding storage tab
       ]
     },
     {
@@ -72,7 +67,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
     routes.Inventories.url,
     routes.Products.url,
     routes.Events.url,
-    routes.Storage.url,
   ];
 
   const logout = () => {
@@ -103,9 +97,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
       setSelectedTab("3");
     } else if (pathName.includes("/events") || pathName === "/certifier") {
       setSelectedTab("4");
-    } else if (pathName.includes("/storage")) {
-      setSelectedTab("5");
-    }
+    } 
     else {
       setSelectedTab("0");
     }
@@ -222,13 +214,6 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
             navigate(navUrls[item.key], { state: { tab: "EventType" } })
           }
           else navigate(navUrls[item.key]);
-          if (item.key === "5") {
-            TagManager.dataLayer({
-              dataLayer: {
-                event: 'view_storage_page',
-              }
-            });
-          }
         }}
         items={navItems[roleIndex]?.items}
       />
@@ -264,7 +249,7 @@ const HeaderComponent = ({ isOauth, user, loginUrl }) => {
                 })
               }} >
               Login / Register
-            </a> : (isOauth ? <Title style={{ backgroundColor: 'red', border: 3, padding: 10, color: '#FFFFFF' }} level={3} >Something went wrong, try to refresh page</Title> : null)
+            </a> : null
           ) :
             <Dropdown menu={{ items }} placement="bottomLeft" trigger={["click"]} overlayStyle={{ marginTop: "40px" }}>
               <a onClick={(e) => e.preventDefault()} className="text-base text-white" id="user-dropdown">

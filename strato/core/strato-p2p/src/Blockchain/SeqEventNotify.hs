@@ -12,8 +12,8 @@ module Blockchain.SeqEventNotify (
   seqEventNotificationSourceChanPour
   ) where
 
+import           BroadcastChan
 import           Conduit
-import           Control.Concurrent.Chan.Unagi
 import           Control.Monad.Change.Modify (Modifiable(..))
 import           Control.Monad
 import           Control.Monad.Except
@@ -34,7 +34,7 @@ instance Monad m => Modifiable K.KafkaState (State.StateT K.KafkaState m) where
 seqEventNotificationSourceChanFill :: ( MonadIO m
                                       , MonadLogger m
                                       )
-                                   => K.KafkaState -> InChan (P2pEvent,Int64) -> m ()
+                                   => K.KafkaState -> BroadcastChan In (P2pEvent,Int64) -> m ()
 seqEventNotificationSourceChanFill ks p2peventchan = do
   res <- runExceptT $ flip State.evalStateT ks $ do
               ofs' <- K.withKafkaRetry1s $ K.getLastOffset K.LatestTime 0 seqP2pEventsTopicName
@@ -47,18 +47,20 @@ seqEventNotificationSourceChanFill ks p2peventchan = do
                         unless (null events) $ do -- stop bloating the logs
                           $logInfoS "seqEventNotifyChanFill" . T.pack $ "filling kakfa middleman of kafka seqevents @ " ++ show nextOffset
                           forM_ events $ \e -> do
-                            liftIO $ writeChan p2peventchan (e,(\(KP.Offset o) -> o) nextOffset)
+                            liftIO $ writeBChan p2peventchan (e,(\(KP.Offset o) -> o) nextOffset)
                         loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
 
 seqEventNotificationSourceChanPour :: ( MonadIO m
-                                      , MonadLogger m 
+                                      , MonadLogger m
                                       )
-                                   => t -> (t -> IO (OutChan (P2pEvent,Int64))) -> ConduitT () P2pEvent m ()
-seqEventNotificationSourceChanPour p2peventchan dupaction = do
-  dupchan <- liftIO $ dupaction p2peventchan
+                                   => BroadcastChan In (P2pEvent,Int64) -> ConduitT () P2pEvent m ()
+seqEventNotificationSourceChanPour p2peventchanin = do
+  dupchan <- liftIO $ newBChanListener p2peventchanin
   loop dupchan
   where loop chan = do
-            (event,nextOffset) <- liftIO $ readChan chan
-            $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ Offset " ++ show nextOffset
-            _ <- yield event
-            loop chan
+            newevent <- liftIO $ readBChan chan
+            case newevent of
+              Nothing                 -> loop chan
+              Just (event,nextOffset) -> do $logInfoS "seqEventNotifyChanPour" . T.pack $ "pouring from kafka middleman of kafka seqevents @ Offset " ++ show nextOffset
+                                            _ <- yield event
+                                            loop chan

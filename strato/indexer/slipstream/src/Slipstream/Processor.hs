@@ -86,6 +86,7 @@ import qualified SolidVM.Model.CodeCollection as CC (contractName)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
+import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
 
 instance MonadUnliftIO m => Selectable Account Contract (SQLM m) where
@@ -426,7 +427,8 @@ processTheMessages env conn messages = do
     cc' <- getCC g cp ccString
     case cc' of
       Right cc -> do
-        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) <> ", contracts = " <> T.pack (show $ Map.keys $ cc ^. contracts)
+        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
+        multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         deferredForeignKeys <- fmap concat $
           forM (Map.toList $ cc ^. contracts) $ \(nameString, c) -> do
@@ -443,10 +445,11 @@ processTheMessages env conn messages = do
             let mapNames = getMapNamesFromContract c
 
             let historyTableNames = map (historyTableName o a') hl
-            $logInfoS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
+            $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
             nameParts@(o'', a'', n'') <- resolveNameParts o a' c
-            $logInfoS "processTheMessages" $ "New Contract Added: org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n'' <> " (fields: " <> T.pack (show $ Map.toList $ fmap _varType $ c ^. storageDefs) <> ")"
+            $logInfoS "processTheMessages/Contract Added" $ "org=" <> o'' <> ", app=" <> a'' <> ", name=" <> n''
+            multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
             --Create mapping tables
             deferredForeignKeysForMappings <- fmap concat $
@@ -509,14 +512,13 @@ processTheMessages env conn messages = do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
-      $logInfoS "processTheMessages" $ "Combined Action = " <> formatAction row
+      $logDebugS "processTheMessages" $ "Combined Action = " <> formatAction row
       $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
       case actionStorage row of
         Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
         Action.SolidVMDiff {} -> do
           let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-              -- (SolidVMCode name _) = actionCodeHash row
               name = case actionCodeHash row of
                 SolidVMCode name' _ -> name'
                 _ -> error "internal error: contract should be SolidVM for SolidVM"

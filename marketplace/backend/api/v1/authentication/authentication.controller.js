@@ -1,5 +1,5 @@
 import jwtDecode from 'jwt-decode'
-import { oauthUtil, rest } from 'blockapps-rest'
+import { rest } from 'blockapps-rest'
 import RestStatus from 'http-status-codes'
 import config from '/load.config'
 
@@ -11,11 +11,10 @@ import constants from '/helpers/constants'
 import dappJs from '/dapp/dapp/dapp'
 import certificateJs from '/dapp/certificates/certificate'
 
-const oauth = oauthUtil.init(config.nodes[0].oauth)
 const options = { config }
-const loadEnv = dotenv.config()
 class AuthenticationController {
   static async callback(req, res, next) {
+    const oauth = req.app.oauth
     const { code } = req.query
     const { app } = req
 
@@ -82,7 +81,7 @@ class AuthenticationController {
       rest.response.status(RestStatus.FORBIDDEN, res)
       return next()
     }
-
+    
     res.cookie(oauth.getCookieNameAccessToken(), accessToken, {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
@@ -95,7 +94,7 @@ class AuthenticationController {
       maxAge: config.nodes[0].oauth.appTokenCookieMaxAge,
       httpOnly: true,
     })
-
+    
     // check if user exists - if not, create them
 
     // bind to dapp as service user (to have permissions to create user if needed)
@@ -148,6 +147,7 @@ class AuthenticationController {
   }
 
   static async logout(req, res) {
+    const oauth = req.app.oauth
     let oauthSignOutUrl
     if (config.dockerized) {
       oauthSignOutUrl = '/auth/logout'

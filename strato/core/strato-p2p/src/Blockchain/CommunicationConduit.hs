@@ -45,9 +45,9 @@ import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
 import Blockchain.TimerSource
 import Blockchain.Watchdog
+import BroadcastChan
 import Conduit
 import Control.Concurrent (ThreadId)
-import Control.Concurrent.Chan.Unagi
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Unlift

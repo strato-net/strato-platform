@@ -33,8 +33,6 @@ import EventSerialNumberList from "./components/Event/EventSerialNumberList";
 import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
-import { StorageProvider } from "./contexts/storage";
-import Storage from "./components/Storage";
 import LoginRedirect from "./components/LoginRedirect";
 
 const AuthenticatedRoutes = ({ user, users }) => {
@@ -387,16 +385,6 @@ const AuthenticatedRoutes = ({ user, users }) => {
             </EventsProvider>
           </UsersProvider>
         }
-      />
-      <Route
-        exact
-        path={routes.Storage.url}
-        element={
-          <UsersProvider>
-            <StorageProvider>
-              <Storage user={user} users={users} />
-            </StorageProvider>
-          </UsersProvider>}
       />
       <Route
         path="/"

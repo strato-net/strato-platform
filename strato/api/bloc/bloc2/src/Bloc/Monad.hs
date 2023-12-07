@@ -55,7 +55,6 @@ type HasBlocEnv m = Accessible BlocEnv m
 data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     gasOn :: Bool,
-    evmCompatible :: Bool,
     txSizeLimit :: Int,
     accountNonceLimit :: Integer,
     gasLimit :: Integer,

@@ -49,7 +49,7 @@ services:
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
-    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
+    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     build: .
     image: ${APEX_IMAGE:-<REPO_URL>apex:<VERSION>}
     restart: unless-stopped
@@ -110,6 +110,7 @@ services:
       - ASSET_TABLE_NAME=${ASSET_TABLE_NAME}
       - SALE_TABLE_NAME=${SALE_TABLE_NAME}
       - SITE_ID=${SITE_ID:-038fe3fa}
+
     build: .
     image: ${MARKETPLACEUI_IMAGE:-<REPO_URL>marketplace-ui:<VERSION>}
     restart: unless-stopped
@@ -137,6 +138,7 @@ services:
     environment:
     - accountNonceLimit=${accountNonceLimit}
     - addBootnodes=${addBootnodes}
+    - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
     - appFetchLimit=${appFetchLimit}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
@@ -154,8 +156,8 @@ services:
     - debugWSPort=${debugWSPort}
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
-    - evmTraceMode=${evmTraceMode}
     - faucetEnabled=${faucetEnabled}
+    - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - gasOn=${gasOn:-false}
     - generateKey=${generateKey:-true}
@@ -168,8 +170,6 @@ services:
     - maxReturnedHeaders=${maxReturnedHeaders}
     - maxTxsPerBlock=${maxTxsPerBlock}
     - minBlockDifficulty=${minBlockDifficulty}
-    - mineBlocks=${mineBlocks:-true}
-    - miningAlgorithm=${miningAlgorithm}
     - miningThreads=${miningThreads}
     - network=${network}
     - networkID=${networkID}
@@ -185,18 +185,18 @@ services:
     - postgres_port=5432
     - postgres_slipstream_db=cirrus
     - postgres_user=postgres
-    - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - PROCESS_MONITORING=${PROCESS_MONITORING:-true}
     - redisBDBNumber=${redisBDBNumber}
     - redisHost=redis
     - redisPort=6379
     - requireCerts=${requireCerts:-true}
-    - seqDebugMode=${seqDebugMode}
     - seqEventsBatchSize=${seqEventsBatchSize}
     - seqEventsCostHeuristic=${seqEventsCostHeuristic}
     - seqMaxEventsPerIter=${seqMaxEventsPerIter}
     - seqMaxUsPerIter=${seqMaxUsPerIter}
     - seqRTSOPTs=${seqRTSOPTs}
-    - SLIPSTREAM_DEBUG=${SLIPSTREAM_DEBUG}
+    - SEQUENCER_DEBUG_LOG=${SEQUENCER_DEBUG_LOG:-false}
+    - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - splitinit=true
     - stratoHost=strato:3000
@@ -212,12 +212,11 @@ services:
     - VAULT_URL=${VAULT_URL}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - vmDebug=${vmDebug}
+    - VM_DEBUG_LOG=${VM_DEBUG_LOG:-false}
     - vmRunnerRTSOPTs=${vmRunnerRTSOPTs}
     - wireMessageCacheSize=${wireMessageCacheSize}
     - wsDebug=${wsDebug}
     - zkHost=zookeeper
-    - EVM_COMPATIBLE=${EVM_COMPATIBLE}
-    - indexEVM=${indexEVM:-false}
     build: .
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>}
     ports:
@@ -304,7 +303,7 @@ services:
     - STRATO_PORT_API2=${STRATO_PORT_API2}
     - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
-    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY}
+    - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - vmDebug=${vmDebug}
     build: .
     image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>}
