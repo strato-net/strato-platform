@@ -126,7 +126,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         string _serialNumber,
         uint _price,
         uint _units
-    ) public ("update semiFungible") returns (uint) {
+    ) public returns (uint) {
         serialNumber = _serialNumber;
         updateAsset(_name, _description, _images, _status, _price);
         if (_units != units) {
