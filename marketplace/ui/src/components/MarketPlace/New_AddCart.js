@@ -415,7 +415,7 @@ import New_ResponsiveCart from "./New_ResponsiveCart";
               </Breadcrumb.Item>
             </Breadcrumb>
 
-            <div className="pt-5">
+            <div className=" pt-[18px] lg:pt-6 ">
                 <p className="text-2xl font-semibold leading-9">My Cart</p>
             </div>
             {
