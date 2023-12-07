@@ -89,6 +89,11 @@ export const Clothing = {
   create: '/'
 }
 
+export const Membership = {
+  prefix: '/membership',
+  getAll: '/',
+  create: '/'
+}
 
 export const Order = {
   prefix: '/order',

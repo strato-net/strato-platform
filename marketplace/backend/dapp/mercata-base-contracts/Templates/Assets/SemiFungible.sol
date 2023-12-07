@@ -1,3 +1,7 @@
+pragma es6;
+pragma strict;
+import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+
 abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
     uint public serialNumber;
@@ -31,7 +35,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     }
 
     function splitAsset(address orderAddress, uint _units, address newOwner) public requireOwner("split asset") returns (address[] memory) {
-        uint splitUnits = takeLockedUnits(orderAddress);
+        // uint splitUnits = takeLockedUnits(orderAddress);
         require(_units <= units, "Cannot split more units than available");
         // Ensure there are enough unlocked units available for the split
         // require(_units <= lockedUnits[orderAddress], "Not enough unlocked units to split");
@@ -41,7 +45,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         //for example:
         //splitUnitsArray for SemiFungible will be [1,1,1,1,1] if someone buys 5 semiFungibles
         //splitUnitsArray for Carbon will be [5] if someone buys 5 semiFungibles
-        for (uint i = 0; i < splitUnits; i++) {
+        for (uint i = 0; i < _units; i++) {
             SemiFungible sf = mint(
                 name,
                 description,
