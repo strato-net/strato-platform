@@ -501,14 +501,14 @@ const CreateInventoryModal = ({
                     label="Serial Number"
                     name="serialNumber"
                     className="w-72"
-                    style={{ display: formik.values.category === 'Carbon' ? 'none' : 'block' }}
                   >
                     <Input
                       label="serialNumber"
                       placeholder="Enter Serial Number"
                       name="serialNumber"
-                      value={formik.values.serialNumber}
+                      value={formik.values.category === 'Carbon' ? "" : formik.values.serialNumber}
                       onChange={formik.handleChange}
+                      disabled={formik.values.category === 'Carbon'}
                     />
                     {formik.touched.serialNumber &&
                       formik.errors.serialNumber && (
