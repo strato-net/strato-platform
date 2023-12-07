@@ -33,8 +33,7 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         string _serialNumber,
         ItemStatus _status,
         uint _price,
-        PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths) internal overrides public returns(){
+        PaymentType[] _paymentTypes) internal override returns(address){
         require(block.timestamp < expirationDate, "Membership is expired");
         Membership newAsset = new Membership(
                 _name,
@@ -46,10 +45,9 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
                 _status,
                 _price,
                 _paymentTypes,
-                _expirationPeriodInMonths
+                expirationPeriodInMonths
                     );
-
-            newAssets.push(address(newAsset));
-            emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+        return address(newAsset);
+            // emit AssetSplit(address(newAsset), splitUnitsArray[i]);
     }
 }

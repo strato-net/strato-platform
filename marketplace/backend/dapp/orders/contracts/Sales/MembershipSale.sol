@@ -5,5 +5,5 @@ import "/dapp/mercata-base-contracts/Templates/Sale/SemiFungibleSale.sol";
 
 /// @title A representation of asset sale contract
 contract MembershipSale is SemiFungibleSale{
-    constructor(address _assetToBeSold, PaymentType _payment, uint _price, uint _units) SemiFungibleSale(_assetToBeSold, _price, _payment, _units){}
+    constructor(address _assetToBeSold, PaymentType _payment, uint _price, uint _units) SemiFungibleSale(_assetToBeSold, _payment, _price, _units){}
 }

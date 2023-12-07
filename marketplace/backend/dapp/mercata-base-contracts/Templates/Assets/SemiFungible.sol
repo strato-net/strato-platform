@@ -4,9 +4,9 @@ import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 
 abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
-    uint public serialNumber;
+    string public serialNumber;
 
-    mapping (address => uint) lockedUnits;
+    // mapping (address => uint) lockedUnits;
     event AssetSplit(address newAsset, uint unitsMoved);
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
@@ -16,7 +16,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         string[] _images,
         uint _createdDate,
         uint _units,
-        uint _serialNumber,
+        string _serialNumber,
         ItemStatus _status,
         uint _price,
         PaymentType[] _paymentTypes
@@ -46,37 +46,63 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         //splitUnitsArray for SemiFungible will be [1,1,1,1,1] if someone buys 5 semiFungibles
         //splitUnitsArray for Carbon will be [5] if someone buys 5 semiFungibles
         for (uint i = 0; i < _units; i++) {
-            SemiFungible sf = mint(
+            SemiFungible sf = SemiFungible(mint(
                 name,
                 description,
                 images,
                 createdDate,
                 1,
-                serialNumber + i+1,
+                serialNumber,
                 ItemStatus.UNPUBLISHED,
                 0,
                 []
-            );
+            ));
             Asset(sf).transferOwnership(msg.sender, newOwner);
 
             newAssets.push(address(sf));
         }
 
-        SemiFungible sf = mint(
+        SemiFungible sf = SemiFungible(mint(
                 name,
                 description,
                 images,
                 createdDate,
-                (units-splitUnits),
-                serialNumber + 1,
+                (units-_units),
+                serialNumber,
                 ItemStatus.UNPUBLISHED,
                 0,
                 []
-            );
+            ));
 
         newAssets.push(address(sf));
         return newAssets;
     }
+
+    function mint(string _name,
+        string _description,
+        string[] _images,
+        uint _createdDate,
+        uint _units,
+        string _serialNumber,
+        ItemStatus _status,
+        uint _price,
+        PaymentType[] _paymentTypes) virtual internal returns(address){
+        // require(block.timestamp < expirationDate, "Membership is expired");
+        SemiFungible newAsset = new SemiFungible(
+                _name,
+                _description,
+                _images,
+                _createdDate,
+                _units,
+                _serialNumber,
+                _status,
+                _price,
+                _paymentTypes
+                    );
+        return address(newAsset);
+            // emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+    }
+
 
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
@@ -99,7 +125,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         string _description, 
         string[] _images, 
         ItemStatus _status,
-        uint _serialNumber,
+        string _serialNumber,
         uint _price,
         uint _units
     ) public requireOwner("update semiFungible") returns (uint) {
@@ -112,22 +138,22 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     }
 
 
-    function lockUnits(address orderAddress, uint unitsToLock) public requireWhitelisted("lock asset units") {
-        require(unitsToLock <= units, "Not enough units to lock");
-        require(lockedUnits[orderAddress] == 0, "Order has already locked units in this asset.");
-        units -= unitsToLock;
-        lockedUnits[orderAddress] = unitsToLock;
-    }
+    // function lockUnits(address orderAddress, uint unitsToLock) public requireWhitelisted("lock asset units") {
+    //     require(unitsToLock <= units, "Not enough units to lock");
+    //     require(lockedUnits[orderAddress] == 0, "Order has already locked units in this asset.");
+    //     units -= unitsToLock;
+    //     lockedUnits[orderAddress] = unitsToLock;
+    // }
 
-    function unlockUnits(address orderAddress) public requireWhitelisted("unlock asset units") {
-        uint unitsToReturn = takeLockedUnits(orderAddress);
-        units += unitsToReturn;
-    }
+    // function unlockUnits(address orderAddress) public requireWhitelisted("unlock asset units") {
+    //     uint unitsToReturn = takeLockedUnits(orderAddress);
+    //     units += unitsToReturn;
+    // }
 
-    function takeLockedUnits(address orderAddress) internal returns (uint) {
-        uint unitsToUnlock = lockedUnits[orderAddress];
-        require(unitsToUnlock > 0, "There are no units to unlock for address");
-        lockedUnits[orderAddress] = 0;
-        return unitsToUnlock;
-    }
+    // function takeLockedUnits(address orderAddress) internal returns (uint) {
+    //     uint unitsToUnlock = lockedUnits[orderAddress];
+    //     require(unitsToUnlock > 0, "There are no units to unlock for address");
+    //     lockedUnits[orderAddress] = 0;
+    //     return unitsToUnlock;
+    // }
 }
