@@ -20,7 +20,7 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         address _owner,
         PaymentType[] _paymentTypes,
         
-    ) SemiFungible(_name, _description, _images, _createdDate, _units, _serialNumber, _status, _price, _owner, _paymentTypes, _expirationPeriodInMonths, uid) {
+    ) SemiFungible(_name, _description, _images, _createdDate, _units, _serialNumber, _status, _price, _owner, _paymentTypes, _expirationPeriodInMonths) {
         expirationPeriodInMonths =_expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
     }
@@ -35,8 +35,7 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         uint _price,
         address _owner,
         PaymentType[] _paymentTypes,
-        uint _expirationPeriodInMonths,
-        uint uid) internal overrides public returns(){
+        uint _expirationPeriodInMonths) internal overrides public returns(){
         require(block.timestamp < expirationDate, "Membership is expired");
         Membership newAsset = new Membership(
                 _name,
