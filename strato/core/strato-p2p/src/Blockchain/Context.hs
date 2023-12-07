@@ -73,10 +73,11 @@ module Blockchain.Context
     ) where
 
 
+import           BroadcastChan
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Concurrent.Chan.Unagi         as CCCU
+--import           Control.Concurrent.Chan.Unagi         as CCCU
 import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
@@ -203,13 +204,14 @@ withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) ->
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState     :: K.KafkaState
-  , contextKafkaMiddleman :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
-  , blockHeaders          :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
-  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
-  , actionTimestamp       :: ActionTimestamp
-  , _blockstanbulPeerAddr :: PeerAddress
-  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
+  { contextKafkaState        :: K.KafkaState
+  --, contextKafkaMiddleman  :: (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  , contextKafkaMiddlemanIn  :: BroadcastChan In (P2pEvent,Int64)
+  , blockHeaders             :: ([BlockData], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
+  , actionTimestamp          :: ActionTimestamp
+  , _blockstanbulPeerAddr    :: PeerAddress
+  , _outboundWireMessages    :: S.OSet (T.Text, Keccak256)
   }
 
 makeLenses ''Context
@@ -709,10 +711,11 @@ initConfig wireMessagesRef maxHeaders = do
 
 initContext :: IO Context
 initContext = do
-  initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  --initContextKafkaMiddleman <- CCCU.newChan :: IO (InChan (P2pEvent,Int64), OutChan (P2pEvent,Int64))
+  initContextKafkaMiddlemanIn  <- newBroadcastChan :: IO (BroadcastChan In (P2pEvent,Int64))
   return Context { actionTimestamp = emptyActionTimestamp
                  , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-                 , contextKafkaMiddleman = initContextKafkaMiddleman
+                 , contextKafkaMiddlemanIn = initContextKafkaMiddlemanIn
                  , blockHeaders = ([], jamshidBirth)
                  , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
                  , _blockstanbulPeerAddr = PeerAddress Nothing

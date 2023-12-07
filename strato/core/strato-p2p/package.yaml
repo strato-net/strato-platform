@@ -46,6 +46,7 @@ library:
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
+    - broadcast-chan
     - bytestring
     - concurrency
     - conduit
@@ -101,7 +102,7 @@ library:
     - thread-hierarchy
     - time
     - transformers
-    - unagi-chan
+      #- unagi-chan
     - unliftio-core
     - unliftio 
     - warp
