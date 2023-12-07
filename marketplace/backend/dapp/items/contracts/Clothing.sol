@@ -7,10 +7,11 @@ import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 /// @title A representation of Clothing assets
 contract Clothing is ItemStatus, RestStatus, Asset {
     string public serialNumber;
-    string public clothingType; // Dropdown selection on UI (Shirt, Pants, Jacket, Shoes, Accessories)
-    string public size; // This will be selected in the UI, a size options appear after selecting the colthing type
-    string public skuNumber; // This could be nice to track more closely. If the SKU is already known it could speed up item creation for user by auto populating things on the form for example.
-    string public condition; // This is a dropdown of conditions on the UI (New, Used)
+    string public clothingType; 
+    string public size; 
+    string public skuNumber; 
+    string public condition;
+    string public brand;
 
     event OwnershipUpdate(
         string seller,
@@ -31,6 +32,7 @@ contract Clothing is ItemStatus, RestStatus, Asset {
         string _size,
         string _skuNumber,
         string _condition,
+        string _brand,
         PaymentType[] _paymentTypes
     ) public Asset(_name, _description, _images, _createdDate){
 
@@ -40,6 +42,7 @@ contract Clothing is ItemStatus, RestStatus, Asset {
         size = _size;
         skuNumber = _skuNumber;
         condition = _condition;
+        brand = _brand;
 
         mapping(string => string) ownerCert = getUserCert(owner);
         ownerOrganization = ownerCert["organization"];

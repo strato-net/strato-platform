@@ -62,7 +62,8 @@ const CreateInventoryModal = ({
     category: "Art",
     size: null,
     skuNumber: null,
-    condition: null
+    condition: null,
+    brand: null,
   };
 
   const formik = useFormik({
@@ -85,9 +86,6 @@ const CreateInventoryModal = ({
     }
     return isJpgOrPng && isLt1M;
   }
-
-  console.log("values", formik.values)
-  console.log("errors", formik.errors)
 
   const handleCreateFormSubmit = async (values) => {
     const formData = new FormData();
@@ -131,7 +129,8 @@ const CreateInventoryModal = ({
               clothingType: values.clothingType,
               skuNumber: values.skuNumber,
               size: values.size,
-              condition: values.condition
+              condition: values.condition,
+              brand: values.brand,
             },
           });
         case "Metals":
@@ -315,6 +314,23 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
+            <Form.Item
+              label="Brand"
+              name="brand"
+            >
+              <Input
+                id="brand"
+                name="brand"
+                placeholder="Enter Brand"
+                value={formik.values.brand}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.brand && formik.errors.brand && (
+                <span className="text-error text-xs">
+                  {formik.errors.brand}
+                </span>
+              )}
+            </Form.Item>
             <Form.Item label="Size" name="size">
               <Select
                 id="size"
@@ -354,10 +370,7 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item
-              label="SKU"
-              name="skuNumber"
-            >
+            <Form.Item label="SKU" name="skuNumber">
               <Input
                 id="skuNumber"
                 name="skuNumber"
