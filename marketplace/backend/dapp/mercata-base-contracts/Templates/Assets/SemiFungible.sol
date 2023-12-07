@@ -34,7 +34,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         }
     }
 
-    function splitAsset(address orderAddress, uint _units, address newOwner) public requireOwner("split asset") returns (address[] memory) {
+    function splitAsset(address orderAddress, uint _units, address newOwner) public returns (address[] memory) {
         // uint splitUnits = takeLockedUnits(orderAddress);
         require(_units <= units, "Cannot split more units than available");
         // Ensure there are enough unlocked units available for the split
@@ -103,7 +103,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
             // emit AssetSplit(address(newAsset), splitUnitsArray[i]);
     }
 
-    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
+    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public ("create sale") returns (uint) {
         // require(block.timestamp < expirationDate, "SemiFungible is expired");
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new SemiFungibleSale(address(this), _paymentTypes[i], _price, _units)));
@@ -126,7 +126,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         string _serialNumber,
         uint _price,
         uint _units
-    ) public requireOwner("update semiFungible") returns (uint) {
+    ) public ("update semiFungible") returns (uint) {
         serialNumber = _serialNumber;
         updateAsset(_name, _description, _images, _status, _price);
         if (_units != units) {
