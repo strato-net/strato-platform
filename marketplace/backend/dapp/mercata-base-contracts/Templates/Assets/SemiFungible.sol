@@ -26,9 +26,9 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
 
         status = _status;
 
-        mapping(string => string) ownerCert = getUserCert(owner);
-        ownerOrganization = ownerCert["organization"];
-        ownerCommonName = ownerCert["commonName"];
+        // mapping(string => string) ownerCert = getUserCert(owner);
+        // ownerOrganization = ownerCert["organization"];
+        // ownerCommonName = ownerCert["commonName"];
         if(_paymentTypes.length > 0) {
             createSales(_paymentTypes, _price, _units);
         }
@@ -102,8 +102,6 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         return address(newAsset);
             // emit AssetSplit(address(newAsset), splitUnitsArray[i]);
     }
-
-
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
         // require(block.timestamp < expirationDate, "SemiFungible is expired");
