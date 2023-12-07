@@ -61,7 +61,7 @@ const CreateInventoryModal = ({
     paymentTypes: [],
     category: "Art",
     size: null,
-    skuNumber: "",
+    skuNumber: null,
     condition: null
   };
 
@@ -85,6 +85,9 @@ const CreateInventoryModal = ({
     }
     return isJpgOrPng && isLt1M;
   }
+
+  console.log("values", formik.values)
+  console.log("errors", formik.errors)
 
   const handleCreateFormSubmit = async (values) => {
     const formData = new FormData();
@@ -161,7 +164,6 @@ const CreateInventoryModal = ({
       },
     });
 
-    console.log(finalBody(body))
     let isDone = await actions.createItem(
       dispatch,
       finalBody(body),
@@ -235,7 +237,6 @@ const CreateInventoryModal = ({
     }
   };
 
-  console.log("values", formik.values);
   const categoricalProperties = () => {
     switch (formik.values.category) {
       case "Art":
@@ -353,7 +354,7 @@ const CreateInventoryModal = ({
               )}
             </Form.Item>
             <Form.Item
-              label="SKU Number"
+              label="SKU"
               name="skuNumber"
             >
               <Input
@@ -363,6 +364,11 @@ const CreateInventoryModal = ({
                 placeholder="Enter SKU Number"
                 onChange={formik.handleChange}
               />
+              {formik.touched.skuNumber && formik.errors.skuNumber && (
+                <span className="text-error text-xs">
+                  {formik.errors.skuNumber}
+                </span>
+              )}
             </Form.Item>
           </div>
         );
