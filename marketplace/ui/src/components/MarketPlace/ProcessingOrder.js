@@ -80,7 +80,7 @@ const ProcessingOrder = () => {
             if (body.data["payment_status"] === "paid") {
               const customerEmail = body.data["customer_details"]["email"];
               const cart = JSON.parse(body.data.metadata.cart);
-              let object = { paymentSessionId: sessionId, paymentMethod: body.data.payment_method, ...cart };
+              let object = { paymentSessionId: sessionId, paymentMethod: body.data.payment_method_options, ...cart };
               handleOrderConfirm(object, customerEmail);
             }
           }
