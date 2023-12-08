@@ -1,17 +1,13 @@
-import "/dapp/orders/contracts/Sales/ClothingSale.sol";
+import "/dapp/orders/contracts/Sales/CollectibleSale.sol";
 
 pragma es6;
 pragma strict;
 import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 
-/// @title A representation of Clothing assets
-contract Clothing is ItemStatus, RestStatus, Asset {
+/// @title A representation of Collectible assets
+contract Collectible is ItemStatus, RestStatus, Asset {
     string public serialNumber;
-    string public clothingType; 
-    string public size; 
-    string public skuNumber; 
     string public condition;
-    string public brand;
     uint public units;
 
     event OwnershipUpdate(
@@ -29,11 +25,7 @@ contract Clothing is ItemStatus, RestStatus, Asset {
         string _description,
         string[] _images,
         uint _price,
-        string _clothingType,
-        string _size,
-        string _skuNumber,
         string _condition,
-        string _brand,
         uint _units,
         ItemStatus _status,
         PaymentType[] _paymentTypes
@@ -41,9 +33,6 @@ contract Clothing is ItemStatus, RestStatus, Asset {
 
         owner = _owner;
         serialNumber = _serialNumber;
-        clothingType = _clothingType;
-        size = _size;
-        skuNumber = _skuNumber;
         condition = _condition;
         brand = _brand;
         units = _units;
@@ -57,24 +46,20 @@ contract Clothing is ItemStatus, RestStatus, Asset {
 
     function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
         for (uint i = 0; i < whitelistedSales.length; i++) {
-            ClothingSale(whitelistedSales[i]).changeSaleQuantity(_units);
+            CollectibleSale(whitelistedSales[i]).changeSaleQuantity(_units);
         }
     }
 
     function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
         require(splitUnits < units, "Cannot split more units than available");
-        Clothing newAsset = new Clothing(serialNumber + "1", 
+        Collectible newAsset = new Collectible(serialNumber + "1", 
                                      createdDate, 
                                      newOwner, 
                                      name,
                                      description, 
                                      images, 
                                      0,
-                                     clothingType,
-                                     size,
-                                     skuNumber,
                                      condition,
-                                     brand,
                                      splitUnits, 
                                      ItemStatus.UNPUBLISHED,
                                      []);
@@ -89,29 +74,28 @@ contract Clothing is ItemStatus, RestStatus, Asset {
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("Create sale") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new ClothingSale(address(this), _paymentTypes[i], _price, _units)));
+            whitelistSale(address(new CollectibleSale(address(this), _paymentTypes[i], _price, _units)));
         }
         status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
 
     function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
-        address newSale = address(new ClothingSale(address(this), _paymentType, _price, _units));
+        address newSale = address(new CollectibleSale(address(this), _paymentType, _price, _units));
         return (RestStatus.OK, string(newSale));
     }
 
+
     // TODO: Finish the update function. 
-    function updateClothing(
+    function updateCollectible(
         string _name, 
         string _description, 
         string[] _images, 
         ItemStatus _status,
         string _serialNumber,
-        string _clothingType,
         uint _price
-    ) public requireOwner("update clothing") returns (uint) {
+    ) public requireOwner("update collectible") returns (uint) {
         serialNumber = _serialNumber;
-        clothingType = _clothingType;
         updateAsset(_name, _description, _images, _status, _price);
         return RestStatus.OK;
     }

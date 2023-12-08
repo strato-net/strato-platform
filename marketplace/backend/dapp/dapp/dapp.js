@@ -354,6 +354,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ CLOTHING ENDS--------------------------------
 
+  // ------------------------------ COLLECTIBLES STARTS------------------------------
+
+  contract.createCollectible = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: 1
+    };
+    return collectibleJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return collectibleJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ COLLECTIBLES ENDS--------------------------------
+
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
