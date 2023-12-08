@@ -66,7 +66,6 @@ const CreateInventoryModal = ({
     brand: null,
   };
 
-  
   const formik = useFormik({
     initialValues: initialValues,
     validationSchema: schema,
@@ -88,7 +87,7 @@ const CreateInventoryModal = ({
     return isJpgOrPng && isLt1M;
   }
 
-  console.log(formik.errors)
+  console.log(formik.errors);
   const handleCreateFormSubmit = async (values) => {
     const formData = new FormData();
     formData.append("fileUpload", values.images);
@@ -114,14 +113,13 @@ const CreateInventoryModal = ({
             itemArgs: {
               ...body.itemArgs,
               artist: values.artist,
-            }
-          }
-        case 'Carbon':
-          const {serialNumber, ...restArgs} = body.itemArgs;
-          return body = {
+            },
+          });
+        case "Carbon":
+          return (body = {
             itemArgs: {
-              ...restArgs,
-              // projectType: values.projectType,
+              ...body.itemArgs,
+              projectType: values.projectType,
               units: values.units,
             },
           });
@@ -134,15 +132,15 @@ const CreateInventoryModal = ({
               size: values.size,
               condition: values.condition,
               brand: values.brand,
-              units: values.units
+              units: values.units,
             },
           });
-        case "Collectibles": 
+        case "Collectibles":
           return (body = {
             itemArgs: {
               ...body.itemArgs,
               condition: values.condition,
-              units: values.units
+              units: values.units,
             },
           });
         case "Metals":
@@ -174,7 +172,6 @@ const CreateInventoryModal = ({
         event: "create_item",
       },
     });
-
 
     let isDone = await actions.createItem(
       dispatch,
@@ -242,7 +239,27 @@ const CreateInventoryModal = ({
   const updateSizeOptions = (type) => {
     switch (type) {
       case "shoes":
-        setSizeOptions([ "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", ]);
+        setSizeOptions([
+          "5",
+          "5.5",
+          "6",
+          "6.5",
+          "7",
+          "7.5",
+          "8",
+          "8.5",
+          "9",
+          "9.5",
+          "10",
+          "10.5",
+          "11",
+          "11.5",
+          "12",
+          "12.5",
+          "13",
+          "13.5",
+          "14",
+        ]);
         break;
       default:
         setSizeOptions(["XXS", "XS", "S", "M", "L", "XL", "XXL"]);
@@ -292,11 +309,7 @@ const CreateInventoryModal = ({
                   </span>
                 )}
             </Form.Item> */}
-            <Form.Item
-              label="Units"
-              name="units"
-              className="w-72"
-            >
+            <Form.Item label="Units" name="units" className="w-72">
               <Input
                 label="units"
                 placeholder="Enter Units"
@@ -336,10 +349,7 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item
-              label="Brand"
-              name="brand"
-            >
+            <Form.Item label="Brand" name="brand">
               <Input
                 id="brand"
                 name="brand"
@@ -422,44 +432,44 @@ const CreateInventoryModal = ({
             </Form.Item>
           </div>
         );
-        case "Collectibles":
-          return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <Form.Item label="Condition" name="condition">
-                <Select
-                  id="condition"
-                  name="condition"
-                  value={formik.values.condition}
-                  placeholder="Select Condition"
-                  onChange={(value) => formik.setFieldValue("condition", value)}
-                  onBlur={formik.handleBlur}
-                >
-                  <Option value="new">New</Option>
-                  <Option value="conditional">Conditional</Option>
-                  <Option value="used">Used</Option>
-                </Select>
-                {formik.touched.condition && formik.errors.condition && (
-                  <span className="text-error text-xs">
-                    {formik.errors.condition}
-                  </span>
-                )}
-              </Form.Item>
-              <Form.Item label="Units" name="units">
-                <Input
-                  id="units"
-                  name="units"
-                  value={formik.values.units}
-                  placeholder="Enter Units"
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.units && formik.errors.units && (
-                  <span className="text-error text-xs">
-                    {formik.errors.units}
-                  </span>
-                )}
-              </Form.Item>
-            </div>
-          );
+      case "Collectibles":
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <Form.Item label="Condition" name="condition">
+              <Select
+                id="condition"
+                name="condition"
+                value={formik.values.condition}
+                placeholder="Select Condition"
+                onChange={(value) => formik.setFieldValue("condition", value)}
+                onBlur={formik.handleBlur}
+              >
+                <Option value="new">New</Option>
+                <Option value="conditional">Conditional</Option>
+                <Option value="used">Used</Option>
+              </Select>
+              {formik.touched.condition && formik.errors.condition && (
+                <span className="text-error text-xs">
+                  {formik.errors.condition}
+                </span>
+              )}
+            </Form.Item>
+            <Form.Item label="Units" name="units">
+              <Input
+                id="units"
+                name="units"
+                value={formik.values.units}
+                placeholder="Enter Units"
+                onChange={formik.handleChange}
+              />
+              {formik.touched.units && formik.errors.units && (
+                <span className="text-error text-xs">
+                  {formik.errors.units}
+                </span>
+              )}
+            </Form.Item>
+          </div>
+        );
       case "Metals":
         return (
           <div className="flex justify-between mt-4 ">
@@ -694,7 +704,11 @@ const CreateInventoryModal = ({
                     )}
                 </Form.Item>
               </div>
-              <Form.Item label="Description" name="description" className="mt-4">
+              <Form.Item
+                label="Description"
+                name="description"
+                className="mt-4"
+              >
                 <TextArea
                   label="description"
                   placeholder="Enter Description"
@@ -726,10 +740,12 @@ const CreateInventoryModal = ({
                     )}
                     <Upload
                       onChange={(e) => {
-                        setSelectedImage(URL.createObjectURL(e.file.originFileObj));
+                        setSelectedImage(
+                          URL.createObjectURL(e.file.originFileObj)
+                        );
                         formik.setFieldValue("images", e.file.originFileObj);
                       }}
-                      customRequest={() => { }}
+                      customRequest={() => {}}
                       style={{ display: "none" }}
                       accept="image/png, image/jpeg"
                       maxCount={1}
@@ -764,9 +780,13 @@ const CreateInventoryModal = ({
                       label="serialNumber"
                       placeholder="Enter Serial Number"
                       name="serialNumber"
-                      value={formik.values.category === 'Carbon' ? "" : formik.values.serialNumber}
+                      value={
+                        formik.values.category === "Carbon"
+                          ? ""
+                          : formik.values.serialNumber
+                      }
                       onChange={formik.handleChange}
-                      disabled={formik.values.category === 'Carbon'}
+                      disabled={formik.values.category === "Carbon"}
                     />
                     {formik.touched.serialNumber &&
                       formik.errors.serialNumber && (
