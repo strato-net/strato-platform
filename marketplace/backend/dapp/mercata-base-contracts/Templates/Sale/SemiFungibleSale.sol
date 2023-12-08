@@ -25,11 +25,11 @@ abstract contract SemiFungibleSale is Sale{
           
     }
 
-    function lockUnits(uint unitsToLock) public {
-        SemiFungible(assetToBeSold).lockUnits(msg.sender, unitsToLock);
-    }
+    // function lockUnits(uint unitsToLock) public {
+    //     SemiFungible(assetToBeSold).lockUnits(msg.sender, unitsToLock);
+    // }
 
-    function unlockUnits() public {
-        SemiFungible(assetToBeSold).unlockUnits(msg.sender);
-    }
+    // function unlockUnits() public {
+    //     SemiFungible(assetToBeSold).unlockUnits(msg.sender);
+    // }
 }
