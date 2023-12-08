@@ -202,25 +202,6 @@ async function transferOwnership(user, contract, options, newOwner) {
     return transferStatus
 }
 
-async function updateMetals(user, contract, args, options) {
-    const callArgs = {
-      contract,
-      method: "updateMetals",
-      args: util.usc({ ...args }),
-    };
-    const updateStatus = await rest.call(user, callArgs, options);
-  
-    if (parseInt(updateStatus, 10) !== RestStatus.OK) {
-      throw new rest.RestError(
-        updateStatus,
-        "You cannot update an item you don't own",
-        { callArgs }
-      );
-    }
-  
-    return updateStatus;
-}
-
 async function getAllOwnershipEvents(admin, args = {}, options) {
     const itemOwnershipEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.OWNERSHIP_UPDATE}`, args, options, admin)
     return itemOwnershipEvents.map((item) => marshalOut(item))
@@ -235,7 +216,6 @@ export default {
     getAll,
     getAllOwnershipEvents,
     transferOwnership,
-    updateMetals,
     marshalIn,
     marshalOut,
     getHistory

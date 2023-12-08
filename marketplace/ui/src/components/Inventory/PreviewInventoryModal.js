@@ -48,7 +48,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
       case "Carbon":
         return (
           <>
-            <div>
+            {/* <div>
               <div className="flex items-center">
                 <p className="text-primaryC text-sm w-44">Project Type</p>
                 <p text-secondryB text-sm>
@@ -56,7 +56,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
                 </p>
                 <p className="text-secondryB text-sm ml-3">{itemData.projectType}</p>
               </div>
-            </div>
+            </div> */}
             <div>
               <div className="flex items-center">
                 <p className="text-primaryC text-sm w-44">Units</p>
