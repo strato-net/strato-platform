@@ -15,9 +15,8 @@ contract CarbonDAO is SemiFungible {
         string _membershipNumber,
         ItemStatus _status,
         uint _price,
-        address _owner,
         PaymentType[] _paymentTypes,   
-    ) SemiFungible(_name, _description, _images, _createdDate, _units, _membershipNumber, _status, _price, _owner, _paymentTypes) {}
+    ) SemiFungible(_name, _description, _images, _createdDate, _units, _membershipNumber, _status, _price, _paymentTypes) {}
 
     function mint(string _name,
         string _description,
@@ -27,7 +26,6 @@ contract CarbonDAO is SemiFungible {
         string _membershipNumber,
         ItemStatus _status,
         uint _price,
-        address _owner,
         PaymentType[] _paymentTypes,
         ) internal override public returns(address){
         
@@ -40,7 +38,6 @@ contract CarbonDAO is SemiFungible {
                                 _membershipNumber,
                                 _status,
                                 _price,
-                                _owner,
                                 _paymentTypes);
         return address(newAsset);
         // newAssets.push(address(newAsset));

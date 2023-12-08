@@ -1,4 +1,5 @@
 import "/dapp/orders/contracts/Sales/MembershipSale.sol";
+import "/dapp/mercata-base-contracts/Templates/Assets/SemiFungible.sol";
 
 pragma es6;
 pragma strict;

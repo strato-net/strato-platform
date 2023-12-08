@@ -1,3 +1,7 @@
+pragma es6;
+pragma strict;
+import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+
 /// @title A representation of asset sale contract
 abstract contract SemiFungibleSale is Sale{
     uint public units;

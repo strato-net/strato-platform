@@ -1,3 +1,7 @@
+pragma es6;
+pragma strict;
+import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+
 abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
     uint public units; // Number of units this asset represents
     string public serialNumber;
@@ -54,7 +58,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
                 serialNumber,
                 ItemStatus.UNPUBLISHED,
                 0,
-                newOwner,
+                owner,
                 []
             ));
             Asset(sf).whitelistSale(msg.sender);
@@ -92,7 +96,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         address _owner,
         PaymentType[] _paymentTypes) virtual internal returns(address){
         // require(block.timestamp < expirationDate, "Membershipt is expired");
-        require(spent==false, "Cannot mint for spent Memberships");
+        require(spent==false, "Cannot mint more units for spent Membership");
         SemiFungible newAsset = new SemiFungible(
                 _name,
                 _description,

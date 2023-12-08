@@ -10,6 +10,7 @@ const getSchema = () => {
     brand: yup.string(),
     projectType: yup.string(),
     units: yup.number().positive("Units must be a positive number").required("Units is required"),
+    expirationPeriodInMonths: yup.number().positive("Expiration period must be a positive number").required("Expiration period is required"),
     images: yup.mixed().optional().nullable(),
     price: yup.number().positive("Price must be a positive number").required("Price is required"),
     paymentTypes: yup.array().of(yup.number().positive("Payment type must be a positive number").required("Payment type is required.")).required("Payment types are required"),
