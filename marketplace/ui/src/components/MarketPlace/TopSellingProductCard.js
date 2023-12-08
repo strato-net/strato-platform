@@ -1,29 +1,20 @@
 import React, { useEffect, useState } from "react";
 import {
-  Card,
   Typography,
-  Image,
-  Space,
-  Button,
   Spin,
   notification,
 } from "antd";
-import { LeftArrow, RightArrow } from "../../images/SVGComponents";
-import { Cart } from "../../images/SVGComponents";
 import { actions } from "../../contexts/marketplace/actions";
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from "../../contexts/marketplace";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
-import { setCookie } from "../../helpers/cookie";
-import image_placeholder from "../../images/resources/image_placeholder.png";
+import NewTrendingCard from "./NewTrendingCard";
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 const TopSellingProductCard = () => {
   const [offset, setOffset] = useState(0);
@@ -120,133 +111,16 @@ const TopSellingProductCard = () => {
   return (
     <div>
       {contextHolder}
-      <Card className="w-full mt-14">
-        <div className="flex justify-between mb-5">
-          <Title level={3}>Recently Listed Products</Title>
-          <Space size="large">
-            <div
-              onClick={getPrevProds}
-              className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center"
-            >
-              <LeftArrow />
-            </div>
-            <div
-              onClick={getNextProds}
-              className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center"
-            >
-              <RightArrow />
-            </div>
-          </Space>
-        </div>
-        <div className="flex justify-evenly px-2" id="topSelling">
-          {isTopSellingProductsLoading ? (
+      <Title className="pt-16 md:px-10 !text-xl md:!text-4xl !text-left">Trending in All Categories</Title>
+      {isTopSellingProductsLoading ? (
             <div className="h-52 flex justify-center items-center">
               <Spin spinning={isTopSellingProductsLoading} size="large" />
             </div>
-          ) : (
-            topSellingProducts
-              .map((topSellingProduct, index) => {
-                const itemData = JSON.parse(topSellingProduct.data);
-                return (
-                  <div
-                    key={index}
-                    id="topSellingChild"
-                    className="w-[25rem] border border-tertiaryB rounded-md py-8 mx-6"
-                  >
-                    <div className="flex flex-col items-center">
-                      <Image
-                        className="cursor-pointer"
-                        src={topSellingProduct.images && topSellingProduct.images.length > 0 ? topSellingProduct.images[0] : image_placeholder}
-                        height={230}
-                        width={230}
-                        style={{ objectFit: "contain" }}
-                        preview={false}
-                        onClick={() =>
-                          navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                        }
-                      />
-                      <Text className="mt-6 text-2xl !text-primaryB font-medium text-center cursor-pointer" onClick={() =>
-                        navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
-                      }>
-                        {decodeURIComponent(topSellingProduct.name)}
-                      </Text>
-                      <Text className="mt-3 text-xl !text-primaryC font-semibold">
-                        ${topSellingProduct.price}
-                      </Text>
-                      <Text className="mt-1 text-sm !text-primaryB">
-                        {itemData.units}{itemData.units ? itemData.units > 1 ? " Tons" : " Ton" : <br/>}
-                      </Text>
-                      <div className="flex justify-evenly items-center mt-4 w-full px-3">
-                        <Button
-                          id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
-                          className="h-11 bg-primary hover:bg-primaryHover !text-white w-9/12"
-                          onClick={() => {
-                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
-                              window.location.href = loginUrl;
-                            } else {
-                              window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Buy Now (from Top Selling Product)', {
-                                  product: topSellingProduct.name,
-                                  category: topSellingProduct.category,
-                                  productId: topSellingProduct.productId
-                                })
-                              }])
-                              TagManager.dataLayer({
-                                dataLayer: {
-                                  event: 'buy_now_from_top_selling_product',
-                                  product_name: topSellingProduct.name,
-                                  category: topSellingProduct.category,
-                                  productId: topSellingProduct.productId
-                                },
-                              });
-                              if (addItemToCart(topSellingProduct)) { 
-                                navigate("/checkout") 
-                              }
-                            }
-                          }}
-                        >
-                          Buy now
-                        </Button>
-                        <div
-                          onClick={() => {
-                            if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                              setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
-                              window.location.href = loginUrl;
-                            } else {
-                              window.LOQ.push(['ready', async LO => {
-                                await LO.$internal.ready('events')
-                                LO.events.track('Add To Cart (from Top Selling Product)', {
-                                  product: topSellingProduct.name,
-                                  category: topSellingProduct.category,
-                                  productId: topSellingProduct.productId
-                                })
-                              }])
-                              TagManager.dataLayer({
-                                dataLayer: {
-                                  event: 'add_to_cart_from_top_selling_product',
-                                  product_name: topSellingProduct.name,
-                                  category: topSellingProduct.category,
-                                  productId: topSellingProduct.productId
-                                },
-                              });
-                              addItemToCart(topSellingProduct);
-                            }
-                          }}
-                          className="w-11 h-10 border border-primary rounded-md flex justify-center items-center cursor-pointer"
-                        >
-                          <Cart style={{ fill: "#181EAC" }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-              .splice(0, 3)
-          )}
-        </div>
-      </Card>
+          ) : 
+      <div className="flex gap-6 p-2 overflow-x-auto trending_cards pl-[1px] md:pl-10">
+          {topSellingProducts.map((topSellingProduct)=>{return(
+          <NewTrendingCard topSellingProduct={topSellingProduct} />)})}
+        </div>}
     </div>
   );
 };

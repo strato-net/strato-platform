@@ -1,0 +1,192 @@
+import { ProfileIcon } from '../../images/SVGComponents'
+import { ShoppingCartOutlined } from '@ant-design/icons'
+import React, { useState } from "react";
+import {
+  Typography,
+  Button,
+  notification,
+} from "antd";
+import { actions } from "../../contexts/marketplace/actions";
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from "../../contexts/marketplace";
+import { useNavigate } from "react-router-dom";
+import routes from "../../helpers/routes";
+import { useAuthenticateState } from "../../contexts/authentication";
+import TagManager from "react-gtm-module";
+import { setCookie } from "../../helpers/cookie";
+import { Images } from '../../images';
+
+const NewTrendingCard = ({topSellingProduct}) => {
+    const [quantity, setQuantity] = useState(0)
+
+    const marketplaceDispatch = useMarketplaceDispatch();
+    const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
+    let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
+    const [api, contextHolder] = notification.useNotification();
+
+  
+    const naviroute = routes.MarketplaceProductDetail.url;
+  
+    const limit = 3;
+  
+    const navigate = useNavigate();
+  
+    const openToast = (placement, isError, msg) => {
+      if (isError) {
+        api.error({
+          message: msg,
+          placement,
+          key: 1,
+        });
+      } else {
+        api.success({
+          message: msg,
+          placement,
+          key: 1,
+        });
+      }
+    };
+  
+    const addItemToCart = (product) => {
+      if (product.ownerCommonName === user?.commonName) {
+        openToast("bottom", true, "Cannot buy your own item")
+        return false;
+      }
+      let found = false;
+      for (var i = 0; i < cartList.length; i++) {
+        if (cartList[i].product.address === product.address) {
+          found = true;
+          break;
+        }
+      }
+      let items = [];
+      if (!found) {
+        items = [...cartList, { product, qty: 1 }];
+        actions.addItemToCart(marketplaceDispatch, items);
+  
+        openToast("bottom", false, "Item added to cart");
+        return true;
+      } else {
+        items = [...cartList];
+        cartList.forEach((element, index) => {
+          if (element.product.address === product.address) {
+            const itemData = JSON.parse(product.data);
+            const availableQuantity = itemData.units ? itemData.units : 1;
+            if (items[index].qty + 1 <= availableQuantity) {
+              items[index].qty += 1;
+              actions.addItemToCart(marketplaceDispatch, items);
+  
+              openToast("bottom", false, "Item updated in cart");
+              return true;
+            } else {
+              openToast(
+                "bottom",
+                true,
+                "Cannot add more than available quantity"
+              );
+              return false;
+            }
+          }
+        });
+      }
+    };
+
+    return(
+        <div className='p-3 px-4 min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max'>
+            <img 
+              onClick={() =>
+                navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+              }
+              className='md:h-[200px] md:w-[30vw] w-[200px] h-[110px]' 
+              src={topSellingProduct.images[0]} 
+            />
+            <div className='flex justify-between'>
+                <Typography 
+                  onClick={() =>
+                    navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
+                  } 
+                  className='font-semibold max-h-4 overflow-hidden cursor-pointer'
+                >
+                  {topSellingProduct?.name || "N/A"}
+                </Typography>
+                <img src={Images.Verified} alt='' />
+            </div>
+            <Typography className='font-semibold'>$2000</Typography>
+            <Typography className='#989898 opacity-40 max-h-4 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
+            <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
+                <Typography>Quantity</Typography>
+                <div className='flex gap-2 p-1 bg-white'>
+                    <Typography className='px-1 bg-[#EEEFFA]' onClick={()=>setQuantity(quantity - 1)}>-</Typography>
+                    <Typography>{quantity}</Typography>
+                    <Typography className='px-1 bg-[#EEEFFA]' onClick={()=>setQuantity(quantity + 1)}>+</Typography>
+                </div>
+            </div>
+            <div className='flex gap-4'>
+                <Button
+                    id={`${topSellingProduct.name.replace(/ /g, "_")}-buy-now`}
+                    type='primary'
+                    className='flex-1'
+                    onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
+                            window.location.href = loginUrl;
+                        } else {
+                            window.LOQ.push(['ready', async LO => {
+                                await LO.$internal.ready('events')
+                                LO.events.track('Buy Now (from Top Selling Product)', {
+                                    product: topSellingProduct.name,
+                                    category: topSellingProduct.category,
+                                    productId: topSellingProduct.productId
+                                })
+                            }])
+                            TagManager.dataLayer({
+                                dataLayer: {
+                                    event: 'buy_now_from_top_selling_product',
+                                    product_name: topSellingProduct.name,
+                                    category: topSellingProduct.category,
+                                    productId: topSellingProduct.productId
+                                },
+                            });
+                            if (addItemToCart(topSellingProduct)) {
+                                navigate("/checkout")
+                            }
+                        }
+                    }}
+                >Buy Now</Button>
+                <Button
+                    onClick={() => {
+                        if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                            setCookie("returnUrl", `/marketplace/productList/${topSellingProduct.address}`, 10);
+                            window.location.href = loginUrl;
+                        } else {
+                            window.LOQ.push(['ready', async LO => {
+                                await LO.$internal.ready('events')
+                                LO.events.track('Add To Cart (from Top Selling Product)', {
+                                    product: topSellingProduct.name,
+                                    category: topSellingProduct.category,
+                                    productId: topSellingProduct.productId
+                                })
+                            }])
+                            TagManager.dataLayer({
+                                dataLayer: {
+                                    event: 'add_to_cart_from_top_selling_product',
+                                    product_name: topSellingProduct.name,
+                                    category: topSellingProduct.category,
+                                    productId: topSellingProduct.productId
+                                },
+                            });
+                            addItemToCart(topSellingProduct);
+                        }
+                    }}
+                    type='primary'
+                >
+                    <ShoppingCartOutlined style={{ color: 'white' }} />
+                </Button>
+            </div>
+        </div>
+    )
+}
+
+export default NewTrendingCard
