@@ -21,7 +21,6 @@ import           Data.ByteString.Char8 as DBC8
 import           Data.Either (fromRight)
 import           Data.Proxy
 import           Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
 import           Network.HTTP.Conduit (responseBody)
 import           Servant.API.ContentTypes
 
@@ -56,7 +55,7 @@ getS3File keccakhash = do
     liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
     S3.GetObjectResponse { S3.gorResponse = rsp } <-
       Aws.pureAws cfg s3cfg mgr $
-        S3.getObject awss3b (decodeUtf8 $ keccak256ToByteString keccakhash)
+        S3.getObject awss3b (T.pack $ keccak256ToHex keccakhash)
     --Save the response to a file.
     liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Saving the response (file contents) to a file."
     filecontents <- runConduit $ responseBody rsp .| sinkList -- $ DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash

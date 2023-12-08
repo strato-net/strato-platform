@@ -110,10 +110,11 @@ const CreateInventoryModal = ({
             }
           }
         case 'Carbon':
+          const {serialNumber, ...restArgs} = body.itemArgs;
           return body = {
             itemArgs: {
-              ...body.itemArgs,
-              projectType: values.projectType,
+              ...restArgs,
+              // projectType: values.projectType,
               units: values.units,
             }
           }
@@ -231,7 +232,7 @@ const CreateInventoryModal = ({
       case 'Carbon':
         return (
           <div className="flex justify-between mt-4 ">
-            <Form.Item
+            {/* <Form.Item
               label="Project Type"
               name="projectType"
               className="w-72"
@@ -249,7 +250,7 @@ const CreateInventoryModal = ({
                     {formik.errors.projectType}
                   </span>
                 )}
-            </Form.Item>
+            </Form.Item> */}
             <Form.Item
               label="Units"
               name="units"
@@ -569,8 +570,9 @@ const CreateInventoryModal = ({
                       label="serialNumber"
                       placeholder="Enter Serial Number"
                       name="serialNumber"
-                      value={formik.values.serialNumber}
+                      value={formik.values.category === 'Carbon' ? "" : formik.values.serialNumber}
                       onChange={formik.handleChange}
+                      disabled={formik.values.category === 'Carbon'}
                     />
                     {formik.touched.serialNumber &&
                       formik.errors.serialNumber && (
