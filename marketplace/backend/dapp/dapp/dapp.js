@@ -13,6 +13,7 @@ import artJs from "/dapp/items/art";
 import carbonJs from "/dapp/items/carbon";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
+import collectibleJs from "dapp/items/collectibles";
 
 import saleJs from "/dapp/orders/sale";
 import saleOrderJs from "/dapp/orders/saleOrder";

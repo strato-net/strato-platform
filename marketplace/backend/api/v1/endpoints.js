@@ -89,8 +89,8 @@ export const Clothing = {
   create: '/'
 }
 
-export const Collectible = {
-  prefix: '/collectible',
+export const Collectibles = {
+  prefix: '/collectibles',
   getAll: '/',
   create: '/'
 }

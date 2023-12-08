@@ -1,10 +1,10 @@
 paths:
-  /collectible/:
+  /collectibles/:
     get:
       security:
         - bearerAuth: []
       tags:
-        - Collectible
+        - Collectibles
       summary: Retrieve collectible
       produces:
         - application/json
@@ -15,7 +15,7 @@ paths:
       security:
         - bearerAuth: []
       tags:
-        - Collectible
+        - Collectibles
       summary: Create a collectible
       produces:
         - application/json

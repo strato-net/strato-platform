@@ -1,23 +1,23 @@
 import express from "express";
-import CollectibleController from "./collectible.controller";
-import { Collectible } from "../endpoints";
+import CollectiblesController from "./collectibles.controller";
+import { Collectibles } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
 router.get(
-  Collectible.getAll,
+  Collectibles.getAll,
   authHandler.authorizeRequest(true),
   loadDapp,
-  CollectibleController.getAll
+  CollectiblesController.getAll
 );
 
 router.post(
-  Collectible.create,
+  Collectibles.create,
   authHandler.authorizeRequest(),
   loadDapp,
-  CollectibleController.create
+  CollectiblesController.create
 );
 
 export default router;

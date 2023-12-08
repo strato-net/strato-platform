@@ -6,8 +6,8 @@ import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
 
-const contractName = "Collectible";
-const contractFilename = `${util.cwd}/dapp/items/contracts/Collectible.sol`;
+const contractName = "Collectibles";
+const contractFilename = `${util.cwd}/dapp/items/contracts/Collectibles.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
 /** 
@@ -163,7 +163,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Collectible']` }, options, admin);
+    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Collectibles']` }, options, admin);
     return inventories.map((inventory) => marshalOut(inventory));
   }
   

@@ -1,11 +1,11 @@
-import "/dapp/orders/contracts/Sales/CollectibleSale.sol";
+import "/dapp/orders/contracts/Sales/CollectiblesSale.sol";
 
 pragma es6;
 pragma strict;
 import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 
 /// @title A representation of Collectible assets
-contract Collectible is ItemStatus, RestStatus, Asset {
+contract Collectibles is ItemStatus, RestStatus, Asset {
     string public serialNumber;
     string public condition;
     uint public units;
@@ -34,7 +34,6 @@ contract Collectible is ItemStatus, RestStatus, Asset {
         owner = _owner;
         serialNumber = _serialNumber;
         condition = _condition;
-        brand = _brand;
         units = _units;
 
         mapping(string => string) ownerCert = getUserCert(owner);
@@ -46,13 +45,13 @@ contract Collectible is ItemStatus, RestStatus, Asset {
 
     function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
         for (uint i = 0; i < whitelistedSales.length; i++) {
-            CollectibleSale(whitelistedSales[i]).changeSaleQuantity(_units);
+            CollectiblesSale(whitelistedSales[i]).changeSaleQuantity(_units);
         }
     }
 
     function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
         require(splitUnits < units, "Cannot split more units than available");
-        Collectible newAsset = new Collectible(serialNumber + "1", 
+        Collectibles newAsset = new Collectibles(serialNumber + "1", 
                                      createdDate, 
                                      newOwner, 
                                      name,
@@ -74,14 +73,14 @@ contract Collectible is ItemStatus, RestStatus, Asset {
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("Create sale") returns (uint) {
         for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new CollectibleSale(address(this), _paymentTypes[i], _price, _units)));
+            whitelistSale(address(new CollectiblesSale(address(this), _paymentTypes[i], _price, _units)));
         }
         status = ItemStatus.PUBLISHED;
         return RestStatus.OK;
     }
 
     function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
-        address newSale = address(new CollectibleSale(address(this), _paymentType, _price, _units));
+        address newSale = address(new CollectiblesSale(address(this), _paymentType, _price, _units));
         return (RestStatus.OK, string(newSale));
     }
 
