@@ -130,12 +130,13 @@ const UpdateInventoryModal = ({
   }, [inventoryToUpdate]);
 
   const handleUpdateFormSubmit = async (values) => {
-    if (inventoryToUpdate.inventory.status === "2" && values.status) {
+    if (inventoryToUpdate.inventory.status === 2 && values.status) {
       let body = {
         itemContract: getCategory(),
         itemAddress: inventoryToUpdate.inventory.address,
         paymentTypes: values.paymentTypes,
         price: values.price,
+        units: values.availableQuantity
       };
       if (getCategory() === "Carbon") {
           body = {

@@ -239,7 +239,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.updateInventory = async function (args, options = defaultOptions) {
-    const { itemContract, itemAddress, ...restArgs} = args;
+    const { itemContract, itemAddress, ...restArgs } = args;
     const contract = { name: itemContract, address: itemAddress };
     return inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }

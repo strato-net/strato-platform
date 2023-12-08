@@ -129,21 +129,12 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         return (RestStatus.OK, string(newSale));
     }
 
-    function updateSemiFungible(
-        string _name, 
-        string _description, 
-        string[] _images, 
+    function update(
         ItemStatus _status,
-        string _serialNumber,
-        uint _price,
-        uint _units
+        uint _price
     ) public requireOwner("update semiFungible") returns (uint) {
-        require(spent==false, "Cannot updateSemiFungible for spent Membership");
-        serialNumber = _serialNumber;
-        updateAsset(_name, _description, _images, _status, _price);
-        if (_units != units) {
-            units = _units;
-        }
+        require(spent==false, "Cannot update for spent Membership");
+        updateAsset(name, description, images, _status, _price);
         return RestStatus.OK;
     }
 
