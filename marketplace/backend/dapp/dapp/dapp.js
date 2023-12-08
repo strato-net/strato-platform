@@ -14,6 +14,7 @@ import carbonJs from "/dapp/items/carbon";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
+import collectibleJs from "dapp/items/collectibles";
 
 import saleJs from "/dapp/orders/sale";
 import saleOrderJs from "/dapp/orders/saleOrder";
@@ -345,6 +346,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
+      status: 1
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -375,6 +377,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ MEMBERSHIP ENDS--------------------------------
+
+  // ------------------------------ COLLECTIBLES STARTS------------------------------
+
+  contract.createCollectible = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: 1
+    };
+    return collectibleJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return collectibleJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ COLLECTIBLES ENDS--------------------------------
 
   // ------------------------------ SALE TEST STARTS ------------------------------
 

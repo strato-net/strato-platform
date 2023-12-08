@@ -70,6 +70,7 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
         );
       case "Clothing":
         return (
+          <>
           <div>
             <div className="flex items-center">
               <p className="text-primaryC text-sm w-44">Brand</p>
@@ -79,6 +80,25 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               <p className="text-secondryB text-sm ml-3">{itemData.brand}</p>
             </div>
           </div>
+          <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Condition</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.condition ? itemData.condition.toUpperCase() : null}
+              </p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">SKU</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.skuNumber ? itemData.skuNumber.toUpperCase() : "No SKU Available"}
+              </p>
+            </div>
+          </>
         );
       case "Metals":
         return (

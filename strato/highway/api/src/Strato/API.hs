@@ -67,8 +67,8 @@ instance MimeRender Web Keccak256 where
 instance AllCTRender '[Web] ContentTypeAndBody where
   handleAcceptH _ _ (ContentTypeAndBody h c) = Just (h,c)
 
-type HighwayGetS3File = "gets3file" :> Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
+type HighwayGetS3File = Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
 
-type HighwayPutS3File = "puts3file" :> MultipartForm Mem (MultipartData Mem) :> Put '[Web] Keccak256
+type HighwayPutS3File = MultipartForm Mem (MultipartData Mem) :> Put '[Web] Keccak256
 
 type HighwayPing      = "ping" :> Get '[JSON] Int
