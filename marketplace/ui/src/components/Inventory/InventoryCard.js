@@ -91,7 +91,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
       case 'Carbon':
         return (
           <>
-            <div className="flex mt-1.5 items-center">
+            {/* <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Project Type</p>
               <p text-secondryB text-sm>
                 :
@@ -99,7 +99,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               <p className="text-secondryB text-sm ml-3">
                 {itemData.projectType}
               </p>
-            </div>
+            </div> */}
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Units</p>
               <p text-secondryB text-sm>
@@ -157,7 +157,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
       {(itemData.spent === "False" || !itemData.spent) &&
         <Card className="w-full mt-6">
           <div className="flex" id={id}>
-            <img className="w-52 object-contain" alt="" src={inventory.images && inventory.images.length > 0 ? inventory.images[0] : image_placeholder} />
+            <img
+              className="w-52 object-contain"
+              alt=""
+              src={
+                inventory.images && inventory.images.length > 0
+                  ? inventory.images[0]
+                  : image_placeholder
+              }
+            />
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
@@ -171,7 +179,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                   }
                 </div>
                 <div className="flex items-center">
-                  <Button type="text"
+                  <Button
+                    type="text"
                     className="text-primary text-sm cursor-pointer"
                     onClick={callDetailPage}
                   >
@@ -192,13 +201,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                           <EditOutlined />
                           <p className="ml-3">Edit</p>
                         </div>
-                        <div
-                          className="flex items-center mt-2 cursor-pointer"
-                          onClick={showResellModal}
-                        >
-                          <PieChartOutlined />
-                          <p className="ml-3">Resell</p>
-                        </div>
                       </div>
                     }
                     trigger="click"
@@ -208,17 +210,17 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                 </div>
               </div>
               {categoricalProperties()}
-              {inventory.status === '2' ? <></> :
+              {inventory.status === "2" ? (
+                <></>
+              ) : (
                 <div className="flex mt-1 items-center">
                   <p className="text-primaryC text-sm w-40">Price</p>
                   <p text-secondryB text-sm>
                     :
                   </p>
-                  <p className="text-secondryB text-sm ml-3">
-                    $ {inventory.price}
-                  </p>
+                  <p className="text-secondryB text-sm ml-3">$ {inventory.price}</p>
                 </div>
-              }
+              )}
               <div className="flex mt-1 items-center">
                 <p className="text-primaryC text-sm w-40">Description</p>
                 <p text-secondryB text-sm>
@@ -228,28 +230,34 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                   {inventory.description}
                 </p>
               </div>
-              <div className="flex mt-1 items-center">
-                <p className="text-primaryC text-sm w-40">Serial Number</p>
-                <p text-secondryB text-sm>
-                  :
-                </p>
-                <p className="text-secondryB text-sm ml-3">
-                  {itemData.serialNumber ? itemData.serialNumber : "No Serial Number Available"}
-                </p>
-              </div>
-              {inventory.status === '2' ?
-                (<div className="flex mt-2.5">
+              {getCategory() === "Carbon" ? (
+                <></>
+              ) : (
+                <div className="flex mt-1 items-center">
+                  <p className="text-primaryC text-sm w-40">Serial Number</p>
+                  <p text-secondryB text-sm>
+                    :
+                  </p>
+                  <p className="text-secondryB text-sm ml-3">
+                    {itemData.serialNumber
+                      ? itemData.serialNumber
+                      : "No Serial Number Available"}
+                  </p>
+                </div>
+              )}
+              {inventory.status === "2" ? (
+                <div className="flex mt-2.5">
                   <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">
                     <p>UNPUBLISHED</p>
                   </div>
-                </div>)
-                :
-                (<div className="flex mt-2.5">
+                </div>
+              ) : (
+                <div className="flex mt-2.5">
                   <div className="text-primary bg-[#EBF7FF] text-center py-1 rounded w-28 text-sm">
                     <p>PUBLISHED</p>
                   </div>
-                </div>)
-              }
+                </div>
+              )}
             </div>
           </div>
           {open && (
@@ -261,7 +269,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             />
           )}
           {openEdit && (
-            <AddEventModal open={openEdit} handleCancel={handleCancelEdit} inventoryId={inventory.address} productId={inventory.productId} />
+            <AddEventModal
+              open={openEdit}
+              handleCancel={handleCancelEdit}
+              inventoryId={inventory.address}
+              productId={inventory.productId}
+            />
           )}
           {editModalOpen && (
             <UpdateInventoryModal
@@ -285,6 +298,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
       }
     </div>
   );
-};
+
+}
 
 export default InventoryCard;
