@@ -38,7 +38,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
 
     function splitAsset(address orderAddress, uint _units, address newOwner) public requireOwner("split asset") returns (address[] memory) {
         // uint splitUnits = takeLockedUnits(orderAddress);
-        require(spent==false, "Cannot split more units for spent Membership);
+        require(spent==false, "Cannot split more units for spent Membership");
         require(_units <= units, "Cannot split more units than available");
         // Ensure there are enough unlocked units available for the split
         // require(_units <= lockedUnits[orderAddress], "Not enough unlocked units to split");
@@ -96,7 +96,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         address _owner,
         PaymentType[] _paymentTypes) virtual internal returns(address){
         // require(block.timestamp < expirationDate, "Membershipt is expired");
-        require(spent==false, "Cannot split more units for spent Membership);
+        require(spent==false, "Cannot mint more units for spent Membership");
         SemiFungible newAsset = new SemiFungible(
                 _name,
                 _description,
@@ -115,7 +115,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
 
     function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("create sale") returns (uint) {
         // require(block.timestamp < expirationDate, "SemiFungible is expired");
-        require(spent==false, "Cannot split more units for spent Membership);
+        require(spent==false, "Cannot createSales for spent Membership");
         for (uint i = 0; i < _paymentTypes.length; i++) {
             whitelistSale(address(new SemiFungibleSale(address(this), _paymentTypes[i], _price, _units)));
         }
@@ -138,6 +138,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
         uint _price,
         uint _units
     ) public requireOwner("update semiFungible") returns (uint) {
+        require(spent==false, "Cannot updateSemiFungible for spent Membership");
         serialNumber = _serialNumber;
         updateAsset(_name, _description, _images, _status, _price);
         if (_units != units) {
