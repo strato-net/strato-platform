@@ -31,4 +31,5 @@ export const Images = {
   'Art-category': require("./resources/categories/Art_category.png") , 
   'Clothing-category': require("./resources/categories/Clothing_category.png") ,
   'Material-category': require("./resources/categories/Material_category.png") ,
+  'Verified': require("./resources/topSelling/verifiedIcon.png")
 };
