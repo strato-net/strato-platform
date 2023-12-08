@@ -1,16 +1,9 @@
-import { ProfileIcon } from '../../images/SVGComponents'
 import { ShoppingCartOutlined } from '@ant-design/icons'
 import React, { useState } from "react";
 import {
   Typography,
   Button,
-  notification,
 } from "antd";
-import { actions } from "../../contexts/marketplace/actions";
-import {
-  useMarketplaceDispatch,
-  useMarketplaceState,
-} from "../../contexts/marketplace";
 import { useNavigate } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -18,80 +11,13 @@ import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import { Images } from '../../images';
 
-const NewTrendingCard = ({topSellingProduct}) => {
+const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
     const [quantity, setQuantity] = useState(0)
 
-    const marketplaceDispatch = useMarketplaceDispatch();
-    const { topSellingProducts, isTopSellingProductsLoading, cartList } = useMarketplaceState();
     let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-    const [api, contextHolder] = notification.useNotification();
 
-  
-    const naviroute = routes.MarketplaceProductDetail.url;
-  
-    const limit = 3;
-  
+    const naviroute = routes.MarketplaceProductDetail.url;  
     const navigate = useNavigate();
-  
-    const openToast = (placement, isError, msg) => {
-      if (isError) {
-        api.error({
-          message: msg,
-          placement,
-          key: 1,
-        });
-      } else {
-        api.success({
-          message: msg,
-          placement,
-          key: 1,
-        });
-      }
-    };
-  
-    const addItemToCart = (product) => {
-      if (product.ownerCommonName === user?.commonName) {
-        openToast("bottom", true, "Cannot buy your own item")
-        return false;
-      }
-      let found = false;
-      for (var i = 0; i < cartList.length; i++) {
-        if (cartList[i].product.address === product.address) {
-          found = true;
-          break;
-        }
-      }
-      let items = [];
-      if (!found) {
-        items = [...cartList, { product, qty: 1 }];
-        actions.addItemToCart(marketplaceDispatch, items);
-  
-        openToast("bottom", false, "Item added to cart");
-        return true;
-      } else {
-        items = [...cartList];
-        cartList.forEach((element, index) => {
-          if (element.product.address === product.address) {
-            const itemData = JSON.parse(product.data);
-            const availableQuantity = itemData.units ? itemData.units : 1;
-            if (items[index].qty + 1 <= availableQuantity) {
-              items[index].qty += 1;
-              actions.addItemToCart(marketplaceDispatch, items);
-  
-              openToast("bottom", false, "Item updated in cart");
-              return true;
-            } else {
-              openToast(
-                "bottom",
-                true,
-                "Cannot add more than available quantity"
-              );
-              return false;
-            }
-          }
-        });
-      }
-    };
 
     return(
         <div className='p-3 px-4 min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max'>

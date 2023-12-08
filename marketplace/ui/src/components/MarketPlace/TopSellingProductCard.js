@@ -36,16 +36,6 @@ const TopSellingProductCard = () => {
 
   const limit = 3;
 
-  const getPrevProds = () => {
-    if (offset > 0) setOffset(offset - limit);
-  };
-
-  const getNextProds = () => {
-    if (offset !== 9) {
-      setOffset(offset + limit);
-    }
-  };
-
   const navigate = useNavigate();
 
   const openToast = (placement, isError, msg) => {
@@ -119,7 +109,10 @@ const TopSellingProductCard = () => {
           ) : 
       <div className="flex gap-6 p-2 overflow-x-auto trending_cards pl-[1px] md:pl-10">
           {topSellingProducts.map((topSellingProduct)=>{return(
-          <NewTrendingCard topSellingProduct={topSellingProduct} />)})}
+          <NewTrendingCard 
+            topSellingProduct={topSellingProduct} 
+            addItemToCart={addItemToCart}
+          />)})}
         </div>}
     </div>
   );
