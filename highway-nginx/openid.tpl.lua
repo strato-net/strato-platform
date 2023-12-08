@@ -23,8 +23,8 @@ end
 
 local node_host_with_protocol = string.format("<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>://%s/", ngx.var.http_host)
 
-local verify_res = ''
-local verify_err = ''
+local unique_name = ''
+local user_access_token = ''
 
 local verify_opts = {
   discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
@@ -33,9 +33,28 @@ local verify_opts = {
   accept_unsupported_alg = false
 }
 
+local authenticate_opts = {
+  redirect_uri = "/auth/openidc/return",
+  discovery = "<OAUTH_DISCOVERY_URL_PLACEHOLDER>",
+  client_id = "<CLIENT_ID_PLACEHOLDER>",
+  client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
+  scope = "<OAUTH_SCOPE_PLACEHOLDER>",
+  token_endpoint_auth_method = "client_secret_post",
+  ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
+  redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
+  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
+  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
+  renew_access_token_on_expiry = true,
+  access_token_expires_in = 300,
+  logout_path = "/auth/logout",
+  post_logout_redirect_uri = node_host_with_protocol,
+  -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
+  revoke_tokens_on_logout = true
+}
+
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
 if ngx.req.get_headers()["Authorization"] then
-  verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
+  local verify_res, verify_err = openidc.bearer_jwt_verify(verify_opts)
 
   if verify_err or not verify_res then
     ngx.status = 403
@@ -43,11 +62,42 @@ if ngx.req.get_headers()["Authorization"] then
     ngx.exit(ngx.HTTP_FORBIDDEN)
   end
 
+  -- Token from Authorization header is verified at this point - can blindly get raw token from header by dropping "Bearer " prefix
+  local header = ngx.req.get_headers()["Authorization"]
+  local divider = header:find(' ')
+  user_access_token = header:sub(divider + 1)
 else
-  ngx.status = 401
-  ngx.say("No Authorization header is provided with the request.")
-  ngx.exit(ngx.HTTP_UNAUTHORIZED)
+  -- Else - use the openidc authenticate flow
+
+  local authenticate_res, authenticate_err
+  -- if requested_uri is the UI page (like SMD) or the API call
+  if ngx.var.is_ui == "true" then
+    -- authenticate with full flow - authenticate() handles authorization, all OAuth2 redirects, sessions, logout flow;
+    -- processes the OAuth2 sign-in and token exchange redirects until the request is completely authorized, or there is an error
+    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts)
+  else
+    -- only validate the session, do not redirect, respond with 401 if not authorized (if API called by UI client (e.g. SMD) - client should refresh page)
+    authenticate_res, authenticate_err = openidc.authenticate(authenticate_opts, nil, "pass")
+    if (authenticate_res == authenticate_err and authenticate_res == nil and ngx.var.allow_optional_anon_access ~= "true") then
+      ngx.header['WWW-Authenticate'] = string.format('realm="%s"', node_host_with_protocol)
+      ngx.exit(ngx.HTTP_UNAUTHORIZED)
+    end
+  end
+
+  -- in case if authentication failed (case unhandled - server error)
+  if (authenticate_err) then
+    ngx.status = 500
+    ngx.say(authenticate_err)
+    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+
+  if authenticate_res ~= nil and authenticate_res.access_token then
+    user_access_token = authenticate_res.access_token
+  end
 end
 
+if user_access_token ~= '' then
+  ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
+end
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT permissioning)
 ngx.req.clear_header("Authorization")

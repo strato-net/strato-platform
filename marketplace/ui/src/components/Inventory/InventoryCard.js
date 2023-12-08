@@ -108,7 +108,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
       case "Carbon":
         return (
           <>
-            <div className="flex mt-1.5 items-center">
+            {/* <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Project Type</p>
               <p text-secondryB text-sm>
                 :
@@ -116,7 +116,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               <p className="text-secondryB text-sm ml-3">
                 {itemData.projectType}
               </p>
-            </div>
+            </div> */}
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Units</p>
               <p text-secondryB text-sm>
@@ -243,13 +243,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
                       <EditOutlined />
                       <p className="ml-3">Edit</p>
                     </div>
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showResellModal}
-                    >
-                      <PieChartOutlined />
-                      <p className="ml-3">Resell</p>
-                    </div>
                   </div>
                 }
                 trigger="click"
@@ -279,6 +272,21 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               {inventory.description}
             </p>
           </div>
+          {getCategory() === "Carbon" ? (
+            <></>
+          ) : (
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Serial Number</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.serialNumber
+                  ? itemData.serialNumber
+                  : "No Serial Number Available"}
+              </p>
+            </div>
+          )}
           {inventory.status === "2" ? (
             <div className="flex mt-2.5">
               <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">

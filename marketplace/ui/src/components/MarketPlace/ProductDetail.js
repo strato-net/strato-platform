@@ -444,11 +444,11 @@ const ProductDetails = ({ user, users }) => {
       case "Carbon":
         return (
           <Space direction="vertical">
-            <Space>
+            {/* <Space>
               <DescTitle text="Project Type" />
               <DescTitle text="                      :" />
               <Text className="text-[13px]">{itemData?.projectType}</Text>
-            </Space>
+            </Space> */}
             <Space>
               <DescTitle text="Units" />
               <DescTitle text="                      :" />

@@ -107,7 +107,6 @@ const CreateInventoryModal = ({
       },
     };
 
-    console.log("body- 1:", body)
     const finalBody = (body) => {
       switch (values.category) {
         case "Art":
@@ -115,13 +114,14 @@ const CreateInventoryModal = ({
             itemArgs: {
               ...body.itemArgs,
               artist: values.artist,
-            },
-          });
-        case "Carbon":
-          return (body = {
+            }
+          }
+        case 'Carbon':
+          const {serialNumber, ...restArgs} = body.itemArgs;
+          return body = {
             itemArgs: {
-              ...body.itemArgs,
-              projectType: values.projectType,
+              ...restArgs,
+              // projectType: values.projectType,
               units: values.units,
             },
           });
@@ -175,7 +175,6 @@ const CreateInventoryModal = ({
       },
     });
 
-    console.log("body", body, "final", finalBody(body))
 
     let isDone = await actions.createItem(
       dispatch,
@@ -274,7 +273,11 @@ const CreateInventoryModal = ({
       case "Carbon":
         return (
           <div className="flex justify-between mt-4 ">
-            <Form.Item label="Project Type" name="projectType" className="w-72">
+            {/* <Form.Item
+              label="Project Type"
+              name="projectType"
+              className="w-72"
+            >
               <Input
                 label="projectType"
                 placeholder="Enter Project Type"
@@ -282,13 +285,18 @@ const CreateInventoryModal = ({
                 value={formik.values.projectType}
                 onChange={formik.handleChange}
               />
-              {formik.touched.projectType && formik.errors.projectType && (
-                <span className="text-error text-xs">
-                  {formik.errors.projectType}
-                </span>
-              )}
-            </Form.Item>
-            <Form.Item label="Units" name="units" className="w-72">
+              {formik.touched.projectType &&
+                formik.errors.projectType && (
+                  <span className="text-error text-xs">
+                    {formik.errors.projectType}
+                  </span>
+                )}
+            </Form.Item> */}
+            <Form.Item
+              label="Units"
+              name="units"
+              className="w-72"
+            >
               <Input
                 label="units"
                 placeholder="Enter Units"
@@ -685,6 +693,89 @@ const CreateInventoryModal = ({
                       </span>
                     )}
                 </Form.Item>
+              </div>
+              <Form.Item label="Description" name="description" className="mt-4">
+                <TextArea
+                  label="description"
+                  placeholder="Enter Description"
+                  name="description"
+                  value={formik.values.description}
+                  onChange={formik.handleChange}
+                />
+                {formik.touched.description && formik.errors.description && (
+                  <span className="text-error text-xs">
+                    {formik.errors.description}
+                  </span>
+                )}
+              </Form.Item>
+
+              <div className="mt-4 flex justify-between">
+                <Form.Item label="Upload Images" name="images">
+                  <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
+                    {selectedImage ? (
+                      <div className="h-20">
+                        <img
+                          alt="Item"
+                          src={selectedImage}
+                          style={{ width: "100%", height: "100%" }}
+                        />
+                        <br />
+                      </div>
+                    ) : (
+                      <PictureOutlined className="text-7xl text-primary opacity-10" />
+                    )}
+                    <Upload
+                      onChange={(e) => {
+                        setSelectedImage(URL.createObjectURL(e.file.originFileObj));
+                        formik.setFieldValue("images", e.file.originFileObj);
+                      }}
+                      customRequest={() => { }}
+                      style={{ display: "none" }}
+                      accept="image/png, image/jpeg"
+                      maxCount={1}
+                      showUploadList={false}
+                      beforeUpload={beforeUpload}
+                    >
+                      <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                        Browse
+                      </div>
+                    </Upload>
+                  </div>
+
+                  <div className="flex items-start">
+                    <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                    <p className="mt-1 text-xs italic ml-1 mr-4">
+                      use jpg, png format of size less than 1mb
+                    </p>
+                  </div>
+                  {formik.touched.images && formik.errors.images && (
+                    <span className="text-error text-xs">
+                      {formik.errors.images}
+                    </span>
+                  )}
+                </Form.Item>
+                <div className="flex flex-col">
+                  <Form.Item
+                    label="Serial Number"
+                    name="serialNumber"
+                    className="w-72"
+                  >
+                    <Input
+                      label="serialNumber"
+                      placeholder="Enter Serial Number"
+                      name="serialNumber"
+                      value={formik.values.category === 'Carbon' ? "" : formik.values.serialNumber}
+                      onChange={formik.handleChange}
+                      disabled={formik.values.category === 'Carbon'}
+                    />
+                    {formik.touched.serialNumber &&
+                      formik.errors.serialNumber && (
+                        <span className="text-error text-xs">
+                          {formik.errors.serialNumber}
+                        </span>
+                      )}
+                  </Form.Item>
+                </div>
               </div>
             </div>
           </div>
