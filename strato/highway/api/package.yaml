@@ -30,3 +30,4 @@ library:
   - servant-multipart
   - servant-server
   - strato-model
+  - text

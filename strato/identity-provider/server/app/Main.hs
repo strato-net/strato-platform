@@ -56,4 +56,4 @@ main = do
         if null flags_SENDGRID_APIKEY
           then Nothing
           else Just (SendgridAPIKey (C8.pack flags_SENDGRID_APIKEY))
-  run p $ identityProviderApp vp iss crt privk realmData mEmailK
+  run p $ identityProviderApp vp iss crt privk realmData mEmailK flags_userRegistryAddress

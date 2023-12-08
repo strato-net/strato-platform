@@ -26,6 +26,7 @@ import Bloc.Client
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
+import Blockchain.Strato.Model.Address (stringAddress)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.Vault
@@ -35,6 +36,7 @@ import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
 import Data.List (elemIndex)
 import qualified Data.Map as M
+import Data.Maybe (fromJust)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -140,7 +142,8 @@ data IdentityServerData = IdentityServerData
     issuerCert :: X509Certificate, -- the signing cert
     issuerPrivKey :: PrivateKey, -- the signing private key
     realmNameToDetails :: RealmData,
-    sendgridAPIKey :: Maybe SendgridAPIKey
+    sendgridAPIKey :: Maybe SendgridAPIKey,
+    userRegistryAddress :: Address
   }
 
 instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
@@ -157,6 +160,9 @@ instance Monad m => Accessible RealmData (ReaderT IdentityServerData m) where
 
 instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
   access _ = asks sendgridAPIKey
+
+instance Monad m => Accessible Address (ReaderT IdentityServerData m) where
+  access _ = asks userRegistryAddress
 
 instance Monad m => Accessible VaultData (VaultM m) where
   access _ = ask
@@ -175,7 +181,8 @@ putIdentity ::
     Accessible X509Certificate m,
     Accessible PrivateKey m,
     Accessible RealmData m,
-    Accessible (Maybe SendgridAPIKey) m
+    Accessible (Maybe SendgridAPIKey) m,
+    Accessible Address m
   ) =>
   Text ->
   Text ->
@@ -208,14 +215,14 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
     Just (AddressAndKey a k) -> do
       -- has vault key, confirm also has cert
       hasCert <- do
-        hasCert' <- certInCirrus accessToken realm a name' org
+        hasCert' <- certInCirrus accessToken realm a org
         -- We don't want to check for a cert using the default
         -- org name if the provided org name is different
         if hasOrgName
           then pure hasCert'
           else if hasCert'
             then pure hasCert'
-            else certInCirrus accessToken realm a name' orgOld
+            else certInCirrus accessToken realm a orgOld
       unless hasCert $ createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realm k
       return a
     Nothing -> do
@@ -238,7 +245,8 @@ putIdentityExternal ::
     Accessible X509Certificate m,
     Accessible PrivateKey m,
     Accessible RealmData m,
-    Accessible (Maybe SendgridAPIKey) m
+    Accessible (Maybe SendgridAPIKey) m,
+    Accessible Address m
   ) =>
   Text ->
   m Address
@@ -264,9 +272,8 @@ certInCirrus ::
   String ->
   Address ->
   String ->
-  String ->
   m Bool
-certInCirrus token realm a name co = do
+certInCirrus token realm a co = do
   rd <- access (Proxy @RealmData)
   case M.lookup realm rd of
     Nothing -> do
@@ -286,14 +293,14 @@ certInCirrus token realm a name co = do
           $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
           throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
   where
-    cirrusSearchPath :: Address -> String -> String -> String
-    cirrusSearchPath address commonName org =
+    cirrusSearchPath :: Address -> String -> String
+    cirrusSearchPath address org =
       let orgParam = ",organization.eq." <> org
-       in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> orgParam <> ")"
+       in "/cirrus/search/Certificate?and=(userAddress.eq." <> show address <> orgParam <> ")"
 
     callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
-      let cirrusEndpoint = cirrusSearchPath a name co
+      let cirrusEndpoint = cirrusSearchPath a co
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
@@ -309,7 +316,8 @@ createAndRegisterCert ::
     Accessible X509Certificate m,
     Accessible PrivateKey m,
     Accessible RealmData m,
-    Accessible (Maybe SendgridAPIKey) m
+    Accessible (Maybe SendgridAPIKey) m,
+    Accessible Address m
   ) =>
   String ->
   Maybe String ->
@@ -327,7 +335,7 @@ createAndRegisterCert name mEmail org uuid realm k = do
           $logErrorS "createAndRegisterCert" "uh oh! We couldn't retrieve an access token for our realm"
           throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
         Just realmToken -> do
-          registerCert newCert realmToken realm
+          registerCert newCert realmToken realm name
           mEmailK <- access (Proxy @(Maybe SendgridAPIKey))
           case (mEmail, mEmailK) of
             (Just email, Just emailK) -> sendWelcomeEmail email name uuid emailK
@@ -352,13 +360,15 @@ createNewCert sub = do
   makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i sub
 
 registerCert ::
-  (MonadIO m, MonadLogger m, Accessible RealmData m) =>
+  (MonadIO m, MonadLogger m, Accessible RealmData m, Accessible Address m) =>
   X509Certificate ->
   AccessToken ->
   String ->
+  String ->
   m ()
-registerCert cert token realm = do
+registerCert cert token realm commonName = do
   rd <- access (Proxy @RealmData)
+  userRegAddr <- access (Proxy @Address)
   case M.lookup realm rd of
     Nothing -> do
       $logErrorS "registerCert" "Trying to register cert for realm we don't support. Error should have been thrown MUCH sooner"
@@ -379,7 +389,20 @@ registerCert cert token realm = do
                   functionpayloadChainid = Nothing,
                   functionpayloadMetadata = Nothing
                 }
-          txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
+          txPayload' =
+            BlocFunction
+              FunctionPayload
+                { functionpayloadContractAddress = userRegAddr,
+                  functionpayloadMethod = "createUser",
+                  functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
+                  functionpayloadValue = Nothing,
+                  functionpayloadTxParams = Nothing,
+                  functionpayloadChainid = Nothing,
+                  functionpayloadMetadata = Nothing
+                }
+          txPayloads = [txPayload, txPayload']
+          txRequest = PostBlocTransactionRequest Nothing txPayloads Nothing Nothing
+          -- txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
           postBlocTx = runClientM (postBlocTransactionExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True txRequest)
       eresponse <- liftIO $ postBlocTx clientEnv
       case eresponse of
@@ -435,7 +458,8 @@ server ::
     Accessible X509Certificate m,
     Accessible PrivateKey m,
     Accessible RealmData m,
-    Accessible (Maybe SendgridAPIKey) m
+    Accessible (Maybe SendgridAPIKey) m,
+    Accessible Address m
   ) =>
   ServerT IDAPI.IdentityProviderAPI m
 server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
@@ -447,8 +471,10 @@ hoistCoreServer ::
   PrivateKey ->
   RealmData ->
   Maybe SendgridAPIKey ->
+  String ->
   Server IDAPI.IdentityProviderAPI
-hoistCoreServer vaulturl iss cert privk rd mEmailK = hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
+hoistCoreServer vaulturl iss cert privk rd mEmailK userRegAddr = 
+  hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     convertErrors r x = Handler $ do
       eRes <- liftIO . try $ r x
@@ -456,7 +482,7 @@ hoistCoreServer vaulturl iss cert privk rd mEmailK = hoistServer (Proxy :: Proxy
         Right a -> return a
         Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd mEmailK x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd mEmailK userRegAddr x
     reThrowError :: IdentityError -> ServerError
     reThrowError =
       \case
@@ -468,9 +494,10 @@ runIdentityM ::
   PrivateKey ->
   RealmData ->
   Maybe SendgridAPIKey ->
+  String ->
   ReaderT IdentityServerData m a ->
   m a
-runIdentityM iss cert privk rd mEmailK x = runReaderT x $ IdentityServerData iss cert privk rd mEmailK
+runIdentityM iss cert privk rd mEmailK userRegAddr x = runReaderT x $ IdentityServerData iss cert privk rd mEmailK (fromJust $ stringAddress userRegAddr)
 
 identityProviderApp ::
   String ->
@@ -479,5 +506,7 @@ identityProviderApp ::
   PrivateKey ->
   RealmData ->
   Maybe SendgridAPIKey ->
+  String ->
   Application
-identityProviderApp vurl iss cert pk rd mEmailK = serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd mEmailK
+identityProviderApp vurl iss cert pk rd mEmailK userRegAddr = 
+  serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd mEmailK userRegAddr

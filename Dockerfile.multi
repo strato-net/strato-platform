@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 as deploy
+FROM ubuntu:22.04 as base
 
 RUN apt-get -y update && apt-get install -y \
       autoconf \
@@ -35,11 +35,31 @@ ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
     LC_ALL="en_US.UTF-8"
 
-
-FROM deploy as built
-COPY ./usr/local/bin /usr/local/bin
-
-FROM built as strato
+FROM base as strato
+COPY \
+  ./usr/local/bin/blockapps-vault-proxy-server \
+  ./usr/local/bin/ethereum-discover \
+  ./usr/local/bin/ethereum-jsonrpc \
+  ./usr/local/bin/forced-config-change \
+  ./usr/local/bin/ghc-debug \
+  ./usr/local/bin/global-db \
+  ./usr/local/bin/init-worker \
+  ./usr/local/bin/logserver \
+  ./usr/local/bin/post-raw-transaction \
+  ./usr/local/bin/queryStrato \
+  ./usr/local/bin/slipstream \
+  ./usr/local/bin/strato-api \
+  ./usr/local/bin/strato-api-indexer \
+  ./usr/local/bin/strato-p2p \
+  ./usr/local/bin/strato-p2p-indexer \
+  ./usr/local/bin/strato-sequencer \
+  ./usr/local/bin/strato-setup \
+  ./usr/local/bin/strato-txr-indexer \
+  ./usr/local/bin/tabula-rasa \
+  ./usr/local/bin/vm-runner \
+  ./usr/local/bin/x509-generator \
+  ./usr/local/bin/x509-keygen \
+    /usr/local/bin/
 COPY ./strato /strato
 EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
@@ -47,21 +67,28 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
 WORKDIR /var/lib/strato
 ENTRYPOINT ["/strato/doit.sh"]
 
-FROM built as highway-wrapper
+FROM base as highway-wrapper
+COPY usr/local/bin/blockapps-highway-wrapper-server /usr/local/bin/
 COPY ./highway-wrapper /highway-wrapper
 EXPOSE 8080
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl --silent --output /dev/null --fail localhost:8080/highway/ping || exit 1
 ENTRYPOINT ["/highway-wrapper/doit.sh"]
 
-FROM built as vault-wrapper
+
+FROM base as vault-wrapper
+COPY usr/local/bin/blockapps-vault-wrapper-server /usr/local/bin/
 COPY ./vault-wrapper /vault-wrapper
 EXPOSE 8000
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl --silent --output /dev/null --fail localhost:8000/strato/v2.3/_ping || exit 1
 ENTRYPOINT ["/vault-wrapper/doit.sh"]
 
-FROM built as identity-provider
+FROM base as identity-provider
+COPY \
+  usr/local/bin/identity-provider-server \
+  usr/local/bin/blockapps-vault-proxy-server \
+    /usr/local/bin/
 RUN apt-get -y update \
   && apt-get install -y wget \
   && apt-get autoremove \

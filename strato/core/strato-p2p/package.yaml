@@ -24,7 +24,6 @@ executables:
       - ordered-containers
       - strato-model
       - strato-p2p
-      - unagi-chan
       - wai-middleware-prometheus
       - warp
       
@@ -42,6 +41,7 @@ library:
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
+    - broadcast-chan
     - bytestring
     - composable-monads-base
     - conduit
@@ -94,7 +94,6 @@ library:
     - thread-hierarchy
     - time
     - transformers
-    - unagi-chan
     - unliftio-core
     - unliftio 
     - warp
