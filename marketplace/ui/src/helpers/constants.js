@@ -106,3 +106,5 @@ export const PAYMENT_TYPE = [
   { name: "Card", value: 1, icon: <CARD width="20px" height="14px"/> },
   { name: "STRAT", value: 2 },
 ]
+
+export const PAYMENT_RECEIVED = 'card';

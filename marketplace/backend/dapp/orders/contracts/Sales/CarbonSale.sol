@@ -1,6 +1,6 @@
 pragma es6;
 pragma strict;
-import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+import <23b42b72d97bb074316c5db4fdae6165346742f5>;
 
 /// @title A representation of asset sale contract
 contract CarbonSale is Sale{

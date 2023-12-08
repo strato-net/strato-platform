@@ -19,12 +19,8 @@ contract ItemStatus{
 contract PaymentType {
 enum PaymentType{
         NONE,
-        AMEX,
-        Discover,
-        Mastercard,
-        STRAT,
-        VISA,
-        MAX
+        CARD,
+        STRAT
     }
 }
 

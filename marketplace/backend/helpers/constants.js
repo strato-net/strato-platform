@@ -81,11 +81,8 @@ export const ITEM_STATUS = {
 }
 
 export const PAYMENT_TYPES = {
-  "amex": "1",
-  "discover": "2",
-  "mastercard": "3",
-  "strat": "4",
-  "visa": "5",
+  "card": "1",
+  "strat": "2",
 }
 
 export const SERVICE_PROVIDERS = {}
