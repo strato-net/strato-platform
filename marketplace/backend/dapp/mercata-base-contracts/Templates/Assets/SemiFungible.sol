@@ -58,7 +58,7 @@ abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
                 serialNumber,
                 ItemStatus.UNPUBLISHED,
                 0,
-                newOwner,
+                msg.sender,
                 []
             ));
             Asset(sf).whitelistSale(msg.sender);
