@@ -18,11 +18,15 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         string _serialNumber,
         ItemStatus _status,
         uint _price,
+        address _owner,
         PaymentType[] _paymentTypes,
         uint _expirationPeriodInMonths
-    ) SemiFungible(_name, _description, _images, _createdDate, _units, _serialNumber, _status, _price, _paymentTypes) {
+    ) SemiFungible(_name, _description, _images, _createdDate, _units, _serialNumber, _status, _price, _owner,_paymentTypes) {
         expirationPeriodInMonths = _expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
+        if(_paymentTypes.length > 0) {
+            createSales(_paymentTypes, _price, _units);
+        }
     }
 
     function mint(string _name,
@@ -33,6 +37,7 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
         string _serialNumber,
         ItemStatus _status,
         uint _price,
+        address _owner,
         PaymentType[] _paymentTypes) internal override returns(address){
         require(block.timestamp < expirationDate, "Membership is expired");
         Membership newAsset = new Membership(
@@ -44,10 +49,26 @@ contract Membership is ItemStatus, PaymentType, SemiFungible {
                 _serialNumber,
                 _status,
                 _price,
+                _owner,
                 _paymentTypes,
                 expirationPeriodInMonths
                     );
         return address(newAsset);
             // emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+    }
+
+    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public override requireOwner("create sale") returns (uint) {
+        // require(block.timestamp < expirationDate, "SemiFungible is expired");
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            whitelistSale(address(new MembershipSale(address(this), _paymentTypes[i], _price, _units)));
+        }
+        status = ItemStatus.PUBLISHED;
+        return RestStatus.OK;
+    }
+
+    function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public override returns (uint, string) {
+        // require(block.timestamp < expirationDate, "SemiFungible is expired");
+        address newSale = address(new MembershipSale(address(this), _paymentType, _price, _units));
+        return (RestStatus.OK, string(newSale));
     }
 }
