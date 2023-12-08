@@ -139,10 +139,10 @@ if ngx.req.get_headers()["Authorization"] then
     unique_name = verify_res['sub']
   end
 
-  if verify_res['name'] then
-    common_name = verify_res['name']
-  elseif verify_res['preferred_username'] then
+  if verify_res['preferred_username'] then
     common_name = verify_res['preferred_username']
+  elseif verify_res['name'] then
+    common_name = verify_res['name']
   end
 
   if verify_res['email'] then

@@ -25,6 +25,7 @@ dependencies:
 - common-log
 - conduit
 - conduit-extra
+- http-client-tls
 - http-conduit
 - monad-logger
 - servant

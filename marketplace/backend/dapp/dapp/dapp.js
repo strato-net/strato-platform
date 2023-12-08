@@ -237,10 +237,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
   }
 
-  contract.updateItem = async function (args, options = defaultOptions) {
+  contract.updateInventory = async function (args, options = defaultOptions) {
     const { itemContract, itemAddress, ...restArgs} = args;
     const contract = { name: itemContract, address: itemAddress };
-    return inventoryJs.updateItem(rawAdmin, contract, restArgs, options);
+    return inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }
 
   // ------------------------------ INVENTORY ENDS--------------------------------
