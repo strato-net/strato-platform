@@ -29,7 +29,7 @@ contract CarbonDAO is SemiFungible {
         uint _price,
         address _owner,
         PaymentType[] _paymentTypes,
-        ) internal overrides public returns(){
+        ) internal override public returns(address){
         
         CarbonDAO newAsset = new CarbonDAO(
                                 _name,
@@ -42,8 +42,21 @@ contract CarbonDAO is SemiFungible {
                                 _price,
                                 _owner,
                                 _paymentTypes);
+        return address(newAsset);
+        // newAssets.push(address(newAsset));
+        // emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+    }
 
-        newAssets.push(address(newAsset));
-        emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public override requireOwner("create sale") returns (uint) {
+        for (uint i = 0; i < _paymentTypes.length; i++) {
+            whitelistSale(address(new CarbonDAOSale(address(this), _paymentTypes[i], _price, _units)));
+        }
+        status = ItemStatus.PUBLISHED;
+        return RestStatus.OK;
+    }
+
+    function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public override returns (uint, string) {
+        address newSale = address(new CarbonDAOSale(address(this), _paymentType, _price, _units));
+        return (RestStatus.OK, string(newSale));
     }
 }
