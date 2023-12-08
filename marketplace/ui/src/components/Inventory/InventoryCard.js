@@ -6,12 +6,15 @@ import {
   EditOutlined,
   EyeOutlined,
   PlusOutlined,
-  PieChartOutlined
+  PieChartOutlined,
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
-import { UNIT_OF_MEASUREMENTS, INVENTORY_STATUS } from "../../helpers/constants";
+import {
+  UNIT_OF_MEASUREMENTS,
+  INVENTORY_STATUS,
+} from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ResellModal from "./ResellModal";
 import routes from "../../helpers/routes";
@@ -67,28 +70,42 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
   };
 
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", inventory.address)}`, { state: { isCalledFromInventory: true } });
-  }
+    navigate(`${naviroute.replace(":id", inventory.address)}`, {
+      state: { isCalledFromInventory: true },
+    });
+  };
 
   const getCategory = () => {
-    const parts = inventory.contract_name.split('-');
+    const parts = inventory.contract_name.split("-");
     return parts[parts.length - 1];
   };
 
   const categoricalProperties = () => {
     switch (getCategory()) {
-      case 'Art':
+      case "Art":
         return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Artist</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.artist}
-            </p>
-          </div>)
-      case 'Carbon':
+          <div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Artist</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.artist}</p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Serial Number</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.serialNumber
+                  ? itemData.serialNumber
+                  : "No Serial Number Available"}
+              </p>
+            </div>
+          </div>
+        );
+      case "Carbon":
         return (
           <>
             {/* <div className="flex mt-1.5 items-center">
@@ -105,34 +122,75 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               <p text-secondryB text-sm>
                 :
               </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.units}</p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Serial Number</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
               <p className="text-secondryB text-sm ml-3">
-                {itemData.units}
+                {itemData.serialNumber
+                  ? itemData.serialNumber
+                  : "No Serial Number Available"}
               </p>
             </div>
           </>
-          )
-      case 'Clothing':
+        );
+      case "Clothing":
         return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Brand</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.brand}
-            </p>
-          </div>)
-      case 'Metals':
+          <div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Brand</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.brand}</p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Condition</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.condition?.toUpperCase()}
+              </p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">SKU</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.skuNumber ? itemData.skuNumber : "No SKU Available"}
+              </p>
+            </div>
+          </div>
+        );
+      case "Metals":
         return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Source</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.source}
-            </p>
-          </div>)
+          <div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Source</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.source}</p>
+            </div>
+
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Serial Number</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.serialNumber
+                  ? itemData.serialNumber
+                  : "No Serial Number Available"}
+              </p>
+            </div>
+          </div>
+        );
       default:
         break;
     }

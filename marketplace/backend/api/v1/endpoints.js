@@ -89,6 +89,11 @@ export const Clothing = {
   create: '/'
 }
 
+export const Collectibles = {
+  prefix: '/collectibles',
+  getAll: '/',
+  create: '/'
+}
 
 export const Order = {
   prefix: '/order',
