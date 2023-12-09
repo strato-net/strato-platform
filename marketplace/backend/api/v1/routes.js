@@ -12,6 +12,7 @@ import art from './Art'
 import carbon from './Carbon'
 import metals from './Metals'
 import clothing from './Clothing'
+import membership from './Membership'
 import collectibles from './Collectibles'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
@@ -36,6 +37,7 @@ import {
   Carbon,
   Metals,
   Clothing,
+  Membership,
   Collectibles,
   Order,
   OrderLineItem,
@@ -60,6 +62,7 @@ router.use(Item.prefix, item)
 router.use(Art.prefix, art)
 router.use(Carbon.prefix, carbon)
 router.use(Clothing.prefix, clothing)
+router.use(Membership.prefix, membership)
 router.use(Collectibles.prefix, collectibles)
 router.use(Metals.prefix, metals)
 router.use(Order.prefix, order)

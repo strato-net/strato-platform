@@ -53,8 +53,9 @@ const CreateInventoryModal = ({
     description: "",
     artist: "",
     source: "",
-    projectType: "",
     units: 1,
+    expirationPeriodInMonths: 1,
+    brand: "",
     clothingType: null,
     images: null,
     price: null,
@@ -119,7 +120,6 @@ const CreateInventoryModal = ({
           return (body = {
             itemArgs: {
               ...body.itemArgs,
-              projectType: values.projectType,
               units: values.units,
             },
           });
@@ -148,8 +148,16 @@ const CreateInventoryModal = ({
             itemArgs: {
               ...body.itemArgs,
               source: values.source,
-            },
+            }
           });
+        case 'Membership':
+          return body = {
+            itemArgs: {
+              ...body.itemArgs,
+              units: values.units,
+              expirationPeriodInMonths: values.expirationPeriodInMonths
+            }
+          }
         default:
           break;
       }
@@ -489,6 +497,48 @@ const CreateInventoryModal = ({
             </Form.Item>
           </div>
         );
+      case 'Membership':
+        return (
+          <div className="flex justify-between mt-4 ">
+            <Form.Item
+              label="Expiration (in months)"
+              name="expirationPeriodInMonths"
+              className="w-72"
+            >
+              <Input
+                label="expirationPeriodInMonths"
+                placeholder="Enter Expiration (in months)"
+                name="expirationPeriodInMonths"
+                value={formik.values.expirationPeriodInMonths}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.expirationPeriodInMonths &&
+                formik.errors.expirationPeriodInMonths && (
+                  <span className="text-error text-xs">
+                    {formik.errors.expirationPeriodInMonths}
+                  </span>
+                )}
+            </Form.Item>
+            <Form.Item
+              label="Units"
+              name="units"
+              className="w-72"
+            >
+              <Input
+                label="units"
+                placeholder="Enter Units"
+                name="units"
+                value={formik.values.units}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.units &&
+                formik.errors.units && (
+                  <span className="text-error text-xs">
+                    {formik.errors.units}
+                  </span>
+                )}
+            </Form.Item>
+          </div>)
       default:
         break;
     }
@@ -658,7 +708,7 @@ const CreateInventoryModal = ({
                       );
                       formik.setFieldValue("images", e.file.originFileObj);
                     }}
-                    customRequest={() => {}}
+                    customRequest={() => { }}
                     style={{ display: "none" }}
                     accept="image/png, image/jpeg"
                     maxCount={1}
@@ -703,99 +753,6 @@ const CreateInventoryModal = ({
                       </span>
                     )}
                 </Form.Item>
-              </div>
-              <Form.Item
-                label="Description"
-                name="description"
-                className="mt-4"
-              >
-                <TextArea
-                  label="description"
-                  placeholder="Enter Description"
-                  name="description"
-                  value={formik.values.description}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.description && formik.errors.description && (
-                  <span className="text-error text-xs">
-                    {formik.errors.description}
-                  </span>
-                )}
-              </Form.Item>
-
-              <div className="mt-4 flex justify-between">
-                <Form.Item label="Upload Images" name="images">
-                  <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
-                    {selectedImage ? (
-                      <div className="h-20">
-                        <img
-                          alt="Item"
-                          src={selectedImage}
-                          style={{ width: "100%", height: "100%" }}
-                        />
-                        <br />
-                      </div>
-                    ) : (
-                      <PictureOutlined className="text-7xl text-primary opacity-10" />
-                    )}
-                    <Upload
-                      onChange={(e) => {
-                        setSelectedImage(
-                          URL.createObjectURL(e.file.originFileObj)
-                        );
-                        formik.setFieldValue("images", e.file.originFileObj);
-                      }}
-                      customRequest={() => {}}
-                      style={{ display: "none" }}
-                      accept="image/png, image/jpeg"
-                      maxCount={1}
-                      showUploadList={false}
-                      beforeUpload={beforeUpload}
-                    >
-                      <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                        Browse
-                      </div>
-                    </Upload>
-                  </div>
-
-                  <div className="flex items-start">
-                    <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                    <p className="mt-1 text-xs italic ml-1 mr-4">
-                      use jpg, png format of size less than 1mb
-                    </p>
-                  </div>
-                  {formik.touched.images && formik.errors.images && (
-                    <span className="text-error text-xs">
-                      {formik.errors.images}
-                    </span>
-                  )}
-                </Form.Item>
-                <div className="flex flex-col">
-                  <Form.Item
-                    label="Serial Number"
-                    name="serialNumber"
-                    className="w-72"
-                  >
-                    <Input
-                      label="serialNumber"
-                      placeholder="Enter Serial Number"
-                      name="serialNumber"
-                      value={
-                        formik.values.category === "Carbon"
-                          ? ""
-                          : formik.values.serialNumber
-                      }
-                      onChange={formik.handleChange}
-                      disabled={formik.values.category === "Carbon"}
-                    />
-                    {formik.touched.serialNumber &&
-                      formik.errors.serialNumber && (
-                        <span className="text-error text-xs">
-                          {formik.errors.serialNumber}
-                        </span>
-                      )}
-                  </Form.Item>
-                </div>
               </div>
             </div>
           </div>

@@ -99,6 +99,7 @@ export const CATEGORIES = [
   "Carbon",
   "Metals",
   "Clothing",
+  "Membership",
   "Collectibles"
 ]
 

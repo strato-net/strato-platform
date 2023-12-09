@@ -1,0 +1,46 @@
+import "/dapp/orders/contracts/Sales/CarbonDAOSale.sol";
+
+pragma es6;
+pragma strict;
+import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+
+/// @title A representation of Membership assets
+contract CarbonDAO is SemiFungible {
+    constructor(
+        string _name,
+        string _description,
+        string[] _images,
+        uint _createdDate,
+        uint _units,
+        string _membershipNumber,
+        ItemStatus _status,
+        uint _price,
+        PaymentType[] _paymentTypes,   
+    ) SemiFungible(_name, _description, _images, _createdDate, _units, _membershipNumber, _status, _price, _paymentTypes) {}
+
+    function mint(string _name,
+        string _description,
+        string[] _images,
+        uint _createdDate,
+        uint _units,
+        string _membershipNumber,
+        ItemStatus _status,
+        uint _price,
+        PaymentType[] _paymentTypes,
+        ) internal overrides public returns(){
+        
+        CarbonDAO newAsset = new CarbonDAO(
+                                _name,
+                                _description,
+                                _images,
+                                _createdDate,
+                                _units,
+                                _membershipNumber,
+                                _status,
+                                _price,
+                                _paymentTypes);
+
+        newAssets.push(address(newAsset));
+        emit AssetSplit(address(newAsset), splitUnitsArray[i]);
+    }
+}

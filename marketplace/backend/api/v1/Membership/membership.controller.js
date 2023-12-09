@@ -5,13 +5,13 @@ import config from '../../../load.config'
 
 const options = { config, cacheNonce: true }
 
-class CarbonController {
+class MembershipController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
 
-      const carbons = await dapp.getCarbons({ ...query })
-      rest.response.status200(res, carbons)
+      const memberships = await dapp.getMemberships({ ...query })
+      rest.response.status200(res, memberships)
 
       return next()
     } catch (e) {
@@ -23,9 +23,9 @@ class CarbonController {
     try {
       const { dapp, body } = req
 
-      CarbonController.validateCreateCarbonArgs(body)
+      MembershipController.validateCreateMembershipArgs(body)
 
-      const result = await dapp.createCarbon(body)
+      const result = await dapp.createMembership(body)
       rest.response.status200(res, result)
 
       return next()
@@ -36,30 +36,31 @@ class CarbonController {
 
   // ----------------------- ARG VALIDATION ------------------------
 
-  static validateCreateCarbonArgs(args) {
-    const createCarbonSchema = Joi.object({
+  static validateCreateMembershipArgs(args) {
+    const createMembershipSchema = Joi.object({
       itemArgs: Joi.object({
+        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
+        expirationPeriodInMonths: Joi.number().integer().min(1).required(),
         units: Joi.number().integer().min(1).required(),
         images: Joi.array().items(Joi.string().optional()).required(),
         price: Joi.number().positive().required(),
-        serialNumber: Joi.string().allow("").optional(),
         paymentTypes: Joi.array().min(1).items(
           Joi.number().integer().min(0).max(5).required(),
         ).required(),
       }).required()
     });
 
-    const validation = createCarbonSchema.validate(args);
+    const validation = createMembershipSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Carbon Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Membership Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
   }
 }
 
-export default CarbonController;
+export default MembershipController;
