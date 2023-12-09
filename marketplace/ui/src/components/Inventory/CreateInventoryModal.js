@@ -547,7 +547,7 @@ const CreateInventoryModal = ({
                 )}
             </Form.Item>
           </div>);
-      case 'Membership':
+      case 'CarbonDAO':
         return (
           <div className="flex justify-between mt-4 ">
             <Form.Item

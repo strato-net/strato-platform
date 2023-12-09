@@ -1,10 +1,11 @@
 import "/dapp/orders/contracts/Sales/CarbonDAOSale.sol";
+import "/dapp/mercata-base-contracts/Templates/Assets/SemiFungible.sol";
 
 pragma es6;
 pragma strict;
 import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
 
-/// @title A representation of Membership assets
+/// @title A representation of CarbonDAO assets
 contract CarbonDAO is SemiFungible {
     constructor(
         string _name,
@@ -12,21 +13,27 @@ contract CarbonDAO is SemiFungible {
         string[] _images,
         uint _createdDate,
         uint _units,
-        string _membershipNumber,
+        string _serialNumber,
         ItemStatus _status,
         uint _price,
-        PaymentType[] _paymentTypes,   
-    ) SemiFungible(_name, _description, _images, _createdDate, _units, _membershipNumber, _status, _price, _paymentTypes) {}
+        address _owner,
+        PaymentType[] _paymentTypes
+    ) SemiFungible(_name, _description, _images, _createdDate, _units, _serialNumber, _status, _price, _owner, _paymentTypes) {
+        if(_paymentTypes.length > 0) {
+            createSales(_paymentTypes, _price, _units);
+        }
+    }
 
     function mint(string _name,
         string _description,
         string[] _images,
         uint _createdDate,
         uint _units,
-        string _membershipNumber,
+        string _serialNumber,
         ItemStatus _status,
         uint _price,
-        PaymentType[] _paymentTypes,
+        address _owner,
+        PaymentType[] _paymentTypes
         ) internal override public returns(address){
         
         CarbonDAO newAsset = new CarbonDAO(
@@ -35,9 +42,10 @@ contract CarbonDAO is SemiFungible {
                                 _images,
                                 _createdDate,
                                 _units,
-                                _membershipNumber,
+                                _serialNumber,
                                 _status,
                                 _price,
+                                _owner,
                                 _paymentTypes);
         return address(newAsset);
         // newAssets.push(address(newAsset));

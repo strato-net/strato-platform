@@ -369,6 +369,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       owner: rawAdmin.address,
       status: 1,
     };
+    console.log("newArgs", newArgs);
     return membershipJs.uploadContract(rawAdmin, newArgs, options);
   };
 
@@ -389,6 +390,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       owner: rawAdmin.address,
       status: 1,
     };
+    console.log("newArgs", newArgs);
     return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
   };
 
