@@ -5,13 +5,13 @@ import config from '../../../load.config'
 
 const options = { config, cacheNonce: true }
 
-class ClothingController {
+class CollectibleController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
 
-      const clothings = await dapp.getClothings({ ...query })
-      rest.response.status200(res, clothings)
+      const collectibles = await dapp.getCollectibles({ ...query })
+      rest.response.status200(res, collectibles)
 
       return next()
     } catch (e) {
@@ -23,9 +23,9 @@ class ClothingController {
     try {
       const { dapp, body } = req
 
-      ClothingController.validateCreateClothingArgs(body)
+      CollectibleController.validateCreateCollectibleArgs(body)
 
-      const result = await dapp.createClothing(body)
+      const result = await dapp.createCollectible(body)
       rest.response.status200(res, result)
 
       return next()
@@ -36,17 +36,13 @@ class ClothingController {
 
   // ----------------------- ARG VALIDATION ------------------------
 
-  static validateCreateClothingArgs(args) {
-    const createClothingSchema = Joi.object({
+  static validateCreateCollectibleArgs(args) {
+    const createCollectibleSchema = Joi.object({
       itemArgs: Joi.object({
         serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
-        clothingType: Joi.string().required(),
-        size: Joi.string().required(),
-        skuNumber: Joi.string().required(),
         condition: Joi.string().required(),
-        brand: Joi.string().required(),
         images: Joi.array().items(Joi.string().optional()).required(),
         price: Joi.number().positive().required(),
         units: Joi.number().positive().required(),
@@ -56,15 +52,15 @@ class ClothingController {
       }).required()
     });
 
-    const validation = createClothingSchema.validate(args);
+    const validation = createCollectibleSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Clothing Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Collectible Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
   }
 }
 
-export default ClothingController;
+export default CollectibleController;

@@ -460,8 +460,18 @@ const ProductDetails = ({ user, users }) => {
           <Space direction="vertical">
             <Space>
               <DescTitle text="Brand" />
-              <DescTitle text="                      :" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.brand}</Text>
+            </Space>
+            <Space>
+              <DescTitle text="Condition" />
+              <DescTitle text=":" />
+              <Text className="text-[13px]">{itemData.condition ? itemData.condition.toUpperCase() : null}</Text>
+            </Space>
+            <Space>
+              <DescTitle text="SKU" />
+              <DescTitle text=":" />
+              <Text className="text-[13px]">{itemData.skuNumber ? itemData.skuNumber.toUpperCase() : "No SKU Available"}</Text>
             </Space>
           </Space>)
       case "Metals":
