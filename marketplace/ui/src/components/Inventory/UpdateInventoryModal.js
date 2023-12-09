@@ -122,7 +122,7 @@ const UpdateInventoryModal = ({
         price: inventoryToUpdate.inventory.price,
         batchId: inventoryToUpdate.inventory.batchId,
         serialNumber: null,
-        status: inventoryToUpdate.inventory.status === "1" ? true : false,
+        status: inventoryToUpdate.inventory.status === 1 ? true : false,
       };
     
       setFormState(nextState);
@@ -312,7 +312,7 @@ const UpdateInventoryModal = ({
                     value={formik.values.paymentTypes}
                     onChange={handleSelectAll}
                     showSearch={false}
-                    disabled={inventoryToUpdate.inventory.status === "1"  || !formik.values.status}
+                    disabled={inventoryToUpdate.inventory.status === 1  || !formik.values.status}
                   >
                     {PAYMENT_TYPE.map((e, index) => (
                       <Option value={e.value} key={index}>

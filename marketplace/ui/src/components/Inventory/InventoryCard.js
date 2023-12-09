@@ -124,17 +124,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
               </p>
               <p className="text-secondryB text-sm ml-3">{itemData.units}</p>
             </div>
-            <div className="flex mt-1 items-center">
-              <p className="text-primaryC text-sm w-40">Serial Number</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {itemData.serialNumber
-                  ? itemData.serialNumber
-                  : "No Serial Number Available"}
-              </p>
-            </div>
           </>
         );
       case "Clothing":
@@ -179,6 +168,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </p>
           </div>)
       case 'Membership':
+        return (
+          <>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Units</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.units}
+              </p>
+            </div>
+          </>
+        )
+      case "CarbonDAO":
         return (
           <>
             <div className="flex mt-1.5 items-center">
@@ -253,7 +256,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </div>
           </div>
           {categoricalProperties()}
-          {inventory.status === "2" ? (
+          {inventory.status === 2 ? (
             <></>
           ) : (
             <div className="flex mt-1 items-center">
