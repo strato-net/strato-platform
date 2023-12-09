@@ -147,6 +147,7 @@ class AuthenticationController {
   }
 
   static async logout(req, res) {
+    const oauth = req.app.oauth
     let oauthSignOutUrl
     if (config.dockerized) {
       oauthSignOutUrl = '/auth/logout'
