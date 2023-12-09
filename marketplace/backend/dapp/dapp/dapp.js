@@ -14,6 +14,7 @@ import carbonJs from "/dapp/items/carbon";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
+import carbonDAOJs from "/dapp/items/carbonDAO";
 import collectibleJs from "dapp/items/collectibles";
 
 import saleJs from "/dapp/orders/sale";
@@ -377,6 +378,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ MEMBERSHIP ENDS--------------------------------
+
+  // ------------------------------ CARBONDAO STARTS------------------------------
+
+  contract.createCarbonDAO = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: 1,
+    };
+    return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCarbonDAOs = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return carbonDAOJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ CARBONDAO ENDS--------------------------------
 
   // ------------------------------ COLLECTIBLES STARTS------------------------------
 
