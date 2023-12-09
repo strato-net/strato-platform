@@ -164,7 +164,7 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = JSON.parse(details.data);
       setItemData(detailsData);
       if (detailsData.units) {
-        setAvailableQuantity(detailsData.units);
+        setAvailableQuantity(details.saleQuantity || 1);
       }
     }
   }, [categorys, details]);

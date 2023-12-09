@@ -9,10 +9,9 @@ const getSchema = () => {
     source: yup.string(),
     brand: yup.string(),
     projectType: yup.string(),
-    units: yup.number().positive("Units must be a positive number").required("Units is required"),
+    quantity: yup.number().positive("Quantity must be a positive number").required("Quantity is required"),
     images: yup.mixed().optional().nullable(),
-    price: yup.number().positive("Price must be a positive number").required("Price is required"),
-    paymentTypes: yup.array().of(yup.number().positive("Payment type must be a positive number").required("Payment type is required.")).required("Payment types are required"),
+    files: yup.mixed().optional().nullable(),
     category: yup.string().required("Category is required"),
   });
 };

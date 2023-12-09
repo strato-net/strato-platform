@@ -3,7 +3,7 @@ pragma strict;
 import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
 
 /// @title A representation of asset sale contract
-contract CarbonSale is Sale {
+contract SimpleSale is Sale {
     constructor(
         address _assetToBeSold,
         uint _price,

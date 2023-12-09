@@ -47,6 +47,8 @@ export const Inventory = {
   getAll: '/',
   create: '/',
   update: '/update',
+  list: '/list',
+  unlist: '/unlist',
   resell: '/resell',
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership',
@@ -156,7 +158,7 @@ export const Marketplace = {
 export const PaymentService = {
   prefix: '/payment',
   stripeOnboarding: '/stripe/account',
-  stripeConnectStatus: '/stripe/account/status/:ownerOrganization',
+  stripeConnectStatus: '/stripe/account/status/:ownerCommonName',
   stripeWebhook: '/stripe/webhook',
   stripeWebhookConnect: '/stripe/webhook/connect',
 }

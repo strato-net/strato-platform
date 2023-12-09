@@ -121,12 +121,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     //We are not guaranteed the user will have a certificate
     //99% chance they do, but if this this their first login
     //the node might not have a certificate in time
-    if (!(userCertificate === null || userCertificate === undefined || userCertificate.organization === null || userCertificate.organization === undefined)) {
+    if (!(userCertificate === null || userCertificate === undefined || userCertificate.commonName === null || userCertificate.commonName === undefined)) {
       contract.userOrganization = userCertificate.organization
       userOrganization = userCertificate.organization
       userCommonName = userCertificate.commonName
       userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
-      console.log('dapp - userCertificate', userCertificate)
     }
   }
 
@@ -211,9 +210,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate', status: [1,2] }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return {inventories: inventories, inventoryCount: inventoryCount}
   };
+
+  contract.listItem = async function (args, options = defaultOptions) {
+    return inventoryJs.uploadSaleContract(rawAdmin, args, options);
+  }
+
+  contract.unlistItem = async function (args, options = defaultOptions) {
+    const { saleAddress, ...restArgs } = args;
+    const contract = { address: saleAddress };
+    return inventoryJs.unlistItem(rawAdmin, contract, restArgs, options);
+  }
 
   contract.resellItem = async function (args, options = defaultOptions) {
     const { itemContract, itemAddress, ...restArgs } = args;
@@ -288,8 +297,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      owner: rawAdmin.address,
-      status: 1,
     };
     return carbonJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -343,36 +350,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.createSaleOrder = async function (args, options = defaultOptions) {
     const createdDate = Math.floor(Date.now() / 1000);
-    const { orderList, paymentMethod, ...restArgs } = args;
-    const assetAddresses = orderList.map(asset => {
-      return asset.assetAddress;
+    const { items, ...restArgs } = args;
+    const saleAddresses = items.map(item => {
+      return item.saleAddress;
     })
-    const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
-    const sellersAddress = sales[0].sellersAddress;
-    const sellersCommonName = sales[0].sellersCommonName;
-    const saleAddresses = await Promise.all(sales.map(async (sale) => {
-      const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
-      const saleData = JSON.parse(sale.data);
-      if (saleData.units && orderForSale.quantity < saleData.units) {
-        const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
-        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, { 
-          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]), 
-          price: sale.price, 
-          units: orderForSale.quantity,
-        }, options, contract);
-        return splitSaleAddress;
-      }
-      else {
-        return sale.address;
-      }
-    }));
+    const quantities = items.map(item => {
+      return item.quantity;
+    })
     const newArgs = {
       ...restArgs,
       saleAddresses,
-      sellersCommonName,
-      sellersAddress,
-      purchasersCommonName: userCert.commonName,
-      purchasersAddress: rawAdmin.address,
+      quantities,
       orderId: util.uid(),
       createdDate: createdDate,
     }
@@ -393,8 +381,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
-      const getOptions = { ...options, app: contractName };
-      const userContactAddress = await userAddressJs.get(rawAdmin, { address: order.shippingAddress }, getOptions);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses, state: [1,2] }, options);
       const assetAddresses = sales.map(sale => {
         return sale.assetToBeSold;
@@ -403,16 +389,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const assetsWithoutQuantity = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
       assetsWithoutQuantity.map(asset => {
         const saleForAsset = sales.find(sale => sale.assetToBeSold === asset.address);
-        const saleData = JSON.parse(saleForAsset.data);
-        const quantity = saleData.units ? saleData.units : 1;
         assets.push({
           ...asset,
           price: saleForAsset.price,
-          quantity: quantity,
-          amount: quantity * saleForAsset.price,
+          saleQuantity: saleForAsset.quantity,
+          saleAddress: saleForAsset.address,
+          amount: saleForAsset.quantity * saleForAsset.price,
         })
       })
-      const result = { userContactAddress, order, assets };
+      const result = { userContactAddress: order.shippingAddress, order, assets };
 
       return result;
     } catch (error) {
@@ -429,10 +414,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.cancelOrder(rawAdmin, contract, options, comments);
   }
 
-  contract.saleOrderTransferOwnership = async function (args, options = defaultOptions) {
-    const { saleOrderAddress, fulfillmentDate, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.transferOwnership(rawAdmin, contract, options, fulfillmentDate, comments);
+  contract.completeOrder = async function (args, options = defaultOptions) {
+    return saleOrderJs.completeOrder(rawAdmin, args, options);
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
@@ -447,7 +430,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin, { name: SERVICE_PROVIDERS.STRIPE, accountDeauthorized: false }, getOptions)
 
       /*  check if an accountId already exists for the user org */
-      if (Object.keys(sellerStripeDetails).length > 0 && sellerStripeDetails.accountLinked) {
+      if (Object.keys(sellerStripeDetails).length > 0) {
         throw new rest.RestError(RestStatus.CONFLICT, "User has already connected their stripe account.")
       }
 
@@ -455,11 +438,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         userStripeAccount = await StripeService.generateStripeAccountId();
         // save generated account id
         const accountDetails = {
-          name: SERVICE_PROVIDERS.STRIPE,
+          name: `${SERVICE_PROVIDERS.STRIPE}`,
           accountId: userStripeAccount.id, status: "", createdDate: dayjs().unix(),
         }
         userStripeAccount = userStripeAccount.id
-        // await managers.paymentManager.createPaymentProvider(accountDetails)
+        await paymentProviderJs.uploadContract(rawAdmin, accountDetails, options);
       } else {
         userStripeAccount = sellerStripeDetails.accountId
       }
@@ -498,7 +481,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       const { detailsSubmitted, chargesEnabled, payoutsEnabled, accountDeauthorized } = connectedStripeAccountStatus
       if (paymentProvider.detailsSubmitted !== detailsSubmitted || paymentProvider.chargesEnabled !== chargesEnabled || paymentProvider.payoutsEnabled !== payoutsEnabled || paymentProvider.accountDeauthorized !== accountDeauthorized) {
-        // await managers.paymentManager.updatePaymentProvider(connectedStripeAccountStatus, options)
+        await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, connectedStripeAccountStatus, options)
       }
 
       return connectedStripeAccountStatus
@@ -528,8 +511,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (paymentProvider.eventTime > eventTime) {
         return true;
       }
-
-      // await managers.paymentManager.updatePaymentProvider({ paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
+      await paymentManagerJs.updatePaymentProvider(rawAdmin, paymentProvider, { paymentProviderAddress: paymentProvider.address, chargesEnabled, detailsSubmitted, payoutsEnabled, accountDeauthorized, eventTime }, chainOptions)
 
     } catch (error) {
       console.error(error);
@@ -543,17 +525,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const { orderList, orderTotal: recievedOrderTotal } = args;
 
-      const newOptions = { ...options, app: contractName }
+      const newOptions = { ...options, app: paymentProviderJs.contractName }
 
       const assetAddresses = orderList.map(o => o.assetAddress);
       
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses, status: 1 }, options);
+      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
+
+      const saleAddresses = assets.map(a => a.saleAddress);
 
       if (assets.length == 0 || assets.length != orderList.length) {
         throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
       }
 
-      const inventoryOrganization = assets[0].ownerOrganization;
       const sellerName = assets[0].ownerCommonName;
       for (const currInventory of assets) {
 
@@ -569,7 +552,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // const chainOptions = { ...options, chainIds: [contract.chainId] };
       const sellerStripeDetails = await paymentProviderJs.get(rawAdmin,
         {
-          name: SERVICE_PROVIDERS.STRIPE, ownerOrganization: inventoryOrganization,
+          name: SERVICE_PROVIDERS.STRIPE, ownerCommonName: sellerName,
           accountDeauthorized: false
         },
         newOptions)
@@ -599,16 +582,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(err.statusCode, err.message)
       }
       const paymentParameters = {
+        address: sellerStripeDetails.address,
+        saleAddresses,
         paymentSessionId: stripePaymentSession.id,
-        paymentProvider: "stripe",
         paymentStatus: stripePaymentSession.payment_status,
         sessionStatus: stripePaymentSession.status,
         amount: stripePaymentSession.amount_total.toString(),
         expiresAt: stripePaymentSession.expires_at,
         createdDate: stripePaymentSession.created,
-        sellerAccountId: sellerStripeDetails.accountId
       }
-      // const paymentContract = await managers.paymentManager.createPayment(paymentParameters)
+      await paymentProviderJs.createPayment(rawAdmin, paymentParameters, newOptions);
       return stripePaymentSession
 
     } catch (error) {
@@ -622,8 +605,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.updatePayment = async function (args, options = defaultOptions, token) {
     try {
-      const chainOptions = { ...options, chainIds: [contract.chainId] };
-      // return managers.paymentManager.updatePayment(args, chainOptions)
+      return paymentProviderJs.finalizePayment(args, options)
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating payment status", { message: "Error while updating payment status" })
     }
@@ -641,11 +623,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       const newOptions = { ...options, app: contractName }
       const { session_id } = args
-      // const paymentDetail = await managers.paymentManager.get({ paymentSessionId: session_id }, newOptions);
-      // const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
-      // const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
-      // const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
-      return {} // { ...paymentSession, payment_method: paymentMethod.card.brand }
+      const paymentDetail = await paymentProviderJs.getPaymentSession(rawAdmin, { paymentSessionId: session_id }, newOptions);
+      const paymentSession = await StripeService.getPaymentSession(session_id, paymentDetail.sellerAccountId);
+      const paymentIntent = await StripeService.getPaymentIntent(paymentSession.payment_intent, paymentDetail.sellerAccountId);
+      const paymentMethod = await StripeService.getPaymentMethod(paymentIntent.payment_method, paymentDetail.sellerAccountId);
+      return { ...paymentSession, payment_method: paymentMethod.card.brand }
     } catch (error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching payment session", { message: "Error while fetching payment" })
     }

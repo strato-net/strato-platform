@@ -21,7 +21,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, Utils {
     uint public createdDate;
     uint public quantity;
 
-    Sale public sale;
+    address public sale;
 
 
     constructor(
@@ -64,7 +64,7 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, Utils {
     }
 
     modifier fromSale(string action) {
-        if (address(sale) == address(0)) {
+        if (sale == address(0)) {
             string err = "Only the owner can "
                        + action
                        + ".";
@@ -73,20 +73,20 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, Utils {
             string err = "Only the current Sale contract can "
                        + action
                        + ".";
-            require(msg.sender == address(sale), err);
+            require(msg.sender == sale, err);
         }
         _;
     }
 
     // Updated function to add a sale to the whitelist
     function attachSale() public requireOwnerOrigin("attach sale") {
-        require(address(sale) == address(0), "Sale is already assigned for this asset");
-        sale = Sale(msg.sender);
+        require(sale == address(0), "Sale is already assigned for this asset");
+        sale = msg.sender;
     }
 
     // Updated function to remove a sale from the whitelist
     function closeSale() public fromSale("close sale") {
-        sale = Sale(address(0));
+        sale = address(0);
     }
 
     function _transfer(address _newOwner, uint _quantity) internal virtual {

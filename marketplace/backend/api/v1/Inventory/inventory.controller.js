@@ -24,10 +24,10 @@ class InventoryController {
 
       let result;
       const inventory = await dapp.getInventory(args, chainOptions)
-      inventory.images && inventory.images.length > 0 ?
+      inventory && inventory.images && inventory.images.length > 0 ?
         result = { ...inventory, images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))}
         :
-        result = inventory
+        result = inventory || {}
       rest.response.status200(res, result)
 
       return next()
@@ -82,6 +82,36 @@ class InventoryController {
       InventoryController.validateUpdateInventoryArgs(body)
 
       const result = await dapp.updateInventory(body, options)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async list(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateListItemArgs(body)
+
+      const result = await dapp.listItem(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async unlist(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateUnlistItemArgs(body)
+
+      const result = await dapp.unlistItem(body)
       rest.response.status200(res, result)
 
       return next()
@@ -179,6 +209,41 @@ class InventoryController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Inventory Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateListItemArgs(args) {
+    const listItemSchema = Joi.object({
+      assetToBeSold: Joi.string().required(),
+      paymentProviders: Joi.array().min(1).items(
+        Joi.string().min(0).required(),
+      ).required(),
+      price: Joi.number().integer().greater(0).required(),
+      quantity: Joi.number().integer().greater(0).optional(),
+    });
+
+    const validation = listItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'List Item Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateUnlistItemArgs(args) {
+    const unlistItemSchema = Joi.object({
+      saleAddress: Joi.string().required(),
+    });
+
+    const validation = unlistItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Unlist Item Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

@@ -8,16 +8,16 @@ import { PAYMENT_TYPE } from "../../helpers/constants";
 
 const { Option } = Select;
 
-const ResellModal = ({ open, handleCancel, inventory }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [paymentTypes, setPaymentTypes] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
     const itemDispatch = useItemDispatch();
-    const [canResell, setCanResell] = useState(true);
+    const [canList, setCanList] = useState(true);
     const {
-        isReselling
+        isListing
     } = useInventoryState();
     const {
         items
@@ -29,11 +29,11 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
 
     useEffect(() => {
         const itemData = JSON.parse(inventory.data);
-        if (quantity > itemData.units || quantity <= 0) {
-            setCanResell(false);
+        if (quantity > itemData.quantity || quantity <= 0) {
+            setCanList(false);
         }
         else {
-            setCanResell(true);
+            setCanList(true);
         };
     }, [quantity])
 
@@ -102,7 +102,7 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
                 finalColumns = finalColumns.concat(
                     [
                         {
-                            title: "Units",
+                            title: "Quantity",
                             align: "center",
                             render: () => (
                                 <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
@@ -138,15 +138,14 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
 
     const handleSubmit = async () => {
         let body = {
-            itemContract: getCategory(),
-            itemAddress: inventory.address,
-            paymentTypes: paymentTypes,
+            assetToBeSold: inventory.address,
+            paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
             price: pricePerUnit,
         };
         if (getCategory() === "Carbon") {
             body = {
                 ...body,
-                units: quantity,
+                quantity,
             }
         } else {
             body = {
@@ -154,7 +153,7 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
                 quantity: 1,
             }
         }
-        let isDone = await actions.resellInventory(inventoryDispatch, body);
+        let isDone = await actions.listInventory(inventoryDispatch, body);
         if (isDone) {
             actions.fetchInventory(inventoryDispatch, 10, 0, "");
             handleCancel();
@@ -165,11 +164,11 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`Resell - ${decodeURIComponent(inventory.name)}`}
+            title={`List - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canResell || inventory.status === "1"} loading={isReselling}>
-                    Resell
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList || inventory.status === "1"} loading={isListing}>
+                    List
                 </Button>
             ]}
         >
@@ -183,4 +182,4 @@ const ResellModal = ({ open, handleCancel, inventory }) => {
 }
 
 
-export default ResellModal;
+export default ListForSaleModal;

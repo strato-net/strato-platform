@@ -28,6 +28,20 @@ router.post(
 );
 
 router.post(
+  Inventory.list,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.list
+);
+
+router.post(
+  Inventory.unlist,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.unlist
+);
+
+router.post(
   Inventory.resell,
   authHandler.authorizeRequest(),
   loadDapp,

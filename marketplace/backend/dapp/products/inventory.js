@@ -8,6 +8,8 @@ import saleJs from "../orders/sale";
 
 const contractName = constants.assetTableName;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
+const saleContractName = 'SimpleSale';
+const saleContractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Sales/SimpleSale.sol`;
 
 /** 
  * Upload a new Inventory 
@@ -39,6 +41,31 @@ async function uploadContract(user, _constructorArgs, options) {
     contract.src = 'removed';
 
     return bind(user, contract, copyOfOptions);
+}
+
+async function uploadSaleContract(user, _constructorArgs, options) {
+
+    const contractArgs = {
+        name: saleContractName,
+        source: await importer.combine(saleContractFilename),
+        args: util.usc(_constructorArgs),
+    };
+
+    let error = [];
+
+    if (error.length) {
+        throw new Error(error.join('\n'));
+    }
+
+    const copyOfOptions = {
+        ...options,
+        history: saleContractName
+    }
+
+    const contract = await rest.createContract(user, contractArgs, copyOfOptions);
+    contract.src = 'removed';
+
+    return contract;
 }
 
 /**
@@ -137,6 +164,26 @@ function bindAddress(user, address, options) {
     return bind(user, contract, options);
 }
 
+async function unlistItem(user, _contract, args, options) {
+    const contract = { name: saleContractName, ..._contract }
+    const callArgs = {
+      contract,
+      method: "closeSale",
+      args: util.usc({ ...args }),
+    };
+    const unlistStatus = await rest.call(user, callArgs, options);
+  
+    if (parseInt(unlistStatus, 10) !== RestStatus.OK) {
+      throw new rest.RestError(
+        unlistStatus,
+        "You cannot unlist the item because it's already published",
+        { callArgs }
+      );
+    }
+  
+    return unlistStatus;
+}
+
 async function resellItem(user, contract, args, options) {
     const callArgs = {
       contract,
@@ -164,19 +211,20 @@ async function resellItem(user, contract, args, options) {
 
 async function get(user, args, options) {
     const { address, ...restArgs } = args;
+    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     let inventory;
 
     const searchArgs = setSearchQueryOptions(restArgs, {
         key: "address",
         value: address,
     });
-    inventory = await searchOne(contractName, searchArgs, options, user);
+    inventory = await searchOne(contractName, searchArgs, newOptions, user);
 
     if (!inventory) {
         return undefined;
     }
 
-    const sale = await saleJs.get(user, { assetToBeSold: inventory.address, state: 1 }, options);
+    const sale = await saleJs.get(user, { assetToBeSold: inventory.address, state: 1 }, newOptions);
 
     if (sale) {
         inventory = {
@@ -190,18 +238,18 @@ async function get(user, args, options) {
     });
 }
 
-async function getAll(admin, args = {}, options) {
+async function getAll(admin, args = {}, defaultOptions) {
     const { range, ownerCommonName, assetAddresses, status, ...restArgs } = args;
     let inventories;
     let sales;
     let finalInventory = [];
+    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
 
     if (ownerCommonName) {
         inventories = await searchAllWithQueryArgs(contractName, 
             {   
                 ...restArgs,
                 ownerCommonName: ownerCommonName, 
-                status: status ? status : [1,2],
             }, options, admin);
     }
     else if (assetAddresses) {
@@ -209,14 +257,12 @@ async function getAll(admin, args = {}, options) {
             { 
                 ...restArgs,
                 address: assetAddresses, 
-                status: status ? status : [1, 2],
             }, options, admin);
     }
     else {
         inventories = await searchAllWithQueryArgs(contractName, 
             { 
                 ...restArgs, 
-                status: status ? status : [1,2],
             }, options, admin);
     }
 
@@ -224,11 +270,13 @@ async function getAll(admin, args = {}, options) {
         const assetAddresses = inventories.map((inventory) => inventory.address);
         sales = await saleJs.getAll(admin, { assetAddresses }, options);
         inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address);
+            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.state == 1);
             if (itemSale) {
                 finalInventory.push({
                     ...inventory,
                     price: itemSale?.price,
+                    saleAddress: itemSale?.address,
+                    saleQuantity: itemSale?.quantity,
                 })
             } else {
                 finalInventory.push(inventory);
@@ -239,14 +287,14 @@ async function getAll(admin, args = {}, options) {
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
-async function inventoryCount(admin, args = {}, options) {
+async function inventoryCount(admin, args = {}, defaultOptions) {
+    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
     const queryArgs = setSearchQueryOptionsPrime({
         ...args,
         limit: undefined,
         offset: 0,
         order: undefined,
     });
-
     const totalResult = await searchAll(
     contractName,
     {
@@ -260,7 +308,6 @@ async function inventoryCount(admin, args = {}, options) {
     options,
     admin
     );
-
     return totalResult[0].count
 }
 
@@ -275,9 +322,13 @@ async function getState(user, contract, options) {
 
 export default {
     uploadContract,
+    uploadSaleContract,
     contractName,
     contractFilename,
+    saleContractName,
+    saleContractFilename,
     bindAddress,
+    unlistItem,
     resellItem,
     get,
     getAll,

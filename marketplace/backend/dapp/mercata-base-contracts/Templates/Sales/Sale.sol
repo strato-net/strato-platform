@@ -26,6 +26,7 @@ abstract contract Sale is SaleState, Utils {
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         price = _price;
+        require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
         quantity = _quantity;
         state = SaleState.Created;
         addPaymentProviders(_paymentProviders);
@@ -39,7 +40,7 @@ abstract contract Sale is SaleState, Utils {
                    + " can perform "
                    + action
                    + ".";
-        string commonName = getCommonName(msg.sender);
+        string commonName = getCommonName(tx.origin);
         require(commonName == sellersCommonName, err);
     }
 
@@ -79,15 +80,11 @@ abstract contract Sale is SaleState, Utils {
     }
 
     function completeSale(
-        address _orderAddress,
-        uint _fulfillmentDate,
-        string _comments
     ) public requireSeller("complete sale") returns (uint) {
-        Order order = Order(_orderAddress);
+        Order order = Order(msg.sender);
         address purchaser = order.purchasersAddress();
-        uint orderQuantity = takeLockedQuantity(_orderAddress);
+        uint orderQuantity = takeLockedQuantity(msg.sender);
         assetToBeSold.transferOwnership(purchaser, orderQuantity);
-        order.saleCompleted(_fulfillmentDate, _comments);
         return RestStatus.OK;
     }
 

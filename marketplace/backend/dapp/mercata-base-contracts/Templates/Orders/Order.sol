@@ -6,22 +6,24 @@ import "../Enums/OrderStatus.sol";
 import "../Enums/RestStatus.sol";
 import "../Sales/Sale.sol";
 
-contract Order is OrderStatus, Utils {
+abstract contract Order is OrderStatus, Utils {
     uint public orderId;
     address[] public saleAddresses;
-    mapping (address => uint) saleMap;
     uint[] public quantities;
     bool[] public completedSales;
     uint outstandingSales;
     address public purchasersAddress;
     string public purchasersCommonName;
+    string public sellersCommonName;
     uint public createdDate;
     uint public totalPrice;
     OrderStatus public status;
     string public shippingAddress;
     string public paymentSessionId;
+    uint public fulfillmentDate;
+    string public comments;
 
-    event SaleCompleted(uint fulfillmentDate, string comments);
+    event OrderCompleted(uint fulfillmentDate, string comments);
 
     constructor(
         uint _orderId,
@@ -39,11 +41,16 @@ contract Order is OrderStatus, Utils {
         for (uint i = 0; i < _saleAddresses.length; i++) {
             address a = _saleAddresses[i];
             Sale s = Sale(a);
+            string _sellersCommonName = s.assetToBeSold().ownerCommonName();
+            if (sellersCommonName == "") {
+                sellersCommonName = _sellersCommonName;
+            } else {
+                require(sellersCommonName == _sellersCommonName, "Cannot create order from multiple sellers.");
+            }
             uint q = _quantities[i];
             s.lockQuantity(q);
             totalPrice += s.price() * q;
             saleAddresses.push(a);
-            saleMap[a] = saleAddresses.length;
             completedSales.push(false);
             quantities.push(q);
             outstandingSales++;
@@ -52,15 +59,19 @@ contract Order is OrderStatus, Utils {
         shippingAddress = _shippingAddress;
     }
 
-    function saleCompleted(uint _fulfillmentDate, string _comments) external returns (uint) {
-        require(status != OrderStatus.CLOSED, "Order already closed.");
-        uint index = saleMap[msg.sender];
-        if (index > 0 && !completedSales[index - 1]) {
-            completedSales[index - 1] = true;
-            outstandingSales--;
-            emit SaleCompleted(_fulfillmentDate, _comments);
+    function completeOrder(uint _fulfillmentDate, string _comments) external returns (uint) {
+        require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
+        for (uint i = 0; i < saleAddresses.length; i++) {
+            if (!completedSales[i]) {
+                Sale(saleAddresses[i]).completeSale();
+                completedSales[i] = true;
+                outstandingSales--;
+            }
         }
         if (outstandingSales == 0) {
+            fulfillmentDate = _fulfillmentDate;
+            comments = _comments;
+            emit OrderCompleted(_fulfillmentDate, _comments);
             status = OrderStatus.CLOSED;
         }
         return RestStatus.OK;
@@ -76,16 +87,11 @@ contract Order is OrderStatus, Utils {
             }
         }
     }
-    
-    function completeOrder() external returns (uint) {
-        status = OrderStatus.CLOSED;
-        unlockSales();
-        return RestStatus.OK;
-    }
 
     function onCancel() internal virtual {}
 
     function cancelOrder() external {
+        require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         require(tx.origin == purchasersAddress, "Only the purchaser can cancel the order");
         onCancel();
         unlockSales();

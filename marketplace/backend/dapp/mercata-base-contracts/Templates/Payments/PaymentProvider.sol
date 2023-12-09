@@ -8,7 +8,6 @@ import "../Utils/Utils.sol";
 
 /// @title A representation of PaymentProvider_1 assets
 contract PaymentProvider is Utils {
-
     address public owner;
     string public ownerCommonName;
 
@@ -21,6 +20,11 @@ contract PaymentProvider is Utils {
     uint public eventTime;
     uint public createdDate;
     bool public accountDeauthorized;
+
+    event Payment(
+        string sellerAccountId,
+        string amount
+    );
 
 
     constructor (

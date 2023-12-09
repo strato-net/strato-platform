@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Modal, Tabs,Button } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
 import { useAuthenticateState } from "../../contexts/authentication";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 
@@ -59,11 +58,11 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
             </div>
             <div>
               <div className="flex items-center">
-                <p className="text-primaryC text-sm w-44">Units</p>
+                <p className="text-primaryC text-sm w-44">Quantity</p>
                 <p text-secondryB text-sm>
                   :
                 </p>
-                <p className="text-secondryB text-sm ml-3">{itemData.units}</p>
+                <p className="text-secondryB text-sm ml-3">{itemData.quantity}</p>
               </div>
             </div>
           </>
@@ -156,9 +155,9 @@ const PreviewInventoryModal = ({ open, handleCancel, inventory, category }) => {
               <p className="text-xs text-secondryB mt-1.5">
                 {decodeURIComponent(inventory.description)}
               </p>
-              <h3 className="font-semibold text-primaryB text-xl mt-3">
-                $ {inventory.price}
-              </h3>
+              {inventory.price ? (<h3 className="font-semibold text-primaryB text-xl mt-3">
+                ${inventory.price}
+              </h3>) : <></>}
               <h5 className="font-medium text-primaryB text-sm mt-3">
                 Quantity
               </h5>

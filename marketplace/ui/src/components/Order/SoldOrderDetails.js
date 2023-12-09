@@ -216,7 +216,7 @@ const SoldOrderDetails = ({ user, users }) => {
     let isDone=false;
 
     body = {
-      saleOrderAddress: details.order.address,
+      orderAddress: details.order.address,
       fulfillmentDate: dayjs(selectedDate).unix(),
       comments: comment,
     };

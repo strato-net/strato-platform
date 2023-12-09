@@ -17,6 +17,9 @@ const actionDescriptors = {
   updateInventory: "update_inventory",
   updateInventorySuccessful: "update_inventory_successful",
   updateInventoryFailed: "update_inventory_failed",
+  listInventory: "list_inventory",
+  listInventorySuccessful: "list_inventory_successful",
+  listInventoryFailed: "list_inventory_failed",
   resellInventory: "resell_inventory",
   resellInventorySuccessful: "resell_inventory_successful",
   resellInventoryFailed: "resell_inventory_failed",
@@ -243,6 +246,114 @@ const actions = {
     }
   },
 
+  listInventory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.listInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/inventory/list`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.listInventorySuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Listing Item was successful", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.listInventoryFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.listInventoryFailed, error: "Error while listing Item" });
+        actions.setMessage(dispatch, "Error while listing Item")
+        return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.listInventoryFailed, 
+          error: "Unauthorized while listing Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.listInventoryFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.listInventoryFailed,
+        error: "Error while listing Item",
+      });
+      actions.setMessage(dispatch, "Error while listing Item");
+    }
+  },
+
+  unlistInventory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.unlistInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/inventory/unlist`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.unlistInventorySuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Unlisting Item was successful", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.unlistInventoryFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.unlistInventoryFailed, error: "Error while unlisting Item" });
+        actions.setMessage(dispatch, "Error while unlisting Item")
+        return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.unlistInventoryFailed, 
+          error: "Unauthorized while unlisting Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.unlistInventoryFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.unlistInventoryFailed,
+        error: "Error while unlisting Item",
+      });
+      actions.setMessage(dispatch, "Error while unlisting Item");
+    }
+  },
+
   resellInventory: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.resellInventory });
 
@@ -381,11 +492,11 @@ const actions = {
     }
   },
 
-  sellerStripeStatus: async (dispatch, org) => {
+  sellerStripeStatus: async (dispatch, username) => {
     dispatch({ type: actionDescriptors.sellerStripeStatus });
 
     try {
-      const response = await fetch(`${apiUrl}/payment/stripe/account/status/${org}`, {
+      const response = await fetch(`${apiUrl}/payment/stripe/account/status/${username}`, {
         method: HTTP_METHODS.GET,
       });
 

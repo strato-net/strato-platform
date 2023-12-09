@@ -84,6 +84,40 @@ const reducer = (state, action) => {
         error: action.error,
         isinventoryUpdating: false
       };
+    case actionDescriptors.listInventory:
+      return {
+        ...state,
+        isListing: true
+      };
+    case actionDescriptors.listInventorySuccessful:
+      return {
+        ...state,
+        inventory: action.payload,
+        isListing: false
+      };
+    case actionDescriptors.listInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isListing: false
+      };
+    case actionDescriptors.unlistInventory:
+      return {
+        ...state,
+        isUnlisting: true
+      };
+    case actionDescriptors.unlistInventorySuccessful:
+      return {
+        ...state,
+        inventory: action.payload,
+        isUnlisting: false
+      };
+    case actionDescriptors.unlistInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUnlisting: false
+      };
     case actionDescriptors.resellInventory:
       return {
         ...state,

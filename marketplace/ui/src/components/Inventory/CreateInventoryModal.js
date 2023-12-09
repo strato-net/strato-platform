@@ -52,11 +52,10 @@ const CreateInventoryModal = ({
     artist: "",
     source: "",
     projectType: "",
-    units: 1,
+    quantity: 1,
     brand: "",
     images: null,
-    price: null,
-    paymentTypes: [],
+    files: null,
     category: "Art"
   };
 
@@ -92,8 +91,7 @@ const CreateInventoryModal = ({
         name: values.name,
         description: values.description,
         images: (imageData ? [imageData.imageKey] : []),
-        price: values.price,
-        paymentTypes: values.paymentTypes
+        files: [] //(imageData ? [imageData.imageKey] : []),
       },
     };
 
@@ -111,7 +109,7 @@ const CreateInventoryModal = ({
             itemArgs: {
               ...body.itemArgs,
               projectType: values.projectType,
-              units: values.units,
+              quantity: values.quantity,
             }
           }
         case 'Clothing':
@@ -244,21 +242,21 @@ const CreateInventoryModal = ({
                 )}
             </Form.Item>
             <Form.Item
-              label="Units"
-              name="units"
+              label="Quantity"
+              name="quantity"
               className="w-72"
             >
               <Input
-                label="units"
-                placeholder="Enter Units"
-                name="units"
-                value={formik.values.units}
+                label="quantity"
+                placeholder="Enter Quantity"
+                name="quantity"
+                value={formik.values.quantity}
                 onChange={formik.handleChange}
               />
-              {formik.touched.units &&
-                formik.errors.units && (
+              {formik.touched.quantity &&
+                formik.errors.quantity && (
                   <span className="text-error text-xs">
-                    {formik.errors.units}
+                    {formik.errors.quantity}
                   </span>
                 )}
             </Form.Item>
@@ -313,6 +311,56 @@ const CreateInventoryModal = ({
   };
 
   const disabled = isCreateInventorySubmitting || isUploadImageSubmitting;
+
+  /*
+              <div className="flex justify-between mt-4 ">
+                <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
+                  <Select
+                    id="paymentTypes"
+                    mode="multiple"
+                    tagRender={tagRender}
+                    placeholder="Select Payment Types"
+                    allowClear
+                    name="paymentTypes"
+                    maxTagCount="responsive"
+                    value={formik.values.paymentTypes}
+                    onChange={handleSelectAll}
+                    showSearch={false}
+                  >
+                    {PAYMENT_TYPE.map((e, index) => (
+                      <Option value={e.value} key={index}>
+                        {e.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  {getIn(formik.touched, "paymentTypes") &&
+                    getIn(formik.errors, "paymentTypes") && (
+                      <span className="text-error text-xs">
+                        {getIn(formik.errors, "paymentTypes")}
+                      </span>
+                    )}
+                </Form.Item>
+                <Form.Item
+                  label={formik.values.category === 'Carbon' ? 'Price per unit' : 'Price'}
+                  name="price"
+                  className="w-72"
+                >
+                  <Input
+                    label="price"
+                    placeholder="Enter Price"
+                    name="price"
+                    value={formik.values.price}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.price &&
+                    formik.errors.price && (
+                      <span className="text-error text-xs">
+                        {formik.errors.price}
+                      </span>
+                    )}
+                </Form.Item>
+              </div>
+  */
 
   return (
     <>
@@ -388,53 +436,6 @@ const CreateInventoryModal = ({
                 </Form.Item>
               </div>
               {categoricalProperties()}
-              <div className="flex justify-between mt-4 ">
-                <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
-                  <Select
-                    id="paymentTypes"
-                    mode="multiple"
-                    tagRender={tagRender}
-                    placeholder="Select Payment Types"
-                    allowClear
-                    name="paymentTypes"
-                    maxTagCount="responsive"
-                    value={formik.values.paymentTypes}
-                    onChange={handleSelectAll}
-                    showSearch={false}
-                  >
-                    {PAYMENT_TYPE.map((e, index) => (
-                      <Option value={e.value} key={index}>
-                        {e.name}
-                      </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "paymentTypes") &&
-                    getIn(formik.errors, "paymentTypes") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "paymentTypes")}
-                      </span>
-                    )}
-                </Form.Item>
-                <Form.Item
-                  label={formik.values.category === 'Carbon' ? 'Price per unit' : 'Price'}
-                  name="price"
-                  className="w-72"
-                >
-                  <Input
-                    label="price"
-                    placeholder="Enter Price"
-                    name="price"
-                    value={formik.values.price}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.price &&
-                    formik.errors.price && (
-                      <span className="text-error text-xs">
-                        {formik.errors.price}
-                      </span>
-                    )}
-                </Form.Item>
-              </div>
               <Form.Item label="Description" name="description" className="mt-4">
                 <TextArea
                   label="description"
