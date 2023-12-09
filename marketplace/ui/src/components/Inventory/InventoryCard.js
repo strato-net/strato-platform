@@ -13,6 +13,10 @@ import {
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
+import {
+  UNIT_OF_MEASUREMENTS,
+  INVENTORY_STATUS,
+} from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ListForSaleModal from "./ListForSaleModal";
 import UnlistModal from "./UnlistModal";
@@ -90,31 +94,45 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const callDetailPage = () => {
-    navigate(`${naviroute.replace(":id", inventory.address)}`, { state: { isCalledFromInventory: true } });
-  }
+    navigate(`${naviroute.replace(":id", inventory.address)}`, {
+      state: { isCalledFromInventory: true },
+    });
+  };
 
   const getCategory = () => {
-    const parts = inventory.contract_name.split('-');
+    const parts = inventory.contract_name.split("-");
     return parts[parts.length - 1];
   };
 
   const categoricalProperties = () => {
     switch (getCategory()) {
-      case 'Art':
+      case "Art":
         return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Artist</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.artist}
-            </p>
-          </div>)
-      case 'Carbon':
+          <div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Artist</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.artist}</p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Serial Number</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.serialNumber
+                  ? itemData.serialNumber
+                  : "No Serial Number Available"}
+              </p>
+            </div>
+          </div>
+        );
+      case "Carbon":
         return (
           <>
-            <div className="flex mt-1.5 items-center">
+            {/* <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Project Type</p>
               <p text-secondryB text-sm>
                 :
@@ -122,30 +140,58 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               <p className="text-secondryB text-sm ml-3">
                 {itemData.projectType}
               </p>
-            </div>
+            </div> */}
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Quantity</p>
               <p text-secondryB text-sm>
                 :
               </p>
+              <p className="text-secondryB text-sm ml-3">{inventory.quantity}</p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Serial Number</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
               <p className="text-secondryB text-sm ml-3">
-                {inventory.quantity}
+                {itemData.serialNumber
+                  ? itemData.serialNumber
+                  : "No Serial Number Available"}
               </p>
             </div>
           </>
-          )
-      case 'Clothing':
+        );
+      case "Clothing":
         return (
-          <div className="flex mt-1.5 items-center">
-            <p className="text-primaryC text-sm w-40">Brand</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.brand}
-            </p>
-          </div>)
-      case 'Metals':
+          <div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Brand</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">{itemData.brand}</p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">Condition</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.condition?.toUpperCase()}
+              </p>
+            </div>
+            <div className="flex mt-1 items-center">
+              <p className="text-primaryC text-sm w-40">SKU</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.skuNumber ? itemData.skuNumber : "No SKU Available"}
+              </p>
+            </div>
+          </div>
+        );
+      case "Metals":
         return (
           <div className="flex mt-1.5 items-center">
             <p className="text-primaryC text-sm w-40">Source</p>
@@ -156,6 +202,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               {itemData.source}
             </p>
           </div>)
+      case 'Membership':
+        return (
+          <>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Units</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.units}
+              </p>
+            </div>
+          </>
+        )
       default:
         break;
     }
@@ -164,7 +224,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   return (
     <Card className="w-full mt-6">
       <div className="flex" id={id}>
-        <img className="w-52 object-contain" alt="" src={inventory.images && inventory.images.length > 0 ? inventory.images[0] : image_placeholder} />
+        <img
+          className="w-52 object-contain"
+          alt=""
+          src={
+            inventory.images && inventory.images.length > 0
+              ? inventory.images[0]
+              : image_placeholder
+          }
+        />
         <div className="ml-12 w-full">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
@@ -178,7 +246,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               }
             </div>
             <div className="flex items-center">
-              <Button type="text"
+              <Button
+                type="text"
                 className="text-primary text-sm cursor-pointer"
                 onClick={callDetailPage}
               >
@@ -279,8 +348,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               <div className="text-error bg-[#FFF0F0] text-center py-1 rounded w-28 text-sm">
                 <p>UNPUBLISHED</p>
               </div>
-            </div>)
-          }
+            </div>
+          )}
         </div>
       </div>
       {open && (
@@ -292,7 +361,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         />
       )}
       {openEdit && (
-        <AddEventModal open={openEdit} handleCancel={handleCancelEdit} inventoryId={inventory.address} productId={inventory.productId} />
+        <AddEventModal
+          open={openEdit}
+          handleCancel={handleCancelEdit}
+          inventoryId={inventory.address}
+          productId={inventory.productId}
+        />
       )}
       {editModalOpen && (
         <UpdateInventoryModal
@@ -330,6 +404,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
       )}
     </Card>
   );
-};
+
+}
 
 export default InventoryCard;

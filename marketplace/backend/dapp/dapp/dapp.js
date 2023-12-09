@@ -13,6 +13,8 @@ import artJs from "/dapp/items/art";
 import carbonJs from "/dapp/items/carbon";
 import metalsJs from "/dapp/items/metals";
 import clothingJs from "/dapp/items/clothing";
+import membershipJs from "/dapp/items/membership";
+import collectibleJs from "dapp/items/collectibles";
 
 import saleJs from "/dapp/orders/sale";
 import saleOrderJs from "/dapp/orders/saleOrder";
@@ -201,7 +203,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // -------------------------- INVENTORY --------------------------------
-  
+
   contract.getInventory = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName, };
     return inventoryJs.get(rawAdmin, { ...args }, getOptions);
@@ -211,7 +213,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName };
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    return {inventories: inventories, inventoryCount: inventoryCount}
+    return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
@@ -230,10 +232,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
   }
 
-  contract.updateItem = async function (args, options = defaultOptions) {
-    const { itemContract, itemAddress, ...restArgs} = args;
+  contract.updateInventory = async function (args, options = defaultOptions) {
+    const { itemContract, itemAddress, ...restArgs } = args;
     const contract = { name: itemContract, address: itemAddress };
-    return inventoryJs.updateItem(rawAdmin, contract, restArgs, options);
+    return inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
   }
 
   // ------------------------------ INVENTORY ENDS--------------------------------
@@ -335,6 +337,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
+      status: 1
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
@@ -345,6 +348,46 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ CLOTHING ENDS--------------------------------
+
+  // ------------------------------ MEMBERSHIP STARTS------------------------------
+
+  contract.createMembership = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: 1,
+    };
+    return membershipJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return membershipJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ MEMBERSHIP ENDS--------------------------------
+
+  // ------------------------------ COLLECTIBLES STARTS------------------------------
+
+  contract.createCollectible = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      owner: rawAdmin.address,
+      status: 1
+    };
+    return collectibleJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return collectibleJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ COLLECTIBLES ENDS--------------------------------
 
   // ------------------------------ SALE TEST STARTS ------------------------------
 
@@ -357,6 +400,27 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const quantities = items.map(item => {
       return item.quantity;
     })
+    /*
+    const sales = await saleJs.getAll(rawAdmin, { assetAddresses, paymentMethod }, options);
+    const sellersAddress = sales[0].sellersAddress;
+    const sellersCommonName = sales[0].sellersCommonName;
+    const saleAddresses = await Promise.all(sales.map(async (sale) => {
+      const orderForSale = orderList.find(order => order.assetAddress === sale.assetToBeSold);
+      const saleData = JSON.parse(sale.data);
+      if (saleData.units && orderForSale.quantity < saleData.units) {
+        const contract = { name: orderForSale.category, address: orderForSale.assetAddress }
+        const splitSaleAddress = await saleJs.createSplitSale(rawAdmin, {
+          paymentType: parseInt(PAYMENT_TYPES[paymentMethod]),
+          price: sale.price,
+          units: orderForSale.quantity,
+        }, options, contract);
+        return splitSaleAddress;
+      }
+      else {
+        return sale.address;
+      }
+    }));
+    */
     const newArgs = {
       ...restArgs,
       saleAddresses,
@@ -528,7 +592,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const newOptions = { ...options, app: paymentProviderJs.contractName }
 
       const assetAddresses = orderList.map(o => o.assetAddress);
-      
+
       const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
 
       const saleAddresses = assets.map(a => a.saleAddress);

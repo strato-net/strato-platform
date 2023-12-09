@@ -98,7 +98,9 @@ export const CATEGORIES = [
   "Art",
   "Carbon",
   "Metals",
-  "Clothing"
+  "Clothing",
+  "Membership",
+  "Collectibles"
 ]
 
 export const PAYMENT_TYPE = [

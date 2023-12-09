@@ -78,6 +78,15 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, Utils {
         _;
     }
 
+    modifier requireWhitelisted(string action) {
+        bool isWhitelisted = isSaleWhitelisted(msg.sender);
+        string err = "Only a whitelisted Sale contract can "
+                   + action
+                   + ".";
+        require(isWhitelisted, err);
+        _;
+    }
+
     // Updated function to add a sale to the whitelist
     function attachSale() public requireOwnerOrigin("attach sale") {
         require(sale == address(0), "Sale is already assigned for this asset");

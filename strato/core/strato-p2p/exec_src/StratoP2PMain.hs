@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
-import           Control.Concurrent.Chan.Unagi.Bounded
 import           Control.Monad.IO.Class
 import           Control.Concurrent.Async.Lifted.Safe
 import           Blockchain.VMOptions       ()
@@ -39,10 +38,9 @@ initP2P = do
   cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   context <- liftIO $ readIORef $ configContext cfg
   let contextkafkastate = contextKafkaState context
-  let contextkafkamiddleman = contextKafkaMiddleman context
-  _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate ((\(a,_) -> a) contextkafkamiddleman)
-  let sSource = seqEventNotificationSourceChanPour ((\(a,_) -> a) contextkafkamiddleman)
-                                                   dupChan
+  let contextkafkamiddlemanin = contextKafkaMiddlemanIn context
+  _ <- async $ runContextM cfg $ seqEventNotificationSourceChanFill contextkafkastate contextkafkamiddlemanin
+  let sSource = seqEventNotificationSourceChanPour contextkafkamiddlemanin
       runner f = runContextM cfg $ f sSource
   liftIO $
     race_

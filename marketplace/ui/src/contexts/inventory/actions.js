@@ -375,20 +375,20 @@ const actions = {
           type: actionDescriptors.resellInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Reselling Item was successful", true);
+        actions.setMessage(dispatch, "Inventory has been updated", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({ type: actionDescriptors.resellInventoryFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while reselling Item" });
-        actions.setMessage(dispatch, "Error while reselling Item")
+        dispatch({ type: actionDescriptors.resellInventoryFailed, error: "Error while publishing Item" });
+        actions.setMessage(dispatch, "Error while publishing Item")
         return false;
       } else if(response.status === RestStatus.UNAUTHORIZED) {
         dispatch({ 
           type: actionDescriptors.resellInventoryFailed, 
-          error: "Unauthorized while reselling Inventory" 
+          error: "Unauthorized while publishing Inventory" 
         });
         window.location.href = body.error.loginUrl;
       }
@@ -402,9 +402,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.resellInventoryFailed,
-        error: "Error while reselling Item",
+        error: "Error while publishing Item",
       });
-      actions.setMessage(dispatch, "Error while reselling Item");
+      actions.setMessage(dispatch, "Error while publishing Item");
     }
   },
 

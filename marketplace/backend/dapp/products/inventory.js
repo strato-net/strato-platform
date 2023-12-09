@@ -186,20 +186,40 @@ async function unlistItem(user, _contract, args, options) {
 
 async function resellItem(user, contract, args, options) {
     const callArgs = {
-      contract,
-      method: "createSales",
-      args: util.usc({ ...args }),
+        contract,
+        method: "createSales",
+        args: util.usc({ ...args }),
     };
     const resellStatus = await rest.call(user, callArgs, options);
-  
+
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
-      throw new rest.RestError(
-        resellStatus,
-        "You cannot resell the item because it's already published",
-        { callArgs }
-      );
+        throw new rest.RestError(
+            resellStatus,
+            "You cannot resell the item because it's already published",
+            { callArgs }
+        );
     }
-  
+
+    return resellStatus;
+}
+
+async function updateInventory(user, contract, args, options) {
+    const callArgs = {
+        contract,
+        method: "update",
+        args: util.usc({ ...args.updates }),
+    };
+
+    const resellStatus = await rest.call(user, callArgs, options);
+
+    if (parseInt(resellStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+            resellStatus,
+            "You cannot resell the item because it's already published",
+            { callArgs }
+        );
+    }
+
     return resellStatus;
 }
 
@@ -246,15 +266,15 @@ async function getAll(admin, args = {}, defaultOptions) {
     const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
 
     if (ownerCommonName) {
-        inventories = await searchAllWithQueryArgs(contractName, 
-            {   
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
                 ...restArgs,
                 ownerCommonName: ownerCommonName, 
             }, options, admin);
     }
     else if (assetAddresses) {
-        inventories = await searchAllWithQueryArgs(contractName, 
-            { 
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
                 ...restArgs,
                 address: assetAddresses, 
             }, options, admin);
@@ -296,17 +316,17 @@ async function inventoryCount(admin, args = {}, defaultOptions) {
         order: undefined,
     });
     const totalResult = await searchAll(
-    contractName,
-    {
-        ...queryArgs,
-        sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
-        queryOptions: {
-        ...queryArgs.queryOptions,
-        select: "count",
+        contractName,
+        {
+            ...queryArgs,
+            sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
+            queryOptions: {
+                ...queryArgs.queryOptions,
+                select: "count",
+            },
         },
-    },
-    options,
-    admin
+        options,
+        admin
     );
     return totalResult[0].count
 }
@@ -330,6 +350,7 @@ export default {
     bindAddress,
     unlistItem,
     resellItem,
+    updateInventory,
     get,
     getAll,
     inventoryCount,

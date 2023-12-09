@@ -16,6 +16,8 @@ where
 import qualified Data.ByteString.Char8              as DBC8
 import qualified Data.ByteString.Lazy               as DBL
 import qualified Data.List.NonEmpty                 as NE
+import qualified Data.Text                          as T
+import           Data.Text.Encoding                 (encodeUtf8)
 import           Blockchain.Strato.Model.Keccak256
 import           Network.HTTP.Media ((//), (/:))
 import           Servant.API
@@ -59,14 +61,14 @@ instance MimeUnrender Web ContentTypeAndBody where
                                                  , contentTypeBody   = bs                                  --both of these
                                                  } 
 
-instance MimeRender Web () where
-  mimeRender _ _ = DBL.empty
+instance MimeRender Web Keccak256 where
+  mimeRender _ bs = DBL.fromStrict . encodeUtf8 . T.pack $ keccak256ToHex bs
 
 instance AllCTRender '[Web] ContentTypeAndBody where
   handleAcceptH _ _ (ContentTypeAndBody h c) = Just (h,c)
 
-type HighwayGetS3File = "gets3file" :> Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
+type HighwayGetS3File = Capture "hash" Keccak256 :> Get '[Web] ContentTypeAndBody
 
-type HighwayPutS3File = "puts3file" :> MultipartForm Mem (MultipartData Mem) :> Put '[Web] ()
+type HighwayPutS3File = MultipartForm Mem (MultipartData Mem) :> Put '[Web] Keccak256
 
 type HighwayPing      = "ping" :> Get '[JSON] Int

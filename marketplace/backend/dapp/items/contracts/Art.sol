@@ -40,18 +40,11 @@ contract Art is ItemStatus, RestStatus, Asset {
         return RestStatus.OK;
     }
 
-    function updateArt(
-        string _name, 
-        string _description, 
-        string[] _images, 
+    function update(
         ItemStatus _status,
-        string _serialNumber,
-        string _artist,
         uint _price
     ) public requireOwner("update art") returns (uint) {
-        serialNumber = _serialNumber;
-        artist = _artist;
-        updateAsset(_name, _description, _images, _status, _price);
+        updateAsset(name, description, images, _status, _price);
         return RestStatus.OK;
     }
 }

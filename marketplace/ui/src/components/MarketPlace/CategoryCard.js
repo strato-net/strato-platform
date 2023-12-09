@@ -19,7 +19,7 @@ const CategoryCard = () => {
     Images.carbon,
     Images.metals,
     Images.clothing,
-    Images.collectibles,
+    Images.membership
   ];
 
   return (

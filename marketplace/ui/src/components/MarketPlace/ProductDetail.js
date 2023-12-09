@@ -444,11 +444,11 @@ const ProductDetails = ({ user, users }) => {
       case "Carbon":
         return (
           <Space direction="vertical">
-            <Space>
+            {/* <Space>
               <DescTitle text="Project Type" />
               <DescTitle text="                      :" />
               <Text className="text-[13px]">{itemData?.projectType}</Text>
-            </Space>
+            </Space> */}
             <Space>
               <DescTitle text="Units" />
               <DescTitle text="                      :" />
@@ -460,8 +460,18 @@ const ProductDetails = ({ user, users }) => {
           <Space direction="vertical">
             <Space>
               <DescTitle text="Brand" />
-              <DescTitle text="                      :" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.brand}</Text>
+            </Space>
+            <Space>
+              <DescTitle text="Condition" />
+              <DescTitle text=":" />
+              <Text className="text-[13px]">{itemData.condition ? itemData.condition.toUpperCase() : null}</Text>
+            </Space>
+            <Space>
+              <DescTitle text="SKU" />
+              <DescTitle text=":" />
+              <Text className="text-[13px]">{itemData.skuNumber ? itemData.skuNumber.toUpperCase() : "No SKU Available"}</Text>
             </Space>
           </Space>)
       case "Metals":

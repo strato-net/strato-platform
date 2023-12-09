@@ -6,12 +6,12 @@ import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
 
-const contractName = "Art";
-const contractFilename = `${util.cwd}/dapp/items/contracts/Art.sol`;
+const contractName = "Membership";
+const contractFilename = `${util.cwd}/dapp/items/contracts/Membership.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 
 /** 
- * Uploads a new Art item 
+ * Uploads a new Membership item 
  * @param user User token (typically an admin)
  * @param _constructorArgs Arguments of Item's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
@@ -119,7 +119,7 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing Art contract to a new user token. Useful for having multiple users test
+ * Bind an existing Membership contract to a new user token. Useful for having multiple users test
  * the same contract.
  * @example <caption>Create an admin and user bound to the same new item contract.</caption>
  * const adminBoundContract = createArt(adminToken, args, options);
@@ -163,10 +163,10 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Art']` }, options, admin);
+    const inventories = await searchAllWithQueryArgs(constants.assetTableName, { ...args, category: `['Membership']` }, options, admin);
     return inventories.map((inventory) => marshalOut(inventory));
-  }
-  
+}
+
 
 /**
  * Get contract state in bloc.
@@ -192,9 +192,6 @@ async function transferOwnership(user, contract, options, newOwner) {
     };
     const transferStatus = await rest.call(user, callArgs, options);
 
-    console.log('transferStatus', transferStatus);
-    console.log(parseInt(transferStatus, 10));
-    console.log(RestStatus.OK);
     if (parseInt(transferStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(transferStatus, 'You cannot transfer the ownership of a Item you don\'t own', { newOwner })
     }
