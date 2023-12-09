@@ -87,14 +87,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           <div>
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Artist</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">{itemData.artist}</p>
             </div>
             <div className="flex mt-1 items-center">
               <p className="text-primaryC text-sm w-40">Serial Number</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
@@ -110,7 +110,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           <>
             {/* <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Project Type</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
@@ -119,7 +119,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </div> */}
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Units</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">{itemData.units}</p>
@@ -131,14 +131,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           <div>
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Brand</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">{itemData.brand}</p>
             </div>
             <div className="flex mt-1 items-center">
               <p className="text-primaryC text-sm w-40">Condition</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
@@ -147,7 +147,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             </div>
             <div className="flex mt-1 items-center">
               <p className="text-primaryC text-sm w-40">SKU</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
@@ -160,7 +160,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
         return (
           <div className="flex mt-1.5 items-center">
             <p className="text-primaryC text-sm w-40">Source</p>
-            <p text-secondryB text-sm>
+            <p className="text-secondryB text-sm">
               :
             </p>
             <p className="text-secondryB text-sm ml-3">
@@ -172,7 +172,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           <>
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Units</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
@@ -186,7 +186,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           <>
             <div className="flex mt-1.5 items-center">
               <p className="text-primaryC text-sm w-40">Units</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
@@ -261,7 +261,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           ) : (
             <div className="flex mt-1 items-center">
               <p className="text-primaryC text-sm w-40">Price</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">$ {inventory.price}</p>
@@ -269,7 +269,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           )}
           <div className="flex mt-1 items-center">
             <p className="text-primaryC text-sm w-40">Description</p>
-            <p text-secondryB text-sm>
+            <p className="text-secondryB text-sm">
               :
             </p>
             <p className="text-secondryB text-sm ml-3">
@@ -281,7 +281,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           ) : (
             <div className="flex mt-1 items-center">
               <p className="text-primaryC text-sm w-40">Serial Number</p>
-              <p text-secondryB text-sm>
+              <p className="text-secondryB text-sm">
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
