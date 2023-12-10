@@ -4,6 +4,7 @@ pragma builtinCreates;
 
 import <509>;
 import "Templates/Assets/Asset.sol";
+import "Templates/Assets/Mintable.sol";
 import "Templates/Assets/UTXO.sol";
 import "Templates/Enums/ItemStatus.sol";
 import "Templates/Enums/OrderStatus.sol";

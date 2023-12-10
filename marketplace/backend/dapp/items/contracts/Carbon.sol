@@ -4,7 +4,7 @@ pragma strict;
 import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
 
 /// @title A representation of Carbon assets
-contract Carbon is UTXO {
+contract Carbon is Mintable {
     uint serialNumber;
     string public projectType;
 
@@ -19,7 +19,7 @@ contract Carbon is UTXO {
         uint _quantity,
         uint _serialNumber,
         string _projectType
-    ) UTXO (
+    ) Mintable (
         _name,
         _description,
         "Carbon",
@@ -42,7 +42,7 @@ contract Carbon is UTXO {
                               splitQuantity, 
                               serialNumber + 1, 
                               projectType);
-        return UTXO(c);
+        return UTXO(address(c)); // Typechecker won't let me cast directly to UTXO
     }
 
     function updateCarbon(

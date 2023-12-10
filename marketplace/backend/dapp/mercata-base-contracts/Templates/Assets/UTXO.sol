@@ -26,7 +26,7 @@ abstract contract UTXO is Asset {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
-        return new UTXO(name, description, category, subCategory, images, files, createdDate, quantity);
+        return new UTXO(name, description, category, subCategory, images, files, createdDate, _quantity);
     }
 
     // Quantity is already checked by transferOwnership function

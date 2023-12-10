@@ -163,7 +163,7 @@ const ProductDetails = ({ user, users }) => {
       setCategoryName(prodCategory?.name);
       const detailsData = JSON.parse(details.data);
       setItemData(detailsData);
-      if (detailsData.units) {
+      if (details.saleQuantity) {
         setAvailableQuantity(details.saleQuantity || 1);
       }
     }
@@ -437,7 +437,7 @@ const ProductDetails = ({ user, users }) => {
           <Space direction="vertical">
             <Space>
               <DescTitle text="Artist" />
-              <DescTitle text="                      :" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.artist}</Text>
             </Space>
           </Space>)
@@ -450,8 +450,8 @@ const ProductDetails = ({ user, users }) => {
               <Text className="text-[13px]">{itemData?.projectType}</Text>
             </Space> */}
             <Space>
-              <DescTitle text="Units" />
-              <DescTitle text="                      :" />
+              <DescTitle text="Quantity" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{availableQuantity}</Text>
             </Space>
           </Space>)
@@ -479,7 +479,7 @@ const ProductDetails = ({ user, users }) => {
           <Space direction="vertical">
             <Space>
               <DescTitle text="Source" />
-              <DescTitle text="                      :" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.source}</Text>
             </Space>
           </Space>)

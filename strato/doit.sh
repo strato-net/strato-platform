@@ -206,7 +206,7 @@ function newnode {
     --diffPublish=${diffPublish:-true} \
     --gasOn=${gasOn:-true} \
     --maxTxsPerBlock=${maxTxsPerBlock:-500} \
-    --minLogLevel=${vmMinLogLevel} \
+    --minLogLevel=LevelDebug \
     --networkID=${networkID:--1} \
     --seqEventsBatchSize=${seqEventsBatchSize:--1} \
     --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \

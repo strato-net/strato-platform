@@ -211,15 +211,8 @@ const Checkout = ({ user }) => {
       dataIndex: "quantity",
       align: "center",
       width: "160px",
-      render: (text) => {
-        let qty = 1;
-        let product;
-        cartList.forEach((element) => {
-          if (element.product.address === text) {
-            qty = element.qty;
-            product = element.product;
-          }
-        });
+      render: (text, product) => {
+        let qty = product.qty;
         return (
           <div className="flex items-center mt-2">
             <div
@@ -229,8 +222,8 @@ const Checkout = ({ user }) => {
                 }
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
+                  if (element.product.address === product.key) {
+                    const availableQuantity = product.quantity ? product.quantity : 1;
                     if (items[index].qty - 1 <= availableQuantity) {
                       items[index].qty -= 1;
                       actions.addItemToCart(marketplaceDispatch, items);
@@ -253,8 +246,8 @@ const Checkout = ({ user }) => {
                 onChange={e => {
                   let items = [...cartList];
                   cartList.forEach((element, index) => {
-                    if (element.product.address === product.address) {
-                      const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
+                    if (element.product.address === product.key) {
+                      const availableQuantity = product.quantity ? product.quantity : 1;
                       if (e <= availableQuantity) {
                         items[index].qty = e;
                         actions.addItemToCart(marketplaceDispatch, items);
@@ -270,8 +263,8 @@ const Checkout = ({ user }) => {
               onClick={() => {
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
+                  if (element.product.address === product.key) {
+                    const availableQuantity = product.quantity ? product.quantity : 1;
                     if (items[index].qty + 1 <= availableQuantity) {
                       items[index].qty += 1;
                       actions.addItemToCart(marketplaceDispatch, items);

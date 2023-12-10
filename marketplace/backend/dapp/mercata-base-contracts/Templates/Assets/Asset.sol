@@ -2,14 +2,10 @@ pragma es6;
 pragma strict;
 
 import <509>;
-import "../Enums/OrderStatus.sol";
-import "../Enums/PaymentType.sol";
 import "../Enums/RestStatus.sol";
-import "../Enums/SaleState.sol";
-import "../Sales/Sale.sol";
 import "../Utils/Utils.sol";
 
-abstract contract Asset is PaymentType, SaleState, RestStatus, Utils {
+abstract contract Asset is Utils {
     address public owner;
     string public ownerCommonName;
     string public name;

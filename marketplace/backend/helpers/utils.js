@@ -248,7 +248,13 @@ export const setSearchQueryOptionsPrime = (args) => {
     
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
-      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      if (Array.isArray(args[key])) {
+        notEqualsField.map((field, i) => {
+          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+        })
+      } else {
+        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      }
     }
 
     return result
@@ -353,7 +359,13 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
 
     if (key === 'notEqualsValue') {
       const { notEqualsField, notEqualsValue } = args
-      result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      if (Array.isArray(args[key])) {
+        notEqualsField.map((field, i) => {
+          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+        })
+      } else {
+        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+      }
     }
 
     if (key === 'sort') {

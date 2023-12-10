@@ -250,13 +250,8 @@ class InventoryController {
 
   static validateResellItemArgs(args) {
     const resellItemSchema = Joi.object({
-      itemContract: Joi.string().required(),
-      itemAddress: Joi.string().required(),
-      paymentTypes: Joi.array().min(1).items(
-        Joi.number().integer().min(0).max(5).required(),
-      ).required(),
-      price: Joi.number().integer().greater(0).required(),
-      units: Joi.number().integer().greater(0).optional(),
+      assetAddress: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
     });
 
     const validation = resellItemSchema.validate(args);

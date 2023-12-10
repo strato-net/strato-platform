@@ -132,18 +132,9 @@ const UpdateInventoryModal = ({
   const handleUpdateFormSubmit = async (values) => {
     if (inventoryToUpdate.inventory.status === 2 && values.status) {
       let body = {
-        itemContract: getCategory(),
-        itemAddress: inventoryToUpdate.inventory.address,
-        paymentTypes: values.paymentTypes,
-        price: values.price,
-        units: values.availableQuantity
+        assetAddress: inventoryToUpdate.inventory.address,
+        quantity: values.availableQuantity
       };
-      if (getCategory() === "Carbon") {
-          body = {
-              ...body,
-              units: values.availableQuantity,
-          }
-      }
       let isDone = await actions.resellInventory(dispatch, body);
       if (isDone) {
           actions.fetchInventory(dispatch, 10, 0, "");
@@ -300,98 +291,6 @@ const UpdateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-              <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
-                  <Select
-                    id="paymentTypes"
-                    mode="multiple"
-                    tagRender={tagRender}
-                    placeholder="Select Payment Types"
-                    allowClear
-                    name="paymentTypes"
-                    maxTagCount="responsive"
-                    value={formik.values.paymentTypes}
-                    onChange={handleSelectAll}
-                    showSearch={false}
-                    disabled={inventoryToUpdate.inventory.status === "1"  || !formik.values.status}
-                  >
-                    {PAYMENT_TYPE.map((e, index) => (
-                      <Option value={e.value} key={index}>
-                        {e.name}
-                      </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "paymentTypes") &&
-                    getIn(formik.errors, "paymentTypes") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "paymentTypes")}
-                      </span>
-                    )}
-                </Form.Item>
-            </div>
-            <div className="flex justify-between mt-4 ">
-                <Form.Item
-                  label="Price Per Unit"
-                  name="price "
-                  className="w-72"
-                >
-                  <Input
-                    label="price"
-                    placeholder="Enter Price"
-                    name="price"
-                    value={formik.values.price}
-                    onChange={formik.handleChange}
-                    disabled={ !formik.values.status }
-                  />
-                  {formik.touched.price && formik.errors.price && (
-                    <span className="text-error text-xs">
-                      {formik.errors.price}
-                    </span>
-                  )}
-                </Form.Item>
-
-              <Form.Item label="Status" name="status" className="w-72">
-                <Radio.Group
-                  value={formik.values.status}
-                  onChange={formik.handleChange}
-                  name="status"
-                >
-                  <Radio value={true}>Publish</Radio>
-                  <Radio value={false}>Unpublish</Radio>
-                </Radio.Group>
-
-                {formik.touched.status && formik.errors.status && (
-                  <span className="text-error text-xs">
-                    {formik.errors.status}
-                  </span>
-                )}
-              </Form.Item>
-              {/* <Form.Item label="Batch ID" name="batchId" className="w-72">
-                <Input
-                  label="batchId"
-                  placeholder="Enter Batch ID"
-                  name="batchId"
-                  disabled={true}
-                  value={formik.values.batchId}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.batchId && formik.errors.batchId && (
-                  <span className="text-error text-xs">
-                    {formik.errors.batchId}
-                  </span>
-                )}
-              </Form.Item> */}
-            </div>
-            <div className="flex justify-between mt-4 ">
-              {/* <div className="mt-4 flex justify-between items-center">
-                <div>Enter Serial Numbers</div>
-              </div>
-              <TextArea
-                label="serialNumbers"
-                className="mt-2"
-                disabled={true}
-                // value={formik.values.serialNumber}
-                placeholder="Enter serial numbers as comma separated values 1232WE13W43,1232WE13W434,1232WE13W45"
-              /> */}
             </div>
           </div>
         </Form>

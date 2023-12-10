@@ -44,10 +44,7 @@ class MetalsController {
         description: Joi.string().required(),
         source: Joi.string().required(),
         images: Joi.array().items(Joi.string().optional()).required(),
-        price: Joi.number().positive().required(),
-        paymentTypes: Joi.array().min(1).items(
-          Joi.number().integer().min(0).max(5).required(),
-        ).required(),
+        files: Joi.array().items(Joi.string().optional()).required(),
       }).required()
     });
 

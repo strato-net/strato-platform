@@ -90,11 +90,12 @@ abstract contract Order is OrderStatus, Utils {
 
     function onCancel() internal virtual {}
 
-    function cancelOrder() external {
+    function cancelOrder() external returns (uint) {
         require(status != OrderStatus.CLOSED && status != OrderStatus.CANCELED, "Order already closed.");
         require(tx.origin == purchasersAddress, "Only the purchaser can cancel the order");
         onCancel();
         unlockSales();
         status = OrderStatus.CANCELED;
+        return RestStatus.OK;
     }
 }

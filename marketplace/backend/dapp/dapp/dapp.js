@@ -227,8 +227,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.resellItem = async function (args, options = defaultOptions) {
-    const { itemContract, itemAddress, ...restArgs } = args;
-    const contract = { name: itemContract, address: itemAddress };
+    const { assetAddress, ...restArgs } = args;
+    const contract = { address: assetAddress };
     return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
   }
 
@@ -252,12 +252,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args }, getOptions)
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions)
+    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
+                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
   // ------------------------------ ART STARTS ------------------------------

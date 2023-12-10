@@ -44,6 +44,7 @@ const CreateInventoryModal = ({
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [clothingType, setClothingType] = useState(null);
   const [sizeOptions, setSizeOptions] = useState([]);
 
@@ -60,7 +61,7 @@ const CreateInventoryModal = ({
     clothingType: null,
     images: null,
     files: null,
-    category: "Art"
+    category: "Art",
     size: null,
     skuNumber: null,
     condition: null,
@@ -76,7 +77,7 @@ const CreateInventoryModal = ({
     enableReinitialize: true,
   });
 
-  function beforeUpload(file) {
+  function beforeImageUpload(file) {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
       setUploadErr("Image must be of jpeg or png format");
@@ -86,6 +87,18 @@ const CreateInventoryModal = ({
       setUploadErr("Cannot upload an image of size more than 1mb");
     }
     return isJpgOrPng && isLt1M;
+  }
+
+  function beforeFileUpload(file) {
+    const isPdf = file.type === "application/pdf";
+    if (!isPdf) {
+      setUploadErr("File must be PDF format");
+    }
+    const isLt1M = file.size / 1024 / 1024 < 1;
+    if (!isLt1M) {
+      setUploadErr("Cannot upload a PDF of size more than 1mb");
+    }
+    return isPdf && isLt1M;
   }
 
   console.log(formik.errors);
@@ -122,7 +135,7 @@ const CreateInventoryModal = ({
               projectType: values.projectType,
               quantity: values.quantity,
             }
-          }
+          });
         case 'Clothing':
           return (body = {
             itemArgs: {
@@ -132,7 +145,7 @@ const CreateInventoryModal = ({
               size: values.size,
               condition: values.condition,
               brand: values.brand,
-              units: values.units,
+              quantity: values.quantity,
             },
           });
         case "Collectibles":
@@ -140,7 +153,7 @@ const CreateInventoryModal = ({
             itemArgs: {
               ...body.itemArgs,
               condition: values.condition,
-              units: values.units,
+              quantity: values.quantity,
             },
           });
         case "Metals":
@@ -154,7 +167,7 @@ const CreateInventoryModal = ({
           return body = {
             itemArgs: {
               ...body.itemArgs,
-              units: values.units,
+              quantity: values.quantity,
               expirationPeriodInMonths: values.expirationPeriodInMonths
             }
           }
@@ -429,17 +442,17 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item label="Units" name="units">
+            <Form.Item label="Quantity" name="quantity">
               <Input
-                id="units"
-                name="units"
-                value={formik.values.units}
-                placeholder="Enter Units"
+                id="quantity"
+                name="quantity"
+                value={formik.values.quantity}
+                placeholder="Enter Quantity"
                 onChange={formik.handleChange}
               />
-              {formik.touched.units && formik.errors.units && (
+              {formik.touched.quantity && formik.errors.quantity && (
                 <span className="text-error text-xs">
-                  {formik.errors.units}
+                  {formik.errors.quantity}
                 </span>
               )}
             </Form.Item>
@@ -467,17 +480,17 @@ const CreateInventoryModal = ({
                 </span>
               )}
             </Form.Item>
-            <Form.Item label="Units" name="units">
+            <Form.Item label="Quantity" name="quantity">
               <Input
-                id="units"
-                name="units"
-                value={formik.values.units}
-                placeholder="Enter Units"
+                id="quantity"
+                name="quantity"
+                value={formik.values.quantity}
+                placeholder="Enter Quantity"
                 onChange={formik.handleChange}
               />
-              {formik.touched.units && formik.errors.units && (
+              {formik.touched.quantity && formik.errors.quantity && (
                 <span className="text-error text-xs">
-                  {formik.errors.units}
+                  {formik.errors.quantity}
                 </span>
               )}
             </Form.Item>
@@ -525,21 +538,21 @@ const CreateInventoryModal = ({
                 )}
             </Form.Item>
             <Form.Item
-              label="Units"
-              name="units"
+              label="Quantity"
+              name="quantity"
               className="w-72"
             >
               <Input
-                label="units"
-                placeholder="Enter Units"
-                name="units"
-                value={formik.values.units}
+                label="quantity"
+                placeholder="Enter Quantity"
+                name="quantity"
+                value={formik.values.quantity}
                 onChange={formik.handleChange}
               />
-              {formik.touched.units &&
-                formik.errors.units && (
+              {formik.touched.quantity &&
+                formik.errors.quantity && (
                   <span className="text-error text-xs">
-                    {formik.errors.units}
+                    {formik.errors.quantity}
                   </span>
                 )}
             </Form.Item>
@@ -672,120 +685,7 @@ const CreateInventoryModal = ({
             </div>
             {categoricalProperties()}
             <div className="flex justify-between mt-4 ">
-              <Form.Item
-                label="Payment Types"
-                name="paymentTypes"
-                className="w-72"
-                getValueFromEvent={handleSelectAll}
-              >
-                <Select
-                  id="paymentTypes"
-                  mode="multiple"
-                  tagRender={tagRender}
-                  placeholder="Select Payment Types"
-                  allowClear
-                  name="paymentTypes"
-                  maxTagCount="responsive"
-                  value={formik.values.paymentTypes}
-                  onChange={handleSelectAll}
-                  showSearch={false}
-                >
-                  {PAYMENT_TYPE.map((e, index) => (
-                    <Option value={e.value} key={index}>
-                      {e.name}
-                    </Option>
-                  ))}
-                </Select>
-                {getIn(formik.touched, "paymentTypes") &&
-                  getIn(formik.errors, "paymentTypes") && (
-                    <span className="text-error text-xs">
-                      {getIn(formik.errors, "paymentTypes")}
-                    </span>
-                  )}
-              </Form.Item>
-              <Form.Item
-                label={
-                  formik.values.category === "Carbon"
-                    ? "Price per unit"
-                    : "Price"
-                }
-                name="price"
-                className="w-72"
-              >
-                <Input
-                  label="price"
-                  placeholder="Enter Price"
-                  name="price"
-                  value={formik.values.price}
-                  onChange={formik.handleChange}
-                />
-                {formik.touched.price && formik.errors.price && (
-                  <span className="text-error text-xs">
-                    {formik.errors.price}
-                  </span>
-                )}
-              </Form.Item>
-            </div>
-            <Form.Item label="Description" name="description" className="mt-4">
-              <TextArea
-                label="description"
-                placeholder="Enter Description"
-                name="description"
-                value={formik.values.description}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.description && formik.errors.description && (
-                <span className="text-error text-xs">
-                  {formik.errors.description}
-                </span>
-              )}
-            </Form.Item>
-
-            <div className="mt-4 flex justify-between">
-              <Form.Item label="Upload Images" name="images">
-                <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
-                  {selectedImage ? (
-                    <div className="h-20">
-                      <img
-                        alt="Item"
-                        src={selectedImage}
-                        style={{ width: "100%", height: "100%" }}
-                      />
-                      <br />
-                    </div>
-                  ) : (
-                    <PictureOutlined className="text-7xl text-primary opacity-10" />
-                  )}
-                  <Upload
-                    onChange={(e) => {
-                      setSelectedImage(
-                        URL.createObjectURL(e.file.originFileObj)
-                      );
-                      formik.setFieldValue("images", e.file.originFileObj);
-                    }}
-                    customRequest={() => { }}
-                    style={{ display: "none" }}
-                    accept="image/png, image/jpeg"
-                    maxCount={1}
-                    showUploadList={false}
-                    beforeUpload={beforeUpload}
-                  >
-                    {CATEGORIES.map((e, index) => (
-                      <Option value={e} key={index}>
-                        {e}
-                      </Option>
-                    ))}
-                  </Select>
-                  {getIn(formik.touched, "category") &&
-                    getIn(formik.errors, "category") && (
-                      <span className="text-error text-xs">
-                        {getIn(formik.errors, "category")}
-                      </span>
-                    )}
-                </Form.Item>
-              </div>
-              {categoricalProperties()}
-              <Form.Item label="Description" name="description" className="mt-4">
+              <Form.Item label="Description" name="description" className="w-full">
                 <TextArea
                   label="description"
                   placeholder="Enter Description"
@@ -799,9 +699,8 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-
               <div className="mt-4 flex justify-between">
-                <Form.Item label="Upload Images" name="images">
+                <Form.Item label="Upload Images" name="images" className="w-full">
                   <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
                     {selectedImage ? (
                       <div className="h-20">
@@ -823,12 +722,12 @@ const CreateInventoryModal = ({
                       customRequest={() => { }}
                       style={{ display: "none" }}
                       accept="image/png, image/jpeg"
-                      maxCount={1}
+                      maxCount={10}
                       showUploadList={false}
-                      beforeUpload={beforeUpload}
+                      beforeUpload={beforeImageUpload}
                     >
                       <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                        Browse
+                        Browse Images
                       </div>
                     </Upload>
                   </div>
@@ -845,6 +744,42 @@ const CreateInventoryModal = ({
                     </span>
                   )}
                 </Form.Item>
+              </div>
+              <div className="mt-4 flex justify-between">
+                <Form.Item label="Upload Files" name="files" className="w-full">
+                  <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
+                    <Upload
+                      onChange={(e) => {
+                        setSelectedFile(URL.createObjectURL(e.file.originFileObj));
+                        formik.setFieldValue("files", e.file.originFileObj);
+                      }}
+                      customRequest={() => { }}
+                      style={{ display: "none" }}
+                      accept="application/pdf"
+                      maxCount={10}
+                      showUploadList={false}
+                      beforeUpload={beforeFileUpload}
+                    >
+                      <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                        Browse Files
+                      </div>
+                    </Upload>
+                  </div>
+
+                  <div className="flex items-start">
+                    <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                    <p className="mt-1 text-xs italic ml-1 mr-4">
+                      use pdf format of size less than 1mb
+                    </p>
+                  </div>
+                  {formik.touched.images && formik.errors.images && (
+                    <span className="text-error text-xs">
+                      {formik.errors.images}
+                    </span>
+                  )}
+                </Form.Item>
+              </div>
+              <div className="mt-4 flex justify-between">
                 <div className="flex flex-col">
                   <Form.Item
                     label="Serial Number"
@@ -866,7 +801,6 @@ const CreateInventoryModal = ({
                       )}
                   </Form.Item>
                 </div>
-
               </div>
             </div>
           </div>

@@ -305,7 +305,7 @@ const Inventory = ({ user }) => {
                           category={category}
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
-                          paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : ''}
+                          paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined }
                         />
                       );
                     })}

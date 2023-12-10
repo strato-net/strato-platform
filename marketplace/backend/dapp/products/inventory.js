@@ -187,7 +187,7 @@ async function unlistItem(user, _contract, args, options) {
 async function resellItem(user, contract, args, options) {
     const callArgs = {
         contract,
-        method: "createSales",
+        method: "mintNew",
         args: util.usc({ ...args }),
     };
     const resellStatus = await rest.call(user, callArgs, options);
@@ -195,7 +195,7 @@ async function resellItem(user, contract, args, options) {
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(
             resellStatus,
-            "You cannot resell the item because it's already published",
+            "You cannot resell the item because you're not",
             { callArgs }
         );
     }
@@ -215,7 +215,7 @@ async function updateInventory(user, contract, args, options) {
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(
             resellStatus,
-            "You cannot resell the item because it's already published",
+            "You cannot update the item",
             { callArgs }
         );
     }
@@ -250,6 +250,8 @@ async function get(user, args, options) {
         inventory = {
             ...inventory,
             price: sale.price,
+            saleAddress: sale.address,
+            saleQuantity: sale.quantity,
         }
     }
 

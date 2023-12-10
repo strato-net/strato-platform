@@ -112,7 +112,7 @@ abstract contract Sale is SaleState, Utils {
         return quantityToUnlock;
     }
 
-    function unlockQuantity() public fromSale("unlock asset quantity") {
+    function unlockQuantity() public {
         uint quantityToReturn = takeLockedQuantity(msg.sender);
         quantity += quantityToReturn;
     }

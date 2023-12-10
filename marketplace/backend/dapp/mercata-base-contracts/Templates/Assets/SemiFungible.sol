@@ -1,8 +1,8 @@
 pragma es6;
 pragma strict;
-import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
 
-abstract contract SemiFungible is ItemStatus, RestStatus, Asset {
+abstract contract SemiFungible is Asset {
     uint public units; // Number of units this asset represents
     string public serialNumber;
     bool public spent;

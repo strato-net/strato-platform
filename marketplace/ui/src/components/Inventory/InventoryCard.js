@@ -100,8 +100,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   };
 
   const getCategory = () => {
-    const parts = inventory.contract_name.split("-");
-    return parts[parts.length - 1];
+    return inventory.category;
   };
 
   const categoricalProperties = () => {
@@ -115,17 +114,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">{itemData.artist}</p>
-            </div>
-            <div className="flex mt-1 items-center">
-              <p className="text-primaryC text-sm w-40">Serial Number</p>
-              <p text-secondryB text-sm>
-                :
-              </p>
-              <p className="text-secondryB text-sm ml-3">
-                {itemData.serialNumber
-                  ? itemData.serialNumber
-                  : "No Serial Number Available"}
-              </p>
             </div>
           </div>
         );
@@ -142,7 +130,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               </p>
             </div> */}
             <div className="flex mt-1.5 items-center">
-              <p className="text-primaryC text-sm w-40">Quantity</p>
+              <p className="text-primaryC text-sm w-40">Quantity Owned</p>
               <p text-secondryB text-sm>
                 :
               </p>
@@ -211,7 +199,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 :
               </p>
               <p className="text-secondryB text-sm ml-3">
-                {itemData.units}
+                {inventory.quantity}
               </p>
             </div>
           </>
@@ -239,11 +227,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               <h3 className="font-semibold text-primaryB text-xl">
                 {decodeURIComponent(inventory.name)}
               </h3>
-              {
-                <p className="font-medium text-secondryB text-base ml-2">
-                  ({getCategory()})
-                </p>
-              }
+              <p className="font-medium text-secondryB text-base ml-2">
+                ({getCategory()})
+              </p>
+              {itemData.isMint && itemData.isMint == 'True' ? (<div className="flex ml-2">
+                <div className="text-primary bg-[#EBFFF7] text-center py-1 rounded w-20 text-xs">
+                  <p>RESELLABLE</p>
+                </div>
+              </div>) : (<div></div>)}
             </div>
             <div className="flex items-center">
               <Button
@@ -274,20 +265,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                     >
                       <StopOutlined />
                       <p className="ml-3">Cancel Listing</p>
-                    </div>) : (<div
+                    </div>) : paymentProviderAddress ? (<div
                       className="flex items-center mt-2 cursor-pointer"
                       onClick={showListModal}
                     >
                       <DollarOutlined />
                       <p className="ml-3">List for Sale</p>
-                    </div>)}
-                    <div
+                    </div>) : (<div></div>)}
+                    {itemData.isMint && itemData.isMint == 'True' ? (<div
                       className="flex items-center mt-2 cursor-pointer"
                       onClick={showResellModal}
                     >
                       <PieChartOutlined />
                       <p className="ml-3">Resell</p>
-                    </div>
+                    </div>) : (<div></div>)}
                   </div>
                 }
                 trigger="click"
@@ -326,15 +317,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
             </p>
             <p className="text-secondryB text-sm ml-3">
               {inventory.description}
-            </p>
-          </div>
-          <div className="flex mt-1 items-center">
-            <p className="text-primaryC text-sm w-40">Serial Number</p>
-            <p text-secondryB text-sm>
-              :
-            </p>
-            <p className="text-secondryB text-sm ml-3">
-              {itemData.serialNumber ? itemData.serialNumber : "No Serial Number Available"}
             </p>
           </div>
           { inventory.price ?
