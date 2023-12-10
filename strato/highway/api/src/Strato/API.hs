@@ -64,6 +64,6 @@ instance AllCTRender '[Web] ContentTypeAndBody where
 
 type HighwayGetS3File = "highway" :> Capture "filename" T.Text :> Get '[Web] ContentTypeAndBody
 
-type HighwayPutS3File = "highway" :> MultipartForm Mem (MultipartData Mem) :> Put '[Web] T.Text
+type HighwayPutS3File = "highway" :> MultipartForm Mem (MultipartData Mem) :> Post '[Web] T.Text
 
 type HighwayPing      = "ping" :> Get '[JSON] Int
