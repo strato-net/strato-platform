@@ -72,7 +72,7 @@ COPY usr/local/bin/blockapps-highway-wrapper-server /usr/local/bin/
 COPY ./highway-wrapper /highway-wrapper
 EXPOSE 8080
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
-  CMD curl --silent --output /dev/null --fail localhost:8080/highway/ping || exit 1
+  CMD curl --silent --output /dev/null --fail localhost:8080/ping || exit 1
 ENTRYPOINT ["/highway-wrapper/doit.sh"]
 
 
