@@ -2,8 +2,6 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
-import constants from '../../../helpers/constants'
 import sendEmail from '../../../helpers/email'
 const options = { config, cacheNonce: true }
 
@@ -22,15 +20,7 @@ class OrderController {
       }
 
       const order = await dapp.getOrder(args, chainOptions);
-      const assetsWithImageUrl = order.assets.map(asset => (
-        asset.images && asset.images.length > 0 ?
-        {
-          ...asset,
-          images: asset.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName)))),
-        }
-        :
-        asset
-      ))
+      const assetsWithImageUrl = order.assets
       const result = { ...order, assets: assetsWithImageUrl }
       rest.response.status200(res, result)
 

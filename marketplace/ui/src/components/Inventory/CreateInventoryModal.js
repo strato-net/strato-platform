@@ -1,13 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useFormik, getIn } from "formik";
-import { DownloadOutlined, PaperClipOutlined } from "@ant-design/icons";
 import {
   Form,
   Modal,
   Input,
   Select,
   Tag,
-  Radio,
   Button,
   Spin,
   Upload,
@@ -18,13 +16,11 @@ import {
   useInventoryState,
 } from "../../contexts/inventory";
 import { actions } from "../../contexts/inventory/actions";
-import { Link } from "react-router-dom";
 import TextArea from "antd/es/input/TextArea";
 import getSchema from "./InventorySchema";
 import { usePapaParse } from "react-papaparse";
 import TagManager from "react-gtm-module";
 import { CATEGORIES, PAYMENT_TYPE } from "../../helpers/constants";
-import { PictureOutlined } from "@ant-design/icons";
 
 const { Option } = Select;
 
@@ -43,8 +39,8 @@ const CreateInventoryModal = ({
   const [uploadErr, setUploadErr] = useState("");
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedImages, setSelectedImages] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
   const [sizeOptions, setSizeOptions] = useState([]);
 
@@ -103,19 +99,33 @@ const CreateInventoryModal = ({
 
   console.log(formik.errors);
   const handleCreateFormSubmit = async (values) => {
-    const formData = new FormData();
-    formData.append("fileUpload", values.images);
+    let imageKeys = []
+    if (values.images && values.images.length > 0) {
+      for (const img of values.images) {
+        const formData = new FormData();
+        formData.append(img.name, img);
+        const imageData = await actions.uploadImage(dispatch, formData);
+        imageKeys.push(imageData);
+      }
+    }
 
-    let imageData = values.images
-      ? await actions.uploadImage(dispatch, formData)
-      : null;
+    let fileKeys = []
+    if (values.files && values.files.length > 0) {
+      for (const file of values.files) {
+        const formData = new FormData();
+        formData.append(file.name, file);
+        const fileData = await actions.uploadImage(dispatch, formData);
+        fileKeys.push(fileData);
+      }
+    }
+
     const body = {
       itemArgs: {
         serialNumber: values.serialNumber,
         name: values.name,
         description: values.description,
-        images: imageData ? [imageData.imageKey] : [],
-        files: [] //(imageData ? [imageData.imageKey] : []),
+        images: imageKeys,
+        files: fileKeys,
       },
     };
 
@@ -699,108 +709,97 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-              <div className="mt-4 flex justify-between">
-                <Form.Item label="Upload Images" name="images" className="w-full">
-                  <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
-                    {selectedImage ? (
-                      <div className="h-20">
-                        <img
-                          alt="Item"
-                          src={selectedImage}
-                          style={{ width: "100%", height: "100%" }}
-                        />
-                        <br />
-                      </div>
-                    ) : (
-                      <PictureOutlined className="text-7xl text-primary opacity-10" />
-                    )}
-                    <Upload
-                      onChange={(e) => {
-                        setSelectedImage(URL.createObjectURL(e.file.originFileObj));
-                        formik.setFieldValue("images", e.file.originFileObj);
-                      }}
-                      customRequest={() => { }}
-                      style={{ display: "none" }}
-                      accept="image/png, image/jpeg"
-                      maxCount={10}
-                      showUploadList={false}
-                      beforeUpload={beforeImageUpload}
-                    >
-                      <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                        Browse Images
-                      </div>
-                    </Upload>
-                  </div>
-
-                  <div className="flex items-start">
-                    <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                    <p className="mt-1 text-xs italic ml-1 mr-4">
-                      use jpg, png format of size less than 1mb
-                    </p>
-                  </div>
-                  {formik.touched.images && formik.errors.images && (
-                    <span className="text-error text-xs">
-                      {formik.errors.images}
-                    </span>
-                  )}
-                </Form.Item>
-              </div>
-              <div className="mt-4 flex justify-between">
-                <Form.Item label="Upload Files" name="files" className="w-full">
-                  <div className="h-48 p-4 border-secondryD border rounded flex flex-col justify-around">
-                    <Upload
-                      onChange={(e) => {
-                        setSelectedFile(URL.createObjectURL(e.file.originFileObj));
-                        formik.setFieldValue("files", e.file.originFileObj);
-                      }}
-                      customRequest={() => { }}
-                      style={{ display: "none" }}
-                      accept="application/pdf"
-                      maxCount={10}
-                      showUploadList={false}
-                      beforeUpload={beforeFileUpload}
-                    >
-                      <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
-                        Browse Files
-                      </div>
-                    </Upload>
-                  </div>
-
-                  <div className="flex items-start">
-                    <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                    <p className="mt-1 text-xs italic ml-1 mr-4">
-                      use pdf format of size less than 1mb
-                    </p>
-                  </div>
-                  {formik.touched.images && formik.errors.images && (
-                    <span className="text-error text-xs">
-                      {formik.errors.images}
-                    </span>
-                  )}
-                </Form.Item>
-              </div>
-              <div className="mt-4 flex justify-between">
-                <div className="flex flex-col">
-                  <Form.Item
-                    label="Serial Number"
-                    name="serialNumber"
-                    className="w-72"
+            </div>
+            <div className="mt-4 flex justify-between">
+              <Form.Item label="Upload Images" name="images" className="w-72">
+                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+                  <Upload
+                    onChange={(es) => {
+                      if (es && es.fileList && es.fileList.length > 0) {
+                        setSelectedImages(es.fileList);
+                        formik.setFieldValue("images", es.fileList.map((e) => e.originFileObj));
+                      }
+                    }}
+                    fileList={selectedImages}
+                    accept="image/png, image/jpeg"
+                    multiple={true}
+                    maxCount={10}
+                    beforeUpload={beforeImageUpload}
+                    listType="picture"
                   >
-                    <Input
-                      label="serialNumber"
-                      placeholder="Enter Serial Number"
-                      name="serialNumber"
-                      value={formik.values.serialNumber}
-                      onChange={formik.handleChange}
-                    />
-                    {formik.touched.serialNumber &&
-                      formik.errors.serialNumber && (
-                        <span className="text-error text-xs">
-                          {formik.errors.serialNumber}
-                        </span>
-                      )}
-                  </Form.Item>
+                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                      Browse Images
+                    </div>
+                  </Upload>
                 </div>
+
+                <div className="flex items-start">
+                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                  <p className="mt-1 text-xs italic ml-1 mr-4">
+                    use jpg, png format of size less than 1mb
+                  </p>
+                </div>
+                {formik.touched.images && formik.errors.images && (
+                  <span className="text-error text-xs">
+                    {formik.errors.images}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item label="Upload Files" name="files" className="w-72">
+                <div className="p-4 border-secondryD border rounded flex flex-col justify-around">
+                  <Upload
+                    onChange={(es) => {
+                      if (es && es.fileList && es.fileList.length > 0) {
+                        setSelectedFiles(es.fileList);
+                        formik.setFieldValue("files", es.fileList.map((e) => e.originFileObj));
+                      }
+                    }}
+                    fileList={selectedFiles}
+                    accept="application/pdf"
+                    multiple={true}
+                    maxCount={10}
+                    beforeUpload={beforeFileUpload}
+                  >
+                    <div className="text-primary border border-primary rounded px-4 py-2 text-center hover:text-white hover:bg-primary cursor-pointer">
+                      Browse Files
+                    </div>
+                  </Upload>
+                </div>
+
+                <div className="flex items-start">
+                  <p className="mt-1 text-xs italic font-medium ">Note:</p>
+                  <p className="mt-1 text-xs italic ml-1 mr-4">
+                    use pdf format of size less than 1mb
+                  </p>
+                </div>
+                {formik.touched.images && formik.errors.images && (
+                  <span className="text-error text-xs">
+                    {formik.errors.images}
+                  </span>
+                )}
+              </Form.Item>
+            </div>
+            <div className="mt-4 flex justify-between">
+              <div className="flex flex-col">
+                <Form.Item
+                  label="Serial Number"
+                  name="serialNumber"
+                  className="w-72"
+                >
+                  <Input
+                    label="serialNumber"
+                    placeholder="Enter Serial Number"
+                    name="serialNumber"
+                    value={formik.values.serialNumber}
+                    onChange={formik.handleChange}
+                  />
+                  {formik.touched.serialNumber &&
+                    formik.errors.serialNumber && (
+                      <span className="text-error text-xs">
+                        {formik.errors.serialNumber}
+                      </span>
+                    )}
+                </Form.Item>
               </div>
             </div>
           </div>

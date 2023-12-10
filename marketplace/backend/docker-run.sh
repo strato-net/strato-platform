@@ -85,11 +85,6 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     echo "One or both of STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY vars are empty, but are required values"
     exit 17
   fi
-  
-  if [[ -z "${EXT_STORAGE_S3_ACCESS_KEY_ID}" || -z "${EXT_STORAGE_S3_SECRET_ACCESS_KEY}" || -z "${EXT_STORAGE_S3_BUCKET}" ]]; then
-    echo "One or few of EXT_STORAGE_S3_ACCESS_KEY_ID, EXT_STORAGE_S3_SECRET_ACCESS_KEY, EXT_STORAGE_S3_BUCKET vars are empty, but are required values"
-    exit 18
-  fi
 
   # Create /etc/hosts record to resolve STRATO_HOST to STRATO_LOCAL_IP
   if [ -n "${STRATO_LOCAL_IP}" ]; then

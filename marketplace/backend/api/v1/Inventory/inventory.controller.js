@@ -2,8 +2,6 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
-import constants from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
 
@@ -22,13 +20,8 @@ class InventoryController {
         chainOptions = { ...options }
       }
 
-      let result;
       const inventory = await dapp.getInventory(args, chainOptions)
-      inventory && inventory.images && inventory.images.length > 0 ?
-        result = { ...inventory, images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))}
-        :
-        result = inventory || {}
-      rest.response.status200(res, result)
+      rest.response.status200(res, inventory)
 
       return next()
     } catch (e) {
@@ -41,16 +34,7 @@ class InventoryController {
       const { dapp, query } = req
 
       const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories?.inventories.map(inventory => (
-        inventory.images && inventory.images.length > 0 ?
-        {
-          ...inventory,
-          images: inventory.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName)))
-          )
-        }
-        :
-        inventory
-      ))
+      const inventoriesWithImageUrl = inventories?.inventories
       rest.response.status200(res, {inventoriesWithImageUrl:inventoriesWithImageUrl, count: inventories.inventoryCount})
 
       return next()

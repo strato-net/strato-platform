@@ -38,10 +38,6 @@ cd backend
 GLOBAL_ADMIN_NAME=<globalAdminUsername>
 GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
 
-EXT_STORAGE_S3_ACCESS_KEY_ID=<s3Key>
-EXT_STORAGE_S3_SECRET_ACCESS_KEY=<s3AccessKey>
-EXT_STORAGE_S3_BUCKET=<s3Bucket>
-
 SENDGRID_API_KEY=<sendgridApiKey>
 
 STRIPE_PUBLISHABLE_KEY=<stripePublishableKey>

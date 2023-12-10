@@ -187,7 +187,7 @@ async function unlistItem(user, _contract, args, options) {
 async function resellItem(user, contract, args, options) {
     const callArgs = {
         contract,
-        method: "mintNew",
+        method: "mintNewUnits",
         args: util.usc({ ...args }),
     };
     const resellStatus = await rest.call(user, callArgs, options);

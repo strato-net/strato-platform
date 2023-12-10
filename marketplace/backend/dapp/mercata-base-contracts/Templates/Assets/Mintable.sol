@@ -48,7 +48,7 @@ abstract contract Mintable is UTXO {
         return UTXO(m);
     }
 
-    function mintNew(uint _quantity) public returns (uint) {
+    function mintNewUnits(uint _quantity) public returns (uint) {
         require(isMint, "Only the mint contract can mint new units");
         require(getCommonName(msg.sender) == minterCommonName, "Only the minter can mint new units");
         quantity += _quantity;

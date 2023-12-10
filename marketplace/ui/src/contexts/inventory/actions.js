@@ -1,5 +1,5 @@
 import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import { apiUrl, fileServerUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
   createInventory: "create_inventory",
@@ -533,20 +533,25 @@ const actions = {
     dispatch({ type: actionDescriptors.uploadImage });
 
     try {
-      const response = await fetch(`${apiUrl}/Image`, {
-        method: HTTP_METHODS.POST,
-        body: payload,
-      });
+      let response
+      try {
+        response = await fetch(fileServerUrl, {
+          method: HTTP_METHODS.POST,
+          body: payload,
+        });
+      } catch(e) {
+        console.log(JSON.stringify(e))
+      }
 
-      const body = await response.json();
+      const body = await response.text();
 
-      if (response.status === RestStatus.CREATED) {
+      if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.uploadImageSuccessful,
-          payload: body.data,
+          payload: body,
         });
         // actions.setMessage(dispatch, "Image uploaded successfully", true);
-        return body.data;
+        return body;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.uploadImageFailed,

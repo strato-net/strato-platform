@@ -16,27 +16,6 @@ import swaggerSpecs from "./swaggerspecs";
 import dotenv from "dotenv";
 import websocket from "./websocket";
 
-if (
-  !process.env.EXT_STORAGE_S3_ACCESS_KEY_ID ||
-  !process.env.EXT_STORAGE_S3_BUCKET ||
-  !process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
-) {
-  dotenv.config();
-}
-
-assert.isDefined(
-  process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
-  "Missing external storage params"
-);
-assert.isDefined(
-  process.env.EXT_STORAGE_S3_BUCKET,
-  "Missing external storage params"
-);
-assert.isDefined(
-  process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY,
-  "Missing external storage params"
-);
-
 let server
 (async () => {
   const app = express();
@@ -72,14 +51,6 @@ let server
     console.error('Error initializing the oauthHandler', e)
     throw e
   }
-  
-  app.set(constants.s3ParamName, {
-    bucket: {
-      Bucket: process.env.EXT_STORAGE_S3_BUCKET
-    },
-    accessKeyId: process.env.EXT_STORAGE_S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.EXT_STORAGE_S3_SECRET_ACCESS_KEY
-  });
   // Setup routes
   app.use(`${baseUrl}`, routes);
   

@@ -152,12 +152,6 @@ export const Event = {
   transferOwnership: '/transferOwnership',
 }
 
-export const Image = {
-  prefix: '/image',
-  upload: '/',
-  update: '/:fileKey',
-}
-
 export const Marketplace = {
   prefix: '/marketplace',
   getAll: '/',

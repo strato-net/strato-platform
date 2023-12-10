@@ -13,6 +13,7 @@ import {
   Spin,
   notification,
   InputNumber,
+  Carousel,
 } from "antd";
 import { MinusOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -557,9 +558,20 @@ const ProductDetails = ({ user, users }) => {
 
           <div className="flex mx-16">
             <div className="w-1/2">
-              <div className="h-96 flex items-center justify-center border border-grayLight">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
-              </div>
+              {details.images && details.images.length ?
+                (<Carousel>
+                  {
+                    details.images.map((image) => (
+                      <div className="h-96 flex items-center justify-center border border-grayLight">
+                        <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={image} />
+                      </div>
+                    ))
+                  }
+                </Carousel>) :
+                (<div className="h-96 flex items-center justify-center border border-grayLight">
+                  <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={image_placeholder} />
+                </div>)
+              }
               {availableQuantity !== 0 ?
                 <Row className="justify-center my-7">
                   {ownerSameAsUser() ? <Button
