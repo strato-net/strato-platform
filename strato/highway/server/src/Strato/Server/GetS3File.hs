@@ -18,21 +18,17 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.ByteString.Lazy as DBL
 import           Data.ByteString.Char8 as DBC8
-import           Data.Either (fromRight)
-import           Data.Proxy
 import           Data.Text as T
 import           Network.HTTP.Conduit (responseBody)
-import           Servant.API.ContentTypes
+import           System.FilePath (takeExtension)
 
 --import           BlockApps.Logging
 import           Strato.API
 import           Strato.Monad
-import           Blockchain.Strato.Model.Keccak256
 
-
-getS3File :: Keccak256
+getS3File :: Text
           -> HighwayM ContentTypeAndBody
-getS3File keccakhash = do
+getS3File filename = do
   --Set up AWS credentials and the default configuration.
   $logInfoS "highway/getS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
   mgr     <- asks httpManager
@@ -55,13 +51,22 @@ getS3File keccakhash = do
     liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Creating a request object with getObject and running the request via pureAws."
     S3.GetObjectResponse { S3.gorResponse = rsp } <-
       Aws.pureAws cfg s3cfg mgr $
-        S3.getObject awss3b (T.pack $ keccak256ToHex keccakhash)
-    --Save the response to a file.
-    liftIO $ unliftIO st $ $logInfoS "highway/getS3File" $ T.pack $ "Saving the response (file contents) to a file."
+        S3.getObject awss3b filename
     filecontents <- runConduit $ responseBody rsp .| sinkList -- $ DBLC8.unpack $ DBL.fromStrict $ keccak256ToByteString keccakhash
-    let filecontentsf = fromRight (ContentTypeAndBody { contentTypeHeader = DBL.empty
-                                                      , contentTypeBody   = DBL.empty
-                                                      }
-                                  ) 
-                                  (mimeUnrender (Proxy @Web) (DBC8.fromStrict $ DBC8.concat filecontents))
-    return filecontentsf
+    let header = case takeExtension $ T.unpack filename of
+          ".jpg" -> "image/jpg"
+          ".jpeg" -> "image/jpeg"
+          ".png" -> "image/png"
+          ".gif" -> "image/gif"
+          ".svg" -> "image/svg+xml"
+          ".pdf" -> "application/pdf"
+          ".html" -> "text/html"
+          ".css" -> "text/css"
+          ".js" -> "text/javascript"
+          ".json" -> "application/json"
+          ".webp" -> "image/webp"
+          _ -> "text/plain"
+    pure $ ContentTypeAndBody
+      { contentTypeHeader = header
+      , contentTypeBody   = DBL.fromStrict $ DBC8.concat filecontents
+      }
