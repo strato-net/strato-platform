@@ -143,14 +143,6 @@ const CreateInventoryModal = ({
               units: values.units,
             },
           });
-        case 'Membership':
-          return body = {
-            itemArgs: {
-              ...body.itemArgs,
-              units: values.units,
-              expirationPeriodInMonths: values.expirationPeriodInMonths
-            }
-          }
         case "Collectibles":
           return (body = {
             itemArgs: {
@@ -577,28 +569,6 @@ const CreateInventoryModal = ({
                 formik.errors.units && (
                   <span className="text-error text-xs">
                     {formik.errors.units}
-                  </span>
-                )}
-            </Form.Item>
-          </div>)
-      case 'Clothing':
-        return (<div className="flex justify-between mt-4 ">
-            <Form.Item
-              label="Brand"
-              name="brand"
-              className="w-72"
-            >
-              <Input
-                label="brand"
-                placeholder="Enter Clothing Brand"
-                name="brand"
-                value={formik.values.brand}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.brand &&
-                formik.errors.brand && (
-                  <span className="text-error text-xs">
-                    {formik.errors.brand}
                   </span>
                 )}
             </Form.Item>
