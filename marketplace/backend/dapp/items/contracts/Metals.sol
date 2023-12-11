@@ -119,26 +119,11 @@ contract Metals is ItemStatus, UnitOfMeasurement, RestStatus, Asset {
         return (RestStatus.OK, string(newSale));
     }
 
-    function updateMetals(
-        UnitOfMeasurement _unitOfMeasurement,
-        string _name, 
-        string _description, 
-        string[] _images, 
+    function update(
         ItemStatus _status,
-        string _serialNumber,
-        string _source,
-        uint _price,
-        uint _units
+        uint _price
     ) public requireOwner("update metals") returns (uint) {
-        serialNumber = _serialNumber;
-        unitOfMeasurement = _unitOfMeasurement;
-        source = _source;
-        updateAsset(_name, _description, _images, _status, _price);
-        if(_units != units)
-        {
-            changeUnitQuantity(_units);
-            units = _units;
-        }
+        updateAsset(name, description, images, _status, _price);
         return RestStatus.OK;
     }
 }

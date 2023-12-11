@@ -168,6 +168,7 @@ const CreateInventoryModal = ({
               units: values.units,
               unitOfMeasurement: selectedUOM.value,
               leastSellableUnits: values.leastSellableUnits,
+              source: values.source,
               units: values.units,
               purity: values.purity
             }
