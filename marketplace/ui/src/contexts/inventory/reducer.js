@@ -84,6 +84,23 @@ const reducer = (state, action) => {
         error: action.error,
         isinventoryUpdating: false
       };
+    case actionDescriptors.updateSale:
+      return {
+        ...state,
+        issaleUpdating: true
+      };
+    case actionDescriptors.updateSaleSuccessful:
+      return {
+        ...state,
+        saleUpdateObject: action.payload,
+        issaleUpdating: false
+      };
+    case actionDescriptors.updateSaleFailed:
+      return {
+        ...state,
+        error: action.error,
+        issaleUpdating: false
+      };
     case actionDescriptors.listInventory:
       return {
         ...state,

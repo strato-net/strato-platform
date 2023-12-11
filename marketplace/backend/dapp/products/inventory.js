@@ -223,6 +223,41 @@ async function updateInventory(user, contract, args, options) {
     return resellStatus;
 }
 
+async function updateSale(admin, contract, _args, options) {
+  // const args = paymentJs.marshalIn(_args)
+  const args = { ..._args }
+  const scheme = Object.keys(_args).reduce((agg, key) => {
+    const base = 1
+    switch (key) {
+      case 'quantity':
+        return agg | (base << 0)
+      case 'price':
+        return agg | (base << 1)
+      case 'paymentProviders':
+        return agg | (base << 2)
+      default:
+        return agg
+    }
+  }, 0)
+
+  const callArgs = {
+    contract,
+    method: 'update',
+    args: util.usc({
+      scheme,
+      ...args
+    }),
+  }
+
+  const restStatus = await rest.call(admin, callArgs, options)
+
+  if (parseInt(restStatus, 10) !== RestStatus.OK) {
+    throw new rest.RestError(restStatus, 0, { callArgs })
+  }
+
+  return restStatus;
+}
+
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
  * @param args Lookup with an address or uniqueInventoryID.
@@ -353,6 +388,7 @@ export default {
     unlistItem,
     resellItem,
     updateInventory,
+    updateSale,
     get,
     getAll,
     inventoryCount,

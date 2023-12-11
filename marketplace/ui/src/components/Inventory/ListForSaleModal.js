@@ -1,31 +1,21 @@
 import { Button, Input, InputNumber, Modal, Select, Tag, Table } from "antd";
 import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
-import { actions as itemActions } from "../../contexts/item/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import { useItemDispatch, useItemState } from "../../contexts/item";
 import { PAYMENT_TYPE } from "../../helpers/constants";
 
 const { Option } = Select;
 
 const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddress }) => {
     const [data, setData] = useState([inventory]);
-    const [quantity, setQuantity] = useState(1);
+    const [quantity, setQuantity] = useState(inventory.saleQuantity ? inventory.saleQuantity : 1);
     const [paymentTypes, setPaymentTypes] = useState([]);
-    const [pricePerUnit, setpricePerUnit] = useState(inventory.pricePerUnit);
+    const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
     const inventoryDispatch = useInventoryDispatch();
-    const itemDispatch = useItemDispatch();
     const [canList, setCanList] = useState(true);
     const {
         isListing
     } = useInventoryState();
-    const {
-        items
-    } = useItemState();
-
-    useEffect(() => {
-        itemActions.fetchItem(itemDispatch, "", 0, inventory.address);
-    }, [])
 
     useEffect(() => {
         const itemData = JSON.parse(inventory.data);
@@ -138,10 +128,14 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
 
     const handleSubmit = async () => {
         let body = {
-            assetToBeSold: inventory.address,
             paymentProviders: paymentProviderAddress ? [paymentProviderAddress] : [],
             price: pricePerUnit,
         };
+        if (inventory.saleAddress) {
+            body = { ...body, saleAddress: inventory.saleAddress }
+        } else {
+            body = { ...body, assetToBeSold: inventory.address }
+        }
         if (getCategory() === "Carbon") {
             body = {
                 ...body,
@@ -153,7 +147,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                 quantity: 1,
             }
         }
-        let isDone = await actions.listInventory(inventoryDispatch, body);
+
+        let isDone
+        if (inventory.saleAddress) {
+            isDone = await actions.updateSale(inventoryDispatch, body);
+        } else {
+            isDone = await actions.listInventory(inventoryDispatch, body);
+        }
         if (isDone) {
             actions.fetchInventory(inventoryDispatch, 10, 0, "");
             handleCancel();
@@ -164,11 +164,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`List - ${decodeURIComponent(inventory.name)}`}
+            title={`${inventory.saleAddress ? 'Update' : 'List'} - ${decodeURIComponent(inventory.name)}`}
             width={650}
             footer={[
                 <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canList || inventory.status === "1"} loading={isListing}>
-                    List
+                    {inventory.saleAddress ? 'Update' : 'List' }
                 </Button>
             ]}
         >

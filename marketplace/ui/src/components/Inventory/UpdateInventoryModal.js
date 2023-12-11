@@ -13,7 +13,6 @@ import {
 } from "../../contexts/category";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useProductState } from "../../contexts/product";
-import { INVENTORY_STATUS, PAYMENT_TYPE } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 
 
@@ -48,11 +47,7 @@ const UpdateInventoryModal = ({
       address: "",
     },
     availableQuantity: null,
-    price: "",
     batchId: "",
-    serialNumber: null,
-    status: true,
-    paymentTypes: [],
   };
 
   const formik = useFormik({
@@ -72,39 +67,6 @@ const UpdateInventoryModal = ({
     const parts = inventoryToUpdate.inventory.contract_name.split('-');
     return parts[parts.length - 1];
   };
-  
-  const tagRender = (props) => {
-    const { label, value, closable, onClose } = props;
-    const onPreventMouseDown = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    };
-    return (
-      <Tag
-        onMouseDown={onPreventMouseDown}
-        closable={closable}
-        onClose={onClose}
-        className="flex items-center mr-1"
-      >
-        {PAYMENT_TYPE[value].icon ? PAYMENT_TYPE[value].icon : <></>}
-        <p className="ml-1">{label}</p>
-      </Tag>
-    );
-  };
-  
-  const handleSelectAll = (value) => {
-    if (value.includes(0)) {
-      if (value.length === PAYMENT_TYPE.length) {
-        formik.setFieldValue("paymentTypes", []);
-        return []
-      }
-      formik.setFieldValue("paymentTypes", [1, 2, 3, 4, 5]);
-      return [1, 2, 3, 4, 5];
-    } else {
-      formik.setFieldValue("paymentTypes", value);
-      return value;
-    }
-  }
 
   useEffect(() => {
     if (inventoryToUpdate) {
@@ -118,11 +80,8 @@ const UpdateInventoryModal = ({
           name: decodeURIComponent(inventoryToUpdate.inventory.name),
           address: inventoryToUpdate.inventory.productId,
         },
-        availableQuantity: data?.units ?? null,
-        price: inventoryToUpdate.inventory.price,
+        availableQuantity: data?.quantity ?? null,
         batchId: inventoryToUpdate.inventory.batchId,
-        serialNumber: null,
-        status: inventoryToUpdate.inventory.status === "1" ? true : false,
       };
     
       setFormState(nextState);
@@ -130,45 +89,30 @@ const UpdateInventoryModal = ({
   }, [inventoryToUpdate]);
 
   const handleUpdateFormSubmit = async (values) => {
-    if (inventoryToUpdate.inventory.status === 2 && values.status) {
-      let body = {
-        assetAddress: inventoryToUpdate.inventory.address,
-        quantity: values.availableQuantity
-      };
-      let isDone = await actions.resellInventory(dispatch, body);
-      if (isDone) {
-          actions.fetchInventory(dispatch, 10, 0, "");
-          handleCancel();
-      }
-    }
-    else {
-      const body = {
-        itemContract: values.category.name,
-        itemAddress: inventoryToUpdate.inventory.address,
-        updates: {
-          price: values.price,
-          status: values.status ? INVENTORY_STATUS['PUBLISHED'] : INVENTORY_STATUS['UNPUBLISHED'],
-        },
-      };
+    const body = {
+      itemContract: values.category.name,
+      itemAddress: inventoryToUpdate.inventory.address,
+      updates: {
+      },
+    };
   
-      window.LOQ = window.LOQ || []
-      window.LOQ.push(['ready', async LO => {
-          // Track an event
-          await LO.$internal.ready('events')
-          LO.events.track('Update Inventory', {category: values.category.name, product: values.productName.name})
-      }])
+    window.LOQ = window.LOQ || []
+    window.LOQ.push(['ready', async LO => {
+        // Track an event
+        await LO.$internal.ready('events')
+        LO.events.track('Update Inventory', {category: values.category.name, product: values.productName.name})
+    }])
   
-      TagManager.dataLayer({
-        dataLayer: {
-          event: 'update_inventory',
-        },
-      });
-      let isDone = await actions.updateInventory(dispatch, body);
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'update_inventory',
+      },
+    });
+    let isDone = await actions.updateInventory(dispatch, body);
 
-      if (isDone) {
-        actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
-        handleCancel();
-      }
+    if (isDone) {
+      actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm);
+      handleCancel();
     }
   };
 

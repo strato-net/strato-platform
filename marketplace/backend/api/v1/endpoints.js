@@ -50,6 +50,7 @@ export const Inventory = {
   list: '/list',
   unlist: '/unlist',
   resell: '/resell',
+  updateSale: '/updateSale',
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership',
 }

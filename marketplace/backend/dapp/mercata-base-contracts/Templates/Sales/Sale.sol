@@ -17,6 +17,7 @@ abstract contract Sale is SaleState, Utils {
     address[] public paymentProviders;
     mapping (address => uint) paymentProvidersMap;
     mapping (address => uint) lockedQuantity;
+    uint totalLockedQuantity;
 
     constructor(
         address _assetToBeSold,
@@ -28,6 +29,7 @@ abstract contract Sale is SaleState, Utils {
         price = _price;
         require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
         quantity = _quantity;
+        totalLockedQuantity = 0;
         state = SaleState.Created;
         addPaymentProviders(_paymentProviders);
         assetToBeSold.attachSale();
@@ -103,12 +105,14 @@ abstract contract Sale is SaleState, Utils {
         require(lockedQuantity[msg.sender] == 0, "Order has already locked quantity in this asset.");
         quantity -= quantityToLock;
         lockedQuantity[msg.sender] = quantityToLock;
+        totalLockedQuantity += quantityToLock;
     }
 
     function takeLockedQuantity(address orderAddress) internal returns (uint) {
         uint quantityToUnlock = lockedQuantity[orderAddress];
         require(quantityToUnlock > 0, "There are no quantity to unlock for address " + string(orderAddress));
         lockedQuantity[orderAddress] = 0;
+        totalLockedQuantity -= quantityToUnlock;
         return quantityToUnlock;
     }
 
@@ -120,5 +124,30 @@ abstract contract Sale is SaleState, Utils {
     function cancelOrder() public requireSeller("cancel order") returns (uint) {
         unlockQuantity();
         return RestStatus.OK;
+    }
+
+    function update(
+        uint _quantity,
+        uint _price,
+        address[] _paymentProviders,
+        uint _scheme
+    ) returns (uint) {
+
+      if (_scheme == 0) {
+        return RestStatus.OK;
+      }
+
+      if ((_scheme & (1 << 0)) == (1 << 0)) {
+        require(_quantity + totalLockedQuantity <= assetToBeSold.quantity(), "Cannot sell more units than owned");
+        quantity = _quantity;
+      }
+      if ((_scheme & (1 << 1)) == (1 << 1)) {
+        price = _price;
+      }
+      if ((_scheme & (1 << 2)) == (1 << 2)) {
+        clearPaymentProviders();
+        addPaymentProviders(_paymentProviders);
+      }
+      return RestStatus.OK;
     }
 }

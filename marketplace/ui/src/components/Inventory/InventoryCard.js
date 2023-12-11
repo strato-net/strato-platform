@@ -1,22 +1,16 @@
 import React, { useState } from "react";
-import classNames from "classnames";
 import { Card, Popover, Button } from "antd";
 import {
   DollarOutlined,
   MoreOutlined,
   EditOutlined,
-  EyeOutlined,
-  PlusOutlined,
+  FormOutlined,
   PieChartOutlined,
   StopOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
-import {
-  UNIT_OF_MEASUREMENTS,
-  INVENTORY_STATUS,
-} from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ListForSaleModal from "./ListForSaleModal";
 import UnlistModal from "./UnlistModal";
@@ -256,15 +250,24 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                       className="flex items-center mt-2 cursor-pointer"
                       onClick={showEditModal}
                     >
-                      <EditOutlined />
-                      <p className="ml-3">Edit</p>
+                      <FormOutlined />
+                      <p className="ml-3">Edit Inventory</p>
                     </div>
-                    {inventory.price ? (<div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showUnlistModal}
-                    >
-                      <StopOutlined />
-                      <p className="ml-3">Cancel Listing</p>
+                    {inventory.price ? (<div>
+                      <div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showListModal}
+                      >
+                        <EditOutlined />
+                        <p className="ml-3">Edit Listing</p>
+                      </div>
+                      <div
+                        className="flex items-center mt-2 cursor-pointer"
+                        onClick={showUnlistModal}
+                      >
+                        <StopOutlined />
+                        <p className="ml-3">Cancel Listing</p>
+                      </div>
                     </div>) : paymentProviderAddress ? (<div
                       className="flex items-center mt-2 cursor-pointer"
                       onClick={showListModal}

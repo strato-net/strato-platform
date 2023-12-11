@@ -119,6 +119,21 @@ class InventoryController {
     }
   }
 
+  static async updateSale(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateUpdateSaleArgs(body)
+
+      const result = await dapp.updateSale(body, options)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   // static async audit(req, res, next) {
   //   try {
   //     const { dapp, params } = req
@@ -243,6 +258,26 @@ class InventoryController {
     if (validation.error) {
       console.log('validation error: ', validation.error)
       throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateUpdateSaleArgs(args) {
+    const updateSaleItemSchema = Joi.object({
+      saleAddress: Joi.string().required(),
+      paymentProviders: Joi.array().min(1).items(
+        Joi.string().min(0).required(),
+      ).optional(),
+      price: Joi.number().integer().greater(0).optional(),
+      quantity: Joi.number().integer().greater(0).optional(),
+    });
+
+    const validation = updateSaleItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Sale Item Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

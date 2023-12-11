@@ -17,6 +17,9 @@ const actionDescriptors = {
   updateInventory: "update_inventory",
   updateInventorySuccessful: "update_inventory_successful",
   updateInventoryFailed: "update_inventory_failed",
+  updateSale: "update_sale",
+  updateSaleSuccessful: "update_sale_successful",
+  updateSaleFailed: "update_sale_failed",
   listInventory: "list_inventory",
   listInventorySuccessful: "list_inventory_successful",
   listInventoryFailed: "list_inventory_failed",
@@ -243,6 +246,59 @@ const actions = {
         error: "Error while updating Inventory",
       });
       actions.setMessage(dispatch, "Error while updating Inventory");
+    }
+  },
+
+  updateSale: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.updateSale });
+
+    try {
+      const response = await fetch(`${apiUrl}/inventory/updateSale`, {
+        method: HTTP_METHODS.PUT,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.updateSaleSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Sale has been updated", true);
+        return true;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.updateSaleFailed,
+          error: "Error while updating Sale",
+        });
+        actions.setMessage(dispatch, "Error while updating Sale");
+        return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.updateSaleFailed, 
+          error: "Unauthorized while updating Sale" 
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.updateSaleFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, "Error while updating Sale");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.updateSaleFailed,
+        error: "Error while updating Sale",
+      });
+      actions.setMessage(dispatch, "Error while updating Sale");
     }
   },
 

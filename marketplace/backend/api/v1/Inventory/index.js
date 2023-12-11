@@ -55,4 +55,11 @@ router.put(
   InventoryController.update
 )
 
+router.put(
+  Inventory.updateSale,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.updateSale
+)
+
 export default router;
