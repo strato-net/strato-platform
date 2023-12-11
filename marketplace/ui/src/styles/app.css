@@ -162,3 +162,104 @@ border : 1px solid #E9E9E9 !important;
 .ant-table-measure-row+tr>td{
   border-top:none !important;
 }
+
+
+.prodcut_details .control-dots .dot {
+  width: 7px;
+  height: 7px;
+  background-color: red; 
+
+}
+
+.prodcut_details  .selected {
+  width: 7px;
+  height: 7px;
+  background-color: green; 
+}
+
+.prodcut_detail .carousel .control-prev {
+  position: absolute;
+}
+
+.product_detail .carousel .control-dots .dot.selected{
+  background-color: #202020; 
+}
+
+.product_detail .carousel .control-dots .dot {
+  background-color: #989898;
+}
+
+
+.product_detail .carousel .control-arrow  {
+  height: 32px;
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 100%;
+  top: 90%;
+ 
+}
+
+.product_detail .carousel .control-arrow.control-prev  {
+  display: none;
+ 
+}
+
+
+.product_detail .carousel .control-arrow.control-next {
+  display: none;
+}
+
+.product_detail .carousel .control-arrow.control-prev::before{
+
+
+ border-right: none;
+}
+.product_detail .carousel .control-arrow.control-next::before{
+
+ border-left: none;
+}
+
+
+ .ant-tabs .ant-tabs-tab-btn {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+
+.product_details .anticon-plus svg{
+  width : 20px;
+  height :  20px;
+  color: black;
+}
+
+
+.product_details .anticon-minus svg {
+
+width : 20px;
+  height :  20px;
+  color: black;
+}
+
+.anticon svg {
+color : black;
+}
+
+
+
+@media  screen and (min-width: 1024px ) {
+  .product_detail .carousel .control-arrow.control-prev  {
+    display: block;
+    left: 16px ;
+    background: url("../images/resources/Backward.png");
+   
+  }
+  
+  
+  .product_detail .carousel .control-arrow.control-next {
+    display: block;
+    right : 25px;
+    background: url("../images/resources/Forward.png");
+  } 
+}

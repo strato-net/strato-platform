@@ -27,4 +27,7 @@ export const Images = {
   'RemoveIcon' :  require("./resources/Remove.png"),
   'CancelIcon' : require("./resources/Cancel.png"),
   'Dropdown' :  require("./resources/DropDown.png"),
+  'Cart' :  require("./resources/Cart.png"),
+  'Backward' :  require("./resources/Backward.png"),
+  'Forward' :  require("./resources/Forward.png"),
 };

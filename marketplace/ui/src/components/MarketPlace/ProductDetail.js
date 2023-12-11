@@ -50,6 +50,10 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import image_placeholder from "../../images/resources/image_placeholder.png";
+import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a loader
+import { Carousel } from 'react-responsive-carousel';
+import { Images } from "../../images";
+
 
 
 const ProductDetails = ({ user, users }) => {
@@ -129,6 +133,7 @@ const ProductDetails = ({ user, users }) => {
     path: routes.InventoryDetail.url,
     strict: true,
   });
+
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -429,6 +434,7 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const DescriptionComponent = () => {
+    console.log("this is the Details" , details)
     const categoryName = getCategory(details);
 
     switch (categoryName) {
@@ -460,18 +466,8 @@ const ProductDetails = ({ user, users }) => {
           <Space direction="vertical">
             <Space>
               <DescTitle text="Brand" />
-              <DescTitle text=":" />
+              <DescTitle text="                      :" />
               <Text className="text-[13px]">{itemData?.brand}</Text>
-            </Space>
-            <Space>
-              <DescTitle text="Condition" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData.condition ? itemData.condition.toUpperCase() : null}</Text>
-            </Space>
-            <Space>
-              <DescTitle text="SKU" />
-              <DescTitle text=":" />
-              <Text className="text-[13px]">{itemData.skuNumber ? itemData.skuNumber.toUpperCase() : "No SKU Available"}</Text>
             </Space>
           </Space>)
       case "Metals":
@@ -516,7 +512,7 @@ const ProductDetails = ({ user, users }) => {
 
   return (
     <>
-      {contextHolder}
+      {contextHolder} 
       {details === null ||
         isInventoryDetailsLoading ||
         iscategorysLoading ||
@@ -527,7 +523,7 @@ const ProductDetails = ({ user, users }) => {
       ) : (
         <div>
           <Row>
-            <Breadcrumb className="text-xs mt-14 mb-8 ml-16">
+            <Breadcrumb className="text-xs mt-8 lg:mt-[42px] mb-8 lg:mb-[44px] ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                 <ClickableCell href={routes.Marketplace.url}>
                   <p
@@ -554,80 +550,97 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
+          <div className="  flex w-screen flex-col  px-5 md:px-10 items-center   ">
 
-          <div className="flex mx-16">
-            <div className="w-1/2">
-              <div className="h-[212px] lg:h-[417px] flex items-center justify-center border border-grayLight">
+          <div className="  flex justify-between gap-6 flex-col md:flex-row   ">
+           
+            <Carousel  className="product_detail  h-[420px] w-[348px] " showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
+              <div className="h-[212px] lg:h-[417px]   rounded-md flex items-center justify-center overflow-hidden">
+                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
+             </div>
+                  <div className="h-[212px] lg:h-[417px]   rounded-md flex items-center justify-center overflow-hidden">
                 <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
               </div>
+              </Carousel>
+            <div className=" w-full lg:w-1/2  " id="">
+              <div className=" border-b border-[#E9E9E9] pb-[6px]">
+                <Text className="font-semibold text-3xl text-[#202020]">
+                  
+                  {decodeURIComponent(details.name)}
+                </Text>
+                {/* <Text className="font-medium text-sm text-secondryB ">
+                  ({getCategory(details)})
+                </Text> */}
+                <div className="flex ">
+                <Text  className="text-[#202020] text-xs  font-medium">Owned By:</Text>
+                 <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
+                </div>
+              </div>
+            <div className="pt-[22px]">
+             
+              <Text level={4} className=" text-[#13188A] text-2xl font-semibold">
+                {details.price ? <>$ {details.price}</> : "No Price Available"}
+              </Text>
+              </div> 
+              <div className="pt-[18px]">
+                <Typography  className="text-xl font-medium text-[#202020]">Description</Typography>
+              </div>
+              <div className="pt-[7px]">
+              <Paragraph
+                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
+                className="text-[#202020] text-sm  h-[60px]"
+              >
+                {decodeURIComponent(details.description).split('\n').map((line, index) => (
+                  <React.Fragment key={index}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
+             
+              </Paragraph>
+              </div>
+
               {availableQuantity !== 0 ?
-                <Row className="justify-center my-7">
-                  {ownerSameAsUser() ? <Button
-                    className="group w-1/3 h-9 border border-primary"
-                    disabled={true}
-                    id="addToCart"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                        window.location.href = loginUrl;
-                      } else {
-                        window.LOQ.push(['ready', async LO => {
-                          // Track an event
-                          await LO.$internal.ready('events')
-                          LO.events.track('Add to Cart (from Product Details)', {
-                            product: details.name,
-                            category: details.category,
-                            productId: details.productId
-                          })
-                        }])
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'add_to_cart_from_product_details',
-                            product_name: details.name,
-                            category: details.category,
-                            productId: details.productId
-                          },
-                        });
-                        addItemToCart();
-                      }
-                    }}
-                  >
-                    Add To Cart
-                  </Button> : <Button
-                    className="group w-1/3 h-9 border border-primary hover:bg-primary"
-                    onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
-                        window.location.href = loginUrl;
-                      } else {
-                        window.LOQ.push(['ready', async LO => {
-                          // Track an event
-                          await LO.$internal.ready('events')
-                          LO.events.track('Add to Cart (from Product Details)', {
-                            product: details.name,
-                            category: details.category,
-                            productId: details.productId
-                          })
-                        }])
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'add_to_cart_from_product_details',
-                            product_name: details.name,
-                            category: details.category,
-                            productId: details.productId
-                          },
-                        });
-                        addItemToCart();
-                      }
-                    }}
-                  >
-                    <div className="text-primary group-hover:text-white">
-                      Add To Cart
+         
+               
+                  <div className="flex justify-between  w-full gap-[15px]" id="quantity">
+                    <div
+                      onClick={subtract}
+                      className="h-[46px] w-[46px] rounded-lg flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+                      <MinusOutlined className="product_details  font-semibold " style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
                     </div>
-                  </Button>}
+                    <InputNumber className="w-full h-[46px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={availableQuantity} value={qty} defaultValue={qty} controls={false}
+                      onChange={e => {
+                        if (e < availableQuantity) {
+                          setQty(e)
+                        } else {
+                          openToast(
+                            "bottom",
+                            true,
+                            "Cannot add more than available quantity"
+                          );
+                          setQty(availableQuantity)
+                        }
+                      }} />
+                    <div
+                      onClick={add}
+                      className="ml-0.5 h-[46px] rounded-lg w-[46px] flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+                      <PlusOutlined className="product_details font-semibold " style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
+                    </div>
+                  </div>
+              
+                :
+                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
+                If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
+              </Paragraph>
+              }
+            
+
+{availableQuantity !== 0 ?
+                <Row className="flex flex-row gap-4 pt-4">
                   <Button
                     type="primary"
-                    className="w-1/3 h-9 ml-6 bg-primary !hover:bg-primaryHover"
+                    className="w-[365px] h-9  bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
@@ -659,14 +672,83 @@ const ProductDetails = ({ user, users }) => {
                   >
                     Buy Now
                   </Button>
+
+                  {ownerSameAsUser() ? <Button
+                    icon={<div className="flex justify-center items-center">
+                    <img src={Images.Cart} alt="cart"  width={14} height={14}></img>
+                    </div>}
+                    className="group w-[36px] h-9 border border-primary"
+                    disabled={true}
+                    id="addToCart"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
+                        window.location.href = loginUrl;
+                      } else {
+                        window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Add to Cart (from Product Details)', {
+                            product: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          })
+                        }])
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'add_to_cart_from_product_details',
+                            product_name: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          },
+                        });
+                        addItemToCart();
+                      }
+                    }}
+                  >
+                  
+                  </Button> : <Button
+                  icon={<div className="flex justify-center items-center">
+                    <img src={Images.Cart} alt="cart"  width={14} height={14}></img>
+                    </div>}
+                    className="group w-9 h-9 border  bg-[#13188A] hover:bg-primary"
+                    onClick={() => {
+                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                        setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
+                        window.location.href = loginUrl;
+                      } else {
+                        window.LOQ.push(['ready', async LO => {
+                          // Track an event
+                          await LO.$internal.ready('events')
+                          LO.events.track('Add to Cart (from Product Details)', {
+                            product: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          })
+                        }])
+                        TagManager.dataLayer({
+                          dataLayer: {
+                            event: 'add_to_cart_from_product_details',
+                            product_name: details.name,
+                            category: details.category,
+                            productId: details.productId
+                          },
+                        });
+                        addItemToCart();
+                      }
+                    }}
+                  >
+                    
+                  </Button>}
                 </Row>
                 :
-                <div className="flex justify-center">
+                <div className="flex ">
                   <Button
                     type="primary"
-                    className="w-40 h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
+                    className="w-[365px] h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
                     onClick={() => {
+                    
                       window.LOQ.push(['ready', async LO => {
                         await LO.$internal.ready('events')
                         LO.events.track('Contact Sales (from Product Details)', {
@@ -687,66 +769,19 @@ const ProductDetails = ({ user, users }) => {
                     Contact to Buy
                   </Button>
                 </div>
-              }
+           
+          }
+
+
+
+            
             </div>
-            <div className="w-1/2 ml-8  mb-6" id="details">
-              <Row className="items-center">
-                <Text className="font-semibold text-xl text-primaryB">
-                  {decodeURIComponent(details.name)}&nbsp;
-                </Text>
-                <Text className="font-medium text-sm text-secondryB ">
-                  ({getCategory(details)})
-                </Text>
-              </Row>
-              <Paragraph
-                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
-                className="text-primaryC text-[13px] mt-2"
-              >
-                {decodeURIComponent(details.description).split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    <br />
-                  </React.Fragment>
-                ))}
-              </Paragraph>
-              <Title level={4} className="!mt-0">
-                {details.price ? <>$ {details.price}</> : "No Price Available"}
-              </Title>
-              {availableQuantity !== 0 ?
-                <Space>
-                  <Text className="text-primaryB text-base">Quantity</Text>
-                  <div className="flex items-center my-2 ml-5" id="quantity">
-                    <div
-                      onClick={subtract}
-                      className="h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
-                      <MinusOutlined className="text-xs text-secondryD" style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
-                    </div>
-                    <InputNumber className="ml-0.5 h-[32px] w-[77px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={availableQuantity} value={qty} defaultValue={qty} controls={false}
-                      onChange={e => {
-                        if (e < availableQuantity) {
-                          setQty(e)
-                        } else {
-                          openToast(
-                            "bottom",
-                            true,
-                            "Cannot add more than available quantity"
-                          );
-                          setQty(availableQuantity)
-                        }
-                      }} />
-                    <div
-                      onClick={add}
-                      className="ml-0.5 h-[32px] w-[27px] pt-1 border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
-                      <PlusOutlined className="text-xs text-secondryC" style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
-                    </div>
-                  </div>
-                </Space>
-                :
-                <Paragraph style={{color:'red', fontSize:14}} className="!mt-0" id="prod-price">
-                If you are interested in purchasing this item, please contact our sales team at sales@blockapps.net
-              </Paragraph>
-              }
-              <Tabs
+          </div>
+
+          <div className="pt-10 w-[60%] ">
+
+          <Tabs
+          className="product_detail"
                 defaultActiveKey="1"
                 onChange={onTabChange}
                 items={!user ?
@@ -781,9 +816,10 @@ const ProductDetails = ({ user, users }) => {
                   },
                   ]}
               />
-            </div>
           </div>
-
+          
+          </div>
+       
           {isEventSelected ?
             iseventDetailsLoading || eventDetails == null ?
               <div className="h-80 flex justify-center items-center">
