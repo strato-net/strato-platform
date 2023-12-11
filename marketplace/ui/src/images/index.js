@@ -9,7 +9,6 @@ export const Images = {
   'metals': require("./resources/categories/metals.png"),
   'collectibles': require("./resources/categories/collectibles.jpg"),
   'membership': require("./resources/categories/membership.jpg"),
-  'carbonDAO': require("./resources/categories/carbonDAO.png"),
   'category1': require("./resources/categories/category1.png"),
   'category2': require("./resources/categories/category2.png"),
   'category3': require("./resources/categories/category3.png"),
