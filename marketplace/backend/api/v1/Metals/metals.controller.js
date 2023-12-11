@@ -39,7 +39,7 @@ class MetalsController {
   static validateCreateMetalsArgs(args) {
     const createMetalsSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(), // delete?
+        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         source: Joi.string().required(),
