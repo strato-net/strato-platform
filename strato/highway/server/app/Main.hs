@@ -21,6 +21,7 @@ import Data.ByteString.Char8 as DBC8
 import Data.Text as T
 import HFlags
 import Network.HTTP.Client hiding (Proxy)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
@@ -62,7 +63,9 @@ highway3DMacroFont =
   |]
 
 main :: IO ()
-main = runLoggingT initHighway
+main = do
+  _ <- $initHFlags "Setup Highway Wrapper AWS settings"
+  runLoggingT initHighway
 
 initHighway :: LoggingT IO ()
 initHighway = do
@@ -70,7 +73,6 @@ initHighway = do
   liftIO $ blockappsInit "blockapps-highway-wrapper-server"
   liftIO $ Prelude.putStrLn highway3DMacroFont
   liftIO $ forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
-  _ <- liftIO $ $initHFlags "Setup Highway Wrapper AWS settings"
   case Prelude.null flags_awsaccesskeyid of
       True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS Access Key ID highway env variable was not passed in."
                   return ()
@@ -81,9 +83,16 @@ initHighway = do
                             True  -> do $logErrorS "highway/initHighway" $ T.pack $ "AWS S3 Bucket highway env variable was not passed in."
                                         return ()
                             False -> do $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
-                                        mgr <- liftIO $ newManager defaultManagerSettings
+                                        mgr <- liftIO $ newManager tlsManagerSettings
                                         boundary <- liftIO genBoundary
-                                        let env = HighwayWrapperEnv mgr boundary (DBC8.pack flags_awsaccesskeyid) (DBC8.pack flags_awssecretaccesskey) (T.pack flags_awss3bucket)
+                                        let env = HighwayWrapperEnv
+                                                    mgr
+                                                    boundary
+                                                    (DBC8.pack flags_awsaccesskeyid)
+                                                    (DBC8.pack flags_awssecretaccesskey)
+                                                    (T.pack flags_awss3bucket)
+                                                    (T.pack flags_highwayUrl)
+                                        $logInfoS "highway/initHighway" $ T.pack $ "Initialization successful!"
                                         liftIO $ run 8080 $ appHighwayWrapper env
 
 appHighwayWrapper :: HighwayWrapperEnv -> Application
@@ -97,7 +106,7 @@ appHighwayWrapper env =
     . cors (const $ Just policy)
     . serve
       ( Proxy
-          @( "highway" :> HighwayWrapperAPI
+          @( HighwayWrapperAPI
            )
       )
     $ serveHighwayWrapper env

@@ -139,20 +139,40 @@ function bindAddress(user, address, options) {
 
 async function resellItem(user, contract, args, options) {
     const callArgs = {
-      contract,
-      method: "createSales",
-      args: util.usc({ ...args }),
+        contract,
+        method: "createSales",
+        args: util.usc({ ...args }),
     };
     const resellStatus = await rest.call(user, callArgs, options);
-  
+
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
-      throw new rest.RestError(
-        resellStatus,
-        "You cannot resell the item because it's already published",
-        { callArgs }
-      );
+        throw new rest.RestError(
+            resellStatus,
+            "You cannot resell the item because it's already published",
+            { callArgs }
+        );
     }
-  
+
+    return resellStatus;
+}
+
+async function updateInventory(user, contract, args, options) {
+    const callArgs = {
+        contract,
+        method: "update",
+        args: util.usc({ ...args.updates }),
+    };
+
+    const resellStatus = await rest.call(user, callArgs, options);
+
+    if (parseInt(resellStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+            resellStatus,
+            "You cannot resell the item because it's already published",
+            { callArgs }
+        );
+    }
+
     return resellStatus;
 }
 
@@ -195,35 +215,42 @@ async function getAll(admin, args = {}, options) {
     let inventories;
     let sales;
     let finalInventory = [];
+    let filteredInvetories = [];
 
     if (ownerCommonName) {
-        inventories = await searchAllWithQueryArgs(contractName, 
-            {   
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
                 ...restArgs,
-                ownerCommonName: ownerCommonName, 
-                status: status ? status : [1,2],
+                ownerCommonName: ownerCommonName,
+                status: status ? status : [1, 2],
             }, options, admin);
     }
     else if (assetAddresses) {
-        inventories = await searchAllWithQueryArgs(contractName, 
-            { 
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
                 ...restArgs,
-                address: assetAddresses, 
+                address: assetAddresses,
                 status: status ? status : [1, 2],
             }, options, admin);
     }
     else {
-        inventories = await searchAllWithQueryArgs(contractName, 
-            { 
-                ...restArgs, 
-                status: status ? status : [1,2],
+        inventories = await searchAllWithQueryArgs(contractName,
+            {
+                ...restArgs,
+                status: status ? status : [1, 2],
             }, options, admin);
     }
 
     if (inventories) {
-        const assetAddresses = inventories.map((inventory) => inventory.address);
+        inventories.map((inv) => {
+            const itemData = JSON.parse(inv.data);
+            if (!itemData.spent || itemData.spent === "False") {
+                filteredInvetories.push(inv);
+            }
+        })
+        const assetAddresses = filteredInvetories.map((inventory) => inventory.address);
         sales = await saleJs.getAll(admin, { assetAddresses }, options);
-        inventories.forEach(inventory => {
+        filteredInvetories.forEach(inventory => {
             const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address);
             if (itemSale) {
                 finalInventory.push({
@@ -248,17 +275,17 @@ async function inventoryCount(admin, args = {}, options) {
     });
 
     const totalResult = await searchAll(
-    contractName,
-    {
-        ...queryArgs,
-        sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
-        queryOptions: {
-        ...queryArgs.queryOptions,
-        select: "count",
+        contractName,
+        {
+            ...queryArgs,
+            sort: undefined, // can't sort and count together or postgres complains (redundant anyway)
+            queryOptions: {
+                ...queryArgs.queryOptions,
+                select: "count",
+            },
         },
-    },
-    options,
-    admin
+        options,
+        admin
     );
 
     return totalResult[0].count
@@ -279,6 +306,7 @@ export default {
     contractFilename,
     bindAddress,
     resellItem,
+    updateInventory,
     get,
     getAll,
     inventoryCount,

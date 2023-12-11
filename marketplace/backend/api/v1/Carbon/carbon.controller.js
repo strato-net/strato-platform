@@ -39,13 +39,12 @@ class CarbonController {
   static validateCreateCarbonArgs(args) {
     const createCarbonSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
-        projectType: Joi.string().required(),
         units: Joi.number().integer().min(1).required(),
         images: Joi.array().items(Joi.string().optional()).required(),
         price: Joi.number().positive().required(),
+        serialNumber: Joi.string().allow("").optional(),
         paymentTypes: Joi.array().min(1).items(
           Joi.number().integer().min(0).max(5).required(),
         ).required(),
