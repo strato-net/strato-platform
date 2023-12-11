@@ -58,6 +58,7 @@ data HighwayWrapperEnv = HighwayWrapperEnv
   , awsaccesskeyid     :: DB.ByteString
   , awssecretaccesskey :: DB.ByteString
   , awss3bucket        :: Text
+  , highwayUrl         :: Text
   }
 
 data HighwayWrapperError

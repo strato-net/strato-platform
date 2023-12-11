@@ -97,6 +97,15 @@ abstract contract Asset is PaymentType, SaleState, RestStatus, ItemStatus {
         _;
     }
 
+    modifier requireWhitelisted(string action) {
+        bool isWhitelisted = isSaleWhitelisted(msg.sender);
+        string err = "Only a whitelisted Sale contract can "
+                   + action
+                   + ".";
+        require(isWhitelisted, err);
+        _;
+    }
+
     // Updated function to add a sale to the whitelist
     function whitelistSale(address saleContract) public requireOwner("whitelist a Sale") {
         require(!isSaleWhitelisted(saleContract), "Sale is already whitelisted.");
@@ -272,6 +281,8 @@ abstract contract Order is RestStatus, OrderStatus {
         comments = _comments;
         return RestStatus.OK; 
     }
+
+    function onCancel() internal virtual {}
     
     function transferOwnership(uint _fulfillmentDate, string _comments) external returns (uint) {
         require(tx.origin == sellersAddress, "Only the seller can fulfill the order and transfer ownership");
