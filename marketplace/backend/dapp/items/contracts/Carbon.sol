@@ -5,9 +5,6 @@ import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
 
 /// @title A representation of Carbon assets
 contract Carbon is Mintable {
-    uint serialNumber;
-    string public projectType;
-
     event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
     constructor(
@@ -16,9 +13,7 @@ contract Carbon is Mintable {
         string[] _images,
         string[] _files,
         uint _createdDate,
-        uint _quantity,
-        uint _serialNumber,
-        string _projectType
+        uint _quantity
     ) Mintable (
         _name,
         _description,
@@ -29,8 +24,6 @@ contract Carbon is Mintable {
         _createdDate,
         _quantity
     ) {
-        serialNumber = _serialNumber;
-        projectType = _projectType;
     }
 
     function mint(uint splitQuantity) internal override returns (UTXO) {
@@ -39,21 +32,7 @@ contract Carbon is Mintable {
                               images, 
                               files, 
                               createdDate, 
-                              splitQuantity, 
-                              serialNumber + 1, 
-                              projectType);
+                              splitQuantity);
         return UTXO(address(c)); // Typechecker won't let me cast directly to UTXO
-    }
-
-    function updateCarbon(
-        string[] _images, 
-        string[] _files, 
-        uint _serialNumber,
-        string _projectType
-    ) public requireOwner("update carbon") returns (uint) {
-        serialNumber = _serialNumber;
-        projectType = _projectType;
-        updateAsset(_images, _files);
-        return RestStatus.OK;
     }
 }

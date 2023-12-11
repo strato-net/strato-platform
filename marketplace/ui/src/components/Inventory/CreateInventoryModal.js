@@ -45,12 +45,10 @@ const CreateInventoryModal = ({
   const [sizeOptions, setSizeOptions] = useState([]);
 
   const initialValues = {
-    serialNumber: "",
     name: "",
     description: "",
     artist: "",
     source: "",
-    projectType: "",
     quantity: 1,
     expirationPeriodInMonths: 1,
     brand: "",
@@ -121,7 +119,6 @@ const CreateInventoryModal = ({
 
     const body = {
       itemArgs: {
-        serialNumber: values.serialNumber,
         name: values.name,
         description: values.description,
         images: imageKeys,
@@ -142,7 +139,6 @@ const CreateInventoryModal = ({
           return (body = {
             itemArgs: {
               ...body.itemArgs,
-              projectType: values.projectType,
               quantity: values.quantity,
             }
           });
@@ -321,25 +317,6 @@ const CreateInventoryModal = ({
       case "Carbon":
         return (
           <div className="flex justify-between mt-4 ">
-            <Form.Item
-              label="Project Type"
-              name="projectType"
-              className="w-72"
-            >
-              <Input
-                label="projectType"
-                placeholder="Enter Project Type"
-                name="projectType"
-                value={formik.values.projectType}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.projectType &&
-                formik.errors.projectType && (
-                  <span className="text-error text-xs">
-                    {formik.errors.projectType}
-                  </span>
-                )}
-            </Form.Item>
             <Form.Item
               label="Quantity"
               name="quantity"
@@ -778,29 +755,6 @@ const CreateInventoryModal = ({
                   </span>
                 )}
               </Form.Item>
-            </div>
-            <div className="mt-4 flex justify-between">
-              <div className="flex flex-col">
-                <Form.Item
-                  label="Serial Number"
-                  name="serialNumber"
-                  className="w-72"
-                >
-                  <Input
-                    label="serialNumber"
-                    placeholder="Enter Serial Number"
-                    name="serialNumber"
-                    value={formik.values.serialNumber}
-                    onChange={formik.handleChange}
-                  />
-                  {formik.touched.serialNumber &&
-                    formik.errors.serialNumber && (
-                      <span className="text-error text-xs">
-                        {formik.errors.serialNumber}
-                      </span>
-                    )}
-                </Form.Item>
-              </div>
             </div>
           </div>
         </Form>

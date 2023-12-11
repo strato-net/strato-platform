@@ -12,7 +12,6 @@ const getSchema = () => {
     // skuNumber: yup.string().nullable().required("An SKU is required"),
     // condition: yup.string().nullable().required("The condition is required"),
     // brand: yup.string().nullable().required("A brand is required"),
-    projectType: yup.string(),
     quantity: yup.number().positive("Quantity must be a positive number").required("Quantity is required"),
     expirationPeriodInMonths: yup.number().positive("Expiration period must be a positive number").required("Expiration period is required"),
     images: yup.mixed().optional().nullable(),
