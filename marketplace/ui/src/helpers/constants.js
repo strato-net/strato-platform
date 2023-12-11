@@ -104,6 +104,7 @@ export const CATEGORIES = [
   "Metals",
   "Clothing",
   "Membership",
+  "CarbonDAO",
   "Collectibles"
 ]
 

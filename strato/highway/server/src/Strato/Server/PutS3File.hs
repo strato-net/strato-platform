@@ -19,13 +19,14 @@ import           Data.ByteString as DB
 import           Data.Text as T
 import           Network.HTTP.Conduit (RequestBody(..))
 import           Servant.Multipart
+import           System.FilePath (takeExtension)
 
 import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
 
 
 putS3File :: MultipartData Mem 
-          -> HighwayM Keccak256
+          -> HighwayM Text
 putS3File multipartdata =
   --Ensure we have only a single file input via form.
   case files multipartdata of
@@ -35,14 +36,16 @@ putS3File multipartdata =
                                   fdPayload    $
                                   file
 
-                let contentHash = hash content
-                    contentHashText = T.pack $ keccak256ToHex contentHash
+                let contentHash = T.pack . keccak256ToHex $ hash content
+                    extension = T.pack . takeExtension . T.unpack $ fdFileName file
+                    uploadFileName = contentHash <> extension
                 --Set up AWS credentials and the default configuration.
                 $logInfoS "highway/putS3File" $ T.pack $ "Setting up AWS credentials and the default AWS configuration."
                 mgr     <- asks httpManager
                 awsakid <- asks awsaccesskeyid
                 awssak  <- asks awssecretaccesskey
                 awss3b  <- asks awss3bucket
+                hwUrl  <- asks highwayUrl
                 cr      <- liftIO $ Aws.makeCredentials awsakid
                                                         awssak
                 let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp
@@ -59,7 +62,7 @@ putS3File multipartdata =
                   --Create a request object with S3.getObject and run the request with pureAws.
                   liftIO $ unliftIO st $ $logInfoS "highway/putS3File" $ T.pack $ "Creating request object with getObject and running request via pureAws."
                   _ <- Aws.pureAws cfg s3cfg mgr $
-                         S3.putObject awss3b contentHashText body
-                  return contentHash
+                         S3.putObject awss3b uploadFileName body
+                  return $ hwUrl <> "/highway/" <> uploadFileName
     _ -> --Too many or no files provided via form.
       liftIO $ throwIO BadPutError

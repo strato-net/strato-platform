@@ -3,7 +3,7 @@ pragma strict;
 
 import <3efeac2e0e1801d90653e56ebdce867bbec5874a>;
 
-/// @title A representation of Membership assets
+/// @title A representation of CarbonDAO assets
 contract CarbonDAO is SemiFungible {
     constructor(
         string _name,
