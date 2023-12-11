@@ -73,7 +73,7 @@ const Inventory = ({ user }) => {
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user?.organization);
+    actions.sellerStripeStatus(dispatch, user?.commonName);
   }, [dispatch, user]);
   
   useEffect(() => {
@@ -305,6 +305,7 @@ const Inventory = ({ user }) => {
                           category={category}
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
+                          paymentProviderAddress={stripeStatus ? stripeStatus.paymentProviderAddress : undefined }
                         />
                       );
                     })}

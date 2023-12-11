@@ -1,19 +1,18 @@
+pragma es6;
+pragma strict;
 
-
-import "/blockapps-sol/lib/rest/contracts/RestStatus.sol";
-import "/dapp/dapp/contracts/Dapp.sol";
-import "/dapp/payments/contracts/PaymentServices.sol";
+import <509>;
+import "../Assets/Asset.sol";
+import "../Enums/RestStatus.sol";
+import "../Utils/Utils.sol";
 
 /// @title A representation of PaymentProvider_1 assets
-contract PaymentProvider_1 is PaymentServices{
-
+contract PaymentProvider is Utils {
     address public owner;
-    string public ownerOrganization;
-    string public ownerOrganizationalUnit;
     string public ownerCommonName;
 
 
-    PaymentServices public name;
+    string public name;
     string public accountId;
     bool public chargesEnabled;
     bool public detailsSubmitted;
@@ -22,13 +21,19 @@ contract PaymentProvider_1 is PaymentServices{
     uint public createdDate;
     bool public accountDeauthorized;
 
+    event Payment(
+        string sellerAccountId,
+        string amount
+    );
 
-    constructor(
-            PaymentServices _name
+
+    constructor (
+            string _name
         ,   string _accountId
         ,   uint _createdDate
     ) public {
-        owner = tx.origin;
+        owner = msg.sender;
+        ownerCommonName = getCommonName(msg.sender);
 
         name = _name;
         accountId = _accountId;
@@ -38,11 +43,6 @@ contract PaymentProvider_1 is PaymentServices{
         eventTime = 0;
         createdDate = _createdDate;
         accountDeauthorized = false;
-
-        mapping(string => string) ownerCert = getUserCert(owner);
-        ownerOrganization = ownerCert["organization"];
-        ownerOrganizationalUnit = ownerCert["organizationalUnit"];
-        ownerCommonName = ownerCert["commonName"];
     }
 
     function update(

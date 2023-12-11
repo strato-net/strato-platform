@@ -1,27 +1,55 @@
+import "Asset.sol";
+
 abstract contract UTXO is Asset {
-    uint public units; // Number of units this asset represents
-    uint public serialNo;
-    event AssetSplit(address newAsset, uint unitsMoved);
+    uint public utxoMagicNumber = 0x5554584F; // 'UTXO'
 
     constructor(
         string _name,
         string _description,
+        string _category,
+        string _subCategory,
         string[] _images,
+        string[] _files,
         uint _createdDate,
-        uint _units,
-        uint _serialNo
-    ) Asset(_name, _description, _images, _createdDate) {
-        units = _units;
-        serialNo = _serialNo;
+        uint _quantity
+    ) Asset(
+        _name,
+        _description,
+        _category,
+        _subCategory,
+        _images,
+        _files,
+        _createdDate,
+        _quantity
+    ) {
     }
 
-    function splitAsset(uint splitUnits) public requireOwner("Split Asset") returns (address newAssetAddress) {
-        require(splitUnits < units, "Cannot split more units than available");
+    function mint(uint _quantity) internal virtual returns (UTXO) {
+        return new UTXO(name, description, category, subCategory, images, files, createdDate, _quantity);
+    }
+
+    // Quantity is already checked by transferOwnership function
+    function _transfer(address _newOwner, uint _quantity) internal override {
         // Create a new UTXO with a portion of the units
-        UTXO newAsset = new UTXO(name, description, images, price, createdDate, splitUnits, (serialNo+1));
-        units -= splitUnits; // Reduce the units in the current contract
-
-        emit AssetSplit(address(newAsset), splitUnits);
-
-        return address(newAsset);
-    }}
+        try {
+            // This is a hack to prevent the splitted UTXO from infinitely creating new UTXOs
+            assert(UTXO(owner).utxoMagicNumber() == utxoMagicNumber);
+            owner = _newOwner;
+            ownerCommonName = getCommonName(_newOwner);
+        } catch {
+            emit OwnershipTransfer(
+                originAddress,
+                owner,
+                ownerCommonName,
+                _newOwner,
+                getCommonName(_newOwner),
+                itemNumber,
+                itemNumber + _quantity - 1
+            );
+            UTXO newAsset = mint(_quantity);
+            Asset(newAsset).transferOwnership(_newOwner, _quantity);
+            quantity -= _quantity;
+            itemNumber += _quantity;
+        }
+    }
+}

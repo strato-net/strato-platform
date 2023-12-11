@@ -1,6 +1,8 @@
- 
+import <509>;
 
-/// @title A representation of status of an Item
+pragma es6;
+pragma strict;
+
 contract ItemStatus{
   enum ItemStatus{
     NULL,

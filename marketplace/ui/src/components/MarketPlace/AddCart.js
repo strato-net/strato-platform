@@ -78,7 +78,7 @@ const Checkout = ({ user }) => {
   useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
-      const org = obj.product.ownerOrganization;
+      const org = obj.product.ownerCommonName;
       if (!map.has(org)) {
         map.set(org, []);
       }
@@ -98,11 +98,11 @@ const Checkout = ({ user }) => {
             status: "Active",
           },
           category: parts[parts.length - 1],
-          sellersOrganization: item.product.ownerOrganization,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price,
-          quantity: item.product.address,
+          quantity: item.product.saleQuantity,
+          saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
@@ -191,15 +191,6 @@ const Checkout = ({ user }) => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
-      ),
-      dataIndex: "sellersOrganization",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-      width: "12%"
-    },
-    {
-      title: (
         <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
       ),
       dataIndex: "sellersCommonName",
@@ -210,7 +201,7 @@ const Checkout = ({ user }) => {
       width: "12%"
     },
     {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">UNIT PRICE ($)</Text>,
       dataIndex: "unitPrice",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
@@ -220,15 +211,8 @@ const Checkout = ({ user }) => {
       dataIndex: "quantity",
       align: "center",
       width: "160px",
-      render: (text) => {
-        let qty = 1;
-        let product;
-        cartList.forEach((element) => {
-          if (element.product.address === text) {
-            qty = element.qty;
-            product = element.product;
-          }
-        });
+      render: (text, product) => {
+        let qty = product.qty;
         return (
           <div className="flex items-center mt-2">
             <div
@@ -238,9 +222,8 @@ const Checkout = ({ user }) => {
                 }
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    const itemData = JSON.parse(product.data);
-                    const availableQuantity = itemData.units ? itemData.units : 1;
+                  if (element.product.address === product.key) {
+                    const availableQuantity = product.quantity ? product.quantity : 1;
                     if (items[index].qty - 1 <= availableQuantity) {
                       items[index].qty -= 1;
                       actions.addItemToCart(marketplaceDispatch, items);
@@ -263,9 +246,8 @@ const Checkout = ({ user }) => {
                 onChange={e => {
                   let items = [...cartList];
                   cartList.forEach((element, index) => {
-                    if (element.product.address === product.address) {
-                      const itemData = JSON.parse(product.data);
-                      const availableQuantity = itemData.units ? itemData.units : 1;
+                    if (element.product.address === product.key) {
+                      const availableQuantity = product.quantity ? product.quantity : 1;
                       if (e <= availableQuantity) {
                         items[index].qty = e;
                         actions.addItemToCart(marketplaceDispatch, items);
@@ -281,9 +263,8 @@ const Checkout = ({ user }) => {
               onClick={() => {
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    const itemData = JSON.parse(product.data);
-                    const availableQuantity = itemData.units ? itemData.units : 1;
+                  if (element.product.address === product.key) {
+                    const availableQuantity = product.quantity ? product.quantity : 1;
                     if (items[index].qty + 1 <= availableQuantity) {
                       items[index].qty += 1;
                       actions.addItemToCart(marketplaceDispatch, items);
@@ -306,21 +287,21 @@ const Checkout = ({ user }) => {
       },
     },
     {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">TAX ($)</Text>,
       dataIndex: "tax",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
+        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES ($)</Text>
       ),
       dataIndex: "shippingCharges",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">AMOUNT ($)</Text>,
       dataIndex: "amount",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
@@ -370,7 +351,7 @@ const Checkout = ({ user }) => {
       orderList.push({ inventoryId: item.product.address, quantity: item.qty });
     });
     const body = {
-      buyerOrganization: user.organization,
+      buyerCommonName: user.commonName,
       orderList,
       orderTotal: total + tax + shipping,
     };
