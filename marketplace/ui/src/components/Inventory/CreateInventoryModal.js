@@ -65,7 +65,7 @@ const CreateInventoryModal = ({
     brand: "",
     clothingType: null,
     images: null,
-    price: 0,
+    price: 1,
     paymentTypes: [],
     category: "Art",
     size: null,
@@ -142,6 +142,14 @@ const CreateInventoryModal = ({
               units: values.units,
             },
           });
+        case 'Membership':
+          return body = {
+            itemArgs: {
+              ...body.itemArgs,
+              units: values.units,
+              expirationPeriodInMonths: values.expirationPeriodInMonths
+            }
+          }
         case "Collectibles":
           return (body = {
             itemArgs: {
@@ -151,13 +159,6 @@ const CreateInventoryModal = ({
             },
           });
         case "Metals":
-          return (body = {
-            itemArgs: {
-              ...body.itemArgs,
-              source: values.source,
-            }
-          });
-        case 'Membership':
           const selectedUOM = unitOfMeasures.find(u => u.value === values.unitOfMeasurement.value);
           
           return {
@@ -168,7 +169,6 @@ const CreateInventoryModal = ({
               unitOfMeasurement: selectedUOM.value,
               leastSellableUnits: values.leastSellableUnits,
               units: values.units,
-              expirationPeriodInMonths: values.expirationPeriodInMonths
               purity: values.purity
             }
           };
@@ -499,25 +499,7 @@ const CreateInventoryModal = ({
             </Form.Item>
           </div>
         );
-      case "Metals":
-        return (
-          <div className="flex justify-between mt-4 ">
-            <Form.Item label="Source" name="source" className="w-72">
-              <Input
-                label="source"
-                placeholder="Enter Material Source"
-                name="source"
-                value={formik.values.source}
-                onChange={formik.handleChange}
-              />
-              {formik.touched.source && formik.errors.source && (
-                <span className="text-error text-xs">
-                  {formik.errors.source}
-                </span>
-              )}
-            </Form.Item>
-          </div>
-        );
+
       case 'Membership':
         return (
           <div className="flex justify-between mt-4 ">
@@ -812,7 +794,7 @@ const CreateInventoryModal = ({
                     placeholder="Enter Price"
                     name="price"
                     addonAfter="$"
-                    min={0}
+                    min={1}
                     value={formik.values.price}
                     onChange={(value) => formik.setFieldValue("price", value)}
                   />
