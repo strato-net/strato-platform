@@ -6,7 +6,7 @@ const getSchema = () => {
     name: yup.string().required("Name is required"),
     description: yup.string().required("Description is required"),
     artist: yup.string(),
-    source: yup.string().required("Source is required"),
+    source: yup.string(),
     // unitOfMeasurement: yup.number().positive("Choose the given options").required("Unit of Measurement is required"),
     // leastSellableUnit: yup.number().min(1).required("LSU is required"),
     projectType: yup.string(),
