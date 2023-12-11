@@ -5,6 +5,7 @@ import {
   Form,
   Modal,
   Input,
+  InputNumber,
   Select,
   Tag,
   Radio,
@@ -23,7 +24,7 @@ import TextArea from "antd/es/input/TextArea";
 import getSchema from "./InventorySchema";
 import { usePapaParse } from "react-papaparse";
 import TagManager from "react-gtm-module";
-import { CATEGORIES, PAYMENT_TYPE } from "../../helpers/constants";
+import { CATEGORIES, PAYMENT_TYPE, unitOfMeasures, categoryInfo } from "../../helpers/constants";
 import { PictureOutlined } from "@ant-design/icons";
 
 
@@ -52,13 +53,16 @@ const CreateInventoryModal = ({
     artist: "",
     source: "",
     leastSellableUnits: 1,
-    unitOfMeasurement: 1,
+    unitOfMeasurement: {
+      name: "TON",
+      value: 1,
+    },
     purity: "",
     projectType: "",
     units: 1,
     brand: "",
     images: null,
-    price: null,
+    price: 0,
     paymentTypes: [],
     category: "Art"
   };
@@ -126,16 +130,20 @@ const CreateInventoryModal = ({
             }
           }
         case 'Metals':
-          return body = {
+          const selectedUOM = unitOfMeasures.find(u => u.value === values.unitOfMeasurement.value);
+          
+          return {
+            ...body,
             itemArgs: {
               ...body.itemArgs,
               units: values.units,
-              unitOfMeasurement: values.unitOfMeasurement,
+              unitOfMeasurement: selectedUOM.value,
               leastSellableUnits: values.leastSellableUnits,
               source: values.source,
               purity: values.purity
             }
-          }
+          };
+          
         default:
           break;
       }
@@ -204,6 +212,12 @@ const CreateInventoryModal = ({
       return value;
     }
   }
+  
+  const getCategoryInfo = () => {
+    return categoryInfo[formik.values.category] || categoryInfo['default'];
+  };
+
+  const { label, width, enableSerialNumber } = getCategoryInfo();
 
   const categoricalProperties = () => {
     switch (formik.values.category) {
@@ -294,11 +308,11 @@ const CreateInventoryModal = ({
             </Form.Item>
           </div>)
       case 'Metals':
-        return (<div className="flex justify-between mt-4 ">
+        return (<div className="flex flex-wrap gap-4 mt-4">
             <Form.Item
               label="Source"
               name="source"
-              className="w-72"
+              className="mr-8 w-72"
             >
               <Input
                 label="source"
@@ -333,10 +347,42 @@ const CreateInventoryModal = ({
                   </span>
                 )}
             </Form.Item>
+            <div className="flex justify-between mt-4">
+            <Form.Item
+                label="Unit of Measurement "
+                name="unitOfMeasurement "
+                className="w-30 mr-8"
+              >
+                <Select
+                  id="unitOfMeasurement"
+                  placeholder="Select Unit of Measurement "
+                  allowClear
+                  className="w-35"
+                  name="unitOfMeasurement.name"
+                  value={formik.values.unitOfMeasurement.name}
+                  onChange={(value) => {
+                    let selectedUOM = unitOfMeasures.find(u => u.value === value);
+                    formik.setFieldValue("unitOfMeasurement.name", selectedUOM.name);
+                    formik.setFieldValue("unitOfMeasurement.value", value);
+                  }}
+                >
+                  {unitOfMeasures.map((e, index) => (
+                    <Option value={e.value} key={index}>
+                      {e.name}
+                    </Option>
+                  ))}
+                </Select>
+                {getIn(formik.touched, "unitofmeasurement.name") &&
+                  getIn(formik.errors, "unitofmeasurement.name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "unitofmeasurement.name")}
+                    </span>
+                  )}
+              </Form.Item>
             <Form.Item
               label="Least Sellable Units"
               name="leastSellableUnits"
-              className="w-72"
+              className="w-30 mr-8"
             >
               <Input
                 label="leastSellableUnits"
@@ -355,7 +401,7 @@ const CreateInventoryModal = ({
             <Form.Item
               label="Quantity"
               name="units"
-              className="w-72"
+              className="w-30"
             >
               <Input
                 label="units"
@@ -371,6 +417,7 @@ const CreateInventoryModal = ({
                   </span>
                 )}
             </Form.Item>
+            </div>
             </div>)
       default:
         break;
@@ -454,7 +501,7 @@ const CreateInventoryModal = ({
               </div>
               {categoricalProperties()}
               <div className="flex justify-between mt-4 ">
-                <Form.Item label="Payment Types" name="paymentTypes" className="w-72" getValueFromEvent={handleSelectAll}>
+                <Form.Item label="Payment Types" name="paymentTypes" className={width} getValueFromEvent={handleSelectAll}>
                   <Select
                     id="paymentTypes"
                     mode="multiple"
@@ -481,16 +528,18 @@ const CreateInventoryModal = ({
                     )}
                 </Form.Item>
                 <Form.Item
-                  label={formik.values.category === 'Carbon' ? 'Price per unit' : 'Price'}
+                  label={label}
                   name="price"
                   className="w-72"
                 >
-                  <Input
+                  <InputNumber
                     label="price"
                     placeholder="Enter Price"
                     name="price"
+                    addonAfter="$"
+                    min={0}
                     value={formik.values.price}
-                    onChange={formik.handleChange}
+                    onChange={(value) => formik.setFieldValue("price", value)}
                   />
                   {formik.touched.price &&
                     formik.errors.price && (
@@ -570,9 +619,14 @@ const CreateInventoryModal = ({
                       label="serialNumber"
                       placeholder="Enter Serial Number"
                       name="serialNumber"
-                      value={formik.values.category === 'Carbon' ? "" : formik.values.serialNumber}
-                      onChange={formik.handleChange}
-                      disabled={formik.values.category === 'Carbon'}
+                      value={enableSerialNumber ? formik.values.serialNumber : ""}
+                      onChange={(e) => {
+                        // Allow changes only if enableSerialNumber is true
+                        if (enableSerialNumber) {
+                          formik.handleChange(e);
+                        }
+                      }}
+                      disabled={!enableSerialNumber}
                     />
                     {formik.touched.serialNumber &&
                       formik.errors.serialNumber && (

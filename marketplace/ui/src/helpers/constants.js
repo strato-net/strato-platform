@@ -42,18 +42,19 @@ export const INVENTORY_STATUS = {
 };
 
 export const unitOfMeasures = [
-  { name: "LB", value: 1 },
-  { name: "Ounce", value: 2 },
-  { name: "Ton", value: 3 },
-  { name: "Bag", value: 4 },
-  { name: "Box", value: 5 },
-  { name: "Piece", value: 6 },
-  { name: "Bale", value: 7 },
-  { name: "Gallon", value: 8 },
-  { name: "Pound", value: 9 },
-  { name: "Yard", value: 10 },
-  { name: "Kilogram", value: 11 }
+  { name: "TON", value: 1 },
+  { name: "POUND", value: 2 },
+  { name: "OUNCE", value: 3 },
+  { name: "TONNE", value: 4 },
+  { name: "KG", value: 5 },
+  { name: "G", value: 6 }
 ];
+
+export const categoryInfo = {
+  'default': { label: 'Price', width: 'w-72', enableSerialNumber: true },
+  'Carbon': { label: 'Price per unit', width: 'w-72', enableSerialNumber: false },
+  'Metals': { label: 'Price', width: 'w-72 mr-8', enableSerialNumber: true },
+};
 
 export const CHARGES = {
   "SHIPPING": 0,
