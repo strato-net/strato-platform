@@ -6,7 +6,8 @@ import {
   EditOutlined,
   FormOutlined,
   PieChartOutlined,
-  StopOutlined
+  StopOutlined,
+  SwapOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
@@ -15,6 +16,7 @@ import UpdateInventoryModal from "./UpdateInventoryModal";
 import ListForSaleModal from "./ListForSaleModal";
 import UnlistModal from "./UnlistModal";
 import ResellModal from "./ResellModal";
+import TransferModal from "./TransferModal";
 import routes from "../../helpers/routes";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 
@@ -26,6 +28,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
 
@@ -85,6 +88,15 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
 
   const handleResellModalClose = () => {
     setResellModalOpen(false);
+  };
+
+  const showTransferModal = () => {
+    hide();
+    setTransferModalOpen(true);
+  };
+
+  const handleTransferModalClose = () => {
+    setTransferModalOpen(false);
   };
 
   const callDetailPage = () => {
@@ -212,8 +224,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           src={
             inventory.images && inventory.images.length > 0
               ? inventory.images[0]
-              : image_placeholder
-          }
+              : image_placeholder }
         />
         <div className="ml-12 w-full">
           <div className="flex justify-between items-center">
@@ -282,6 +293,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                       <PieChartOutlined />
                       <p className="ml-3">Resell</p>
                     </div>) : (<div></div>)}
+                    <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showTransferModal}
+                    >
+                      <SwapOutlined />
+                      <p className="ml-3">Transfer</p>
+                    </div>
                   </div>
                 }
                 trigger="click"
@@ -384,6 +402,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
         <ResellModal
           open={resellModalOpen}
           handleCancel={handleResellModalClose}
+          inventory={inventory}
+        />
+      )}
+      {transferModalOpen && (
+        <TransferModal
+          open={transferModalOpen}
+          handleCancel={handleTransferModalClose}
           inventory={inventory}
         />
       )}

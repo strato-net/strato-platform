@@ -232,6 +232,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
   }
 
+  contract.transferItem = async function (args, options = defaultOptions) {
+    const { assetAddress, ...restArgs } = args;
+    const contract = { address: assetAddress };
+    return inventoryJs.transferItem(rawAdmin, contract, restArgs, options);
+  }
+
   contract.updateSale = async function (args, options = defaultOptions) {
     const { saleAddress, ...restArgs } = args;
     const contract = { address: saleAddress };

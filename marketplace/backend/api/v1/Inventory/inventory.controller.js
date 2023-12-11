@@ -119,6 +119,21 @@ class InventoryController {
     }
   }
 
+  static async transfer(req, res, next) {
+    try {
+      const { dapp, body } = req
+
+      InventoryController.validateTransferItemArgs(body)
+
+      const result = await dapp.transferItem(body)
+      rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async updateSale(req, res, next) {
     try {
       const { dapp, body } = req
@@ -254,6 +269,23 @@ class InventoryController {
     });
 
     const validation = resellItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateTransferItemArgs(args) {
+    const transferItemSchema = Joi.object({
+      assetAddress: Joi.string().required(),
+      newOwner: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
+    });
+
+    const validation = transferItemSchema.validate(args);
 
     if (validation.error) {
       console.log('validation error: ', validation.error)

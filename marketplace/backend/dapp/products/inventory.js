@@ -195,12 +195,31 @@ async function resellItem(user, contract, args, options) {
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(
             resellStatus,
-            "You cannot resell the item because you're not",
+            "You cannot resell the item because it has already been sold by the original owner.",
             { callArgs }
         );
     }
 
     return resellStatus;
+}
+
+async function transferItem(user, contract, args, options) {
+    const callArgs = {
+        contract,
+        method: "automaticTransfer",
+        args: util.usc({ ...args }),
+    };
+    const transferStatus = await rest.call(user, callArgs, options);
+
+    if (parseInt(transferStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+            transferStatus,
+            "You cannot transfer the item",
+            { callArgs }
+        );
+    }
+
+    return transferStatus;
 }
 
 async function updateInventory(user, contract, args, options) {
@@ -387,6 +406,7 @@ export default {
     bindAddress,
     unlistItem,
     resellItem,
+    transferItem,
     updateInventory,
     updateSale,
     get,

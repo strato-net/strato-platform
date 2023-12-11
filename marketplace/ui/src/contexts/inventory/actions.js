@@ -26,6 +26,9 @@ const actionDescriptors = {
   resellInventory: "resell_inventory",
   resellInventorySuccessful: "resell_inventory_successful",
   resellInventoryFailed: "resell_inventory_failed",
+  transferInventory: "transfer_inventory",
+  transferInventorySuccessful: "transfer_inventory_successful",
+  transferInventoryFailed: "transfer_inventory_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
   onboardSellerToStripe: "onboard_seller_to_stripe",
@@ -461,6 +464,60 @@ const actions = {
         error: "Error while publishing Item",
       });
       actions.setMessage(dispatch, "Error while publishing Item");
+    }
+  },
+
+  transferInventory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.transferInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/inventory/transfer`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.transferInventorySuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Inventory has been transferred", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.transferInventoryFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.transferInventoryFailed, error: "Error while transferring Item" });
+        actions.setMessage(dispatch, "Error while transferring Item")
+        return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.transferInventoryFailed, 
+          error: "Unauthorized while transferring Inventory" 
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.transferInventoryFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.transferInventoryFailed,
+        error: "Error while transferring Item",
+      });
+      actions.setMessage(dispatch, "Error while transferring Item");
     }
   },
 

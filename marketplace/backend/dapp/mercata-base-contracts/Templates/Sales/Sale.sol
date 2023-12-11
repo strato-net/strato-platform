@@ -87,7 +87,28 @@ abstract contract Sale is SaleState, Utils {
         address purchaser = order.purchasersAddress();
         uint orderQuantity = takeLockedQuantity(msg.sender);
         assetToBeSold.transferOwnership(purchaser, orderQuantity);
+        closeSaleIfEmpty();
         return RestStatus.OK;
+    }
+
+    function automaticTransfer(address _newOwner, uint _quantity) public returns (uint) {
+        require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
+        uint assetQuantity = assetToBeSold.quantity();
+        require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
+        if (_quantity > quantity) { // We can transfer more than the Sale quantity
+            quantity = 0;
+        } else {
+            quantity -= _quantity;
+        }
+        assetToBeSold.transferOwnership(_newOwner, _quantity);
+        closeSaleIfEmpty();
+        return RestStatus.OK;
+    }
+
+    function closeSaleIfEmpty() internal {
+        if (quantity == 0 && totalLockedQuantity == 0) {
+            closeSale();
+        }
     }
 
     function closeSale() public requireSeller("close sale") returns (uint) {
