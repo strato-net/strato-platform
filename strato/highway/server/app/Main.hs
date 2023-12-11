@@ -85,7 +85,13 @@ initHighway = do
                             False -> do $logInfoS "highway/initHighway" $ T.pack $ "Preparing environment for highway."
                                         mgr <- liftIO $ newManager tlsManagerSettings
                                         boundary <- liftIO genBoundary
-                                        let env = HighwayWrapperEnv mgr boundary (DBC8.pack flags_awsaccesskeyid) (DBC8.pack flags_awssecretaccesskey) (T.pack flags_awss3bucket)
+                                        let env = HighwayWrapperEnv
+                                                    mgr
+                                                    boundary
+                                                    (DBC8.pack flags_awsaccesskeyid)
+                                                    (DBC8.pack flags_awssecretaccesskey)
+                                                    (T.pack flags_awss3bucket)
+                                                    (T.pack flags_highwayUrl)
                                         $logInfoS "highway/initHighway" $ T.pack $ "Initialization successful!"
                                         liftIO $ run 8080 $ appHighwayWrapper env
 
@@ -100,7 +106,7 @@ appHighwayWrapper env =
     . cors (const $ Just policy)
     . serve
       ( Proxy
-          @( "highway" :> HighwayWrapperAPI
+          @( HighwayWrapperAPI
            )
       )
     $ serveHighwayWrapper env
