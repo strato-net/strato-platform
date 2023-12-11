@@ -44,7 +44,7 @@
     "@sendgrid/mail": "^7.7.0",
     "aws-sdk": "^2.1284.0",
     "babel-plugin-module-resolver": "^4.1.0",
-    "blockapps-rest": "8.1.0",
+    "blockapps-rest": "8.3.1",
     "body-parser": "^1.20.1",
     "chai": "^4.3.7",
     "chai-http": "^4.3.0",

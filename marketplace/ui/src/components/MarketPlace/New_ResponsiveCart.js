@@ -1,7 +1,6 @@
 import { Button, Row, notification, Input, Col, Card, Typography,Divider } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
-import DataTableComponent from "../DataTableComponent";
 import "./index.css";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";

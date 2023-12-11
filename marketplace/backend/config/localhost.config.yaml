@@ -14,7 +14,7 @@ marketplaceUiUrlPrefix: "/marketplace"
 nodes:
   - id: 0
     label: localhost
-    url: https://workspace-rejolut-39dh49q.mercata-testnet2.blockapps.net
+    url: https://node2.mercata-testnet2.blockapps.net
     port: 443
     oauth:
       appTokenCookieName: asset_framework_session

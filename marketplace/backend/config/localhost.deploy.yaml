@@ -1,5 +1,5 @@
-url: https://workspace-rejolut-39dh49q.mercata-testnet2.blockapps.net
+url: https://node2.mercata-testnet2.blockapps.net
 dapp:
   contract:
     name: Dapp
-    address: 2f3506bb1b3bf187e06c824698c5729bdc41ac03
+    address: 69090966b7327a92059f776321f44adcf845bc2c

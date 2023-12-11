@@ -44,21 +44,17 @@ const New_CartComponent = ({ columns, data }) => {
         setTotal(tot)
     }, [data])
     useEffect(() => {
-        // Update inner width when the window is resized
         const handleResize = () => {
           setInnerWidth(window.innerWidth);
         };
     
         window.addEventListener("resize", handleResize);
     
-        return () => {
-          // Cleanup the event listener on component unmount
-          window.removeEventListener("resize", handleResize);
-        };
+        return () => {         
+            window.removeEventListener("resize", handleResize);
+    };
       }, []);
     
-   
-
 
     return (
         // <Card className="my-4">

@@ -34,7 +34,7 @@ import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
 import Invoice from "./components/Order/Invoice";
 import { CertifiersProvider } from "./contexts/certifier";
 import LoginRedirect from "./components/LoginRedirect";
-import New_Checkout from "./components/MarketPlace/New_AddCart";
+
 
 const AuthenticatedRoutes = ({ user, users }) => {
   return (
@@ -64,8 +64,7 @@ const AuthenticatedRoutes = ({ user, users }) => {
           <UsersProvider>
             <CategorysProvider>
               <OrdersProvider>
-                {/* <Checkout user={user} users={users} /> */}
-                <New_Checkout user={user} users={users}/>
+                <Checkout user={user} users={users} />
               </OrdersProvider>
             </CategorysProvider>
           </UsersProvider>
