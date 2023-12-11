@@ -503,6 +503,24 @@ const ProductDetails = ({ user, users }) => {
             </Space>
           </Space>
           </>)
+      case "Membership":
+        return (
+          <Space direction="vertical">
+           <Space>
+              <DescTitle text="Units" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{availableQuantity}</Text>
+            </Space>
+          </Space>)
+      case "CarbonDAO":
+        return (
+          <Space direction="vertical">
+            <Space>
+              <DescTitle text="Units" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{availableQuantity}</Text>
+            </Space>
+          </Space>)
       default:
         break;
     }

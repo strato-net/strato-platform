@@ -5,13 +5,13 @@ import config from '../../../load.config'
 
 const options = { config, cacheNonce: true }
 
-class CarbonController {
+class CarbonDAOController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
 
-      const carbons = await dapp.getCarbons({ ...query })
-      rest.response.status200(res, carbons)
+      const carbonDAOs = await dapp.getCarbonDAOs({ ...query })
+      rest.response.status200(res, carbonDAOs)
 
       return next()
     } catch (e) {
@@ -23,9 +23,9 @@ class CarbonController {
     try {
       const { dapp, body } = req
 
-      CarbonController.validateCreateCarbonArgs(body)
+      CarbonDAOController.validateCreateCarbonDAOArgs(body)
 
-      const result = await dapp.createCarbon(body)
+      const result = await dapp.createCarbonDAO(body)
       rest.response.status200(res, result)
 
       return next()
@@ -36,9 +36,10 @@ class CarbonController {
 
   // ----------------------- ARG VALIDATION ------------------------
 
-  static validateCreateCarbonArgs(args) {
-    const createCarbonSchema = Joi.object({
+  static validateCreateCarbonDAOArgs(args) {
+    const createCarbonDAOSchema = Joi.object({
       itemArgs: Joi.object({
+        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         units: Joi.number().integer().min(1).required(),
@@ -50,15 +51,15 @@ class CarbonController {
       }).required()
     });
 
-    const validation = createCarbonSchema.validate(args);
+    const validation = createCarbonDAOSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Carbon Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create CarbonDAO Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
   }
 }
 
-export default CarbonController;
+export default CarbonDAOController;

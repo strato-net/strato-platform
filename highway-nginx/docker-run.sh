@@ -8,8 +8,7 @@ OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-HIGHWAY_PROVIDER_HOSTNAME=${HIGHWAY_PROVIDER_HOSTNAME:-highway-wrapper}
-HIGHWAY_PORT=${HIGHWAY_PORT:-8080}
+HIGHWAY_HOST=${HIGHWAY_HOST:-highway:8080}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -31,10 +30,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
   fi
 
-  # Replacing HOST NAME PLACEHOLDERS
-  sed -i "s/__HIGHWAY_PROVIDER_HOSTNAME__/$HIGHWAY_PROVIDER_HOSTNAME/g" /tmp/nginx.conf
-  sed -i "s/__HIGHWAY_PORT__/$HIGHWAY_PORT/g" /tmp/nginx.conf
-
+  # Replacing HOST PLACEHOLDERS
+  sed -i "s/__HIGHWAY_HOST__/$HIGHWAY_HOST/g" /tmp/nginx.conf
 
   ########
   ### Generate .lua scripts from templates according to configuration provided
