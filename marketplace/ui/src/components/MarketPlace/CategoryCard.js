@@ -20,7 +20,8 @@ const CategoryCard = () => {
     Images.metals,
     Images.clothing,
     Images.membership,
-    Images.carbonDAO
+    null,
+    Images.collectibles
   ];
 
   return (
@@ -38,6 +39,7 @@ const CategoryCard = () => {
       </div>
       <div className="flex justify-evenly px-2">
         {categorys.map((category, index) => {
+          if (category.name !== 'CarbonDAO') {
           return (
             <div
               id={category.name}
@@ -71,6 +73,7 @@ const CategoryCard = () => {
               </div>
             </div>
           );
+        }
         })}
       </div>
     </Card>
