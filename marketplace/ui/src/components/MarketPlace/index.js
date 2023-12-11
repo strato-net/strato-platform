@@ -24,7 +24,7 @@ const MarketPlace = () => {
 
   return (
     <>
-      <Carousel centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
+      <Carousel autoPlay centerSlidePercentage={95} showArrows={false} infiniteLoop showStatus={false} swipeable emulateTouch autoFocus centerMode>
         <div className="relative p-2 h-[222px] md:h-[380px] ml-3">
           <div className="flex flex-col gap-3 backdrop-blur-2xl text-left p-4 px-3 md:px-8 mt-28 h-[90%] w-[90%] sm:w-[60%] md:h-52 rounded-3xl md:w-[480px] absolute left-6 md:left-12 md:top-12 -top-[104px] bg-[rgba(256,256,256,0.17)] z-50">
             <Typography.Text className="text-base md:text-2xl md:leading-[60px] text-white font-semibold">

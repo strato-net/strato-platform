@@ -3,6 +3,7 @@ import {
   Typography,
   Spin,
   notification,
+  Button,
 } from "antd";
 import { actions } from "../../contexts/marketplace/actions";
 import {
@@ -101,7 +102,18 @@ const TopSellingProductCard = () => {
   return (
     <div>
       {contextHolder}
-      <Title className="pt-16 md:px-10 !text-xl md:!text-4xl !text-left">Trending in All Categories</Title>
+      <div className="pt-16 pr-10 flex justify-between">
+        <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
+          Trending in All Categories
+        </Title>
+        <Button 
+          size="large" 
+          onClick={()=>navigate('/marketplace/category/:category')}
+          className="text-black hover:!text-black border-grayDark"
+        >
+            View All
+        </Button>
+      </div>
       {isTopSellingProductsLoading ? (
             <div className="h-52 flex justify-center items-center">
               <Spin spinning={isTopSellingProductsLoading} size="large" />

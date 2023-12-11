@@ -26,7 +26,7 @@ const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
                 navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
               }
               className='md:h-[200px] md:w-[30vw] w-[200px] h-[110px]' 
-              src={topSellingProduct.images[0]} 
+              src={topSellingProduct.images ? topSellingProduct?.images[0] : ""} 
             />
             <div className='flex justify-between'>
                 <Typography 

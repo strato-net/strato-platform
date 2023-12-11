@@ -35,13 +35,13 @@ const CategoryCard = () => {
           </div>
         </Space> */}
       </div>
-      <div className="flex justify-start gap-4 lg:gap-[15px] flex-wrap md:px-10">
+      <div className="flex justify-start gap-4 lg:gap-[15px] flex-wrap px-[4px] md:px-10">
         {categorys.map((category, index) => {
           return (
             <div
               id={category.name}
               key={index}
-              className=" w-[156px]   lg:w-[248px] xl:w-[300px]   h-[160px] lg:h-[180px] xl:h-[220px] border border-tertiaryB shadow-category   rounded-lg cursor-pointer"
+              className=" w-[162px] md:w-[228px] xl:w-[280px] h-[160px] md:h-[185px] xl:h-[200px] border border-tertiaryB shadow-category   rounded-lg cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 window.LOQ.push(['ready', async LO => {
@@ -58,14 +58,14 @@ const CategoryCard = () => {
               }
             >
               <div className="flex flex-col">
-                <Image
+                <img
                   src={categoryImages[index]}
-                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px]"
+                  className="rounded-t-lg px-[9px] py-[6px] lg:px-[0px] lg:py-[0px] h-[110px] md:h-[140px]"
                   preview={false}
                 />
-                <div className="py-3  ">
-                <Text type="secondary" className=" text-2xl !text-primaryB font-semibold  text-left" style={{textAlign : "left"}} >
-                  <span className="px-4 font-sans">
+                <div className="py-2 xl:py-3 flex justify-center md:justify-start ">
+                <Text type="secondary" className="text-lg md:text-xl lg:text-2xl !text-primaryB font-semibold" >
+                  <span className="p-3 font-sans">
                   {category.name}
                     </span>
                 </Text>
