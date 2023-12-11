@@ -1,4 +1,4 @@
-url: https://node2.mercata-testnet2.blockapps.net
+url: http://localhost:8080
 dapp:
   contract:
     name: Dapp
