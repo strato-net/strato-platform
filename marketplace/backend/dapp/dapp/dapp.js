@@ -216,6 +216,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
+  contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
+    console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
+    return inventoryJs.getOwnershipHistory(rawAdmin, args, options);
+  };
+
   contract.listItem = async function (args, options = defaultOptions) {
     return inventoryJs.uploadSaleContract(rawAdmin, args, options);
   }

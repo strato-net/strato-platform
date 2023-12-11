@@ -14,6 +14,9 @@ const actionDescriptors = {
   fetchInventoryDetail: "fetch_inventory_detail",
   fetchInventoryDetailSuccessful: "fetch_inventory_detail_successful",
   fetchInventoryDetailFailed: "fetch_inventory_detail_failed",
+  fetchInventoryOwnershipHistory: "fetch_inventory_ownership_history",
+  fetchInventoryOwnershipHistorySuccessful: "fetch_inventory_ownership_history_successful",
+  fetchInventoryOwnershipHistoryFailed: "fetch_inventory_ownership_history_failed",
   updateInventory: "update_inventory",
   updateInventorySuccessful: "update_inventory_successful",
   updateInventoryFailed: "update_inventory_failed",
@@ -556,6 +559,52 @@ const actions = {
         type: actionDescriptors.fetchInventoryDetailFailed,
         error: "Error while fetching Inventory",
       });
+    }
+  },
+
+  fetchInventoryOwnershipHistory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.fetchInventoryOwnershipHistory });
+
+    try {
+      const {
+        contract_name,
+        originAddress,
+        minItemNumber,
+        maxItemNumber
+      } = payload
+      const queryStr = `?contract_name=${contract_name}&originAddress=${originAddress}&minItemNumber=${minItemNumber}&maxItemNumber=${maxItemNumber}`
+      const response = await fetch(`${apiUrl}/inventory/ownership/history${queryStr}`, {
+        method: HTTP_METHODS.GET,
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchInventoryOwnershipHistorySuccessful,
+          payload: body.data,
+        });
+
+        return true;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchInventoryOwnershipHistoryFailed, 
+          error: "Unauthorized while fetching ownership history" 
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
+        error: "Error while fetching ownership history",
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
+        error: "Error while fetching ownership history",
+      });
+      return false;
     }
   },
 

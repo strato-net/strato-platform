@@ -325,7 +325,7 @@ export const setSearchQueryOptionsLike = (args = {}, _queryOptionsArray) => {
 }
 
 export const searchAllWithQueryArgs = async (contractName, args, options, user) => {
-  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'notEqualsField', 'notEqualsValue']
+  const nonQueryOptions = ['queryValue', 'queryFields', 'queryOptions', 'limit', 'offset', 'sort', 'range', 'gteField', 'gteValue', 'lteField', 'lteValue', 'notEqualsField', 'notEqualsValue']
   const queryArgs = setSearchQueryOptions(args, Object.keys(args).reduce((result, key) => {
     if (!nonQueryOptions.includes(key) && key != 'category') {
       if (Array.isArray(args[key])) {
@@ -355,6 +355,11 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     if (key === 'gteValue') {
       const { gteField, gteValue } = args
       result.push({ key: gteField, value: gteValue, predicate: 'gte' })
+    }
+
+    if (key === 'lteValue') {
+      const { lteField, lteValue } = args
+      result.push({ key: lteField, value: lteValue, predicate: 'lte' })
     }
 
     if (key === 'notEqualsValue') {
@@ -391,6 +396,7 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
   }, []))
 
   const { category, ...restQueryArgs } = queryArgs;
+  console.log('#### REST QUERY ARGS', JSON.stringify(restQueryArgs))
   const results = await searchAll(contractName, restQueryArgs, options, user)
 
   return results

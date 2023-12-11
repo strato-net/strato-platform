@@ -149,6 +149,20 @@ class InventoryController {
     }
   }
 
+  static async getOwnershipHistory(req, res, next) {
+    try {
+      const { dapp, query } = req
+      InventoryController.validateGetOwnershipHistoryArgs(query)
+
+      const items = await dapp.getOwnershipHistory(query)
+      rest.response.status200(res, items)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   // static async audit(req, res, next) {
   //   try {
   //     const { dapp, params } = req
@@ -160,19 +174,6 @@ class InventoryController {
   //     return next(e)
   //   }
   // }
-
-  // static async transferOwnership(req, res, next) {
-  //   try {
-  //     const { dapp, body } = req
-
-  //     InventoryController.validateTransferOwnershipArgs(body)
-  //     const result = await dapp.transferOwnershipInventory(body, options)
-  //     rest.response.status200(res, result)
-  //   } catch (e) {
-  //     return next(e)
-  //   }
-  // }
-
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -326,6 +327,23 @@ class InventoryController {
 
     if (validation.error) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, 'Transfer Ownership Inventory Argument Validation Error', {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+
+  static validateGetOwnershipHistoryArgs(args) {
+    const getOwnershipHistorySchema = Joi.object({
+      contract_name: Joi.string().required(),
+      originAddress: Joi.string().required(),
+      minItemNumber: Joi.number().min(0).required(),
+      maxItemNumber: Joi.number().min(0).required(),
+    });
+
+    const validation = getOwnershipHistorySchema.validate(args);
+
+    if (validation.error) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Get Ownership History Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }

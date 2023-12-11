@@ -363,6 +363,22 @@ async function getAll(admin, args = {}, defaultOptions) {
     return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
 }
 
+async function getOwnershipHistory(user, args, options) {
+    const { contract_name , originAddress, minItemNumber, maxItemNumber } = args;
+    const newOptions = { ...options, org: undefined, app: undefined }
+    const searchArgs = {
+        originAddress,
+        gteField: 'maxItemNumber',
+        gteValue: minItemNumber,
+        lteField: 'minItemNumber',
+        lteValue: maxItemNumber,
+        sort: '+block_timestamp'
+    };
+
+    const history = await searchAllWithQueryArgs(`${contract_name}.OwnershipTransfer`, searchArgs, newOptions, user);
+    return history;
+}
+
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
     const queryArgs = setSearchQueryOptionsPrime({
@@ -411,6 +427,7 @@ export default {
     updateSale,
     get,
     getAll,
+    getOwnershipHistory,
     inventoryCount,
     marshalIn,
     marshalOut,

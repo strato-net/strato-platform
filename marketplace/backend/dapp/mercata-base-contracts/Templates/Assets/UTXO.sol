@@ -2,7 +2,6 @@ import "Asset.sol";
 
 abstract contract UTXO is Asset {
     uint public utxoMagicNumber = 0x5554584F; // 'UTXO'
-    event AssetSplit(address newAsset, uint unitsMoved);
 
     constructor(
         string _name,
@@ -38,10 +37,19 @@ abstract contract UTXO is Asset {
             owner = _newOwner;
             ownerCommonName = getCommonName(_newOwner);
         } catch {
+            emit OwnershipTransfer(
+                originAddress,
+                owner,
+                ownerCommonName,
+                _newOwner,
+                getCommonName(_newOwner),
+                itemNumber,
+                itemNumber + _quantity - 1
+            );
             UTXO newAsset = mint(_quantity);
             Asset(newAsset).transferOwnership(_newOwner, _quantity);
             quantity -= _quantity;
-            emit AssetSplit(address(newAsset), _quantity);
+            itemNumber += _quantity;
         }
     }
 }

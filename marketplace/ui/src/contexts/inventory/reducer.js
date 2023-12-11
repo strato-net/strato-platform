@@ -169,6 +169,23 @@ const reducer = (state, action) => {
         error: action.error,
         isTransferring: false
       };
+    case actionDescriptors.fetchInventoryOwnershipHistory:
+      return {
+        ...state,
+        isInventoryOwnershipHistoryLoading: true
+      };
+    case actionDescriptors.fetchInventoryOwnershipHistorySuccessful:
+      return {
+        ...state,
+        inventoryOwnershipHistory: action.payload,
+        isInventoryOwnershipHistoryLoading: false
+      };
+    case actionDescriptors.fetchInventoryOwnershipHistoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isInventoryOwnershipHistoryLoading: false
+      };
     case actionDescriptors.fetchInventoryDetail:
       return {
         ...state,

@@ -6,8 +6,10 @@ import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
 abstract contract Asset is Utils {
+    uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address public owner;
     string public ownerCommonName;
+    address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public name;
     string public description;
     string public category;
@@ -16,9 +18,19 @@ abstract contract Asset is Utils {
     string[] public files;
     uint public createdDate;
     uint public quantity;
+    uint public itemNumber;
 
     address public sale;
 
+    event OwnershipTransfer(
+        address originAddress,
+        address sellerAddress,
+        string sellerCommonName,
+        address purchaserAddress,
+        string purchaserCommonName,
+        uint minItemNumber,
+        uint maxItemNumber
+    );
 
     constructor(
         string _name,
@@ -41,6 +53,23 @@ abstract contract Asset is Utils {
         files = _files;
         createdDate = _createdDate;
         quantity = _quantity;
+        try {
+            assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
+            originAddress = Asset(msg.sender).originAddress();
+            itemNumber = Asset(msg.sender).itemNumber();
+        } catch {
+            originAddress = address(this);
+            itemNumber = 1;
+            emit OwnershipTransfer(
+                originAddress,
+                address(0),
+                "",
+                owner,
+                ownerCommonName,
+                itemNumber,
+                itemNumber + _quantity - 1
+            );
+        }
     }
 
     modifier requireOwner(string action) {
@@ -95,8 +124,18 @@ abstract contract Asset is Utils {
     }
 
     function _transfer(address _newOwner, uint _quantity) internal virtual {
+        string newOwnerCommonName = getCommonName(_newOwner);
+        emit OwnershipTransfer(
+            originAddress,
+            owner,
+            ownerCommonName,
+            _newOwner,
+            newOwnerCommonName,
+            itemNumber,
+            itemNumber + _quantity - 1
+        );
         owner = _newOwner;
-        ownerCommonName = getCommonName(_newOwner);
+        ownerCommonName = newOwnerCommonName;
         closeSale();
     }
     
