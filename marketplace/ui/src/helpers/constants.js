@@ -41,6 +41,11 @@ export const INVENTORY_STATUS = {
   "2": "Unpublished",
 };
 
+export const getUnitNameByIndex = (index) => {
+  const unit = unitOfMeasures.find((measure) => measure.value === parseInt(index));
+  return unit ? unit.name : null;
+};
+
 export const unitOfMeasures = [
   { name: "TON", value: 1 },
   { name: "POUND", value: 2 },

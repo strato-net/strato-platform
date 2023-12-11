@@ -85,6 +85,7 @@ contract Metals is ItemStatus, UnitOfMeasurement, RestStatus, Asset {
 
     function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
         require(splitUnits < units, "Cannot split more units than available");
+        MetalsSale sale = MetalsSale(saleContract);
         Metals newMetals = new Metals(unitOfMeasurement,
             leastSellableUnits,
             source,
@@ -95,8 +96,8 @@ contract Metals is ItemStatus, UnitOfMeasurement, RestStatus, Asset {
             images,
             createdDate,
             splitUnits,
-            0,
-            "",
+            sale.price(),
+            serialNumber,
             ItemStatus.UNPUBLISHED,
             []);
         units -= splitUnits;
@@ -118,7 +119,7 @@ contract Metals is ItemStatus, UnitOfMeasurement, RestStatus, Asset {
         return (RestStatus.OK, string(newSale));
     }
 
-    function updateMetals( //should you be able to update units?...
+    function updateMetals(
         UnitOfMeasurement _unitOfMeasurement,
         string _name, 
         string _description, 

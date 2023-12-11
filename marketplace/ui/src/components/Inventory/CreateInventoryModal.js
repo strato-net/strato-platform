@@ -351,7 +351,7 @@ const CreateInventoryModal = ({
             <Form.Item
                 label="Unit of Measurement "
                 name="unitOfMeasurement "
-                className="w-30 mr-8"
+                className="w-30 mr-14"
               >
                 <Select
                   id="unitOfMeasurement"
@@ -380,9 +380,9 @@ const CreateInventoryModal = ({
                   )}
               </Form.Item>
             <Form.Item
-              label="Least Sellable Units"
+              label="Least Sellable Unit(s)"
               name="leastSellableUnits"
-              className="w-30 mr-8"
+              className="w-30 mr-14"
             >
               <Input
                 label="leastSellableUnits"

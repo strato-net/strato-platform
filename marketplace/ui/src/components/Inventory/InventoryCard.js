@@ -11,7 +11,7 @@ import {
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import AddEventModal from "./AddEventModal";
 import { useNavigate } from "react-router-dom";
-import { UNIT_OF_MEASUREMENTS, INVENTORY_STATUS } from "../../helpers/constants";
+import {  getUnitNameByIndex, INVENTORY_STATUS } from "../../helpers/constants";
 import UpdateInventoryModal from "./UpdateInventoryModal";
 import ResellModal from "./ResellModal";
 import routes from "../../helpers/routes";
@@ -124,6 +124,27 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
           </div>)
       case 'Metals':
         return (
+          <>
+          <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Available Quantity</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+                {itemData.units}
+              </p>
+            </div>
+            <div className="flex mt-1.5 items-center">
+              <p className="text-primaryC text-sm w-40">Unit Of Measurement</p>
+              <p text-secondryB text-sm>
+                :
+              </p>
+              <p className="text-secondryB text-sm ml-3">
+              {getUnitNameByIndex(itemData.unitOfMeasurement)}
+       
+                
+              </p>
+            </div>
           <div className="flex mt-1.5 items-center">
             <p className="text-primaryC text-sm w-40">Source</p>
             <p text-secondryB text-sm>
@@ -132,7 +153,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id }) => {
             <p className="text-secondryB text-sm ml-3">
               {itemData.source}
             </p>
-          </div>)
+          </div>
+          </>)
       default:
         break;
     }
