@@ -117,9 +117,10 @@ const CreateInventoryModal = ({
             },
           });
         case "Carbon":
+          const {serialNumber, ...restArgs} = body.itemArgs;
           return (body = {
             itemArgs: {
-              ...body.itemArgs,
+              ...restArgs,
               units: values.units,
             },
           });
@@ -151,13 +152,20 @@ const CreateInventoryModal = ({
             }
           });
         case 'Membership':
-          return body = {
+          return (body = {
             itemArgs: {
               ...body.itemArgs,
               units: values.units,
               expirationPeriodInMonths: values.expirationPeriodInMonths
             }
-          }
+          });
+        case 'CarbonDAO':
+          return (body = {
+            itemArgs: {
+              ...body.itemArgs,
+              units: values.units
+            }
+          });
         default:
           break;
       }
@@ -538,6 +546,29 @@ const CreateInventoryModal = ({
                   </span>
                 )}
             </Form.Item>
+          </div>);
+      case 'CarbonDAO':
+        return (
+          <div className="flex justify-between mt-4 ">
+            <Form.Item
+              label="Units"
+              name="units"
+              className="w-72"
+            >
+              <Input
+                label="units"
+                placeholder="Enter Units"
+                name="units"
+                value={formik.values.units}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.units &&
+                formik.errors.units && (
+                  <span className="text-error text-xs">
+                    {formik.errors.units}
+                  </span>
+                )}
+            </Form.Item>
           </div>)
       default:
         break;
@@ -743,8 +774,13 @@ const CreateInventoryModal = ({
                     label="serialNumber"
                     placeholder="Enter Serial Number"
                     name="serialNumber"
-                    value={formik.values.serialNumber}
+                    value={
+                      formik.values.category === "Carbon"
+                        ? ""
+                        : formik.values.serialNumber
+                    }
                     onChange={formik.handleChange}
+                    disabled={formik.values.category === 'Carbon'}
                   />
                   {formik.touched.serialNumber &&
                     formik.errors.serialNumber && (

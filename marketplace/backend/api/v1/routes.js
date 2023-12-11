@@ -13,6 +13,7 @@ import carbon from './Carbon'
 import metals from './Metals'
 import clothing from './Clothing'
 import membership from './Membership'
+import carbonDAO from './CarbonDAO'
 import collectibles from './Collectibles'
 import order from './Order'
 import orderLineItem from './OrderLineItem'
@@ -38,6 +39,7 @@ import {
   Metals,
   Clothing,
   Membership,
+  CarbonDAO,
   Collectibles,
   Order,
   OrderLineItem,
@@ -63,6 +65,7 @@ router.use(Art.prefix, art)
 router.use(Carbon.prefix, carbon)
 router.use(Clothing.prefix, clothing)
 router.use(Membership.prefix, membership)
+router.use(CarbonDAO.prefix, carbonDAO)
 router.use(Collectibles.prefix, collectibles)
 router.use(Metals.prefix, metals)
 router.use(Order.prefix, order)

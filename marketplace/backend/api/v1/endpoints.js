@@ -95,6 +95,12 @@ export const Membership = {
   create: '/'
 }
 
+export const CarbonDAO = {
+  prefix: '/carbonDAO',
+  getAll: '/',
+  create: '/'
+}
+
 export const Collectibles = {
   prefix: '/collectibles',
   getAll: '/',
