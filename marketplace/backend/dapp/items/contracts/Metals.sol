@@ -18,15 +18,6 @@ enum UnitOfMeasurement {
 
 /// @title A representation of Metals assets
 contract Metals is ItemStatus, UnitOfMeasurement, RestStatus, Asset {
-    // description would have the acutal product details of units and stuff
-    // least sellable unit = #
-    // unit of measurement
-    // user should set correct units (# of least sellable units)
-
-    // can fractionalize product; what is smallest unit can be sold in?
-    // least sellable unit
-    // units sellable = (sellableNumUnits, sellableUnitType) ex: 5 KG
-    // units describes sellable units not product units
     UnitOfMeasurement public unitOfMeasurement;
     uint public leastSellableUnits;
     string public source; //call manufacturer instead?
