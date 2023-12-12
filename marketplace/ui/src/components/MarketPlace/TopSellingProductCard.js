@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Typography,
   Spin,
@@ -18,6 +18,7 @@ import NewTrendingCard from "./NewTrendingCard";
 const { Title } = Typography;
 
 const TopSellingProductCard = () => {
+  const containerRef = useRef(null)
   const [offset, setOffset] = useState(0);
 
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -98,17 +99,53 @@ const TopSellingProductCard = () => {
     }
   };
 
+  const [prevVisible, setPrevVisible] = useState(false);
+  const [nextVisible, setNextVisible] = useState(true);
+
+  useEffect(() => {
+    const parent = containerRef.current;
+    const handleScroll = (e) => {
+      setPrevVisible(parent.scrollLeft !== 0);
+      setNextVisible(
+        Math.round(parent.offsetWidth + parent.scrollLeft) !==
+          parent.scrollWidth
+      );
+    };
+
+    // Scroll listener to change visibility of left and right arrow button
+    parent?.addEventListener("scroll", handleScroll);
+    return () => {
+      parent?.removeEventListener("scroll", handleScroll);
+    };
+  }, [topSellingProducts]);
+
+  const scroll = (left) => {
+    containerRef.current.scrollBy({
+      top: 0,
+      left,
+      behavior: "smooth",
+    });
+  };
+
+
   return (
     <div>
       {contextHolder}
-      <div className="pt-16 pr-10 flex justify-between">
+      <div className="pt-10 md:pt-16 pr-2 md:pr-10 flex justify-between">
         <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
           Trending in All Categories
         </Title>
         <Button 
           size="large" 
-          onClick={()=>navigate('/marketplace/category/:category')}
-          className="text-black hover:!text-black border-grayDark"
+          onClick={()=>navigate('/category/:category')}
+          className="text-black hover:!text-black border-grayDark hidden md:flex"
+        >
+            View All
+        </Button>
+        <Button 
+          size="small" 
+          onClick={()=>navigate('/category/:category')}
+          className="text-black hover:!text-black border-grayDark flex md:hidden"
         >
             View All
         </Button>
@@ -118,12 +155,18 @@ const TopSellingProductCard = () => {
               <Spin spinning={isTopSellingProductsLoading} size="large" />
             </div>
           ) : 
-      <div className="flex gap-6 p-2 overflow-x-auto trending_cards pl-[1px] md:pl-10">
-          {topSellingProducts.map((topSellingProduct)=>{return(
-          <NewTrendingCard 
-            topSellingProduct={topSellingProduct} 
-            addItemToCart={addItemToCart}
-          />)})}
+        <div className="relative pl-[1px] md:pl-10">
+          <div onClick={()=>scroll(-300)}  className={`${!prevVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute  justify-center items-center top-48 left-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{"<"}</div>
+          <div ref={containerRef} className="overflow-x-auto gap-6 p-2 flex trending_cards">
+            {topSellingProducts.map((topSellingProduct) => {
+              return (
+                <NewTrendingCard
+                topSellingProduct={topSellingProduct}
+                addItemToCart={addItemToCart}
+                />)
+              })}
+          </div>
+          <div onClick={()=>scroll(300)}  className={`${!nextVisible ? 'hidden' : 'md:flex hidden'} cursor-pointer absolute justify-center items-center top-48 right-24 h-16 w-16 text-2xl bg-[#6A6A6A] rounded-full text-white`}>{">"}</div>
         </div>}
     </div>
   );
