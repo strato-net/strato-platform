@@ -20,7 +20,7 @@ const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
     const navigate = useNavigate();
 
     return(
-        <div className='p-3 px-4 min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max'>
+        <div className='trending_cards_container_card bg-white p-3 px-4 min-w-[230px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max'>
             <img 
               onClick={() =>
                 navigate(`${naviroute.replace(":address", topSellingProduct.address)}`, { state: { isCalledFromInventory: false } })
@@ -39,14 +39,14 @@ const NewTrendingCard = ({topSellingProduct, addItemToCart}) => {
                 </Typography>
                 <img src={Images.Verified} alt='' />
             </div>
-            <Typography className='font-semibold'>$2000</Typography>
+            <Typography className='font-semibold'>{'$'+topSellingProduct?.price || "N/A"}</Typography>
             <Typography className='#989898 opacity-40 max-h-4 overflow-hidden'>{topSellingProduct?.description || "N/A"}</Typography>
             <div className='flex justify-between items-center bg-[#EEEFFA] p-2'>
                 <Typography>Quantity</Typography>
-                <div className='flex gap-2 p-1 bg-white'>
-                    <Typography className='px-1 bg-[#EEEFFA]' onClick={()=>setQuantity(quantity - 1)}>-</Typography>
+                <div className='flex gap-3 p-1 bg-white'>
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={()=>setQuantity(quantity == 0 ? quantity : quantity - 1)}>-</Typography>
                     <Typography>{quantity}</Typography>
-                    <Typography className='px-1 bg-[#EEEFFA]' onClick={()=>setQuantity(quantity + 1)}>+</Typography>
+                    <Typography className='px-2 bg-[#EEEFFA] cursor-pointer' onClick={()=>setQuantity(quantity + 1)}>+</Typography>
                 </div>
             </div>
             <div className='flex gap-4'>
