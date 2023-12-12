@@ -8,6 +8,7 @@ export const Images = {
   'realEstate': require("./resources/categories/real_estate.png"),
   'metals': require("./resources/categories/metals.png"),
   'collectibles': require("./resources/categories/collectibles.jpg"),
+  'membership': require("./resources/categories/membership.jpg"),
   'category1': require("./resources/categories/category1.png"),
   'category2': require("./resources/categories/category2.png"),
   'category3': require("./resources/categories/category3.png"),
@@ -23,4 +24,8 @@ export const Images = {
   'orderImg2': require('./resources/orderImages/orderImg2.png'),
   'orderImg3': require('./resources/orderImages/orderImg3.png'),
   'role-request': require('./resources/request-role.png'),
+  'RemoveIcon' :  require("./resources/Remove.png"),
+  'CancelIcon' : require("./resources/Cancel.png"),
+  'Dropdown' :  require("./resources/DropDown.png"),
+  'AddBlack' :  require("./resources/AddBlack.png"),
 };

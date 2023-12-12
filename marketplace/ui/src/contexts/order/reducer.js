@@ -31,6 +31,19 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       };
+    case actionDescriptors.cancelOrder:
+      return {
+        ...state,
+      };
+    case actionDescriptors.cancelOrderSuccessful:
+      return {
+        ...state,
+      };
+    case actionDescriptors.cancelOrderFailed:
+      return {
+        ...state,
+        error: action.error,
+      };
     case actionDescriptors.createPayment:
       return {
         ...state,

@@ -1,4 +1,4 @@
-name:                blockapps-highway-wrapper-client
+name:                blockapps-highway-client
 version:             0.1.0.0
 github:              "githubuser/client"
 author:              "Author name here"
@@ -20,7 +20,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
-- blockapps-highway-wrapper-api
+- blockapps-highway-api
 
 library:
   source-dirs: src

@@ -1,12 +1,7 @@
 import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
-import constants from '../../../helpers/constants'
 import CategoriesJson from  "../../../category-utility/categories.json"
-
-const options = { config, cacheNonce: true }
 
 class CategoryController {
 
