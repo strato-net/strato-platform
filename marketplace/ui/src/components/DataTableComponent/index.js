@@ -39,9 +39,7 @@ const DataTableComponent = ({
           x: scrollX ? scrollX : 1300,
         }}
         size="middle"
-        rowClassName={(record, index) =>
-          index % 2 === 0 ? "bg-white" : "bg-secondry"
-        }
+        rowClassName={"bg-white"}
         rowKey={rowKey}
         rowSelection={rowSelection}
         onChange={onChange}
