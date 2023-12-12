@@ -1,41 +1,105 @@
-import <509>;
-
 pragma es6;
 pragma strict;
 
-abstract contract Asset is PaymentType, SaleState, RestStatus{
+import <509>;
+import "../Enums/RestStatus.sol";
+import "../Utils/Utils.sol";
+
+abstract contract Asset is Utils {
+    uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address public owner;
     string public ownerCommonName;
+    address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public name;
     string public description;
+    string public category;
+    string public subCategory;
     string[] public images;
+    string[] public files;
     uint public createdDate;
+    uint public quantity;
+    uint public itemNumber;
 
-    // Sale public sale;
-    address[] public whitelistedSales;
+    address public sale;
 
+    event OwnershipTransfer(
+        address originAddress,
+        address sellerAddress,
+        string sellerCommonName,
+        address purchaserAddress,
+        string purchaserCommonName,
+        uint minItemNumber,
+        uint maxItemNumber
+    );
 
-    constructor(string _name, string _description, string[] _images, uint _createdDate) {
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(msg.sender);
-        owner  = c.userAddress();
-        ownerCommonName = c.commonName();
+    constructor(
+        string _name,
+        string _description,
+        string _category,
+        string _subCategory,
+        string[] _images,
+        string[] _files,
+        uint _createdDate,
+        uint _quantity
+    ) {
+        // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
+        owner  = msg.sender;
+        ownerCommonName = getCommonName(msg.sender);
         name = _name;
-        description =_description;
-        images =_images;
+        description = _description;
+        category = _category;
+        subCategory = _subCategory;
+        images = _images;
+        files = _files;
         createdDate = _createdDate;
+        quantity = _quantity;
+        try {
+            assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
+            originAddress = Asset(msg.sender).originAddress();
+            itemNumber = Asset(msg.sender).itemNumber();
+        } catch {
+            originAddress = address(this);
+            itemNumber = 1;
+            emit OwnershipTransfer(
+                originAddress,
+                address(0),
+                "",
+                owner,
+                ownerCommonName,
+                itemNumber,
+                itemNumber + _quantity - 1
+            );
+        }
     }
 
     modifier requireOwner(string action) {
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(tx.origin);
-        string err = "Only "
-                   + ownerCommonName
-                   + " can perform "
+        string err = "Only the owner of the asset can "
                    + action
                    + ".";
-        string commonName = c.commonName();
-        require(commonName == ownerCommonName, err);
+        require(getCommonName(msg.sender) == ownerCommonName, err);
+        _;
+    }
+
+    modifier requireOwnerOrigin(string action) {
+        string err = "Only the owner of the asset can "
+                   + action
+                   + ".";
+        require(getCommonName(tx.origin) == ownerCommonName, err);
+        _;
+    }
+
+    modifier fromSale(string action) {
+        if (sale == address(0)) {
+            string err = "Only the owner can "
+                       + action
+                       + ".";
+            require(getCommonName(msg.sender) == ownerCommonName, err);
+        } else {
+            string err = "Only the current Sale contract can "
+                       + action
+                       + ".";
+            require(msg.sender == sale, err);
+        }
         _;
     }
 
@@ -49,47 +113,53 @@ abstract contract Asset is PaymentType, SaleState, RestStatus{
     }
 
     // Updated function to add a sale to the whitelist
-    function whitelistSale(address saleContract) public requireOwner("whitelistSale") {
-        require(!isSaleWhitelisted(saleContract), "Sale already whitelisted");
-        whitelistedSales.push(saleContract);
-    }
-
-    // Helper function to check if a sale is already whitelisted
-    function isSaleWhitelisted(address saleContract) public returns (bool) {
-        for (uint i = 0; i < whitelistedSales.length; i++) {
-            if (whitelistedSales[i] == saleContract) {
-                return true;
-            }
-        }
-        return false;
+    function attachSale() public requireOwnerOrigin("attach sale") {
+        require(sale == address(0), "Sale is already assigned for this asset");
+        sale = msg.sender;
     }
 
     // Updated function to remove a sale from the whitelist
-    function dewhitelistSale(address saleContract) public requireOwner("dewhitelist a Sale") {
-        require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
-        address[] newArray = [];
-        for (uint i = 0; i < whitelistedSales.length; i++) {
-            if (whitelistedSales[i] != saleContract) {
-                newArray.push(whitelistedSales[i]);
-            }
-        }
-        whitelistedSales = newArray;
+    function closeSale() public fromSale("close sale") {
+        sale = address(0);
     }
 
-
-    // Updated function to disable all sales
-    function disableAllSales() public requireOwner("disableAllSales") {
-        for (uint i = 0; i < whitelistedSales.length; i++) {
-            Sale(whitelistedSales[i]).changeSaleState(SaleState.Closed);
-            whitelistedSales=[];
-        }
+    function _transfer(address _newOwner, uint _quantity) internal virtual {
+        string newOwnerCommonName = getCommonName(_newOwner);
+        emit OwnershipTransfer(
+            originAddress,
+            owner,
+            ownerCommonName,
+            _newOwner,
+            newOwnerCommonName,
+            itemNumber,
+            itemNumber + _quantity - 1
+        );
+        owner = _newOwner;
+        ownerCommonName = newOwnerCommonName;
+        closeSale();
     }
     
-    function transferOwnership(address saleContract, string _newOwnerCommonName, address _newOwner) public requireOwner("Ownership transfer") {
-        require(isSaleWhitelisted(saleContract), "Sale not found in whitelist");
-        ownerCommonName = _newOwnerCommonName;
-        owner = _newOwner;
-        disableAllSales();
+    function transferOwnership(address _newOwner, uint _quantity) public fromSale("transfer ownership") {
+        require(_quantity <= quantity, "Cannot transfer more than available quantity.");
+        _transfer(_newOwner, _quantity);
+    }
 
+    function automaticTransfer(address _newOwner, uint _quantity) public requireOwner("automatic transfer") returns (uint) {
+        require(_quantity <= quantity, "Cannot transfer more than available quantity.");
+        if (sale == address(0)) {
+            _transfer(_newOwner, _quantity);
+            return RestStatus.OK;
+        } else {
+            return Sale(sale).automaticTransfer(_newOwner, _quantity);
+        }
+    }
+
+    function updateAsset(
+        string[] _images,
+        string[] _files
+    ) public requireOwner("update asset") returns (uint) {
+        images = _images;
+        files = _files;
+        return RestStatus.OK;
     }
 }

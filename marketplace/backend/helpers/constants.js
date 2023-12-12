@@ -23,9 +23,9 @@ export default {
   tempUploadDir: "./temp",
   buyerOrgName: "rejolut",
   sellerOrgName: "blockapps",
-  assetTableName: "BlockApps-Mercata-Asset",
-  saleTableName: "BlockApps-Mercata-Sale",
-  orderTableName: "BlockApps-Mercata-Order",
+  assetTableName: "Asset",
+  saleTableName: "Sale",
+  orderTableName: "Order",
 };
 
 export const STRIPE_ENV = {

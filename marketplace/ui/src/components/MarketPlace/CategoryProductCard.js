@@ -42,8 +42,7 @@ const CategoryProductCard = ({ product, category }) => {
   const navigate = useNavigate();
   const naviroute = routes.MarketplaceProductDetail.url;
   const [qty, setQty] = useState(1);
-  const itemData = JSON.parse(product?.data);
-  const availableQuantity = itemData && itemData.units ? itemData.units : 1;
+  const availableQuantity = product && product.saleQuantity ? product.saleQuantity : 1;
 
   const subtract = () => {
     if (qty !== 1) {
@@ -104,8 +103,7 @@ const CategoryProductCard = ({ product, category }) => {
       items = [...cartList];
       cartList.forEach((element, index) => {
         if (element.product.address === product.address) {
-          const itemData = JSON.parse(product.data);
-          const availableQuantity = itemData.units ? itemData.units : 1;
+          const availableQuantity = product.saleQuantity ? product.saleQuantity : 1;
           if (items[index].qty + qty <= availableQuantity) {
             items[index].qty += qty;
             actions.addItemToCart(marketplaceDispatch, items);

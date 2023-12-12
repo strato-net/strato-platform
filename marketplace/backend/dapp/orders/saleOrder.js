@@ -4,15 +4,12 @@ import RestStatus from "http-status-codes";
 import {
   setSearchQueryOptions,
   searchOne,
-  searchAll,
   searchAllWithQueryArgs,
-  setSearchQueryOptionsPrime
 } from "/helpers/utils";
-import dayjs from "dayjs";
 import constants from "../../helpers/constants";
 
-const contractName = "SaleOrder";
-const contractFilename = `${util.cwd}/dapp/orders/contracts/SaleOrder.sol`;
+const contractName = "SimpleOrder";
+const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
 
 /**
  * Upload a new Sale Order
@@ -151,13 +148,14 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
   const { address, ...restArgs } = args;
+  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
   const searchArgs = setSearchQueryOptions(restArgs, {
     key: "address",
     value: address,
   });
-  order = await searchOne(constants.orderTableName, searchArgs, options, user);
+  order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
 
   if (!order) {
     return undefined;
@@ -170,8 +168,8 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-
-  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, options, admin);
+  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, newOptions, admin);
 
   const count = await searchAllWithQueryArgs(
     constants.orderTableName,
@@ -184,7 +182,7 @@ async function getAll(admin, args = {}, options) {
       select: "count",
       }
     },
-    options,
+    newOptions,
     admin
   );
 
@@ -204,7 +202,7 @@ async function cancelOrder(user, contract, options, comments = "") {
   const callArgs = {
     contract,
     method: "cancelOrder",
-    args: util.usc({ comments: comments }),
+    args: util.usc({}), // { comments: comments }),
   };
   const cancelStatus = await rest.call(user, callArgs, options);
 
@@ -220,29 +218,31 @@ async function cancelOrder(user, contract, options, comments = "") {
 }
 
 /**
- * Transfer the ownership of a SimpleSale
+ * Complete an Order
  * @param newOwner The common name of the new owner of the SimpleSale.
  */
-async function transferOwnership(user, contract, options, fulfillmentDate, comments) {
+async function completeOrder(user, args, options) {
+  const { orderAddress, ...restArgs } = args;
+  const contract = { name: contractName, address: orderAddress }
   const callArgs = {
     contract,
-    method: "transferOwnership",
-    args: util.usc({ fulfillmentDate: fulfillmentDate, comments: comments }),
+    method: "completeOrder",
+    args: util.usc(restArgs),
   };
-  const transferStatus = await rest.call(user, callArgs, options);
+  const completionStatus = await rest.call(user, callArgs, options);
 
-  console.log("transferStatus", transferStatus);
-  console.log(parseInt(transferStatus, 10));
+  console.log("completionStatus", completionStatus);
+  console.log(parseInt(completionStatus, 10));
   console.log(RestStatus.OK);
-  if (parseInt(transferStatus, 10) !== RestStatus.OK) {
+  if (parseInt(completionStatus, 10) !== RestStatus.OK) {
     throw new rest.RestError(
-      transferStatus,
-      "You cannot transfer the ownership of a Order you don't own",
+      completionStatus,
+      "You cannot complete an Order you don't own",
       { newOwner }
     );
   }
 
-  return transferStatus;
+  return completionStatus;
 }
 
 export default {
@@ -253,7 +253,7 @@ export default {
   get,
   getAll,
   cancelOrder,
-  transferOwnership,
+  completeOrder,
   marshalIn,
   marshalOut,
   getHistory,
