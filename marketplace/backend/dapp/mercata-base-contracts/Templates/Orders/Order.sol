@@ -2,11 +2,19 @@ pragma es6;
 pragma strict;
 
 import <509>;
-import "../Enums/OrderStatus.sol";
 import "../Enums/RestStatus.sol";
 import "../Sales/Sale.sol";
 
-abstract contract Order is OrderStatus, Utils {
+abstract contract Order is Utils {
+    enum OrderStatus {
+        NULL,
+        AWAITING_FULFILLMENT,
+        AWAITING_SHIPMENT,
+        CLOSED,
+        CANCELED,
+        MAX
+    }
+
     uint public orderId;
     address[] public saleAddresses;
     uint[] public quantities;

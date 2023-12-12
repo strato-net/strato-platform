@@ -260,12 +260,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args }, getOptions);
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: '0000000000000000000000000000000000000000' }
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    return marketplaceJs.getAll(rawAdmin, { ...args, notEqualsField: 'ownerCommonName', notEqualsValue: userCommonName }, getOptions);
+    const newArgs = { ...args, notEqualsField: ['sale', 'ownerCommonName'],
+                      notEqualsValue: ['0000000000000000000000000000000000000000', userCommonName] }
+    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
@@ -488,7 +491,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
-      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses, state: [1,2] }, options);
+      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: order.saleAddresses }, options);
       const assetAddresses = sales.map(sale => {
         return sale.assetToBeSold;
       })
