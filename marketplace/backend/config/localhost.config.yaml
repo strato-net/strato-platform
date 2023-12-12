@@ -15,7 +15,7 @@ marketplaceUiUrlPrefix: "/marketplace"
 nodes:
   - id: 0
     label: localhost
-    url: https://node2.mercata-testnet2.blockapps.net
+    url: http://localhost
     oauth:
       appTokenCookieName: asset_framework_session
       appTokenCookieMaxAge: 7776000000

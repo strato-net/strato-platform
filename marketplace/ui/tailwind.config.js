@@ -34,6 +34,7 @@ module.exports = {
       sans: ["Montserrat", "sans-serif"],
       serif: ["Montserrat", "serif"],
     },
+ 
     extend: {
       spacing: {
         128: "32rem",
@@ -42,6 +43,10 @@ module.exports = {
       borderRadius: {
         "4xl": "2rem",
       },
+      boxShadow:{
+        Footer : "0px -4px 4px 0px #00000029"
+      }
+      
     },
   },
   plugins: [],

@@ -1,4 +1,4 @@
-name:                blockapps-highway-wrapper-client
+name:                blockapps-highway-client
 version:             0.1.0.0
 github:              "githubuser/client"
 author:              "Author name here"
@@ -26,7 +26,7 @@ dependencies:
 - servant-multipart-client
 - strato-model
 - text
-- blockapps-highway-wrapper-api
+- blockapps-highway-api
 
 library:
   source-dirs: src

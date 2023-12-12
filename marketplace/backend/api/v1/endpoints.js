@@ -43,13 +43,17 @@ export const Product = {
 
 export const Inventory = {
   prefix: '/inventory',
+  getOwnershipHistory: '/ownership/history',
   get: '/:address',
   getAll: '/',
   create: '/',
   update: '/update',
+  list: '/list',
+  unlist: '/unlist',
   resell: '/resell',
+  transfer: '/transfer',
+  updateSale: '/updateSale',
   // audit: '/:address/:chainId/audit',
-  // transferOwnership: '/transferOwnership',
 }
 
 export const Item = {
@@ -91,6 +95,12 @@ export const Clothing = {
 
 export const Membership = {
   prefix: '/membership',
+  getAll: '/',
+  create: '/'
+}
+
+export const CarbonDAO = {
+  prefix: '/carbonDAO',
   getAll: '/',
   create: '/'
 }
@@ -150,12 +160,6 @@ export const Event = {
   transferOwnership: '/transferOwnership',
 }
 
-export const Image = {
-  prefix: '/image',
-  upload: '/',
-  update: '/:fileKey',
-}
-
 export const Marketplace = {
   prefix: '/marketplace',
   getAll: '/',
@@ -167,7 +171,7 @@ export const Marketplace = {
 export const PaymentService = {
   prefix: '/payment',
   stripeOnboarding: '/stripe/account',
-  stripeConnectStatus: '/stripe/account/status/:ownerOrganization',
+  stripeConnectStatus: '/stripe/account/status/:ownerCommonName',
   stripeWebhook: '/stripe/webhook',
   stripeWebhookConnect: '/stripe/webhook/connect',
 }

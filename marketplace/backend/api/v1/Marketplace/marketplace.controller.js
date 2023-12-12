@@ -1,11 +1,4 @@
 import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
-import constants from '../../../helpers/constants'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
-
-const options = { config, cacheNonce: true }
 
 class MarketplaceController {
 
@@ -19,14 +12,6 @@ class MarketplaceController {
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
       const productsWithImageUrl = inventories
-        .map(product => (
-          product.images && product.images.length > 0 ?
-          {
-          ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
-          }
-        : product
-        ))
       rest.response.status200(res, productsWithImageUrl)
 
       return next()
@@ -46,14 +31,6 @@ class MarketplaceController {
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
       const productsWithImageUrl = inventories
-        .map(product => (
-          product.images && product.images.length > 0 ?
-          {
-          ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
-          }
-          : product
-        ))
       rest.response.status200(res, productsWithImageUrl)
 
       return next()
@@ -66,15 +43,7 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProducts({ ...query })
-      const productsWithImageUrl = inventories.map(product => (
-        product.images && product.images.length > 0 ?
-        {
-          ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
-        }
-        :
-        product
-      ))
+      const productsWithImageUrl = inventories
       rest.response.status200(res, productsWithImageUrl)
 
       return next()
@@ -87,13 +56,7 @@ class MarketplaceController {
     try {
       const { dapp, query } = req
       const inventories = await dapp.getTopSellingProductsLoggedIn({ ...query })
-      const productsWithImageUrl = inventories.map(product => (
-        product.images && product.images.length > 0 ?
-        {
-          ...product,
-          images: product.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName))))
-        } : product
-      ))
+      const productsWithImageUrl = inventories
       rest.response.status200(res, productsWithImageUrl)
 
       return next()

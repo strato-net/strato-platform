@@ -157,18 +157,16 @@ const ProcessingOrder = () => {
     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
 
     // Prepare order data to be sent to order controller
-    let assetAddresses = [];
+    let saleAddresses = [];
     const orderList = storedConfirmList.map(o => {
-      assetAddresses.push(o.key);
-      return { assetAddress: o.key, quantity: o.qty, category: o.category };
+      saleAddresses.push(o.key);
+      return { saleAddress: o.saleAddress, quantity: o.qty };
     });
     
     const body = {
-      orderList: orderList,
-      paymentMethod: cartData.paymentMethod,
-      totalPrice: cartData.orderTotal,
+      items: orderList,
       shippingAddress: cartData.shippingAddress,
-      paymentSessionId: cartData.paymentSessionId,
+      // paymentSessionId: cartData.paymentSessionId,
       to: customerEmail,
       subject: "Your Order Confirmation",
       htmlContents: htmlContents,
@@ -178,7 +176,7 @@ const ProcessingOrder = () => {
     if (isDone) {
       let updatedCart = [];
       storedData.forEach(cart => {
-        if (!assetAddresses.includes(cart.product.address)) {
+        if (!saleAddresses.includes(cart.product.saleAddress)) {
           updatedCart.push(cart);
         }
       });
