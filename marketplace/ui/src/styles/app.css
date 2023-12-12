@@ -123,16 +123,19 @@
 display:  none;
 }
 
-:ant-table-row:hover{
-  background: red !important;
-}
 
 
 /* Hover effect */
-.ant-table-tbody tr:hover {
-  background-color: #EEEFFA; /* Set your desired hover background color */
+.ant-table-cell-row-hover{
+ 
+  background-color: #EEEFFA !important;
 }
 
+
+.ant-table-cell-row {
+  border-radius:  0px;
+  background-color: white;
+}
 
 .ant-table-tbody tr > td {
   background-color: white;
