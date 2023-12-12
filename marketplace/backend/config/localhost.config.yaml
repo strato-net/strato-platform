@@ -11,6 +11,7 @@ bootMembersFilename: boot_members.yaml
 cacheNonce: true
 dockerized: false
 marketplaceUiUrlPrefix: "/marketplace"
+
 nodes:
   - id: 0
     label: localhost
@@ -26,6 +27,6 @@ nodes:
       serviceOAuthFlow: 
       redirectUri: http://localhost/api/v1/authentication/callback
       logoutRedirectUri: http://localhost
-      tokenField: 
+      tokenField: access_token
       tokenUsernameProperty: 
       tokenUsernamePropertyServiceFlow: 
