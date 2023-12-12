@@ -70,7 +70,7 @@ main = do
 initHighway :: LoggingT IO ()
 initHighway = do
   $logInfoS "highway/initHighway" $ T.pack $ "Starting up highway."
-  liftIO $ blockappsInit "blockapps-highway-wrapper-server"
+  liftIO $ blockappsInit "blockapps-highway-server"
   liftIO $ Prelude.putStrLn highway3DMacroFont
   liftIO $ forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering --Do we need this?
   case Prelude.null flags_awsaccesskeyid of
@@ -102,7 +102,7 @@ appHighwayWrapper env =
       { prometheusEndPoint = ["highway", "metrics"],
         prometheusInstrumentApp = False
       }
-    . instrumentApp "highway-wrapper"
+    . instrumentApp "highway"
     . cors (const $ Just policy)
     . serve
       ( Proxy

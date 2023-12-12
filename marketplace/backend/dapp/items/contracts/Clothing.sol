@@ -1,18 +1,16 @@
-import "/dapp/orders/contracts/Sales/ClothingSale.sol";
-
 pragma es6;
 pragma strict;
-import <0b469dbb1f0207a49cb014192ab05a72f5b2fcf3>;
+
+import <1d2bdc27fe948a302ced772409305ff42bd76582>;
 
 /// @title A representation of Clothing assets
-contract Clothing is ItemStatus, RestStatus, Asset {
+contract Clothing is Mintable {
     string public serialNumber;
     string public clothingType; 
     string public size; 
     string public skuNumber; 
     string public condition;
     string public brand;
-    uint public units;
 
     event OwnershipUpdate(
         string seller,
@@ -22,97 +20,55 @@ contract Clothing is ItemStatus, RestStatus, Asset {
     );
 
     constructor(
-        string _serialNumber,
-        uint _createdDate,
-        address _owner,
         string _name,
         string _description,
         string[] _images,
-        uint _price,
+        string[] _files,
+        uint _createdDate,
+        uint _quantity,
+        string _serialNumber,
         string _clothingType,
         string _size,
         string _skuNumber,
         string _condition,
-        string _brand,
-        uint _units,
-        ItemStatus _status,
-        PaymentType[] _paymentTypes
-    ) public Asset(_name, _description, _images, _createdDate){
-
-        owner = _owner;
+        string _brand
+    ) public Mintable(_name, _description, "Clothing", "Clothing", _images, _files, _createdDate, _quantity) {
         serialNumber = _serialNumber;
         clothingType = _clothingType;
         size = _size;
         skuNumber = _skuNumber;
         condition = _condition;
         brand = _brand;
-        units = _units;
-
-        mapping(string => string) ownerCert = getUserCert(owner);
-        ownerOrganization = ownerCert["organization"];
-        ownerCommonName = ownerCert["commonName"];
-
-        createSales(_paymentTypes, _price, _units);
     }
 
-    function changeUnitQuantity(uint _units) public requireOwner("change unit quantity") {
-        for (uint i = 0; i < whitelistedSales.length; i++) {
-            ClothingSale(whitelistedSales[i]).changeSaleQuantity(_units);
-        }
-    }
-
-    function splitAsset(address saleContract, uint splitUnits, address newOwner) public requireOwner("split asset") returns (address) {
-        require(splitUnits < units, "Cannot split more units than available");
-        Clothing newAsset = new Clothing(serialNumber + "1", 
-                                     createdDate, 
-                                     newOwner, 
-                                     name,
-                                     description, 
-                                     images, 
-                                     0,
-                                     clothingType,
-                                     size,
-                                     skuNumber,
-                                     condition,
-                                     brand,
-                                     splitUnits, 
-                                     ItemStatus.UNPUBLISHED,
-                                     []);
-        units -= splitUnits;
-
-        changeUnitQuantity(units);
-
-        emit AssetSplit(address(newAsset), splitUnits);
-
-        return address(newAsset);
-    }
-
-    function createSales(PaymentType[] _paymentTypes, uint _price, uint _units) public requireOwner("Create sale") returns (uint) {
-        for (uint i = 0; i < _paymentTypes.length; i++) {
-            whitelistSale(address(new ClothingSale(address(this), _paymentTypes[i], _price, _units)));
-        }
-        status = ItemStatus.PUBLISHED;
-        return RestStatus.OK;
-    }
-
-    function createSplitSale(PaymentType _paymentType, uint _price, uint _units) public returns (uint, string) {
-        address newSale = address(new ClothingSale(address(this), _paymentType, _price, _units));
-        return (RestStatus.OK, string(newSale));
+    function mint(uint _quantity) internal override returns (UTXO) {
+        Clothing newAsset = new Clothing(
+            name,
+            description,
+            images,
+            files,
+            createdDate,
+            _quantity,
+            serialNumber,
+            clothingType,
+            size,
+            skuNumber,
+            condition,
+            brand
+        );
+        return UTXO(newAsset);
     }
 
     // TODO: Finish the update function. 
     function updateClothing(
-        string _name, 
-        string _description, 
         string[] _images, 
-        ItemStatus _status,
+        string[] _files, 
         string _serialNumber,
-        string _clothingType,
-        uint _price
+        string _clothingType
     ) public requireOwner("update clothing") returns (uint) {
         serialNumber = _serialNumber;
         clothingType = _clothingType;
-        updateAsset(_name, _description, _images, _status, _price);
+        updateAsset(_images, _files);
         return RestStatus.OK;
     }
 }

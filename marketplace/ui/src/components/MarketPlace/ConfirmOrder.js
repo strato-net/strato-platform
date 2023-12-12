@@ -273,15 +273,6 @@ const ConfirmOrder = () => {
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SELLER ORGANIZATION</Text>
-      ),
-      dataIndex: "sellersOrganization",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-      width: "12%"
-    },
-    {
-      title: (
         <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
       ),
       dataIndex: "sellersCommonName",
@@ -290,7 +281,7 @@ const ConfirmOrder = () => {
       width: "12%"
     },
     {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">UNIT PRICE ($)</Text>,
       dataIndex: "unitPrice",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
@@ -302,66 +293,26 @@ const ConfirmOrder = () => {
       render: (text) => <p className="text-center">{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">TAX($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">TAX ($)</Text>,
       dataIndex: "tax",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES($)</Text>
+        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES ($)</Text>
       ),
       dataIndex: "shippingCharges",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">AMOUNT ($)</Text>,
       dataIndex: "amount",
       align: "center",
       render: (text) => <p className="text-center">{text}</p>,
     },
   ];
-
-
-
-  const navigate = useNavigate();
-
-
-  const handleOrderConfirm = async () => {
-    handleCancel();
-    let orderList = [];
-    let orderItemAddress = [];
-    confirmOrderList.forEach((item) => {
-      orderList.push({ inventoryId: item.key, quantity: item.qty });
-      orderItemAddress.push(item.key);
-    });
-    const body = {
-      buyerOrganization: userOrganization,
-      orderList,
-      orderTotal: total + tax + shipping,
-      shippingAddress: userAddresses[selectedAddress].address,
-    };
-    
-    TagManager.dataLayer({
-      dataLayer: {
-        event: 'pay_later_button',
-      },
-    });
-    let isDone = await orderActions.createOrder(orderDispatch, body);
-    if (isDone) {
-      let updatedCart = [];
-      cartList.forEach(cart => {
-        if (!orderItemAddress.includes(cart.product.address)) {
-          updatedCart.push(cart);
-        }
-      });
-      actions.addItemToCart(marketplaceDispatch, updatedCart);
-      setTimeout(function () {
-        navigate(`/orders`, { state: { defaultKey: "Bought" } });
-      }, 2000);
-    }
-  };
 
   const handlePaymentConfirm = async () => {
     let orderList = [];
@@ -378,7 +329,7 @@ const ConfirmOrder = () => {
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total + tax + shipping,
-      shippingAddress: userAddresses[selectedAddress].address,
+      shippingAddress: '', // userAddresses[selectedAddress].address,
       tax: tax,
       user: user.commonName,
       email: user.preferred_username,
@@ -402,7 +353,7 @@ const ConfirmOrder = () => {
 
   useEffect(() => {
     if (data.length !== 0) {
-      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellersOrganization"]);
+      inventoryAction.sellerStripeStatus(inventoryDispatch, data[0]["sellersCommonName"]);
     }
   }, [inventoryDispatch, data]);
 
@@ -749,7 +700,7 @@ const ConfirmOrder = () => {
                     </Card>
               }
             </div>
-            {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className="justify-center mt-12">
+            {stripeStatus == null ? <div></div> : <Row className="justify-center mt-12">
               {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
                 onClick={() => {
                   setOpen(true);

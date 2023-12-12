@@ -52,13 +52,11 @@ class PaymentServiceController {
           break;
         case 'checkout.session.completed':
           // Then define and call a function to handle the event checkout.session.completed
-          // const paymentSessionId = object.id;
-          // const paymentStatus = object.payment_status;
-          // const sessionStatus = object.status;
-          // const paymentIntentId = object.payment_intent;
-          // const paymentContract = await dapp.getPayment({ paymentSessionId })
-
-          // await dapp.updatePayment({ payment: paymentContract.address, paymentStatus, paymentIntentId, sessionStatus })
+          const paymentSessionId = object.id;
+          const paymentStatus = object.payment_status;
+          const sessionStatus = object.status;
+          const paymentIntentId = object.payment_intent;
+          await dapp.updatePayment({ paymentSessionId, paymentStatus, paymentIntentId, sessionStatus })
           break;
         case 'checkout.session.expired':
           const checkoutSessionExpired = object;
@@ -116,7 +114,7 @@ class PaymentServiceController {
 
   static validateGetStripeOnboardingStatusArgs(args) {
     const getStripeOnboardingStatusSchema = Joi.object({
-      ownerOrganization: Joi.string().invalid(":ownerOrganization").required(),
+      ownerCommonName: Joi.string().invalid(":ownerCommonName").required(),
     });
 
     const validation = getStripeOnboardingStatusSchema.validate(args);

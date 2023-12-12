@@ -11,7 +11,7 @@ $(info REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}")
 
 STACK_RESOLVER=$(shell cat strato/stack.yaml | grep "resolver:" | awk '{print $$2}')
 FAKEROOT=$(shell pwd)/.docker-work
-HIGHWAYDIR=${FAKEROOT}/highway-wrapper
+HIGHWAYDIR=${FAKEROOT}/highway
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
 IDENTITYDIR=${FAKEROOT}/identity-provider
@@ -31,9 +31,9 @@ $(info )
 
 all: build_all docker-compose eks
 
-build_all: strato apex highway-wrapper highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx
 
-.PHONY: strato apex highway-wrapper highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -116,11 +116,11 @@ hoogle: build_buildbase
 		stack hoogle generate --rebuild -- --local && \
 		stack hoogle -- server --local
 
-highway-wrapper: build_common 
-	@echo Now building highway-wrapper...
+highway: build_common 
+	@echo Now building highway...
 	cp strato/highway/doit.sh ${HIGHWAYDIR}
-	docker build --target highway-wrapper --tag ${REPO_URL}highway-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
-	docker tag ${REPO_URL}highway-wrapper:${VERSION} ${REPO_AWS_ECR_URL}highway-wrapper:${VERSION}
+	docker build --target highway --tag ${REPO_URL}highway:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}highway:${VERSION} ${REPO_AWS_ECR_URL}highway:${VERSION}
 
 highway-nginx:
 	@echo Now building highway-nginx...

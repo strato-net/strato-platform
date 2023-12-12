@@ -1,6 +1,6 @@
-name:                blockapps-highway-wrapper-server
+name:                blockapps-highway-server
 version:             0.1.0.0
-github:              "githubuser/blockapps-highway-wrapper-server"
+github:              "githubuser/blockapps-highway-server"
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
@@ -20,7 +20,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
-- blockapps-highway-wrapper-api
+- blockapps-highway-api
 - bytestring
 - common-log
 - conduit
@@ -69,12 +69,12 @@ library:
     - yaml
 
 executables:
-  blockapps-highway-wrapper-server:
+  blockapps-highway-server:
     source-dirs: app
     main: Main.hs
     other-modules: [Options]
     dependencies:
-      - blockapps-highway-wrapper-server
+      - blockapps-highway-server
       - blockapps-init
       - cache
       - clock
@@ -91,7 +91,7 @@ executables:
     ghc-options: -threaded 
 
 tests:
-  highway-wrapper-spec:
+  highway-spec:
     source-dirs: test/
     main: Spec.hs
     dependencies:

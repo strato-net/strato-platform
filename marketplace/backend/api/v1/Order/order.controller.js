@@ -2,8 +2,6 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { getSignedUrlFromS3 } from '../../../helpers/s3'
-import constants from '../../../helpers/constants'
 import sendEmail from '../../../helpers/email'
 const options = { config, cacheNonce: true }
 
@@ -22,15 +20,7 @@ class OrderController {
       }
 
       const order = await dapp.getOrder(args, chainOptions);
-      const assetsWithImageUrl = order.assets.map(asset => (
-        asset.images && asset.images.length > 0 ?
-        {
-          ...asset,
-          images: asset.images.map(image => (getSignedUrlFromS3(image, req.app.get(constants.s3ParamName)))),
-        }
-        :
-        asset
-      ))
+      const assetsWithImageUrl = order.assets
       const result = { ...order, assets: assetsWithImageUrl }
       rest.response.status200(res, result)
 
@@ -217,7 +207,7 @@ class OrderController {
 
       OrderController.validateExecuteSaleArgs(body)
 
-      const result = await dapp.saleOrderTransferOwnership(body)
+      const result = await dapp.completeOrder(body)
       rest.response.status200(res, result)
 
       return next()
@@ -262,7 +252,7 @@ class OrderController {
             assetAddress: Joi.string().required(),
           })).required(),
       orderTotal: Joi.number().required(),
-      shippingAddress: Joi.string().required(),
+      shippingAddress: Joi.string().required().allow(''),
       tax: Joi.number().required(),
       user: Joi.string().required(),
       email: Joi.string().required(),
@@ -355,15 +345,11 @@ class OrderController {
 
   static validateCreateSaleOrderArgs(args) {
     const createSaleOrderSchema = Joi.object({
-      orderList: Joi.array().min(1).items(Joi.object({
+      items: Joi.array().min(1).items(Joi.object({
         quantity: Joi.number().required(),
-        assetAddress: Joi.string().required(),
-        category: Joi.string().required(),
+        saleAddress: Joi.string().required(),
       })).required(),
-      paymentMethod: Joi.string().required(),
-      totalPrice: Joi.number().required(),
-      shippingAddress: Joi.string().required(),
-      paymentSessionId: Joi.string().required(),
+      shippingAddress: Joi.string().required().allow(''),
     }).required();
 
     const validation = createSaleOrderSchema.validate(args);
@@ -393,7 +379,7 @@ class OrderController {
 
   static validateExecuteSaleArgs(args) {
     const executeSaleSchema = Joi.object({
-      saleOrderAddress: Joi.string().required(),
+      orderAddress: Joi.string().required(),
       fulfillmentDate: Joi.number().required(),
       comments: Joi.string().allow(""),
     }).required();

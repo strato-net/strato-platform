@@ -44,11 +44,8 @@ class CollectibleController {
         description: Joi.string().required(),
         condition: Joi.string().required(),
         images: Joi.array().items(Joi.string().optional()).required(),
-        price: Joi.number().positive().required(),
-        units: Joi.number().positive().required(),
-        paymentTypes: Joi.array().min(1).items(
-          Joi.number().integer().min(0).max(5).required(),
-        ).required(),
+        files: Joi.array().items(Joi.string().optional()).required(),
+        quantity: Joi.number().positive().required(),
       }).required()
     });
 

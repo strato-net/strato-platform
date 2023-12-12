@@ -1,4 +1,8 @@
- /// @title A representation of OrderStatus of Order
+import <509>;
+
+pragma es6;
+pragma strict;
+
 contract OrderStatus{
     enum OrderStatus{
         NULL,

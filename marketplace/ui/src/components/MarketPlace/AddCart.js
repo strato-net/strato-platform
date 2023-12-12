@@ -81,7 +81,7 @@ const Checkout = ({ user }) => {
   useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
-      const org = obj.product.ownerOrganization;
+      const org = obj.product.ownerCommonName;
       if (!map.has(org)) {
         map.set(org, []);
       }
@@ -101,11 +101,11 @@ const Checkout = ({ user }) => {
             status: "Active",
           },
           category: parts[parts.length - 1],
-          sellersOrganization: item.product.ownerOrganization,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price,
-          quantity: item.product.address,
+          quantity: item.product.saleQuantity,
+          saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           shippingCharges: calculateShipping(item),
           amount:
@@ -240,9 +240,8 @@ const Checkout = ({ user }) => {
                 }
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    const itemData = JSON.parse(product.data);
-                    const availableQuantity = itemData.units ? itemData.units : 1;
+                  if (element.product.address === product.key) {
+                    const availableQuantity = product.quantity ? product.quantity : 1;
                     if (items[index].qty - 1 <= availableQuantity) {
                       items[index].qty -= 1;
                       actions.addItemToCart(marketplaceDispatch, items);
@@ -265,9 +264,8 @@ const Checkout = ({ user }) => {
                 onChange={e => {
                   let items = [...cartList];
                   cartList.forEach((element, index) => {
-                    if (element.product.address === product.address) {
-                      const itemData = JSON.parse(product.data);
-                      const availableQuantity = itemData.units ? itemData.units : 1;
+                    if (element.product.address === product.key) {
+                      const availableQuantity = product.quantity ? product.quantity : 1;
                       if (e <= availableQuantity) {
                         items[index].qty = e;
                         actions.addItemToCart(marketplaceDispatch, items);
@@ -283,9 +281,8 @@ const Checkout = ({ user }) => {
               onClick={() => {
                 let items = [...cartList];
                 cartList.forEach((element, index) => {
-                  if (element.product.address === product.address) {
-                    const itemData = JSON.parse(product.data);
-                    const availableQuantity = itemData.units ? itemData.units : 1;
+                  if (element.product.address === product.key) {
+                    const availableQuantity = product.quantity ? product.quantity : 1;
                     if (items[index].qty + 1 <= availableQuantity) {
                       items[index].qty += 1;
                       actions.addItemToCart(marketplaceDispatch, items);
@@ -379,7 +376,7 @@ const Checkout = ({ user }) => {
       orderList.push({ inventoryId: item.product.address, quantity: item.qty });
     });
     const body = {
-      buyerOrganization: user.organization,
+      buyerCommonName: user.commonName,
       orderList,
       orderTotal: total + tax + shipping,
     };
