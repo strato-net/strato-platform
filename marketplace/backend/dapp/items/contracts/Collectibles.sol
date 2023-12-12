@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <1d2bdc27fe948a302ced772409305ff42bd76582>;
+import <86483be23fa65cf7f992d9cb35eca840e74090bc>;
 
 /// @title A representation of Collectible assets
 contract Collectibles is Mintable {
@@ -25,7 +25,7 @@ contract Collectibles is Mintable {
         uint _quantity,
         string _serialNumber,
         string _condition
-    ) public Mintable(_name, _description, "Membership", "Membership", _images, _files, _createdDate, _quantity) {
+    ) public Mintable(_name, _description, _images, _files, _createdDate, _quantity) {
         serialNumber = _serialNumber;
         condition = _condition;
     }

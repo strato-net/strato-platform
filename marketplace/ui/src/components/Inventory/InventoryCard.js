@@ -218,6 +218,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
     }
   };
 
+/*
+                    <div
+                      className="flex items-center mt-2 cursor-pointer"
+                      onClick={showEditModal}
+                    >
+                      <FormOutlined />
+                      <p className="ml-3">Edit Inventory</p>
+                    </div>
+*/
+
   return (
     <Card className="w-full mt-6">
       <div className="flex" id={id}>
@@ -260,13 +270,6 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                 onOpenChange={handleOpenChange}
                 title={
                   <div className="font-medium">
-                    <div
-                      className="flex items-center mt-2 cursor-pointer"
-                      onClick={showEditModal}
-                    >
-                      <FormOutlined />
-                      <p className="ml-3">Edit Inventory</p>
-                    </div>
                     {inventory.price ? (<div>
                       <div
                         className="flex items-center mt-2 cursor-pointer"
@@ -280,7 +283,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
                         onClick={showUnlistModal}
                       >
                         <StopOutlined />
-                        <p className="ml-3">Cancel Listing</p>
+                        <p className="ml-3">Unlist</p>
                       </div>
                     </div>) : paymentProviderAddress ? (<div
                       className="flex items-center mt-2 cursor-pointer"

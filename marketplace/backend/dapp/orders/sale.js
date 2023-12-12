@@ -117,8 +117,8 @@ async function get(user, args, options) {
                 value: assetToBeSold,
             },
             {
-                key: "state",
-                value: 1
+                key: "isOpen",
+                value: true
             }
             ]);
     }
@@ -148,17 +148,17 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { saleAddresses, assetAddresses, state, ...restArgs } = args;
+    const { saleAddresses, assetAddresses, isOpen, ...restArgs } = args;
     const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
     let sales;
     if (assetAddresses) {
         sales = await searchAllWithQueryArgs(contractName, { 
             assetToBeSold: assetAddresses, 
-            state: state ? state : 1,
+            isOpen: isOpen ? isOpen : true,
         }, options, admin);
     }
     else {
-        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, state: state ? state : 1 }, options, admin);
+        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen ? isOpen : true }, options, admin);
     }
 
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
