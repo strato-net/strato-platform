@@ -78,9 +78,6 @@ instance Monad m => Accessible UDPPort (ReaderT ContextLite m) where
 instance Monad m => Accessible TCPPort (ReaderT ContextLite m) where
   access _ = asks myTcpPort
 
-instance MonadIO m => A.Selectable IPAsText ClosestPeers (ReaderT ContextLite m) where
-  select p ip = liftIO $ A.select p ip
-
 instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m) where
   replace _ (IPAsText ip) peer = do
     maybePeer <- getPeerByIP $ T.unpack ip
@@ -110,12 +107,6 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) wh
           lst -> return . Just . SQL.entityVal $ head lst
         where
           actions = SQL.selectList [PPeerIp SQL.==. T.pack ipStr] []
-
-instance MonadIO m => A.Replaceable T.Text PPeer (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
 
 instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
   replace _ addr packet = do
@@ -161,24 +152,6 @@ instance MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextL
     sock' <- asks sock
     liftIO . timeout 10000000 $ NB.recvFrom sock' 80000
 
-instance MonadIO m => Mod.Accessible AvailablePeers (ReaderT ContextLite m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => Mod.Accessible BondedPeersForUDP (ReaderT ContextLite m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable PPeer UdpEnableTime (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer T.Text (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
-instance MonadIO m => Mod.Accessible UnbondedPeers (ReaderT ContextLite m) where
-  access = liftIO . Mod.access
-
-instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (ReaderT ContextLite m) where
-  replace p k = liftIO . A.replace p k
-
 instance (Monad m, MonadIO m, MonadLogger m) => HasVault (ReaderT ContextLite m) where
   sign msg = do
     vc <- asks vaultClient
@@ -196,27 +169,19 @@ type DiscoveryRunner n m a = (Int -> n a) -> m a
 
 type MonadDiscovery m =
   ( HasVault m,
+    HasPeerDB m,
     MonadFail m,
     MonadCatch m,
     MonadThrow m,
     MonadLogger m,
     MonadUnliftIO m,
-    A.Selectable IPAsText ClosestPeers m,
     A.Selectable String PPeer m,
-    A.Replaceable PPeer PeerUdpDisable m,
-    A.Replaceable PPeer T.Text m,
-    A.Replaceable T.Text PPeer m,
     A.Selectable () (B.ByteString, SockAddr) m,
     A.Replaceable IPAsText PPeer m,
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
-    A.Selectable (Maybe IPAsText, UDPPort) SockAddr m,
-    Mod.Accessible AvailablePeers m,
-    Mod.Accessible BondedPeersForUDP m,
-    A.Replaceable PPeer UdpEnableTime m,
-    Mod.Accessible UnbondedPeers m,
-    A.Replaceable (IPAsText, UDPPort) PeerBondingState m
+    A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
   )
 
 waitOnVault :: (MonadIO m, MonadLogger m, Show a) => m (Either a b) -> m b
