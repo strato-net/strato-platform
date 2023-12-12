@@ -213,6 +213,7 @@ pipeline {
                       docker compose -f docker-compose.push.ecr.yml push 2>&1
                       docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
                       docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
+                      docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                     '''
                   }
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
@@ -235,6 +236,8 @@ pipeline {
                       aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.highway.ecr.yml s3://blockapps-build-artifacts/${version}/
+
                     '''
                   }
                 }
