@@ -24,9 +24,10 @@ const CategoryCard = () => {
   ];
 
   return (
-    <Card className="w-full">
+    // <Card className="w-full">
+    <>
       <div className="flex justify-between mb-5">
-        <Title level={3}>Categories</Title>
+        <Title level={3} className="text-4xl font-semibold" style={{fontSize : "36px" ,  }}>Categories</Title>
         {/* <Space size="large">
           <div className="cursor-pointer w-9 h-9 rounded-full shadow-[0px_0px_2px_0_rgba(0,0,0,0.3)] flex justify-center items-center">
             <LeftArrow />
@@ -36,13 +37,13 @@ const CategoryCard = () => {
           </div>
         </Space> */}
       </div>
-      <div className="flex justify-evenly px-2">
+      <div className="flex gap-[15px] ">
         {categorys.map((category, index) => {
           return (
             <div
               id={category.name}
               key={index}
-              className="w-48 h-44 border border-tertiaryB rounded-md py-5 mx-3 cursor-pointer"
+              className="w-[248px] h-[200px] border border-tertiaryB  mx-3 rounded-lg cursor-pointer"
               onClick={() => {
                 navigate(`${naviroute.replace(":category", category.name)}`);
                 window.LOQ.push(['ready', async LO => {
@@ -58,22 +59,28 @@ const CategoryCard = () => {
                 }
               }
             >
-              <div className="flex flex-col items-center text-center">
+              <div className="flex flex-col items-center ">
                 <Image
                   src={categoryImages[index]}
-                  height={108}
-                  width={150}
+                  height={140}
+                  width={248}
+                  className="rounded-t-lg"
                   preview={false}
                 />
-                <Text type="secondary" className="mt-2 text-sm !text-primaryB">
+                <div className="py-3  ">
+                <Text type="secondary" className=" text-2xl !text-primaryB font-semibold " style={{textAlign : "left"}} >
                   {category.name}
                 </Text>
+               
+                  </div>
+                
               </div>
             </div>
           );
         })}
       </div>
-    </Card>
+     {/* </Card> */}
+    </>
   );
 };
 

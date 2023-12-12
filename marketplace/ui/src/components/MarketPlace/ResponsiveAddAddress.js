@@ -1,0 +1,268 @@
+import React,{useState} from "react";
+import TagManager from "react-gtm-module";
+import {   Button, Form, Input } from "antd";
+import { useFormik } from "formik";
+import * as yup from "yup";
+
+import { actions } from "../../contexts/marketplace/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+import {
+  useMarketplaceState,
+  useMarketplaceDispatch,
+} from "../../contexts/marketplace";
+
+
+const ResponsiveAddAddress = ({back}) => {
+    const [showAddress, setshowAddress] = useState(false);
+    const marketplaceDispatch = useMarketplaceDispatch();
+    const ShippingDetailsSchema = () => {
+      return yup.object().shape({
+        name: yup.string().required("Name is required"),
+        zipcode: yup.string().max(15).required("Zipcode is required")
+          .required("Zipcode is required"),
+        addressLine1: yup.string().required("Address Line 1 is required"),
+        addressLine2: yup.string().notRequired(),
+        city: yup.string().required("City is required"),
+        state: yup.string().required("State is required"),
+        sameAddress: yup.boolean(),
+        name_b: yup.string().when("sameAddress", {
+          is: false,
+          then: yup.string().required("Name is required"),
+        }),
+        zipcode_b: yup.number().when("sameAddress", {
+          is: false,
+          then: yup.string().max(15).required("Zipcode is required"),
+        }),
+        addressLine1_b: yup.string().when("sameAddress", {
+          is: false,
+          then: yup.string().required("Address Line 1 is required"),
+        }),
+        addressLine2_b: yup.string().notRequired(),
+        city_b: yup.string().when("sameAddress", {
+          is: false,
+          then: yup.string().required("City is required"),
+        }),
+        state_b: yup.string().when("sameAddress", {
+          is: false,
+          then: yup.string().required("State is required"),
+        }),
+      });
+    };
+    
+    const handleFormSubmit = async (values) => {
+    
+      setshowAddress(false);
+      let billingAddr;
+      if (values.sameAddress) {
+        billingAddr = {
+          billingName: encodeURIComponent(values.name),
+          billingZipcode: values.zipcode,
+          billingState: encodeURIComponent(values.state),
+          billingCity: encodeURIComponent(values.city),
+          billingAddressLine1: encodeURIComponent(values.addressLine1),
+          billingAddressLine2: encodeURIComponent(values.addressLine2)
+        }
+      } else {
+        billingAddr = {
+          billingName: encodeURIComponent(values.name_b),
+          billingZipcode: values.zipcode_b,
+          billingState: encodeURIComponent(values.state_b),
+          billingCity: encodeURIComponent(values.city_b),
+          billingAddressLine1: encodeURIComponent(values.addressLine1_b),
+          billingAddressLine2: encodeURIComponent(values.addressLine2_b)
+        }
+      }
+    
+      const body = {
+        //shipping address
+        shippingName: encodeURIComponent(values.name),
+        shippingZipcode: values.zipcode,
+        shippingState: encodeURIComponent(values.state),
+        shippingCity: encodeURIComponent(values.city),
+        shippingAddressLine1: encodeURIComponent(values.addressLine1),
+        shippingAddressLine2: encodeURIComponent(values.addressLine2),
+    
+        //billing address
+        ...billingAddr
+      };
+    
+      window.LOQ.push(['ready', async LO => {
+        // Track an event
+        await LO.$internal.ready('events')
+        LO.events.track('Add Shipping Address')
+      }])
+      TagManager.dataLayer({
+        dataLayer: {
+          event: 'add_shipping_address',
+        },
+      });
+      let res = await actions.addShippingAddress(marketplaceDispatch, body);
+      if (res != null) {
+        await actions.fetchUserAddresses(marketplaceDispatch);
+      }
+    };
+    const { TextArea } = Input;
+    const formik = useFormik({
+        initialValues: {
+          sameAddress: true,
+          state: "",
+          name: "",
+          zipcode: "",
+          addressLine1: "",
+          addressLine2: "",
+          city: "",
+          state_b: "",
+          name_b: "",
+          zipcode_b: "",
+          addressLine1_b: "",
+          addressLine2_b: "",
+          city_b: "",
+        },
+        validationSchema: ShippingDetailsSchema,
+        onSubmit: function (values) {
+          handleFormSubmit(values)
+          back();
+        },
+      });
+  return (
+    <div>
+        <Form layout="horizontal" className="">
+      <div className=" py-5 px-4">
+        <div className="flex flex-col gap-[18px]">
+          <Form.Item  name="name" className="">
+            <p className="text-left text-[#202020] font-medium">Name</p>
+            <Input
+              label="name"
+              name="name"
+              className="h-[42px] pt-1  "
+              placeholder="Enter Name"
+              value={formik.values.name}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.name && formik.errors.name && (
+             <p className="text-error text-xs text-left">
+                {formik.errors.name}
+             </p>
+            )}
+          </Form.Item>
+
+          <Form.Item
+            label=""
+            name="addressLine1"
+            className=""
+          >
+             <p className="text-left text-[#202020] font-medium">Address Line 1</p>
+            <Input
+            
+              className="h-[42px] pt-1 "
+              name="addressLine1"
+              placeholder="Enter Address Line 1"
+              value={formik.values.addressLine1}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.addressLine1 && formik.errors.addressLine1 && (
+             <p className="text-error text-xs text-left">
+                {formik.errors.addressLine1}
+             </p>
+            )}
+          </Form.Item>
+        </div>
+
+        <div className=" pb-6">
+         
+        <Form.Item
+            label=""
+            name=""
+            className="pt-[18px]"
+          >
+            <p className="text-left text-[#202020] font-medium">addressLine2</p>
+            <Input
+              className="h-[42px] pt-1 "
+              name="addressLine2"
+              placeholder="Enter Address Line 2"
+              value={formik.values.addressLine2}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.addressLine2 && formik.errors.addressLine2 && (
+             <p className="text-error text-xs  text-left">
+                {formik.errors.addressLine2}
+             </p>
+            )}
+          </Form.Item>
+          <Form.Item label="" name="city" className="pt-[18px]">
+          <p className="text-[#202020] font-medium text-left">City</p>
+            <Input
+              label="city"
+              name="city"
+              className="h-[42px] pt-1 "
+              placeholder="Enter City"
+              value={formik.values.city}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.city && formik.errors.city && (
+             <p className="text-error text-xs text-left">
+                {formik.errors.city}
+             </p>
+            )}
+          </Form.Item>
+        </div>
+
+        <div className=" items-start pb-6">
+        <Form.Item label="" name="state" className="">
+        <p className="text-[#202020] font-medium text-left">State</p>
+            <Input
+              label="state"
+              className="h-[42px] pt-1 "
+              name="state"
+              placeholder="Enter State"
+              value={formik.values.state}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.state && formik.errors.state && (
+             <p className="text-error text-xs text-left">
+                {formik.errors.state}
+             </p>
+            )}
+          </Form.Item>
+
+         
+          <Form.Item label="" name="zipcode" className="pt-[18px]">
+            <p className="text-[#202020] font-medium text-left">Zipcode</p>
+            <Input
+              label="zipcode"
+              name="zipcode"
+              className="h-[42px] pt-1 "
+              placeholder="Enter Zipcode"
+              maxLength={15}
+              value={formik.values.zipcode}
+              onChange={formik.handleChange}
+            />
+            {formik.touched.zipcode && formik.errors.zipcode && (
+             <p className="text-error text-xs text-left">
+                {formik.errors.zipcode}
+             </p>
+            )}
+          </Form.Item>
+        </div>
+
+      </div>
+      
+
+      <div className="absolute bottom-0 px-[14px] w-full py-[14px] shadow-Footer ">
+        <div >
+     
+        <div className="flex w-full justify-between items-center gap-4">
+            <Button type="default" className="h-[42px] pt-1  w-[163px]" onClick={back} >Cancel</Button>
+            <div className="cursor-pointer justify-center flex items-center w-40 h-[42px] pt-1   border border-primary rounded bg-primary hover:bg-primaryHover text-white"
+          onClick={formik.handleSubmit}>
+          Add address
+        </div>
+        </div>
+        </div>
+      </div>
+    </Form>
+    </div>
+  )
+}
+
+export default ResponsiveAddAddress

@@ -6,6 +6,7 @@ import {
   notification,
   Spin,
   Card,
+  Button,
 } from "antd";
 import {
   useMarketplaceState,
@@ -37,6 +38,10 @@ import routes from "../../helpers/routes";
 import AddressComponent from "./AddressComponent";
 import { PlusCircleOutlined, MinusCircleOutlined } from "@ant-design/icons";
 import TagManager from "react-gtm-module";
+import New_ResponsiveCart from "./New_ResponsiveCart";
+import { Images } from "../../images";
+import AddAddressModel from "./AddAddressModel";
+import ResponsiveAddAddress from "./ResponsiveAddAddress";
 
 
 const { TextArea } = Input;
@@ -97,14 +102,24 @@ const ConfirmOrder = () => {
   const inventoryDispatch = useInventoryDispatch();
   const { isLoadingStripeStatus, stripeStatus } = useInventoryState();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
+  const [modelAddress ,  setModelAddress] =  useState(false);
 
-
+  const [responsiveAddress ,  setResponsiveAddress] =  useState(false);
   const [showAddress, setshowAddress] = useState(false);
+ 
+
+  const CloseAddressModel   =()=>{
+    setModelAddress(false);
+    setshowAddress(false);
+  }
 
   const handleCancel = () => {
     setOpen(false);
   };
 
+  const closeResponsiveAddress = ()=>{
+    setResponsiveAddress(false)
+  }
   useEffect(() => {
     actions.fetchUserAddresses(marketplaceDispatch);
   }, [marketplaceDispatch])
@@ -232,7 +247,7 @@ const ConfirmOrder = () => {
       //billing address
       ...billingAddr
     };
-
+    
     window.LOQ.push(['ready', async LO => {
       // Track an event
       await LO.$internal.ready('events')
@@ -252,65 +267,75 @@ const ConfirmOrder = () => {
 
 
   const columns = [
+    
     {
-      title: <Text className="text-primaryC text-[13px]"></Text>,
+      title: <Text className="text-[#202020] text-base font-semibold px-6">Item</Text>,
       dataIndex: "item",
+     
       render: (text) => {
         return (
-          <img className="w-16 h-16 object-contain" alt="" src={text.image} />
+          <div className="flex gap-3 items-center"> 
+              <img className="w-14 h-14 object-contain rounded-[4px]" alt="" src={text.image}  />
+              <p className="text-primary text-sm font-semibold">{decodeURIComponent(text.name)}</p>
+          </div>
+          
         );
       },
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">ITEM</Text>,
-      dataIndex: "item",
-      render: (text) => {
-        return (
-          <p className="text-primary text-[17px]">{decodeURIComponent(text.name)}</p>
-        );
-      },
-
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SELLER NAME</Text>
+        <Text className="text-[#202020] text-base font-semibold">Seller</Text>
       ),
       dataIndex: "sellersCommonName",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-      width: "12%"
+      render: (text) => (
+        <p className="text-center">{text}</p>
+      ),
+      // width: "12%"
+    },{
+      title: (
+        <Text className="text-[#202020] text-base font-semibold">Measurement (Unit)</Text>
+      ),
+      dataIndex: "sellersCommonName",
+      align: "center",
+      render: (text) => (
+        <p className="">lb</p>
+      ),
+  //  width: "12%"
     },
     {
-      title: <Text className="text-primaryC text-[13px]">UNIT PRICE ($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">Unit Price($)</Text>,
       dataIndex: "unitPrice",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className=" text-sm text-[#202020] font-medium font-sans">{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">QUANTITY</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">QUANTITY</Text>,
       dataIndex: "qty",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">TAX ($)</Text>,
-      dataIndex: "tax",
-      align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-sm text-[#202020] font-medium font-sans">{text}</p>,
     },
     {
       title: (
-        <Text className="text-primaryC text-[13px]">SHIPPING CHARGES ($)</Text>
+        <Text className="text-[#202020] text-base font-semibold">Shipping Charges</Text>
       ),
       dataIndex: "shippingCharges",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-sm font-medium text-[#202020] ">{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">AMOUNT ($)</Text>,
+      title: <Text className="text-[#202020] text-base font-semibold">TAX($)</Text>,
+      dataIndex: "tax",
+      align: "center",
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>,
+    },
+    {
+      title: <Text className="text-[#202020] text-base font-semibold">AMOUNT($)</Text>,
       dataIndex: "amount",
       align: "center",
-      render: (text) => <p className="text-center">{text}</p>,
+      render: (text) => <p className="text-sm font-medium text-[#202020]">{text}</p>  
+,
+  
     },
   ];
 
@@ -323,7 +348,6 @@ const ConfirmOrder = () => {
         assetAddress: item.key,
       });
     });
-
     // These additional fields need to be sent to form the request after stripe. 
     let body = {
       buyerOrganization: userOrganization,
@@ -334,6 +358,9 @@ const ConfirmOrder = () => {
       user: user.commonName,
       email: user.preferred_username,
     };
+
+    //Add
+    
     window.LOQ.push(['ready', async LO => {
       // Track an event
       await LO.$internal.ready('events')
@@ -361,14 +388,16 @@ const ConfirmOrder = () => {
   const disabledButtonClass = "cursor-not-allowed justify-center flex items-center w-44 h-9  border border-[#999999] rounded bg-[#cccccc] text-[#666666] mr-4";
 
   return (
-    <div className="h-screen mx-14  mt-14">
+    <>
+  {responsiveAddress ? <ResponsiveAddAddress  back={closeResponsiveAddress} /> :
+    <div className="h-screen md:mx-10 md:mt-10 mt-5 mx-5 lg:mx-14   lg:mt-14">
       {contextHolder}
       {isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
         <div className="h-screen flex justify-center items-center">
           <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large" />
         </div>
       ) : (
-        <div className="pb-20">
+        <div className="pb-[30px]">
           <Breadcrumb>
             <Breadcrumb.Item href="javascript:;">
               <ClickableCell href={routes.Marketplace.url}>
@@ -388,7 +417,10 @@ const ConfirmOrder = () => {
               </p>
             </Breadcrumb.Item>
           </Breadcrumb>
-          <div className="mt-4">
+          <div className="pt-[38px]">
+            <Typography className="text-[#202020] text-2xl font-semibold">My Cart</Typography>
+          </div>
+          <div className="pt-4 hidden lg:block border-top">
             <DataTableComponent
               isLoading={false}
               // rowSelection={{
@@ -401,46 +433,245 @@ const ConfirmOrder = () => {
               pagination={false}
             />
           </div>
+          <div className="lg:hidden">
+            <New_ResponsiveCart data={data} key={data} confirm={true}  />
+          </div>
 
-          <Row className="justify-end mt-4">
-            <p className="text-sm w-36 mr-2">Item Total</p>
-            <p className="text-sm">-</p>
-            <p className="text-sm ml-2 w-20 text-right">${total}</p>
+          <div className="bg-[#EEEFFA] rounded-b-md py-[15px] px-4  hidden lg:flex lg:justify-end ">
+          <div className="w-[235px] flex flex-col gap-[10px]">
+          <Row className="justify-between ">
+            <p className="text-base text-[#6A6A6A]  ">Sub Total:</p>
+            
+            <p className="text-xl text-[#202020]   text-right">${total}</p>
           </Row>
-          <Row className="justify-end mt-0.5">
-            <p className="text-sm w-36 mr-2">Tax</p>
-            <p className="text-sm">-</p>
-            <p className="text-sm ml-2 w-20 text-right">${tax}</p>
+          <Row className="justify-between ">
+            <p className="text-base text-[#6A6A6A]  ">Tax:</p>
+           
+            <p className="text-xl text-[#202020]   text-right">${tax}</p>
           </Row>
-          <Row className="justify-end mt-0.5">
-            <p className="text-sm w-36 mr-2">Shipping Charges</p>
-            <p className="text-sm">-</p>
-            <p className="text-sm ml-2 w-20 text-right">${shipping}</p>
+          <Row className="justify-between ">
+            <p className="text-base text-[#6A6A6A] ">Shipping Charges:</p>
+          
+            <p className="text-xl text-[#202020]  text-right">${shipping}</p>
           </Row>
-          <Divider />
-          <Row className="justify-end">
-            <p className="text-lg font-semibold w-36 mr-2">Total</p>
-            <p className="text-lg font-semibold">-</p>
-            <p className="text-lg font-semibold ml-2 w-20 text-right">
+      
+          <Row className="justify-between">
+            <p className="text-base text-[#6A6A6A] ">Total:</p>
+          
+            <p className="text-xl text-[#202020]   text-right">
               ${total + tax + shipping}
             </p>
           </Row>
-          <Row align="middle">
-            <p className="text-lg font-semibold mr-4">Address Details</p>
+          </div>
+          </div> 
+          <Row align="middle pt-10 flex gap-3 items-center">
+            <p className="text-2xl text-[#202020] font-semibold ">Address Details</p>
             {
-              userAddresses.length === 0 ? <div /> : showAddress ? <MinusCircleOutlined className="text-xl text-primary"
+               showAddress ? <MinusCircleOutlined className="text-xl text-primary"
                 onClick={() => {
                   setshowAddress(false);
                 }}
-              /> : <PlusCircleOutlined className="text-xl text-primary"
+              /> :<>
+              <div className=" hidden md:block"><Button type="link"  icon={<img src={Images.AddBlack}  className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add"/>}
                 onClick={() => {
                   setshowAddress(true);
+                  setModelAddress(true);
                 }}
-              />
+              /></div>
+              <div className="  md:hidden"><Button type="link"  icon={<img src={Images.AddBlack}  className=" w-4 h-4 lg:w-6 lg:h-6 " alt="add"/>}
+                onClick={() => {
+                  setshowAddress(true);
+
+                  setResponsiveAddress(true);
+                 
+                }}
+              /></div>
+              
+              </> 
             }
           </Row>
-          <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select an address" : "Create a new address"}</p>
-          {
+          {modelAddress &&  <AddAddressModel open={modelAddress} close={CloseAddressModel}/>} 
+          <div>
+            <div className="mt-4">
+              {
+                isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
+                  <div className="h-80 flex justify-center items-center">
+                    <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
+                  </div> :
+                  userAddresses.length !== 0 ?
+                    <div className="  grid grid-rows-2 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
+                      {
+                        userAddresses.map((add, index) =>
+                          <div key={index}>
+                            <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? " cursor-pointer border border-[#0000002E] " : " border border-primary cursor-pointer"}`} onClick={() => { setSelectedAddress(index) }}>
+                              <AddressComponent userAddress={add} />
+                            </div>
+                          </div>
+                        )
+                      }
+                    </div> :
+                    <div className="flex justify-center items-center h-48 ">
+                      <p className="text-2xl font-semibold text-[#202020]">
+                        Please Add Address
+                      </p>
+                       </div>
+                    // <Card className="w-3/5 mt-4">
+                    //   <Form layout="vertical" className="mt-5">
+                    //     <div>
+                    //       <div className="flex justify-between mb-4">
+                    //         <Form.Item label="Name" name="name" className="w-72">
+                    //           <Input
+                    //             label="name"
+                    //             name="name"
+                    //             placeholder="Enter Name"
+                    //             value={formik.values.name}
+                    //             onChange={formik.handleChange}
+                    //           />
+                    //           {formik.touched.name && formik.errors.name && (
+                    //             <span className="text-error text-xs">
+                    //               {formik.errors.name}
+                    //             </span>
+                    //           )}
+                    //         </Form.Item>
+
+                    //         <Form.Item label="Zipcode" name="zipcode" className="w-72">
+                    //           <Input
+                    //             label="zipcode"
+                    //             name="zipcode"
+                    //             placeholder="Enter Zipcode"
+                    //             value={formik.values.zipcode}
+                    //             onChange={formik.handleChange}
+                    //             maxLength={15}
+                    //           />
+                    //           {formik.touched.zipcode && formik.errors.zipcode && (
+                    //             <span className="text-error text-xs">
+                    //               {formik.errors.zipcode}
+                    //             </span>
+                    //           )}
+                    //         </Form.Item>
+                    //       </div>
+
+                    //       <div className="flex justify-between mb-4">
+                    //         <Form.Item label="State" name="state" className="w-72">
+                    //           <Input
+                    //             label="state"
+                    //             name="state"
+                    //             placeholder="Enter State"
+                    //             value={formik.values.state}
+                    //             onChange={formik.handleChange}
+                    //           />
+                    //           {formik.touched.state && formik.errors.state && (
+                    //             <span className="text-error text-xs">
+                    //               {formik.errors.state}
+                    //             </span>
+                    //           )}
+                    //         </Form.Item>
+
+                    //         <Form.Item label="City" name="city" className="w-72">
+                    //           <Input
+                    //             label="city"
+                    //             name="city"
+                    //             placeholder="Enter City"
+                    //             value={formik.values.city}
+                    //             onChange={formik.handleChange}
+                    //           />
+                    //           {formik.touched.city && formik.errors.city && (
+                    //             <span className="text-error text-xs">
+                    //               {formik.errors.city}
+                    //             </span>
+                    //           )}
+                    //         </Form.Item>
+                    //       </div>
+
+                    //       <div className="flex justify-between items-start mb-4">
+                    //         <Form.Item
+                    //           label="Address Line 1"
+                    //           name="addressLine1"
+                    //           className="w-72"
+                    //         >
+                    //           <TextArea
+                    //             rows={3}
+                    //             name="addressLine1"
+                    //             placeholder="Enter Address Line 1"
+                    //             value={formik.values.addressLine1}
+                    //             onChange={formik.handleChange}
+                    //           />
+                    //           {formik.touched.addressLine1 && formik.errors.addressLine1 && (
+                    //             <span className="text-error text-xs">
+                    //               {formik.errors.addressLine1}
+                    //             </span>
+                    //           )}
+                    //         </Form.Item>
+
+                    //         <Form.Item
+                    //           label="Address Line 2"
+                    //           name="addressLine2"
+                    //           className="w-72"
+                    //         >
+                    //           <TextArea
+                    //             rows={3}
+                    //             name="addressLine2"
+                    //             placeholder="Enter Address Line 2"
+                    //             value={formik.values.addressLine2}
+                    //             onChange={formik.handleChange}
+                    //           />
+                    //           {formik.touched.addressLine2 && formik.errors.addressLine2 && (
+                    //             <span className="text-error text-xs">
+                    //               {formik.errors.addressLine2}
+                    //             </span>
+                    //           )}
+                    //         </Form.Item>
+
+                    //       </div>
+
+                    //     </div>
+                    //     <div className="flex justify-end mt-8">
+                    //       <div id="add-address-button" className="cursor-pointer justify-center flex items-center w-44 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white"
+                    //         onClick={formik.handleSubmit}>
+                    //         Add address
+                    //       </div>
+                    //     </div>
+                    //   </Form>
+                    // </Card>
+                    
+              }
+            </div>
+            {stripeStatus == null || userAddresses.length === 0 ? <div></div> : <Row className=" justify-center md:justify-end mt-12">
+              {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
+                onClick={() => {
+                  setOpen(true);
+                }}>
+                Pay Later
+              </div> */}
+              <div className="w-full h-[1px] mb-[30px] bg-[#00000020] "></div>
+              <div id="pay-now-button" className={` h-[54px] w-[217px]${stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}`}
+                onClick={() => {
+                  if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
+                    handlePaymentConfirm();
+                  }
+                }}
+              >
+                Review and Submit
+              </div>
+            </Row>}
+          </div>
+        </div>
+      )}
+      {marketplaceMessage && openToastMarketplace("Bottom")}
+      {message && openToastOrder("bottom")}
+    </div> }
+    </>
+  );
+};
+
+
+
+export default ConfirmOrder;
+
+
+
+  {/* <p className="mt-2 text-sm text-primaryC">{userAddresses.length !== 0 ? "Select an address" : "Create a new address"}</p> */}
+          {/* {
             showAddress ? <Card className="w-3/5 mt-4">
               <Form layout="vertical" className="mt-5">
                 <div>
@@ -559,173 +790,4 @@ const ConfirmOrder = () => {
                 </div>
               </Form>
             </Card> : <div />
-          }
-          <div>
-            <div className="mt-4">
-              {
-                isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus ?
-                  <div className="h-80 flex justify-center items-center">
-                    <Spin spinning={isAddingShippingAddress || isLoadingUserAddresses || isLoadingStripeStatus} size="large" />
-                  </div> :
-                  userAddresses.length !== 0 ?
-                    <div className="flex flex-nowrap overflow-x-auto space-x-4">
-                      {
-                        userAddresses.map((add, index) =>
-                          <div key={index}>
-                            <Card className={index !== selectedAddress ? "w-96 cursor-pointer" : "w-96 border border-primary cursor-pointer"} onClick={() => { setSelectedAddress(index) }}>
-                              <AddressComponent userAddress={add} />
-                            </Card>
-                          </div>
-                        )
-                      }
-                    </div>
-                    :
-                    <Card className="w-3/5 mt-4">
-                      <Form layout="vertical" className="mt-5">
-                        <div>
-                          <div className="flex justify-between mb-4">
-                            <Form.Item label="Name" name="name" className="w-72">
-                              <Input
-                                label="name"
-                                name="name"
-                                placeholder="Enter Name"
-                                value={formik.values.name}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.name && formik.errors.name && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.name}
-                                </span>
-                              )}
-                            </Form.Item>
-
-                            <Form.Item label="Zipcode" name="zipcode" className="w-72">
-                              <Input
-                                label="zipcode"
-                                name="zipcode"
-                                placeholder="Enter Zipcode"
-                                value={formik.values.zipcode}
-                                onChange={formik.handleChange}
-                                maxLength={15}
-                              />
-                              {formik.touched.zipcode && formik.errors.zipcode && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.zipcode}
-                                </span>
-                              )}
-                            </Form.Item>
-                          </div>
-
-                          <div className="flex justify-between mb-4">
-                            <Form.Item label="State" name="state" className="w-72">
-                              <Input
-                                label="state"
-                                name="state"
-                                placeholder="Enter State"
-                                value={formik.values.state}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.state && formik.errors.state && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.state}
-                                </span>
-                              )}
-                            </Form.Item>
-
-                            <Form.Item label="City" name="city" className="w-72">
-                              <Input
-                                label="city"
-                                name="city"
-                                placeholder="Enter City"
-                                value={formik.values.city}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.city && formik.errors.city && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.city}
-                                </span>
-                              )}
-                            </Form.Item>
-                          </div>
-
-                          <div className="flex justify-between items-start mb-4">
-                            <Form.Item
-                              label="Address Line 1"
-                              name="addressLine1"
-                              className="w-72"
-                            >
-                              <TextArea
-                                rows={3}
-                                name="addressLine1"
-                                placeholder="Enter Address Line 1"
-                                value={formik.values.addressLine1}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.addressLine1 && formik.errors.addressLine1 && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.addressLine1}
-                                </span>
-                              )}
-                            </Form.Item>
-
-                            <Form.Item
-                              label="Address Line 2"
-                              name="addressLine2"
-                              className="w-72"
-                            >
-                              <TextArea
-                                rows={3}
-                                name="addressLine2"
-                                placeholder="Enter Address Line 2"
-                                value={formik.values.addressLine2}
-                                onChange={formik.handleChange}
-                              />
-                              {formik.touched.addressLine2 && formik.errors.addressLine2 && (
-                                <span className="text-error text-xs">
-                                  {formik.errors.addressLine2}
-                                </span>
-                              )}
-                            </Form.Item>
-
-                          </div>
-
-                        </div>
-                        <div className="flex justify-end mt-8">
-                          <div id="add-address-button" className="cursor-pointer justify-center flex items-center w-44 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white"
-                            onClick={formik.handleSubmit}>
-                            Add address
-                          </div>
-                        </div>
-                      </Form>
-                    </Card>
-              }
-            </div>
-            {stripeStatus == null ? <div></div> : <Row className="justify-center mt-12">
-              {/* <div id="pay-later-button" className="cursor-pointer justify-center flex items-center w-44 h-9 bg-white text-primary border border-primary rounded hover:bg-primary hover:text-white mr-4"
-                onClick={() => {
-                  setOpen(true);
-                }}>
-                Pay Later
-              </div> */}
-              <div id="pay-now-button" className={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled ? activeButtonClass : disabledButtonClass}
-                onClick={() => {
-                  if (stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled) {
-                    handlePaymentConfirm();
-                  }
-                }}
-              >
-                Review and Submit
-              </div>
-            </Row>}
-          </div>
-        </div>
-      )}
-      {marketplaceMessage && openToastMarketplace("Bottom")}
-      {message && openToastOrder("bottom")}
-    </div>
-  );
-};
-
-
-
-export default ConfirmOrder;
+          } */}

@@ -107,3 +107,65 @@
 :where(.css-9ntgx0).ant-checkbox-wrapper+:where(.css-9ntgx0).ant-checkbox-wrapper {
   margin-inline-start: 0px;
 }
+.register-btn span {
+ color :#202020 !important;
+}
+
+.Forget_back span{
+  color :#13188A !important;
+}
+
+.ant-table-header {
+  border-radius: 6px 6px 0px 0px;
+  height: 56px;
+}
+.ant-table-cell::before{
+display:  none;
+}
+
+
+
+/* Hover effect */
+.ant-table-cell-row-hover{
+ 
+  background-color: #EEEFFA !important;
+}
+
+
+.ant-table-cell-row {
+  border-radius:  0px;
+  background-color: white;
+}
+
+.ant-table-tbody tr > td {
+  background-color: white;
+  border-bottom: none !important;
+}
+
+
+
+
+.ant-table   {
+  overflow: auto;
+
+border : 1px solid #E9E9E9 !important;
+
+  background-color: white !important;
+}
+.ant-table-body::-webkit-scrollbar {
+  display: none;
+}
+
+
+.ant-table-tbody{
+  border-bottom: none;
+}
+
+.ant-table-measure-row+tr>td{
+  border-top:none !important;
+}
+
+.hide-Scroll::-webkit-scrollbar {
+  display: none;
+  scroll-behavior: smooth;
+}

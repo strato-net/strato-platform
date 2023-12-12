@@ -24,4 +24,8 @@ export const Images = {
   'orderImg2': require('./resources/orderImages/orderImg2.png'),
   'orderImg3': require('./resources/orderImages/orderImg3.png'),
   'role-request': require('./resources/request-role.png'),
+  'RemoveIcon' :  require("./resources/Remove.png"),
+  'CancelIcon' : require("./resources/Cancel.png"),
+  'Dropdown' :  require("./resources/DropDown.png"),
+  'AddBlack' :  require("./resources/AddBlack.png"),
 };
