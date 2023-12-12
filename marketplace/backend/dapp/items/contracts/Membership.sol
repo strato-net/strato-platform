@@ -35,4 +35,9 @@ contract Membership is SemiFungible {
         );
         return UTXO(newAsset);
     }
+
+    function checkCondition() internal override returns (bool){
+        bool conditon = block.timestamp <= expirationDate;
+        return conditon;
+    }
 }
