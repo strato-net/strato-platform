@@ -6,6 +6,7 @@ import { useItemDispatch, useItemState } from "../../contexts/item";
 import { US_DATE_FORMAT } from "../../helpers/constants";
 import { Pagination } from "antd";
 import "./ordersTable.css"
+import { DownOutlined, UpOutlined } from "@ant-design/icons";
 
 
 const TransfersTable = ({ user, selectedDate }) => {
@@ -70,9 +71,18 @@ const TransfersTable = ({ user, selectedDate }) => {
       dataIndex: "transferDate",
       key: "transferDate",
       render: (text) => <p>{text}</p>,
-      title: "DATE",
-      sorter: true,
-      sortDirections: ["ascend", "descend", "ascend" ]
+      title: (
+        <div style={{ display: "flex" }}>
+          <div className="mt-1.5">{"Date".toUpperCase()}</div>
+          <div>
+            {order === "desc" ? (
+              <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("asc")} />
+            ) : (
+              <DownOutlined className="icon-container icon-hover" onClick={() => setOrder("desc")} />
+            )}
+          </div>
+        </div>
+      ),
     },
     {
       title: "PRODUCT NAME",
