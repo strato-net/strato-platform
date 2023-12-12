@@ -82,7 +82,7 @@ The above queries the endpoint `STRATO_NODE/cirrus/search/Certificate`, essentia
 
 ## Debugger Setup
 **NOTE: The following are required in order to use the debugger:**
-- The STRATO node must be started with vmDebug=true
+- The STRATO node must be started with VM_DEBUGGER=true
 - The version of STRATO must be 7.0 or higher  
 
 To set the Debugger up, click on the icon for **Run and Debug**. Click the dropdown for the box with the green play arrow. 

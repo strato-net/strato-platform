@@ -671,13 +671,11 @@ spec:
           value: ""
         - name: validatorBehavior
           value: "true"
-        - name: vmDebug
+        - name: VM_DEBUGGER
           value: ""
         - name: vmRunnerRTSOPTs
           value: ""
         - name: wireMessageCacheSize
-          value: ""
-        - name: wsDebug
           value: ""
         - name: zkHost
           value: "localhost"
@@ -787,7 +785,7 @@ spec:
           value: ""
         - name: STRATO_PORT_VAULT_PROXY
           value: "8013"
-        - name: vmDebug
+        - name: VM_DEBUGGER
           value: ""
       - image: swaggerapi/swagger-ui:v3.22.1
         name: docs

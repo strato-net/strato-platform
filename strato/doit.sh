@@ -199,7 +199,7 @@ function newnode {
     --cacheTransactionResults=${cacheTransactionResults:-true} \
     --createTransactionResults=true \
     --debug=${evmDebugMode:-false} \
-    --debugEnabled=${vmDebug:-false} \
+    --debugEnabled=${VM_DEBUGGER:-false} \
     --debugPort=${debugPort:-8051} \
     --debugWSHost=${debugWSHost:-strato} \
     --debugWSPort=${debugWSPort:-8052} \
@@ -215,7 +215,6 @@ function newnode {
     --svmTrace=${svmTrace:-false} \
     --requireCerts=${requireCerts:-true} \
     --useSyncMode=${useSyncMode:-false} \
-    --wsDebug=${wsDebug:-false} \
     ${networkFlag} \
     "${aclFlag}" \
     "${txsFlag}" \
