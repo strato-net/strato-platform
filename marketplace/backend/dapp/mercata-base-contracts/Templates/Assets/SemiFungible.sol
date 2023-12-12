@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <86483be23fa65cf7f992d9cb35eca840e74090bc>;
+import <509>;
 
 /// @title A representation of Carbon assets
 abstract contract SemiFungible is Mintable {
@@ -31,7 +31,7 @@ abstract contract SemiFungible is Mintable {
                               files, 
                               createdDate, 
                               splitQuantity);
-        return UTXO(address(c)); // Typechecker won't let me cast directly to UTXO
+        return UTXO(address(sf)); // Typechecker won't let me cast directly to UTXO
     }
 
     function _callMint(address _newOwner, uint _quantity) internal override{

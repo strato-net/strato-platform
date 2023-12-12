@@ -50,4 +50,9 @@ abstract contract Mintable is UTXO {
         quantity += _quantity;
         return RestStatus.OK;
     }
+    
+    function _callMint(address _newOwner, uint _quantity) internal virtual override{
+        UTXO newAsset = mint(_quantity);
+        Asset(newAsset).transferOwnership(_newOwner, _quantity);
+    }
 }

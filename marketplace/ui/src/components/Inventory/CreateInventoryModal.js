@@ -182,7 +182,7 @@ const CreateInventoryModal = ({
           return (body = {
             itemArgs: {
               ...body.itemArgs,
-              units: values.units
+              quantity: values.quantity
             }
           });
         default:
