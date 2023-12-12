@@ -117,7 +117,6 @@
 
 .ant-table-header {
   border-radius: 6px 6px 0px 0px;
-
   height: 56px;
 }
 .ant-table-cell::before{
@@ -161,4 +160,9 @@ border : 1px solid #E9E9E9 !important;
 
 .ant-table-measure-row+tr>td{
   border-top:none !important;
+}
+
+.hide-Scroll::-webkit-scrollbar {
+  display: none;
+  scroll-behavior: smooth;
 }

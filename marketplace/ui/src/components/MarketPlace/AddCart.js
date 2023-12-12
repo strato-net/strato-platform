@@ -93,6 +93,7 @@ const Checkout = ({ user }) => {
       let modifiedValue = [];
       value.forEach(item => {
         const parts = item.product.contract_name.split('-');
+      
         modifiedValue.push({
           key: item.product.address,  
           item: {
@@ -121,7 +122,6 @@ const Checkout = ({ user }) => {
       return { key: key, value: modifiedValue };
     });
     setmapData(mapDataArray)
-
     let t = 0;
     cartList.forEach((item) => {
       t += calculateTax(item);
@@ -139,6 +139,90 @@ const Checkout = ({ user }) => {
     setTotal(sum);
   }, [marketplaceDispatch, cartList]);
 
+const MinusQty = (qty,product)=>{
+  if (qty === 1) {
+    return;
+  }
+
+  let items = [...cartList];
+  cartList.forEach((element, index) => {
+    if (element.product.address === product.key) {
+      const availableQuantity = product.quantity ? product.quantity : 1;
+      if (items[index].qty - 1 <= availableQuantity) {
+        items[index].qty -= 1;
+        actions.addItemToCart(marketplaceDispatch, items);
+      } else {
+        openToast(
+          "bottom",
+          true,
+          "Cannot add more than available quantity"
+        );
+        return;
+      }
+    }
+  });
+}
+
+const AddQty  = (product)=>{
+  let items = [...cartList];
+  cartList.forEach((element, index) => {
+    if (element.product.address === product.key) {
+      const availableQuantity = product.quantity ? product.quantity : 1;
+      if (items[index].qty + 1 <= availableQuantity) {
+        items[index].qty += 1;
+        actions.addItemToCart(marketplaceDispatch, items);
+      } else {
+        openToast(
+          "bottom",
+          true,
+          "Cannot add more than available quantity"
+        );
+        return;
+      }
+    }
+  });
+}
+
+const removeCartList = (text)=>{
+  let items = [...cartList];
+  items.splice(
+    items.findIndex(function (i) {
+      window.LOQ = window.LOQ || []
+      window.LOQ.push(['ready', async LO => {
+          // Track an event
+          await LO.$internal.ready('events')
+          LO.events.track('Delete Cart Item', { product: i.product.name, category: i.product.category })
+      }])
+      TagManager.dataLayer({
+        dataLayer: {
+          event: 'delete_item_from_cart',
+          product_name: i.product.name,
+          category: i.product.category
+        },
+      });
+      return i.product.address === text;
+    }),
+    1
+  );
+  actions.deleteCartItem(marketplaceDispatch, items);
+}
+
+const ValueQty = (product , e)=>{
+  let items = [...cartList];
+  cartList.forEach((element, index) => {
+    if (element.product.address === product.key) {
+      const availableQuantity = product.quantity ? product.quantity : 1;
+      if (e <= availableQuantity) {
+        items[index].qty = e;
+        actions.addItemToCart(marketplaceDispatch, items);
+      } else {
+        openToast("bottom", true, "Cannot add more than available quantity");
+        items[index].qty = availableQuantity;
+        actions.addItemToCart(marketplaceDispatch, items);
+      }
+    }
+  });
+}
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -182,7 +266,7 @@ const Checkout = ({ user }) => {
       render: (text) => {
         return (
           <div className="flex gap-3 items-center"> 
-              <img className="w-14 h-14 object-contain rounded-[4px]" alt="" src={text.image}  />
+              <img className=" w-10 h-10 md:w-[52px] md:h-[52px] lg:w-14 lg:h-14  object-contain rounded-[4px]" alt="" src={text.image}  />
               <p className="text-primary text-sm font-semibold">{decodeURIComponent(text.name)}</p>
           </div>
           
@@ -221,81 +305,27 @@ const Checkout = ({ user }) => {
       title: <Text className="text-[#202020] text-base font-semibold">Quantity</Text>,
       dataIndex: "quantity",
       align: "center",
-      // width: "160px",
-      render: (text) => {
-        let qty = 1;
-        let product;
-        cartList.forEach((element) => {
-          if (element.product.address === text) {
-            qty = element.qty;
-            product = element.product;
-          }
-        });
+      render: (text, product) => {
+      
+        let qty = product.qty;
         return (
           <div className="flex items-center justify-center mt-2">
             <div
-              onClick={() => {
-                if (qty === 1) {
-                  return;
-                }
-                let items = [...cartList];
-                cartList.forEach((element, index) => {
-                  if (element.product.address === product.key) {
-                    const availableQuantity = product.quantity ? product.quantity : 1;
-                    if (items[index].qty - 1 <= availableQuantity) {
-                      items[index].qty -= 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      return;
-                    }
-                  }
-                });
+              onClick={() => 
+                {
+                MinusQty(qty ,  product)
               }}
               className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
               <MinusOutlined className="text-[17px] text-[#202020] font-medium" />
             </div>
             <InputNumber  className="w-[43px] border-none text-[#202020]  bg-none font-medium text-sm text-center flex flex-col justify-center"
-                min={1} value={qty} defaultValue={qty} controls={false}
+                 min={1} value={qty} defaultValue={qty} controls={false}
                 onChange={e => {
-                  let items = [...cartList];
-                  cartList.forEach((element, index) => {
-                    if (element.product.address === product.key) {
-                      const availableQuantity = product.quantity ? product.quantity : 1;
-                      if (e <= availableQuantity) {
-                        items[index].qty = e;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      } else {
-                        openToast("bottom", true, "Cannot add more than available quantity");
-                        items[index].qty = availableQuantity;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      }
-                    }
-                  });
+                 ValueQty(product);
                 }} />
             <div
-              onClick={() => {
-                let items = [...cartList];
-                cartList.forEach((element, index) => {
-                  if (element.product.address === product.key) {
-                    const availableQuantity = product.quantity ? product.quantity : 1;
-                    if (items[index].qty + 1 <= availableQuantity) {
-                      items[index].qty += 1;
-                      actions.addItemToCart(marketplaceDispatch, items);
-                    } else {
-                      openToast(
-                        "bottom",
-                        true,
-                        "Cannot add more than available quantity"
-                      );
-                      return;
-                    }
-                  }
-                });
+               onClick={() => {
+                AddQty(product);
               }}
               className="  w-6 h-6    bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
               <PlusOutlined className="text-[17px] text-[#202020] font-medium" />
@@ -331,37 +361,16 @@ const Checkout = ({ user }) => {
       title: <Text className="text-[#202020] text-base font-semibold "></Text>,
       dataIndex: "action",
       align: "center",
-      render: (text) => (
-          
-          <Button
+      render: (text) => {
+         return( <Button
           type="link"
           icon={<img src={Images.RemoveIcon} alt="remove"  className="" />}
             onClick={() => {
-              let items = [...cartList];
-              items.splice(
-                items.findIndex(function (i) {
-                  window.LOQ = window.LOQ || []
-                  window.LOQ.push(['ready', async LO => {
-                      // Track an event
-                      await LO.$internal.ready('events')
-                      LO.events.track('Delete Cart Item', { product: i.product.name, category: i.product.category })
-                  }])
-                  TagManager.dataLayer({
-                    dataLayer: {
-                      event: 'delete_item_from_cart',
-                      product_name: i.product.name,
-                      category: i.product.category
-                    },
-                  });
-                  return i.product.address === text;
-                }),
-                1
-              );
-              actions.deleteCartItem(marketplaceDispatch, items);
+              removeCartList(text)
             }}
             className="hover:text-error cursor-pointer text-xl"
-          />
-      ),
+          />)
+          },
       with :"12%"
     },
   ];
@@ -421,9 +430,9 @@ const Checkout = ({ user }) => {
               <Title level={3} className="mt-2">
                 No item found
               </Title>
-            </div> : mapData.map(e  => <React.Fragment >
+            </div> : mapData.map(e  => <React.Fragment  key={e.key}>
             
-<div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><New_ResponsiveCart data={e.value}/></div></div></React.Fragment>)
+<div className="hidden  lg:block"><CartComponent columns={columns} data={e.value} /> </div> <div className="lg:hidden"><div className="flex gap-3 flex-col"><New_ResponsiveCart data={e.value}    AddQty={AddQty} MinusQty={MinusQty} ValueQty={ValueQty} removeCartList={removeCartList}/></div></div></React.Fragment>)
           }
         </div>
       )}
