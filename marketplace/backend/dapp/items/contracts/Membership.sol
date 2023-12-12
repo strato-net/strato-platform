@@ -14,9 +14,8 @@ contract Membership is SemiFungible {
         string[] _files,
         uint _createdDate,
         uint _quantity,
-        string _serialNumber,
         uint _expirationPeriodInMonths
-    ) public SemiFungible(_name, _description, _images, _files, _createdDate, _quantity, _serialNumber) {
+    ) public SemiFungible(_name, _description, _images, _files, _createdDate, _quantity) {
         expirationPeriodInMonths = _expirationPeriodInMonths;
         expirationDate = block.timestamp + (expirationPeriodInMonths*2592000);
     }
@@ -30,7 +29,6 @@ contract Membership is SemiFungible {
             files,
             createdDate,
             _quantity,
-            serialNumber,
             expirationPeriodInMonths
         );
         return UTXO(newAsset);
