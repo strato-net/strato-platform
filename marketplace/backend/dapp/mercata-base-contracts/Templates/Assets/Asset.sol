@@ -3,7 +3,6 @@ pragma strict;
 
 import <509>;
 import "../Enums/RestStatus.sol";
-import "Sale.sol";
 import "../Utils/Utils.sol";
 
 abstract contract Asset is Utils {
