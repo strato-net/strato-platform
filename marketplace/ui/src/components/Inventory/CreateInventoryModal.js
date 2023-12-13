@@ -20,7 +20,7 @@ import TextArea from "antd/es/input/TextArea";
 import getSchema from "./InventorySchema";
 import { usePapaParse } from "react-papaparse";
 import TagManager from "react-gtm-module";
-import { CATEGORIES, PAYMENT_TYPE } from "../../helpers/constants";
+import { CATEGORIES, PAYMENT_TYPE, unitOfMeasures } from "../../helpers/constants";
 
 const { Option } = Select;
 
@@ -49,6 +49,12 @@ const CreateInventoryModal = ({
     description: "",
     artist: "",
     source: "",
+    leastSellableUnits: 1,
+    unitOfMeasurement: {
+      name: "TON",
+      value: 1,
+    },
+    purity: "",
     quantity: 1,
     expirationPeriodInMonths: 1,
     brand: "",
@@ -164,10 +170,16 @@ const CreateInventoryModal = ({
             },
           });
         case "Metals":
+          const selectedUOM = unitOfMeasures.find(u => u.value === values.unitOfMeasurement.value);
+      
           return (body = {
             itemArgs: {
               ...body.itemArgs,
+              quantity: values.quantity,
+              unitOfMeasurement: selectedUOM.value,
+              leastSellableUnits: values.leastSellableUnits,
               source: values.source,
+              purity: values.purity
             }
           });
         case 'Membership':
@@ -492,9 +504,12 @@ const CreateInventoryModal = ({
           </div>
         );
       case "Metals":
-        return (
-          <div className="flex justify-between mt-4 ">
-            <Form.Item label="Source" name="source" className="w-72">
+          return (<div className="flex flex-wrap gap-4 mt-4">
+            <Form.Item
+              label="Source"
+              name="source"
+              className="mr-8 w-72"
+            >
               <Input
                 label="source"
                 placeholder="Enter Material Source"
@@ -502,14 +517,99 @@ const CreateInventoryModal = ({
                 value={formik.values.source}
                 onChange={formik.handleChange}
               />
-              {formik.touched.source && formik.errors.source && (
+              {formik.touched.source &&
+                formik.errors.source && (
+                  <span className="text-error text-xs">
+                    {formik.errors.source}
+                  </span>
+                )}
+            </Form.Item>
+            <Form.Item
+              label="Purity"
+              name="purity"
+              className="w-72"
+            >
+              <Input
+                label="purity"
+                placeholder="Enter Purity"
+                name="purity"
+                value={formik.values.purity}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.purity &&
+                formik.errors.purity && (
+                  <span className="text-error text-xs">
+                    {formik.errors.purity}
+                  </span>
+                )}
+            </Form.Item>
+            <div className="flex justify-between mt-4">
+            <Form.Item
+                label="Unit of Measurement "
+                name="unitOfMeasurement "
+                className="w-30 mr-14"
+              >
+                <Select
+                  id="unitOfMeasurement"
+                  placeholder="Select Unit of Measurement "
+                  allowClear
+                  className="w-35"
+                  name="unitOfMeasurement.name"
+                  value={formik.values.unitOfMeasurement.name}
+                  onChange={(value) => {
+                    let selectedUOM = unitOfMeasures.find(u => u.value === value);
+                    formik.setFieldValue("unitOfMeasurement.name", selectedUOM.name);
+                    formik.setFieldValue("unitOfMeasurement.value", value);
+                  }}
+                >
+                  {unitOfMeasures.map((e, index) => (
+                    <Option value={e.value} key={index}>
+                      {e.name}
+                    </Option>
+                  ))}
+                </Select>
+                {getIn(formik.touched, "unitofmeasurement.name") &&
+                  getIn(formik.errors, "unitofmeasurement.name") && (
+                    <span className="text-error text-xs">
+                      {getIn(formik.errors, "unitofmeasurement.name")}
+                    </span>
+                  )}
+              </Form.Item>
+            <Form.Item
+              label="Least Sellable Unit(s)"
+              name="leastSellableUnits"
+              className="w-30 mr-14"
+            >
+              <Input
+                label="leastSellableUnits"
+                placeholder="Enter Least Sellable Units"
+                name="leastSellableUnits"
+                value={formik.values.leastSellableUnits}
+                onChange={formik.handleChange}
+              />
+              {formik.touched.leastSellableUnits &&
+                formik.errors.leastSellableUnits && (
+                  <span className="text-error text-xs">
+                    {formik.errors.leastSellableUnits}
+                  </span>
+                )}
+            </Form.Item>
+            <Form.Item label="Quantity" name="quantity">
+              <Input
+                id="quantity"
+                name="quantity"
+                value={formik.values.quantity}
+                placeholder="Enter Quantity"
+                onChange={formik.handleChange}
+              />
+              {formik.touched.quantity && formik.errors.quantity && (
                 <span className="text-error text-xs">
-                  {formik.errors.source}
+                  {formik.errors.quantity}
                 </span>
               )}
             </Form.Item>
-          </div>
-        );
+            </div>
+            </div>);
       case 'Membership':
         return (
           <div className="flex justify-between mt-4 ">

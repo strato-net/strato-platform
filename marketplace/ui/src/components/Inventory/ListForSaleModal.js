@@ -106,6 +106,24 @@ const ListForSaleModal = ({ open, handleCancel, inventory, paymentProviderAddres
                             )
                         }
                     ])
+            case 'Metals':
+                finalColumns = finalColumns.concat(
+                    [
+                        {
+                            title: "Quantity",
+                            align: "center",
+                            render: () => (
+                                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                            )
+                        },
+                        {
+                            title: "Set Price Per Unit",
+                            align: "center",
+                            render: () => (
+                                <InputNumber value={pricePerUnit} controls={false} min={1} onChange={(value) => setpricePerUnit(value)} />
+                            )
+                        }
+                    ])
                 break;
             default:
                 finalColumns.push({
