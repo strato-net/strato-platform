@@ -6,8 +6,6 @@ abstract contract UTXO is Asset {
     constructor(
         string _name,
         string _description,
-        string _category,
-        string _subCategory,
         string[] _images,
         string[] _files,
         uint _createdDate,
@@ -15,8 +13,6 @@ abstract contract UTXO is Asset {
     ) Asset(
         _name,
         _description,
-        _category,
-        _subCategory,
         _images,
         _files,
         _createdDate,
@@ -25,7 +21,7 @@ abstract contract UTXO is Asset {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
-        return new UTXO(name, description, category, subCategory, images, files, createdDate, _quantity);
+        return new UTXO(name, description, images, files, createdDate, _quantity);
     }
 
     // Quantity is already checked by transferOwnership function

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuthenticateState } from "./contexts/authentication";
 import AuthenticatedRoutes from "./AuthenticatedRoutes";
 import "@shopify/polaris/build/esm/styles.css";
@@ -13,6 +13,7 @@ import { getCookie, delete_cookie } from "./helpers/cookie";
 const { Content } = Layout;
 
 const App = () => {
+  const [showMenu, setShowMenu] = useState(false)
   const tagManagerArgs = {
     gtmId: "GTM-NHBZ2BX",
   };
@@ -60,18 +61,29 @@ const App = () => {
     }
   }, []);
 
+  const handleSubMenu = () => {
+    setShowMenu(!showMenu)
+  }
+
+  const handleMenuTab = (data) => {
+    setShowMenu(false)
+  }
+
   return (
     <BrowserRouter basename="/marketplace">
-      <Layout>
+      <Layout className="overflow-auto">
         <UsersProvider>
           <HeaderComponent
             isOauth={isAuthenticated}
             user={user}
             users={users}
             loginUrl={loginUrl}
+            showMenu={showMenu}
+            handleSubMenu={handleSubMenu}
+            handleMenuTab={handleMenuTab}
           />
         </UsersProvider>
-        <Content>
+        <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[90vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-24 md:mt-28' : 'mt-24 d:mt-32'}`}>
           <AuthenticatedRoutes user={user} users={users} />
         </Content>
       </Layout>

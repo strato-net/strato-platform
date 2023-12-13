@@ -4,20 +4,19 @@ pragma strict;
 import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
-import "../Enums/SaleState.sol";
 import "../Orders/Order.sol";
 import "../Payments/PaymentProvider.sol";
 import "../Utils/Utils.sol";
 
-abstract contract Sale is SaleState, Utils { 
+abstract contract Sale is Utils { 
     Asset public assetToBeSold;
     uint public price;
     uint public quantity;
-    SaleState public state;
     address[] public paymentProviders;
     mapping (address => uint) paymentProvidersMap;
     mapping (address => uint) lockedQuantity;
     uint totalLockedQuantity;
+    bool isOpen;
 
     constructor(
         address _assetToBeSold,
@@ -30,7 +29,7 @@ abstract contract Sale is SaleState, Utils {
         require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
         quantity = _quantity;
         totalLockedQuantity = 0;
-        state = SaleState.Created;
+        isOpen = true;
         addPaymentProviders(_paymentProviders);
         assetToBeSold.attachSale();
     }
@@ -107,18 +106,23 @@ abstract contract Sale is SaleState, Utils {
 
     function closeSaleIfEmpty() internal {
         if (quantity == 0 && totalLockedQuantity == 0) {
-            closeSale();
+            close();
+            isOpen = false;
         }
     }
 
     function closeSale() public requireSeller("close sale") returns (uint) {
+        close();
+        isOpen = false;
+        return RestStatus.OK;
+    }
+
+    function close() internal {
         try {
             assetToBeSold.closeSale();
         } catch {
 
         }
-        state = SaleState.Closed;
-        return RestStatus.OK;
     }
 
     function lockQuantity(uint quantityToLock) public {

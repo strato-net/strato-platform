@@ -14,8 +14,6 @@ abstract contract Mintable is UTXO {
     constructor(
         string _name,
         string _description,
-        string _category,
-        string _subCategory,
         string[] _images,
         string[] _files,
         uint _createdDate,
@@ -23,8 +21,6 @@ abstract contract Mintable is UTXO {
     ) UTXO(
         _name,
         _description,
-        _category,
-        _subCategory,
         _images,
         _files,
         _createdDate,
@@ -44,7 +40,7 @@ abstract contract Mintable is UTXO {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
-        Mintable m = new Mintable(name, description, category, subCategory, images, files, createdDate, _quantity);
+        Mintable m = new Mintable(name, description, images, files, createdDate, _quantity);
         return UTXO(m);
     }
 
