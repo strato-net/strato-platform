@@ -5,8 +5,9 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } f
 // import dayjs from 'dayjs';
 
 
-const contractName = 'PaymentProvider_1';
-const contractFilename = `${util.cwd}/dapp/payments/contracts/PaymentProvider.sol`;
+const contractName = 'StripePaymentProvider';
+const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
+const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
 
 /** 
  * Upload a new PaymentProvider 
@@ -149,15 +150,16 @@ function bindAddress(user, address, options) {
 
 
 
-async function get(user, args, options) {
-    const { ownerOrganization, name, address, accountId, accountDeauthorized, ...restArgs } = args;
+async function get(user, args, defaultOptions) {
+    const { ownerCommonName, name, address, accountId, accountDeauthorized, ...restArgs } = args;
+    const options = { ...defaultOptions, org: 'BlockApps', app: contractName }
     let paymentProvider;
 
     if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, { key: 'address', value: address });
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'chargesEnabled', value: true}]);
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
-    } else if (ownerOrganization) {
-        let searchValues = [{ key: 'ownerOrganization', value: ownerOrganization }, { key: 'name', value: name }];
+    } else if (ownerCommonName) {
+        let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'chargesEnabled', value: true}];
         if (accountDeauthorized != undefined) {
             searchValues.push({ key: 'accountDeauthorized', value: accountDeauthorized })
         }
@@ -165,7 +167,7 @@ async function get(user, args, options) {
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     } else if (accountId) {
 
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }]);
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'chargesEnabled', value: true}]);
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     }
     if (!paymentProvider) {
@@ -189,6 +191,58 @@ async function getState(user, contract, options) {
     return marshalOut(state);
 }
 
+async function getPaymentSession(user, args, defaultOptions) {
+    const { paymentSessionId, ...restArgs } = args;
+    const options = { ...defaultOptions, org: 'BlockApps', app: undefined }
+    const searchArgs = setSearchQueryOptions(restArgs, { key: 'paymentSessionId', value: paymentSessionId });
+    const paymentProvider = await searchOne(paymentContractName, searchArgs, options, user);
+
+    return marshalOut({ ...paymentProvider, });
+}
+
+
+async function createPayment(user, args, options) {
+    const { address, ...restArgs } = args;
+    const contract = { name: contractName, address }
+    const callArgs = {
+      contract,
+      method: "initializePayment",
+      args: util.usc({ ...restArgs }),
+    };
+    const createStatus = await rest.call(user, callArgs, options);
+  
+    if (parseInt(createStatus, 10) !== RestStatus.OK) {
+      throw new rest.RestError(
+        createStatus,
+        "You cannot initialize the payment because it's already been initialized",
+        { callArgs }
+      );
+    }
+  
+    return createStatus;
+}
+
+async function finalizePayment(user, args, options) {
+    const { address, ...restArgs } = args;
+    const contract = { name: contractName, ..._contract }
+    const callArgs = {
+      contract,
+      method: "finalizePayment",
+      args: util.usc({ ...restArgs }),
+    };
+    const finalizeStatus = await rest.call(user, callArgs, options);
+  
+    if (parseInt(finalizeStatus, 10) !== RestStatus.OK) {
+      throw new rest.RestError(
+        finalizeStatus,
+        "You cannot finalize the payment because it isn't active",
+        { callArgs }
+      );
+    }
+  
+    return finalizeStatus;
+}
+
 export default {
     uploadContract,
     contractName,
@@ -199,5 +253,8 @@ export default {
     getState,
     marshalIn,
     marshalOut,
-    getHistory
+    getHistory,
+    getPaymentSession,
+    createPayment,
+    finalizePayment
 }

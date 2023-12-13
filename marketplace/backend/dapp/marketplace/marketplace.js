@@ -55,27 +55,13 @@ function marshalOut(_args) {
 }
 
 async function getAll(admin, args = {}, options) {
-    const inventoryResults = await inventoryJs.getAll(admin, { ...args, status: 1 }, options);
-    let filteredInventoryResults = [];
-    inventoryResults.map((inv) => {
-        const itemData = JSON.parse(inv.data);
-        if (!itemData.spent || itemData.spent === "False") {
-            filteredInventoryResults.push(inv);
-        }
-    })
-    return filteredInventoryResults.map(inventory => marshalOut(inventory));
+    const inventoryResults = await inventoryJs.getAll(admin, { ...args }, options);
+    return inventoryResults.map(inventory => marshalOut(inventory));
 }
 
 async function getTopSellingProducts(admin, args = {}, options) {
-    const inventoryResults = await inventoryJs.getAll(admin, { ...args, status: 1 }, options);
-    let filteredInventoryResults = [];
-    inventoryResults.map((inv) => {
-        const itemData = JSON.parse(inv.data);
-        if (!itemData.spent || itemData.spent === "False") {
-            filteredInventoryResults.push(inv);
-        }
-    })
-    return filteredInventoryResults.map(inventory => marshalOut(inventory));
+    const inventoryResults = await inventoryJs.getAll(admin, { ...args }, options);
+    return inventoryResults.map(inventory => marshalOut(inventory));
 }
 
 

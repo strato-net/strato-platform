@@ -1,9 +1,7 @@
-import { util, rest, importer } from '/blockapps-rest-plus';
-import config from '/load.config';
+import { util, rest } from '/blockapps-rest-plus';
 import RestStatus from 'http-status-codes';
-import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, setSearchQueryOptionsPrime } from '/helpers/utils';
-import dayjs from 'dayjs';
-import constants, { PAYMENT_TYPES } from '../../helpers/constants';
+import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs } from '/helpers/utils';
+import constants from '../../helpers/constants';
 
 const contractName = constants.saleTableName;
 
@@ -108,6 +106,7 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
     const { address, assetToBeSold, state, ...restArgs } = args;
+    const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     let sale;
     let searchArgs;
 
@@ -118,8 +117,8 @@ async function get(user, args, options) {
                 value: assetToBeSold,
             },
             {
-                key: "state",
-                value: 1
+                key: "isOpen",
+                value: true
             }
             ]);
     }
@@ -136,7 +135,7 @@ async function get(user, args, options) {
             ]);
     }
 
-    sale = await searchOne(contractName, searchArgs, options, user);
+    sale = await searchOne(contractName, searchArgs, newOptions, user);
 
     if (!sale) {
         return undefined;
@@ -148,47 +147,21 @@ async function get(user, args, options) {
     });
 }
 
-async function getAll(admin, args = {}, options) {
-    const { saleAddresses, assetAddresses, state, paymentMethod, ...restArgs } = args;
+async function getAll(admin, args = {}, defaultOptions) {
+    const { saleAddresses, assetAddresses, isOpen, ...restArgs } = args;
+    const options = {...defaultOptions, org: 'BlockApps', app: 'Mercata'}
     let sales;
-
-    if (assetAddresses && paymentMethod) {
+    if (assetAddresses) {
         sales = await searchAllWithQueryArgs(contractName, { 
             assetToBeSold: assetAddresses, 
-            state: state ? state : 1,
-            payment: PAYMENT_TYPES[paymentMethod]
-        }, options, admin);
-    }
-    else if (assetAddresses) {
-        sales = await searchAllWithQueryArgs(contractName, { 
-            assetToBeSold: assetAddresses, 
-            state: state ? state : 1,
+            isOpen: isOpen ? isOpen : true,
         }, options, admin);
     }
     else {
-        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, state: state ? state : 1 }, options, admin);
+        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen ? isOpen : true }, options, admin);
     }
 
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
-}
-
-async function createSplitSale(user, args = {}, options, contract) {
-    const callArgs = {
-        contract,
-        method: "createSplitSale",
-        args: util.usc({ ...args }),
-      };
-      const [splitStatus, saleAddress] = await rest.call(user, callArgs, options);
-    
-      if (parseInt(splitStatus, 10) !== RestStatus.OK) {
-        throw new rest.RestError(
-          splitStatus,
-          "Create Split Sale has failed",
-          { ...args }
-        );
-      }
-    
-      return saleAddress;
 }
 
 /**
@@ -205,7 +178,6 @@ export default {
     bindAddress,
     get,
     getAll,
-    createSplitSale,
     marshalIn,
     marshalOut,
     getHistory
