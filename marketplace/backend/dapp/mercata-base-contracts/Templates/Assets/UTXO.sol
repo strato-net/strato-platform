@@ -26,6 +26,7 @@ abstract contract UTXO is Asset {
 
     // Quantity is already checked by transferOwnership function
     function _transfer(address _newOwner, uint _quantity) internal override {
+        require(checkCondition(), "Condition is not met");
         // Create a new UTXO with a portion of the units
         try {
             // This is a hack to prevent the splitted UTXO from infinitely creating new UTXOs
@@ -42,10 +43,18 @@ abstract contract UTXO is Asset {
                 itemNumber,
                 itemNumber + _quantity - 1
             );
-            UTXO newAsset = mint(_quantity);
-            Asset(newAsset).transferOwnership(_newOwner, _quantity);
+            _callMint(_newOwner, _quantity);
             quantity -= _quantity;
             itemNumber += _quantity;
         }
+    }
+
+    function _callMint(address _newOwner, uint _quantity) internal virtual{
+        UTXO newAsset = mint(_quantity);
+        Asset(newAsset).transferOwnership(_newOwner, _quantity);
+    }
+
+    function checkCondition() internal virtual returns (bool){
+        return true;
     }
 }
