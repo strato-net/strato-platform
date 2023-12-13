@@ -338,3 +338,13 @@ export const VISA = (props) => {
     </svg>
   )
 }
+
+export const ProfileIcon = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z" stroke="#6A6A6A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M12 15C14.0711 15 15.75 13.3211 15.75 11.25C15.75 9.17893 14.0711 7.5 12 7.5C9.92893 7.5 8.25 9.17893 8.25 11.25C8.25 13.3211 9.92893 15 12 15Z" stroke="#6A6A6A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M6 18.6943C6.56429 17.5828 7.42534 16.6493 8.4877 15.9972C9.55005 15.3452 10.7722 15 12.0188 15C13.2653 15 14.4874 15.3452 15.5498 15.9972C16.6122 16.6493 17.4732 17.5828 18.0375 18.6943" stroke="#6A6A6A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  )
+}
