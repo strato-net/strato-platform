@@ -14,7 +14,6 @@ contract Membership is SemiFungible {
         string[] _files,
         uint _createdDate,
         uint _quantity,
-        string _serialNumber,
         uint _expirationPeriodInMonths
     ) public SemiFungible(_name, _description, _images, _files, _createdDate, _quantity, _serialNumber) {
         expirationPeriodInMonths = _expirationPeriodInMonths;
@@ -38,6 +37,6 @@ contract Membership is SemiFungible {
 
     function checkCondition() internal override returns (bool){
         bool conditon = block.timestamp <= expirationDate;
-        return conditon;
+        return conditon;    
     }
 }
