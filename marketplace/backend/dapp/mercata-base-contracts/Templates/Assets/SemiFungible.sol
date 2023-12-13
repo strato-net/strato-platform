@@ -31,14 +31,17 @@ abstract contract SemiFungible is Mintable {
                               files, 
                               createdDate, 
                               splitQuantity);
-        return UTXO(address(c)); // Typechecker won't let me cast directly to UTXO
+        return UTXO(address(sf)); // Typechecker won't let me cast directly to UTXO
     }
 
-    function _callMint(address _newOwner, uint _quantity) internal override returns(uint){
+    function _callMint(address _newOwner, uint _quantity) internal override{
         for (uint i = 0; i < _quantity; i++) {
             UTXO newAsset = mint(1);
             Asset(newAsset).transferOwnership(_newOwner, 1);
         }
-        return RestStatus.OK;
+    }
+
+    function checkCondition() internal override returns (bool){
+        return true;   
     }
 }

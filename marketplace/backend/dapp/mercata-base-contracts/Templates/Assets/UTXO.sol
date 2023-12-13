@@ -1,3 +1,6 @@
+pragma es6;
+pragma strict;
+
 import "Asset.sol";
 
 abstract contract UTXO is Asset {
