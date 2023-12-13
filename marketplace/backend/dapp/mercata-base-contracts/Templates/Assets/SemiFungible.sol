@@ -6,7 +6,6 @@ import "../Enums/RestStatus.sol";
 
 /// @title A representation of Carbon assets
 abstract contract SemiFungible is Mintable {
-    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
     constructor(
         string _name,
