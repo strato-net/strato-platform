@@ -11,7 +11,7 @@ import {
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
 
-const New_ResponsiveCart = ({ data , confirm ,  AddQty ,  MinusQty ,  ValueQty ,  removeCartList}) => {
+const ResponsiveCart = ({ data , confirm ,  AddQty ,  MinusQty ,  ValueQty ,  removeCartList}) => {
 
   const navigate = useNavigate();
   const [tax, setTax] = useState(0);
@@ -209,5 +209,5 @@ const New_ResponsiveCart = ({ data , confirm ,  AddQty ,  MinusQty ,  ValueQty ,
   );
 };
 
-export default New_ResponsiveCart;
+export default ResponsiveCart;
 
