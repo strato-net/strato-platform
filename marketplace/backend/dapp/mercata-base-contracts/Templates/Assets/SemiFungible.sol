@@ -5,6 +5,7 @@ import <509>;
 
 /// @title A representation of Carbon assets
 abstract contract SemiFungible is Mintable {
+    event OwnershipUpdate(string seller, string newOwner, uint ownershipStartDate, address itemAddress);
 
     constructor(
         string _name,
@@ -38,6 +39,7 @@ abstract contract SemiFungible is Mintable {
             UTXO newAsset = mint(1);
             Asset(newAsset).transferOwnership(_newOwner, 1);
         }
+        
     }
 
     function checkCondition() internal virtual override returns (bool){
