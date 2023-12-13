@@ -14,7 +14,7 @@ import {
   notification,
   InputNumber,
 } from "antd";
-import { MinusOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
+import {EyeOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/inventory/actions";
 import {
@@ -451,9 +451,7 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const DescriptionComponent = () => {
-    console.log("this is the Details" , details)
     const categoryName = getCategory(details);
-
     switch (categoryName) {
       case "Art":
         return (
@@ -567,6 +565,14 @@ const ProductDetails = ({ user, users }) => {
                     Home
                   </p>
                 </ClickableCell>
+              </Breadcrumb.Item> <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                <ClickableCell href={routes.Marketplace.url}>
+                  <p
+                    className="text-[#13188A]  text-sm font-semibold "
+                  >
+                    Marketplace
+                  </p>
+                </ClickableCell>
               </Breadcrumb.Item>
               {
                 isCalledFromInventory ?
@@ -617,7 +623,6 @@ const ProductDetails = ({ user, users }) => {
               </div>
               <div className="pt-[7px]">
               <Paragraph
-                // ellipsis={{ rows: 2, expandable: true, symbol: "more" }}
                 className="text-[#202020] text-sm  h-[60px]"
               >
                 {decodeURIComponent(details.description).split('\n').map((line, index) => (
@@ -634,10 +639,12 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px]" id="quantity">
                     <div
                       onClick={subtract}
-                      className="h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
-                      <MinusOutlined className="product_details  font-semibold " style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
+                      className="h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+ <p className=" text-2xl md:text-3xl lg:text-5xl font-semibold lg:text-[#202020] text-[#989898]">
+                       -
+                        </p> 
                     </div>
-                    <InputNumber className=" w-full lg:w-[295px] h-9  md:h-10  lg:h-[46px]  border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={availableQuantity} value={qty} defaultValue={qty} controls={false}
+                    <InputNumber className=" w-full lg:w-[295px] h-9  md:h-10  lg:h-[46px]  border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center" min={1} max={availableQuantity} value={`Quantity (LB) ${qty}`} defaultValue={`Quantity (LB) ${qty}`} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -649,11 +656,13 @@ const ProductDetails = ({ user, users }) => {
                           );
                           setQty(availableQuantity)
                         }
-                      }} />
+                      }} /> 
                     <div
                       onClick={add}
-                      className="ml-0.5 h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg  flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
-                      <PlusOutlined className="product_details font-semibold " style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
+                      className="ml-0.5 h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg  flex justify-center items-center border border-[#00000029] text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+                       <p className="text-2xl md:text-3xl lg:text-5xl font-semibold lg:text-[#202020] text-[#989898]">
+                       +
+                        </p> 
                     </div>
                   </div>
               
