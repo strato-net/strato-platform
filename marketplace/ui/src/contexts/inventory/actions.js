@@ -378,8 +378,9 @@ const actions = {
   sellerStripeStatus: async (dispatch, org) => {
     dispatch({ type: actionDescriptors.sellerStripeStatus });
 
+    const orgParam = encodeURIComponent(org);
     try {
-      const response = await fetch(`${apiUrl}/payment/stripe/account/status/${org}`, {
+      const response = await fetch(`${apiUrl}/payment/stripe/account/status/${orgParam}`, {
         method: HTTP_METHODS.GET,
       });
 
