@@ -23,7 +23,7 @@ where
 import BlockApps.Logging (runNoLoggingT)
 import Blockchain.EthConf (connStr)
 import Control.DeepSeq
-import Control.Monad.Change.Modify (Accessible (..), Proxy (..))
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
 import Control.Monad.Logger (MonadLoggerIO)
@@ -39,23 +39,23 @@ newtype SQLDB = SQLDB {unSQLDB :: SQL.ConnectionPool}
 instance NFData SQLDB where
   rnf (SQLDB db) = db `seq` ()
 
-type HasSQLDB m = (MonadIO m, MonadUnliftIO m, Accessible SQLDB m)
+type HasSQLDB m = (MonadIO m, MonadUnliftIO m, AccessibleEnv SQLDB m)
 
 newtype CirrusDB = CirrusDB {unCirrusDB :: SQL.ConnectionPool}
 
 instance NFData CirrusDB where
   rnf (CirrusDB db) = db `seq` ()
 
-type HasCirrusDB m = (MonadIO m, MonadUnliftIO m, Accessible CirrusDB m)
+type HasCirrusDB m = (MonadIO m, MonadUnliftIO m, AccessibleEnv CirrusDB m)
 
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
-sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< access Proxy
+sqlQuery q = runResourceT . SQL.runSqlPool q . unSQLDB =<< accessEnv
 
 cirrusQuery :: HasCirrusDB m => SQL.SqlPersistT (ResourceT m) a -> m a
-cirrusQuery q = runResourceT . SQL.runSqlPool q . unCirrusDB =<< access Proxy
+cirrusQuery q = runResourceT . SQL.runSqlPool q . unCirrusDB =<< accessEnv
 
 sqlQueryNoTransaction :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a -> m a
-sqlQueryNoTransaction q = runResourceT . flip (SQL.runSqlPoolNoTransaction q) Nothing . unSQLDB =<< access Proxy
+sqlQueryNoTransaction q = runResourceT . flip (SQL.runSqlPoolNoTransaction q) Nothing . unSQLDB =<< accessEnv
 
 runSqlPool :: MonadUnliftIO m => SQL.SqlPersistT (ResourceT m) a -> SQLDB -> m a
 runSqlPool q = runResourceT . SQL.runSqlPool q . unSQLDB

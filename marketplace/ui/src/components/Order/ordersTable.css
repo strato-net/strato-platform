@@ -8,3 +8,32 @@
     background-color: #f0f0f0;
     /* Change to the desired gray color */
 }
+
+.orders_searchbar input{
+    background-color: #F6F6F6;
+}
+
+.ant-picker{
+    background-color: #F6F6F6;
+    padding: 8px 20px;
+}
+.ant-picker-input{
+    display: flex !important;
+    justify-content: space-between;
+    gap: 60px;
+}
+.ant-picker-input input{
+    color: #989898;
+    padding: 2px 10px;
+}
+
+.sort_conatiner article{
+    cursor: pointer;
+    color: #6A6A6A;
+    padding: 12px;
+}
+.sort_conatiner article:hover{
+    background-color: #EEEFFA;
+    color: #13188A;
+    font-weight: 600;
+}

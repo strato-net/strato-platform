@@ -110,7 +110,7 @@ import Data.Time.Clock (getCurrentTime)
 import Data.Traversable (for)
 import Debugger (DebugSettings)
 import Executable.EthereumDiscovery
-import Executable.EthereumVM
+import Executable.EthereumVM2
 import Executable.StratoP2P
 import Executable.StratoP2PClient
 import Executable.StratoP2PServer
@@ -865,13 +865,6 @@ fromActivityState :: ActivityState -> Int
 fromActivityState Active = 1
 fromActivityState Inactive = 0
 
-instance (MonadIO m, State.MonadState TestContext m) => A.Selectable (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
-  select = A.lookup
-
-instance (MonadIO m, State.MonadState TestContext m) => A.Alters (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
-  lookup _ (IPAsText t, _) = fmap (fmap $ toActivityState . pPeerActiveState) . lift . use $ stringPPeerMap . at (T.unpack t)
-  insert _ (IPAsText t, _) a = lift $ stringPPeerMap . at (T.unpack t) . _Just %= \p -> p {pPeerActiveState = fromActivityState a}
-  delete _ _ = error "Test peer should not be deleting activity states"
 
 instance (MonadIO m, MonadLogger m, MonadReader P2PPeer m) => RunsClient (MonadP2PTest m) where
   runClientConnection ipAsText@(IPAsText ip) tcpPort@(TCPPort p) sSource f = do
@@ -944,6 +937,78 @@ instance MonadReader P2PPeer m => A.Selectable (Maybe IPAsText, UDPPort) SockAdd
     myIP <- lift $ asks _p2pMyIPAddress
     pure $ ipAndPortToSockAddr myIP udpPort
 
+
+------------------------- BEGIN HasPeerDB
+
+instance Mod.Accessible AvailablePeers m where
+  access = error "'instance Mod.Accessible AvailablePeers m' not implemented"
+
+instance MonadIO m => Mod.Accessible AvailablePeers (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    IPAsText ip <- asks _p2pMyIPAddress
+    AvailablePeers . filter ((< currentTime) . pPeerEnableTime) . filter ((/= ip) . pPeerIp) . M.elems <$> use stringPPeerMap
+
+instance (MonadIO m, State.MonadState TestContext m) => A.Selectable (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
+  select = A.lookup
+
+instance (MonadIO m, State.MonadState TestContext m) => A.Alters (IPAsText, TCPPort) ActivityState (MonadP2PTest m) where
+  lookup _ (IPAsText t, _) = fmap (fmap $ toActivityState . pPeerActiveState) . lift . use $ stringPPeerMap . at (T.unpack t)
+  insert _ (IPAsText t, _) a = lift $ stringPPeerMap . at (T.unpack t) . _Just %= \p -> p {pPeerActiveState = fromActivityState a}
+  delete _ _ = error "Test peer should not be deleting activity states"
+
+instance A.Replaceable (IPAsText, TCPPort) ActivityState m where
+  replace = error "'A.Replaceable (IPAsText, TCPPort) ActivityState m' not implemented"
+
+instance Mod.Accessible ActivePeers m where
+  access = error "'Mod.Accessible ActivePeers m' not implemented"
+
+instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText t, _) (PeerBondingState s) = do
+    let ip = T.unpack t
+    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
+
+instance (Monad m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadTest m) where
+  replace _ (IPAsText t, _) (PeerBondingState s) = do
+    let ip = T.unpack t
+    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
+
+instance (Monad m, A.Replaceable (IPAsText, TCPPort) PeerBondingState m) => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance Mod.Accessible BondedPeers m where
+  access = error "'Mod.Accessible BondedPeers m' not implemented"
+  
+instance MonadIO m => Mod.Accessible BondedPeers (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    IPAsText ip <- asks _p2pMyIPAddress
+    let f p = pPeerBondState p == 2 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
+    BondedPeers . filter f . M.elems <$> use stringPPeerMap
+
+instance MonadIO m => Mod.Accessible BondedPeersForUDP (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    IPAsText ip <- asks _p2pMyIPAddress
+    let f p = pPeerBondState p == 2 && pPeerUdpEnableTime p < currentTime && pPeerIp p /= ip
+    BondedPeersForUDP . filter f . M.elems <$> use stringPPeerMap
+
+instance (Monad m, Mod.Accessible BondedPeersForUDP m) => Mod.Accessible BondedPeersForUDP (MonadP2PTest m) where
+  access = lift . Mod.access
+
+instance MonadIO m => Mod.Accessible UnbondedPeers (MonadTest m) where
+  access _ = do
+    currentTime <- liftIO getCurrentTime
+    IPAsText ip <- asks _p2pMyIPAddress
+    let f p = pPeerBondState p == 0 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
+    UnbondedPeers . filter f . M.elems <$> use stringPPeerMap
+
+instance (Monad m, Mod.Accessible UnbondedPeers m) => Mod.Accessible UnbondedPeers (MonadP2PTest m) where
+  access = lift . Mod.access
+
 instance MonadIO m => A.Selectable IPAsText ClosestPeers (MonadTest m) where
   select _ (IPAsText t) = Just . ClosestPeers . filter f . M.elems <$> use stringPPeerMap
     where
@@ -951,6 +1016,66 @@ instance MonadIO m => A.Selectable IPAsText ClosestPeers (MonadTest m) where
 
 instance A.Selectable IPAsText ClosestPeers m => A.Selectable IPAsText ClosestPeers (MonadP2PTest m) where
   select p = lift . A.select p
+
+instance MonadIO m => A.Replaceable PPeer UdpEnableTime (MonadTest m) where
+  replace _ peer' (UdpEnableTime enableTime) = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = enableTime})
+
+instance (Monad m, A.Replaceable PPeer UdpEnableTime m) => A.Replaceable PPeer UdpEnableTime (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer TcpEnableTime (MonadTest m) where
+  replace _ peer' (TcpEnableTime enableTime) = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerEnableTime = enableTime})
+
+instance (Monad m, A.Replaceable PPeer TcpEnableTime m) => A.Replaceable PPeer TcpEnableTime (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
+  replace _ peer' d = case d of
+    ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
+      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor})
+    SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
+      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+
+instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (MonadTest m) where
+  replace _ peer' d = do
+    currentTime <- liftIO getCurrentTime
+    case d of
+      ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
+      SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+      ResetPeerUdpDisable ->
+        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime})
+
+instance (Monad m, A.Replaceable PPeer PeerUdpDisable m) => A.Replaceable PPeer PeerUdpDisable (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable PPeer T.Text (MonadTest m) where
+  replace _ peer' e = do
+    stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerDisableException = e})
+
+instance (Monad m, A.Replaceable PPeer T.Text m) => A.Replaceable PPeer T.Text (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+instance MonadIO m => A.Replaceable T.Text PPeer (MonadTest m) where
+  replace _ message peer' = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerLastMsg = message})
+
+instance (Monad m, A.Replaceable T.Text PPeer m) => A.Replaceable T.Text PPeer (MonadP2PTest m) where
+  replace p k = lift . A.replace p k
+
+-------- END HasPeerDB
+
+
+
+
+
+
+
+
+
 
 instance
   ( MonadIO m,
@@ -1010,37 +1135,6 @@ instance
             mResp <- timeout 5000000 . atomically $ readTQueue myS
             pure $ secPubKeyToPoint . processDataStream' . fst <$> mResp
 
-instance MonadIO m => Mod.Accessible AvailablePeers (MonadTest m) where
-  access _ = do
-    currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
-    AvailablePeers . filter ((< currentTime) . pPeerEnableTime) . filter ((/= ip) . pPeerIp) . M.elems <$> use stringPPeerMap
-
-instance (Monad m, Mod.Accessible AvailablePeers m) => Mod.Accessible AvailablePeers (MonadP2PTest m) where
-  access = lift . Mod.access
-
-instance MonadIO m => Mod.Accessible BondedPeersForUDP (MonadTest m) where
-  access _ = do
-    currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
-    let f p = pPeerBondState p == 2 && pPeerUdpEnableTime p < currentTime && pPeerIp p /= ip
-    BondedPeersForUDP . filter f . M.elems <$> use stringPPeerMap
-
-instance (Monad m, Mod.Accessible BondedPeersForUDP m) => Mod.Accessible BondedPeersForUDP (MonadP2PTest m) where
-  access = lift . Mod.access
-
-instance MonadIO m => A.Replaceable PPeer UdpEnableTime (MonadTest m) where
-  replace _ peer' (UdpEnableTime enableTime) = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = enableTime})
-
-instance (Monad m, A.Replaceable PPeer UdpEnableTime m) => A.Replaceable PPeer UdpEnableTime (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer TcpEnableTime (MonadTest m) where
-  replace _ peer' (TcpEnableTime enableTime) = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerEnableTime = enableTime})
-
-instance (Monad m, A.Replaceable PPeer TcpEnableTime m) => A.Replaceable PPeer TcpEnableTime (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
 instance MonadIO m => (ChainMemberParsedSet `A.Selectable` [ChainMemberParsedSet]) (MonadTest m) where
   select _ cm = do
     db <- use parsedSetMap
@@ -1071,79 +1165,6 @@ instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (M
 
 instance (ChainMemberParsedSet `A.Selectable` X509CertInfoState) m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (MonadP2PTest m) where
   select p cm = lift $ A.select p cm
-
-instance MonadIO m => Mod.Accessible BondedPeers (MonadTest m) where
-  access _ = do
-    currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
-    let f p = pPeerBondState p == 2 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
-    BondedPeers . filter f . M.elems <$> use stringPPeerMap
-
-instance (Monad m, Mod.Accessible BondedPeers m) => Mod.Accessible BondedPeers (MonadP2PTest m) where
-  access = lift . Mod.access
-
-instance MonadIO m => Mod.Accessible UnbondedPeers (MonadTest m) where
-  access _ = do
-    currentTime <- liftIO getCurrentTime
-    IPAsText ip <- asks _p2pMyIPAddress
-    let f p = pPeerBondState p == 0 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
-    UnbondedPeers . filter f . M.elems <$> use stringPPeerMap
-
-instance (Monad m, Mod.Accessible UnbondedPeers m) => Mod.Accessible UnbondedPeers (MonadP2PTest m) where
-  access = lift . Mod.access
-
-instance MonadIO m => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText t, _) (PeerBondingState s) = do
-    let ip = T.unpack t
-    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
-
-instance MonadIO m => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadTest m) where
-  replace _ (IPAsText t, _) (PeerBondingState s) = do
-    let ip = T.unpack t
-    stringPPeerMap . at ip . _Just %= (\p -> p {pPeerBondState = s})
-
-instance (Monad m, A.Replaceable (IPAsText, UDPPort) PeerBondingState m) => A.Replaceable (IPAsText, UDPPort) PeerBondingState (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance (Monad m, A.Replaceable (IPAsText, TCPPort) PeerBondingState m) => A.Replaceable (IPAsText, TCPPort) PeerBondingState (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer PeerDisable (MonadTest m) where
-  replace _ peer' d = case d of
-    ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
-      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor})
-    SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
-      stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
-
-instance MonadIO m => A.Replaceable PPeer T.Text (MonadTest m) where
-  replace _ peer' e = do
-    stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerDisableException = e})
-
-instance (Monad m, A.Replaceable PPeer PeerDisable m) => A.Replaceable PPeer PeerDisable (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance (Monad m, A.Replaceable PPeer T.Text m) => A.Replaceable PPeer T.Text (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance MonadIO m => A.Replaceable PPeer PeerUdpDisable (MonadTest m) where
-  replace _ peer' d = do
-    currentTime <- liftIO getCurrentTime
-    case d of
-      ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
-        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
-      SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
-        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
-      ResetPeerUdpDisable ->
-        stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime})
-
-instance (Monad m, A.Replaceable PPeer PeerUdpDisable m) => A.Replaceable PPeer PeerUdpDisable (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
-
-instance MonadIO m => A.Replaceable T.Text PPeer (MonadTest m) where
-  replace _ message peer' = stringPPeerMap . at (T.unpack $ pPeerIp peer') . _Just %= (\p -> p {pPeerLastMsg = message})
-
-instance (Monad m, A.Replaceable T.Text PPeer m) => A.Replaceable T.Text PPeer (MonadP2PTest m) where
-  replace p k = lift . A.replace p k
 
 startingCheckpoint :: [ChainMemberParsedSet] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}

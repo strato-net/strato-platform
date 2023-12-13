@@ -1,8 +1,7 @@
 pragma es6;
 pragma strict;
 
-import "Mintable.sol";
-import "../Enums/RestStatus.sol";
+import <509>;
 
 /// @title A representation of Carbon assets
 abstract contract SemiFungible is Mintable {

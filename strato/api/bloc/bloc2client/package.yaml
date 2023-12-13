@@ -22,7 +22,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - bloc2api
-- evm-solidity
 - servant-client
 - solid-vm-model
 - strato-model

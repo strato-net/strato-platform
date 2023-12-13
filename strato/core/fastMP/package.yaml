@@ -3,17 +3,7 @@ version:             0.1.0.0
 
 dependencies:
 - base
-- base16-bytestring
 - bytestring
-- ethereum-rlp
-- format
-- leveldb-haskell
-- merkle-patricia-db
-- nibblestring
-- resourcet
-
-
-
 
 library:
   source-dirs:         src
@@ -23,20 +13,34 @@ library:
   - -with-rtsopts=-N
   dependencies:
     - ansi-wl-pprint
+    - base16-bytestring
     - common-log
     - conduit
+    - ethereum-rlp
+    - format
+    - leveldb-haskell
+    - merkle-patricia-db
     - monad-alter
     - monad-loops
+    - nibblestring
+    - resourcet
     - strato-model
     - text
     - transformers
-
 
 executables:
   fastMP-exe:
     main:                Main.hs
     source-dirs:         app
-    dependencies:	 fastMP
+    dependencies:
+      - base16-bytestring
+      - ethereum-rlp
+      - fastMP
+      - format
+      - leveldb-haskell
+      - merkle-patricia-db
+      - nibblestring
+      - resourcet
     ghc-options:
     - -threaded
     - -rtsopts
@@ -46,10 +50,14 @@ executables:
     main:                insertMP.hs
     source-dirs:         app
     dependencies:
-      - conduit
+      - ethereum-rlp
       - fastMP
+      - format
       - labeled-error
+      - leveldb-haskell
+      - merkle-patricia-db
       - monad-alter
+      - nibblestring
       - transformers
     ghc-options:
     - -threaded
@@ -63,6 +71,7 @@ executables:
       - conduit
       - fastMP
       - labeled-error
+      - leveldb-haskell
     ghc-options:
     - -threaded
     - -rtsopts
@@ -76,4 +85,5 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+      - base16-bytestring
       - strato-model
