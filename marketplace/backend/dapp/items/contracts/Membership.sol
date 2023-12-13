@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <86483be23fa65cf7f992d9cb35eca840e74090bc>;
+import "/dapp/mercata-base-contracts/Templates/Assets/SemiFungible.sol";
 
 /// @title A representation of Membership assets
 contract Membership is SemiFungible {
