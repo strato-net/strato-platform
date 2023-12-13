@@ -21,7 +21,6 @@ contract Membership is SemiFungible {
     }
 
     function mint(uint _quantity) internal override returns(UTXO) {
-        require(checkCondition(), "Membership is expired");
         Membership newAsset = new Membership(
             name,
             description,
