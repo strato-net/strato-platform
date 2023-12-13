@@ -52,15 +52,15 @@ main = do
                                testfilename
   runHighwayContextWithEnv testenv testFileUpload
 
-testFileUpload :: HighwayContextM ()
-testFileUpload =
-  liftIO $ 
+testFileUpload :: ReaderT HighwayContext (NoLoggingT IO) ()
+testFileUpload = do
+  bs                 <- asks _bs
+  filename           <- asks _filename
+  liftIO $
     hspec $ do
       describe "highway" $ do
         describe "server" $ do
           it "can take a file and its contents, return a url, and then grab the file by that url." $ do
-            bs                 <- asks _bs
-            filename           <- asks _filename
             let contentHash    = T.pack $ keccak256ToHex $ hash bs
                 extension      = T.pack . takeExtension . T.unpack $ filename
                 uploadfilename = contentHash <> extension
