@@ -44,16 +44,16 @@ abstract contract Mintable is UTXO {
         return UTXO(m);
     }
 
-    function _callMint(address _newOwner, uint _quantity) internal virtual override{
-        UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(_newOwner, _quantity);
-    }
-
     function mintNewUnits(uint _quantity) public returns (uint) {
         require(isMint, "Only the mint contract can mint new units");
         require(getCommonName(msg.sender) == minterCommonName, "Only the minter can mint new units");
         quantity += _quantity;
         return RestStatus.OK;
+    }
+
+    function _callMint(address _newOwner, uint _quantity) internal virtual override{
+        UTXO newAsset = mint(_quantity);
+        Asset(newAsset).transferOwnership(_newOwner, _quantity);
     }
     
     function checkCondition() internal virtual override returns (bool){
