@@ -10,9 +10,10 @@ import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Radio, Space} from "antd";
+import { Pagination, Button, Radio, Space, Typography} from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
+import { FilterIcon } from "../../images/SVGComponents";
 
 
 const BoughtOrdersTable = ({ user, selectedDate }) => {
@@ -66,6 +67,12 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
     setdata(items);
   }, [orders]);
 
+  const handleSort = (data) => {
+    setSelectedValue(data)
+    setFilter(data);
+    setDropdownVisible(false)
+  }
+
   const column = [
     {
       title: "Order Number".toUpperCase(),
@@ -102,8 +109,8 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       key: "date",
       render: (text) => <p>{text}</p>,
       title: (
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div className="mt-1.5">{"Date (mm/dd/yyyy)".toUpperCase()}</div>
+        <div style={{ display: "flex" }}>
+          <div className="mt-1.5">{"Date".toUpperCase()}</div>
           <div>
             {order === "createdDate.desc" ? (
               <UpOutlined className="icon-container icon-hover" onClick={() => setOrder("createdDate.asc")} />
@@ -150,52 +157,15 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
       key: "status",
       render: (text) => statusComponent(text),
       filterDropdown: ({confirm}) => ( dropdownVisible && (
-        <div style={{ padding: 8 }}>
-          <Radio.Group
-            onChange={(e) => {
-              setSelectedValue(e.target.value);
-            }}
-            value={selectedValue}
-            vertical={true}
-          >
-            <Space direction="vertical">
-              <Radio value={1}>Awaiting Fulfillment</Radio>
-              <Radio value={2}>Awaiting Shipment</Radio>
-              <Radio value={3}>Closed</Radio>
-              <Radio value={4}>Canceled</Radio>
-            </Space>
-          </Radio.Group>
-          <div className="mt-2" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Button
-              type="primary"
-              onClick={() => {
-                setFilter(0);
-                setSelectedValue(null);
-                setDropdownVisible(false);
-                confirm();
-              }}
-              style={{ marginRight: 8 }}
-            >
-              Reset
-            </Button>
-            <Button
-              type="primary"
-              onClick={() => {
-                if (selectedValue === null) {
-                  setFilter(0);
-                }
-                else {
-                  setFilter(selectedValue);
-                }
-                confirm();
-              }}
-            >
-              OK
-            </Button>
+          <div className="flex flex-col gap-2 sort_conatiner py-1">
+            <Typography onClick={()=>handleSort(0)}>All</Typography>
+            <Typography onClick={()=>handleSort(1)}>Awaiting Fulfillment</Typography>
+            <Typography onClick={()=>handleSort(2)}>Awaiting Shipment</Typography>
+            <Typography onClick={()=>handleSort(3)}>Closed</Typography>
+            <Typography onClick={()=>handleSort(4)}>Canceled</Typography>
           </div>
-        </div>
       )),
-      filterIcon: () => (<FilterFilled style={{ color: filter !== 0 ? '#1890ff' : undefined }}/>),
+      filterIcon: () => (<FilterIcon />),
       onFilterDropdownOpenChange: (visible) => {setDropdownVisible(visible)},
       filterSearch: true,
       filterMultiple: false,
@@ -205,17 +175,30 @@ const BoughtOrdersTable = ({ user, selectedDate }) => {
   ];
 
   const statusComponent = (status) => {
-    let textClass = "text-orange bg-[#FFF6EC]";
+    let textClass = "bg-[#FFF6EC]";
     if (status === "Awaiting Shipment") {
-      textClass = "text-blue  bg-[#EBF7FF]";
+      textClass = "bg-[#EBF7FF]";
+    } else if (status === "Awaiting Fulfillment"){
+      textClass = "bg-[#FF8C0033]"
     } else if (status === "Closed") {
-      textClass = "text-success  bg-[#EAFFEE]";
+      textClass = "bg-[#119B2D33]";
     } else if (status === "Canceled") {
-      textClass = "text-error  bg-[#FFF0F0]";
+      textClass = "bg-[#FFF0F0]";
+    }
+    let bgClass = "bg-[#119B2D]";
+    if (status === "Awaiting Shipment") {
+      bgClass = "bg-[#13188A]";
+    } else if (status === "Awaiting Fulfillment"){
+      bgClass = "bg-[#FF8C00]"
+    } else if (status === "Closed") {
+      bgClass = "bg-[#119B2D]";
+    } else if (status === "Canceled") {
+      bgClass = "bg-[#FF0000]";
     }
 
     return (
-      <div className={classNames(textClass, "text-center py-1 rounded")}>
+      <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
+        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
         <p>{status}</p>
       </div>
     );
