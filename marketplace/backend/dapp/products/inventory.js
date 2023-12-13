@@ -339,6 +339,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         inventories = await searchAllWithQueryArgs(contractName, 
             { 
                 ...restArgs, 
+                range,
             }, options, admin);
     }
 

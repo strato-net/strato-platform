@@ -318,7 +318,7 @@ const actions = {
     if (filter) {
       query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
     }
-    console.log("CALLED!!");
+
     try {
       const response = await fetch(
         `${apiUrl}/order?&limit=${limit}&offset=${offset}&order=${order}&sellersCommonName=${encodedCommonName}${query}`,

@@ -11,8 +11,8 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventories({ ...query })
 
-      const productsWithImageUrl = inventories
-      rest.response.status200(res, productsWithImageUrl)
+      const productsWithImageUrl = inventories?.inventoryResults
+      rest.response.status200(res, {productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount})
 
       return next()
     } catch (e) {
@@ -30,8 +30,8 @@ class MarketplaceController {
       }
       const inventories = await dapp.getMarketplaceInventoriesLoggedIn({ ...query })
 
-      const productsWithImageUrl = inventories
-      rest.response.status200(res, productsWithImageUrl)
+      const productsWithImageUrl = inventories?.inventoryResults
+      rest.response.status200(res, {productsWithImageUrl: productsWithImageUrl, inventoryCount: inventories?.inventoryCount})
 
       return next()
     } catch (e) {

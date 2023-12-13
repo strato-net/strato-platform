@@ -22,7 +22,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchMarketplaceSuccessful:
       return {
         ...state,
-        marketplaceList: action.payload,
+        marketplaceList: action.payload.productsWithImageUrl,
+        marketplaceListCount: action.payload.inventoryCount,
         isMarketplaceLoading: false,
       };
     case actionDescriptors.fetchMarketplaceFailed:
@@ -39,7 +40,8 @@ const reducer = (state, action) => {
       case actionDescriptors.fetchMarketplaceLoggedInSuccessful:
         return {
           ...state,
-          marketplaceList: action.payload,
+          marketplaceList: action.payload.productsWithImageUrl,
+          marketplaceListCount: action.payload.inventoryCount,
           isMarketplaceLoading: false,
         };
       case actionDescriptors.fetchMarketplaceLoggedInFailed:
