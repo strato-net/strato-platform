@@ -35,7 +35,6 @@ contract Membership is SemiFungible {
 
     function checkCondition() internal override returns (bool){
         bool conditon = block.timestamp <= expirationDate;
-        return conditon;    
+        return conditon;
     }
 }
-
