@@ -4,7 +4,6 @@ const Promise = require('bluebird');
 const rp = require('request-promise');
 const moment = require('moment');
 const si = require('systeminformation');
-const diskusage = require('diskusage-ng');
 const config = require('../config/app.config');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
@@ -230,79 +229,90 @@ async function checkSystemInfo(isGlobalPasswordSet) {
     let additional_info = [];
     let sysInfoCollected = {}
     let isHealthy = true;
-    const [memdata, metadataLoad, metadataFs, metadataFsStat, metadataNetwork] = await Promise.all([
+    const [memdata, cpudata, metadataLoad, metadataFs, metadataNetwork] = await Promise.all([
       si.mem(),
+      si.cpu(),
       si.currentLoad(),
       si.fsSize(),
-      si.fsStats(),
       si.networkStats(),
     ]);
-
-    sysInfoCollected.mem_active = memdata.active;
-    sysInfoCollected.mem_active = memdata.active;
-    sysInfoCollected.mem_free = memdata.free;
-    sysInfoCollected.mem_available = memdata.available;
-
-    if (memdata.available / memdata.total * 100 < config.healthCheck.memoryUsageBound) {
-      isHealthy = false;
-      additional_info.push("Low Memory")
+    
+    // MEMORY
+    const useLevel = (1 - (memdata.available / memdata.total)) * 100
+    sysInfoCollected.memory = {
+      "active": memdata.active,
+      "free": memdata.free,
+      "available": memdata.available,
+      "total": memdata.total,
+      "use": useLevel,
     }
-    // FIXME: the callback function is async and the response may come late and be unprocessed!
-    // Why checking the disk space with both - `diskspace` and `si` ?? Can we fully remove this faulty `diskspace` code block?
-    diskusage('/', function (err, info) {
-      if (err) {
-        winston.warn("Error when checking for disk usage", err);
-        isHealthy = false;
-        additional_info.push("Could not check disk space")
-      } else {
-        const diskUsageRatio = info.available / info.total * 100;
-        sysInfoCollected.disk_usage = diskUsageRatio;
-        if (diskUsageRatio < config.healthCheck.diskUsageBound) {
+    if (useLevel >= config.healthCheck.memoryUsedAlertLevel) {
+      isHealthy = false;
+      additional_info.push(`Low Memory (used ${useLevel}%)`)
+    }
+    
+    // CPU
+    sysInfoCollected.cpu = {
+      'manufacturer': cpudata.manufacturer,
+      'brand': cpudata.brand,
+      'cores': cpudata.cores,
+      'physicalCores': cpudata.physicalCores,
+      'currentLoad': metadataLoad.currentLoad,
+      'avgLoad': metadataLoad.avgLoad,
+    };
+    if (metadataLoad.avgLoad >= config.healthCheck.cpuAvgLoadAlertLevel) {
+      isHealthy = false;
+      additional_info.push(`Average CPU load is high (${metadataLoad.avgLoad})`)
+    }
+    if (metadataLoad.currentLoad >= config.healthCheck.cpuCurrentLoadAlertLevel) {
+      isHealthy = false;
+      additional_info.push(`Current CPU load is high (${metadataLoad.currentLoad})`)
+    }
+
+    // FILESYSTEM
+    const fsData = []
+    metadataFs.forEach(function (fs) {
+      if (fs.fs !== 'overlay') {
+        fsData.push(
+            {
+              'name': fs.fs,
+              'size': fs.size,
+              'used': fs.used,
+              'use': fs.use,
+            }
+        )
+        if (fs.use >= config.healthCheck.diskspaceUsedAlertLevel) {
           isHealthy = false;
-          additional_info.push("Low Disk Space")
+          additional_info.push(`Low Disk Space on ${fs.fs} (used ${fs.use}%)`)
         }
       }
     })
-    sysInfoCollected.currentLoad = metadataLoad.currentload;
+    sysInfoCollected.filesystem = fsData;
 
-    const fss = []
-    metadataFs.forEach(function (fs) {
-      const fsDetails = {}
-      fsDetails.name = fs.fs;
-      fsDetails.fsSize = fs.size;
-      fsDetails.fsSize_use = fs.use;
-      fsDetails.fsSize_used = fs.used;
-      fsDetails.fsSize_size = fs.size;
-      fss.push(fsDetails)
-      if ((100 - fsDetails.fsSize_use) <= config.healthCheck.diskUsageBound) {
-        isHealthy = false;
-        additional_info.push(`Low Disk Space on ${fsDetails.name}`)
-      }
+    // NETWORK
+    const nwData = []
+    metadataNetwork.forEach(function (nwStat) {
+      nwData.push(
+          {
+            'interface': nwStat.iface,
+            'networkStats_rx_bytes': nwStat.rx_bytes,
+            'networkStats_tx_bytes': nwStat.tx_bytes,
+          }
+      )
     })
-    sysInfoCollected.fsSize = fss;
-    sysInfoCollected.fsStats_rx = metadataFsStat.rx;
-    sysInfoCollected.fsStats_wx = metadataFsStat.wx;
-
-    const nwStats = []
-    metadataNetwork.forEach(function (ntStat) {
-      const nsStatDetails = {}
-      nsStatDetails.iface = ntStat.iface;
-      nsStatDetails.networkStats_rx_bytes = ntStat.rx_bytes;
-      nsStatDetails.networkStats_tx_bytes = ntStat.tx_bytes;
-      nwStats.push(nsStatDetails)
-    })
-    sysInfoCollected.networkStats = nwStats;
+    sysInfoCollected.networkStats = nwData;
 
     if (!isGlobalPasswordSet) {
       isHealthy = false;
-      additional_info.push("STRATO password is not set")
+      additional_info.push("STRATO Vault password is not set")
     }
 
     if (additional_info) {
       sysInfoCollected.Alerts = additional_info
     }
 
-    winston.info("sysInfoCollected at checkSystemInfo: ", sysInfoCollected)
+    winston.info(`Sys info collected at ${moment().format()}`)
+    winston.debug('sysInfoCollected: ', sysInfoCollected)
     return [isHealthy, sysInfoCollected];
   } catch (e) {
     winston.warn(`Error ${e.message ? e.message : ''} occurred while checking System Information`)
