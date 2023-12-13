@@ -56,7 +56,7 @@ abstract contract Mintable is UTXO {
         return RestStatus.OK;
     }
     
-    function checkCondition() internal override returns (bool){
+    function checkCondition() internal virtual override returns (bool){
         return true;   
     }
 }
