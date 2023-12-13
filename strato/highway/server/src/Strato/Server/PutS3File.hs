@@ -24,7 +24,6 @@ import           System.FilePath (takeExtension)
 import           Strato.Monad
 import           Blockchain.Strato.Model.Keccak256
 
-
 putS3File :: MultipartData Mem 
           -> HighwayM Text
 putS3File multipartdata =
@@ -32,10 +31,9 @@ putS3File multipartdata =
   case files multipartdata of
     [file] -> do --Derive hash (Keccak256?) based on the file contents.
                 $logInfoS "highway/putS3File" $ T.pack $ "Deriving hash based on the file contents."
-                let content     = toStrict     $
-                                  fdPayload    $
+                let content     = toStrict  $
+                                  fdPayload $
                                   file
-
                 let contentHash = T.pack . keccak256ToHex $ hash content
                     extension = T.pack . takeExtension . T.unpack $ fdFileName file
                     uploadFileName = contentHash <> extension
@@ -45,7 +43,7 @@ putS3File multipartdata =
                 awsakid <- asks awsaccesskeyid
                 awssak  <- asks awssecretaccesskey
                 awss3b  <- asks awss3bucket
-                hwUrl  <- asks highwayUrl
+                hwUrl   <- asks highwayUrl
                 cr      <- liftIO $ Aws.makeCredentials awsakid
                                                         awssak
                 let cfg = Aws.Configuration { Aws.timeInfo    = Aws.Timestamp

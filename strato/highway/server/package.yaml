@@ -101,5 +101,8 @@ tests:
       - cryptonite
       - hspec
       - labeled-error
+      - monad-logger
+      - mtl
       - secp256k1-haskell
       - strato-model
+      - text
