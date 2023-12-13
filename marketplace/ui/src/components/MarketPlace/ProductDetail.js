@@ -13,7 +13,6 @@ import {
   Spin,
   notification,
   InputNumber,
-  Carousel,
 } from "antd";
 import { MinusOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -52,7 +51,7 @@ import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css"; // requires a loader
-import { Carousel } from 'react-responsive-carousel';
+import {Carousel} from "react-responsive-carousel"
 import { Images } from "../../images";
 
 
@@ -559,11 +558,11 @@ const ProductDetails = ({ user, users }) => {
       ) : (
         <div>
           <Row>
-            <Breadcrumb className="text-xs mt-8 lg:mt-[42px] mb-8 lg:mb-[44px] ml-16">
+            <Breadcrumb className="text-xs  mt-4 mb-4 md:mt-6 lg:mt-[42px] md:mb-6 lg:mb-[44px] ml-4 lg:ml-16">
               <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                 <ClickableCell href={routes.Marketplace.url}>
                   <p
-                    className="text-primaryB hover:bg-transparent"
+                    className="text-[#13188A]  text-sm font-semibold "
                   >
                     Home
                   </p>
@@ -574,52 +573,47 @@ const ProductDetails = ({ user, users }) => {
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                     <ClickableCell href={routes.Inventories.url}>
                       <p
-                        className="text-primaryB hover:bg-transparent"
+                        className="text-[#13188A]  text-sm font-semibold "
                       >
                         Inventory
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
               }
-              <Breadcrumb.Item className="text-primary">
+              <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
                 {decodeURIComponent(details.name)}
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="  flex w-screen flex-col  px-5 md:px-10 items-center   ">
-
-          <div className="  flex justify-between gap-6 flex-col md:flex-row   ">
-           
-            <Carousel  className="product_detail  h-[420px] w-[348px] " showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-              <div className="h-[212px] lg:h-[417px]   rounded-md flex items-center justify-center overflow-hidden">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
-             </div>
-                  <div className="h-[212px] lg:h-[417px]   rounded-md flex items-center justify-center overflow-hidden">
-                <Image height={"100%"} width={"100%"} style={{ objectFit: "contain" }} src={details.images && details.images.length > 0 ? details.images[0] : image_placeholder} />
-              </div>
+          <div className="  flex w-full flex-col  px-4 sm:px-8 md:px-0  items-center md:items-start  md:w-[735px] lg:w-[835px]  md:mx-auto ">
+          <div className="  flex   md:justify-center gap-[15px] lg:gap-6 flex-col md:flex-row   ">
+            <Carousel  className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[317px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
+             {details.images && details.images.map((element,  index)=>{
+                  return ( <div key={index} className="h-[212px] md:h-[348px]  lg:h-[348px]  md:w-[317px] lg:w-[417px] w-full rounded-md flex items-center justify-center overflow-hidden">
+                  <Image  width={"100%"} style={{ objectFit: "contain" }} className="   h-full " src={element} />
+               </div>)
+             }) }
               </Carousel>
+
             <div className=" w-full lg:w-1/2  " id="">
-              <div className=" border-b border-[#E9E9E9] pb-[6px]">
-                <Text className="font-semibold text-3xl text-[#202020]">
+              <div className=" lg:border-b lg:border-[#E9E9E9] pb-[6px]">
+                <Text className="font-semibold text-base lg:text-3xl text-[#202020]">
                   
                   {decodeURIComponent(details.name)}
                 </Text>
-                {/* <Text className="font-medium text-sm text-secondryB ">
-                  ({getCategory(details)})
-                </Text> */}
-                <div className="flex ">
+                <div className="flex pt-[6px] ">
                 <Text  className="text-[#202020] text-xs  font-medium">Owned By:</Text>
                  <Text className="text-[#202020] text-xs  font-medium" >{details?.ownerOrganization}</Text>
                 </div>
               </div>
-            <div className="pt-[22px]">
+            <div className=" pt-4 lg:pt-[22px]">
              
-              <Text level={4} className=" text-[#13188A] text-2xl font-semibold">
+              <Text level={4} className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                 {details.price ? <>$ {details.price}</> : "No Price Available"}
               </Text>
               </div> 
-              <div className="pt-[18px]">
-                <Typography  className="text-xl font-medium text-[#202020]">Description</Typography>
+              <div className=" pt-6 lg:pt-[18px]">
+                <Typography  className="text-xl hidden lg:block font-medium text-[#202020]">Description</Typography>
               </div>
               <div className="pt-[7px]">
               <Paragraph
@@ -637,15 +631,13 @@ const ProductDetails = ({ user, users }) => {
               </div>
 
               {availableQuantity !== 0 ?
-         
-               
-                  <div className="flex justify-between  w-full gap-[15px]" id="quantity">
+                  <div className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px]" id="quantity">
                     <div
                       onClick={subtract}
-                      className="h-[46px] w-[46px] rounded-lg flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
+                      className="h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: qty > 1 ? '#1777FF' : '#E3E3E3' }}>
                       <MinusOutlined className="product_details  font-semibold " style={{ color: qty > 1 ? '#1777FF' : '#E3E3E3' }}/>
                     </div>
-                    <InputNumber className="w-full h-[46px] border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={availableQuantity} value={qty} defaultValue={qty} controls={false}
+                    <InputNumber className=" w-full lg:w-[295px] h-9  md:h-10  lg:h-[46px]  border text-primaryC border-tertiary text-center flex flex-col justify-center" min={1} max={availableQuantity} value={qty} defaultValue={qty} controls={false}
                       onChange={e => {
                         if (e < availableQuantity) {
                           setQty(e)
@@ -660,7 +652,7 @@ const ProductDetails = ({ user, users }) => {
                       }} />
                     <div
                       onClick={add}
-                      className="ml-0.5 h-[46px] rounded-lg w-[46px] flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
+                      className="ml-0.5 h-9 w-9 md:h-10 md:w-10 lg:h-[46px] lg:w-[46px] rounded-lg  flex justify-center items-center border border-tertiary text-center cursor-pointer" style={{ borderColor: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}>
                       <PlusOutlined className="product_details font-semibold " style={{ color: availableQuantity > qty ? '#1777FF' : '#E3E3E3' }}/>
                     </div>
                   </div>
@@ -673,10 +665,10 @@ const ProductDetails = ({ user, users }) => {
             
 
 {availableQuantity !== 0 ?
-                <Row className="flex flex-row gap-4 pt-4">
+                <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                   <Button
                     type="primary"
-                    className="w-[365px] h-9  bg-primary !hover:bg-primaryHover"
+                    className="w-[90%] md:w-[365px] h-9  bg-primary !hover:bg-primaryHover"
                     onClick={() => {
                       if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                         setCookie("returnUrl", `/marketplace/productList/${details.address}`, 10);
@@ -710,10 +702,10 @@ const ProductDetails = ({ user, users }) => {
                   </Button>
 
                   {ownerSameAsUser() ? <Button
-                    icon={<div className="flex justify-center items-center">
-                    <img src={Images.Cart} alt="cart"  width={14} height={14}></img>
+                    icon={<div className="">
+                    <img src={Images.Cart} alt="cart"   className="object-contain w-[18px] h-[18px]"></img>
                     </div>}
-                    className="group w-[36px] h-9 border border-primary"
+                    className=" w-9 h-9 border border-primary rounded-md"
                     disabled={true}
                     id="addToCart"
                     onClick={() => {
@@ -776,12 +768,12 @@ const ProductDetails = ({ user, users }) => {
                   >
                     
                   </Button>}
-                </Row>
+                </div>
                 :
                 <div className="flex ">
                   <Button
                     type="primary"
-                    className="w-[365px] h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
+                    className="w-[80%] md:w-[365px] h-9 m-3 mt-10 bg-primary !hover:bg-primaryHover"
                     href={`mailto:sales@blockapps.net`}
                     onClick={() => {
                     
@@ -807,15 +799,10 @@ const ProductDetails = ({ user, users }) => {
                 </div>
            
           }
-
-
-
-            
             </div>
           </div>
 
-          <div className="pt-10 w-[60%] ">
-
+          <div className=" pt-9 lg:pt-10 w-full sm:w-[75%]  md:w-full">
           <Tabs
           className="product_detail"
                 defaultActiveKey="1"
@@ -854,7 +841,6 @@ const ProductDetails = ({ user, users }) => {
                   ]}
               />
           </div>
-          
           </div>
        
           {isEventSelected ?
