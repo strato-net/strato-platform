@@ -33,7 +33,6 @@ library:
   - strato-model
   - swagger2
   - text
-  - unordered-containers
   - utf8-string
   - vector
 

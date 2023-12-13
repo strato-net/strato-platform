@@ -19,6 +19,7 @@ import           Blockchain.Strato.Model.Options()
 import           Blockchain.Participation (p2pApp, setParticipationMode)
 import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
+import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
