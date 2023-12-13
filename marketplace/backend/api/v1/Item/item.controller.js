@@ -45,6 +45,7 @@ class ItemController {
   static async getOwnershipHistory(req, res, next) {
     try {
       const { dapp, params } = req
+      console.log('#### I am coming here for some reason?');
       ItemController.validateGetItemOwnershipHistoryArgs(params)
       const { address } = params
 

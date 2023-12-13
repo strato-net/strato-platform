@@ -1,5 +1,5 @@
-url: https://workspace-rejolut-39dh49q.mercata-testnet2.blockapps.net
+url: http://localhost
 dapp:
   contract:
-    name: Dapp
-    address: 2f3506bb1b3bf187e06c824698c5729bdc41ac03
+    name: Mercata
+    address: 86483be23fa65cf7f992d9cb35eca840e74090bc

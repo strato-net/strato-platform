@@ -1,8 +1,5 @@
-import { Button, Row, notification, Input, Col, Card, Typography,Divider } from "antd";
+import { Button, Row,   Col,  Typography,Divider, InputNumber } from "antd";
 import { MinusOutlined, PlusOutlined } from "@ant-design/icons";
-import { useOrderState, useOrderDispatch } from "../../contexts/order";
-import DataTableComponent from "../DataTableComponent";
-import "./index.css";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { actions } from "../../contexts/marketplace/actions";
@@ -13,17 +10,15 @@ import {
 } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
 import TagManager from "react-gtm-module";
-import { element } from "prop-types";
-const New_ResponsiveCart = ({ data }) => {
-  const [api, contextHolder] = notification.useNotification();
+
+const New_ResponsiveCart = ({ data , confirm ,  AddQty ,  MinusQty ,  ValueQty ,  removeCartList}) => {
+
   const navigate = useNavigate();
   const [tax, setTax] = useState(0);
   const [shipping, setShipping] = useState(0);
   const { cartList } = useMarketplaceState();
   const [total, setTotal] = useState(0);
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { isCreateOrderSubmitting, message, success } = useOrderState();
-  const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const [faqOpenState, setFaqOpenState] = useState(Array(data.length).fill(false));
   const toggleFaq = (index) => {
@@ -56,45 +51,14 @@ const New_ResponsiveCart = ({ data }) => {
       product = element.product;
     }
   });
-
-  const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
-  };
-
-  const openToastOrder = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(orderDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(orderDispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
+  
+ 
 
   return (
-    <div className=" border border-[#E9E9E9]  rounded-md mt-3 flex flex-col gap-[18px] p-3  items-center   ">
+    <div className="h-max border border-[#E9E9E9]  rounded-md mt-3 flex flex-col gap-[18px] p-3  items-center   ">
       {data.map((element,index) => {
-       
+           let qty = element.qty;
+           let product  =  element
         return (
           <div
             className="p-3 border border-[#E9E9E9] rounded-md w-full sm:w-[95%] md:w-[90%]"
@@ -105,7 +69,7 @@ const New_ResponsiveCart = ({ data }) => {
                 <img
                   src={element?.item?.image}
                   alt={element?.item?.name}
-                  className="w-12 h-12 rounded-[4px] "
+                  className="w-12 h-12 rounded-[4px] object-contain "
                 />
                 <Typography className="text-[#13188A] text-base font-medium ">
                   {element?.item?.name}
@@ -113,29 +77,9 @@ const New_ResponsiveCart = ({ data }) => {
               </div>
               <Button
             type="link"
-            icon={<img src={Images.CancelIcon} alt="remove"  className="w-[18px] h-[18px]" />}
+            icon={<img src={Images.CancelIcon} alt="remove"   className="w-[18px] h-[18px] " />}
               onClick={() => {
-                let items = [...cartList];
-                items.splice(
-                  items.findIndex(function (i) {
-                    window.LOQ = window.LOQ || []
-                    window.LOQ.push(['ready', async LO => {
-             
-                        await LO.$internal.ready('events')
-                        LO.events.track('Delete Cart Item', { product: i.product.name, category: i.product.category })
-                    }])
-                    TagManager.dataLayer({
-                      dataLayer: {
-                        event: 'delete_item_from_cart',
-                        product_name: i.product.name,
-                        category: i.product.category
-                      },
-                    });
-                    return i.product.address === element.key;
-                  }),
-                  1
-                );
-                actions.deleteCartItem(marketplaceDispatch, items);
+                removeCartList(element.action);
               }}
               className="hover:text-error cursor-pointer text-xl"
             />
@@ -146,73 +90,22 @@ const New_ResponsiveCart = ({ data }) => {
               <div>
               <div className="flex items-center justify-center mt-2">
               <div
-                onClick={() => {
-                  if (qty === 1) {
-                    return;
-                  }
-                  let items = [...cartList];
-                  cartList.forEach((element, index) => {
-                    if (element.product.address === product.address) {
-                      const itemData = JSON.parse(product.data);
-                      const availableQuantity = itemData.units ? itemData.units : 1;
-                      if (items[index].qty - 1 <= availableQuantity) {
-                        items[index].qty -= 1;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      } else {
-                        openToast(
-                          "bottom",
-                          true,
-                          "Cannot add more than available quantity"
-                        );
-                        return;
-                      }
-                    }
-                  });
-                }}
-                className="  w-6 h-6   mr-4 bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
+               onClick={() => {
+               MinusQty(qty ,  product);
+              }}
+                className="  w-6 h-6   mr-1 bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
                 <MinusOutlined className="text-[17px] text-[#202020] font-medium " />
               </div>
-              <Input  className="w-[43px] border-none text-[#202020]  bg-none font-medium text-sm text-center flex flex-col justify-center"
+              <InputNumber  className=" w-[43px] border-none text-[#202020]  bg-[transparent]  rounded-none outline-none font-medium text-sm text-center flex flex-col justify-center"
                   min={1} value={qty} defaultValue={qty} controls={false}
                   onChange={e => {
-                    let items = [...cartList];
-                    cartList.forEach((element, index) => {
-                      if (element.product.address === product.address) {
-                        const itemData = JSON.parse(product.data);
-                        const availableQuantity = itemData.units ? itemData.units : 1;
-                        if (e <= availableQuantity) {
-                          items[index].qty = e;
-                          actions.addItemToCart(marketplaceDispatch, items);
-                        } else {
-                          openToast("bottom", true, "Cannot add more than available quantity");
-                          items[index].qty = availableQuantity;
-                          actions.addItemToCart(marketplaceDispatch, items);
-                        }
-                      }
-                    });
+                    ValueQty(product , e);
                   }} />
               <div
-                onClick={() => {
-                  let items = [...cartList];
-                  cartList.forEach((element, index) => {
-                    if (element.product.address === product.address) {
-                      const itemData = JSON.parse(product.data);
-                      const availableQuantity = itemData.units ? itemData.units : 1;
-                      if (items[index].qty + 1 <= availableQuantity) {
-                        items[index].qty += 1;
-                        actions.addItemToCart(marketplaceDispatch, items);
-                      } else {
-                        openToast(
-                          "bottom",
-                          true,
-                          "Cannot add more than available quantity"
-                        );
-                        return;
-                      }
-                    }
-                  });
-                }}
-                className="  w-6 h-6   ml-4 bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
+               onClick={() => {
+                AddQty(product);
+              }}
+                className="  w-6 h-6   ml-1 bg-[#E9E9E9] flex justify-center items-center cursor-pointer rounded-full">
                 <PlusOutlined className="text-[17px] text-[#202020] font-medium" />
               </div>
             </div>
@@ -256,7 +149,7 @@ const New_ResponsiveCart = ({ data }) => {
         );
       })}
 
-      <div className=" flex flex-col w-full sm:w-[95%] md:w-[90%]">
+       <div className=" flex flex-col w-full sm:w-[95%] md:w-[90%]">
       <Row className="   mt-2  bg-[#F6F6F6]">
                         <Col className="w-full  bg-[#F6F6F6]">
                             <Row className="justify-between ">
@@ -284,7 +177,7 @@ const New_ResponsiveCart = ({ data }) => {
                             </Row>
                         </Col>
                     </Row>
-                    <Row className="justify-center lg:mt-12 mt-2 ">
+                { !confirm &&   <Row className="justify-center lg:mt-12 mt-2 ">
                         <Button
                             type="primary"
                             id="submit-order-button"
@@ -310,8 +203,8 @@ const New_ResponsiveCart = ({ data }) => {
                         >
                             Submit Order
                         </Button>
-                    </Row>
-      </div>
+                    </Row> }
+      </div> 
     </div>
   );
 };

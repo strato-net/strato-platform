@@ -13,6 +13,7 @@ import {
   Spin,
   notification,
   InputNumber,
+  Carousel,
 } from "antd";
 import { MinusOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import { useMatch } from "react-router-dom";
@@ -112,15 +113,18 @@ const ProductDetails = ({ user, users }) => {
   const [categoryName, setCategoryName] = useState("");
   const [api, contextHolder] = notification.useNotification();
   const { categorys, iscategorysLoading } = useCategoryState();
-  const { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+  const {
+    inventoryDetails, 
+    inventoryOwnershipHistory, 
+    isInventoryDetailsLoading,
+    isInventoryOwnershipHistoryLoading,
+  } = useInventoryState();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { cartList } = useMarketplaceState();
   const navigate = useNavigate();
   const {
     serialNumbers,
     isSerialNumbersLoading,
-    ownershipHistory,
-    isOwnershipHistoryLoading,
     isRawMaterialsLoading
   } = useItemState();
 
@@ -152,7 +156,20 @@ const ProductDetails = ({ user, users }) => {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
       // }
     }
-  }, [Id, dispatch, itemDispatch, user]);
+  }, [Id, dispatch, user]);
+
+  useEffect(() => {
+    if (inventoryDetails) {
+      actions.fetchInventoryOwnershipHistory(
+        dispatch,
+        { contract_name: inventoryDetails.contract_name,
+          originAddress: inventoryDetails.originAddress,
+          minItemNumber: inventoryDetails.itemNumber,
+          maxItemNumber: inventoryDetails.itemNumber + inventoryDetails.quantity - 1
+        }
+      );
+    }
+  }, [inventoryDetails, dispatch]);
 
   useEffect(() => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
@@ -168,8 +185,8 @@ const ProductDetails = ({ user, users }) => {
       setCategoryName(prodCategory?.name);
       const detailsData = JSON.parse(details.data);
       setItemData(detailsData);
-      if (detailsData.units) {
-        setAvailableQuantity(detailsData.units);
+      if (details.saleQuantity) {
+        setAvailableQuantity(details.saleQuantity || 1);
       }
     }
   }, [categorys, details]);
@@ -301,28 +318,29 @@ const ProductDetails = ({ user, users }) => {
     },
   ];
 
-  const ownershipColumn = [
+  const ownershipColumns = [
     {
-      title: <Text className="text-primaryC text-[13px]">SERIAL NUMBER</Text>,
-      dataIndex: "serialNumber",
+      title: <Text className="text-primaryC text-[13px]">ITEM NUMBER</Text>,
+      dataIndex: "itemNumber",
       // Fixes UI issue of children having the same key
-      key: serialNumbers[0] === "" ? "itemNumber" : "serialNumber",
+      key: "itemNumber", // ?
       align: "center",
       onCell: (record) => {
         return {
           onClick: (ev) => {
-            setIsSerialNumberSelected(true);
-            setSerialNumber(record.serialNumber);
-            itemsActions.fetchItemOwnershipHistory(
-              itemDispatch,
-              record.address
+            actions.fetchInventoryOwnershipHistory(
+              dispatch,
+              { originAddress: record.originAddress,
+                minItemNumber: record.itemNumber,
+                maxItemNumber: record.itemNumber + record.quantity - 1
+              }
             );
           },
         };
       },
-      render: (serialNumber) => (
+      render: (itemNumber) => (
         <Button type="link" className="text-primary text-[17px]">
-          {serialNumber}
+          {itemNumber}
         </Button>
       ),
     },
@@ -399,15 +417,15 @@ const ProductDetails = ({ user, users }) => {
   const ownershipDetailColumn = [
     {
       title: <Text className="text-primaryC text-[13px]">SELLER</Text>,
-      dataIndex: "seller",
-      key: "seller",
+      dataIndex: "sellerCommonName",
+      key: "sellerCommonName",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">OWNER</Text>,
-      dataIndex: "newOwner",
-      key: "newOwner",
+      dataIndex: "purchaserCommonName",
+      key: "purchaserCommonName",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
@@ -417,10 +435,10 @@ const ProductDetails = ({ user, users }) => {
           OWNERSHIP START DATE
         </Text>
       ),
-      dataIndex: "ownershipStartDate",
-      key: "ownershipStartDate",
+      dataIndex: "block_timestamp",
+      key: "block_timestamp",
       align: "center",
-      render: (epoch) => <p>{epochToDate(epoch)}</p>,
+      render: (epoch) => <p>{epoch.split(' ')[0]}</p>,
     },
   ];
 
@@ -443,7 +461,7 @@ const ProductDetails = ({ user, users }) => {
           <Space direction="vertical">
             <Space>
               <DescTitle text="Artist" />
-              <DescTitle text="                      :" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.artist}</Text>
             </Space>
           </Space>)
@@ -456,8 +474,8 @@ const ProductDetails = ({ user, users }) => {
               <Text className="text-[13px]">{itemData?.projectType}</Text>
             </Space> */}
             <Space>
-              <DescTitle text="Units" />
-              <DescTitle text="                      :" />
+              <DescTitle text="Quantity" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{availableQuantity}</Text>
             </Space>
           </Space>)
@@ -475,8 +493,26 @@ const ProductDetails = ({ user, users }) => {
           <Space direction="vertical">
             <Space>
               <DescTitle text="Source" />
-              <DescTitle text="                      :" />
+              <DescTitle text=":" />
               <Text className="text-[13px]">{itemData?.source}</Text>
+            </Space>
+          </Space>)
+      case "Membership":
+        return (
+          <Space direction="vertical">
+           <Space>
+              <DescTitle text="Units" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{availableQuantity}</Text>
+            </Space>
+          </Space>)
+      case "CarbonDAO":
+        return (
+          <Space direction="vertical">
+            <Space>
+              <DescTitle text="Units" />
+              <DescTitle text="                      :" />
+              <Text className="text-[13px]">{availableQuantity}</Text>
             </Space>
           </Space>)
       default:
@@ -800,18 +836,19 @@ const ProductDetails = ({ user, users }) => {
                     label: `Ownership History`,
                     key: "3",
                     children: (
-                      <DataTableComponent
-                        columns={ownershipColumn}
-                        data={serialNumbers}
-                        scrollX="100%"
-                        isLoading={isSerialNumbersLoading}
-                        pagination={{
-                          defaultPageSize: 5,
-                          showSizeChanger: false,
-                          position: ["bottomCenter"],
-                        }}
-                        rowKey={(record) => record.serialNumber}
-                      />
+                      <div>
+                        <DataTableComponent
+                          columns={ownershipDetailColumn}
+                          scrollX="100%"
+                          data={inventoryOwnershipHistory}
+                          isLoading={isInventoryOwnershipHistoryLoading}
+                          pagination={{
+                            defaultPageSize: 10,
+                            position: ["bottomCenter"],
+                            showSizeChanger: false,
+                          }}
+                        />
+                      </div>
                     ),
                   },
                   ]}
@@ -861,8 +898,8 @@ const ProductDetails = ({ user, users }) => {
               <DataTableComponent
                 columns={ownershipDetailColumn}
                 scrollX="100%"
-                data={ownershipHistory}
-                isLoading={isOwnershipHistoryLoading}
+                data={inventoryOwnershipHistory}
+                isLoading={isInventoryOwnershipHistoryLoading}
                 pagination={{
                   defaultPageSize: 10,
                   position: ["bottomCenter"],

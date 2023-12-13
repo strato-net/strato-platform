@@ -9,8 +9,12 @@
 * {
   padding: 0;
   margin: 0;
-  background-color: "#F9F9F9";
+  background-color: "#ffffff";
   font-family: "Montserrat", sans-serif;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 .ant-table
@@ -117,23 +121,25 @@
 
 .ant-table-header {
   border-radius: 6px 6px 0px 0px;
-
   height: 56px;
 }
 .ant-table-cell::before{
 display:  none;
 }
 
-:ant-table-row:hover{
-  background: red !important;
-}
 
 
 /* Hover effect */
-.ant-table-tbody tr:hover {
-  background-color: #EEEFFA; /* Set your desired hover background color */
+.ant-table-cell-row-hover{
+ 
+  background-color: #EEEFFA !important;
 }
 
+
+.ant-table-cell-row {
+  border-radius:  0px;
+  background-color: white;
+}
 
 .ant-table-tbody tr > td {
   background-color: white;
@@ -245,10 +251,6 @@ width : 20px;
 .anticon svg {
 color : black;
 }
-
-
-
-@media  screen and (min-width: 1024px ) {
   .product_detail .carousel .control-arrow.control-prev  {
     display: block;
     left: 16px ;
@@ -262,4 +264,7 @@ color : black;
     right : 25px;
     background: url("../images/resources/Forward.png");
   } 
+.hide-Scroll::-webkit-scrollbar {
+  display: none;
+  scroll-behavior: smooth;
 }
