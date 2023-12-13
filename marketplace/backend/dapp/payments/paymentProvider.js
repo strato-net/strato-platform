@@ -156,10 +156,10 @@ async function get(user, args, defaultOptions) {
     let paymentProvider;
 
     if (address) {
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'sort', value: '-chargesEnabled'}]);
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'order', value: 'chargesEnabled.desc'}]);
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     } else if (ownerCommonName) {
-        let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'sort', value: '-chargesEnabled'}];
+        let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc'}];
         if (accountDeauthorized != undefined) {
             searchValues.push({ key: 'accountDeauthorized', value: accountDeauthorized })
         }
@@ -167,7 +167,7 @@ async function get(user, args, defaultOptions) {
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     } else if (accountId) {
 
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'sort', value: '-chargesEnabled'}]);
+        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc'}]);
         paymentProvider = await searchOne(contractName, searchArgs, options, user);
     }
     if (!paymentProvider) {
