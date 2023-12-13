@@ -556,21 +556,21 @@ const CreateInventoryModal = ({
         return (
           <div className="flex justify-between mt-4 ">
             <Form.Item
-              label="Units"
-              name="units"
+              label="Quantity"
+              name="quantity"
               className="w-72"
             >
               <Input
-                label="units"
-                placeholder="Enter Units"
-                name="units"
-                value={formik.values.units}
+                 label="quantity"
+                 placeholder="Enter Quantity"
+                 name="quantity"
+                value={formik.values.quantity}
                 onChange={formik.handleChange}
               />
-              {formik.touched.units &&
-                formik.errors.units && (
+              {formik.touched.quantity &&
+                formik.errors.quantity && (
                   <span className="text-error text-xs">
-                    {formik.errors.units}
+                    {formik.errors.quantity}
                   </span>
                 )}
             </Form.Item>
